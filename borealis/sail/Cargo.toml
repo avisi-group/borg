@@ -3,12 +3,21 @@ name = "sail"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev.package.insta]
+opt-level = 3
+
+[profile.dev.package.similar]
+opt-level = 3
+
 [dependencies]
-chumsky = "0.8.0"
 ariadne = "0.1.5"
+chumsky = "0.8.0"
+strum = { version = "0.24.1", features = ["derive"] }
 
 [[example]]
 name = "cli"
 
 [dev-dependencies]
 color-eyre = { version = "0.6.2", default-features = false }
+insta = "1.21.0"
+proptest = "1.0.0"

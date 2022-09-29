@@ -16,7 +16,7 @@ fn main() -> Result<()> {
     for path in args.skip(1) {
         let source = std::fs::read_to_string(&path).wrap_err("Failed to read input source file")?;
 
-        match sail::parser().parse(source.as_str()) {
+        match sail::lexer().parse(source.as_str()) {
             Ok(ast) => println!("{:#?}", ast),
             Err(errors) => errors.iter().map(Error::into_report).for_each(|report| {
                 report.print(Source::from(&source)).unwrap();
