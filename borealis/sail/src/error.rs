@@ -8,7 +8,7 @@ use {
 
 /// Parse error
 #[derive(Debug)]
-pub struct Error(Simple<char>);
+pub struct Error(pub Simple<char>);
 
 impl Error {
     /// Create a diagnostics `ariadne::Report` from an Error

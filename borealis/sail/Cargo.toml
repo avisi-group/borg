@@ -3,15 +3,10 @@ name = "sail"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev.package.insta]
-opt-level = 3
-
-[profile.dev.package.similar]
-opt-level = 3
-
 [dependencies]
 ariadne = "0.1.5"
 chumsky = "0.8.0"
+num-bigint = "0.4.3"
 strum = { version = "0.24.1", features = ["derive"] }
 
 [[example]]

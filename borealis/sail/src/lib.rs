@@ -1,6 +1,5 @@
-//! SAIL language parser
+//! Sail2 language parser
 
-mod dead_end;
 pub mod error;
 pub mod lexer;
 pub mod parser;

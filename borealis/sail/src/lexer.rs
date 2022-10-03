@@ -1,18 +1,19 @@
 use {
     crate::{
-        dead_end::DeadEnd,
         error::Error,
         span::{Span, Spanned},
     },
     chumsky::{
+        error::Simple,
         primitive::{choice, end, filter, just, one_of, take_until},
         text::{self, TextParser},
         Parser,
     },
+    std::ops::Range,
     strum::{EnumCount, EnumIter, IntoEnumIterator},
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Keyword {
     And,
     As,
@@ -270,7 +271,7 @@ impl Operator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     Ampersand,
     At,
@@ -315,7 +316,7 @@ pub enum Token {
     InfixRight((u32, Operator)),
     Operator(Operator),
     TyVar(String),
-    Identifier(String), // including "~" and
+    Identifier(String), // including "~"
     Keyword(Keyword),
     Real(String),
     Num(String),
@@ -444,22 +445,46 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error> {
         .map(Token::Real);
 
     let bin = just("0b")
-        .recover_with(DeadEnd)
         .ignore_then(
-            filter(|c: &char| c.is_digit(2) || *c == '_')
+            filter(|c: &char| c.is_ascii_alphanumeric() || *c == '_')
                 .repeated()
                 .at_least(1),
         )
+        .validate(|chars, span: Range<usize>, emit| {
+            chars.iter().for_each(|c| {
+                if !(c.is_digit(2) || *c == '_') {
+                    emit(Error(Simple::custom(
+                        span.clone(),
+                        format!(
+                            "Encountered non-binary character \"{c}\" while parsing binary literal"
+                        ),
+                    )))
+                }
+            });
+
+            chars
+        })
         .collect::<String>()
         .map(Token::Bin);
 
     let hex = just("0x")
-        .recover_with(DeadEnd)
         .ignore_then(
-            filter(|c: &char| c.is_digit(16) || *c == '_')
+            filter(|c: &char| c.is_ascii_alphanumeric() || *c == '_')
                 .repeated()
                 .at_least(1),
         )
+        .validate(|chars, span: Range<usize>, emit| {
+            chars.iter().for_each(|c| {
+                if !(c.is_digit(16) || *c == '_') {
+                    emit(Error(Simple::custom(
+                        span.clone(),
+                        format!("Encountered non-hexadecimal character \"{c}\" while parsing hexadecimal literal"),
+                    )))
+                }
+            });
+
+            chars
+        })
         .collect::<String>()
         .map(Token::Hex);
 
@@ -501,7 +526,6 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error> {
 
 #[cfg(test)]
 mod tests {
-
     use {
         crate::lexer::{lexer, Operator},
         chumsky::Parser,
