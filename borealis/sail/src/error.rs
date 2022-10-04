@@ -1,16 +1,24 @@
 //! Error handling for SAIL parser
 
 use {
+    crate::lexer::Token,
     ariadne::{Color, Fmt, Label, Report, ReportKind},
     chumsky::error::Simple,
-    std::ops::Range,
+    std::{fmt::Debug, hash::Hash, ops::Range},
 };
+
+/// Supertrait for input types allowed in lexer and parser
+pub trait Input: Hash + Eq + Debug {}
+
+impl Input for char {}
+
+impl Input for Token {}
 
 /// Parse error
 #[derive(Debug)]
-pub struct Error(pub Simple<char>);
+pub struct Error<I: Input>(pub Simple<I>);
 
-impl Error {
+impl<I: Input> Error<I> {
     /// Create a diagnostics `ariadne::Report` from an Error
     pub fn into_report(&self) -> Report {
         let e = &self.0;
@@ -35,7 +43,7 @@ impl Error {
                 } else {
                     e.expected()
                         .map(|expected| match expected {
-                            Some(expected) => expected.to_string(),
+                            Some(expected) => format!("{expected:?}"),
                             None => "end of input".to_string(),
                         })
                         .collect::<Vec<_>>()
@@ -54,7 +62,7 @@ impl Error {
                         _ => format!(
                             "Unexpected {}",
                             e.found()
-                                .map(|c| format!("token {}", c.fg(Color::Red)))
+                                .map(|c| format!("token {}", format!("{c:?}").fg(Color::Red)))
                                 .unwrap_or_else(|| "end of input".to_string())
                         ),
                     })
@@ -66,7 +74,7 @@ impl Error {
                 Label::new(span.clone())
                     .with_message(format!(
                         "Unclosed delimiter {}",
-                        delimiter.fg(Color::Yellow)
+                        format!("{delimiter:?}").fg(Color::Yellow)
                     ))
                     .with_color(Color::Yellow),
             ),
@@ -78,15 +86,15 @@ impl Error {
     }
 }
 
-impl chumsky::Error<char> for Error {
+impl<I: Input> chumsky::Error<I> for Error<I> {
     type Span = Range<usize>;
 
     type Label = &'static str;
 
-    fn expected_input_found<Iter: IntoIterator<Item = Option<char>>>(
+    fn expected_input_found<Iter: IntoIterator<Item = Option<I>>>(
         span: Self::Span,
         expected: Iter,
-        found: Option<char>,
+        found: Option<I>,
     ) -> Self {
         Self(Simple::expected_input_found(span, expected, found))
     }
@@ -100,8 +108,8 @@ impl chumsky::Error<char> for Error {
     }
 }
 
-impl Into<Simple<char>> for Error {
-    fn into(self) -> Simple<char> {
+impl<I: Input> Into<Simple<I>> for Error<I> {
+    fn into(self) -> Simple<I> {
         self.0
     }
 }

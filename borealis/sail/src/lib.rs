@@ -5,4 +5,4 @@ pub mod lexer;
 pub mod parser;
 pub mod span;
 
-pub use crate::lexer::lexer;
+pub use crate::{lexer::lexer, parser::parser};

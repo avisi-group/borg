@@ -9,11 +9,11 @@ use {
         text::{self, TextParser},
         Parser,
     },
-    std::ops::Range,
+    std::{fmt::Display, ops::Range},
     strum::{EnumCount, EnumIter, IntoEnumIterator},
 };
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Keyword {
     And,
     As,
@@ -193,7 +193,7 @@ impl TryFrom<&str> for Keyword {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, EnumIter, EnumCount)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, EnumIter, EnumCount)]
 pub enum Operator {
     Bang,
     Percent,
@@ -271,7 +271,7 @@ impl Operator {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum Token {
     Ampersand,
     At,
@@ -326,7 +326,13 @@ pub enum Token {
     EndOfFile,
 }
 
-pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error> {
+impl Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error<char>> {
     let simple_tokens = choice((
         just('&').to(Token::Ampersand),
         just('@').to(Token::At),
