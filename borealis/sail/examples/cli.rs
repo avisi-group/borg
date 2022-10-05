@@ -2,7 +2,7 @@ use {
     ariadne::Source,
     chumsky::{Parser as _, Stream},
     color_eyre::eyre::{Context, Result},
-    sail::{error::Error, span::Span},
+    sail::error::Error,
     std::env,
 };
 
@@ -20,7 +20,7 @@ fn main() -> Result<()> {
 
         if let Some(tokens) = tokens {
             let len = source.chars().count();
-            let stream = Stream::from_iter(Span::from(len..len + 1), tokens.into_iter());
+            let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
             sail::parser().parse_recovery(stream);
         }
 

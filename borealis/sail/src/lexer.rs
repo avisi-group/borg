@@ -1,8 +1,5 @@
 use {
-    crate::{
-        error::Error,
-        span::{Span, Spanned},
-    },
+    crate::{error::Error, span::Spanned},
     chumsky::{
         error::Simple,
         primitive::{choice, end, filter, just, one_of, take_until},
@@ -311,9 +308,9 @@ pub enum Token {
     EqualsGreaterThan,
     LessThanEquals,
     Pragma(String),
-    Infix((u32, Operator)),
-    InfixLeft((u32, Operator)),
-    InfixRight((u32, Operator)),
+    Infix((u8, Vec<Operator>)),
+    InfixLeft((u8, Vec<Operator>)),
+    InfixRight((u8, Vec<Operator>)),
     Operator(Operator),
     TyVar(String),
     Identifier(String), // including "~"
@@ -386,6 +383,8 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error<char>> {
     let digit = filter(|c: &char| c.is_digit(10)).map(|c| {
         c.to_digit(10)
             .expect("is_digit is true means to_digit must always succeed")
+            .try_into()
+            .expect("digit could not be converted to u8")
     });
 
     let (infix, infix_left, infix_right) = {
@@ -393,21 +392,21 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error<char>> {
             .padded()
             .ignore_then(digit)
             .padded()
-            .then(operator.clone())
+            .then(operator.clone().repeated().at_least(1))
             .map(Token::Infix);
 
         let infix_left = just("infixl")
             .padded()
             .ignore_then(digit)
             .padded()
-            .then(operator.clone())
+            .then(operator.clone().repeated().at_least(1))
             .map(Token::InfixLeft);
 
         let infix_right = just("infixr")
             .padded()
             .ignore_then(digit)
             .padded()
-            .then(operator.clone())
+            .then(operator.clone().repeated().at_least(1))
             .map(Token::InfixRight);
 
         (infix, infix_left, infix_right)
@@ -522,7 +521,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error<char>> {
     let comment = just("/*").then(take_until(just("*/"))).padded();
 
     token
-        .map_with_span(|tok, span| (tok, Span::from(span)))
+        .map_with_span(|tok, span| (tok, span))
         .padded_by(line_comment.repeated())
         .padded_by(comment.repeated())
         .padded()

@@ -3,11 +3,10 @@
 use {
     crate::{
         error::Error,
-        lexer::Token,
-        span::{Span, Spanned},
+        lexer::{Keyword, Token},
+        span::Spanned,
     },
     chumsky::{
-        combinator::To,
         primitive::{choice, just},
         select, Parser,
     },
@@ -15,12 +14,53 @@ use {
 };
 
 /// Gets new instance of Sail parser
-pub fn parser<I>() -> impl Parser<Token, Vec<Spanned<Definition>>, Error = Error<Token>> {
+pub fn parser() -> impl Parser<Token, Vec<Spanned<Definition>>, Error = Error<Token>> {
+    let pattern = just(Token::LeftCurly);
+
+    let expression = just(Token::LeftCurly);
+
+    let rec_measure = just(Token::LeftCurly)
+        .ignore_then(pattern)
+        .then_ignore(just(Token::Equals))
+        .then_ignore(just(Token::GreaterThan))
+        .then(expression)
+        .then_ignore(just(Token::RightCurly));
+
+    let function_clauses = just(Token::LeftCurly);
+
+    let function_definition = just(Token::Keyword(Keyword::Function))
+        .ignore_then(rec_measure)
+        .then(function_clauses)
+        .map(|_| {
+            Definition::Function(FunctionDefinition(
+                RecursiveAnnotation::NonRecursive,
+                TypeAnnotation(None),
+                EffectAnnotation(None),
+                vec![],
+            ))
+        });
+
+    let type_scheme = just(Token::Ampersand);
+
+    let mapping_clause_list = just(Token::Ampersand);
+
+    let mapping_definition = just(Token::Keyword(Keyword::Mapping))
+        .ignore_then(select! {Token::Identifier(s) => s})
+        .then(just(Token::Colon).ignore_then(type_scheme).or_not())
+        .then(mapping_clause_list)
+        .map(|_| {
+            Definition::Mapping(MappingDefinition(
+                Identifier::Identifier("".to_owned()),
+                None,
+                vec![],
+            ))
+        });
+
     let pragma = select! { Token::Pragma(s) => Definition::Pragma(s.clone(), s)};
 
     let definition = choice((
-        // function_definition,
-        // mapping_definition,
+        function_definition,
+        mapping_definition,
         // function_implementation,
         // infix_operator,
         // value_specification,
@@ -37,9 +77,7 @@ pub fn parser<I>() -> impl Parser<Token, Vec<Spanned<Definition>>, Error = Error
         // termination,
     ));
 
-    definition
-        .map_with_span(|def, span| (def, Span::from(span)))
-        .repeated()
+    definition.map_with_span(|def, span| (def, span)).repeated()
 }
 
 #[derive(Debug, Clone)]
@@ -637,4 +675,25 @@ pub enum LValueExpression {
     VectorRange(Box<LValueExpression>, Expression, Expression),
     VectorConcat(Vec<LValueExpression>),
     Field(Box<LValueExpression>, Identifier),
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        crate::{lexer, parser},
+        chumsky::{Parser, Stream},
+        insta::assert_debug_snapshot,
+    };
+
+    #[test]
+    fn aarch64_prelude_snapshot() {
+        let source = include_str!("../examples/prelude.sail");
+        let tokens = lexer().parse(source).unwrap();
+        assert_debug_snapshot!(parser()
+            .parse(Stream::from_iter(
+                source.len()..source.len() + 1,
+                tokens.into_iter()
+            ))
+            .unwrap())
+    }
 }
