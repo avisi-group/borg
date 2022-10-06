@@ -4,6 +4,270 @@ expression: "lexer().parse(include_str!(\"../examples/prelude.sail\")).unwrap()"
 ---
 [
     (
+        Doc(
+            "************************************************************************",
+        ),
+        0..76,
+    ),
+    (
+        Doc(
+            " BSD 3-clause Clear License                                             ",
+        ),
+        77..153,
+    ),
+    (
+        Doc(
+            "                                                                        ",
+        ),
+        154..230,
+    ),
+    (
+        Doc(
+            " Copyright (c) 2019                                                     ",
+        ),
+        231..307,
+    ),
+    (
+        Doc(
+            "   Arm Limited (or its affiliates),                                     ",
+        ),
+        308..384,
+    ),
+    (
+        Doc(
+            "   Alasdair Armstrong,                                                  ",
+        ),
+        385..461,
+    ),
+    (
+        Doc(
+            "   Alastair Reid,                                                       ",
+        ),
+        462..538,
+    ),
+    (
+        Doc(
+            "   Thomas Bauereiss,                                                    ",
+        ),
+        539..615,
+    ),
+    (
+        Doc(
+            "   Peter Sewell,                                                        ",
+        ),
+        616..692,
+    ),
+    (
+        Doc(
+            "   Kathryn Gray,                                                        ",
+        ),
+        693..769,
+    ),
+    (
+        Doc(
+            "   Anthony Fox                                                          ",
+        ),
+        770..846,
+    ),
+    (
+        Doc(
+            "                                                                        ",
+        ),
+        847..923,
+    ),
+    (
+        Doc(
+            " All rights reserved.                                                   ",
+        ),
+        924..1000,
+    ),
+    (
+        Doc(
+            "                                                                        ",
+        ),
+        1001..1077,
+    ),
+    (
+        Doc(
+            " Redistribution and use in source and binary forms, with or without     ",
+        ),
+        1078..1154,
+    ),
+    (
+        Doc(
+            " modification, are permitted (subject to the limitations in the         ",
+        ),
+        1155..1231,
+    ),
+    (
+        Doc(
+            " disclaimer below) provided that the following conditions are met:      ",
+        ),
+        1232..1308,
+    ),
+    (
+        Doc(
+            "                                                                        ",
+        ),
+        1309..1385,
+    ),
+    (
+        Doc(
+            " \t* Redistributions of source code must retain the above            ",
+        ),
+        1386..1458,
+    ),
+    (
+        Doc(
+            "        copyright notice, this list of conditions and the following     ",
+        ),
+        1459..1535,
+    ),
+    (
+        Doc(
+            " \t  disclaimer.                                                     ",
+        ),
+        1536..1608,
+    ),
+    (
+        Doc(
+            "      * Redistributions in binary form must reproduce the above         ",
+        ),
+        1609..1685,
+    ),
+    (
+        Doc(
+            "        copyright notice, this list of conditions and the following     ",
+        ),
+        1686..1762,
+    ),
+    (
+        Doc(
+            "        disclaimer in the documentation and/or other materials          ",
+        ),
+        1763..1839,
+    ),
+    (
+        Doc(
+            " \t  provided with the distribution.                                 ",
+        ),
+        1840..1912,
+    ),
+    (
+        Doc(
+            " \t* Neither the name of ARM Limited nor the names of its            ",
+        ),
+        1913..1985,
+    ),
+    (
+        Doc(
+            "        contributors may be used to endorse or promote products         ",
+        ),
+        1986..2062,
+    ),
+    (
+        Doc(
+            "        derived from this software without specific prior written       ",
+        ),
+        2063..2139,
+    ),
+    (
+        Doc(
+            "        permission.                                                     ",
+        ),
+        2140..2216,
+    ),
+    (
+        Doc(
+            "                                                                        ",
+        ),
+        2217..2293,
+    ),
+    (
+        Doc(
+            " NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE        ",
+        ),
+        2294..2370,
+    ),
+    (
+        Doc(
+            " GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT    ",
+        ),
+        2371..2447,
+    ),
+    (
+        Doc(
+            " HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED            ",
+        ),
+        2448..2524,
+    ),
+    (
+        Doc(
+            " WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF   ",
+        ),
+        2525..2601,
+    ),
+    (
+        Doc(
+            " MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE               ",
+        ),
+        2602..2678,
+    ),
+    (
+        Doc(
+            " DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE  ",
+        ),
+        2679..2755,
+    ),
+    (
+        Doc(
+            " LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR    ",
+        ),
+        2756..2832,
+    ),
+    (
+        Doc(
+            " CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF   ",
+        ),
+        2833..2909,
+    ),
+    (
+        Doc(
+            " SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR        ",
+        ),
+        2910..2986,
+    ),
+    (
+        Doc(
+            " BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,  ",
+        ),
+        2987..3063,
+    ),
+    (
+        Doc(
+            " WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE   ",
+        ),
+        3064..3140,
+    ),
+    (
+        Doc(
+            " OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN ",
+        ),
+        3141..3217,
+    ),
+    (
+        Doc(
+            " IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                          ",
+        ),
+        3218..3294,
+    ),
+    (
+        Doc(
+            "************************************************************************",
+        ),
+        3295..3371,
+    ),
+    (
         Keyword(
             Default,
         ),
@@ -15367,6 +15631,12 @@ expression: "lexer().parse(include_str!(\"../examples/prelude.sail\")).unwrap()"
         15135..15136,
     ),
     (
+        Doc(
+            "\nval ex_range : forall 'n 'm.\n  range('n, 'm) -> {'o, 'n <= 'o & 'o <= 'm. atom('o)}\n\nval coerce_int_nat : int -> nat effect {escape}\n\nfunction coerce_int_nat 'x = {\n  assert(constraint('x >= 0), \"Cannot coerce int to nat\");\n  x\n}\n",
+        ),
+        15138..15373,
+    ),
+    (
         Keyword(
             Val,
         ),
@@ -17459,6 +17729,12 @@ expression: "lexer().parse(include_str!(\"../examples/prelude.sail\")).unwrap()"
     (
         RightCurly,
         17164..17165,
+    ),
+    (
+        Doc(
+            " Used for creating long bitvector literals in the C backend. ",
+        ),
+        17167..17232,
     ),
     (
         Keyword(

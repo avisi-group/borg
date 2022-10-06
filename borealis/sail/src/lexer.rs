@@ -320,6 +320,7 @@ pub enum Token {
     Bin(String),
     Hex(String),
     String(String),
+    Doc(String),
     EndOfFile,
 }
 
@@ -330,6 +331,12 @@ impl Display for Token {
 }
 
 pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error<char>> {
+    let doc_comment = just("/*")
+        .then(take_until(just("*/")))
+        .map(|(_, (xs, _))| xs)
+        .collect::<String>()
+        .map(Token::Doc);
+
     let simple_tokens = choice((
         just('&').to(Token::Ampersand),
         just('@').to(Token::At),
@@ -500,6 +507,7 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error<char>> {
         .map(Token::String);
 
     let token = choice((
+        doc_comment,
         simple_tokens,
         pragma,
         infix,
@@ -518,12 +526,10 @@ pub fn lexer() -> impl Parser<char, Vec<Spanned<Token>>, Error = Error<char>> {
     ));
 
     let line_comment = just("//").then(take_until(just('\n'))).padded();
-    let comment = just("/*").then(take_until(just("*/"))).padded();
 
     token
         .map_with_span(|tok, span| (tok, span))
         .padded_by(line_comment.repeated())
-        .padded_by(comment.repeated())
         .padded()
         .repeated()
         .then_ignore(end())

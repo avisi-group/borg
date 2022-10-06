@@ -16,9 +16,9 @@ fn main() -> Result<()> {
     for path in args.skip(1) {
         let source = std::fs::read_to_string(&path).wrap_err("Failed to read input source file")?;
 
-        let (tokens, errors) = sail::lexer().parse_recovery(source.as_str());
+        let (tokens_opt, errors) = sail::lexer().parse_recovery(source.as_str());
 
-        if let Some(tokens) = tokens {
+        if let Some(tokens) = tokens_opt {
             let len = source.chars().count();
             let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
             sail::parser().parse_recovery(stream);

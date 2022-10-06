@@ -1,5 +1,6 @@
 //! Sail2 language parser
 
+pub mod ast;
 pub mod error;
 pub mod lexer;
 pub mod parser;
