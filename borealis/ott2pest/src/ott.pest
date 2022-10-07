@@ -1,0 +1,345 @@
+main = { items }
+
+items = { item* }
+
+item = {
+    metavardefn
+    | RULES ~ rules
+    | DEFNCLASS ~ defnclass
+    | FUNDEFNCLASS ~ fundefnclass
+ 	| SUBRULES ~ subrules
+ 	| CONTEXTRULES ~ contextrules
+ 	| SUBSTITUTIONS ~ substitutions
+ 	| FREEVARS ~ freevars
+ 	| EMBED ~ embed
+ 	| PARSING ~ parsing_annotations
+ 	| HOMS ~ hom_section
+ 	| COQSECTIONBEGIN ~ coq_section_begin
+ 	| COQSECTIONEND ~ coq_section_end
+ 	| COQVARIABLE ~ coq_variable
+}
+
+metavardefn = {
+    metavardefn_int
+    | indexvardefn_int
+}
+
+metavardefn_int	= {
+    METAVAR ~ ne_ident_hom_desc_list ~ CCE ~ metavarrep
+}
+
+indexvardefn_int = {
+    INDEXVAR ~ ne_ident_hom_desc_list ~ CCE ~ metavarrep
+}
+
+metavarrep = { homomorphism_list }
+
+homomorphism_list = { homomorphism* }
+
+homomorphism = {
+    DOUBLELEFTBRACE ~ hom_name ~ (hom_spec_el*) ~ DOUBLERIGHTBRACE
+}
+
+hom_name = { BLANKS? ~ STRING ~ BLANKS }
+
+
+hom_spec_el	= {
+      DOUBLELEFTBRACKET ~ hom_inner ~ DOUBLERIGHTBRACKET
+ 	| STRING
+ 	| BLANKS
+ 	| DOTDOT
+ 	| DOTDOTDOT
+ 	| DOTDOTDOTDOT
+}
+
+hom_inner =	{
+ 	ident_and_blanks_list ~ dots ~ ident_and_blanks_list
+ 	| COMP_LEFT ~ ident_and_blanks_list ~ COMP_MIDDLE ~ comp_bound ~ COMP_RIGHT ~ blanks_list
+    | ident_and_blanks_list
+}
+
+embedmorphism = { DOUBLELEFTBRACE ~ hom_name ~ embed_spec_el* ~ DOUBLERIGHTBRACE }
+
+embed_spec_el = {
+      DOUBLELEFTBRACKET ~ embed_inner ~ DOUBLERIGHTBRACKET
+ 	| STRING
+ 	| BLANKS
+ 	| DOTDOT
+ 	| DOTDOTDOT
+ 	| DOTDOTDOTDOT
+}
+
+embed_inner	= { (STRING | BLANKS)* }
+
+bindspec = {
+      BIND ~ mse ~ IN ~ ident
+ 	| ident ~ EQ ~ mse
+ 	| NAMES ~ LPAREN ~ mse ~ RPAREN ~ EQ ~ NAMES ~ LPAREN ~ mse ~ RPAREN
+ 	| NAMES ~ LPAREN ~ mse ~ RPAREN ~ HASH ~ NAMES ~ LPAREN ~ mse ~ RPAREN
+ 	| DISTINCTNAMES ~ LPAREN ~ mse ~ RPAREN
+}
+
+bindspeclist = { bindspec* }
+
+mse = {
+      ident
+ 	| ident ~ dots ~ ident
+ 	| COMP_LEFT ~ ident ~ COMP_MIDDLE ~ comp_bound ~ COMP_RIGHT
+ 	| ident ~ LPAREN ~ ident ~ RPAREN
+ 	| ident ~ LPAREN ~ ident ~ dots ~ ident ~ RPAREN
+ 	| ident ~ LPAREN ~ COMP_LEFT ~ ident ~ COMP_MIDDLE ~ comp_bound ~ COMP_RIGHT ~ RPAREN
+ 	| ident ~ COMP_LEFT ~ ident ~ COMP_MIDDLE ~ comp_bound ~ COMP_RIGHT
+ 	//| mse ~ UNION ~ mse
+ 	| EMPTY
+}
+
+bindspeclistlist = { (BIND_LEFT_DELIM ~ bindspeclist ~ BIND_RIGHT_DELIM)* }
+
+bindspecall	= {	bindspeclistlist }
+
+dots = { DOTDOT | DOTDOTDOT | DOTDOTDOTDOT }
+
+element	= {
+      ident
+ 	| dots
+ 	| COMP_LEFT ~ element_list ~ COMP_MIDDLE ~ comp_bound ~ COMP_RIGHT
+ 	| COMP_LEFT ~ element_list ~ COMP_MIDDLE ~ ident ~ COMP_MIDDLE ~ comp_bound ~ COMP_RIGHT
+}
+
+comp_bound = {
+    ident ~ (COMP_IN ~ ident ~ (dots ~ ident)?)?
+}
+
+element_list = { element* }
+
+rules = { rule_list }
+
+rule_list = { rule* }
+
+rule	=	{
+    ne_ident_hom_desc_list ~ COLONCOLON ~ STRING ~ CCE ~ homomorphism_list ~ prodlist
+}
+
+prod	= {
+    flavour ~ element_list ~ COLONCOLON ~ ident_list ~ COLONCOLON ~ STRING ~ bindspecall ~ homomorphism_list
+}
+
+prodlist	= { prod* }
+
+flavour	= { BAR }
+
+ident_desc	= { STRING }
+
+ne_ident_hom_desc_list	= {
+    ident_desc ~ homomorphism_list ~ (COMMA ~ ne_ident_hom_desc_list)?
+}
+
+ident	= { STRING }
+
+blanks	= { BLANKS }
+
+ident_list	= { ( ident | BLANKS )* }
+
+ident_and_blanks_list = { (ident | blanks)* }
+
+blanks_list	= { BLANKS }
+
+defnclass	= {
+    STRING ~ COLONCOLON ~ STRING ~ CCE ~ homomorphism_list ~ defn_list
+}
+
+defn_list = { defn* }
+
+defn = {
+    DEFN ~ element_list ~ COLONCOLON ~ ident_list ~ COLONCOLON ~ STRING ~ COLONCOLON ~ STRING ~ homomorphism_list ~ BY ~ semiraw_rule_list
+}
+
+fundefnclass	= {
+    STRING ~ CCE ~ homomorphism_list ~ fundefn_list
+}
+
+fundefn_list	= { fundefn* }
+
+fundefn	= {
+    FUNDEFN ~ element_list ~ COLONCOLON ~ ident ~ COLONCOLON ~ STRING ~ homomorphism_list ~ BY ~ BLANKLINE ~ anylinelist
+}
+
+anylinelist	= { ( line | COMMENTLINE | BLANKLINE )* }
+
+line = { LINE }
+
+lineline = { LINELINE }
+
+linelist	= { (line | COMMENTLINE)* }
+
+nelinelist	= {
+    ((line | COMMENTLINE) ~ linelist)?
+}
+
+semiraw_rule	= {
+      linelist ~ lineline ~ linelist
+ 	| nelinelist
+}
+
+blanklinelist	= { BLANKLINE* }
+
+neblanklinelist	= { BLANKLINE+ }
+
+defncom	= {
+    DEFNCOM ~ embed_spec_el* ~ DOUBLERIGHTBRACE
+}
+
+semiraw_rule_list = {
+    (BLANKLINE* ~ (semiraw_rule | defncom)?)*
+}
+
+subrules	= { subrules_body }
+
+subrules_body	= { subrule* }
+
+subrule	= {
+    ident_desc ~ LTCOLONCOLON ~ ident_desc ~ homomorphism_list
+}
+
+contextrules	= { contextrules_body }
+
+contextrules_body	= { contextrule* }
+
+contextrule	= {
+    ident_desc ~ UNDERSCORECOLONCOLON ~ ident_desc ~ COLONCOLON ~ ident_desc
+}
+
+substitutions	= { substitutions_body }
+
+substitutions_body	= { substitution* }
+
+substitution	= {
+    substitution_kind ~ ident_desc ~ ident_desc ~ COLONCOLON ~ ident_desc ~ homomorphism_list
+}
+
+substitution_kind	= {
+      SINGLE
+ 	| MULTIPLE
+}
+
+freevars	= { freevars_body }
+
+freevars_body	= { freevar* }
+
+freevar	= {
+    ident_desc ~ ident_desc ~ COLONCOLON ~ ident_desc ~ homomorphism_list
+}
+
+embed	= { embedmorphism* }
+
+parsing_annotation_type	= {
+      LTEQ
+ 	| LEFT
+ 	| RIGHT
+ 	| NON
+}
+
+parsing_annotations	= { parsing_annotations_body }
+
+parsing_annotations_body = { parsing_annotation* }
+
+parsing_annotation	= {
+    ident_desc ~ parsing_annotation_type ~ ident_desc
+}
+
+hom_section_item = {
+    COLONCOLON ~ STRING ~ bindspecall ~ homomorphism_list
+}
+
+hom_section_item_list = { hom_section_item* }
+
+hom_section	= { STRING ~ hom_section_item_list }
+
+coq_section_begin	= { STRING }
+
+coq_section_end	= { STRING }
+
+coq_variable	= { STRING }
+
+unfiltered_spec_el	= {
+      DOUBLELEFTBRACKET ~ unfiltered_inner ~ DOUBLERIGHTBRACKET
+ 	| STRING
+ 	| BLANKS
+}
+
+unfiltered_inner = { (STRING | BLANKS)* }
+
+BLANKS = { NON_NEWLINE_WHITESPACE+ }
+STRING = { (!WHITESPACE ~ ANY)+ }
+
+WHITESPACE = { NON_NEWLINE_WHITESPACE | "\010" | "\013" }
+NON_NEWLINE_WHITESPACE = { " " | "\t" | "\012" }
+
+COMMENTLINE = { NON_NEWLINE_WHITESPACE* ~ "%" ~ (!"\n" ~ ANY)* ~ NEWLINE }
+BLANKLINE = { NON_NEWLINE_WHITESPACE* ~ NEWLINE }
+NEWLINE = { "\010" | "\013" | "\013\010" }
+NON_NEWLINE = { !("\010" | "\013") ~ ANY }
+LINELINE = { NON_NEWLINE_WHITESPACE* ~ "----" ~ "-"* ~ NON_NEWLINE+ ~ (NEWLINE | EOI) }
+LINE = { NON_NEWLINE+ ~ (NEWLINE | EOI) }
+
+
+// Keyword Terminals
+
+EMBED                = { "embed" }
+HOMS                 = { "homs" }
+METAVAR              = { "metavar" }
+INDEXVAR             = { "indexvar" }
+RULES                = { "grammar" }
+SUBRULES             = { "subrules" }
+CONTEXTRULES         = { "contextrules" }
+SUBSTITUTIONS        = { "substitutions" }
+SINGLE               = { "single" }
+MULTIPLE             = { "multiple" }
+FREEVARS             = { "freevars" }
+DEFNCLASS            = { "defns" }
+DEFN                 = { "defn" }
+FUNDEFNCLASS         = { "funs" }
+FUNDEFN              = { "fun" }
+BY                   = { "by" }
+BIND                 = { "bind" }
+IN                   = { "in" }
+NAMES                = { "names" }
+DISTINCTNAMES        = { "distinctnames" }
+UNION                = { "union" }
+COMP_IN              = { "IN" }
+PARSING              = { "parsing" }
+LEFT                 = { "left" }
+RIGHT                = { "right" }
+NON                  = { "non" }
+COQSECTIONBEGIN      = { "begincoqsection" }
+COQSECTIONEND        = { "endcoqsection" }
+COQVARIABLE          = { "coqvariable" }
+
+
+// Symbol Terminals
+
+LTEQ                 = { "<=" }
+BIND_LEFT_DELIM      = { "(+" }
+DOTDOT               = { ".." }
+DOTDOTDOT            = { "..." }
+DOTDOTDOTDOT         = { "...." }
+COMP_LEFT            = { "</" }
+COMP_MIDDLE          = { "//" }
+COMP_RIGHT           = { "/>" }
+DOUBLELEFTBRACKET    = { "[[" }
+DOUBLERIGHTBRACKET   = { "]]" }
+COMMA                = { "," }
+CCE                  = { "::=" }
+BAR                  = { "|" }
+DOUBLELEFTBRACE      = { "{{" }
+DOUBLERIGHTBRACE     = { "}}" }
+COLONCOLON           = { "::" }
+LTCOLONCOLON         = { "<::" }
+UNDERSCORECOLONCOLON = { "_::" }
+BIND_RIGHT_DELIM     = { "+)" }
+DEFNCOM              = { "{{com" }
+EQ                   = { "=" }
+HASH                 = { "#" }
+LPAREN               = { "(" }
+RPAREN               = { ")" }
+EMPTY                = { "{}" }

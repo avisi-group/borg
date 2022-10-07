@@ -11,3 +11,7 @@ Rendered PDF of topic proposal for PhD.
 ### `sail`
 
 Sail2 parser written in Rust.
+
+### `ott2pest`
+
+Ott to PEST grammar compiler.
