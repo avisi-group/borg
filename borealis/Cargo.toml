@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "sail","ott2pest"
+    "sail"
 ]
 
 [profile.dev.package.insta]

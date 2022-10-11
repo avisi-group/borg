@@ -1,8 +1,5 @@
 use {
-    ariadne::Source,
-    chumsky::{Parser as _, Stream},
     color_eyre::eyre::{Context, Result},
-    sail::error::Error,
     std::env,
 };
 
@@ -16,17 +13,7 @@ fn main() -> Result<()> {
     for path in args.skip(1) {
         let source = std::fs::read_to_string(&path).wrap_err("Failed to read input source file")?;
 
-        let (tokens_opt, errors) = sail::lexer().parse_recovery(source.as_str());
-
-        if let Some(tokens) = tokens_opt {
-            let len = source.chars().count();
-            let stream = Stream::from_iter(len..len + 1, tokens.into_iter());
-            sail::parser().parse_recovery(stream);
-        }
-
-        errors.iter().map(Error::into_report).for_each(|report| {
-            report.print(Source::from(&source)).unwrap();
-        });
+        dbg!(source);
     }
 
     Ok(())

@@ -5,9 +5,7 @@ edition = "2021"
 
 [dependencies]
 ariadne = "0.1.5"
-chumsky = "0.8.0"
 num-bigint = "0.4.3"
-strum = { version = "0.24.1", features = ["derive"] }
 
 [[example]]
 name = "cli"
