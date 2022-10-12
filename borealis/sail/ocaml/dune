@@ -1,5 +1,6 @@
 (executable
  (name wrapper)
  (public_name wrapper)
- (libraries libsail)
+ (libraries sail)
+ (ocamlopt_flags "-I" "/lib/x86_64-linux-gnu/")
  (modes exe object))
