@@ -1,1 +1,1 @@
-# `Sail2` Parser
+# `Sail` Compiler Wrapper

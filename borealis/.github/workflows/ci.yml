@@ -22,15 +22,19 @@ jobs:
 
       - run: cargo fmt --all -- --check
 
-  test:
-    name: Test
+  build:
+    strategy:
+      matrix:
+        ocaml-compiler: ["4.14.0"]
+
+    name: Build & Test
     runs-on: ubuntu-latest
     needs: stylecheck
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install stable toolchain and run cargo test
+      - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -43,9 +47,26 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             ~/.cargo/bin
+            ~/.opam
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.ocaml-compiler }}
           restore-keys: |
-            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.ocaml-compiler }}
 
-      - run: cargo test --all-features --no-fail-fast --all
+      - name: Install OCaml toolchain
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+
+      - name: Set Opam env
+        run: opam env | tr '\n' ' ' >> $GITHUB_ENV
+
+      - name: Add Opam switch to PATH
+        run: opam var bin >> $GITHUB_PATH
+
+      - name: Install dune
+        run: opam install dune
+
+      - run: cargo build --workspace --all-features --all-targets
+
+      - run: cargo test --workspace --all-features --all-targets --no-fail-fast

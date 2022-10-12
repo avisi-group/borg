@@ -1,5 +1,0 @@
----
-source: sail/src/parser.rs
-expression: "parser().parse(Stream::from_iter(source.len()..source.len() + 1,\n            tokens.into_iter())).unwrap()"
----
-[]

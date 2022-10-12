@@ -6,6 +6,10 @@ edition = "2021"
 [dependencies]
 ariadne = "0.1.5"
 num-bigint = "0.4.3"
+ocaml = "1.0.0-beta.3"
+
+[build-dependencies]
+cc = "1.0.73"
 
 [[example]]
 name = "cli"

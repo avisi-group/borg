@@ -1,0 +1,5 @@
+(executable
+ (name wrapper)
+ (public_name wrapper)
+ (link_flags -linkall)
+ (modes exe object))
