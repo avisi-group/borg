@@ -6,4 +6,4 @@
 
 (package
  (name wrapper)
- (depends ocaml dune))
+ (depends ocaml dune libsail))

@@ -64,8 +64,8 @@ jobs:
       - name: Add Opam switch to PATH
         run: opam var bin >> $GITHUB_PATH
 
-      - name: Install dune
-        run: opam install dune
+      - name: Install Opam dependencies
+        run: opam install dune sail
 
       - run: cargo build --workspace --all-features --all-targets
 
