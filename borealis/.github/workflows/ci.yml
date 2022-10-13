@@ -25,10 +25,11 @@ jobs:
   build:
     strategy:
       matrix:
+        os: [macos-latest, ubuntu-latest]
         ocaml-compiler: ["4.14.0"]
 
-    name: Build & Test
-    runs-on: ubuntu-latest
+    name: Test
+    runs-on: ${{ matrix.os }}
     needs: stylecheck
     steps:
       - name: Checkout sources
