@@ -1,12 +1,13 @@
 //! Sail2 language parser
 
 use {
+    crate::error::Error,
     ocaml::{List, Runtime},
     once_cell::sync::Lazy,
 };
 
 pub mod ast;
-//pub mod error;
+pub mod error;
 pub mod parser;
 pub mod span;
 
@@ -22,7 +23,7 @@ ocaml::import! {
     fn internal_dedup(l: List<i32>) -> List<i32>;
 }
 
-pub fn dedup(list: Vec<i32>) -> Vec<i32> {
+pub fn dedup(list: Vec<i32>) -> Result<Vec<i32>, Error> {
     let rt = &*RT;
 
     let mut l = List::empty();
@@ -31,7 +32,7 @@ pub fn dedup(list: Vec<i32>) -> Vec<i32> {
         l = unsafe { l.add(rt, &element) };
     }
 
-    unsafe { internal_dedup(rt, l) }.unwrap().into_vec()
+    Ok(unsafe { internal_dedup(rt, l) }?.into_vec())
 }
 
 #[cfg(test)]
@@ -51,7 +52,7 @@ mod tests {
             v_d.dedup();
             v_d.sort();
 
-            let mut out = dedup(v);
+            let mut out = dedup(v).unwrap();
             out.sort();
             assert_eq!(out, v_d);
         }
