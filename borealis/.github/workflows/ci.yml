@@ -32,6 +32,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: stylecheck
     steps:
+      - name: Print ld gmp
+        run: brew --prefix gmp
+        if: ${{ matrix.os == 'macos-latest' }}
+
       - name: Checkout sources
         uses: actions/checkout@v2
 
