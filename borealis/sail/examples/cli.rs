@@ -1,6 +1,5 @@
 use {
     color_eyre::eyre::{Context, Result},
-    sail::entry_point,
     std::env,
 };
 
@@ -16,8 +15,6 @@ fn main() -> Result<()> {
 
         dbg!(source);
     }
-
-    entry_point();
 
     Ok(())
 }
