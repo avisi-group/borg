@@ -6,7 +6,7 @@ use {
     crate::error::Error,
     ocaml::{List, Runtime},
     once_cell::sync::Lazy,
-    parking_lot::Mutex,
+    parking_lot::RwLock,
 };
 
 pub mod ast;
@@ -16,11 +16,11 @@ pub mod span;
 
 /// OCaml runtime handle, initialised on first access
 ///
-/// *Every* function referencing RT must use &*RT or it will possibly not be initialised and cause
-/// a "boxroot is not setup" error. This error will be hard to diagnose as it will be dependent on
-/// the order that other (correctly dereferencing RT and thus initialising the runtime) functions
-/// are called. Need to investigate how this can be prevented.
-static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(ocaml::runtime::init()));
+/// *Every* function referencing RT must either begin with RT.write() or it will possibly not be
+/// initialised and cause a "boxroot is not setup" error. This error will be hard to diagnose as
+/// it will be dependent on the order that other (correctly dereferencing RT and thus initialising
+/// the runtime) functions are called. Need to investigate how this can be prevented.
+static RT: Lazy<RwLock<Runtime>> = Lazy::new(|| RwLock::new(ocaml::runtime::init()));
 
 ocaml::import! {
     fn internal_util_dedup(l: List<i32>) -> List<i32>;
@@ -28,13 +28,15 @@ ocaml::import! {
 
 /// Removes duplicate values in the supplied Vec
 pub fn dedup(list: Vec<i32>) -> Result<Vec<i32>, Error> {
+    RT.write();
+
     let mut l = List::empty();
 
     for element in list {
-        l = unsafe { l.add(&*RT.lock(), &element) };
+        l = unsafe { l.add(&RT.read(), &element) };
     }
 
-    Ok(unsafe { internal_util_dedup(&*RT.lock(), l) }?.into_vec())
+    Ok(unsafe { internal_util_dedup(&RT.read(), l) }?.into_vec())
 }
 
 #[cfg(test)]

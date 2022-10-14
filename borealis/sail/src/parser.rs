@@ -41,19 +41,21 @@ ocaml::import! {
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
 pub fn load_files(files: Vec<String>) -> Result<(), Error> {
-    let env = unsafe { internal_type_check_initial_env(&*RT.lock())? };
+    RT.write();
+
+    let env = unsafe { internal_type_check_initial_env(&RT.read())? };
 
     let files = {
         let mut l = List::empty();
         for file in files {
-            let file_rooted: BoxRoot<String> = file.to_boxroot(&mut *RT.lock());
-            l = unsafe { l.add(&*RT.lock(), &file_rooted) };
+            let file_rooted: BoxRoot<String> = file.to_boxroot(&mut RT.write());
+            l = unsafe { l.add(&RT.read(), &file_rooted) };
         }
         l
     };
 
     let (output_name, ast, type_envs) =
-        unsafe { internal_process_file_load_files(&*RT.lock(), false, List::empty(), env, files)? };
+        unsafe { internal_process_file_load_files(&RT.read(), false, List::empty(), env, files)? };
 
     dbg!((output_name, ast, type_envs));
 
