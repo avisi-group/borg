@@ -25,17 +25,13 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        os: [ubuntu-latest]
         ocaml-compiler: ["4.14.0"]
 
     name: Test
     runs-on: ${{ matrix.os }}
     needs: stylecheck
     steps:
-      - name: Print ld gmp
-        run: brew --prefix gmp
-        if: ${{ matrix.os == 'macos-latest' }}
-
       - name: Checkout sources
         uses: actions/checkout@v2
 
@@ -52,11 +48,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             ~/.cargo/bin
+            _opam
             ~/.opam
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.ocaml-compiler }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.ocaml-compiler }}
+          key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ matrix.ocaml-compiler }}
 
       - name: Install OCaml toolchain
         uses: ocaml/setup-ocaml@v2
@@ -70,7 +65,8 @@ jobs:
         run: opam var bin >> $GITHUB_PATH
 
       - name: Install Opam dependencies
-        run: opam install dune sail
+        # ignore failures if already installed
+        run: opam install dune sail || true
 
       - run: cargo build --workspace --all-features --all-targets
 
