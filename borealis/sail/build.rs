@@ -12,8 +12,8 @@ fn main() -> Result<()> {
 
     check_build_environment()?;
 
-    let source_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join("ocaml");
-    let build_path = PathBuf::from(env::var("OUT_DIR")?).join("ocaml");
+    let source_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join("sail_wrapper");
+    let build_path = PathBuf::from(env::var("OUT_DIR")?).join("sail_wrapper");
 
     // dune
     ensure!(
@@ -38,7 +38,7 @@ fn main() -> Result<()> {
             build.object(p);
         });
 
-    build.compile("ocaml");
+    build.compile("sail_wrapper");
 
     Ok(())
 }
