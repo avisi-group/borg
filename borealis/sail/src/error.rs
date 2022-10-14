@@ -9,6 +9,10 @@ pub enum Error {
     Interface(ocaml::Error),
 }
 
+// terrible, terrible
+unsafe impl Send for Error {}
+unsafe impl Sync for Error {}
+
 impl From<ocaml::Error> for Error {
     fn from(e: ocaml::Error) -> Self {
         Self::Interface(e)

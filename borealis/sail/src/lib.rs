@@ -6,6 +6,7 @@ use {
     crate::error::Error,
     ocaml::{List, Runtime},
     once_cell::sync::Lazy,
+    parking_lot::Mutex,
 };
 
 pub mod ast;
@@ -19,23 +20,21 @@ pub mod span;
 /// a "boxroot is not setup" error. This error will be hard to diagnose as it will be dependent on
 /// the order that other (correctly dereferencing RT and thus initialising the runtime) functions
 /// are called. Need to investigate how this can be prevented.
-static RT: Lazy<Runtime> = Lazy::new(ocaml::runtime::init);
+static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(ocaml::runtime::init()));
 
 ocaml::import! {
-    fn internal_dedup(l: List<i32>) -> List<i32>;
+    fn internal_util_dedup(l: List<i32>) -> List<i32>;
 }
 
 /// Removes duplicate values in the supplied Vec
 pub fn dedup(list: Vec<i32>) -> Result<Vec<i32>, Error> {
-    let rt = &*RT;
-
     let mut l = List::empty();
 
     for element in list {
-        l = unsafe { l.add(rt, &element) };
+        l = unsafe { l.add(&*RT.lock(), &element) };
     }
 
-    Ok(unsafe { internal_dedup(rt, l) }?.into_vec())
+    Ok(unsafe { internal_util_dedup(&*RT.lock(), l) }?.into_vec())
 }
 
 #[cfg(test)]

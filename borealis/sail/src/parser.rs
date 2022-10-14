@@ -1,9 +1,17 @@
 //! Sail source file parsing
 
-use crate::RT;
+use ocaml::interop::{BoxRoot, ToOCaml};
+
+use {
+    crate::{error::Error, RT},
+    ocaml::{List, Value},
+};
 
 ocaml::import! {
-    fn internal_load_files();
+    fn internal_type_check_initial_env() -> Value;
+
+    // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> (String, Value, Value);
 }
 
 /// Parses supplied Sail files and returns the AST
@@ -14,7 +22,7 @@ ocaml::import! {
 /// their ASTs. The pre-processor is then run, which evaluates `$directive`
 /// statements in Sail, such as
 ///
-/// ```
+/// ```sail
 /// $include <prelude.sail>
 /// ```
 ///
@@ -32,9 +40,45 @@ ocaml::import! {
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_files() {
-    let rt = &*RT;
-    unsafe {
-        internal_load_files(rt).unwrap();
+pub fn load_files(files: Vec<String>) -> Result<(), Error> {
+    let env = unsafe { internal_type_check_initial_env(&*RT.lock())? };
+
+    let files = {
+        let mut l = List::empty();
+        for file in files {
+            let file_rooted: BoxRoot<String> = file.to_boxroot(&mut *RT.lock());
+            l = unsafe { l.add(&*RT.lock(), &file_rooted) };
+        }
+        l
+    };
+
+    let (output_name, ast, type_envs) =
+        unsafe { internal_process_file_load_files(&*RT.lock(), false, List::empty(), env, files)? };
+
+    dbg!((output_name, ast, type_envs));
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        crate::parser::load_files,
+        std::{env, path::PathBuf},
+    };
+
+    #[test]
+    fn load_files_empty() {
+        load_files(vec![]).unwrap();
+    }
+
+    #[test]
+    fn load_files_prelude() {
+        let path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+            .join("examples/prelude.sail")
+            .to_string_lossy()
+            .to_string();
+
+        load_files(vec![path]).unwrap();
     }
 }

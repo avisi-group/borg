@@ -1,5 +1,6 @@
 use {
     color_eyre::eyre::{Context, Result},
+    sail::parser::load_files,
     std::env,
 };
 
@@ -9,12 +10,7 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = env::args();
 
-    // parse each file
-    for path in args.skip(1) {
-        let source = std::fs::read_to_string(&path).wrap_err("Failed to read input source file")?;
-
-        dbg!(source);
-    }
+    load_files(args.skip(1).collect::<Vec<_>>()).wrap_err("Failed to parse Sail files")?;
 
     Ok(())
 }
