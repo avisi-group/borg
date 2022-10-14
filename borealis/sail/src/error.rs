@@ -1,4 +1,4 @@
-//! Error handling for SAIL parser
+//! Error handling for Sail interface
 
 use std::fmt::Debug;
 

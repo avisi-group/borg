@@ -1,4 +1,6 @@
-//! Sail2 language parser
+#![deny(missing_docs)]
+
+//! Rust interface to `Sail` compiler library
 
 use {
     crate::error::Error,
@@ -23,6 +25,7 @@ ocaml::import! {
     fn internal_dedup(l: List<i32>) -> List<i32>;
 }
 
+/// Removes duplicate values in the supplied Vec
 pub fn dedup(list: Vec<i32>) -> Result<Vec<i32>, Error> {
     let rt = &*RT;
 

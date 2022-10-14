@@ -1,18 +1,13 @@
-use std::ops::Range;
+//! Span type
 
-pub type Spanned<T> = (T, Range<usize>);
+use std::{ops::Range, path::PathBuf};
 
+/// Type alias for tuple `(T, Span)`
+pub type Spanned<T> = (T, Span);
+
+/// Span over a Sail source file
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Span(Range<usize>);
-
-impl Span {
-    pub fn into_inner(self) -> Range<usize> {
-        self.0
-    }
-}
-
-impl From<Range<usize>> for Span {
-    fn from(r: Range<usize>) -> Self {
-        Self(r)
-    }
+pub struct Span {
+    path: PathBuf,
+    range: Range<usize>,
 }

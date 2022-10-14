@@ -1,4 +1,6 @@
-//! Sail2 AST
+#![allow(missing_docs)]
+
+//! Sail Abstract Syntax Tree
 
 use num_bigint::BigInt;
 
