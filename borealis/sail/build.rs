@@ -12,20 +12,25 @@ fn main() -> Result<()> {
 
     check_build_environment()?;
 
-    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join("ocaml");
+    let source_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join("ocaml");
+    let build_path = PathBuf::from(env::var("OUT_DIR")?).join("ocaml");
 
     // dune
-    assert!(Command::new("dune")
-        .current_dir(&root)
-        .arg("build")
-        .status()?
-        .success());
+    ensure!(
+        Command::new("dune")
+            .arg("build")
+            .env("DUNE_BUILD_DIR", &build_path)
+            .current_dir(&source_path)
+            .status()?
+            .success(),
+        format!("Failed to build OCaml wrapper library at source path {source_path:?} and build path {build_path:?}")
+    );
 
     let mut build = cc::Build::new();
 
-    let search_dir = root.join("_build").join("default");
+    let search_path = build_path.join("default");
 
-    fs::read_dir(search_dir)?
+    fs::read_dir(search_path)?
         .map(|f| f.unwrap().path())
         .filter(|p| p.extension().is_some())
         .filter(|p| p.extension().unwrap() == "o")
