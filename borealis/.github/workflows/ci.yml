@@ -68,6 +68,6 @@ jobs:
         # ignore failures if already installed
         run: opam install dune sail || true
 
-      - run: cargo build --workspace --all-features --all-targets
+      - run: cargo build --workspace --all-features --all-targets --release
 
-      - run: cargo test --workspace --all-features --all-targets --no-fail-fast
+      - run: cargo test --workspace --all-features --all-targets --no-fail-fast --release
