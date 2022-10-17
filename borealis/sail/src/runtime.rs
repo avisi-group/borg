@@ -70,16 +70,16 @@ impl Runtime {
     }
 
     pub fn dedup(&self, l: Vec<i32>) -> Result<Vec<i32>, Error> {
-        self.request.send(Request::Dedup(l)).unwrap();
-        self.response.recv().unwrap().map(|res| match res {
+        self.request.send(Request::Dedup(l))?;
+        self.response.recv()?.map(|res| match res {
             Response::Dedup(l) => l,
             _ => panic!("received different response kind to request"),
         })
     }
 
     pub fn load_files(&self, files: Vec<String>) -> Result<String, Error> {
-        self.request.send(Request::LoadFiles(files)).unwrap();
-        self.response.recv().unwrap().map(|res| match res {
+        self.request.send(Request::LoadFiles(files))?;
+        self.response.recv()?.map(|res| match res {
             Response::LoadFiles(ret) => ret,
             _ => panic!("received different response kind to request"),
         })
@@ -99,7 +99,8 @@ ocaml::import! {
 ///
 /// Each variant corresponds to one method on the runtime, which in turn correspond to one public
 /// function. Variants may *not* contain any OCaml values or will introduce unsoundness.
-enum Request {
+#[doc(hidden)]
+pub enum Request {
     Dedup(Vec<i32>),
     LoadFiles(Vec<String>),
 }

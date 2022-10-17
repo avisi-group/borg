@@ -66,8 +66,8 @@ jobs:
 
       - name: Install Opam dependencies
         # ignore failures if already installed
-        run: opam install dune sail || true
+        run: opam install sail || true
 
-      - run: cargo build --workspace --all-features --all-targets --release
+      - run: cargo build --workspace --release
 
-      - run: cargo test --workspace --all-features --all-targets --no-fail-fast --release
+      - run: cargo test --workspace --no-fail-fast --release -- load_files
