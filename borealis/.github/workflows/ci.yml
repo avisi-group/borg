@@ -70,4 +70,4 @@ jobs:
 
       - run: cargo build --workspace --release
 
-      - run: cargo test --workspace --no-fail-fast --release -- load_files
+      - run: cargo test --workspace --no-fail-fast --release

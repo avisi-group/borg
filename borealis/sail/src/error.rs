@@ -1,8 +1,9 @@
 //! Error handling for Sail interface
 
+use ocaml::FromValue;
+
 use {
     crate::runtime::Request,
-    fragile::Fragile,
     std::{
         fmt::Debug,
         sync::mpsc::{RecvError, SendError},
@@ -13,19 +14,21 @@ use {
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
     /// Error returned by OCaml function: {0:?}
-    OcamlFunction(
-        // fragile to make `ocaml::Error` `Send` (may contain a raw pointer but since we are not
-        // dereferencing it is safe to send across threads)
-        Fragile<ocaml::Error>,
-    ),
+    OCamlFunction(ocaml::Error),
 
     /// Error when communicating with runtime worker thread: {0}
     RuntimeCommunication(#[from] ChannelError),
+
+    /// Error due to exception thrown in OCaml: {0}
+    OCamlException(#[from] OCamlException),
 }
+
+unsafe impl Send for Error {}
+unsafe impl Sync for Error {}
 
 impl From<ocaml::Error> for Error {
     fn from(e: ocaml::Error) -> Self {
-        Self::OcamlFunction(Fragile::new(e))
+        Self::OCamlFunction(e)
     }
 }
 
@@ -47,5 +50,15 @@ impl From<SendError<Request>> for Error {
 impl From<RecvError> for Error {
     fn from(e: RecvError) -> Self {
         Error::RuntimeCommunication(e.into())
+    }
+}
+
+/// Exception in OCaml: {0:?}
+#[derive(Debug, displaydoc::Display, thiserror::Error)]
+pub struct OCamlException(String);
+
+unsafe impl FromValue for OCamlException {
+    fn from_value(v: ocaml::Value) -> Self {
+        Self(String::from_value(v))
     }
 }

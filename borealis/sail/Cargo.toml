@@ -4,14 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ocaml = "1.0.0-beta.3"
+ocaml = { git = "https://github.com/zshipko/ocaml-rs.git", rev = "723f750", features = ["no-panic-hook"] }
 num-bigint = "0.4.3"
 once_cell = "1.15.0"
 parking_lot = "0.12.1"
 displaydoc = "0.2.3"
 thiserror = "1.0.37"
 log = "0.4.17"
-fragile = "1.2.1"
 
 [build-dependencies]
 cc = "1.0.73"
@@ -22,5 +21,6 @@ name = "cli"
 
 [dev-dependencies]
 color-eyre = { version = "0.6.2", default-features = false }
+simple_logger = "2.3.0"
 insta = "1.21.0"
 proptest = "1.0.0"
