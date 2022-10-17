@@ -1,20 +1,6 @@
 //! Sail source file parsing
 
-use {
-    crate::{error::Error, RT},
-    ocaml::{
-        interop::{BoxRoot, ToOCaml},
-        List, Value,
-    },
-    once_cell::sync::Lazy,
-};
-
-ocaml::import! {
-    fn internal_type_check_initial_env() -> Value;
-
-    // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> (String, Value, Value);
-}
+use crate::{error::Error, RT};
 
 /// Parses supplied Sail files and returns the AST
 ///
@@ -42,25 +28,8 @@ ocaml::import! {
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_files(files: Vec<String>) -> Result<(), Error> {
-    Lazy::force(&RT);
-
-    let env = unsafe { internal_type_check_initial_env(&*RT.lock())? };
-
-    let mut file_list = List::empty();
-
-    for file in files {
-        let file_rooted: BoxRoot<String> = file.to_boxroot(&mut *RT.lock());
-        file_list = unsafe { file_list.add(&*RT.lock(), &file_rooted) };
-    }
-
-    let (output_name, ast, type_envs) = unsafe {
-        internal_process_file_load_files(&*RT.lock(), false, List::empty(), env, file_list)?
-    };
-
-    dbg!((output_name, ast, type_envs));
-
-    Ok(())
+pub fn load_files(files: Vec<String>) -> Result<String, Error> {
+    Ok(RT.lock().load_files(files)?)
 }
 
 #[cfg(test)]

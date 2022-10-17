@@ -10,6 +10,7 @@ once_cell = "1.15.0"
 parking_lot = "0.12.1"
 displaydoc = "0.2.3"
 thiserror = "1.0.37"
+log = "0.4.17"
 
 [build-dependencies]
 cc = "1.0.73"
