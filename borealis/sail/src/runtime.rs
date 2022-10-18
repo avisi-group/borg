@@ -8,11 +8,9 @@
 //! type `Value` is *not* safe to send across the interface. Doing so will result in a `SIGSEGV:
 //! invalid memory reference`
 
-use crate::error::OCamlException;
-
 use {
     crate::error::Error,
-    log::{error, trace},
+    log::error,
     ocaml::{
         interop::{BoxRoot, ToOCaml},
         List, Runtime as OCamlRuntime, ToValue, Value,
@@ -32,34 +30,24 @@ pub struct Runtime {
 impl Runtime {
     /// Instantiate a new Runtime with corresponding worker thread
     pub fn new() -> Self {
-        trace!("runtime new called");
-
         let (req_tx, req_rx) = mpsc::channel();
         let (res_tx, res_rx) = mpsc::channel();
 
-        trace!("initialised channels");
-
         // handle dropped implicitly by not assigning detaches thread
         thread::spawn(move || {
-            trace!("thread spawned");
-
             // initialise runtime *once* in a *single* thread
             let mut rt = ocaml::runtime::init();
-            trace!("ocaml::runtime::init");
 
             let requests = req_rx;
             let responses = res_tx;
 
             // loop indefinitely processing requests
             loop {
-                trace!("start loop");
                 // block on receiving a request
                 match requests.recv() {
                     // if successful, process request
                     Ok(request) => {
-                        trace!("received req: {:?}", request);
                         let response = process_request(&mut rt, request);
-                        trace!("processed response: {:?}", response);
 
                         // log errors if sending failed but do not terminate instead process next request
                         if let Err(e) = responses.send(response) {
@@ -90,26 +78,22 @@ impl Runtime {
     }
 
     pub fn load_files(&self, files: Vec<String>) -> Result<String, Error> {
-        trace!("sending load files request");
         self.request.send(Request::LoadFiles(files))?;
-        trace!("sent load files request");
+
         self.response.recv()?.map(|res| match res {
-            Response::LoadFiles(ret) => {
-                trace!("received response");
-                ret
-            }
+            Response::LoadFiles(ret) => ret,
             _ => panic!("received different response kind to request"),
         })
     }
 }
 
 ocaml::import! {
-    fn internal_util_dedup(l: List<Value>) -> Result<List<i32>, OCamlException>;
+    fn internal_util_dedup(l: List<Value>) -> Result<List<i32>, ocaml::Error>;
 
-    fn internal_type_check_initial_env() -> Result<Value, OCamlException>;
+    fn internal_type_check_initial_env() -> Result<Value, ocaml::Error>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Value, Value), OCamlException>;
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Value, Value), ocaml::Error>;
 }
 
 /// Request made against runtime
@@ -152,25 +136,19 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
         }
 
         Request::LoadFiles(files) => {
-            trace!("processing load files request");
             let env = unsafe { internal_type_check_initial_env(rt)?? };
-            trace!("got env: {:?}", env);
 
             let mut file_list = List::empty();
 
             for file in files {
-                trace!("adding file {:?}", file);
                 let file_rooted: BoxRoot<String> = file.to_boxroot(rt);
-                trace!("boxed file {:?}", file);
+
                 file_list = unsafe { file_list.add(rt, &file_rooted) };
-                trace!("added file {:?}", file);
             }
 
             let (output_name, ast, type_envs) = unsafe {
                 internal_process_file_load_files(rt, false, List::empty(), env, file_list)??
             };
-
-            trace!("load_files called");
 
             dbg!((ast, type_envs));
 
