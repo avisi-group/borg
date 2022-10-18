@@ -2,6 +2,7 @@
 
 use {
     crate::runtime::Request,
+    ocaml::CamlError,
     std::{
         fmt::Debug,
         sync::mpsc::{RecvError, SendError},
@@ -23,7 +24,18 @@ unsafe impl Sync for Error {}
 
 impl From<ocaml::Error> for Error {
     fn from(e: ocaml::Error) -> Self {
-        Self::OCamlFunction(e)
+        if let ocaml::Error::Caml(CamlError::Exception(val)) = &e {
+            let msg = unsafe { val.exception_to_string() }.unwrap_or_else(|e| {
+                format!(
+                    "Failed to convert exception to string due to UTF-8 error: {}",
+                    e
+                )
+            });
+
+            Self::OCamlFunction(ocaml::Error::Error(msg.into()))
+        } else {
+            Self::OCamlFunction(e)
+        }
     }
 }
 
