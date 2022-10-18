@@ -21,9 +21,9 @@ RUN eval `opam env` && CPPFLAGS=-I/tmp/gmp-prefix/include CFLAGS=-I/tmp/gmp-pref
 # build rust dependencies
 RUN cargo init --lib .
 COPY Cargo.toml .
-RUN eval `opam env` && cargo build --release --target x86_64-unknown-linux-musl --tests --examples
+RUN eval `opam env` && cargo build --release --tests --examples
 
 # run tests
 COPY . .
 RUN touch src/lib.rs
-RUN eval `opam env` && cargo test --release --target x86_64-unknown-linux-musl --no-fail-fast
+RUN eval `opam env` && cargo test --release --no-fail-fast

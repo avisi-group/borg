@@ -40,6 +40,13 @@ fn main() -> Result<()> {
 
     build.compile("sail_wrapper");
 
+    // Fix linker errors on aarch64 macOS
+    #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
+    {
+        println!("cargo:rustc-link-arg=-lgmp");
+        println!("cargo:rustc-link-arg=-L/opt/homebrew/lib");
+    }
+
     Ok(())
 }
 
