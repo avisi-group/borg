@@ -68,6 +68,6 @@ jobs:
         # ignore failures if already installed
         run: opam install sail || true
 
-      - run: cargo build --workspace --release
+      - run: cargo build --workspace --release --examples --tests
 
-      - run: cargo test --workspace --no-fail-fast --release
+      - run: cargo test --workspace --release --no-fail-fast

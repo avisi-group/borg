@@ -16,9 +16,6 @@ log = "0.4.17"
 cc = "1.0.73"
 color-eyre = "0.6.2"
 
-[[example]]
-name = "cli"
-
 [dev-dependencies]
 color-eyre = { version = "0.6.2", default-features = false }
 simple_logger = "2.3.0"

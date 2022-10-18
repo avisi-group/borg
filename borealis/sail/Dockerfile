@@ -1,24 +1,29 @@
-# Included for reference and testing that targeting ARM64 is not entirely broken, as it is not tested in CI
+# Included for reference and testing that targeting ARM64 / MUSL is not entirely broken, as it is not tested in CI
 
-FROM rust AS builder
+FROM rust:alpine AS builder
 WORKDIR /tmp/build
 
-# install OCaml, Opam, dune, and sail
-RUN apt update && apt install -y opam
+# install packages
+RUN apk update && apk add opam alpine-sdk findutils zlib-dev gcc m4
+
+RUN curl https://gmplib.org/download/gmp/gmp-6.2.1.tar.lz | tar --lzip -x
+RUN cd gmp-6.2.1; ./configure --prefix /tmp/gmp-prefix && make && make install
+
+# setup OCaml
 RUN opam init --disable-sandboxing --enable-shell-hook -a -y
 RUN opam init --shell-setup
+RUN opam switch create 4.11.2+musl+static+flambda
 
 ENV PATH="/root/.opam/default/bin:$PATH"
 
-RUN opam install -y dune sail
+RUN eval `opam env` && CPPFLAGS=-I/tmp/gmp-prefix/include CFLAGS=-I/tmp/gmp-prefix/include LDFLAGS=-L/tmp/gmp-prefix/lib opam install --assume-depexts -y sail
 
 # build rust dependencies
 RUN cargo init --lib .
-RUN mkdir examples && touch examples/cli.rs
 COPY Cargo.toml .
-RUN cargo build
+RUN eval `opam env` && cargo build --release --target x86_64-unknown-linux-musl --tests --examples
 
 # run tests
 COPY . .
 RUN touch src/lib.rs
-RUN . ~/.opam/opam-init/init.sh && cargo test --all-features --all-targets --no-fail-fast
+RUN eval `opam env` && cargo test --release --target x86_64-unknown-linux-musl --no-fail-fast
