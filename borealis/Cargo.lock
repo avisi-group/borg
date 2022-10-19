@@ -350,7 +350,7 @@ dependencies = [
 [[package]]
 name = "ocaml"
 version = "1.0.0-beta.4"
-source = "git+https://github.com/zshipko/ocaml-rs.git?rev=723f750#723f750f1e744787f2bac3651b0d397476e1cbb8"
+source = "git+https://github.com/fmckeogh/ocaml-rs.git?rev=f7324c0#f7324c0c4ef2c8c6aeba97cd518e018480c803f1"
 dependencies = [
  "ocaml-boxroot-sys",
  "ocaml-derive",
@@ -370,7 +370,7 @@ dependencies = [
 [[package]]
 name = "ocaml-derive"
 version = "1.0.0-beta.4"
-source = "git+https://github.com/zshipko/ocaml-rs.git?rev=723f750#723f750f1e744787f2bac3651b0d397476e1cbb8"
+source = "git+https://github.com/fmckeogh/ocaml-rs.git?rev=f7324c0#f7324c0c4ef2c8c6aeba97cd518e018480c803f1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -401,7 +401,7 @@ dependencies = [
 [[package]]
 name = "ocaml-sys"
 version = "0.23.0"
-source = "git+https://github.com/zshipko/ocaml-rs.git?rev=723f750#723f750f1e744787f2bac3651b0d397476e1cbb8"
+source = "git+https://github.com/fmckeogh/ocaml-rs.git?rev=f7324c0#f7324c0c4ef2c8c6aeba97cd518e018480c803f1"
 dependencies = [
  "cc",
  "cty",

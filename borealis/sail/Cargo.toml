@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-ocaml = { git = "https://github.com/zshipko/ocaml-rs.git", rev = "723f750", features = ["no-panic-hook"] }
+ocaml = { git = "https://github.com/fmckeogh/ocaml-rs.git", rev = "f7324c0", features = ["no-panic-hook"] }
 num-bigint = "0.4.3"
 once_cell = "1.15.0"
 parking_lot = "0.12.1"

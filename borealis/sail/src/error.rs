@@ -2,9 +2,9 @@
 
 use {
     crate::runtime::Request,
-    ocaml::{CamlError, FromValue, Value},
+    ocaml::{interop::BoxRoot, CamlError, FromValue, Int, Value},
     std::{
-        fmt::Debug,
+        fmt::{Debug, Formatter},
         sync::mpsc::{RecvError, SendError},
     },
 };
@@ -82,23 +82,46 @@ pub enum WrapperError {
 /// Sail library error
 #[derive(Debug, displaydoc::Display, thiserror::Error, FromValue)]
 pub enum SailError {
-    /// General
-    General(Value, String),
-    /// Unreachable
-    Unreachable(
-        Value,
-        (String, ocaml::Int, ocaml::Int, ocaml::Int, ocaml::Int),
-        Value,
-        String,
-    ),
-    /// Todo
-    Todo(Value, String),
-    /// Syntax
-    Syntax(Value, String),
-    /// Syntax location
-    SyntaxLocation(Value, String),
-    /// Lexer
-    Lexer(Value, String),
-    /// Type
-    Type(Value, String),
+    /// General error
+    General(L, String),
+    /// Unreachable error
+    Unreachable(L, (String, Int, Int, Int, Int), Value, String),
+    /// Todo error
+    Todo(L, String),
+    /// Syntax error
+    Syntax(Position, String),
+    /// Syntax location error
+    SyntaxLocation(L, String),
+    /// Lexical error
+    Lexical(Position, String),
+    /// Type error
+    Type(L, String),
+}
+
+/// Location
+#[derive(Debug, FromValue)]
+pub enum L {
+    /// Unknown location
+    Unknown,
+    /// Unique location
+    Unique(Int, Box<L>),
+    /// Generated location
+    Generated(Box<L>),
+    /// Range between two positions
+    Range(Position, Position),
+    /// Documented location
+    Documented(String, Box<L>),
+}
+
+/// Position in a source file
+#[derive(Debug, FromValue)]
+pub struct Position {
+    /// File name
+    pos_fname: String,
+    /// Line number
+    pos_lnum: Int,
+    /// Character offset of beginning of line
+    pos_bol: Int,
+    /// Character offset of the position
+    pos_cnum: Int,
 }
