@@ -1,18 +1,22 @@
-use sail::parser::load_files;
+use {color_eyre::Result, sail::parser::load_files};
 
-fn main() {
+fn main() -> Result<()> {
     color_eyre::install().unwrap();
     simple_logger::init_with_env().unwrap();
 
-    dbg!();
-    dbg!(load_files(vec![
-        "/home/fm208/Documents/borealis/sail/examples/prelude.sail".to_owned()
-    ])
-    .unwrap());
+    println!(
+        "{}",
+        load_files(vec![
+            "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail".to_owned()
+        ])?
+    );
 
-    dbg!();
-    dbg!(load_files(vec![
-        "/home/fm208/Documents/borealis/sail/examples/prelude.sail".to_owned()
-    ])
-    .unwrap());
+    println!(
+        "{}",
+        load_files(vec![
+            "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail".to_owned()
+        ])?
+    );
+
+    Ok(())
 }

@@ -9,7 +9,7 @@
 //! invalid memory reference`
 
 use {
-    crate::error::Error,
+    crate::error::{Error, WrapperError},
     log::error,
     ocaml::{
         interop::{BoxRoot, ToOCaml},
@@ -51,7 +51,8 @@ impl Runtime {
 
                         // log errors if sending failed but do not terminate instead process next request
                         if let Err(e) = responses.send(response) {
-                            error!("Runtime thread failed to send response with error {e}");
+                            error!("Runtime thread failed to send response with error {e}, terminating thread");
+                            break;
                         }
                     }
                     // if unsuccessful, channel must be closed so report error and terminate
@@ -88,12 +89,12 @@ impl Runtime {
 }
 
 ocaml::import! {
-    fn internal_util_dedup(l: List<Value>) -> Result<List<i32>, ocaml::Error>;
+    fn internal_util_dedup(l: List<Value>) -> Result<List<i32>, WrapperError>;
 
-    fn internal_type_check_initial_env() -> Result<Value, ocaml::Error>;
+    fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Value, Value), ocaml::Error>;
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Value, Value), WrapperError>;
 }
 
 /// Request made against runtime
