@@ -300,27 +300,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num-bigint"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f93ab6289c7b344a8a9f60f88d80aa20032336fe78da341afc91c8a2341fc75f"
-dependencies = [
- "autocfg",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "num-integer"
-version = "0.1.45"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "225d3389fb3509a24c93f5c29eb6bde2586b98d9f016636dff58d7c6f7569cd9"
-dependencies = [
- "autocfg",
- "num-traits",
-]
-
-[[package]]
 name = "num-traits"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -350,7 +329,7 @@ dependencies = [
 [[package]]
 name = "ocaml"
 version = "1.0.0-beta.4"
-source = "git+https://github.com/fmckeogh/ocaml-rs.git?rev=f7324c0#f7324c0c4ef2c8c6aeba97cd518e018480c803f1"
+source = "git+https://github.com/zshipko/ocaml-rs.git?rev=9a7ad2a#9a7ad2aedc13fdcddbc174fcb4a415ebd73b48f9"
 dependencies = [
  "ocaml-boxroot-sys",
  "ocaml-derive",
@@ -370,7 +349,7 @@ dependencies = [
 [[package]]
 name = "ocaml-derive"
 version = "1.0.0-beta.4"
-source = "git+https://github.com/fmckeogh/ocaml-rs.git?rev=f7324c0#f7324c0c4ef2c8c6aeba97cd518e018480c803f1"
+source = "git+https://github.com/zshipko/ocaml-rs.git?rev=9a7ad2a#9a7ad2aedc13fdcddbc174fcb4a415ebd73b48f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -401,7 +380,7 @@ dependencies = [
 [[package]]
 name = "ocaml-sys"
 version = "0.23.0"
-source = "git+https://github.com/fmckeogh/ocaml-rs.git?rev=f7324c0#f7324c0c4ef2c8c6aeba97cd518e018480c803f1"
+source = "git+https://github.com/zshipko/ocaml-rs.git?rev=9a7ad2a#9a7ad2aedc13fdcddbc174fcb4a415ebd73b48f9"
 dependencies = [
  "cc",
  "cty",
@@ -594,7 +573,6 @@ dependencies = [
  "displaydoc",
  "insta",
  "log",
- "num-bigint",
  "ocaml",
  "once_cell",
  "parking_lot",

@@ -1,10 +1,13 @@
 //! Error handling for Sail interface
 
 use {
-    crate::runtime::Request,
-    ocaml::{interop::BoxRoot, CamlError, FromValue, Int, Value},
+    crate::{
+        ast::{Position, L},
+        runtime::Request,
+    },
+    ocaml::{CamlError, FromValue, Int, Value},
     std::{
-        fmt::{Debug, Formatter},
+        fmt::Debug,
         sync::mpsc::{RecvError, SendError},
     },
 };
@@ -96,32 +99,4 @@ pub enum SailError {
     Lexical(Position, String),
     /// Type error
     Type(L, String),
-}
-
-/// Location
-#[derive(Debug, FromValue)]
-pub enum L {
-    /// Unknown location
-    Unknown,
-    /// Unique location
-    Unique(Int, Box<L>),
-    /// Generated location
-    Generated(Box<L>),
-    /// Range between two positions
-    Range(Position, Position),
-    /// Documented location
-    Documented(String, Box<L>),
-}
-
-/// Position in a source file
-#[derive(Debug, FromValue)]
-pub struct Position {
-    /// File name
-    pos_fname: String,
-    /// Line number
-    pos_lnum: Int,
-    /// Character offset of beginning of line
-    pos_bol: Int,
-    /// Character offset of the position
-    pos_cnum: Int,
 }

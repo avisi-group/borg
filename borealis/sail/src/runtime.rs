@@ -9,7 +9,10 @@
 //! invalid memory reference`
 
 use {
-    crate::error::{Error, WrapperError},
+    crate::{
+        ast::Definition,
+        error::{Error, WrapperError},
+    },
     log::error,
     ocaml::{
         interop::{BoxRoot, ToOCaml},
@@ -94,7 +97,7 @@ ocaml::import! {
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Value, Value), WrapperError>;
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Definition, Value), WrapperError>;
 }
 
 /// Request made against runtime

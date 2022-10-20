@@ -2,44 +2,83 @@
 
 //! Sail Abstract Syntax Tree
 
-use num_bigint::BigInt;
+use {
+    ocaml::{FromValue, Int, Value},
+    std::fmt::Debug,
+};
 
-#[derive(Debug, Clone)]
-pub struct Extern {
-    pub pure: bool,
-    pub bindings: Vec<(String, String)>,
+/// Location
+#[derive(Debug, Clone, FromValue)]
+pub enum L {
+    /// Unknown location
+    Unknown,
+    /// Unique location
+    Unique(Int, Box<L>),
+    /// Generated location
+    Generated(Box<L>),
+    /// Range between two positions
+    Range(Position, Position),
+    /// Documented location
+    Documented(String, Box<L>),
 }
 
-#[derive(Debug, Clone)]
-pub enum Identifier {
-    Identifier(String),
-    Operator(String),
+/// Position in a source file
+#[derive(Debug, Clone, FromValue)]
+pub struct Position {
+    /// File name
+    pub pos_fname: String,
+    /// Line number
+    pub pos_lnum: Int,
+    /// Character offset of beginning of line
+    pub pos_bol: Int,
+    /// Character offset of the position
+    pub pos_cnum: Int,
 }
 
-/// Identifiers with kind, ticked to differntiate from program variables
-#[derive(Debug, Clone)]
-pub struct KindIdentifier(String);
+#[derive(Debug, Clone, FromValue)]
+pub struct Text(String);
 
-#[derive(Debug, Clone)]
-pub enum Kind {
-    Int,
+/// Idenitifer
+#[derive(Debug, Clone, FromValue)]
+pub struct X(Text);
+
+/// Infix identifier
+#[derive(Debug, Clone, FromValue)]
+pub struct Xi(Text);
+
+/// Base kind
+#[derive(Debug, Clone, FromValue)]
+pub enum KindAux {
+    /// Kind of types
     Type,
+    /// Kind of natural number size expressions
+    Int,
+    /// Kind of vector order specifications
     Order,
+    /// Kind of constraints
     Bool,
 }
 
-#[derive(Debug, Clone)]
-pub enum BaseEffect {
+/// Base kind
+#[derive(Debug, Clone, FromValue)]
+pub struct Kind(KindAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub enum BaseEffectAux {
     /// Read register
     ReadRegister,
     /// Write register
     WriteRegister,
     /// Read memory
     ReadMemory,
+    /// Read memory tagged
+    ReadMemoryTagged,
     /// Write memory
     WriteMemory,
     /// Write memory value
     WriteMemoryValue,
+    /// Write memory value tagged
+    WriteMemoryValueTagged,
     /// Address for write signaled
     EaMemory,
     /// Determine if a store-exclusive (ARM) is going to succeed
@@ -54,30 +93,59 @@ pub enum BaseEffect {
     Unspecified,
     /// Nondeterminism from intra-instruction parallelism
     Nondetermine,
-    ///
+    /// ?
     Escape,
-    ///
+    /// ?
     Config,
 }
 
-#[derive(Debug, Clone)]
-pub enum Literal {
+#[derive(Debug, Clone, FromValue)]
+pub struct BaseEffect(BaseEffectAux, L);
+
+/// Identifiers with kind, ticked to differntiate from program variables
+#[derive(Debug, Clone, FromValue)]
+pub enum KindIdentifierAux {
+    Var(X),
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct KindIdentifier(KindIdentifierAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub enum IdentifierAux {
+    Identifier(X),
+    Operator(X),
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct Identifier(IdentifierAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub enum LiteralAux {
     Unit,
     Zero,
     One,
     True,
     False,
-    Num(BigInt),
+    /// Natural number constant
+    Num(Value),
+    /// Bit vector constant, C-style
     Hex(String),
+    /// Bit vector constant, C-style
     Bin(String),
+    /// Undefined value
     Undefined,
+    /// String constant
     String(String),
     Real(String),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct Literal(LiteralAux, L);
+
 /// Expressions of all kinds, to be translated to types, nats, orders, and effects after parsing
-#[derive(Debug, Clone)]
-pub enum Atyp {
+#[derive(Debug, Clone, FromValue)]
+pub enum AtypAux {
     /// Identifier
     Identifier(Identifier),
     /// Ticked variable
@@ -85,7 +153,7 @@ pub enum Atyp {
     /// Literal
     Literal(Literal),
     /// Numeric set
-    NumericSet(KindIdentifier, Vec<BigInt>),
+    NumericSet(KindIdentifier, Vec<Value>),
     /// Product
     Product(Box<Atyp>, Box<Atyp>),
     /// Sum
@@ -115,38 +183,56 @@ pub enum Atyp {
     Base(String, Box<Atyp>, Box<Atyp>),
 }
 
+/// Expressions of all kinds, to be translated to types, nats, orders, and effects after parsing
+#[derive(Debug, Clone, FromValue)]
+pub struct Atyp(AtypAux, L);
+
 /// Optionally kind-annotated identifier
-#[derive(Debug, Clone)]
-pub struct KindedIdentifier(
+#[derive(Debug, Clone, FromValue)]
+pub struct KindedIdentifierAux(
     pub Option<String>,
     pub Vec<KindIdentifier>,
-    pub Option<Kind>,
+    pub Option<KindAux>,
 );
 
+/// Optionally kind-annotated identifier
+#[derive(Debug, Clone, FromValue)]
+pub struct KindedIdentifier(KindIdentifierAux, L);
+
 /// Either a kinded identifier or a nexp constraint for a typquant
-#[derive(Debug, Clone)]
-pub enum QuantItem {
+#[derive(Debug, Clone, FromValue)]
+pub enum QuantItemAux {
     /// Optionally kinded identifier
     KindedIdentifier(KindedIdentifier),
     /// Constraint for this type
     Constraint(Atyp),
 }
 
+/// Either a kinded identifier or a nexp constraint for a typquant
+#[derive(Debug, Clone, FromValue)]
+pub struct QuantItem(QuantItemAux, L);
+
 /// Type quantifiers and constraints
-#[derive(Debug, Clone)]
-pub enum TypQuant {
+#[derive(Debug, Clone, FromValue)]
+pub enum TypQuantAux {
     Tq(Vec<QuantItem>),
     /// Sugar, omitting quantifier and constraints
     NoForAll,
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct TypQuant(TypQuantAux, L);
+
 /// Type scheme
-#[derive(Debug, Clone)]
-pub struct TypeScheme(pub TypQuant, pub Atyp);
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeSchemeAux(pub TypQuant, pub Atyp);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeScheme(TypeSchemeAux, L);
 
 /// Pattern
-#[derive(Debug, Clone)]
-pub enum Pattern {
+#[derive(Debug, Clone, FromValue)]
+pub enum PatternAux {
     /// Literal constant pattern
     Literal(Literal),
     /// Always matches
@@ -179,29 +265,39 @@ pub enum Pattern {
     StringAppend(Vec<Pattern>),
 }
 
+/// Pattern
+#[derive(Debug, Clone, FromValue)]
+pub struct Pattern(PatternAux, L);
+
 /// Field pattern
-#[derive(Debug, Clone)]
-pub struct FieldPattern(pub Identifier, pub Pattern);
+#[derive(Debug, Clone, FromValue)]
+pub struct FieldPatternAux(pub Identifier, pub Pattern);
+
+/// Field pattern
+#[derive(Debug, Clone, FromValue)]
+pub struct FieldPattern(FieldPatternAux, L);
 
 /// Loop kind
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromValue)]
 pub enum Loop {
     While,
     Until,
 }
 
-/// Pattern match
-///
-/// `pexp` in Sail source
-#[derive(Debug, Clone)]
-pub enum PatternMatch {
-    Expression(Pattern, Expression),
-    When(Pattern, Expression, Expression),
+/// Optional termination measure for a loop
+#[derive(Debug, Clone, FromValue)]
+pub enum MeasureAux {
+    None,
+    Some(Expression),
 }
 
+/// Optional termination measure for a loop
+#[derive(Debug, Clone, FromValue)]
+pub struct Measure(MeasureAux, L);
+
 /// Expression
-#[derive(Debug, Clone)]
-pub enum Expression {
+#[derive(Debug, Clone, FromValue)]
+pub enum ExpressionAux {
     /// Block (parsing conflict with structs?)
     Block(Vec<Expression>),
 
@@ -314,38 +410,90 @@ pub enum Expression {
     InternalReturn(Box<Expression>),
 }
 
+/// Expression
+#[derive(Debug, Clone, FromValue)]
+pub struct Expression(ExpressionAux, L);
+
 /// Field Expression
-#[derive(Debug, Clone)]
-pub struct FieldExpression(pub Identifier, pub Expression);
+#[derive(Debug, Clone, FromValue)]
+pub struct FieldExpressionAux(pub Identifier, pub Expression);
+
+/// Field Expression
+#[derive(Debug, Clone, FromValue)]
+pub struct FieldExpression(FieldExpressionAux, L);
 
 /// Optional default value for indexed vectors
 ///
 /// To define a default value for any unspecified positions in a sparse map
-#[derive(Debug, Clone)]
-pub enum OptionalDefault {
+#[derive(Debug, Clone, FromValue)]
+pub enum OptionalDefaultAux {
     Empty,
     Dec(Expression),
 }
 
+/// Optional default value for indexed vectors
+///
+/// To define a default value for any unspecified positions in a sparse map
+#[derive(Debug, Clone, FromValue)]
+pub struct OptionalDefault(OptionalDefaultAux, L);
+
+/// Pattern match
+///
+/// `pexp` in Sail source
+#[derive(Debug, Clone, FromValue)]
+pub enum PatternMatchAux {
+    Expression(Pattern, Expression),
+    When(Pattern, Expression, Expression),
+}
+
+/// Pattern match
+///
+/// `pexp` in Sail source
+#[derive(Debug, Clone, FromValue)]
+pub struct PatternMatch(PatternMatchAux, L);
+
 /// Value binding
 ///
 /// Implicit type, pattern must be total
-#[derive(Debug, Clone)]
-pub struct LetBind(pub Box<Pattern>, pub Box<Expression>);
+#[derive(Debug, Clone, FromValue)]
+pub struct LetBindAux(pub Box<Pattern>, pub Box<Expression>);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct LetBind(LetBindAux, L);
 
 /// Optional type annotation for functions
-#[derive(Debug, Clone)]
-pub struct TypeAnnotation(pub Option<(TypQuant, Atyp)>);
+#[derive(Debug, Clone, FromValue)]
+pub enum TypeAnnotationOptAux {
+    None,
+    Some(TypQuant, Atyp),
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeAnnotationOpt(TypeAnnotationOptAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub enum TypeSchemeOptAux {
+    None,
+    Some(TypeScheme),
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeSchemeOpt(TypeSchemeOptAux, L);
 
 /// Optional effect annotation for functions
-///
-/// Inner `None` is sugar for empty effect set
-#[derive(Debug, Clone)]
-pub struct EffectAnnotation(pub Option<Atyp>);
+#[derive(Debug, Clone, FromValue)]
+pub enum EffectAnnotationOptAux {
+    /// Sugar for empty effect set
+    None,
+    Some(Atyp),
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct EffectAnnotationOpt(EffectAnnotationOptAux, L);
 
 /// Optional recursive annotation for functions
-#[derive(Debug, Clone)]
-pub enum RecursiveAnnotation {
+#[derive(Debug, Clone, FromValue)]
+pub enum RecursiveAnnotationOptAux {
     /// Non-recursive
     NonRecursive,
     /// Recursive
@@ -354,29 +502,29 @@ pub enum RecursiveAnnotation {
     Measure(Pattern, Expression),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct RecursiveAnnotationOpt(RecursiveAnnotationOptAux, L);
+
 /// Function clause
-#[derive(Debug, Clone)]
-pub struct FunctionClause(pub Identifier, pub PatternMatch);
+#[derive(Debug, Clone, FromValue)]
+pub struct FunctionClauseAux(pub Identifier, pub PatternMatch);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct FunctionClause(FunctionClauseAux, L);
 
 /// Type union constructors
-#[derive(Debug, Clone)]
-pub enum TypeUnion {
+#[derive(Debug, Clone, FromValue)]
+pub enum TypeUnionAux {
     Identifier(Atyp, Identifier),
     AnonymousRecord(Vec<(Atyp, Identifier)>, Identifier),
 }
 
-/// Instantiation substitution
-#[derive(Debug, Clone)]
-pub enum Substitution {
-    /// Instantiate a type variable with a type
-    Type(KindIdentifier, Atyp),
-    /// Instantiate an identifier with another identifier
-    Identifier(Identifier, Identifier),
-}
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeUnion(TypeUnionAux, L);
 
 /// Index specification, for bitfields in register types
-#[derive(Debug, Clone)]
-pub enum IndexRange {
+#[derive(Debug, Clone, FromValue)]
+pub enum IndexRangeAux {
     /// Single index
     Single(Atyp),
     /// Index range
@@ -385,15 +533,21 @@ pub enum IndexRange {
     Concat(Box<IndexRange>, Box<IndexRange>),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct IndexRange(IndexRangeAux, L);
+
 /// Default kinding or typing assumption, and default order for literal vectors and vector shorthands
-#[derive(Debug, Clone)]
-pub struct DefaultTypingSpecification(pub Kind, pub Atyp);
+#[derive(Debug, Clone, FromValue)]
+pub struct DefaultTypingSpecificationAux(pub Kind, pub Atyp);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct DefaultTypingSpecification(DefaultTypingSpecificationAux, L);
 
 /// Mapping pattern
 ///
 /// Mostly the same as normal patterns but only constructible parts
-#[derive(Debug, Clone)]
-pub enum MappingPattern {
+#[derive(Debug, Clone, FromValue)]
+pub enum MappingPatternAux {
     /// Literal
     Literal(Literal),
     Identifier(Identifier),
@@ -414,50 +568,61 @@ pub enum MappingPattern {
     /// x^^y
     StringAppend(Vec<MappingPattern>),
     /// Typed pattern
-    Type(Atyp, Box<MappingPattern>),
+    Type(Box<MappingPattern>, Atyp),
     As(Box<MappingPattern>, Identifier),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct MappingPattern(MappingPatternAux, L);
+
 /// Mapping pattern expression
-#[derive(Debug, Clone)]
-pub enum MappingPatternExpression {
+#[derive(Debug, Clone, FromValue)]
+pub enum MappingPatternExpressionAux {
     Pattern(MappingPattern),
     When(MappingPattern, Expression),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct MappingPatternExpression(MappingPatternExpressionAux, L);
+
 /// Mapping clause (bidirectional pattern-match)
-#[derive(Debug, Clone)]
-pub enum MappingClause {
+#[derive(Debug, Clone, FromValue)]
+pub enum MappingClauseAux {
     Bidirectional(MappingPatternExpression, MappingPatternExpression),
-    Forwards(MappingPatternExpression, MappingPatternExpression),
-    Backwards(MappingPatternExpression, MappingPatternExpression),
+    Forwards(MappingPatternExpression, Expression),
+    Backwards(MappingPatternExpression, Expression),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct MappingClause(MappingClauseAux, L);
+
 /// Mapping definition (bidirectional pattern-match function)
-#[derive(Debug, Clone)]
-pub struct MappingDefinition(
+#[derive(Debug, Clone, FromValue)]
+pub struct MappingDefinitionAux(
     pub Identifier,
     pub Option<TypeScheme>,
     pub Vec<MappingClause>,
 );
 
-/// Outcome declaration
-#[derive(Debug, Clone)]
-pub struct OutcomeDeclaration(pub Identifier, pub TypeScheme, pub Vec<KindedIdentifier>);
+#[derive(Debug, Clone, FromValue)]
+pub struct MappingDefinition(MappingDefinitionAux, L);
 
 /// Function definition
-#[derive(Debug, Clone)]
-pub struct FunctionDefinition(
-    pub RecursiveAnnotation,
-    pub TypeAnnotation,
-    pub EffectAnnotation,
+#[derive(Debug, Clone, FromValue)]
+pub struct FunctionDefinitionAux(
+    pub RecursiveAnnotationOpt,
+    pub TypeAnnotationOpt,
+    pub EffectAnnotationOpt,
     pub Vec<FunctionClause>,
 );
 
+#[derive(Debug, Clone, FromValue)]
+pub struct FunctionDefinition(FunctionDefinitionAux, L);
+
 /// Type definition body
-#[derive(Debug, Clone)]
-pub enum TypeDefinition {
-    Abbreviation(Identifier, TypQuant, Kind, Atyp),
+#[derive(Debug, Clone, FromValue)]
+pub enum TypeDefinitionAux {
+    Abbreviation(Identifier, TypQuant, KindAux, Atyp),
     /// Struct type definition
     Record(Identifier, TypQuant, Vec<(Atyp, Identifier)>, bool),
     /// Union type definition
@@ -473,25 +638,34 @@ pub enum TypeDefinition {
     Bitfield(Identifier, Atyp, Vec<(Identifier, IndexRange)>),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeDefinition(TypeDefinitionAux, L);
+
 /// Value type specification
-#[derive(Debug, Clone)]
-pub struct ValueSpecification(TypeScheme, Identifier, Option<Extern>, bool);
+#[derive(Debug, Clone, FromValue)]
+pub struct ValueSpecificationAux(TypeScheme, Identifier, Vec<(String, String)>, bool);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct ValueSpecification(ValueSpecificationAux, L);
 
 /// Register declarations
-#[derive(Debug, Clone)]
-pub enum DecSpec {
+#[derive(Debug, Clone, FromValue)]
+pub enum DecSpecAux {
     Register(Atyp, Atyp, Atyp, Identifier, Option<Expression>),
     Config(Identifier, Atyp, Expression),
 }
 
+#[derive(Debug, Clone, FromValue)]
+pub struct DecSpec(DecSpecAux, L);
+
 /// Function and type union definitions that can be spread across a file. Each one must end in $_$
-#[derive(Debug, Clone)]
-pub enum ScatteredDefinition {
+#[derive(Debug, Clone, FromValue)]
+pub enum ScatteredDefinitionAux {
     /// Scattered function definition header
     Function(
-        RecursiveAnnotation,
-        TypeAnnotation,
-        EffectAnnotation,
+        RecursiveAnnotationOpt,
+        TypeAnnotationOpt,
+        EffectAnnotationOpt,
         Identifier,
     ),
     /// Scattered function definition clause
@@ -500,27 +674,30 @@ pub enum ScatteredDefinition {
     Variant(Identifier, TypQuant),
     /// Scattered union definition member
     UnionClause(Identifier, TypeUnion),
-    Mapping(Identifier, TypeAnnotation),
+    Mapping(Identifier, TypeAnnotationOpt),
     MappingClause(Identifier, MappingClause),
     /// Scattered definition end
     End(Identifier),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromValue)]
+pub struct ScatteredDefinition(ScatteredDefinitionAux, L);
+
+#[derive(Debug, Clone, FromValue)]
 pub struct LoopMeasure(Loop, Expression);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromValue)]
 pub enum Prec {
     Infix,
     InfixLeft,
     InfixRight,
 }
 
-#[derive(Debug, Clone)]
-pub struct FixityToken(Prec, BigInt, String);
+#[derive(Debug, Clone, FromValue)]
+pub struct FixityToken(Prec, Value, String);
 
 /// Top-level Sail2 definition
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, FromValue)]
 pub enum Definition {
     /// Type definition
     Type(TypeDefinition),
@@ -531,11 +708,8 @@ pub enum Definition {
     /// Mapping definition
     Mapping(MappingDefinition),
 
-    /// Implementation definition (`funcl` in Sail2 internals)
-    Implementation(FunctionClause),
-
-    /// Let bind value definition
-    Let(LetBind),
+    /// Value definition
+    Value(LetBind),
 
     /// Operator overload specifications
     Overload {
@@ -544,27 +718,25 @@ pub enum Definition {
     },
 
     /// Fixity declaration
-    InfixOperator {
-        kind: Prec,
-        digit: BigInt,
-        operator: Identifier,
-    },
+    Fixity(Prec, Value, Identifier),
 
     /// Top-level type constraint
     ValueSpec(ValueSpecification),
 
-    /// Top-level outcome definition
-    OutcomeSpec(OutcomeDeclaration, Vec<Definition>),
+    /// Implementation definition (`funcl` in Sail2 internals)
+    Implementation(FunctionClause),
 
-    /// Instantiation
-    Instantiation {
-        identifier: Identifier,
-        subst: Vec<Substitution>,
+    /// Fixity declaration
+    InfixOperator {
+        kind: Prec,
+        digit: Value,
+        operator: Identifier,
     },
 
     /// Default type and kind assumptions
     Default(DefaultTypingSpecification),
 
+    /// Scattered definition
     Scattered(ScatteredDefinition),
 
     /// Separate termination measure declaration
@@ -591,8 +763,8 @@ pub enum Definition {
 }
 
 /// l-value expression
-#[derive(Debug, Clone)]
-pub enum LValueExpression {
+#[derive(Debug, Clone, FromValue)]
+pub enum LValueExpressionAux {
     Identifier(Identifier),
     Memory(Identifier, Vec<Expression>),
     Vector(Box<LValueExpression>, Expression),
@@ -600,3 +772,9 @@ pub enum LValueExpression {
     VectorConcat(Vec<LValueExpression>),
     Field(Box<LValueExpression>, Identifier),
 }
+
+#[derive(Debug, Clone, FromValue)]
+pub struct LValueExpression(LValueExpressionAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct Definitions(Vec<(String, Vec<Definition>)>);
