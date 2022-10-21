@@ -2,9 +2,11 @@
 
 //! Sail Abstract Syntax Tree
 
+pub mod type_check;
+
 use {
     ocaml::{FromValue, Int, Value},
-    std::fmt::Debug,
+    std::{collections::LinkedList, fmt::Debug},
 };
 
 /// Location
@@ -35,16 +37,13 @@ pub struct Position {
     pub pos_cnum: Int,
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct Text(String);
+pub type Text = String;
 
 /// Idenitifer
-#[derive(Debug, Clone, FromValue)]
-pub struct X(Text);
+pub type X = Text;
 
 /// Infix identifier
-#[derive(Debug, Clone, FromValue)]
-pub struct Xi(Text);
+pub type Xi = Text;
 
 /// Base kind
 #[derive(Debug, Clone, FromValue)]
@@ -153,7 +152,7 @@ pub enum AtypAux {
     /// Literal
     Literal(Literal),
     /// Numeric set
-    NumericSet(KindIdentifier, Vec<Value>),
+    NumericSet(KindIdentifier, LinkedList<Value>),
     /// Product
     Product(Box<Atyp>, Box<Atyp>),
     /// Sum
@@ -169,17 +168,17 @@ pub enum AtypAux {
     /// Default order for increasing or decreasing signficant bits
     DefaultOrder,
     /// Effect set
-    EffectSet(Vec<BaseEffect>),
+    EffectSet(LinkedList<BaseEffect>),
     /// Function type, last element is an effect
     Function(Box<Atyp>, Box<Atyp>, Box<Atyp>),
     /// Mapping type, last element is an effect
     Mapping(Box<Atyp>, Box<Atyp>, Box<Atyp>),
     Wildcard,
     /// Tuple type
-    Tuple(Vec<Atyp>),
+    Tuple(LinkedList<Atyp>),
     /// Type constructor application
-    Application(Identifier, Vec<Atyp>),
-    Exist(Vec<KindedIdentifier>, Box<Atyp>, Box<Atyp>),
+    Application(Identifier, LinkedList<Atyp>),
+    Exist(LinkedList<KindedIdentifier>, Box<Atyp>, Box<Atyp>),
     Base(String, Box<Atyp>, Box<Atyp>),
 }
 
@@ -191,7 +190,7 @@ pub struct Atyp(AtypAux, L);
 #[derive(Debug, Clone, FromValue)]
 pub struct KindedIdentifierAux(
     pub Option<String>,
-    pub Vec<KindIdentifier>,
+    pub LinkedList<KindIdentifier>,
     pub Option<KindAux>,
 );
 
@@ -215,7 +214,7 @@ pub struct QuantItem(QuantItemAux, L);
 /// Type quantifiers and constraints
 #[derive(Debug, Clone, FromValue)]
 pub enum TypQuantAux {
-    Tq(Vec<QuantItem>),
+    Tq(LinkedList<QuantItem>),
     /// Sugar, omitting quantifier and constraints
     NoForAll,
 }
@@ -248,21 +247,21 @@ pub enum PatternAux {
     /// Bind pattern to type variable
     Variable(Box<Pattern>, Atyp),
     /// Union constructor patern
-    Application(Identifier, Vec<Pattern>),
+    Application(Identifier, LinkedList<Pattern>),
     /// Vector pattern
-    Vector(Vec<Pattern>),
+    Vector(LinkedList<Pattern>),
     /// Concatenated vector pattern
-    VectorConcat(Vec<Pattern>),
+    VectorConcat(LinkedList<Pattern>),
     /// Tuple pattern
-    Tuple(Vec<Pattern>),
+    Tuple(LinkedList<Pattern>),
     /// List pattern
-    List(Vec<Pattern>),
+    List(LinkedList<Pattern>),
     /// Cons pattern
     Cons(Box<Pattern>, Box<Pattern>),
     /// String append pattern
     ///
     /// x^^y
-    StringAppend(Vec<Pattern>),
+    StringAppend(LinkedList<Pattern>),
 }
 
 /// Pattern
@@ -299,7 +298,7 @@ pub struct Measure(MeasureAux, L);
 #[derive(Debug, Clone, FromValue)]
 pub enum ExpressionAux {
     /// Block (parsing conflict with structs?)
-    Block(Vec<Expression>),
+    Block(LinkedList<Expression>),
 
     /// Identifier
     Identifier(Identifier),
@@ -315,13 +314,13 @@ pub enum ExpressionAux {
     Cast(Atyp, Box<Expression>),
 
     /// Function application
-    Application(Identifier, Vec<Expression>),
+    Application(Identifier, LinkedList<Expression>),
 
     /// Infix function application
     ApplicationInfix(Box<Expression>, Identifier, Box<Expression>),
 
     /// Tuple
-    Tuple(Vec<Expression>),
+    Tuple(LinkedList<Expression>),
 
     /// Conditional
     If(Box<Expression>, Box<Expression>, Box<Expression>),
@@ -343,7 +342,7 @@ pub enum ExpressionAux {
     ),
 
     /// Vector (indexed from 0)
-    Vector(Vec<Expression>),
+    Vector(LinkedList<Expression>),
 
     /// Vector access
     VectorAccess(Box<Expression>, Box<Expression>),
@@ -366,22 +365,22 @@ pub enum ExpressionAux {
     VectorAppend(Box<Expression>, Box<Expression>),
 
     /// List
-    List(Vec<Expression>),
+    List(LinkedList<Expression>),
 
     /// Cons
     Cons(Box<Expression>, Box<Expression>),
 
     /// Struct
-    Record(Vec<Expression>),
+    Record(LinkedList<Expression>),
 
     /// Functional update of struct
-    RecordUpdate(Box<Expression>, Vec<Expression>),
+    RecordUpdate(Box<Expression>, LinkedList<Expression>),
 
     /// Field projection from struct
     Field(Box<Expression>, Identifier),
 
     /// Pattern matching
-    Case(Box<Expression>, Vec<PatternMatch>),
+    Case(Box<Expression>, LinkedList<PatternMatch>),
 
     /// Let expression
     Let(LetBind, Box<Expression>),
@@ -397,7 +396,7 @@ pub enum ExpressionAux {
 
     Throw(Atyp),
 
-    Try(Box<Expression>, Vec<PatternMatch>),
+    Try(Box<Expression>, LinkedList<PatternMatch>),
 
     Return(Box<Expression>),
 
@@ -516,7 +515,7 @@ pub struct FunctionClause(FunctionClauseAux, L);
 #[derive(Debug, Clone, FromValue)]
 pub enum TypeUnionAux {
     Identifier(Atyp, Identifier),
-    AnonymousRecord(Vec<(Atyp, Identifier)>, Identifier),
+    AnonymousRecord(LinkedList<(Atyp, Identifier)>, Identifier),
 }
 
 #[derive(Debug, Clone, FromValue)]
@@ -552,21 +551,21 @@ pub enum MappingPatternAux {
     Literal(Literal),
     Identifier(Identifier),
     /// Union constructor patern
-    Application(Identifier, Vec<MappingPattern>),
+    Application(Identifier, LinkedList<MappingPattern>),
     /// Vector pattern
-    Vector(Vec<MappingPattern>),
+    Vector(LinkedList<MappingPattern>),
     /// Concatenated vector pattern
-    VectorConcat(Vec<MappingPattern>),
+    VectorConcat(LinkedList<MappingPattern>),
     /// Tuple pattern
-    Tuple(Vec<MappingPattern>),
+    Tuple(LinkedList<MappingPattern>),
     /// List pattern
-    List(Vec<MappingPattern>),
+    List(LinkedList<MappingPattern>),
     /// Cons pattern
     Cons(Box<MappingPattern>, Box<MappingPattern>),
     /// String append pattern
     ///
     /// x^^y
-    StringAppend(Vec<MappingPattern>),
+    StringAppend(LinkedList<MappingPattern>),
     /// Typed pattern
     Type(Box<MappingPattern>, Atyp),
     As(Box<MappingPattern>, Identifier),
@@ -601,7 +600,7 @@ pub struct MappingClause(MappingClauseAux, L);
 pub struct MappingDefinitionAux(
     pub Identifier,
     pub Option<TypeScheme>,
-    pub Vec<MappingClause>,
+    pub LinkedList<MappingClause>,
 );
 
 #[derive(Debug, Clone, FromValue)]
@@ -613,7 +612,7 @@ pub struct FunctionDefinitionAux(
     pub RecursiveAnnotationOpt,
     pub TypeAnnotationOpt,
     pub EffectAnnotationOpt,
-    pub Vec<FunctionClause>,
+    pub LinkedList<FunctionClause>,
 );
 
 #[derive(Debug, Clone, FromValue)]
@@ -622,20 +621,15 @@ pub struct FunctionDefinition(FunctionDefinitionAux, L);
 /// Type definition body
 #[derive(Debug, Clone, FromValue)]
 pub enum TypeDefinitionAux {
-    Abbreviation(Identifier, TypQuant, KindAux, Atyp),
+    Abbreviation(Identifier, Value, Value),
     /// Struct type definition
-    Record(Identifier, TypQuant, Vec<(Atyp, Identifier)>, bool),
+    Record(Value),
     /// Union type definition
-    Variant(Identifier, TypQuant, Vec<TypeUnion>, bool),
+    Variant(Value),
     /// Enumeration type definition
-    Enumeration(
-        Identifier,
-        Vec<(Identifier, Atyp)>,
-        Vec<(Identifier, Option<Expression>)>,
-        bool,
-    ),
+    Enumeration(Value),
     /// Register mutable bitfield type definition
-    Bitfield(Identifier, Atyp, Vec<(Identifier, IndexRange)>),
+    Bitfield(Value),
 }
 
 #[derive(Debug, Clone, FromValue)]
@@ -643,7 +637,7 @@ pub struct TypeDefinition(TypeDefinitionAux, L);
 
 /// Value type specification
 #[derive(Debug, Clone, FromValue)]
-pub struct ValueSpecificationAux(TypeScheme, Identifier, Vec<(String, String)>, bool);
+pub struct ValueSpecificationAux(TypeScheme, Identifier, LinkedList<(String, String)>, bool);
 
 #[derive(Debug, Clone, FromValue)]
 pub struct ValueSpecification(ValueSpecificationAux, L);
@@ -651,8 +645,10 @@ pub struct ValueSpecification(ValueSpecificationAux, L);
 /// Register declarations
 #[derive(Debug, Clone, FromValue)]
 pub enum DecSpecAux {
-    Register(Atyp, Atyp, Atyp, Identifier, Option<Expression>),
+    Register(Value, Value, Value, Identifier),
     Config(Identifier, Atyp, Expression),
+    Alias(Identifier, Value),
+    TypeAlias(Value, Identifier, Value),
 }
 
 #[derive(Debug, Clone, FromValue)]
@@ -700,31 +696,28 @@ pub struct FixityToken(Prec, Value, String);
 #[derive(Debug, Clone, FromValue)]
 pub enum Definition {
     /// Type definition
-    Type(TypeDefinition),
+    Type((L, Value)),
 
     /// Function definition
-    Function(FunctionDefinition),
+    Function(Value),
 
     /// Mapping definition
-    Mapping(MappingDefinition),
+    Mapping(Value),
 
     /// Value definition
-    Value(LetBind),
+    Value(Value),
 
     /// Operator overload specifications
-    Overload {
-        identifier: Identifier,
-        ids: Vec<Identifier>,
-    },
+    Overload(Value),
 
     /// Fixity declaration
     Fixity(Prec, Value, Identifier),
 
     /// Top-level type constraint
-    ValueSpec(ValueSpecification),
+    ValueSpec(Value),
 
     /// Implementation definition (`funcl` in Sail2 internals)
-    Implementation(FunctionClause),
+    Implementation(Value),
 
     /// Fixity declaration
     InfixOperator {
@@ -734,10 +727,10 @@ pub enum Definition {
     },
 
     /// Default type and kind assumptions
-    Default(DefaultTypingSpecification),
+    Default(Value),
 
     /// Scattered definition
-    Scattered(ScatteredDefinition),
+    Scattered(Value),
 
     /// Separate termination measure declaration
     TerminationMeasurePatternExpression {
@@ -747,34 +740,50 @@ pub enum Definition {
     },
 
     /// Separate termination measure declaration
-    TerminationMeasureLoop {
-        identifier: Identifier,
-        loop_measure: Vec<LoopMeasure>,
-    },
+    TerminationMeasureLoop(Value),
 
     /// Register declaration
-    Register(DecSpec),
+    Register(Value),
 
     /// Pragma
     Pragma(String, String),
 
     /// Internal mutrec
-    Mutual(Vec<FunctionDefinition>),
+    Mutual(LinkedList<Value>),
 }
 
 /// l-value expression
 #[derive(Debug, Clone, FromValue)]
 pub enum LValueExpressionAux {
     Identifier(Identifier),
-    Memory(Identifier, Vec<Expression>),
+    Memory(Identifier, LinkedList<Expression>),
     Vector(Box<LValueExpression>, Expression),
     VectorRange(Box<LValueExpression>, Expression, Expression),
-    VectorConcat(Vec<LValueExpression>),
+    VectorConcat(LinkedList<LValueExpression>),
     Field(Box<LValueExpression>, Identifier),
 }
 
 #[derive(Debug, Clone, FromValue)]
 pub struct LValueExpression(LValueExpressionAux, L);
 
+// #[derive(Debug, Clone, FromValue)]
+// pub struct Definitions(LinkedList<(String, LinkedList<Definition>)>);
+
 #[derive(Debug, Clone, FromValue)]
-pub struct Definitions(Vec<(String, Vec<Definition>)>);
+pub enum CommentType {
+    Block,
+    Line,
+}
+
+#[derive(Debug, Clone, FromValue)]
+
+pub struct Comment(CommentType, Position, Position, String);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct Ast {
+    pub defs: LinkedList<Definition>,
+    pub comments: LinkedList<(String, LinkedList<Comment>)>,
+}
+
+unsafe impl Send for Ast {}
+unsafe impl Sync for Ast {}

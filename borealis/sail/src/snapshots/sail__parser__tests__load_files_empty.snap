@@ -1,0 +1,118 @@
+---
+source: sail/src/parser.rs
+expression: "load_files(vec![]).unwrap()"
+---
+(
+    "out.sail",
+    Ast {
+        defs: [],
+        comments: [],
+    },
+    Env {
+        top_val_specs: Root(
+            Root(
+                0x0000000130540320,
+            ),
+        ),
+        defined_val_specs: Root(
+            Root(
+                0x0000000130540328,
+            ),
+        ),
+        locals: Root(
+            Root(
+                0x0000000130540330,
+            ),
+        ),
+        top_letbinds: Root(
+            Root(
+                0x0000000130540338,
+            ),
+        ),
+        union_ids: Root(
+            Root(
+                0x0000000130540340,
+            ),
+        ),
+        registers: Root(
+            Root(
+                0x0000000130540348,
+            ),
+        ),
+        variants: Root(
+            Root(
+                0x0000000130540350,
+            ),
+        ),
+        scattered_variant_envs: Root(
+            Root(
+                0x0000000130540358,
+            ),
+        ),
+        mappings: Root(
+            Root(
+                0x0000000130540360,
+            ),
+        ),
+        typ_vars: Root(
+            Root(
+                0x0000000130540368,
+            ),
+        ),
+        shadow_vars: Root(
+            Root(
+                0x0000000130540370,
+            ),
+        ),
+        typ_synonyms: Root(
+            Root(
+                0x0000000130540378,
+            ),
+        ),
+        overloads: Root(
+            Root(
+                0x0000000130540380,
+            ),
+        ),
+        enums: Root(
+            Root(
+                0x0000000130540388,
+            ),
+        ),
+        records: Root(
+            Root(
+                0x0000000130540390,
+            ),
+        ),
+        accessors: Root(
+            Root(
+                0x0000000130540398,
+            ),
+        ),
+        externs: Root(
+            Root(
+                0x00000001305403a0,
+            ),
+        ),
+        casts: [],
+        allow_casts: true,
+        allow_bindings: true,
+        constraints: [],
+        default_order: None,
+        ret_typ: None,
+        poly_undefineds: false,
+        prove: Some(
+            Root(
+                Root(
+                    0x00000001305403b0,
+                ),
+            ),
+        ),
+        allow_unknowns: false,
+        bitfields: Root(
+            Root(
+                0x00000001305403a8,
+            ),
+        ),
+    },
+)

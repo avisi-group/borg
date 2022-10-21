@@ -10,7 +10,7 @@
 
 use {
     crate::{
-        ast::Definition,
+        ast::{type_check::Env, Ast},
         error::{Error, WrapperError},
     },
     log::error,
@@ -81,7 +81,7 @@ impl Runtime {
         })
     }
 
-    pub fn load_files(&self, files: Vec<String>) -> Result<String, Error> {
+    pub fn load_files(&self, files: Vec<String>) -> Result<(String, Ast, Env), Error> {
         self.request.send(Request::LoadFiles(files))?;
 
         self.response.recv()?.map(|res| match res {
@@ -97,7 +97,7 @@ ocaml::import! {
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Definition, Value), WrapperError>;
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Ast, Env), WrapperError>;
 }
 
 /// Request made against runtime
@@ -118,7 +118,7 @@ pub enum Request {
 #[derive(Debug)]
 enum Response {
     Dedup(Vec<i32>),
-    LoadFiles(String),
+    LoadFiles((String, Ast, Env)),
 }
 
 /// Process a single incoming request by calling the corresponding OCaml function
@@ -150,13 +150,9 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
                 file_list = unsafe { file_list.add(rt, &file_rooted) };
             }
 
-            let (output_name, ast, type_envs) = unsafe {
+            Ok(Response::LoadFiles(unsafe {
                 internal_process_file_load_files(rt, false, List::empty(), env, file_list)??
-            };
-
-            dbg!((ast, type_envs));
-
-            Ok(Response::LoadFiles(output_name))
+            }))
         }
     }
 }

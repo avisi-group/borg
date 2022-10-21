@@ -1,6 +1,10 @@
 //! Sail source file parsing
 
-use crate::{error::Error, RT};
+use crate::{
+    ast::{type_check::Env, Ast},
+    error::Error,
+    RT,
+};
 
 /// Parses supplied Sail files and returns the AST
 ///
@@ -28,7 +32,7 @@ use crate::{error::Error, RT};
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_files(files: Vec<String>) -> Result<String, Error> {
+pub fn load_files(files: Vec<String>) -> Result<(String, Ast, Env), Error> {
     Ok(RT.lock().load_files(files)?)
 }
 
@@ -41,7 +45,7 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
-        load_files(vec![]).unwrap();
+        insta::assert_debug_snapshot!(load_files(vec![]).unwrap());
     }
 
     #[test]
@@ -51,6 +55,6 @@ mod tests {
             .to_string_lossy()
             .to_string();
 
-        load_files(vec![path.clone()]).unwrap();
+        insta::assert_debug_snapshot!(load_files(vec![path]).unwrap());
     }
 }

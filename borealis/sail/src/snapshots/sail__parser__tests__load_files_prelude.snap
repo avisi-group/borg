@@ -1,0 +1,2043 @@
+---
+source: sail/src/parser.rs
+expression: "load_files(vec![path]).unwrap()"
+---
+(
+    "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+    Ast {
+        defs: [
+            Root(
+                Root(
+                    0x0000000130540040,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540048,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540050,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540058,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540060,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540068,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540070,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540078,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540080,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540088,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540090,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540098,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400a0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400a8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400b0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400b8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400c0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400c8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400d0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400d8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400e0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400e8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400f0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305400f8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540100,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540108,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540110,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540118,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540120,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540128,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540130,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540138,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540140,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540148,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540150,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540158,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540160,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540168,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540170,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540178,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540180,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540188,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540190,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540198,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401a0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401a8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401b0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401b8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401c0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401c8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401d0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401d8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401e0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401e8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401f0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305401f8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540200,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540208,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540210,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540218,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540220,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540228,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540230,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540238,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540240,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540248,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540250,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540258,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540260,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540268,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540270,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540278,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540280,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130540288,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544060,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544058,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544068,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544070,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544078,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544080,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544088,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544090,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544098,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440a0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440a8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440b0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440b8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440c0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440c8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440d0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440d8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440e0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440e8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440f0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305440f8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544100,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544108,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544110,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544118,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544120,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544128,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544130,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544138,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544140,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544148,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544150,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544158,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544160,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544168,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544170,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544178,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544180,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544188,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544190,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544198,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441a0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441a8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441b0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441b8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441c0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441c8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441d0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441d8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441e0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441e8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441f0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305441f8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544200,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544208,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544210,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544218,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544220,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544228,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544230,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544238,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544240,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544248,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544250,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544258,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544260,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544268,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544270,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544278,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544280,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544288,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544290,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544298,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442a0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442a8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442b0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442b8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442c0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442c8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442d0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442d8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442e0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442e8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442f0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305442f8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544300,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544308,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544310,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544318,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544320,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544328,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544330,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544338,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544340,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544348,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544350,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544358,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544360,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544368,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544370,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544378,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544380,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544388,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544390,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544398,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443a0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443a8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443b0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443b8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443c0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443c8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443d0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443d8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443e0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443e8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443f0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305443f8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544400,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544408,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544410,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544418,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544420,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544428,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544430,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544438,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544440,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544448,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544450,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544458,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544460,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544468,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544470,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544478,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544480,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544488,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544490,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544498,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444a0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444a8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444b0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444b8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444c0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444c8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444d0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444d8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444e0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444e8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444f0,
+                ),
+            ),
+            Root(
+                Root(
+                    0x00000001305444f8,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544500,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544508,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544510,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544518,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544520,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544528,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544530,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544538,
+                ),
+            ),
+            Root(
+                Root(
+                    0x0000000130544540,
+                ),
+            ),
+        ],
+        comments: [
+            (
+                "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                [
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 461,
+                            pos_bol: 17167,
+                            pos_cnum: 17167,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 461,
+                            pos_bol: 17167,
+                            pos_cnum: 17232,
+                        },
+                        " Used for creating long bitvector literals in the C backend. ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 394,
+                            pos_bol: 15138,
+                            pos_cnum: 15138,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 404,
+                            pos_bol: 15371,
+                            pos_cnum: 15373,
+                        },
+                        "\nval ex_range : forall 'n 'm.\n  range('n, 'm) -> {'o, 'n <= 'o & 'o <= 'm. atom('o)}\n\nval coerce_int_nat : int -> nat effect {escape}\n\nfunction coerce_int_nat 'x = {\n  assert(constraint('x >= 0), );\n  x\n}\n",
+                    ),
+                    Comment(
+                        Line,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 352,
+                            pos_bol: 13716,
+                            pos_cnum: 13716,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 353,
+                            pos_bol: 13807,
+                            pos_cnum: 13807,
+                        },
+                        "val modulus = {ocaml: \"modulus\", lem: \"hardware_mod\", c: \"tmod_int\"} : (int, int) -> int",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 44,
+                            pos_bol: 3295,
+                            pos_cnum: 3295,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 44,
+                            pos_bol: 3295,
+                            pos_cnum: 3371,
+                        },
+                        "************************************************************************",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 43,
+                            pos_bol: 3218,
+                            pos_cnum: 3218,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 43,
+                            pos_bol: 3218,
+                            pos_cnum: 3294,
+                        },
+                        " IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.                          ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 42,
+                            pos_bol: 3141,
+                            pos_cnum: 3141,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 42,
+                            pos_bol: 3141,
+                            pos_cnum: 3217,
+                        },
+                        " OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 41,
+                            pos_bol: 3064,
+                            pos_cnum: 3064,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 41,
+                            pos_bol: 3064,
+                            pos_cnum: 3140,
+                        },
+                        " WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE   ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 40,
+                            pos_bol: 2987,
+                            pos_cnum: 2987,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 40,
+                            pos_bol: 2987,
+                            pos_cnum: 3063,
+                        },
+                        " BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,  ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 39,
+                            pos_bol: 2910,
+                            pos_cnum: 2910,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 39,
+                            pos_bol: 2910,
+                            pos_cnum: 2986,
+                        },
+                        " SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 38,
+                            pos_bol: 2833,
+                            pos_cnum: 2833,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 38,
+                            pos_bol: 2833,
+                            pos_cnum: 2909,
+                        },
+                        " CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF   ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 37,
+                            pos_bol: 2756,
+                            pos_cnum: 2756,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 37,
+                            pos_bol: 2756,
+                            pos_cnum: 2832,
+                        },
+                        " LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR    ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 36,
+                            pos_bol: 2679,
+                            pos_cnum: 2679,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 36,
+                            pos_bol: 2679,
+                            pos_cnum: 2755,
+                        },
+                        " DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE  ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 35,
+                            pos_bol: 2602,
+                            pos_cnum: 2602,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 35,
+                            pos_bol: 2602,
+                            pos_cnum: 2678,
+                        },
+                        " MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE               ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 34,
+                            pos_bol: 2525,
+                            pos_cnum: 2525,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 34,
+                            pos_bol: 2525,
+                            pos_cnum: 2601,
+                        },
+                        " WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF   ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 33,
+                            pos_bol: 2448,
+                            pos_cnum: 2448,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 33,
+                            pos_bol: 2448,
+                            pos_cnum: 2524,
+                        },
+                        " HOLDERS AND CONTRIBUTORS  AND ANY EXPRESS OR IMPLIED            ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 32,
+                            pos_bol: 2371,
+                            pos_cnum: 2371,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 32,
+                            pos_bol: 2371,
+                            pos_cnum: 2447,
+                        },
+                        " GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT    ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 31,
+                            pos_bol: 2294,
+                            pos_cnum: 2294,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 31,
+                            pos_bol: 2294,
+                            pos_cnum: 2370,
+                        },
+                        " NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 30,
+                            pos_bol: 2217,
+                            pos_cnum: 2217,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 30,
+                            pos_bol: 2217,
+                            pos_cnum: 2293,
+                        },
+                        "                                                                        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 29,
+                            pos_bol: 2140,
+                            pos_cnum: 2140,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 29,
+                            pos_bol: 2140,
+                            pos_cnum: 2216,
+                        },
+                        "        permission.                                                     ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 28,
+                            pos_bol: 2063,
+                            pos_cnum: 2063,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 28,
+                            pos_bol: 2063,
+                            pos_cnum: 2139,
+                        },
+                        "        derived from this software without specific prior written       ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 27,
+                            pos_bol: 1986,
+                            pos_cnum: 1986,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 27,
+                            pos_bol: 1986,
+                            pos_cnum: 2062,
+                        },
+                        "        contributors may be used to endorse or promote products         ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 26,
+                            pos_bol: 1913,
+                            pos_cnum: 1913,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 26,
+                            pos_bol: 1913,
+                            pos_cnum: 1985,
+                        },
+                        " \t* Neither the name of ARM Limited nor the names of its            ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 25,
+                            pos_bol: 1840,
+                            pos_cnum: 1840,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 25,
+                            pos_bol: 1840,
+                            pos_cnum: 1912,
+                        },
+                        " \t  provided with the distribution.                                 ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 24,
+                            pos_bol: 1763,
+                            pos_cnum: 1763,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 24,
+                            pos_bol: 1763,
+                            pos_cnum: 1839,
+                        },
+                        "        disclaimer in the documentation and/or other materials          ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 23,
+                            pos_bol: 1686,
+                            pos_cnum: 1686,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 23,
+                            pos_bol: 1686,
+                            pos_cnum: 1762,
+                        },
+                        "        copyright notice, this list of conditions and the following     ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 22,
+                            pos_bol: 1609,
+                            pos_cnum: 1609,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 22,
+                            pos_bol: 1609,
+                            pos_cnum: 1685,
+                        },
+                        "      * Redistributions in binary form must reproduce the above         ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 21,
+                            pos_bol: 1536,
+                            pos_cnum: 1536,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 21,
+                            pos_bol: 1536,
+                            pos_cnum: 1608,
+                        },
+                        " \t  disclaimer.                                                     ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 20,
+                            pos_bol: 1459,
+                            pos_cnum: 1459,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 20,
+                            pos_bol: 1459,
+                            pos_cnum: 1535,
+                        },
+                        "        copyright notice, this list of conditions and the following     ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 19,
+                            pos_bol: 1386,
+                            pos_cnum: 1386,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 19,
+                            pos_bol: 1386,
+                            pos_cnum: 1458,
+                        },
+                        " \t* Redistributions of source code must retain the above            ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 18,
+                            pos_bol: 1309,
+                            pos_cnum: 1309,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 18,
+                            pos_bol: 1309,
+                            pos_cnum: 1385,
+                        },
+                        "                                                                        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 17,
+                            pos_bol: 1232,
+                            pos_cnum: 1232,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 17,
+                            pos_bol: 1232,
+                            pos_cnum: 1308,
+                        },
+                        " disclaimer below) provided that the following conditions are met:      ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 16,
+                            pos_bol: 1155,
+                            pos_cnum: 1155,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 16,
+                            pos_bol: 1155,
+                            pos_cnum: 1231,
+                        },
+                        " modification, are permitted (subject to the limitations in the         ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 15,
+                            pos_bol: 1078,
+                            pos_cnum: 1078,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 15,
+                            pos_bol: 1078,
+                            pos_cnum: 1154,
+                        },
+                        " Redistribution and use in source and binary forms, with or without     ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 14,
+                            pos_bol: 1001,
+                            pos_cnum: 1001,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 14,
+                            pos_bol: 1001,
+                            pos_cnum: 1077,
+                        },
+                        "                                                                        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 13,
+                            pos_bol: 924,
+                            pos_cnum: 924,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 13,
+                            pos_bol: 924,
+                            pos_cnum: 1000,
+                        },
+                        " All rights reserved.                                                   ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 12,
+                            pos_bol: 847,
+                            pos_cnum: 847,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 12,
+                            pos_bol: 847,
+                            pos_cnum: 923,
+                        },
+                        "                                                                        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 11,
+                            pos_bol: 770,
+                            pos_cnum: 770,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 11,
+                            pos_bol: 770,
+                            pos_cnum: 846,
+                        },
+                        "   Anthony Fox                                                          ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 10,
+                            pos_bol: 693,
+                            pos_cnum: 693,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 10,
+                            pos_bol: 693,
+                            pos_cnum: 769,
+                        },
+                        "   Kathryn Gray,                                                        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 9,
+                            pos_bol: 616,
+                            pos_cnum: 616,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 9,
+                            pos_bol: 616,
+                            pos_cnum: 692,
+                        },
+                        "   Peter Sewell,                                                        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 8,
+                            pos_bol: 539,
+                            pos_cnum: 539,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 8,
+                            pos_bol: 539,
+                            pos_cnum: 615,
+                        },
+                        "   Thomas Bauereiss,                                                    ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 7,
+                            pos_bol: 462,
+                            pos_cnum: 462,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 7,
+                            pos_bol: 462,
+                            pos_cnum: 538,
+                        },
+                        "   Alastair Reid,                                                       ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 6,
+                            pos_bol: 385,
+                            pos_cnum: 385,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 6,
+                            pos_bol: 385,
+                            pos_cnum: 461,
+                        },
+                        "   Alasdair Armstrong,                                                  ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 5,
+                            pos_bol: 308,
+                            pos_cnum: 308,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 5,
+                            pos_bol: 308,
+                            pos_cnum: 384,
+                        },
+                        "   Arm Limited (or its affiliates),                                     ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 4,
+                            pos_bol: 231,
+                            pos_cnum: 231,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 4,
+                            pos_bol: 231,
+                            pos_cnum: 307,
+                        },
+                        " Copyright (c) 2019                                                     ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 3,
+                            pos_bol: 154,
+                            pos_cnum: 154,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 3,
+                            pos_bol: 154,
+                            pos_cnum: 230,
+                        },
+                        "                                                                        ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 2,
+                            pos_bol: 77,
+                            pos_cnum: 77,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 2,
+                            pos_bol: 77,
+                            pos_cnum: 153,
+                        },
+                        " BSD 3-clause Clear License                                             ",
+                    ),
+                    Comment(
+                        Block,
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 1,
+                            pos_bol: 0,
+                            pos_cnum: 0,
+                        },
+                        Position {
+                            pos_fname: "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail",
+                            pos_lnum: 1,
+                            pos_bol: 0,
+                            pos_cnum: 76,
+                        },
+                        "************************************************************************",
+                    ),
+                ],
+            ),
+        ],
+    },
+    Env {
+        top_val_specs: Root(
+            Root(
+                0x0000000130544548,
+            ),
+        ),
+        defined_val_specs: Root(
+            Root(
+                0x0000000130544550,
+            ),
+        ),
+        locals: Root(
+            Root(
+                0x0000000130540298,
+            ),
+        ),
+        top_letbinds: Root(
+            Root(
+                0x0000000130540290,
+            ),
+        ),
+        union_ids: Root(
+            Root(
+                0x0000000130544558,
+            ),
+        ),
+        registers: Root(
+            Root(
+                0x00000001305402a8,
+            ),
+        ),
+        variants: Root(
+            Root(
+                0x0000000130544560,
+            ),
+        ),
+        scattered_variant_envs: Root(
+            Root(
+                0x00000001305402a0,
+            ),
+        ),
+        mappings: Root(
+            Root(
+                0x00000001305402b0,
+            ),
+        ),
+        typ_vars: Root(
+            Root(
+                0x00000001305402b8,
+            ),
+        ),
+        shadow_vars: Root(
+            Root(
+                0x00000001305402c0,
+            ),
+        ),
+        typ_synonyms: Root(
+            Root(
+                0x0000000130544568,
+            ),
+        ),
+        overloads: Root(
+            Root(
+                0x0000000130544570,
+            ),
+        ),
+        enums: Root(
+            Root(
+                0x00000001305402c8,
+            ),
+        ),
+        records: Root(
+            Root(
+                0x00000001305402d0,
+            ),
+        ),
+        accessors: Root(
+            Root(
+                0x00000001305402d8,
+            ),
+        ),
+        externs: Root(
+            Root(
+                0x0000000130544578,
+            ),
+        ),
+        casts: [],
+        allow_casts: true,
+        allow_bindings: true,
+        constraints: [],
+        default_order: Some(
+            Root(
+                Root(
+                    0x00000001305402e8,
+                ),
+            ),
+        ),
+        ret_typ: None,
+        poly_undefineds: false,
+        prove: Some(
+            Root(
+                Root(
+                    0x00000001305402f0,
+                ),
+            ),
+        ),
+        allow_unknowns: false,
+        bitfields: Root(
+            Root(
+                0x00000001305402e0,
+            ),
+        ),
+    },
+)

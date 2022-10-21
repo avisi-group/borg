@@ -86,17 +86,36 @@ pub enum WrapperError {
 #[derive(Debug, displaydoc::Display, thiserror::Error, FromValue)]
 pub enum SailError {
     /// General error
-    General(L, String),
+    General(L, OCamlString),
     /// Unreachable error
-    Unreachable(L, (String, Int, Int, Int, Int), Value, String),
+    Unreachable(L, (OCamlString, Int, Int, Int, Int), Value, OCamlString),
     /// Todo error
-    Todo(L, String),
+    Todo(L, OCamlString),
     /// Syntax error
-    Syntax(Position, String),
+    Syntax(Position, OCamlString),
     /// Syntax location error
-    SyntaxLocation(L, String),
+    SyntaxLocation(L, OCamlString),
     /// Lexical error
-    Lexical(Position, String),
+    Lexical(Position, OCamlString),
     /// Type error
-    Type(L, String),
+    Type(L, OCamlString),
+}
+
+/// OCaml strings are byte arrays and may contain valid UTF-8 contents or arbitrary bytes
+///
+/// When converting from Value will attempt to parse as a `String`, falling back to `Vec<u8>` on error
+#[derive(Debug, Clone)]
+pub enum OCamlString {
+    String(String),
+    Vec(Vec<u8>),
+}
+
+unsafe impl FromValue for OCamlString {
+    fn from_value(v: Value) -> Self {
+        let vec = Vec::<u8>::from_value(v);
+        match String::from_utf8(vec.clone()) {
+            Ok(s) => Self::String(s),
+            Err(_) => Self::Vec(vec),
+        }
+    }
 }
