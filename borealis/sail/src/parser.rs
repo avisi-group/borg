@@ -1,7 +1,7 @@
 //! Sail source file parsing
 
 use crate::{
-    ast::{type_check::Env, Ast},
+    ast::{parse::Ast, type_check::Env},
     error::Error,
     RT,
 };

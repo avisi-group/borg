@@ -2,7 +2,8 @@
 
 use {
     crate::{
-        ast::{Position, L},
+        ast::parse::{Position, L},
+        ffi::OCamlString,
         runtime::Request,
     },
     ocaml::{CamlError, FromValue, Int, Value},
@@ -99,23 +100,4 @@ pub enum SailError {
     Lexical(Position, OCamlString),
     /// Type error
     Type(L, OCamlString),
-}
-
-/// OCaml strings are byte arrays and may contain valid UTF-8 contents or arbitrary bytes
-///
-/// When converting from Value will attempt to parse as a `String`, falling back to `Vec<u8>` on error
-#[derive(Debug, Clone)]
-pub enum OCamlString {
-    String(String),
-    Vec(Vec<u8>),
-}
-
-unsafe impl FromValue for OCamlString {
-    fn from_value(v: Value) -> Self {
-        let vec = Vec::<u8>::from_value(v);
-        match String::from_utf8(vec.clone()) {
-            Ok(s) => Self::String(s),
-            Err(_) => Self::Vec(vec),
-        }
-    }
 }

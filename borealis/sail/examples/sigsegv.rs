@@ -7,10 +7,9 @@ fn main() -> Result<()> {
     println!(
         "{:#?}",
         load_files(vec![
-            "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/simple.sail".to_owned()
+            "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail".to_owned()
         ])?
-        .1
-        .defs
+        .2
     );
 
     Ok(())

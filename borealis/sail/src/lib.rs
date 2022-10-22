@@ -8,6 +8,7 @@ use {
 
 pub mod ast;
 pub mod error;
+pub mod ffi;
 pub mod parser;
 mod runtime;
 pub mod span;

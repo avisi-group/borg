@@ -10,7 +10,7 @@
 
 use {
     crate::{
-        ast::{type_check::Env, Ast},
+        ast::{parse::Ast, type_check::Env},
         error::{Error, WrapperError},
     },
     log::error,
@@ -97,7 +97,9 @@ ocaml::import! {
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Ast, Env), WrapperError>;
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Ast, Value), WrapperError>;
+
+    pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 }
 
 /// Request made against runtime
@@ -150,9 +152,11 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
                 file_list = unsafe { file_list.add(rt, &file_rooted) };
             }
 
-            Ok(Response::LoadFiles(unsafe {
+            let (name, ast, env) = unsafe {
                 internal_process_file_load_files(rt, false, List::empty(), env, file_list)??
-            }))
+            };
+
+            Ok(Response::LoadFiles((name, ast, Env::from_value(rt, env)?)))
         }
     }
 }
