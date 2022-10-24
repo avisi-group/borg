@@ -1,10 +1,12 @@
 //! Parsed, processed, and desugared AST generated from `l2_parse.ott`.
 
 use {
-    crate::ffi::OCamlString,
-    ocaml::{FromValue, Int, Value},
+    crate::ffi::{BigNum, OCamlString, Position},
+    ocaml::{FromValue, Int},
     std::{collections::LinkedList, fmt::Debug},
 };
+
+pub type Text = OCamlString;
 
 /// Location
 #[derive(Debug, Clone, FromValue)]
@@ -18,23 +20,8 @@ pub enum L {
     /// Range between two positions
     Range(Position, Position),
     /// Documented location
-    Documented(String, Box<L>),
+    Documented(OCamlString, Box<L>),
 }
-
-/// Position in a source file
-#[derive(Debug, Clone, FromValue)]
-pub struct Position {
-    /// File name
-    pub pos_fname: String,
-    /// Line number
-    pub pos_lnum: Int,
-    /// Character offset of beginning of line
-    pub pos_bol: Int,
-    /// Character offset of the position
-    pub pos_cnum: Int,
-}
-
-pub type Text = OCamlString;
 
 /// Idenitifer
 pub type X = Text;
@@ -89,14 +76,11 @@ pub enum BaseEffectAux {
     Unspecified,
     /// Nondeterminism from intra-instruction parallelism
     Nondetermine,
-    /// ?
+    /// Potential exception
     Escape,
-    /// ?
+    /// Configuration option
     Config,
 }
-
-#[derive(Debug, Clone, FromValue)]
-pub struct BaseEffect(BaseEffectAux, L);
 
 /// Identifiers with kind, ticked to differntiate from program variables
 #[derive(Debug, Clone, FromValue)]
@@ -105,13 +89,16 @@ pub enum KindIdentifierAux {
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct KindIdentifier(KindIdentifierAux, L);
-
-#[derive(Debug, Clone, FromValue)]
 pub enum IdentifierAux {
     Identifier(X),
     Operator(X),
 }
+
+#[derive(Debug, Clone, FromValue)]
+pub struct BaseEffect(BaseEffectAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct KindIdentifier(KindIdentifierAux, L);
 
 #[derive(Debug, Clone, FromValue)]
 pub struct Identifier(IdentifierAux, L);
@@ -124,16 +111,16 @@ pub enum LiteralAux {
     True,
     False,
     /// Natural number constant
-    Num(Value),
+    Num(BigNum),
     /// Bit vector constant, C-style
-    Hex(String),
+    Hex(OCamlString),
     /// Bit vector constant, C-style
-    Bin(String),
+    Bin(OCamlString),
     /// Undefined value
     Undefined,
     /// String constant
-    String(String),
-    Real(String),
+    String(OCamlString),
+    Real(OCamlString),
 }
 
 #[derive(Debug, Clone, FromValue)]
@@ -149,7 +136,7 @@ pub enum AtypAux {
     /// Literal
     Literal(Literal),
     /// Numeric set
-    NumericSet(KindIdentifier, LinkedList<Value>),
+    NumericSet(KindIdentifier, LinkedList<BigNum>),
     /// Product
     Product(Box<Atyp>, Box<Atyp>),
     /// Sum
@@ -158,6 +145,8 @@ pub enum AtypAux {
     Subtraction(Box<Atyp>, Box<Atyp>),
     /// Exponential
     Exponential(Box<Atyp>),
+    /// (* Internal (but not M as I want a datatype constructor) negative nexp
+    NegativeExponential(Box<Atyp>),
     /// Increasing
     Increasing,
     /// Decreasing
@@ -176,7 +165,7 @@ pub enum AtypAux {
     /// Type constructor application
     Application(Identifier, LinkedList<Atyp>),
     Exist(LinkedList<KindedIdentifier>, Box<Atyp>, Box<Atyp>),
-    Base(String, Box<Atyp>, Box<Atyp>),
+    Base(OCamlString, Box<Atyp>, Box<Atyp>),
 }
 
 /// Expressions of all kinds, to be translated to types, nats, orders, and effects after parsing
@@ -186,9 +175,9 @@ pub struct Atyp(AtypAux, L);
 /// Optionally kind-annotated identifier
 #[derive(Debug, Clone, FromValue)]
 pub struct KindedIdentifierAux(
-    pub Option<String>,
+    pub Option<OCamlString>,
     pub LinkedList<KindIdentifier>,
-    pub Option<KindAux>,
+    pub Option<Kind>,
 );
 
 /// Optionally kind-annotated identifier
@@ -322,12 +311,7 @@ pub enum ExpressionAux {
     /// Conditional
     If(Box<Expression>, Box<Expression>, Box<Expression>),
 
-    Loop(
-        Loop,
-        Option<Box<Expression>>,
-        Box<Expression>,
-        Box<Expression>,
-    ),
+    Loop(Loop, Box<Measure>, Box<Expression>, Box<Expression>),
 
     For(
         Identifier,
@@ -389,9 +373,9 @@ pub enum ExpressionAux {
 
     Constraint(Atyp),
 
-    Exit(Atyp),
+    Exit(Box<Expression>),
 
-    Throw(Atyp),
+    Throw(Box<Expression>),
 
     Try(Box<Expression>, LinkedList<PatternMatch>),
 
@@ -465,9 +449,6 @@ pub enum TypeAnnotationOptAux {
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct TypeAnnotationOpt(TypeAnnotationOptAux, L);
-
-#[derive(Debug, Clone, FromValue)]
 pub enum TypeSchemeOptAux {
     None,
     Some(TypeScheme),
@@ -484,9 +465,6 @@ pub enum EffectAnnotationOptAux {
     Some(Atyp),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct EffectAnnotationOpt(EffectAnnotationOptAux, L);
-
 /// Optional recursive annotation for functions
 #[derive(Debug, Clone, FromValue)]
 pub enum RecursiveAnnotationOptAux {
@@ -498,15 +476,9 @@ pub enum RecursiveAnnotationOptAux {
     Measure(Pattern, Expression),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct RecursiveAnnotationOpt(RecursiveAnnotationOptAux, L);
-
 /// Function clause
 #[derive(Debug, Clone, FromValue)]
 pub struct FunctionClauseAux(pub Identifier, pub PatternMatch);
-
-#[derive(Debug, Clone, FromValue)]
-pub struct FunctionClause(FunctionClauseAux, L);
 
 /// Type union constructors
 #[derive(Debug, Clone, FromValue)]
@@ -514,6 +486,18 @@ pub enum TypeUnionAux {
     Identifier(Atyp, Identifier),
     AnonymousRecord(LinkedList<(Atyp, Identifier)>, Identifier),
 }
+
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeAnnotationOpt(TypeAnnotationOptAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct EffectAnnotationOpt(EffectAnnotationOptAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct RecursiveAnnotationOpt(RecursiveAnnotationOptAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct FunctionClause(FunctionClauseAux, L);
 
 #[derive(Debug, Clone, FromValue)]
 pub struct TypeUnion(TypeUnionAux, L);
@@ -535,9 +519,6 @@ pub struct IndexRange(IndexRangeAux, L);
 /// Default kinding or typing assumption, and default order for literal vectors and vector shorthands
 #[derive(Debug, Clone, FromValue)]
 pub struct DefaultTypingSpecificationAux(pub Kind, pub Atyp);
-
-#[derive(Debug, Clone, FromValue)]
-pub struct DefaultTypingSpecification(DefaultTypingSpecificationAux, L);
 
 /// Mapping pattern
 ///
@@ -596,7 +577,7 @@ pub struct MappingClause(MappingClauseAux, L);
 #[derive(Debug, Clone, FromValue)]
 pub struct MappingDefinitionAux(
     pub Identifier,
-    pub Option<TypeScheme>,
+    pub TypeSchemeOpt,
     pub LinkedList<MappingClause>,
 );
 
@@ -612,44 +593,43 @@ pub struct FunctionDefinitionAux(
     pub LinkedList<FunctionClause>,
 );
 
-#[derive(Debug, Clone, FromValue)]
-pub struct FunctionDefinition(FunctionDefinitionAux, L);
-
 /// Type definition body
 #[derive(Debug, Clone, FromValue)]
 pub enum TypeDefinitionAux {
-    Abbreviation(Identifier, Value, Value),
+    /// Type abbreviation
+    Abbreviation(Identifier, TypQuant, Kind, Atyp),
     /// Struct type definition
-    Record(Value),
+    Record(Identifier, TypQuant, LinkedList<(Atyp, Identifier)>, bool),
     /// Union type definition
-    Variant(Value),
+    Variant(Identifier, TypQuant, LinkedList<TypeUnion>, bool),
     /// Enumeration type definition
-    Enumeration(Value),
+    Enumeration(
+        Identifier,
+        LinkedList<(Identifier, Atyp)>,
+        LinkedList<(Identifier, Option<Expression>)>,
+        bool,
+    ),
     /// Register mutable bitfield type definition
-    Bitfield(Value),
+    Bitfield(Identifier, Atyp, LinkedList<(Identifier, IndexRange)>),
 }
-
-#[derive(Debug, Clone, FromValue)]
-pub struct TypeDefinition(TypeDefinitionAux, L);
 
 /// Value type specification
 #[derive(Debug, Clone, FromValue)]
-pub struct ValueSpecificationAux(TypeScheme, Identifier, LinkedList<(String, String)>, bool);
-
-#[derive(Debug, Clone, FromValue)]
-pub struct ValueSpecification(ValueSpecificationAux, L);
+pub struct ValueSpecificationAux(
+    TypeScheme,
+    Identifier,
+    LinkedList<(OCamlString, OCamlString)>,
+    bool,
+);
 
 /// Register declarations
 #[derive(Debug, Clone, FromValue)]
 pub enum DecSpecAux {
-    Register(Value, Value, Value, Identifier),
+    Register(Atyp, Atyp, Atyp, Identifier),
     Config(Identifier, Atyp, Expression),
-    Alias(Identifier, Value),
-    TypeAlias(Value, Identifier, Value),
+    Alias(Identifier, Expression),
+    TypeAlias(Atyp, Identifier, Expression),
 }
-
-#[derive(Debug, Clone, FromValue)]
-pub struct DecSpec(DecSpecAux, L);
 
 /// Function and type union definitions that can be spread across a file. Each one must end in $_$
 #[derive(Debug, Clone, FromValue)]
@@ -674,10 +654,27 @@ pub enum ScatteredDefinitionAux {
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct ScatteredDefinition(ScatteredDefinitionAux, L);
+pub struct DefaultTypingSpecification(DefaultTypingSpecificationAux, L);
 
 #[derive(Debug, Clone, FromValue)]
-pub struct LoopMeasure(Loop, Expression);
+pub struct FunctionDefinition(FunctionDefinitionAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct TypeDefinition(TypeDefinitionAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct ValueSpecification(ValueSpecificationAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub struct DecSpec(DecSpecAux, L);
+
+#[derive(Debug, Clone, FromValue)]
+pub enum LoopMeasure {
+    Loop(Loop, Expression),
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct ScatteredDefinition(ScatteredDefinitionAux, L);
 
 #[derive(Debug, Clone, FromValue)]
 pub enum Prec {
@@ -687,47 +684,37 @@ pub enum Prec {
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct FixityToken(Prec, Value, String);
+pub struct FixityToken(Prec, BigNum, OCamlString);
 
 /// Top-level Sail2 definition
 #[derive(Debug, Clone, FromValue)]
 pub enum Definition {
     /// Type definition
-    Type((L, Value)),
+    Type(TypeDefinition),
 
     /// Function definition
-    Function(Value),
+    Function(FunctionDefinition),
 
     /// Mapping definition
-    Mapping(Value),
+    Mapping(MappingDefinition),
 
     /// Value definition
-    Value(Value),
+    Value(LetBind),
 
     /// Operator overload specifications
-    Overload(Value),
+    Overload(Identifier, LinkedList<Identifier>),
 
     /// Fixity declaration
-    Fixity(Prec, Value, Identifier),
+    Fixity(Prec, BigNum, Identifier),
 
     /// Top-level type constraint
-    ValueSpec(Value),
-
-    /// Implementation definition (`funcl` in Sail2 internals)
-    Implementation(Value),
-
-    /// Fixity declaration
-    InfixOperator {
-        kind: Prec,
-        digit: Value,
-        operator: Identifier,
-    },
+    ValueSpec(ValueSpecification),
 
     /// Default type and kind assumptions
-    Default(Value),
+    Default(DefaultTypingSpecification),
 
     /// Scattered definition
-    Scattered(Value),
+    Scattered(ScatteredDefinition),
 
     /// Separate termination measure declaration
     TerminationMeasurePatternExpression {
@@ -737,16 +724,16 @@ pub enum Definition {
     },
 
     /// Separate termination measure declaration
-    TerminationMeasureLoop(Value),
+    TerminationMeasureLoop(Identifier, LinkedList<LoopMeasure>),
 
     /// Register declaration
-    Register(Value),
+    Register(DecSpec),
 
     /// Pragma
-    Pragma(String, String),
+    Pragma(OCamlString, OCamlString, L),
 
     /// Internal mutrec
-    Mutual(LinkedList<Value>),
+    Mutual(LinkedList<FunctionDefinition>),
 }
 
 /// l-value expression
@@ -763,24 +750,5 @@ pub enum LValueExpressionAux {
 #[derive(Debug, Clone, FromValue)]
 pub struct LValueExpression(LValueExpressionAux, L);
 
-// #[derive(Debug, Clone, FromValue)]
-// pub struct Definitions(LinkedList<(String, LinkedList<Definition>)>);
-
 #[derive(Debug, Clone, FromValue)]
-pub enum CommentType {
-    Block,
-    Line,
-}
-
-#[derive(Debug, Clone, FromValue)]
-
-pub struct Comment(CommentType, Position, Position, String);
-
-#[derive(Debug, Clone, FromValue)]
-pub struct Ast {
-    pub defs: LinkedList<Value>,
-    pub comments: LinkedList<(String, LinkedList<Comment>)>,
-}
-
-unsafe impl Send for Ast {}
-unsafe impl Sync for Ast {}
+pub struct Definitions(LinkedList<(String, LinkedList<Definition>)>);

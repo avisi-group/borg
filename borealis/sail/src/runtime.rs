@@ -10,7 +10,7 @@
 
 use {
     crate::{
-        ast::{parse::Ast, type_check::Env},
+        ast::{generated::Ast, type_check::Env},
         error::{Error, WrapperError},
     },
     log::error,

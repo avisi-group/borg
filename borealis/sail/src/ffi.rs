@@ -1,6 +1,6 @@
 //! OCaml Interface types and functions
 
-use ocaml::{FromValue, Value};
+use ocaml::{FromValue, Int, Value};
 
 /// OCaml strings are byte arrays and may contain valid UTF-8 contents or arbitrary bytes
 ///
@@ -20,3 +20,28 @@ unsafe impl FromValue for OCamlString {
         }
     }
 }
+
+/// Position in a source file
+#[derive(Debug, Clone, FromValue)]
+pub struct Position {
+    /// File name
+    pub pos_fname: OCamlString,
+    /// Line number
+    pub pos_lnum: Int,
+    /// Character offset of beginning of line
+    pub pos_bol: Int,
+    /// Character offset of the position
+    pub pos_cnum: Int,
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct BigNum(Value);
+
+unsafe impl Send for BigNum {}
+unsafe impl Sync for BigNum {}
+
+#[derive(Debug, Clone, FromValue)]
+pub struct Rational(Value);
+
+unsafe impl Send for Rational {}
+unsafe impl Sync for Rational {}

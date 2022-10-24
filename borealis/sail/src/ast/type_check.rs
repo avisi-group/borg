@@ -1,9 +1,5 @@
 use {
-    crate::{
-        ast::parse::{Identifier, TypQuant},
-        error::Error,
-        runtime::internal_bindings_to_list,
-    },
+    crate::{ast::parse::Identifier, error::Error, runtime::internal_bindings_to_list},
     ocaml::{FromValue, Runtime, Value},
     std::{collections::LinkedList, fmt::Debug},
 };
@@ -12,32 +8,32 @@ use {
 #[derive(Debug, Clone, FromValue)]
 struct RawEnv {
     top_val_specs: Value,
-    defined_val_specs: Value,
-    locals: Value,
-    top_letbinds: Value,
-    union_ids: Value,
-    registers: Value,
-    variants: Value,
-    scattered_variant_envs: Value,
-    mappings: Value,
-    typ_vars: Value,
-    shadow_vars: Value,
-    typ_synonyms: Value,
-    overloads: Value,
-    enums: Value,
-    records: Value,
-    accessors: Value,
-    externs: Value,
+    _defined_val_specs: Value,
+    _locals: Value,
+    _top_letbinds: Value,
+    _union_ids: Value,
+    _registers: Value,
+    _variants: Value,
+    _scattered_variant_envs: Value,
+    _mappings: Value,
+    _typ_vars: Value,
+    _shadow_vars: Value,
+    _typ_synonyms: Value,
+    _overloads: Value,
+    _enums: Value,
+    _records: Value,
+    _accessors: Value,
+    _externs: Value,
     casts: LinkedList<Identifier>,
     allow_casts: bool,
     allow_bindings: bool,
-    constraints: LinkedList<Value>,
-    default_order: Option<Value>,
-    ret_typ: Option<Value>,
-    poly_undefineds: bool,
-    prove: Option<Value>,
+    _constraints: LinkedList<Value>,
+    _default_order: Option<Value>,
+    _ret_typ: Option<Value>,
+    _poly_undefineds: bool,
+    _prove: Option<Value>,
     allow_unknowns: bool,
-    bitfields: Value,
+    _bitfields: Value,
 }
 
 // #[derive(Debug, Clone)]
@@ -51,7 +47,7 @@ struct RawEnv {
 
 #[derive(Debug, Clone)]
 pub struct Env {
-    top_val_specs: LinkedList<(Identifier, (Value, Value))>,
+    pub top_val_specs: LinkedList<(Identifier, (Value, Value))>,
     // defined_val_specs: Value,
     // locals: Value,
     // top_letbinds: Value,
@@ -69,14 +65,14 @@ pub struct Env {
     // accessors: Value,
     // externs: Value,
     pub casts: LinkedList<Identifier>,
-    // allow_casts: bool,
-    // allow_bindings: bool,
+    pub allow_casts: bool,
+    pub allow_bindings: bool,
     // constraints: LinkedList<Value>,
     // default_order: Option<Value>,
     // ret_typ: Option<Value>,
     // poly_undefineds: bool,
     // prove: Option<Value>,
-    // allow_unknowns: bool,
+    pub allow_unknowns: bool,
     // bitfields: Map<Map<(u64, u64)>>,
 }
 
@@ -92,6 +88,9 @@ impl Env {
         Ok(Self {
             top_val_specs: unsafe { internal_bindings_to_list(rt, raw_env.top_val_specs)?? }.into(),
             casts: raw_env.casts,
+            allow_casts: raw_env.allow_casts,
+            allow_bindings: raw_env.allow_bindings,
+            allow_unknowns: raw_env.allow_unknowns,
         })
     }
 }

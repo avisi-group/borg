@@ -2,8 +2,8 @@
 
 use {
     crate::{
-        ast::parse::{Position, L},
-        ffi::OCamlString,
+        ast::parse::L,
+        ffi::{OCamlString, Position},
         runtime::Request,
     },
     ocaml::{CamlError, FromValue, Int, Value},
