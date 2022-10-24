@@ -125,16 +125,16 @@ pub enum NumericExpressionAux {
     /// Constant
     Constant(BigNum),
     Application(Identifier, LinkedList<NumericExpression>),
-    Times(Box<NumericExpression>, Box<NumericExpression>),
-    Sum(Box<NumericExpression>, Box<NumericExpression>),
-    Minus(Box<NumericExpression>, Box<NumericExpression>),
-    Exponential(Box<NumericExpression>),
+    Times(NumericExpression, NumericExpression),
+    Sum(NumericExpression, NumericExpression),
+    Minus(NumericExpression, NumericExpression),
+    Exponential(NumericExpression),
     /// Unary negation
-    Negation(Box<NumericExpression>),
+    Negation(NumericExpression),
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct NumericExpression(NumericExpressionAux, L);
+pub struct NumericExpression(Box<NumericExpressionAux>, L);
 
 #[derive(Debug, Clone, FromValue)]
 pub struct Effect(EffectAux, L);
@@ -176,17 +176,17 @@ pub enum TypAux {
     /// Type variable
     Var(KindIdentifier),
     /// Function (first-order only)
-    Fn(LinkedList<Typ>, Box<Typ>, Effect),
+    Fn(LinkedList<Typ>, Typ, Effect),
     /// Mapping
-    BiDir(Box<Typ>, Box<Typ>, Effect),
+    BiDir(Typ, Typ, Effect),
     Tuple(LinkedList<Typ>),
     /// Type constructor application
     Application(Identifier, LinkedList<TypArg>),
-    Exist(LinkedList<KindedIdentifier>, NConstraint, Box<Typ>),
+    Exist(LinkedList<KindedIdentifier>, NConstraint, Typ),
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct Typ(TypAux, L);
+pub struct Typ(Box<TypAux>, L);
 
 /// Type constructor arguments of all kinds
 #[derive(Debug, Clone, FromValue)]
@@ -210,8 +210,8 @@ pub enum NConstraintAux {
     BoundedLt(NumericExpression, NumericExpression),
     NotEqual(NumericExpression, NumericExpression),
     Set(KindIdentifier, LinkedList<BigNum>),
-    Or(Box<NConstraint>, Box<NConstraint>),
-    And(Box<NConstraint>, Box<NConstraint>),
+    Or(NConstraint, NConstraint),
+    And(NConstraint, NConstraint),
     App(Identifier, LinkedList<TypArg>),
     Var(KindIdentifier),
     True,
@@ -219,7 +219,7 @@ pub enum NConstraintAux {
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct NConstraint(NConstraintAux, L);
+pub struct NConstraint(Box<NConstraintAux>, L);
 
 #[derive(Debug, Clone, FromValue)]
 pub struct Literal(LiteralAux, L);
@@ -255,22 +255,22 @@ pub enum PatternAux {
     Wildcard,
 
     /// Pattern disjunction
-    Or(Box<Pattern>, Box<Pattern>),
+    Or(Pattern, Pattern),
 
     /// Pattern negation
-    Not(Box<Pattern>),
+    Not(Pattern),
 
     /// Named pattern
-    As(Box<Pattern>, Identifier),
+    As(Pattern, Identifier),
 
     /// Typed pattern
-    Type(Typ, Box<Pattern>),
+    Type(Typ, Pattern),
 
     /// Identifier
     Identifier(Identifier),
 
     /// Bind pattern to type variable
-    Variable(Box<Pattern>, TypPat),
+    Variable(Pattern, TypPat),
 
     /// Union constructor patern
     Application(Identifier, LinkedList<Pattern>),
@@ -288,7 +288,7 @@ pub enum PatternAux {
     List(LinkedList<Pattern>),
 
     /// Cons pattern
-    Cons(Box<Pattern>, Box<Pattern>),
+    Cons(Pattern, Pattern),
 
     /// String append pattern
     ///
@@ -298,7 +298,7 @@ pub enum PatternAux {
 
 /// TODO CHECK THIS ORDERING OF `ANNOT`
 #[derive(Debug, Clone, FromValue)]
-pub struct Pattern(PatternAux, Annot);
+pub struct Pattern(Box<PatternAux>, Annot);
 
 /// Either a kinded identifier or a nexp constraint for a typquant
 #[derive(Debug, Clone, FromValue)]
@@ -312,7 +312,7 @@ pub enum InternalLoopMeasureAux {
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct InternalLoopMeasure(InternalLoopMeasureAux, L);
+pub struct InternalLoopMeasure(Box<InternalLoopMeasureAux>, L);
 
 /// Expression
 #[derive(Debug, Clone, FromValue)]
@@ -327,120 +327,110 @@ pub enum ExpressionAux {
     Literal(Literal),
 
     /// Cast
-    Cast(Typ, Box<Expression>),
+    Cast(Typ, Expression),
 
     /// Function application
     Application(Identifier, LinkedList<Expression>),
 
     /// Infix function application
-    ApplicationInfix(Box<Expression>, Identifier, Box<Expression>),
+    ApplicationInfix(Expression, Identifier, Expression),
 
     /// Tuple
     Tuple(LinkedList<Expression>),
 
     /// Conditional
-    If(Box<Expression>, Box<Expression>, Box<Expression>),
+    If(Expression, Expression, Expression),
 
-    Loop(
-        Loop,
-        Box<InternalLoopMeasure>,
-        Box<Expression>,
-        Box<Expression>,
-    ),
+    Loop(Loop, InternalLoopMeasure, Expression, Expression),
 
     /// For loop
     For(
         Identifier,
-        Box<Expression>,
-        Box<Expression>,
-        Box<Expression>,
+        Expression,
+        Expression,
+        Expression,
         Order,
-        Box<Expression>,
+        Expression,
     ),
 
     /// Vector (indexed from 0)
     Vector(LinkedList<Expression>),
 
     /// Vector access
-    VectorAccess(Box<Expression>, Box<Expression>),
+    VectorAccess(Expression, Expression),
 
     /// Subvector extraction
-    VectorSubrange(Box<Expression>, Box<Expression>, Box<Expression>),
+    VectorSubrange(Expression, Expression, Expression),
 
     /// Vector functional update
-    VectorUpdate(Box<Expression>, Box<Expression>, Box<Expression>),
+    VectorUpdate(Expression, Expression, Expression),
 
     /// Vector subrange update (with vector)
-    VectorUpdateSubrange(
-        Box<Expression>,
-        Box<Expression>,
-        Box<Expression>,
-        Box<Expression>,
-    ),
+    VectorUpdateSubrange(Expression, Expression, Expression, Expression),
 
     /// Vector concatenation
-    VectorAppend(Box<Expression>, Box<Expression>),
+    VectorAppend(Expression, Expression),
 
     /// List
     List(LinkedList<Expression>),
 
     /// Cons
-    Cons(Box<Expression>, Box<Expression>),
+    Cons(Expression, Expression),
 
     /// Struct
     Record(LinkedList<FieldExpression>),
 
     /// Functional update of struct
-    RecordUpdate(Box<Expression>, LinkedList<FieldExpression>),
+    RecordUpdate(Expression, LinkedList<FieldExpression>),
 
     /// Field projection from struct
-    Field(Box<Expression>, Identifier),
+    Field(Expression, Identifier),
 
     /// Pattern matching
-    Case(Box<Expression>, LinkedList<PatternMatch>),
+    Case(Expression, LinkedList<PatternMatch>),
 
     /// Let expression
-    Let(LetBind, Box<Expression>),
+    Let(LetBind, Expression),
 
     /// Imperative assignment
-    Assign(Box<LValueExpression>, Box<Expression>),
+    Assign(LValueExpression, Expression),
 
     /// Value of $nexp$ at run time
     SizeOf(NumericExpression),
 
     /// Return $(exp 'a)$ from current function
-    Return(Box<Expression>),
+    Return(Expression),
 
     /// Halt all current execution
-    Exit(Box<Expression>),
+    Exit(Expression),
 
     Ref(Identifier),
 
-    Throw(Box<Expression>),
+    Throw(Expression),
 
-    Try(Box<Expression>, LinkedList<PatternMatch>),
+    Try(Expression, LinkedList<PatternMatch>),
 
     /// Halt with error message $(exp 'a)$ when not $(exp 'a)$. exp' is optional.
-    Assert(Box<Expression>, Box<Expression>),
+    Assert(Expression, Expression),
 
     /// This is an internal node for compilation that demonstrates the scope of a local mutable variable
-    Var(Box<LValueExpression>, Box<Expression>, Box<Expression>),
+    Var(LValueExpression, Expression, Expression),
 
     /// his is an internal node, used to distinguised some introduced lets during processing from original ones
-    InternalPLet(Pattern, Box<Expression>, Box<Expression>),
+    InternalPLet(Pattern, Expression, Expression),
 
     /// For internal use to embed into monad definition
-    InternalReturn(Box<Expression>),
+    InternalReturn(Expression),
 
     /// For internal use in interpreter to wrap pre-evaluated values when returning an action
-    InternalValue(Box<Value>),
+    InternalValue(Value),
 
     Constraint(NConstraint),
 }
 
 /// Expression
 #[derive(Debug, Clone, FromValue)]
-pub struct Expression(ExpressionAux, Annot);
+pub struct Expression(Box<ExpressionAux>, Annot);
 
 /// l-value expression
 #[derive(Debug, Clone, FromValue)]
@@ -454,15 +444,15 @@ pub enum LValueExpressionAux {
     /// vector concatenation L-exp
     VectorConcat(LinkedList<LValueExpression>),
     /// vector element
-    Vector(Box<LValueExpression>, Expression),
+    Vector(LValueExpression, Expression),
     /// Subvector
-    VectorRange(Box<LValueExpression>, Expression, Expression),
+    VectorRange(LValueExpression, Expression, Expression),
     /// Struct field
-    Field(Box<LValueExpression>, Identifier),
+    Field(LValueExpression, Identifier),
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct LValueExpression(LValueExpressionAux, Annot);
+pub struct LValueExpression(Box<LValueExpressionAux>, Annot);
 
 /// Field Expression
 #[derive(Debug, Clone, FromValue)]
@@ -491,7 +481,7 @@ pub struct PatternMatch(PatternMatchAux, Annot);
 ///
 /// Implicit type, pattern must be total
 #[derive(Debug, Clone, FromValue)]
-pub struct LetBindAux(pub Box<Pattern>, pub Box<Expression>);
+pub struct LetBindAux(pub Pattern, pub Expression);
 
 #[derive(Debug, Clone, FromValue)]
 pub struct LetBind(LetBindAux, Annot);
@@ -515,18 +505,18 @@ pub enum MappingPatternAux {
     /// List pattern
     List(LinkedList<MappingPattern>),
     /// Cons pattern
-    Cons(Box<MappingPattern>, Box<MappingPattern>),
+    Cons(MappingPattern, MappingPattern),
     /// String append pattern
     ///
     /// x^^y
     StringAppend(LinkedList<MappingPattern>),
     /// Typed pattern
-    Type(Box<MappingPattern>, Typ),
-    As(Box<MappingPattern>, Identifier),
+    Type(MappingPattern, Typ),
+    As(MappingPattern, Identifier),
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct MappingPattern(MappingPatternAux, Annot);
+pub struct MappingPattern(Box<MappingPatternAux>, Annot);
 
 /// Type quantifiers and constraints
 #[derive(Debug, Clone, FromValue)]
@@ -645,11 +635,11 @@ pub enum IndexRangeAux {
     /// Index range
     Range(NumericExpression, NumericExpression),
     /// Concatenation of index ranges
-    Concat(Box<IndexRange>, Box<IndexRange>),
+    Concat(IndexRange, IndexRange),
 }
 
 #[derive(Debug, Clone, FromValue)]
-pub struct IndexRange(IndexRangeAux, L);
+pub struct IndexRange(Box<IndexRangeAux>, L);
 
 /// Value type specification
 #[derive(Debug, Clone, FromValue)]
