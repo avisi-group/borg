@@ -13,6 +13,12 @@ pub mod parse;
 pub mod type_check;
 
 #[derive(Debug, Clone, FromValue)]
+pub enum Mut {
+    Immutable,
+    Mutable,
+}
+
+#[derive(Debug, Clone, FromValue)]
 pub enum Bit {
     B0,
     B1,

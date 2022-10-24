@@ -9,7 +9,7 @@ fn main() -> Result<()> {
         load_files(vec![
             "/Users/ferdiamckeogh/Downloads/borealis/sail/examples/prelude.sail".to_owned()
         ])?
-        .1
+        .2
     );
 
     Ok(())

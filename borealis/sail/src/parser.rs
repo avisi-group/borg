@@ -55,6 +55,6 @@ mod tests {
             .to_string_lossy()
             .to_string();
 
-        insta::assert_debug_snapshot!(load_files(vec![path]).unwrap());
+        load_files(vec![path]).unwrap();
     }
 }
