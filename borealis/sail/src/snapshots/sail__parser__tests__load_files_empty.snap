@@ -9,74 +9,9 @@ expression: "load_files(vec![]).unwrap()"
         comments: [],
     },
     Env {
-        top_val_specs: [
-            (
-                Identifier(
-                    Identifier(
-                        String(
-                            "make_the_value",
-                        ),
-                    ),
-                    Unknown,
-                ),
-                (
-                    Root(
-                        Root(
-                            0x0000000130444030,
-                        ),
-                    ),
-                    Root(
-                        Root(
-                            0x0000000130444050,
-                        ),
-                    ),
-                ),
-            ),
-            (
-                Identifier(
-                    Identifier(
-                        String(
-                            "sail_assume",
-                        ),
-                    ),
-                    Unknown,
-                ),
-                (
-                    Root(
-                        Root(
-                            0x0000000130444058,
-                        ),
-                    ),
-                    Root(
-                        Root(
-                            0x0000000130444060,
-                        ),
-                    ),
-                ),
-            ),
-            (
-                Identifier(
-                    Identifier(
-                        String(
-                            "size_itself_int",
-                        ),
-                    ),
-                    Unknown,
-                ),
-                (
-                    Root(
-                        Root(
-                            0x0000000130444068,
-                        ),
-                    ),
-                    Root(
-                        Root(
-                            0x0000000130444070,
-                        ),
-                    ),
-                ),
-            ),
-        ],
         casts: [],
+        allow_casts: true,
+        allow_bindings: true,
+        allow_unknowns: false,
     },
 )

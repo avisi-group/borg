@@ -83,4 +83,8 @@ let () =
       exception_to_result (fun () -> Type_check.initial_env));
 
   Callback.register "internal_bindings_to_list" (fun a ->
-      exception_to_result (fun () -> bindings_to_list a))
+      exception_to_result (fun () -> bindings_to_list a));
+
+  Callback.register "internal_dummy" (fun () ->
+      exception_to_result (fun () ->
+          Ast.P_aux (Ast.P_wild, (Parse_ast.Unknown, 5))))

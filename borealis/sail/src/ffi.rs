@@ -34,14 +34,7 @@ pub struct Position {
     pub pos_cnum: Int,
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct BigNum(Value);
-
-unsafe impl Send for BigNum {}
-unsafe impl Sync for BigNum {}
+pub type BigNum = ();
 
 #[derive(Debug, Clone, FromValue)]
-pub struct Rational(Value);
-
-unsafe impl Send for Rational {}
-unsafe impl Sync for Rational {}
+pub struct Rational(());

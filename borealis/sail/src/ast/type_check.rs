@@ -1,5 +1,5 @@
 use {
-    crate::{ast::parse::Identifier, error::Error, runtime::internal_bindings_to_list},
+    crate::{ast::parse::Identifier, error::Error},
     ocaml::{FromValue, Runtime, Value},
     std::{collections::LinkedList, fmt::Debug},
 };
@@ -7,7 +7,7 @@ use {
 /// Env type as can be automatically derived, requires further parsing
 #[derive(Debug, Clone, FromValue)]
 struct RawEnv {
-    top_val_specs: Value,
+    _top_val_specs: Value,
     _defined_val_specs: Value,
     _locals: Value,
     _top_letbinds: Value,
@@ -47,7 +47,7 @@ struct RawEnv {
 
 #[derive(Debug, Clone)]
 pub struct Env {
-    pub top_val_specs: LinkedList<(Identifier, (Value, Value))>,
+    //pub top_val_specs: LinkedList<(Identifier, (Value, Value))>,
     // defined_val_specs: Value,
     // locals: Value,
     // top_letbinds: Value,
@@ -80,13 +80,11 @@ unsafe impl Send for Env {}
 unsafe impl Sync for Env {}
 
 impl Env {
-    pub fn from_value(rt: &mut Runtime, env: Value) -> Result<Self, Error> {
+    pub fn from_value(_rt: &mut Runtime, env: Value) -> Result<Self, Error> {
         let raw_env = RawEnv::from_value(env);
 
-        dbg!(&raw_env);
-
         Ok(Self {
-            top_val_specs: unsafe { internal_bindings_to_list(rt, raw_env.top_val_specs)?? }.into(),
+            //  top_val_specs: unsafe { internal_bindings_to_list(rt, raw_env.top_val_specs)?? }.into(),
             casts: raw_env.casts,
             allow_casts: raw_env.allow_casts,
             allow_bindings: raw_env.allow_bindings,
