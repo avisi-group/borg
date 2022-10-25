@@ -12,6 +12,7 @@ use {
     crate::{
         ast::Ast,
         error::{Error, WrapperError},
+        ffi::OCamlString,
         type_check::Env,
     },
     log::error,
@@ -82,7 +83,7 @@ impl Runtime {
         })
     }
 
-    pub fn load_files(&self, files: Vec<String>) -> Result<(String, Ast, Env), Error> {
+    pub fn load_files(&self, files: Vec<String>) -> Result<(OCamlString, Ast, Env), Error> {
         self.request.send(Request::LoadFiles(files))?;
 
         self.response.recv()?.map(|res| match res {
@@ -98,7 +99,7 @@ ocaml::import! {
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(String, Ast, Value), WrapperError>;
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Value), WrapperError>;
 
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
@@ -122,7 +123,7 @@ pub enum Request {
 #[derive(Debug)]
 enum Response {
     Dedup(Vec<i32>),
-    LoadFiles((String, Ast, Env)),
+    LoadFiles((OCamlString, Ast, Env)),
 }
 
 /// Process a single incoming request by calling the corresponding OCaml function

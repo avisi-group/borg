@@ -20,6 +20,10 @@ color-eyre = "0.6.2"
 [dev-dependencies]
 color-eyre = { version = "0.6.2", default-features = false }
 simple_logger = "3.0.0"
-insta = { version = "1.21.0", features = ["json", "redactions"] }
+insta = { version = "1.21.0", features = ["json"] }
 proptest = "1.0.0"
 serde_json = "1.0.87"
+
+[features]
+# some parts of AST are dependent on environment or otherwise impure, enabling this feature serializes these elements to `0`
+redact = []

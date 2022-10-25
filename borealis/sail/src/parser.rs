@@ -1,6 +1,6 @@
 //! Sail source file parsing
 
-use crate::{ast::Ast, error::Error, type_check::Env, RT};
+use crate::{ast::Ast, error::Error, ffi::OCamlString, type_check::Env, RT};
 
 /// Parses supplied Sail files and returns the AST
 ///
@@ -28,7 +28,7 @@ use crate::{ast::Ast, error::Error, type_check::Env, RT};
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_files(files: Vec<String>) -> Result<(String, Ast, Env), Error> {
+pub fn load_files(files: Vec<String>) -> Result<(OCamlString, Ast, Env), Error> {
     Ok(RT.lock().load_files(files)?)
 }
 
@@ -51,6 +51,6 @@ mod tests {
             .to_string_lossy()
             .to_string();
 
-        insta::assert_json_snapshot!(load_files(vec![path]).unwrap(), { ".kind_identifier" => "{String(\"\")}" });
+        insta::assert_json_snapshot!(load_files(vec![path]).unwrap());
     }
 }

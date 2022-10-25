@@ -3,7 +3,9 @@ source: sail/src/parser.rs
 expression: "load_files(vec![]).unwrap()"
 ---
 [
-  "out.sail",
+  {
+    "String": "out.sail"
+  },
   {
     "defs": [],
     "comments": []

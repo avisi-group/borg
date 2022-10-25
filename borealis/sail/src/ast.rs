@@ -53,7 +53,7 @@ pub enum Value {
     String(OCamlString),
     Ref(OCamlString),
     Ctor(OCamlString, LinkedList<Value>),
-    Record(LinkedList<(String, Value)>),
+    Record(LinkedList<(OCamlString, Value)>),
     AttemptedRead(OCamlString),
 }
 
@@ -111,14 +111,14 @@ pub enum BaseEffectAux {
 }
 
 /// kinded IDs: Type, Int, and Order variables
-#[cfg_attr(not(test), derive(Serialize))]
+#[cfg_attr(not(feature = "redact"), derive(Serialize))]
 #[derive(Debug, Clone, FromValue, Deserialize, DeepSizeOf)]
 pub struct KindIdentifierAux {
     kind_identifier: X,
 }
 
 /// Kind identifiers zeroed for tests to prevent snapshot tests from breaking
-#[cfg(test)]
+#[cfg(feature = "redact")]
 impl Serialize for KindIdentifierAux {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -888,10 +888,10 @@ pub enum CommentType {
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 
-pub struct Comment(pub CommentType, pub Position, pub Position, pub String);
+pub struct Comment(pub CommentType, pub Position, pub Position, pub OCamlString);
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ast {
     pub defs: LinkedList<Definition>,
-    pub comments: LinkedList<(String, LinkedList<Comment>)>,
+    pub comments: LinkedList<(OCamlString, LinkedList<Comment>)>,
 }
