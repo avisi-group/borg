@@ -12,6 +12,7 @@ pub mod ffi;
 pub mod parser;
 mod runtime;
 pub mod span;
+pub mod type_check;
 
 /// Global runtime shared by all public functions
 static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));

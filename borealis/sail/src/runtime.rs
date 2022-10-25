@@ -10,8 +10,9 @@
 
 use {
     crate::{
-        ast::{generated::Ast, type_check::Env},
+        ast::Ast,
         error::{Error, WrapperError},
+        type_check::Env,
     },
     log::error,
     ocaml::{

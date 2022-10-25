@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        ast::parse::L,
+        ast::L,
         ffi::{OCamlString, Position},
         runtime::Request,
     },

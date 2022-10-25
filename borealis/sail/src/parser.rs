@@ -1,10 +1,6 @@
 //! Sail source file parsing
 
-use crate::{
-    ast::{generated::Ast, type_check::Env},
-    error::Error,
-    RT,
-};
+use crate::{ast::Ast, error::Error, type_check::Env, RT};
 
 /// Parses supplied Sail files and returns the AST
 ///

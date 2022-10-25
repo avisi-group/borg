@@ -1,13 +1,59 @@
-//! Generated AST from `ast.lem` and `sail.ott`.
+#![allow(missing_docs)]
+
+//! Sail Abstract Syntax Tree, generated from `ast.lem` and `sail.ott`.
 
 use {
-    crate::{
-        ast::{parse::L, Value},
-        ffi::{BigNum, OCamlString, Position},
-    },
-    ocaml::FromValue,
-    std::{collections::LinkedList, fmt::Debug},
+    crate::ffi::{BigNum, OCamlString, Position, Rational},
+    ocaml::{FromValue, Int},
+    std::collections::LinkedList,
 };
+
+/// Location
+#[derive(Debug, Clone, FromValue)]
+pub enum L {
+    /// Unknown location
+    Unknown,
+    /// Unique location
+    Unique(Int, Box<L>),
+    /// Generated location
+    Generated(Box<L>),
+    /// Range between two positions
+    Range(Position, Position),
+    /// Documented location
+    Documented(OCamlString, Box<L>),
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub enum Mut {
+    Immutable,
+    Mutable,
+}
+
+#[derive(Debug, Clone, FromValue)]
+pub enum Bit {
+    B0,
+    B1,
+}
+
+/// Sail AST Value
+///
+/// **Not to be confused with `ocaml::Value`**
+#[derive(Debug, Clone, FromValue)]
+pub enum Value {
+    Vector(LinkedList<Value>),
+    List(LinkedList<Value>),
+    Int(BigNum),
+    Real(Rational),
+    Bool(bool),
+    Bit(Bit),
+    Tuple(LinkedList<Value>),
+    Unit,
+    String(OCamlString),
+    Ref(OCamlString),
+    Ctor(OCamlString, LinkedList<Value>),
+    Record(LinkedList<(String, Value)>),
+    AttemptedRead(OCamlString),
+}
 
 /// Annotation with generic value (ignored as unit here)
 #[derive(Debug, Clone, FromValue)]

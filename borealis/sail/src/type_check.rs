@@ -1,9 +1,6 @@
 use {
     crate::{
-        ast::{
-            generated::{Effect, Identifier, Typ, TypQuant, TypeUnion},
-            Mut,
-        },
+        ast::{Effect, Identifier, Mut, Typ, TypQuant, TypeUnion},
         error::Error,
         runtime::internal_bindings_to_list,
     },
