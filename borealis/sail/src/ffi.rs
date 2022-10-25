@@ -1,7 +1,11 @@
 //! OCaml Interface types and functions
 
+use std::str::FromStr;
+
 use {
+    crate::runtime::internal_bigint_to_string,
     deepsize::DeepSizeOf,
+    num_bigint::BigInt,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},
 };
@@ -63,7 +67,30 @@ pub struct Position {
     pub pos_cnum: Int,
 }
 
-pub type BigNum = ();
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BigNum(BigInt);
+
+unsafe impl FromValue for BigNum {
+    fn from_value(v: Value) -> Self {
+        let rt = unsafe { ocaml::Runtime::recover_handle() };
+
+        let s = match unsafe { internal_bigint_to_string(rt, v) }
+            .unwrap()
+            .unwrap()
+        {
+            OCamlString::String(s) => s,
+            OCamlString::Vec(_) => panic!("invalid UTF-8 when converting bigint to string"),
+        };
+
+        Self(BigInt::from_str(&s).unwrap())
+    }
+}
+
+impl DeepSizeOf for BigNum {
+    fn deep_size_of_children(&self, _context: &mut deepsize::Context) -> usize {
+        (self.0.bits() / 8) as usize
+    }
+}
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Rational(());

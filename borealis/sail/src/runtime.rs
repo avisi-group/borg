@@ -103,6 +103,7 @@ ocaml::import! {
 
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
+    pub fn internal_bigint_to_string(input: Value) -> Result<OCamlString, WrapperError>;
 }
 
 /// Request made against runtime
