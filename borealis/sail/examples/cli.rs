@@ -6,6 +6,7 @@ use {
 
 fn main() -> Result<()> {
     color_eyre::install()?;
+    simple_logger::init_with_env()?;
 
     // parse command line arguments
     let args = env::args();
