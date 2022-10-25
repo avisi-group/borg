@@ -2,337 +2,331 @@
 source: sail/src/parser.rs
 expression: "load_files(vec![]).unwrap()"
 ---
-(
-    "out.sail",
-    Ast {
-        defs: [],
-        comments: [],
-    },
-    Env {
-        top_val_specs: [
-            (
-                Identifier(
-                    Identifier(
-                        String(
-                            "make_the_value",
-                        ),
-                    ),
-                    Unknown,
-                ),
-                (
-                    TypQuant(
-                        Tq(
-                            [
-                                QuantItem(
-                                    KindedIdentifier(
-                                        KindedIdentifier(
-                                            Var(
-                                                String(
-                                                    "\u{3}\0\0\0\0\0\0\0\u{1}\0\0\0\0\0\0",
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                    ),
-                                    Unknown,
-                                ),
-                            ],
-                        ),
-                        Unknown,
-                    ),
-                    Typ(
-                        Fn(
-                            [
-                                Typ(
-                                    Application(
-                                        Identifier(
-                                            Identifier(
-                                                String(
-                                                    "atom",
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                        [
-                                            TypArg(
-                                                NExp(
-                                                    NumericExpression(
-                                                        Var(
-                                                            KindIdentifier(
-                                                                Var(
-                                                                    String(
-                                                                        "'n",
-                                                                    ),
-                                                                ),
-                                                                Unknown,
-                                                            ),
-                                                        ),
-                                                        Unknown,
-                                                    ),
-                                                ),
-                                                Unknown,
-                                            ),
-                                        ],
-                                    ),
-                                    Unknown,
-                                ),
-                            ],
-                            Typ(
-                                Application(
-                                    Identifier(
-                                        Identifier(
-                                            String(
-                                                "itself",
-                                            ),
-                                        ),
-                                        Unknown,
-                                    ),
-                                    [
-                                        TypArg(
-                                            NExp(
-                                                NumericExpression(
-                                                    Var(
-                                                        KindIdentifier(
-                                                            Var(
-                                                                String(
-                                                                    "'n",
-                                                                ),
-                                                            ),
-                                                            Unknown,
-                                                        ),
-                                                    ),
-                                                    Unknown,
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                    ],
-                                ),
-                                Unknown,
-                            ),
-                            Effect(
-                                EffectAux(
-                                    [],
-                                ),
-                                Unknown,
-                            ),
-                        ),
-                        Unknown,
-                    ),
-                ),
-            ),
-            (
-                Identifier(
-                    Identifier(
-                        String(
-                            "sail_assume",
-                        ),
-                    ),
-                    Unknown,
-                ),
-                (
-                    TypQuant(
-                        Tq(
-                            [
-                                QuantItem(
-                                    KindedIdentifier(
-                                        KindedIdentifier(
-                                            Var(
-                                                String(
-                                                    "\u{7}\0\0\0\0\0\0\0\u{1}\0\0\0\0\0\0",
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                    ),
-                                    Unknown,
-                                ),
-                            ],
-                        ),
-                        Unknown,
-                    ),
-                    Typ(
-                        Fn(
-                            [
-                                Typ(
-                                    Application(
-                                        Identifier(
-                                            Identifier(
-                                                String(
-                                                    "atom_bool",
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                        [
-                                            TypArg(
-                                                Bool(
-                                                    NConstraint(
-                                                        Var(
-                                                            KindIdentifier(
-                                                                Var(
-                                                                    String(
-                                                                        "'ex0#",
-                                                                    ),
-                                                                ),
-                                                                Unknown,
-                                                            ),
-                                                        ),
-                                                        Unknown,
-                                                    ),
-                                                ),
-                                                Unknown,
-                                            ),
-                                        ],
-                                    ),
-                                    Unknown,
-                                ),
-                            ],
-                            Typ(
-                                Id(
-                                    Identifier(
-                                        Identifier(
-                                            String(
-                                                "unit",
-                                            ),
-                                        ),
-                                        Unknown,
-                                    ),
-                                ),
-                                Unknown,
-                            ),
-                            Effect(
-                                EffectAux(
-                                    [],
-                                ),
-                                Unknown,
-                            ),
-                        ),
-                        Unknown,
-                    ),
-                ),
-            ),
-            (
-                Identifier(
-                    Identifier(
-                        String(
-                            "size_itself_int",
-                        ),
-                    ),
-                    Unknown,
-                ),
-                (
-                    TypQuant(
-                        Tq(
-                            [
-                                QuantItem(
-                                    KindedIdentifier(
-                                        KindedIdentifier(
-                                            Var(
-                                                String(
-                                                    "\u{3}\0\0\0\0\0\0\0\u{1}\0\0\0\0\0\0",
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                    ),
-                                    Unknown,
-                                ),
-                            ],
-                        ),
-                        Unknown,
-                    ),
-                    Typ(
-                        Fn(
-                            [
-                                Typ(
-                                    Application(
-                                        Identifier(
-                                            Identifier(
-                                                String(
-                                                    "itself",
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                        [
-                                            TypArg(
-                                                NExp(
-                                                    NumericExpression(
-                                                        Var(
-                                                            KindIdentifier(
-                                                                Var(
-                                                                    String(
-                                                                        "'n",
-                                                                    ),
-                                                                ),
-                                                                Unknown,
-                                                            ),
-                                                        ),
-                                                        Unknown,
-                                                    ),
-                                                ),
-                                                Unknown,
-                                            ),
-                                        ],
-                                    ),
-                                    Unknown,
-                                ),
-                            ],
-                            Typ(
-                                Application(
-                                    Identifier(
-                                        Identifier(
-                                            String(
-                                                "atom",
-                                            ),
-                                        ),
-                                        Unknown,
-                                    ),
-                                    [
-                                        TypArg(
-                                            NExp(
-                                                NumericExpression(
-                                                    Var(
-                                                        KindIdentifier(
-                                                            Var(
-                                                                String(
-                                                                    "'n",
-                                                                ),
-                                                            ),
-                                                            Unknown,
-                                                        ),
-                                                    ),
-                                                    Unknown,
-                                                ),
-                                            ),
-                                            Unknown,
-                                        ),
-                                    ],
-                                ),
-                                Unknown,
-                            ),
-                            Effect(
-                                EffectAux(
-                                    [],
-                                ),
-                                Unknown,
-                            ),
-                        ),
-                        Unknown,
-                    ),
-                ),
-            ),
+[
+  "out.sail",
+  {
+    "defs": [],
+    "comments": []
+  },
+  {
+    "top_val_specs": [
+      [
+        [
+          {
+            "Identifier": {
+              "String": "make_the_value"
+            }
+          },
+          "Unknown"
         ],
-        locals: [],
-        union_ids: [],
-        registers: [],
-        variants: [],
-        scattered_variant_envs: [],
-        mappings: [],
-        casts: [],
-        allow_casts: true,
-        allow_bindings: true,
-        allow_unknowns: false,
-    },
-)
+        [
+          [
+            {
+              "Tq": [
+                [
+                  {
+                    "KindedIdentifier": [
+                      {
+                        "kind_identifier": 0
+                      },
+                      "Unknown"
+                    ]
+                  },
+                  "Unknown"
+                ]
+              ]
+            },
+            "Unknown"
+          ],
+          [
+            {
+              "Fn": [
+                [
+                  [
+                    {
+                      "Application": [
+                        [
+                          {
+                            "Identifier": {
+                              "String": "atom"
+                            }
+                          },
+                          "Unknown"
+                        ],
+                        [
+                          [
+                            {
+                              "NExp": [
+                                {
+                                  "Var": [
+                                    {
+                                      "kind_identifier": 0
+                                    },
+                                    "Unknown"
+                                  ]
+                                },
+                                "Unknown"
+                              ]
+                            },
+                            "Unknown"
+                          ]
+                        ]
+                      ]
+                    },
+                    "Unknown"
+                  ]
+                ],
+                [
+                  {
+                    "Application": [
+                      [
+                        {
+                          "Identifier": {
+                            "String": "itself"
+                          }
+                        },
+                        "Unknown"
+                      ],
+                      [
+                        [
+                          {
+                            "NExp": [
+                              {
+                                "Var": [
+                                  {
+                                    "kind_identifier": 0
+                                  },
+                                  "Unknown"
+                                ]
+                              },
+                              "Unknown"
+                            ]
+                          },
+                          "Unknown"
+                        ]
+                      ]
+                    ]
+                  },
+                  "Unknown"
+                ],
+                [
+                  [],
+                  "Unknown"
+                ]
+              ]
+            },
+            "Unknown"
+          ]
+        ]
+      ],
+      [
+        [
+          {
+            "Identifier": {
+              "String": "sail_assume"
+            }
+          },
+          "Unknown"
+        ],
+        [
+          [
+            {
+              "Tq": [
+                [
+                  {
+                    "KindedIdentifier": [
+                      {
+                        "kind_identifier": 0
+                      },
+                      "Unknown"
+                    ]
+                  },
+                  "Unknown"
+                ]
+              ]
+            },
+            "Unknown"
+          ],
+          [
+            {
+              "Fn": [
+                [
+                  [
+                    {
+                      "Application": [
+                        [
+                          {
+                            "Identifier": {
+                              "String": "atom_bool"
+                            }
+                          },
+                          "Unknown"
+                        ],
+                        [
+                          [
+                            {
+                              "Bool": [
+                                {
+                                  "Var": [
+                                    {
+                                      "kind_identifier": 0
+                                    },
+                                    "Unknown"
+                                  ]
+                                },
+                                "Unknown"
+                              ]
+                            },
+                            "Unknown"
+                          ]
+                        ]
+                      ]
+                    },
+                    "Unknown"
+                  ]
+                ],
+                [
+                  {
+                    "Id": [
+                      {
+                        "Identifier": {
+                          "String": "unit"
+                        }
+                      },
+                      "Unknown"
+                    ]
+                  },
+                  "Unknown"
+                ],
+                [
+                  [],
+                  "Unknown"
+                ]
+              ]
+            },
+            "Unknown"
+          ]
+        ]
+      ],
+      [
+        [
+          {
+            "Identifier": {
+              "String": "size_itself_int"
+            }
+          },
+          "Unknown"
+        ],
+        [
+          [
+            {
+              "Tq": [
+                [
+                  {
+                    "KindedIdentifier": [
+                      {
+                        "kind_identifier": 0
+                      },
+                      "Unknown"
+                    ]
+                  },
+                  "Unknown"
+                ]
+              ]
+            },
+            "Unknown"
+          ],
+          [
+            {
+              "Fn": [
+                [
+                  [
+                    {
+                      "Application": [
+                        [
+                          {
+                            "Identifier": {
+                              "String": "itself"
+                            }
+                          },
+                          "Unknown"
+                        ],
+                        [
+                          [
+                            {
+                              "NExp": [
+                                {
+                                  "Var": [
+                                    {
+                                      "kind_identifier": 0
+                                    },
+                                    "Unknown"
+                                  ]
+                                },
+                                "Unknown"
+                              ]
+                            },
+                            "Unknown"
+                          ]
+                        ]
+                      ]
+                    },
+                    "Unknown"
+                  ]
+                ],
+                [
+                  {
+                    "Application": [
+                      [
+                        {
+                          "Identifier": {
+                            "String": "atom"
+                          }
+                        },
+                        "Unknown"
+                      ],
+                      [
+                        [
+                          {
+                            "NExp": [
+                              {
+                                "Var": [
+                                  {
+                                    "kind_identifier": 0
+                                  },
+                                  "Unknown"
+                                ]
+                              },
+                              "Unknown"
+                            ]
+                          },
+                          "Unknown"
+                        ]
+                      ]
+                    ]
+                  },
+                  "Unknown"
+                ],
+                [
+                  [],
+                  "Unknown"
+                ]
+              ]
+            },
+            "Unknown"
+          ]
+        ]
+      ]
+    ],
+    "locals": [],
+    "union_ids": [],
+    "registers": [],
+    "variants": [],
+    "scattered_variant_envs": [],
+    "mappings": [],
+    "casts": [],
+    "allow_casts": true,
+    "allow_bindings": true,
+    "allow_unknowns": false
+  }
+]

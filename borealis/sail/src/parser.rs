@@ -41,7 +41,7 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
-        insta::assert_debug_snapshot!(load_files(vec![]).unwrap());
+        insta::assert_json_snapshot!(load_files(vec![]).unwrap());
     }
 
     #[test]
@@ -51,6 +51,6 @@ mod tests {
             .to_string_lossy()
             .to_string();
 
-        load_files(vec![path]).unwrap();
+        insta::assert_json_snapshot!(load_files(vec![path]).unwrap(), { ".kind_identifier" => "{String(\"\")}" });
     }
 }

@@ -1,5 +1,6 @@
 use {
     color_eyre::eyre::{Context, Result},
+    deepsize::DeepSizeOf,
     sail::parser::load_files,
     std::env,
 };
@@ -11,7 +12,10 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = env::args();
 
-    dbg!(load_files(args.skip(1).collect::<Vec<_>>()).wrap_err("Failed to parse Sail files")?);
+    let (_name, ast, _env) =
+        load_files(args.skip(1).collect::<Vec<_>>()).wrap_err("Failed to parse Sail files")?;
+
+    println!("{} bytes", ast.deep_size_of());
 
     Ok(())
 }

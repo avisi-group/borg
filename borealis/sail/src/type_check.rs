@@ -4,7 +4,9 @@ use {
         error::Error,
         runtime::internal_bindings_to_list,
     },
+    deepsize::DeepSizeOf,
     ocaml::{FromValue, Runtime, Value},
+    serde::{Deserialize, Serialize},
     std::{collections::LinkedList, fmt::Debug},
 };
 
@@ -40,7 +42,7 @@ struct RawEnv {
     _bitfields: Value,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct Env {
     pub top_val_specs: LinkedList<(Identifier, (TypQuant, Typ))>,
     // defined_val_specs: Value,
