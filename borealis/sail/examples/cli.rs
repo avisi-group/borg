@@ -11,10 +11,8 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = env::args();
 
-    let (_name, ast, _env) =
+    let (_name, _ast, _env) =
         load_files(args.skip(1).collect::<Vec<_>>()).wrap_err("Failed to parse Sail files")?;
-
-    dbg!(ast);
 
     Ok(())
 }

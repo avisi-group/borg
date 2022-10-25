@@ -23,5 +23,8 @@ let () =
   Callback.register "internal_bindings_to_list" (fun a ->
       exception_to_result (fun () -> bindings_to_list a));
 
-  Callback.register "internal_bigint_to_string" (fun a ->
-      exception_to_result (fun () -> Z.sprint () a))
+  Callback.register "internal_bigint_to_string" (fun i ->
+      exception_to_result (fun () -> Nat_big_num.to_string i));
+
+  Callback.register "internal_num_to_string" (fun n ->
+      exception_to_result (fun () -> Num.num_of_string n))

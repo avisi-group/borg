@@ -3,7 +3,10 @@
 //! Sail Abstract Syntax Tree, generated from `ast.lem` and `sail.ott`.
 
 use {
-    crate::ffi::{BigNum, OCamlString, Position, Rational},
+    crate::{
+        num::{BigInt, Num},
+        types::{OCamlString, Position},
+    },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int},
     serde::{Deserialize, Serialize},
@@ -44,8 +47,8 @@ pub enum Bit {
 pub enum Value {
     Vector(LinkedList<Value>),
     List(LinkedList<Value>),
-    Int(BigNum),
-    Real(Rational),
+    Int(BigInt),
+    Real(Num),
     Bool(bool),
     Bit(Bit),
     Tuple(LinkedList<Value>),
@@ -187,7 +190,7 @@ pub enum NumericExpressionAux {
     /// Variable
     Var(KindIdentifier),
     /// Constant
-    Constant(BigNum),
+    Constant(BigInt),
     Application(Identifier, LinkedList<NumericExpression>),
     Times(NumericExpression, NumericExpression),
     Sum(NumericExpression, NumericExpression),
@@ -219,7 +222,7 @@ pub enum LiteralAux {
     True,
     False,
     /// Natural number constant
-    Num(BigNum),
+    Num(BigInt),
     /// Bit vector constant, C-style
     Hex(OCamlString),
     /// Bit vector constant, C-style
@@ -273,7 +276,7 @@ pub enum NConstraintAux {
     BoundedLe(NumericExpression, NumericExpression),
     BoundedLt(NumericExpression, NumericExpression),
     NotEqual(NumericExpression, NumericExpression),
-    Set(KindIdentifier, LinkedList<BigNum>),
+    Set(KindIdentifier, LinkedList<BigInt>),
     Or(NConstraint, NConstraint),
     And(NConstraint, NConstraint),
     App(Identifier, LinkedList<TypArg>),
@@ -849,7 +852,7 @@ pub enum Definition {
     Spec(ValueSpecification),
 
     /// Fixity declaration
-    Fixity(Prec, BigNum, Identifier),
+    Fixity(Prec, BigInt, Identifier),
 
     /// Operator overload specifications
     Overload(Identifier, LinkedList<Identifier>),

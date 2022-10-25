@@ -12,8 +12,8 @@ use {
     crate::{
         ast::Ast,
         error::{Error, WrapperError},
-        ffi::OCamlString,
         type_check::Env,
+        types::OCamlString,
     },
     log::error,
     ocaml::{
@@ -104,6 +104,8 @@ ocaml::import! {
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
     pub fn internal_bigint_to_string(input: Value) -> Result<OCamlString, WrapperError>;
+
+    pub fn internal_num_to_string(input: Value) -> Result<OCamlString, WrapperError>;
 }
 
 /// Request made against runtime

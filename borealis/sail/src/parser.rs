@@ -1,6 +1,6 @@
 //! Sail source file parsing
 
-use crate::{ast::Ast, error::Error, ffi::OCamlString, type_check::Env, RT};
+use crate::{ast::Ast, error::Error, type_check::Env, types::OCamlString, RT};
 
 /// Parses supplied Sail files and returns the AST
 ///

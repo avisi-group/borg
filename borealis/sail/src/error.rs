@@ -3,8 +3,8 @@
 use {
     crate::{
         ast::L,
-        ffi::{OCamlString, Position},
         runtime::Request,
+        types::{OCamlString, Position},
     },
     ocaml::{CamlError, FromValue, Int, Value},
     std::{
