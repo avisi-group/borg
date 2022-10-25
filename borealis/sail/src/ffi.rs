@@ -1,11 +1,14 @@
 //! OCaml Interface types and functions
 
-use ocaml::{FromValue, Int, Value};
+use {
+    ocaml::{FromValue, Int, Value},
+    serde::{Deserialize, Serialize},
+};
 
 /// OCaml strings are byte arrays and may contain valid UTF-8 contents or arbitrary bytes
 ///
 /// When converting from Value will attempt to parse as a `String`, falling back to `Vec<u8>` on error
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OCamlString {
     String(String),
     Vec(Vec<u8>),
@@ -22,7 +25,7 @@ unsafe impl FromValue for OCamlString {
 }
 
 /// Position in a source file
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct Position {
     /// File name
     pub pos_fname: OCamlString,
@@ -36,5 +39,5 @@ pub struct Position {
 
 pub type BigNum = ();
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct Rational(());

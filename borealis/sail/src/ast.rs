@@ -5,11 +5,12 @@
 use {
     crate::ffi::{BigNum, OCamlString, Position, Rational},
     ocaml::{FromValue, Int},
+    serde::{Deserialize, Serialize},
     std::collections::LinkedList,
 };
 
 /// Location
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum L {
     /// Unknown location
     Unknown,
@@ -23,13 +24,13 @@ pub enum L {
     Documented(OCamlString, Box<L>),
 }
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum Mut {
     Immutable,
     Mutable,
 }
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum Bit {
     B0,
     B1,
@@ -38,7 +39,7 @@ pub enum Bit {
 /// Sail AST Value
 ///
 /// **Not to be confused with `ocaml::Value`**
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum Value {
     Vector(LinkedList<Value>),
     List(LinkedList<Value>),
@@ -56,11 +57,11 @@ pub enum Value {
 }
 
 /// Annotation with generic value (ignored as unit here)
-#[derive(Debug, Clone, FromValue)]
-pub struct Annot(L, ());
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Annot(pub L, ());
 
 /// Loop kind
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum Loop {
     While,
     Until,
@@ -72,7 +73,7 @@ pub type X = OCamlString;
 /// Infix identifier
 pub type Xi = OCamlString;
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum BaseEffectAux {
     /// Read register
     ReadRegister,
@@ -109,13 +110,13 @@ pub enum BaseEffectAux {
 }
 
 /// kinded IDs: Type, Int, and Order variables
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum KindIdentifierAux {
     Var(X),
 }
 
 /// Base kind
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum KindAux {
     /// Kind of types
     Type,
@@ -127,30 +128,30 @@ pub enum KindAux {
     Bool,
 }
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum IdentifierAux {
     Identifier(X),
     Operator(X),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct BaseEffect(BaseEffectAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct BaseEffect(pub BaseEffectAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct KindIdentifier(KindIdentifierAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct KindIdentifier(pub KindIdentifierAux, pub L);
 
 /// Base kind
-#[derive(Debug, Clone, FromValue)]
-pub struct Kind(KindAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Kind(pub KindAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct Identifier(IdentifierAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Identifier(pub IdentifierAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct EffectAux(LinkedList<BaseEffect>);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct EffectAux(pub LinkedList<BaseEffect>);
 
 /// Vector order specifications, of kind Order
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum OrderAux {
     Variable(KindIdentifier),
     Increasing,
@@ -158,11 +159,11 @@ pub enum OrderAux {
 }
 
 /// Optionally kind-annotated identifier
-#[derive(Debug, Clone, FromValue)]
-pub struct KindedIdentifierAux(Kind, KindIdentifier);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct KindedIdentifierAux(pub Kind, pub KindIdentifier);
 
 /// Numeric expression, of kind Int
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum NumericExpressionAux {
     /// Abbreviation identifier
     Id(Identifier),
@@ -179,21 +180,21 @@ pub enum NumericExpressionAux {
     Negation(NumericExpression),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct NumericExpression(Box<NumericExpressionAux>, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct NumericExpression(pub Box<NumericExpressionAux>, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct Effect(EffectAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Effect(pub EffectAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct Order(OrderAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Order(pub OrderAux, pub L);
 
 /// Optionally kind-annotated identifier
-#[derive(Debug, Clone, FromValue)]
-pub struct KindedIdentifier(KindIdentifierAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct KindedIdentifier(pub KindIdentifierAux, pub L);
 
 /// Literal constant
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum LiteralAux {
     Unit,
     Zero,
@@ -214,7 +215,7 @@ pub enum LiteralAux {
 }
 
 /// Type expressions, of kind Type
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum TypAux {
     InternalUnknown,
     /// Defined type
@@ -231,11 +232,11 @@ pub enum TypAux {
     Exist(LinkedList<KindedIdentifier>, NConstraint, Typ),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct Typ(Box<TypAux>, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Typ(pub Box<TypAux>, pub L);
 
 /// Type constructor arguments of all kinds
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum TypArgAux {
     NExp(NumericExpression),
     Typ(Typ),
@@ -243,11 +244,11 @@ pub enum TypArgAux {
     Bool(NConstraint),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct TypArg(TypArgAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct TypArg(pub TypArgAux, pub L);
 
 /// Constraint over kind Int
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum NConstraintAux {
     Equal(NumericExpression, NumericExpression),
     BoundedGe(NumericExpression, NumericExpression),
@@ -264,25 +265,25 @@ pub enum NConstraintAux {
     False,
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct NConstraint(Box<NConstraintAux>, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct NConstraint(pub Box<NConstraintAux>, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct Literal(LiteralAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Literal(pub LiteralAux, pub L);
 
 /// Type pattern
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum TypPatAux {
     Wild,
     Var(KindIdentifier),
     App(Identifier, LinkedList<TypPat>),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct TypPat(TypPatAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct TypPat(pub TypPatAux, pub L);
 
 /// Kinded identifier or Int constraint
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum QuantItemAux {
     /// Optionally kinded identifier
     KindedIdentifier(KindedIdentifier),
@@ -292,7 +293,7 @@ pub enum QuantItemAux {
 }
 
 /// Pattern
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum PatternAux {
     /// Literal constant pattern
     Literal(Literal),
@@ -342,26 +343,25 @@ pub enum PatternAux {
     StringAppend(LinkedList<Pattern>),
 }
 
-/// TODO CHECK THIS ORDERING OF `ANNOT`
-#[derive(Debug, Clone, FromValue)]
-pub struct Pattern(Box<PatternAux>, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Pattern(pub Box<PatternAux>, pub Annot);
 
 /// Either a kinded identifier or a nexp constraint for a typquant
-#[derive(Debug, Clone, FromValue)]
-pub struct QuantItem(QuantItemAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct QuantItem(pub QuantItemAux, pub L);
 
 /// Internal syntax for an optional termination measure for a loop
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum InternalLoopMeasureAux {
     None,
     Some(Expression),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct InternalLoopMeasure(Box<InternalLoopMeasureAux>, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct InternalLoopMeasure(pub Box<InternalLoopMeasureAux>, pub L);
 
 /// Expression
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum ExpressionAux {
     /// Sequential block
     Block(LinkedList<Expression>),
@@ -475,11 +475,11 @@ pub enum ExpressionAux {
 }
 
 /// Expression
-#[derive(Debug, Clone, FromValue)]
-pub struct Expression(Box<ExpressionAux>, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct Expression(pub Box<ExpressionAux>, pub Annot);
 
 /// l-value expression
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum LValueExpressionAux {
     Identifier(Identifier),
     Deref(Expression),
@@ -497,21 +497,21 @@ pub enum LValueExpressionAux {
     Field(LValueExpression, Identifier),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct LValueExpression(Box<LValueExpressionAux>, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct LValueExpression(pub Box<LValueExpressionAux>, pub Annot);
 
 /// Field Expression
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct FieldExpressionAux(pub Identifier, pub Expression);
 
 /// Field Expression
-#[derive(Debug, Clone, FromValue)]
-pub struct FieldExpression(FieldExpressionAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct FieldExpression(pub FieldExpressionAux, pub Annot);
 
 /// Pattern match
 ///
 /// `pexp` in Sail source
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum PatternMatchAux {
     Expression(Pattern, Expression),
     When(Pattern, Expression, Expression),
@@ -520,22 +520,22 @@ pub enum PatternMatchAux {
 /// Pattern match
 ///
 /// `pexp` in Sail source
-#[derive(Debug, Clone, FromValue)]
-pub struct PatternMatch(PatternMatchAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct PatternMatch(pub PatternMatchAux, pub Annot);
 
 /// Value binding
 ///
 /// Implicit type, pattern must be total
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct LetBindAux(pub Pattern, pub Expression);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct LetBind(LetBindAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct LetBind(pub LetBindAux, pub Annot);
 
 /// Mapping pattern
 ///
 /// Mostly the same as normal patterns but only constructible parts
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum MappingPatternAux {
     /// Literal
     Literal(Literal),
@@ -561,41 +561,41 @@ pub enum MappingPatternAux {
     As(MappingPattern, Identifier),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct MappingPattern(Box<MappingPatternAux>, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct MappingPattern(pub Box<MappingPatternAux>, pub Annot);
 
 /// Type quantifiers and constraints
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum TypQuantAux {
     Tq(LinkedList<QuantItem>),
     /// Sugar, omitting quantifier and constraints
     NoForAll,
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct RegisterIdAux(Identifier);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct RegisterIdAux(pub Identifier);
 
 /// Mapping pattern expression
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum MappingPatternExpressionAux {
     Pattern(MappingPattern),
     When(MappingPattern, Expression),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct TypQuant(TypQuantAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct TypQuant(pub TypQuantAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct RegisterId(RegisterIdAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct RegisterId(pub RegisterIdAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct MappingPatternExpression(MappingPatternExpressionAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct MappingPatternExpression(pub MappingPatternExpressionAux, pub Annot);
 
 /// Type scheme
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct TypeSchemeAux(pub TypQuant, pub Typ);
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum AliasSpecAux {
     SubReg(RegisterId, Identifier),
     Bit(RegisterId, Expression),
@@ -604,18 +604,18 @@ pub enum AliasSpecAux {
 }
 
 /// Optional type annotation for functions
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum TypeAnnotationOptAux {
     None,
     Some(TypQuant, Typ),
 }
 
 /// Function clause
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct FunctionClauseAux(pub Identifier, pub PatternMatch);
 
 /// Optional recursive annotation for functions
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum RecursiveAnnotationOptAux {
     /// Non-recursive
     NonRecursive,
@@ -626,7 +626,7 @@ pub enum RecursiveAnnotationOptAux {
 }
 
 /// Optional effect annotation for functions
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum EffectAnnotationOptAux {
     /// No effect annotation
     None,
@@ -634,47 +634,47 @@ pub enum EffectAnnotationOptAux {
 }
 
 /// Type union constructors
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum TypeUnionAux {
     Identifier(Typ, Identifier),
 }
 
 /// Mapping clause (bidirectional pattern-match)
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum MappingClauseAux {
     Bidirectional(MappingPatternExpression, MappingPatternExpression),
     Forwards(MappingPatternExpression, Expression),
     Backwards(MappingPatternExpression, Expression),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct TypeScheme(TypeSchemeAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct TypeScheme(pub TypeSchemeAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct AliasSpec(AliasSpecAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct AliasSpec(pub AliasSpecAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct TypeAnnotationOpt(TypeAnnotationOptAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct TypeAnnotationOpt(pub TypeAnnotationOptAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct FunctionClause(FunctionClauseAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct FunctionClause(pub FunctionClauseAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct RecursiveAnnotationOpt(RecursiveAnnotationOptAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct RecursiveAnnotationOpt(pub RecursiveAnnotationOptAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum EffectOpt {
     Inner(EffectAnnotationOptAux, L),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct TypeUnion(TypeUnionAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct TypeUnion(pub TypeUnionAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct MappingClause(MappingClauseAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct MappingClause(pub MappingClauseAux, pub Annot);
 
 /// Index specification, for bitfields in register types
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum IndexRangeAux {
     /// Single index
     Single(NumericExpression),
@@ -684,11 +684,11 @@ pub enum IndexRangeAux {
     Concat(IndexRange, IndexRange),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct IndexRange(Box<IndexRangeAux>, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct IndexRange(pub Box<IndexRangeAux>, pub L);
 
 /// Value type specification
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum ValueSpecificationAux {
     Inner(
         TypeScheme,
@@ -699,7 +699,7 @@ pub enum ValueSpecificationAux {
 }
 
 /// Register declarations
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum DecSpecAux {
     Register(Effect, Effect, Typ, Identifier),
     Config(Identifier, Typ, Expression),
@@ -708,7 +708,7 @@ pub enum DecSpecAux {
 }
 
 /// Function definition
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum FunctionDefinitionAux {
     Inner(
         RecursiveAnnotationOpt,
@@ -719,13 +719,13 @@ pub enum FunctionDefinitionAux {
 }
 
 /// default kinding or typing assumption
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum DefaultSpecAux {
     Order(Order),
 }
 
 /// Function and type union definitions that can be spread across a file. Each one must end in $_$
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum ScatteredDefinitionAux {
     /// Scattered function definition header
     Function(
@@ -747,7 +747,7 @@ pub enum ScatteredDefinitionAux {
 }
 
 /// Type definition body
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum TypeDefinitionAux {
     /// Type abbreviation
     Abbreviation(Identifier, TypQuant, TypArg),
@@ -762,7 +762,7 @@ pub enum TypeDefinitionAux {
 }
 
 /// Mapping definition (bidirectional pattern-match function)
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct MappingDefinitionAux(
     pub Identifier,
     pub TypeAnnotationOpt,
@@ -772,50 +772,50 @@ pub struct MappingDefinitionAux(
 /// Optional default value for indexed vectors
 ///
 /// To define a default value for any unspecified positions in a sparse map
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum OptionalDefaultAux {
     Empty,
     Dec(Expression),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct ValueSpecification(ValueSpecificationAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct ValueSpecification(pub ValueSpecificationAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct DecSpec(DecSpecAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct DecSpec(pub DecSpecAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct FunctionDefinition(FunctionDefinitionAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct FunctionDefinition(pub FunctionDefinitionAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct DefaultSpec(DefaultSpecAux, L);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct DefaultSpec(pub DefaultSpecAux, pub L);
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum Prec {
     Infix,
     InfixLeft,
     InfixRight,
 }
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum LoopMeasure {
     Loop(Loop, Expression),
 }
 
-#[derive(Debug, Clone, FromValue)]
-pub struct ScatteredDefinition(ScatteredDefinitionAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct ScatteredDefinition(pub ScatteredDefinitionAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct TypeDefinition(TypeDefinitionAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct TypeDefinition(pub TypeDefinitionAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct MappingDefinition(MappingDefinitionAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct MappingDefinition(pub MappingDefinitionAux, pub Annot);
 
-#[derive(Debug, Clone, FromValue)]
-pub struct OptionalDefault(OptionalDefaultAux, Annot);
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
+pub struct OptionalDefault(pub OptionalDefaultAux, pub Annot);
 
 /// Top-level Sail2 definition
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum Definition {
     /// Type definition
     Type(TypeDefinition),
@@ -863,17 +863,17 @@ pub enum Definition {
     Pragma(OCamlString, OCamlString, L),
 }
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub enum CommentType {
     Block,
     Line,
 }
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 
-pub struct Comment(CommentType, Position, Position, String);
+pub struct Comment(pub CommentType, pub Position, pub Position, pub String);
 
-#[derive(Debug, Clone, FromValue)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize)]
 pub struct Ast {
     pub defs: LinkedList<Definition>,
     pub comments: LinkedList<(String, LinkedList<Comment>)>,
