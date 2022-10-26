@@ -32,7 +32,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         ocaml-compiler: ["4.14.0"]
 
     name: Test
