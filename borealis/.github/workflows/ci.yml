@@ -32,7 +32,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
         ocaml-compiler: ["4.14.0"]
 
     name: Test
@@ -42,8 +42,13 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Install z3
-        run: sudo apt-get install z3
+      - name: Install z3, GMP (apt)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install z3 libgmp-dev
+
+      - name: Install z3, GMP (homebrew)
+        if: matrix.os == 'macos-latest'
+        run: brew install z3 gmp
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -88,7 +93,7 @@ jobs:
         run: cargo doc --all --no-deps
 
       - name: Upload artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && matrix.os == 'ubuntu-latest'
         uses: actions/upload-pages-artifact@v1
         with:
           path: ./target/doc
