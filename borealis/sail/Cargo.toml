@@ -2,9 +2,12 @@
 name = "sail"
 version = "0.1.0"
 edition = "2021"
+description = "Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes20/sail/) written in OCaml."
+homepage = "https://avisi.org.uk"
+repository = "https://github.com/avisi-group/borealis"
 
 [dependencies]
-ocaml = { git = "https://github.com/zshipko/ocaml-rs.git", rev = "9a7ad2a", features = ["no-panic-hook"] }
+ocaml = { git = "https://github.com/zshipko/ocaml-rs.git", rev = "95e30b7", features = ["no-panic-hook"] }
 once_cell = "1.15.0"
 parking_lot = "0.12.1"
 displaydoc = "0.2.3"
