@@ -1,12 +1,14 @@
 //! Interface to OCaml runtime infrastructure
 //!
 //! Due to an issue with <https://github.com/zshipko/ocaml-rs> not supporting multithreaded
-//! environments, all interaction with OCaml objects *must* occur on a single worker thread.
+//! environments, all interaction with OCaml objects *must* occur on a single
+//! worker thread.
 //!
-//! For example, in `load_files`, the String returned by `internal_process_file_load_files` is safe
-//! to cross the interface boundary (in `Response::LoadFiles`) but the AST and type environment of
-//! type `Value` is *not* safe to send across the interface. Doing so will result in a `SIGSEGV:
-//! invalid memory reference`
+//! For example, in `load_files`, the String returned by
+//! `internal_process_file_load_files` is safe to cross the interface boundary
+//! (in `Response::LoadFiles`) but the AST and type environment of type `Value`
+//! is *not* safe to send across the interface. Doing so will result in a
+//! `SIGSEGV: invalid memory reference`
 
 use {
     crate::{
@@ -26,7 +28,8 @@ use {
 /// Wrapper around OCaml runtime
 ///
 /// Workaround for <https://github.com/zshipko/ocaml-rs/issues/102> where ocaml::Runtime must be
-/// owned and interacted with from a single thread or there are intermittent memory issues.
+/// owned and interacted with from a single thread or there are intermittent
+/// memory issues.
 pub struct Runtime {
     request: mpsc::Sender<Request>,
     response: mpsc::Receiver<Result<Response, Error>>,
@@ -54,7 +57,8 @@ impl Runtime {
                     Ok(request) => {
                         let response = process_request(&mut rt, request);
 
-                        // log errors if sending failed but do not terminate instead process next request
+                        // log errors if sending failed but do not terminate instead process next
+                        // request
                         if let Err(e) = responses.send(response) {
                             error!("Runtime thread failed to send response with error {e}, terminating thread");
                             break;
@@ -99,7 +103,7 @@ ocaml::import! {
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Value), WrapperError>;
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Env), WrapperError>;
 
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
@@ -110,8 +114,9 @@ ocaml::import! {
 
 /// Request made against runtime
 ///
-/// Each variant corresponds to one method on the runtime, which in turn correspond to one public
-/// function. Variants may *not* contain any OCaml values or will introduce unsoundness.
+/// Each variant corresponds to one method on the runtime, which in turn
+/// correspond to one public function. Variants may *not* contain any OCaml
+/// values or will introduce unsoundness.
 #[doc(hidden)]
 #[derive(Debug)]
 pub enum Request {
@@ -121,18 +126,20 @@ pub enum Request {
 
 /// Response from runtime.
 ///
-/// Each variant must correspond to one `Request` variant. Variants may *not* contain any OCaml
-/// values or will introduce unsoundness.
+/// Each variant must correspond to one `Request` variant. Variants may *not*
+/// contain any OCaml values or will introduce unsoundness.
 #[derive(Debug)]
 enum Response {
     Dedup(Vec<i32>),
     LoadFiles((OCamlString, Ast, Env)),
 }
 
-/// Process a single incoming request by calling the corresponding OCaml function
+/// Process a single incoming request by calling the corresponding OCaml
+/// function
 ///
-/// All interactions with OCaml runtime and objects must occur inside this function; breaking the
-/// barrier will result in unsoundness as only the worker thread may interact with the runtime.
+/// All interactions with OCaml runtime and objects must occur inside this
+/// function; breaking the barrier will result in unsoundness as only the worker
+/// thread may interact with the runtime.
 fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Error> {
     match req {
         Request::Dedup(list) => {
@@ -158,11 +165,9 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
                 file_list = unsafe { file_list.add(rt, &file_rooted) };
             }
 
-            let (name, ast, env) = unsafe {
+            Ok(Response::LoadFiles(unsafe {
                 internal_process_file_load_files(rt, false, List::empty(), env, file_list)??
-            };
-
-            Ok(Response::LoadFiles((name, ast, Env::from_value(rt, env)?)))
+            }))
         }
     }
 }

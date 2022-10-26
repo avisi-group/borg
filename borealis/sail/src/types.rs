@@ -1,4 +1,4 @@
-//! OCaml Interface types and functions
+//! Types and functions for interfacing with OCaml
 
 use {
     deepsize::DeepSizeOf,
@@ -6,13 +6,17 @@ use {
     serde::{Deserialize, Serialize},
 };
 
-/// OCaml strings are byte arrays and may contain valid UTF-8 contents or arbitrary bytes
+/// OCaml string
 ///
-/// When converting from Value will attempt to parse as a `String`, falling back to `Vec<u8>` on error
+/// OCaml strings are byte arrays. They *may* contain valid UTF-8 contents or
+/// could be arbitrary bytes. Conversion from opaque `ocaml::Value` will attempt
+/// to parse as a `String`, falling back to `Vec<u8>` on error.
 #[cfg_attr(not(feature = "redact"), derive(Serialize))]
 #[derive(Debug, Clone, Deserialize, DeepSizeOf)]
 pub enum OCamlString {
+    /// UTF-8 string
     String(String),
+    /// Byte array
     Vec(Vec<u8>),
 }
 
@@ -26,7 +30,8 @@ unsafe impl FromValue for OCamlString {
     }
 }
 
-/// Kind identifiers zeroed for tests to prevent snapshot tests from breaking
+/// If the OCamlString contains a path to a sail source file, strip absolute all
+/// of path except filename to prevent breaking snapshot tests.
 #[cfg(feature = "redact")]
 impl Serialize for OCamlString {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -50,7 +55,9 @@ impl Serialize for OCamlString {
     }
 }
 
-/// Position in a source file
+/// Position of a character in a source file
+///
+/// Can be converted from `Lexing.position` value (https://v2.ocaml.org/api/Lexing.html).
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name

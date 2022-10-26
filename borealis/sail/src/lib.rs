@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 //! Rust interface to `Sail` compiler library
 
 use {
@@ -11,7 +13,6 @@ pub mod error;
 pub mod num;
 pub mod parser;
 mod runtime;
-pub mod span;
 pub mod type_check;
 pub mod types;
 
@@ -19,6 +20,8 @@ pub mod types;
 static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 
 /// Removes duplicate values in the supplied Vec
+///
+/// Not very useful other than as a smoketest for OCaml interop.
 pub fn dedup(list: Vec<i32>) -> Result<Vec<i32>, Error> {
     RT.lock().dedup(list)
 }

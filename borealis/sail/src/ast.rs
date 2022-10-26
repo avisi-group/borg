@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
-//! Sail Abstract Syntax Tree, generated from `ast.lem` and `sail.ott`.
+//! Sail abstract syntax tree corresponding to data structures in `ast.ml`,
+//! which itself is generated from `ast.lem` and `sail.ott`.
 
 use {
     crate::{
@@ -476,19 +477,23 @@ pub enum ExpressionAux {
 
     Try(Expression, LinkedList<PatternMatch>),
 
-    /// Halt with error message $(exp 'a)$ when not $(exp 'a)$. exp' is optional.
+    /// Halt with error message $(exp 'a)$ when not $(exp 'a)$. exp' is
+    /// optional.
     Assert(Expression, Expression),
 
-    /// This is an internal node for compilation that demonstrates the scope of a local mutable variable
+    /// This is an internal node for compilation that demonstrates the scope of
+    /// a local mutable variable
     Var(LValueExpression, Expression, Expression),
 
-    /// his is an internal node, used to distinguised some introduced lets during processing from original ones
+    /// his is an internal node, used to distinguised some introduced lets
+    /// during processing from original ones
     InternalPLet(Pattern, Expression, Expression),
 
     /// For internal use to embed into monad definition
     InternalReturn(Expression),
 
-    /// For internal use in interpreter to wrap pre-evaluated values when returning an action
+    /// For internal use in interpreter to wrap pre-evaluated values when
+    /// returning an action
     InternalValue(Value),
 
     Constraint(NConstraint),
@@ -744,7 +749,8 @@ pub enum DefaultSpecAux {
     Order(Order),
 }
 
-/// Function and type union definitions that can be spread across a file. Each one must end in $_$
+/// Function and type union definitions that can be spread across a file. Each
+/// one must end in $_$
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum ScatteredDefinitionAux {
     /// Scattered function definition header

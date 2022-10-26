@@ -1,4 +1,5 @@
-//! Wrappers around ocaml `Num` arbitrary-precision integer and rational arithmetic library
+//! Wrappers around ocaml `Num` arbitrary-precision integer and rational
+//! arithmetic library
 
 use {
     crate::{runtime::internal_bigint_to_string, types::OCamlString},
@@ -8,13 +9,18 @@ use {
     std::str::FromStr,
 };
 
+/// Arbitrary precision number from `Num.num` OCaml type
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum Num {
+    /// Integer
     Int(Int),
+    /// Big integer
     BigInt(BigInt),
+    /// Ratio of big integers
     Ratio(Ratio),
 }
 
+/// Signed big integer from `Nat_big_num.num` OCaml type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BigInt(pub num_bigint::BigInt);
 
@@ -40,9 +46,13 @@ impl DeepSizeOf for BigInt {
     }
 }
 
+/// Ratio of big integers from `num.Ratio.ratio` OCaml type
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ratio {
-    numerator: BigInt,
-    denominator: BigInt,
-    normalized: bool,
+    /// Numerator
+    pub numerator: BigInt,
+    /// Denominator
+    pub denominator: BigInt,
+    /// Normalized
+    pub normalized: bool,
 }
