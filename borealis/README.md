@@ -2,8 +2,8 @@
 
 > Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes20/sail/) written in OCaml.
 
-[![CI](https://github.com/avisi-group/borealis/actions/workflows/ci.yml/badge.svg)](https://github.com/avisi-group/borealis/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-sail-blue)](https://avisi.org.uk/borealis/sail/)
+[![CI](https://github.com/avisi-group/sail-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/avisi-group/sail-rs/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-sail-blue)](https://avisi.org.uk/sail-rs/sail/)
 
 ## Build Requirements
 
