@@ -7,13 +7,15 @@ use {
     },
 };
 
+const PROJECT_NAME: &str = "wrapper";
+
 fn main() -> Result<()> {
     color_eyre::install()?;
 
     check_build_environment()?;
 
-    let source_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join("sail_wrapper");
-    let build_path = PathBuf::from(env::var("OUT_DIR")?).join("sail_wrapper");
+    let source_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join(PROJECT_NAME);
+    let build_path = PathBuf::from(env::var("OUT_DIR")?).join(PROJECT_NAME);
 
     // dune
     ensure!(
@@ -38,7 +40,7 @@ fn main() -> Result<()> {
             build.object(p);
         });
 
-    build.compile("sail_wrapper");
+    build.compile(PROJECT_NAME);
 
     // Fix linker errors on aarch64 macOS
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
