@@ -1,9 +1,10 @@
-# `sail`
+# `borealis`
 
-> Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes20/sail/) written in OCaml.
+> ISA simulation and development toolchain
 
 [![CI](https://github.com/avisi-group/sail-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/avisi-group/sail-rs/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/badge/docs-sail-blue)](https://avisi.org.uk/sail-rs/sail/)
+[![borealis docs](https://img.shields.io/badge/docs-borealis-blue)](https://avisi.org.uk/sail-rs/borealis/)
+[![sail docs](https://img.shields.io/badge/docs-sail-blue)](https://avisi.org.uk/sail-rs/sail/)
 
 ## Build Requirements
 
@@ -21,4 +22,14 @@
 
 ## Docker
 
-`Dockerfile` included for reference on building `sail` but Github Actions workflow is more likely to be up-to-date and correct.
+`Dockerfile` included for reference on building `borealis` but Github Actions workflow is more likely to be up-to-date and correct.
+
+## Workspace Contents
+
+### `borealis`
+
+Sail frontend to GenSim. Depends on `sail` crate to parse Sail definition, which is then compiled to GenC.
+
+### `sail`
+
+Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes20/sail/) written in OCaml.

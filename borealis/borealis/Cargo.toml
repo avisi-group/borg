@@ -1,0 +1,13 @@
+[package]
+name = "borealis"
+version = "0.1.0"
+edition = "2021"
+authors = ["AVISI Research Group"]
+description = "Sail frontend for GenSim"
+
+[dependencies]
+sail = { path = "../sail" }
+displaydoc = "0.2.3"
+thiserror = "1.0.37"
+color-eyre = { version = "0.6.2", default-features = false }
+clap = { version = "4.0.20", features = ["derive"] }
