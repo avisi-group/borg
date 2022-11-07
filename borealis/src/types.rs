@@ -11,7 +11,7 @@ use {
 /// OCaml strings are byte arrays. They *may* contain valid UTF-8 contents or
 /// could be arbitrary bytes. Conversion from opaque `ocaml::Value` will attempt
 /// to parse as a `String`, falling back to `Vec<u8>` on error.
-#[cfg_attr(not(feature = "redact"), derive(Serialize))]
+#[cfg_attr(not(test), derive(Serialize))]
 #[derive(Debug, Clone, Deserialize, DeepSizeOf)]
 pub enum OCamlString {
     /// UTF-8 string
@@ -32,7 +32,7 @@ unsafe impl FromValue for OCamlString {
 
 /// If the OCamlString contains a path to a sail source file, strip absolute all
 /// of path except filename to prevent breaking snapshot tests.
-#[cfg(feature = "redact")]
+#[cfg(test)]
 impl Serialize for OCamlString {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

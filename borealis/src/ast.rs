@@ -115,25 +115,9 @@ pub enum BaseEffectAux {
 }
 
 /// kinded IDs: Type, Int, and Order variables
-#[cfg_attr(not(feature = "redact"), derive(Serialize))]
-#[derive(Debug, Clone, FromValue, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindIdentifierAux {
     kind_identifier: X,
-}
-
-/// Kind identifiers zeroed for tests to prevent snapshot tests from breaking
-#[cfg(feature = "redact")]
-impl Serialize for KindIdentifierAux {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        use serde::ser::SerializeStruct;
-
-        let mut state = serializer.serialize_struct("KindIdentifierAux", 1)?;
-        state.serialize_field("kind_identifier", &0)?;
-        state.end()
-    }
 }
 
 /// Base kind

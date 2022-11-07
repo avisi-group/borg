@@ -46,11 +46,16 @@ mod tests {
 
     #[test]
     fn load_files_prelude() {
-        let path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
+        let path = PathBuf::from("./")
             .join("examples/prelude.sail")
             .to_string_lossy()
             .to_string();
 
-        insta::assert_json_snapshot!(load_files(vec![path]).unwrap());
+        insta::with_settings!({filters => vec![
+            (r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#, r#""kind_identifier": {}"#),
+            (r#""kind_identifier": \{\s*"Vec": \[[\s,0-9]*\]\s*\}"#, r#""kind_identifier": {}"#),
+        ]}, {
+            insta::assert_json_snapshot!(load_files(vec![path]).unwrap());
+        });
     }
 }

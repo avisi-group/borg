@@ -17,9 +17,7 @@
 
 ## Testing
 
-`cargo test --feature redact` to run all tests.
-
-`redact` feature must be enabled for snapshot tests to pass as some AST nodes are non-deterministic.
+`cargo test` to run all tests.
 
 ## Docker
 

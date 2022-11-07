@@ -1,5 +1,5 @@
 ---
-source: sail/src/parser.rs
+source: src/parser.rs
 expression: "load_files(vec![]).unwrap()"
 ---
 [
@@ -29,7 +29,9 @@ expression: "load_files(vec![]).unwrap()"
                   {
                     "KindedIdentifier": [
                       {
-                        "kind_identifier": 0
+                        "kind_identifier": {
+                          "String": "\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000"
+                        }
                       },
                       "Unknown"
                     ]
@@ -62,7 +64,9 @@ expression: "load_files(vec![]).unwrap()"
                                 {
                                   "Var": [
                                     {
-                                      "kind_identifier": 0
+                                      "kind_identifier": {
+                                        "String": "'n"
+                                      }
                                     },
                                     "Unknown"
                                   ]
@@ -96,7 +100,9 @@ expression: "load_files(vec![]).unwrap()"
                               {
                                 "Var": [
                                   {
-                                    "kind_identifier": 0
+                                    "kind_identifier": {
+                                      "String": "'n"
+                                    }
                                   },
                                   "Unknown"
                                 ]
@@ -138,7 +144,9 @@ expression: "load_files(vec![]).unwrap()"
                   {
                     "KindedIdentifier": [
                       {
-                        "kind_identifier": 0
+                        "kind_identifier": {
+                          "String": "\u0007\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000"
+                        }
                       },
                       "Unknown"
                     ]
@@ -171,7 +179,9 @@ expression: "load_files(vec![]).unwrap()"
                                 {
                                   "Var": [
                                     {
-                                      "kind_identifier": 0
+                                      "kind_identifier": {
+                                        "String": "'ex0#"
+                                      }
                                     },
                                     "Unknown"
                                   ]
@@ -227,7 +237,9 @@ expression: "load_files(vec![]).unwrap()"
                   {
                     "KindedIdentifier": [
                       {
-                        "kind_identifier": 0
+                        "kind_identifier": {
+                          "String": "\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000"
+                        }
                       },
                       "Unknown"
                     ]
@@ -260,7 +272,9 @@ expression: "load_files(vec![]).unwrap()"
                                 {
                                   "Var": [
                                     {
-                                      "kind_identifier": 0
+                                      "kind_identifier": {
+                                        "String": "'n"
+                                      }
                                     },
                                     "Unknown"
                                   ]
@@ -294,7 +308,9 @@ expression: "load_files(vec![]).unwrap()"
                               {
                                 "Var": [
                                   {
-                                    "kind_identifier": 0
+                                    "kind_identifier": {
+                                      "String": "'n"
+                                    }
                                   },
                                   "Unknown"
                                 ]

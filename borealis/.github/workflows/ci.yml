@@ -84,10 +84,10 @@ jobs:
         run: opam install sail || true
 
       - name: Build
-        run: cargo build --workspace --release --examples --tests
+        run: cargo build --release --examples --tests
 
       - name: Test
-        run: cargo test --workspace --release --no-fail-fast --features redact
+        run: cargo test --release --no-fail-fast
 
       - name: Build Documentation
         run: cargo doc --all --no-deps

@@ -248,6 +248,7 @@ dependencies = [
  "console",
  "lazy_static",
  "linked-hash-map",
+ "regex",
  "serde",
  "similar",
  "yaml-rust",
@@ -572,6 +573,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "regex"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e076559ef8e241f2ae3479e36f97bd5741c0330689e217ad51ce2c76808b868a"
+dependencies = [
+ "regex-syntax",
 ]
 
 [[package]]
