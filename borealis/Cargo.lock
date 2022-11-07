@@ -78,9 +78,9 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "cc"
-version = "1.0.73"
+version = "1.0.74"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
+checksum = "581f5dba903aac52ea3feb5ec4810848460ee833876f1f9b0fdeab1f19091574"
 
 [[package]]
 name = "cfg-if"
@@ -372,7 +372,7 @@ dependencies = [
 [[package]]
 name = "ocaml"
 version = "1.0.0-beta.4"
-source = "git+https://github.com/zshipko/ocaml-rs.git?rev=95e30b7#95e30b739affe65eb8eba77a763b4e401ce3b1c4"
+source = "git+https://github.com/zshipko/ocaml-rs.git?rev=d9adaf5#d9adaf5af22d800e9593267a7802f2d16b43fc69"
 dependencies = [
  "ocaml-boxroot-sys",
  "ocaml-derive",
@@ -392,7 +392,7 @@ dependencies = [
 [[package]]
 name = "ocaml-derive"
 version = "1.0.0-beta.4"
-source = "git+https://github.com/zshipko/ocaml-rs.git?rev=95e30b7#95e30b739affe65eb8eba77a763b4e401ce3b1c4"
+source = "git+https://github.com/zshipko/ocaml-rs.git?rev=d9adaf5#d9adaf5af22d800e9593267a7802f2d16b43fc69"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -423,7 +423,7 @@ dependencies = [
 [[package]]
 name = "ocaml-sys"
 version = "0.23.0"
-source = "git+https://github.com/zshipko/ocaml-rs.git?rev=95e30b7#95e30b739affe65eb8eba77a763b4e401ce3b1c4"
+source = "git+https://github.com/zshipko/ocaml-rs.git?rev=d9adaf5#d9adaf5af22d800e9593267a7802f2d16b43fc69"
 dependencies = [
  "cc",
  "cty",
@@ -431,9 +431,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.15.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "owo-colors"
@@ -472,9 +472,9 @@ checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
 
 [[package]]
 name = "ppv-lite86"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb9f9e6e233e5c4a35559a617bf40a4ec447db2e84c20b55a6f83167b7e57872"
+checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "proc-macro2"
@@ -576,9 +576,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.27"
+version = "0.6.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
+checksum = "456c603be3e8d448b072f410900c09faf164fbce2d480456f50eea6e25f9c848"
 
 [[package]]
 name = "remove_dir_all"
@@ -615,7 +615,7 @@ checksum = "4501abdff3ae82a1c1b477a17252eb69cee9e66eb915c1abaa4f44d873df9f09"
 
 [[package]]
 name = "sail"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cc",
  "color-eyre",
@@ -688,15 +688,15 @@ checksum = "62ac7f900db32bf3fd12e0117dd3dc4da74bc52ebaac97f39668446d89694803"
 
 [[package]]
 name = "simple_logger"
-version = "3.0.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc20708d703a44b96b3b700578a85b6fe887fc63ab20315757026bb8a12faaad"
+checksum = "e190a521c2044948158666916d9e872cbb9984f755e9bb3b5b75a836205affcd"
 dependencies = [
  "atty",
  "colored",
  "log",
  "time",
- "winapi",
+ "windows-sys",
 ]
 
 [[package]]
@@ -789,9 +789,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.16"
+version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fab5c8b9980850e06d92ddbe3ab839c062c801f3927c0fb8abd6fc8e918fbca"
+checksum = "a561bf4617eebd33bca6434b988f39ed798e527f51a1e797d0ee4f61c0a38376"
 dependencies = [
  "itoa",
  "libc",
@@ -809,9 +809,9 @@ checksum = "2e153e1f1acaef8acc537e68b44906d2db6436e2b35ac2c6b42640fff91f00fd"
 
 [[package]]
 name = "time-macros"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65bb801831d812c562ae7d2bfb531f26e66e4e1f6b17307ba4149c5064710e5b"
+checksum = "d967f99f534ca7e495c575c62638eebc2898a8c84c119b89e250477bc4ba16b2"
 dependencies = [
  "time-core",
 ]
