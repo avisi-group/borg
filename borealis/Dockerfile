@@ -19,11 +19,19 @@ RUN opam switch create 4.11.2+musl+static+flambda
 RUN eval `opam env` && CPPFLAGS=-I/tmp/gmp-prefix/include CFLAGS=-I/tmp/gmp-prefix/include LDFLAGS=-L/tmp/gmp-prefix/lib opam install --assume-depexts -y sail
 
 # build rust dependencies
-RUN cargo init --lib .
+RUN cargo init --lib borealis
+RUN cargo init --lib sail
 COPY Cargo.toml .
+COPY borealis/Cargo.toml sail/
+COPY sail/Cargo.toml sail/
 RUN eval `opam env` && cargo build --release --tests --examples
 
 # run tests
 COPY . .
-RUN touch src/lib.rs
+RUN touch borealis/src/lib.rs sail/src/lib.rs
 RUN eval `opam env` && cargo test --release --no-fail-fast
+
+# build borealis
+RUN eval `opam env` && cargo build --release
+RUN file target/release/borealis
+RUN size target/release/borealis
