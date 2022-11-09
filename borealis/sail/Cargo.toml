@@ -18,7 +18,7 @@ deepsize = "0.2.0"
 num-bigint = { version = "0.4.3", features = ["serde"] }
 
 [build-dependencies]
-cc = "1.0.74"
+cc = "1.0.76"
 color-eyre = "0.6.2"
 
 [dev-dependencies]
