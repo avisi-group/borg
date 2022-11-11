@@ -6,9 +6,9 @@ use {
     crate::Error,
     std::{
         collections::HashMap,
-        fmt::{self, Display},
+        fmt::Display,
         fs::{self, File},
-        io::{self, Write},
+        io::{self},
         path::Path,
     },
 };
@@ -18,11 +18,33 @@ const ISA_FILENAME: &str = "isa.genc";
 const EXECUTE_FILENAME: &str = "execute.genc";
 const BEHAVIOURS_FILENAME: &str = "behaviours.genc";
 
+struct Context {
+    name: String,
+    ident_mangle_counter: u32,
+}
+
+impl Context {
+    /// Generates a new unique identifier
+    fn generate_ident(&mut self) -> String {
+        let ident = n_to_ident(self.ident_mangle_counter);
+        self.ident_mangle_counter += 1;
+        ident
+    }
+}
+
+trait ContextWrite {
+    fn write<W: io::Write>(&self, ctx: &mut Context, w: &mut W) -> io::Result<()>;
+}
+
 /// GenC description of an instruction set architecture
 pub struct Description {
+    /// Main GenC file
     pub main: Main,
+    /// ISA GenC file
     pub isa: Isa,
+    /// Execute GenC file
     pub execute: Execute,
+    /// Behaviours GenC file
     pub behaviours: Behaviours,
 }
 
@@ -46,18 +68,27 @@ impl Description {
             return Err(Error::OutDirectoryNotEmpty(path.to_owned()));
         }
 
-        write!(File::create(path.join(MAIN_FILENAME))?, "{}", self.main)?;
-        write!(File::create(path.join(ISA_FILENAME))?, "{}", self.isa)?;
-        write!(
-            File::create(path.join(EXECUTE_FILENAME))?,
-            "{}",
-            self.execute
+        let mut context = Context {
+            name: "test".to_lowercase(),
+            ident_mangle_counter: 0,
+        };
+
+        self.main
+            .write(&mut context, &mut File::create(path.join(MAIN_FILENAME))?)?;
+
+        self.isa
+            .write(&mut context, &mut File::create(path.join(ISA_FILENAME))?)?;
+
+        self.execute.write(
+            &mut context,
+            &mut File::create(path.join(EXECUTE_FILENAME))?,
         )?;
-        write!(
-            File::create(path.join(BEHAVIOURS_FILENAME))?,
-            "{}",
-            self.behaviours
+
+        self.behaviours.write(
+            &mut context,
+            &mut File::create(path.join(BEHAVIOURS_FILENAME))?,
         )?;
+
         Ok(())
     }
 
@@ -65,7 +96,6 @@ impl Description {
     pub fn empty() -> Self {
         Description {
             main: Main {
-                name: "arm64".to_owned(),
                 endianness: Endianness::LittleEndian,
                 wordsize: 64,
                 registers: vec![RegisterSpace {
@@ -83,10 +113,11 @@ impl Description {
                 }],
             },
             isa: Isa {
-                name: "arm64".to_owned(),
                 predicated: false,
                 fetchsize: 32,
-                instruction_formats: vec![],
+                formats: vec![Format {
+                    contents: "%sf:1 %op:1 %S:1 0x11:5 %shift:2 %imm12:12 %rn:5 %rd:5".to_owned(),
+                }],
             },
             execute: Execute {},
             behaviours: Behaviours {},
@@ -97,9 +128,6 @@ impl Description {
 /// Main GenC file
 #[derive(Debug)]
 pub struct Main {
-    /// Name of the architecture (e.g. "aarch64" or "riscv")
-    pub name: String,
-
     /// Endianness of the architecture
     pub endianness: Endianness,
 
@@ -110,38 +138,38 @@ pub struct Main {
     pub registers: Vec<RegisterSpace>,
 }
 
-impl Display for Main {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_header(f)?;
-        writeln!(f, "AC_ARCH({})", self.name)?;
-        writeln!(f, "{{")?;
+impl ContextWrite for Main {
+    fn write<W: io::Write>(&self, ctx: &mut Context, w: &mut W) -> io::Result<()> {
+        write_header(w)?;
+        writeln!(w, "AC_ARCH({})", ctx.name)?;
+        writeln!(w, "{{")?;
 
         writeln!(
-            f,
+            w,
             "\tac_mem Data({}, {}, {}, {});",
             self.wordsize, self.wordsize, self.endianness, 0
         )?;
         writeln!(
-            f,
+            w,
             "\tac_mem Fetch({}, {}, {}, {});",
             self.wordsize, self.wordsize, self.endianness, 1
         )?;
-        writeln!(f, "")?;
-        writeln!(f, "\tac_wordsize {};", self.wordsize)?;
-        writeln!(f, "")?;
+        writeln!(w, "")?;
+        writeln!(w, "\tac_wordsize {};", self.wordsize)?;
+        writeln!(w, "")?;
 
         for register in &self.registers {
-            write!(f, "{}", register)?;
+            write!(w, "{}", register)?;
         }
 
-        writeln!(f, "")?;
+        writeln!(w, "")?;
 
-        writeln!(f, "\tARCH_CTOR(arm) {{")?;
-        writeln!(f, "\t\tac_isa(\"{}\");", ISA_FILENAME)?;
-        writeln!(f, "\t\tset_endian(\"{}\");", self.endianness)?;
-        writeln!(f, "\t}};")?;
+        writeln!(w, "\tARCH_CTOR(arm) {{")?;
+        writeln!(w, "\t\tac_isa(\"{}\");", ISA_FILENAME)?;
+        writeln!(w, "\t\tset_endian(\"{}\");", self.endianness)?;
+        writeln!(w, "\t}};")?;
 
-        writeln!(f, "}};")?;
+        writeln!(w, "}};")?;
 
         Ok(())
     }
@@ -149,25 +177,25 @@ impl Display for Main {
 
 /// ISA GenC file
 pub struct Isa {
-    /// Name of the ISA (e.g. "aarch64" or "riscv")
-    pub name: String,
     /// ?
     pub predicated: bool,
+
     /// Instruction size in bytes
     pub fetchsize: u32,
 
-    pub instruction_formats: Vec<Format>,
+    /// Instruction decode format strings
+    pub formats: Vec<Format>,
 }
 
-impl Display for Isa {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_header(f)?;
-        writeln!(f, "AC_ISA({})", self.name)?;
-        writeln!(f, "{{")?;
+impl ContextWrite for Isa {
+    fn write<W: io::Write>(&self, ctx: &mut Context, w: &mut W) -> io::Result<()> {
+        write_header(w)?;
+        writeln!(w, "AC_ISA({})", ctx.name)?;
+        writeln!(w, "{{")?;
 
-        writeln!(f, "\tac_fetchsize {};", self.fetchsize)?;
+        writeln!(w, "\tac_fetchsize {};", self.fetchsize)?;
         writeln!(
-            f,
+            w,
             "\tac_predicated \"{}\";",
             match self.predicated {
                 true => "yes",
@@ -175,14 +203,17 @@ impl Display for Isa {
             }
         )?;
 
-        writeln!(f, "")?;
+        for format in &self.formats {
+            format.write(ctx, w)?;
+        }
 
-        writeln!(f, "\tISA_CTOR(arm) {{")?;
-        writeln!(f, "\t\tac_behaviours(\"{}\");", BEHAVIOURS_FILENAME)?;
-        writeln!(f, "\t\tac_execute(\"{}\");", EXECUTE_FILENAME)?;
-        writeln!(f, "\t}};")?;
+        writeln!(w, "")?;
+        writeln!(w, "\tISA_CTOR(arm) {{")?;
+        writeln!(w, "\t\tac_behaviours(\"{}\");", BEHAVIOURS_FILENAME)?;
+        writeln!(w, "\t\tac_execute(\"{}\");", EXECUTE_FILENAME)?;
+        writeln!(w, "\t}};")?;
 
-        writeln!(f, "}}")?;
+        writeln!(w, "}}")?;
 
         Ok(())
     }
@@ -191,9 +222,9 @@ impl Display for Isa {
 /// Execution GenC file containing instruction implementations
 pub struct Execute {}
 
-impl Display for Execute {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write_header(f)?;
+impl ContextWrite for Execute {
+    fn write<W: io::Write>(&self, _ctx: &mut Context, w: &mut W) -> io::Result<()> {
+        write_header(w)?;
 
         Ok(())
     }
@@ -202,9 +233,9 @@ impl Display for Execute {
 /// Behaviours GenC file
 pub struct Behaviours {}
 
-impl Display for Behaviours {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write_header(f)?;
+impl ContextWrite for Behaviours {
+    fn write<W: io::Write>(&self, _ctx: &mut Context, w: &mut W) -> io::Result<()> {
+        write_header(w)?;
 
         Ok(())
     }
@@ -350,50 +381,116 @@ impl Display for InstructionDefinition {
 /// Format string describing the en/decoding of an instruction
 #[derive(Debug)]
 pub struct Format {
-    /// Identifier for the format
-    pub name: String,
     /// Format string
     pub contents: String,
 }
 
-impl Display for Format {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "")
+impl ContextWrite for Format {
+    fn write<W: io::Write>(&self, ctx: &mut Context, w: &mut W) -> io::Result<()> {
+        let format_ident = ctx.generate_ident();
+        let instruction = "addi";
+
+        writeln!(w, "\tac_format {} = \"{}\";", format_ident, self.contents)?;
+        writeln!(w, "\tac_instruction<{}> {};", format_ident, instruction)?;
+
+        Ok(())
     }
 }
 
 /// Creates a file and writes the initial comment
-fn write_header(f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    writeln!(f, "/* GENERATED BY BOREALIS */")?;
-    writeln!(f, "")?;
+fn write_header<W: io::Write>(w: &mut W) -> io::Result<()> {
+    writeln!(w, "/* GENERATED BY BOREALIS */")?;
+    writeln!(w, "")?;
     Ok(())
+}
+
+/// Converts the supplied integer into base26 ASCII
+fn n_to_ident(mut n: u32) -> String {
+    let mut s = String::new();
+
+    loop {
+        if n < 26 {
+            s.push(char::from_u32(n + 'a' as u32).unwrap());
+            break;
+        } else {
+            s.push(char::from_u32((n % 26) + 'a' as u32).unwrap());
+
+            n /= 26;
+            n -= 1;
+        }
+    }
+
+    s
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::genc::Description;
+    use {
+        crate::genc::{n_to_ident, Context, ContextWrite, Description},
+        proptest::prelude::*,
+    };
 
     #[test]
-    fn genc_display_snapshot_main() {
-        let Description { main, .. } = Description::empty();
-        insta::assert_display_snapshot!(main);
+    fn ident_mangler() {
+        assert_eq!(n_to_ident(0), "a");
+        assert_eq!(n_to_ident(1), "b");
+        assert_eq!(n_to_ident(25), "z");
+        assert_eq!(n_to_ident(26), "aa");
+        assert_eq!(n_to_ident(27), "ba");
+        assert_eq!(n_to_ident(50), "ya");
+        assert_eq!(n_to_ident(51), "za");
+        assert_eq!(n_to_ident(52), "ab");
+        assert_eq!(n_to_ident(216222910), "uidder");
+    }
+
+    proptest! {
+        #[test]
+        fn mangler_doesnt_crash(n in 0u32..u32::MAX) {
+           let _s = n_to_ident(n);
+        }
     }
 
     #[test]
-    fn genc_display_snapshot_isa() {
-        let Description { isa, .. } = Description::empty();
-        insta::assert_display_snapshot!(isa);
-    }
+    fn snapshot() {
+        let mut context = Context {
+            name: "aarch64".to_owned(),
+            ident_mangle_counter: 0,
+        };
 
-    #[test]
-    fn genc_display_snapshot_behaviours() {
-        let Description { behaviours, .. } = Description::empty();
-        insta::assert_display_snapshot!(behaviours);
-    }
+        let Description {
+            main,
+            isa,
+            execute,
+            behaviours,
+        } = Description::empty();
 
-    #[test]
-    fn genc_display_snapshot_execute() {
-        let Description { execute, .. } = Description::empty();
-        insta::assert_display_snapshot!(execute);
+        let main = {
+            let mut buf = vec![];
+            main.write(&mut context, &mut buf).unwrap();
+            String::from_utf8(buf).unwrap()
+        };
+
+        let isa = {
+            let mut buf = vec![];
+            isa.write(&mut context, &mut buf).unwrap();
+            String::from_utf8(buf).unwrap()
+        };
+
+        let execute = {
+            let mut buf = vec![];
+            execute.write(&mut context, &mut buf).unwrap();
+            String::from_utf8(buf).unwrap()
+        };
+
+        let behaviours = {
+            let mut buf = vec![];
+            behaviours.write(&mut context, &mut buf).unwrap();
+            String::from_utf8(buf).unwrap()
+        };
+
+        insta::assert_snapshot!(format!(
+            "main.genc:\n{}\n\n\nisa.genc:\n{}\n\n\nexecute.genc:\n{}\n\n\nbehaviours.genc:\n{}\n\n\n",
+            main, isa, execute, behaviours
+        ));
     }
 }
