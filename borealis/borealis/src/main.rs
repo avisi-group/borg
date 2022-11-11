@@ -1,5 +1,5 @@
 use {
-    borealis::genc::Description,
+    borealis::genc::{export, Description},
     clap::Parser,
     color_eyre::eyre::{Result, WrapErr},
     std::path::PathBuf,
@@ -22,8 +22,8 @@ fn main() -> Result<()> {
 
     // parse command line arguments
     let args = Args::parse();
-    Description::empty()
-        .export(args.out_dir, args.force)
+
+    export(&Description::empty(), args.out_dir, args.force)
         .wrap_err("Error while exporting GenC description")?;
 
     Ok(())
