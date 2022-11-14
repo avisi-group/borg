@@ -10,7 +10,7 @@ sail = { path = "../sail" }
 displaydoc = "0.2.3"
 thiserror = "1.0.37"
 color-eyre = { version = "0.6.2", default-features = false }
-clap = { version = "4.0.22", features = ["derive"] }
+clap = { version = "4.0.23", features = ["derive"] }
 
 [dev-dependencies]
 insta = "1.21.0"
