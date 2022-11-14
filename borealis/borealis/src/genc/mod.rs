@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        genc::ir::{Behaviours, Execute, Files, Format, Function, FunctionKind, Isa, Main},
+        genc::ir::{Execute, Files, Format, Function, FunctionKind, Isa, Main},
         Error,
     },
     std::{
@@ -85,6 +85,8 @@ pub struct Description {
 
     /// Instruction definitions
     pub instructions: HashMap<String, Instruction>,
+
+    pub behaviours: Behaviours,
 }
 
 impl Description {
@@ -131,11 +133,61 @@ impl Description {
                 .collect(),
         );
 
-        let behaviours = Behaviours(vec![Function {
-            kind: FunctionKind::Behaviour,
-            name: "handle_exception".to_owned(),
-            body: "".to_owned(),
-        }]);
+        let required_behaviours = [
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "handle_exception".to_owned(),
+                body: self.behaviours.handle_exception.clone(),
+            },
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "reset".to_owned(),
+                body: self.behaviours.reset.clone(),
+            },
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "irq".to_owned(),
+                body: self.behaviours.irq.clone(),
+            },
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "mmu_fault".to_owned(),
+                body: self.behaviours.mmu_fault.clone(),
+            },
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "page_fault".to_owned(),
+                body: self.behaviours.page_fault.clone(),
+            },
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "undefined_instruction".to_owned(),
+                body: self.behaviours.undefined_instruction.clone(),
+            },
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "single_step".to_owned(),
+                body: self.behaviours.single_step.clone(),
+            },
+            Function {
+                kind: FunctionKind::Behaviour,
+                name: "undef".to_owned(),
+                body: self.behaviours.undef.clone(),
+            },
+        ];
+
+        let behaviours = ir::Behaviours(
+            self.behaviours
+                .additonal
+                .iter()
+                .map(|Behaviour { name, body }| ir::Function {
+                    kind: FunctionKind::Behaviour,
+                    name: name.clone(),
+                    body: body.clone(),
+                })
+                .chain(required_behaviours.into_iter())
+                .collect::<Vec<_>>(),
+        );
 
         Files {
             main,
@@ -197,6 +249,20 @@ impl Description {
                     execute: "return;".to_owned(),
                 },
             )]),
+            behaviours: Behaviours {
+                handle_exception: "".to_owned(),
+                reset: "".to_owned(),
+                irq: "".to_owned(),
+                mmu_fault: "".to_owned(),
+                page_fault: "".to_owned(),
+                undefined_instruction: "".to_owned(),
+                single_step: "".to_owned(),
+                undef: "".to_owned(),
+                additonal: vec![Behaviour {
+                    name: "custom".to_owned(),
+                    body: "return;".to_owned(),
+                }],
+            },
         }
     }
 }
@@ -292,6 +358,25 @@ pub struct Instruction {
     pub format: String,
     /// GenC execution behaviour
     pub execute: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Behaviours {
+    pub handle_exception: String,
+    pub reset: String,
+    pub irq: String,
+    pub mmu_fault: String,
+    pub page_fault: String,
+    pub undefined_instruction: String,
+    pub single_step: String,
+    pub undef: String,
+    pub additonal: Vec<Behaviour>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Behaviour {
+    pub name: String,
+    pub body: String,
 }
 
 #[cfg(test)]
