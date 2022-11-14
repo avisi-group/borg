@@ -10,7 +10,6 @@ use {
         fs::{read_dir, File},
         io::{self, Write as _},
         path::Path,
-        sync::atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -91,6 +90,15 @@ pub struct Description {
 impl Description {
     /// Creates the internal representation of the GenC files
     fn files(&self) -> Files {
+        // `main.genc` file
+        let main = Main {
+            name: self.name.clone(),
+            endianness: self.endianness,
+            wordsize: self.wordsize,
+            registers: self.registers.clone(),
+        };
+
+        // construct Vec of Formats
         let formats = self
             .instructions
             .iter()
@@ -101,25 +109,7 @@ impl Description {
             })
             .collect();
 
-        let functions = self
-            .instructions
-            .iter()
-            .map(
-                |(instruction_ident, Instruction { execute, .. })| Function {
-                    kind: FunctionKind::Execute,
-                    name: instruction_ident.clone(),
-                    body: execute.clone(),
-                },
-            )
-            .collect();
-
-        let main = Main {
-            name: self.name.clone(),
-            endianness: self.endianness,
-            wordsize: self.wordsize,
-            registers: self.registers.clone(),
-        };
-
+        // `isa.genc` file containg arch info and instruction decoding
         let isa = Isa {
             name: self.name.clone(),
             predicated: self.predicated,
@@ -127,7 +117,19 @@ impl Description {
             formats,
         };
 
-        let execute = Execute(functions);
+        // semantics of each instruction
+        let execute = Execute(
+            self.instructions
+                .iter()
+                .map(
+                    |(instruction_ident, Instruction { execute, .. })| Function {
+                        kind: FunctionKind::Execute,
+                        name: instruction_ident.clone(),
+                        body: execute.clone(),
+                    },
+                )
+                .collect(),
+        );
 
         let behaviours = Behaviours(vec![Function {
             kind: FunctionKind::Behaviour,
@@ -167,7 +169,7 @@ impl Description {
                         }),
                         View::Bank(Bank {
                             name: "RBW".to_owned(),
-                            typ: Typ::Uint64,
+                            typ: Typ::Uint32,
                             offset: 0,
                             count: 31,
                             stride: 8,

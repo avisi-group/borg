@@ -193,11 +193,23 @@ impl Display for Isa {
 
         writeln!(f, "")?;
         writeln!(f, "\tISA_CTOR(arm) {{")?;
+
+        for Format {
+            instruction_ident, ..
+        } in &self.formats
+        {
+            writeln!(
+                f,
+                "\t\t{}.set_behaviour({});",
+                instruction_ident, instruction_ident
+            )?;
+        }
+
         writeln!(f, "\t\tac_behaviours(\"{}\");", BEHAVIOURS_FILENAME)?;
         writeln!(f, "\t\tac_execute(\"{}\");", EXECUTE_FILENAME)?;
         writeln!(f, "\t}};")?;
 
-        writeln!(f, "}}")?;
+        writeln!(f, "}};")?;
 
         Ok(())
     }
@@ -223,9 +235,10 @@ impl Display for Format {
         )?;
         writeln!(
             f,
-            "\tac_instruction<{}> {};",
+            "\tac_instr<{}> {};",
             self.format_ident, self.instruction_ident
         )?;
+        writeln!(f, "\tac_behaviour {};", self.instruction_ident)?;
 
         Ok(())
     }

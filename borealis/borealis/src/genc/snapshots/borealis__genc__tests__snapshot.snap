@@ -15,7 +15,7 @@ AC_ARCH(aarch64)
 
 	ac_regspace(248) {
 		bank RBX (uint64, 0, 31, 8, 1, 8, 8);
-		bank RBW (uint64, 0, 31, 8, 1, 4, 4);
+		bank RBW (uint32, 0, 31, 8, 1, 4, 4);
 	}
 	ac_regspace(16) {
 		slot PC (uint64, 8, 0) PC;
@@ -38,13 +38,15 @@ AC_ISA(aarch64)
 	ac_fetchsize 32;
 	ac_predicated "no";
 	ac_format fmt_addi = "%sf:1 %op:1 %S:1 0x11:5 %shift:2 %imm12:12 %rn:5 %rd:5";
-	ac_instruction<fmt_addi> addi;
+	ac_instr<fmt_addi> addi;
+	ac_behaviour addi;
 
 	ISA_CTOR(arm) {
+		addi.set_behaviour(addi);
 		ac_behaviours("behaviours.genc");
 		ac_execute("execute.genc");
 	};
-}
+};
 
 
 
