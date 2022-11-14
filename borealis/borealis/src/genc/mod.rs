@@ -21,14 +21,6 @@ const ISA_FILENAME: &str = "isa.genc";
 const EXECUTE_FILENAME: &str = "execute.genc";
 const BEHAVIOURS_FILENAME: &str = "behaviours.genc";
 
-/// Global atomic counter for generating unique identifiers
-static IDENT_MANGLE_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-/// Generates a new unique identifier
-fn generate_ident() -> String {
-    n_to_ident(IDENT_MANGLE_COUNTER.fetch_add(1, Ordering::SeqCst))
-}
-
 /// Export a GenC description to the supplied empty directory
 pub fn export<P: AsRef<Path>>(
     description: &Description,
@@ -300,60 +292,9 @@ pub struct Instruction {
     pub execute: String,
 }
 
-/// Converts the supplied integer into base26 ASCII
-fn n_to_ident(mut n: u64) -> String {
-    let mut s = String::new();
-
-    loop {
-        if n < 26 {
-            let n = u32::try_from(n).unwrap();
-
-            s.push(char::from_u32(n + 'a' as u32).unwrap());
-
-            break;
-        } else {
-            let rem = u32::try_from(n % 26).unwrap();
-
-            s.push(char::from_u32(rem + 'a' as u32).unwrap());
-
-            n /= 26;
-            n -= 1;
-        }
-    }
-
-    s
-}
-
 #[cfg(test)]
 mod tests {
-    use {
-        crate::genc::{ir::Files, n_to_ident, Description},
-        proptest::prelude::*,
-    };
-
-    #[test]
-    fn ident_mangler() {
-        assert_eq!(n_to_ident(0), "a");
-        assert_eq!(n_to_ident(1), "b");
-        assert_eq!(n_to_ident(25), "z");
-        assert_eq!(n_to_ident(26), "aa");
-        assert_eq!(n_to_ident(27), "ba");
-        assert_eq!(n_to_ident(50), "ya");
-        assert_eq!(n_to_ident(51), "za");
-        assert_eq!(n_to_ident(52), "ab");
-        assert_eq!(n_to_ident(43814), "blue".chars().rev().collect::<String>());
-        assert_eq!(
-            n_to_ident(1797591257351681109),
-            "rustisthebest".chars().rev().collect::<String>()
-        );
-    }
-
-    proptest! {
-        #[test]
-        fn mangler_doesnt_crash(n: u64) {
-           let _s = n_to_ident(n);
-        }
-    }
+    use crate::genc::{ir::Files, Description};
 
     #[test]
     fn snapshot() {
