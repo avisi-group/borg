@@ -25,7 +25,7 @@ const BEHAVIOURS_FILENAME: &str = "behaviours.genc";
 static IDENT_MANGLE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Generates a new unique identifier
-pub fn generate_ident() -> String {
+fn generate_ident() -> String {
     n_to_ident(IDENT_MANGLE_COUNTER.fetch_add(1, Ordering::SeqCst))
 }
 
@@ -159,19 +159,43 @@ impl Description {
             wordsize: 64,
             fetchsize: 32,
             predicated: false,
-            registers: vec![RegisterSpace {
-                size: 248,
-                banks: vec![Bank {
-                    name: "RBX".to_owned(),
-                    typ: Typ::Uint64,
-                    offset: 0,
-                    count: 31,
-                    stride: 8,
-                    element_count: 1,
-                    element_size: 8,
-                    element_stride: 8,
-                }],
-            }],
+            registers: vec![
+                RegisterSpace {
+                    size: 248,
+                    views: vec![
+                        View::Bank(Bank {
+                            name: "RBX".to_owned(),
+                            typ: Typ::Uint64,
+                            offset: 0,
+                            count: 31,
+                            stride: 8,
+                            element_count: 1,
+                            element_size: 8,
+                            element_stride: 8,
+                        }),
+                        View::Bank(Bank {
+                            name: "RBW".to_owned(),
+                            typ: Typ::Uint64,
+                            offset: 0,
+                            count: 31,
+                            stride: 8,
+                            element_count: 1,
+                            element_size: 4,
+                            element_stride: 4,
+                        }),
+                    ],
+                },
+                RegisterSpace {
+                    size: 16,
+                    views: vec![View::Slot(Slot {
+                        name: "PC".to_owned(),
+                        typ: Typ::Uint64,
+                        high: 8,
+                        low: 0,
+                        tag: Some("PC".to_owned()),
+                    })],
+                },
+            ],
             instructions: HashMap::from([(
                 "addi".to_owned(),
                 Instruction {
@@ -197,8 +221,17 @@ pub enum Endianness {
 pub struct RegisterSpace {
     /// Size in bytes of the register space
     pub size: u32,
-    /// Register banks in register space
-    pub banks: Vec<Bank>,
+    /// Views in register space
+    pub views: Vec<View>,
+}
+
+/// Register view
+#[derive(Debug, Clone)]
+pub enum View {
+    /// Register bank
+    Bank(Bank),
+    /// Register slot
+    Slot(Slot),
 }
 
 /// Register bank
@@ -220,6 +253,23 @@ pub struct Bank {
     pub element_size: u32,
     /// Element stride
     pub element_stride: u32,
+}
+
+/// Register slot
+#[derive(Debug, Clone)]
+pub struct Slot {
+    /// Identifier for slot
+    pub name: String,
+
+    /// Register type
+    pub typ: Typ,
+
+    pub high: u32,
+
+    pub low: u32,
+
+    /// Optional tag
+    pub tag: Option<String>,
 }
 
 /// Data type

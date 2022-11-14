@@ -15,6 +15,10 @@ AC_ARCH(aarch64)
 
 	ac_regspace(248) {
 		bank RBX (uint64, 0, 31, 8, 1, 8, 8);
+		bank RBW (uint64, 0, 31, 8, 1, 4, 4);
+	}
+	ac_regspace(16) {
+		slot PC (uint64, 8, 0) PC;
 	}
 
 	ARCH_CTOR(arm) {

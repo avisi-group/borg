@@ -3,13 +3,14 @@
 //! This means we can do two things:
 //!
 //! 1. Maintain a clear, understandable user-facing structure for a GenC description (`crate::genc::Description`)
-//! 2. Use `std::fmt::Display` and recursion to generate each file (a nice pattern ), without requiring externally maintained state
+//! 2. Use `std::fmt::Display` and recursion to generate each file (a nice pattern), without requiring globals or external state
 
 use {
     crate::genc::{
-        Bank, Endianness, RegisterSpace, Typ, BEHAVIOURS_FILENAME, EXECUTE_FILENAME, ISA_FILENAME,
+        Bank, Endianness, RegisterSpace, Slot, Typ, View, BEHAVIOURS_FILENAME, EXECUTE_FILENAME,
+        ISA_FILENAME,
     },
-    std::fmt::{self, Display},
+    std::fmt::{self, Display, Formatter},
 };
 
 /// GenC files which may be rendered using only the `std::fmt::Display` trait, achieved by duplicating several pieces of information between structs.
@@ -24,7 +25,7 @@ pub struct Files {
 }
 
 impl Display for Endianness {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             Endianness::BigEndian => write!(f, "big"),
             Endianness::LittleEndian => write!(f, "little"),
@@ -48,7 +49,7 @@ pub struct Main {
 }
 
 impl Display for Main {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write_header(f)?;
         writeln!(f, "AC_ARCH({})", self.name)?;
         writeln!(f, "{{")?;
@@ -85,17 +86,44 @@ impl Display for Main {
 }
 
 impl Display for RegisterSpace {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(f, "\tac_regspace({}) {{", self.size)?;
-        for bank in &self.banks {
-            write!(f, "{}", bank)?;
+        for view in &self.views {
+            write!(f, "{}", view)?;
         }
         writeln!(f, "\t}}")
     }
 }
 
+impl Display for View {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self {
+            View::Bank(bank) => write!(f, "{}", bank),
+            View::Slot(slot) => write!(f, "{}", slot),
+        }
+    }
+}
+
+impl Display for Slot {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(
+            f,
+            "\t\tslot {} ({}, {}, {})",
+            self.name, self.typ, self.high, self.low
+        )?;
+
+        if let Some(tag) = &self.tag {
+            write!(f, " {}", tag)?;
+        }
+
+        writeln!(f, ";")?;
+
+        Ok(())
+    }
+}
+
 impl Display for Bank {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(
             f,
             "\t\tbank {} ({}, {}, {}, {}, {}, {}, {});",
@@ -112,7 +140,7 @@ impl Display for Bank {
 }
 
 impl Display for Typ {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
             "{}",
@@ -144,7 +172,7 @@ pub struct Isa {
 }
 
 impl Display for Isa {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write_header(f)?;
         writeln!(f, "AC_ISA({})", self.name)?;
         writeln!(f, "{{")?;
@@ -187,7 +215,7 @@ pub struct Format {
 }
 
 impl Display for Format {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(
             f,
             "\tac_format {} = \"{}\";",
@@ -208,7 +236,7 @@ impl Display for Format {
 pub struct Execute(pub Vec<Function>);
 
 impl Display for Execute {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write_header(f)?;
         for func in &self.0 {
             writeln!(f, "{}", func)?;
@@ -222,7 +250,7 @@ impl Display for Execute {
 pub struct Behaviours(pub Vec<Function>);
 
 impl Display for Behaviours {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write_header(f)?;
         for func in &self.0 {
             writeln!(f, "{}", func)?;
@@ -239,7 +267,7 @@ pub struct Function {
 }
 
 impl Display for Function {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(f, "{}({}) {{", self.kind, self.name)?;
         writeln!(f, "{}", self.body)?;
         writeln!(f, "}}")
@@ -253,7 +281,7 @@ pub enum FunctionKind {
 }
 
 impl Display for FunctionKind {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(
             f,
             "{}",
@@ -266,6 +294,6 @@ impl Display for FunctionKind {
 }
 
 /// Creates a file and writes the initial comment
-fn write_header(f: &mut std::fmt::Formatter) -> fmt::Result {
+fn write_header(f: &mut Formatter) -> fmt::Result {
     writeln!(f, "/* GENERATED BY BOREALIS */\n\n")
 }
