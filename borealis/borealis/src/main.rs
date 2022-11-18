@@ -27,11 +27,8 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = Args::parse();
 
-    dbg!();
-
     export(&Description::empty(), args.out_dir, args.force)
         .wrap_err("Error while exporting GenC description")?;
-    dbg!();
 
     dbg!(sail::parser::load_files(args.input).wrap_err("Failed to parse Sail files")?);
 

@@ -22,9 +22,9 @@ RUN eval `opam env` && CPPFLAGS=-I/tmp/gmp-prefix/include CFLAGS=-I/tmp/gmp-pref
 RUN cargo init --lib borealis
 RUN cargo init --lib sail
 COPY Cargo.toml .
-COPY borealis/Cargo.toml sail/
+COPY borealis/Cargo.toml borealis/
 COPY sail/Cargo.toml sail/
-RUN eval `opam env` && cargo build --release --tests --examples
+RUN eval `opam env` && cargo build --release --tests --workspace
 
 # run tests
 COPY . .
