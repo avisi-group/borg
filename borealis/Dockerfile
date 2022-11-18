@@ -34,9 +34,6 @@ RUN eval `opam env` && cargo test --release --no-fail-fast
 
 # build borealis
 RUN eval `opam env` && cargo build --release
-RUN ldd target/release/borealis
-RUN file target/release/borealis
-RUN size target/release/borealis
 
 FROM scratch
 COPY --from=builder /tmp/build/target/release/borealis .
