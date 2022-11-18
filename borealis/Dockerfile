@@ -21,6 +21,7 @@ RUN eval `opam env` && CPPFLAGS=-I/tmp/gmp-prefix/include CFLAGS=-I/tmp/gmp-pref
 # build rust dependencies
 RUN cargo init --lib borealis
 RUN cargo init --lib sail
+COPY Cargo.lock .
 COPY Cargo.toml .
 COPY borealis/Cargo.toml borealis/
 COPY sail/Cargo.toml sail/
