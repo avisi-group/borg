@@ -8,6 +8,10 @@ use {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// Sail files
+    #[arg(short)]
+    input: Vec<String>,
+
     /// Path to empty folder where GenC description files will be emitted.
     #[arg(short, long)]
     out_dir: PathBuf,
@@ -23,8 +27,13 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = Args::parse();
 
+    dbg!();
+
     export(&Description::empty(), args.out_dir, args.force)
         .wrap_err("Error while exporting GenC description")?;
+    dbg!();
+
+    dbg!(sail::parser::load_files(args.input).wrap_err("Failed to parse Sail files")?);
 
     Ok(())
 }
