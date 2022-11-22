@@ -198,6 +198,7 @@ impl Display for Isa {
             instruction_ident, ..
         } in &self.formats
         {
+            writeln!(f, "\t\t{}.set_decoder();", instruction_ident)?;
             writeln!(
                 f,
                 "\t\t{}.set_behaviour({});",

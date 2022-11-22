@@ -42,6 +42,7 @@ AC_ISA(aarch64)
 	ac_behaviour addi;
 
 	ISA_CTOR(arm) {
+		addi.set_decoder();
 		addi.set_behaviour(addi);
 		ac_behaviours("behaviours.genc");
 		ac_execute("execute.genc");
