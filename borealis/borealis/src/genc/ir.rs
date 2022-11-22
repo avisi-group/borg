@@ -109,7 +109,7 @@ impl Display for Slot {
         write!(
             f,
             "\t\tslot {} ({}, {}, {})",
-            self.name, self.typ, self.high, self.low
+            self.name, self.typ, self.width, self.offset
         )?;
 
         if let Some(tag) = &self.tag {

@@ -86,6 +86,7 @@ pub struct Description {
     /// Instruction definitions
     pub instructions: HashMap<String, Instruction>,
 
+    ///
     pub behaviours: Behaviours,
 }
 
@@ -178,9 +179,9 @@ impl Description {
 
         let behaviours = ir::Behaviours(
             self.behaviours
-                .additonal
+                .custom
                 .iter()
-                .map(|Behaviour { name, body }| ir::Function {
+                .map(|CustomBehaviour { name, body }| ir::Function {
                     kind: FunctionKind::Behaviour,
                     name: name.clone(),
                     body: body.clone(),
@@ -236,8 +237,8 @@ impl Description {
                     views: vec![View::Slot(Slot {
                         name: "PC".to_owned(),
                         typ: Typ::Uint64,
-                        high: 8,
-                        low: 0,
+                        width: 8,
+                        offset: 0,
                         tag: Some("PC".to_owned()),
                     })],
                 },
@@ -258,7 +259,7 @@ impl Description {
                 undefined_instruction: "".to_owned(),
                 single_step: "".to_owned(),
                 undef: "".to_owned(),
-                additonal: vec![Behaviour {
+                custom: vec![CustomBehaviour {
                     name: "custom".to_owned(),
                     body: "return;".to_owned(),
                 }],
@@ -324,9 +325,11 @@ pub struct Slot {
     /// Register type
     pub typ: Typ,
 
-    pub high: u32,
+    /// Register slot width
+    pub width: u32,
 
-    pub low: u32,
+    /// Register slot offset in register space
+    pub offset: u32,
 
     /// Optional tag
     pub tag: Option<String>,
@@ -360,22 +363,35 @@ pub struct Instruction {
     pub execute: String,
 }
 
+/// Required and custom behaviours for architecture
 #[derive(Debug, Clone)]
 pub struct Behaviours {
+    /// Exception handler
     pub handle_exception: String,
+    /// Reset
     pub reset: String,
+    /// Interrupt request
     pub irq: String,
+    /// Memory management unit fault
     pub mmu_fault: String,
+    /// Page fault
     pub page_fault: String,
+    /// Undefined instruction
     pub undefined_instruction: String,
+    /// Single step
     pub single_step: String,
+    /// Undefined
     pub undef: String,
-    pub additonal: Vec<Behaviour>,
+    /// Additional, non-required behaviours
+    pub custom: Vec<CustomBehaviour>,
 }
 
+/// Custom behaviour
 #[derive(Debug, Clone)]
-pub struct Behaviour {
+pub struct CustomBehaviour {
+    /// Name of behaviour
     pub name: String,
+    /// Function body
     pub body: String,
 }
 
