@@ -6,6 +6,8 @@ use std::path::PathBuf;
 
 pub mod genc;
 
+pub use sail;
+
 /// Borealis error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
