@@ -27,14 +27,21 @@ COPY borealis/Cargo.toml borealis/
 COPY sail/Cargo.toml sail/
 RUN eval `opam env` && cargo build --release --tests --workspace
 
-# run tests
-COPY . .
+# copy real source after deps built
+COPY borealis borealis
+COPY sail sail
 RUN touch borealis/src/lib.rs sail/src/lib.rs
+
+# build and run tests
 RUN eval `opam env` && cargo test --release --no-fail-fast
 
 # build borealis
 RUN eval `opam env` && cargo build --release
 
+# build docs
+RUN eval `opam env` && cargo doc --release
+
 FROM scratch
+COPY --from=builder /tmp/build/target/doc /doc
 COPY --from=builder /tmp/build/target/release/borealis .
 ENTRYPOINT [ "./borealis", "-o", ".", "--force" ]
