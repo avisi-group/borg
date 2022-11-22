@@ -11,9 +11,6 @@ permissions:
   id-token: write
   packages: write
 
-env:
-  IMAGE_NAME: avisi-group/borealis
-
 jobs:
   stylecheck:
     name: Stylecheck
