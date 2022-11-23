@@ -21,18 +21,19 @@ RUN opam switch create 4.11.2+musl+static+flambda
 # install sail
 RUN eval `opam env` && opam install --assume-depexts -y sail
 
-# build rust dependencies
+# build and document rust dependencies
 RUN cargo init --lib borealis
 RUN cargo init --lib sail
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY borealis/Cargo.toml borealis/
 COPY sail/Cargo.toml sail/
-RUN eval `opam env` && cargo build --release --tests --workspace
+RUN eval `opam env` && cargo build --release && cargo test --release --no-run && cargo doc --release
 
 # copy full source
 COPY borealis borealis
 COPY sail sail
+COPY testdata testdata
 RUN touch borealis/src/lib.rs sail/src/lib.rs
 
 # build and run tests
