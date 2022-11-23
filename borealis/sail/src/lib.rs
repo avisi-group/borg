@@ -53,7 +53,6 @@ mod tests {
     use {
         crate::{load_files, RT},
         proptest::{bits, collection::vec, prelude::*},
-        std::{env, path::PathBuf},
     };
 
     proptest! {
@@ -80,10 +79,7 @@ mod tests {
 
     #[test]
     fn load_files_prelude() {
-        let path = PathBuf::from("./")
-            .join("examples/prelude.sail")
-            .to_string_lossy()
-            .to_string();
+        let path = "../testdata/prelude.sail".to_owned();
 
         insta::with_settings!({filters => vec![
             (r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#, r#""kind_identifier": {}"#),
