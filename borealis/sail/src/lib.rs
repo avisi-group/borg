@@ -79,7 +79,7 @@ mod tests {
 
     #[test]
     fn load_files_prelude() {
-        let path = "../testdata/prelude.sail".to_owned();
+        let path = "../testdata/sail-arm/arm-v8.5-a/model/prelude.sail".to_owned();
 
         insta::with_settings!({filters => vec![
             (r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#, r#""kind_identifier": {}"#),
