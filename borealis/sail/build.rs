@@ -49,6 +49,9 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-arg=-L/opt/homebrew/lib");
     }
 
+    // rebuild if OCaml package is modified
+    println!("cargo:rerun-if-changed=wrapper");
+
     Ok(())
 }
 

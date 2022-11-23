@@ -26,5 +26,7 @@ let () =
   Callback.register "internal_bigint_to_string" (fun i ->
       exception_to_result (fun () -> Nat_big_num.to_string i));
 
-  Callback.register "internal_num_to_string" (fun n ->
-      exception_to_result (fun () -> Num.num_of_string n))
+  Callback.register "internal_add_num" (fun a b ->
+      exception_to_result (fun () ->
+          Num.string_of_num
+            (Num.add_num (Num.num_of_string a) (Num.num_of_string b))))

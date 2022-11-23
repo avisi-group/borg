@@ -57,7 +57,7 @@ impl Serialize for OCamlString {
 
 /// Position of a character in a source file
 ///
-/// Can be converted from `Lexing.position` value (https://v2.ocaml.org/api/Lexing.html).
+/// Can be converted from `Lexing.position` value <https://v2.ocaml.org/api/Lexing.html>.
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name

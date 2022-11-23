@@ -56,3 +56,35 @@ pub struct Ratio {
     /// Normalized
     pub normalized: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use {
+        crate::{types::OCamlString, RT},
+        num_bigint::BigInt,
+        proptest::prelude::*,
+        std::str::FromStr,
+    };
+
+    proptest! {
+        /// Check passing num_bigint::BigInt to OCaml `Num` and back through string representations
+        #[test]
+        fn add_num(a: Vec<u8>, b: Vec<u8>) {
+            let a = BigInt::from_signed_bytes_be(&a);
+            let b = BigInt::from_signed_bytes_be(&b);
+            let c_true = &a + &b;
+
+            // calculate by passing into OCaml
+            let c = {
+                let a_str = a.to_string();
+                let b_str = b.to_string();
+                match RT.lock().add_num(a_str.clone(), b_str.clone()).unwrap() {
+                    OCamlString::String(s) => BigInt::from_str(&s).unwrap(),
+                    OCamlString::Vec(v) => panic!("{:?}", v)
+                }
+            };
+
+            assert_eq!(c_true, c);
+        }
+    }
+}

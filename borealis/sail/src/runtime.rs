@@ -20,7 +20,7 @@ use {
     log::error,
     ocaml::{
         interop::{BoxRoot, ToOCaml},
-        List, Runtime as OCamlRuntime, ToValue, Value,
+        List, Runtime as OCamlRuntime, Value,
     },
     std::{sync::mpsc, thread},
 };
@@ -79,10 +79,20 @@ impl Runtime {
         }
     }
 
+    #[cfg(test)]
     pub fn dedup(&self, l: Vec<i32>) -> Result<Vec<i32>, Error> {
         self.request.send(Request::Dedup(l))?;
         self.response.recv()?.map(|res| match res {
             Response::Dedup(l) => l,
+            _ => panic!("received different response kind to request"),
+        })
+    }
+
+    #[cfg(test)]
+    pub fn add_num(&self, a: String, b: String) -> Result<OCamlString, Error> {
+        self.request.send(Request::AddNum((a, b)))?;
+        self.response.recv()?.map(|res| match res {
+            Response::AddNum(c) => c,
             _ => panic!("received different response kind to request"),
         })
     }
@@ -92,6 +102,8 @@ impl Runtime {
 
         self.response.recv()?.map(|res| match res {
             Response::LoadFiles(ret) => ret,
+
+            #[allow(unreachable_patterns)] // remove this once more variants are added
             _ => panic!("received different response kind to request"),
         })
     }
@@ -109,7 +121,7 @@ ocaml::import! {
 
     pub fn internal_bigint_to_string(input: Value) -> Result<OCamlString, WrapperError>;
 
-    pub fn internal_num_to_string(input: Value) -> Result<OCamlString, WrapperError>;
+    fn internal_add_num(a: String, b: String) -> Result<OCamlString, WrapperError>;
 }
 
 /// Request made against runtime
@@ -120,7 +132,12 @@ ocaml::import! {
 #[doc(hidden)]
 #[derive(Debug)]
 pub enum Request {
+    // requests only used in tests
+    #[cfg(test)]
     Dedup(Vec<i32>),
+    #[cfg(test)]
+    AddNum((String, String)),
+
     LoadFiles(Vec<String>),
 }
 
@@ -130,7 +147,12 @@ pub enum Request {
 /// contain any OCaml values or will introduce unsoundness.
 #[derive(Debug)]
 enum Response {
+    // requests only used in tests
+    #[cfg(test)]
     Dedup(Vec<i32>),
+    #[cfg(test)]
+    AddNum(OCamlString),
+
     LoadFiles((OCamlString, Ast, Env)),
 }
 
@@ -142,7 +164,10 @@ enum Response {
 /// thread may interact with the runtime.
 fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Error> {
     match req {
+        #[cfg(test)]
         Request::Dedup(list) => {
+            use ocaml::ToValue;
+
             let mut l = List::empty();
 
             for element in list {
@@ -153,6 +178,9 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
                 unsafe { internal_util_dedup(rt, l) }??.into_vec(),
             ))
         }
+
+        #[cfg(test)]
+        Request::AddNum((a, b)) => Ok(Response::AddNum(unsafe { internal_add_num(rt, a, b) }??)),
 
         Request::LoadFiles(files) => {
             let env = unsafe { internal_type_check_initial_env(rt)?? };
