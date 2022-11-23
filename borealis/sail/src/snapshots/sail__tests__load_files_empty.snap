@@ -1,5 +1,5 @@
 ---
-source: src/parser.rs
+source: src/lib.rs
 expression: "load_files(vec![]).unwrap()"
 ---
 [

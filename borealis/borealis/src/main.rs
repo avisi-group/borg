@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     export(&Description::empty(), args.out_dir, args.force)
         .wrap_err("Error while exporting GenC description")?;
 
-    dbg!(sail::parser::load_files(args.input).wrap_err("Failed to parse Sail files")?);
+    dbg!(sail::load_files(args.input).wrap_err("Failed to parse Sail files")?);
 
     Ok(())
 }
