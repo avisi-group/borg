@@ -79,33 +79,37 @@ impl Runtime {
         }
     }
 
+    /// Sends a request and receives a response
+    fn request(&self, req: Request) -> Result<Response, Error> {
+        self.request.send(req)?;
+        self.response.recv()?
+    }
+
     #[cfg(test)]
     pub fn dedup(&self, l: Vec<i32>) -> Result<Vec<i32>, Error> {
-        self.request.send(Request::Dedup(l))?;
-        self.response.recv()?.map(|res| match res {
-            Response::Dedup(l) => l,
-            _ => panic!("received different response kind to request"),
-        })
+        if let Response::Dedup(l) = self.request(Request::Dedup(l))? {
+            Ok(l)
+        } else {
+            panic!("received different response kind to request");
+        }
     }
 
     #[cfg(test)]
     pub fn add_num(&self, a: String, b: String) -> Result<OCamlString, Error> {
-        self.request.send(Request::AddNum((a, b)))?;
-        self.response.recv()?.map(|res| match res {
-            Response::AddNum(c) => c,
-            _ => panic!("received different response kind to request"),
-        })
+        if let Response::AddNum(c) = self.request(Request::AddNum((a, b)))? {
+            Ok(c)
+        } else {
+            panic!("received different response kind to request");
+        }
     }
 
     pub fn load_files(&self, files: Vec<String>) -> Result<(OCamlString, Ast, Env), Error> {
-        self.request.send(Request::LoadFiles(files))?;
-
-        self.response.recv()?.map(|res| match res {
-            Response::LoadFiles(ret) => ret,
-
-            #[allow(unreachable_patterns)] // remove this once more variants are added
-            _ => panic!("received different response kind to request"),
-        })
+        #[allow(irrefutable_let_patterns)] // remove when more non-test variants are added
+        if let Response::LoadFiles(ret) = self.request(Request::LoadFiles(files))? {
+            Ok(ret)
+        } else {
+            panic!("received different response kind to request");
+        }
     }
 }
 
@@ -189,7 +193,6 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
 
             for file in files {
                 let file_rooted: BoxRoot<String> = file.to_boxroot(rt);
-
                 file_list = unsafe { file_list.add(rt, &file_rooted) };
             }
 
