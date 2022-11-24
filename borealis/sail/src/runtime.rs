@@ -191,7 +191,7 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
 
             let mut file_list = List::empty();
 
-            for file in files {
+            for file in files.iter().rev() {
                 let file_rooted: BoxRoot<String> = file.to_boxroot(rt);
                 file_list = unsafe { file_list.add(rt, &file_rooted) };
             }
