@@ -12,9 +12,12 @@ let () =
   Callback.register "internal_util_dedup" (fun a ->
       exception_to_result (fun () -> Util.remove_duplicates a));
 
-  Callback.register "internal_process_file_load_files" (fun a b c d ->
+  Callback.register "internal_process_file_load_files"
+    (fun check options env file_paths ->
       exception_to_result (fun () ->
-          let name, ast, env = Process_file.load_files ?check:a b c d in
+          let name, ast, env =
+            Process_file.load_files ?check options env file_paths
+          in
           (name, ast, env)));
 
   Callback.register "internal_type_check_initial_env" (fun () ->
