@@ -10,6 +10,7 @@ use {
 
 pub mod ast;
 pub mod error;
+pub mod json;
 pub mod num;
 mod runtime;
 pub mod type_check;
