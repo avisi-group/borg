@@ -6,6 +6,7 @@ authors = ["AVISI Research Group"]
 description = "Sail frontend for GenSim"
 
 [dependencies]
+common = { path = "../common" }
 sail = { path = "../sail" }
 displaydoc = "0.2.3"
 thiserror = "1.0.37"

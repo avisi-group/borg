@@ -76,6 +76,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "color-eyre",
+ "common",
  "displaydoc",
  "insta",
  "sail",
@@ -173,6 +174,14 @@ dependencies = [
  "atty",
  "lazy_static",
  "winapi",
+]
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "displaydoc",
+ "thiserror",
 ]
 
 [[package]]
@@ -786,6 +795,7 @@ version = "0.1.1"
 dependencies = [
  "cc",
  "color-eyre",
+ "common",
  "deepsize",
  "displaydoc",
  "insta",

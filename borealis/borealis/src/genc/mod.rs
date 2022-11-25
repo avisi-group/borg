@@ -5,11 +5,13 @@ use {
         genc::ir::{Execute, Files, Format, Function, FunctionKind, Isa, Main},
         Error,
     },
+    common::error::IoErrCtx,
     std::{
         collections::HashMap,
+        fmt::Display,
         fs::{read_dir, File},
         io::{self, Write as _},
-        path::Path,
+        path::{Path, PathBuf},
     },
 };
 
@@ -33,7 +35,7 @@ pub fn export<P: AsRef<Path>>(
             if e.kind() == io::ErrorKind::NotFound {
                 Error::OutDirectoryNotFound(path.to_owned())
             } else {
-                e.into()
+                IoErrCtx::new(e, path).into()
             }
         })?
         .count();
@@ -50,15 +52,18 @@ pub fn export<P: AsRef<Path>>(
         behaviours,
     } = description.files();
 
-    writeln!(File::create(path.join(MAIN_FILENAME))?, "{}", main)?;
-    writeln!(File::create(path.join(ISA_FILENAME))?, "{}", isa)?;
-    writeln!(File::create(path.join(EXECUTE_FILENAME))?, "{}", execute)?;
-    writeln!(
-        File::create(path.join(BEHAVIOURS_FILENAME))?,
-        "{}",
-        behaviours
-    )?;
+    write_file(main, path.join(MAIN_FILENAME))?;
+    write_file(isa, path.join(ISA_FILENAME))?;
+    write_file(execute, path.join(EXECUTE_FILENAME))?;
+    write_file(behaviours, path.join(BEHAVIOURS_FILENAME))?;
 
+    Ok(())
+}
+
+/// Creates and writes
+pub fn write_file<D: Display>(contents: D, path: PathBuf) -> Result<(), Error> {
+    let mut file = File::create(&path).map_err(IoErrCtx::f(&path))?;
+    writeln!(file, "{}", contents).map_err(IoErrCtx::f(&path))?;
     Ok(())
 }
 

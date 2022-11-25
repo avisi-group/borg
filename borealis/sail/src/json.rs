@@ -5,9 +5,10 @@
 //! Some of the path-modifying code is potentially fragile. I was unable to find detailed specifications for `sail.json` files; unfortunately this means there is a *very* wide range of possible inputs for the array of paths to files (absolute, relative, non-UTF8, etc).
 
 use {
+    common::error::IoErrCtx,
     serde::Deserialize,
     std::{
-        fs, io,
+        fs,
         path::{Path, PathBuf},
     },
 };
@@ -16,7 +17,7 @@ use {
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
     /// IO error
-    Io(#[from] io::Error),
+    Io(#[from] IoErrCtx),
 
     /// JSON serialisation/deserialisation error
     Json(#[from] serde_json::Error),
@@ -43,7 +44,8 @@ impl ModelConfig {
         let path = path.as_ref();
 
         // read from JSON
-        let mut config: ModelConfig = serde_json::from_reader(fs::File::open(path)?)?;
+        let mut config: ModelConfig =
+            serde_json::from_reader(fs::File::open(path).map_err(IoErrCtx::f(&path))?)?;
 
         // if all the paths are just filenames then prepend the directory the config file is in to each
         if config
@@ -62,7 +64,7 @@ impl ModelConfig {
 
         // verify that each path is valid and points to a file
         for path in &config.files {
-            let attr = fs::metadata(path)?;
+            let attr = fs::metadata(path).map_err(IoErrCtx::f(&path))?;
             if !attr.is_file() {
                 return Err(Error::NotFile(path.to_owned()));
             }
