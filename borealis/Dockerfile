@@ -44,6 +44,7 @@ RUN eval `opam env` && cargo build --release
 
 # build docs
 RUN eval `opam env` && cargo doc --release
+RUN echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; URL=/borealis/borealis" /></head></html>' > target/doc/index.html
 
 FROM scratch
 COPY --from=builder /tmp/build/target/doc /doc
