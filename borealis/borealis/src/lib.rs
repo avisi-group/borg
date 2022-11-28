@@ -2,7 +2,10 @@
 
 //! Sail frontend for GenSim
 
-use {common::error::IoErrCtx, std::path::PathBuf};
+use {
+    common::error::ErrCtx,
+    std::{io, path::PathBuf},
+};
 
 pub mod genc;
 
@@ -12,7 +15,7 @@ pub use sail;
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
     /// IO error
-    Io(#[from] IoErrCtx),
+    Io(#[from] ErrCtx<io::Error>),
     /// Error from Sail compiler
     Sail(#[from] sail::error::Error),
     /// GenC export directory {0:?} not found

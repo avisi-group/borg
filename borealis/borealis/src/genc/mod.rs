@@ -5,7 +5,7 @@ use {
         genc::ir::{Execute, Files, Format, Function, FunctionKind, Isa, Main},
         Error,
     },
-    common::error::IoErrCtx,
+    common::error::ErrCtx,
     std::{
         collections::HashMap,
         fmt::Display,
@@ -35,7 +35,7 @@ pub fn export<P: AsRef<Path>>(
             if e.kind() == io::ErrorKind::NotFound {
                 Error::OutDirectoryNotFound(path.to_owned())
             } else {
-                IoErrCtx::new(e, path).into()
+                ErrCtx::new(e, path).into()
             }
         })?
         .count();
@@ -62,8 +62,8 @@ pub fn export<P: AsRef<Path>>(
 
 /// Creates and writes
 pub fn write_file<D: Display>(contents: D, path: PathBuf) -> Result<(), Error> {
-    let mut file = File::create(&path).map_err(IoErrCtx::f(&path))?;
-    writeln!(file, "{}", contents).map_err(IoErrCtx::f(&path))?;
+    let mut file = File::create(&path).map_err(ErrCtx::f(&path))?;
+    writeln!(file, "{}", contents).map_err(ErrCtx::f(&path))?;
     Ok(())
 }
 

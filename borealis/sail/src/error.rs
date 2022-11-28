@@ -24,6 +24,9 @@ pub enum Error {
 
     /// Error returned by Sail wrapper function
     Wrapper(#[from] WrapperError),
+
+    /// Error while loading Sail JSON
+    ModelConfig(#[from] crate::json::Error),
 }
 
 impl From<ocaml::Error> for Error {

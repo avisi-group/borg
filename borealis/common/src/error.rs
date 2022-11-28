@@ -1,24 +1,29 @@
-//! Errors
+//! Common error utilities
 
 use std::{
-    io,
+    fmt::Display,
     path::{Path, PathBuf},
 };
 
-/// Path {path:?}
-///
-/// Wrapper around `std::io::Error` providing additional context (the path that caused the error).\
-#[derive(Debug, displaydoc::Display, thiserror::Error)]
-#[ignore_extra_doc_attributes]
-pub struct IoErrCtx {
+/// Wrapper around an error providing additional context (the path that caused the error).
+#[derive(Debug, thiserror::Error)]
+pub struct ErrCtx<E> {
+    /// Inner error
     #[source]
-    inner: io::Error,
-    path: PathBuf,
+    pub inner: E,
+    /// Path associated with error
+    pub path: PathBuf,
 }
 
-impl IoErrCtx {
+impl<E> Display for ErrCtx<E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.path)
+    }
+}
+
+impl<E> ErrCtx<E> {
     /// Create a new `IoErrCtx` from an `io::Error` and a path
-    pub fn new<P: AsRef<Path>>(inner: io::Error, path: P) -> Self {
+    pub fn new<P: AsRef<Path>>(inner: E, path: P) -> Self {
         Self {
             inner,
             path: path.as_ref().to_owned(),
@@ -32,29 +37,25 @@ impl IoErrCtx {
     /// For example
     ///
     /// ```
-    /// # use {std::io, common::error::IoErrCtx};
+    /// # use {std::{io, path::PathBuf}, common::error::ErrCtx};
     /// #
-    /// # fn main() -> Result<(), IoErrCtx> {
-    /// #    let mut input = String::new();
-    /// #    let path = "demo.json";
-    /// io::stdin().read_line(&mut input).map_err(|e| IoErrCtx::new(e, path))?;
-    /// #    Ok(())
-    /// # }
+    /// #   let res: Result<(), io::Error> = Err(io::Error::new(io::ErrorKind::Other, "oh no!"));
+    /// #   let path = PathBuf::from("example");
+    /// let res = res.map_err(|e| ErrCtx::new(e, path));
+    /// #   assert_eq!(format!("{res:?}"), "Err(ErrCtx { inner: Custom { kind: Other, error: \"oh no!\" }, path: \"example\" })");
     /// ```
     ///
     /// can become
     ///
     /// ```
-    /// # use {std::io, common::error::IoErrCtx};
+    /// # use {std::{io, path::PathBuf}, common::error::ErrCtx};
     /// #
-    /// # fn main() -> Result<(), IoErrCtx> {
-    /// #    let mut input = String::new();
-    /// #    let path = "demo.json";
-    /// io::stdin().read_line(&mut input).map_err(IoErrCtx::f(path))?;
-    /// #    Ok(())
-    /// # }
+    /// #   let res: Result<(), io::Error> = Err(io::Error::new(io::ErrorKind::Other, "oh no!"));
+    /// #   let path = PathBuf::from("example");
+    /// let res = res.map_err(ErrCtx::f(path));
+    /// #   assert_eq!(format!("{res:?}"), "Err(ErrCtx { inner: Custom { kind: Other, error: \"oh no!\" }, path: \"example\" })");
     /// ```
-    pub fn f<P: AsRef<Path>>(path: P) -> Box<dyn FnOnce(io::Error) -> Self> {
+    pub fn f<P: AsRef<Path>>(path: P) -> Box<dyn FnOnce(E) -> Self> {
         let p = path.as_ref().to_owned();
         Box::new(|e| Self::new(e, p))
     }

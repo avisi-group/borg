@@ -5,10 +5,10 @@
 //! Some of the path-modifying code is potentially fragile. I was unable to find detailed specifications for `sail.json` files; unfortunately this means there is a *very* wide range of possible inputs for the array of paths to files (absolute, relative, non-UTF8, etc).
 
 use {
-    common::error::IoErrCtx,
+    common::error::ErrCtx,
     serde::Deserialize,
     std::{
-        fs,
+        fs, io,
         path::{Path, PathBuf},
     },
 };
@@ -17,10 +17,10 @@ use {
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
     /// IO error
-    Io(#[from] IoErrCtx),
+    Io(#[from] ErrCtx<io::Error>),
 
     /// JSON serialisation/deserialisation error
-    Json(#[from] serde_json::Error),
+    Json(#[from] ErrCtx<serde_json::Error>),
 
     /// Failed to find parent for {0:?}
     NoParent(PathBuf),
@@ -45,7 +45,8 @@ impl ModelConfig {
 
         // read from JSON
         let mut config: ModelConfig =
-            serde_json::from_reader(fs::File::open(path).map_err(IoErrCtx::f(&path))?)?;
+            serde_json::from_reader(fs::File::open(path).map_err(ErrCtx::f(&path))?)
+                .map_err(ErrCtx::f(&path))?;
 
         // if all the paths are just filenames then prepend the directory the config file is in to each
         if config
@@ -64,7 +65,7 @@ impl ModelConfig {
 
         // verify that each path is valid and points to a file
         for path in &config.files {
-            let attr = fs::metadata(path).map_err(IoErrCtx::f(&path))?;
+            let attr = fs::metadata(path).map_err(ErrCtx::f(&path))?;
             if !attr.is_file() {
                 return Err(Error::NotFile(path.to_owned()));
             }
