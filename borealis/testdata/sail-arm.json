@@ -1,8 +1,0 @@
-{
-    "options": "-non_lexical_flow -no_lexp_bounds_check",
-    "files": [
-        "../testdata/sail-arm/arm-v8.5-a/model/prelude.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/no_devices.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch_types.sail"
-    ]
-}

@@ -27,10 +27,13 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = Args::parse();
 
-    dbg!(sail::load_from_config(args.input).wrap_err("Failed to load Sail files")?);
+    let (name, ast, env) =
+        sail::load_from_config(args.input).wrap_err("Failed to load Sail files")?;
 
     export(&Description::empty(), args.output, args.force)
         .wrap_err("Error while exporting GenC description")?;
+
+    dbg!((name, ast, env));
 
     Ok(())
 }

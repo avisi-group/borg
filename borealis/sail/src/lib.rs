@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn load_from_config_arm() {
-        let res = load_from_config("../testdata/sail-arm.json").unwrap();
+        let res = load_from_config("../testdata/sail-arm-small.json").unwrap();
 
         insta::with_settings!({filters => vec![
             (r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#, r#""kind_identifier": {}"#),

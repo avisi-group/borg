@@ -25,7 +25,7 @@ pub struct ModelConfig {
 impl ModelConfig {
     /// Load config from a file
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        let path = path.as_ref();
+        let config_path = path.as_ref();
 
         #[derive(Deserialize)]
         struct Intermediate {
@@ -35,34 +35,32 @@ impl ModelConfig {
 
         // read from JSON (using intermediate private struct to parse command line options)
         let Intermediate { options, files } =
-            serde_json::from_reader(fs::File::open(path).map_err(ErrCtx::f(&path))?)
-                .map_err(ErrCtx::f(&path))?;
+            serde_json::from_reader(fs::File::open(config_path).map_err(ErrCtx::f(&config_path))?)
+                .map_err(ErrCtx::f(&config_path))?;
 
         let mut config = ModelConfig {
             options: options.as_str().try_into()?,
             files,
         };
 
-        // if all the paths are just filenames then prepend the directory the config file is in to each
-        if config
-            .files
-            .iter()
-            .all(|p| p.parent() == Some(&Path::new("")))
-        {
-            let model_dir = path.parent().ok_or(Error::NoParent(path.to_owned()))?;
+        // directory that config file is in
+        let config_dir = dbg!((&config_path)
+            .parent()
+            .ok_or(Error::NoParent(config_path.to_owned()))?);
 
-            config.files = config
-                .files
-                .into_iter()
-                .map(|path| model_dir.join(path))
-                .collect();
-        }
+        // if a path is not absolute, prepend the directory the config file is in to each
+        for file_path in &mut config.files {
+            // if path is absolute, no changes necessary
+            if file_path.has_root() {
+                break;
+            }
 
-        // verify that each path is valid and points to a file
-        for path in &config.files {
-            let attr = fs::metadata(path).map_err(ErrCtx::f(&path))?;
+            *file_path = config_dir.join(&file_path);
+
+            // verify that each path is valid and points to a file
+            let attr = fs::metadata(&file_path).map_err(ErrCtx::f(&file_path))?;
             if !attr.is_file() {
-                return Err(Error::NotFile(path.to_owned()));
+                return Err(Error::NotFile(file_path.clone()));
             }
         }
 
@@ -73,7 +71,9 @@ impl ModelConfig {
 /// Sail compiler options
 #[derive(Debug, Default)]
 pub struct Options {
+    /// When set, enables non-lexical flow
     pub non_lexical_flow: bool,
+    /// When set, disables lexp bounds check
     pub no_lexp_bounds_check: bool,
 }
 
