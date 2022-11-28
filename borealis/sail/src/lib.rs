@@ -3,9 +3,13 @@
 //! Rust interface to `Sail` compiler library
 
 use {
-    crate::{ast::Ast, error::Error, runtime::Runtime, type_check::Env, types::OCamlString},
+    crate::{
+        ast::Ast, error::Error, json::ModelConfig, runtime::Runtime, type_check::Env,
+        types::OCamlString,
+    },
     once_cell::sync::Lazy,
     parking_lot::Mutex,
+    std::path::Path,
 };
 
 pub mod ast;
@@ -45,14 +49,21 @@ static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_files(files: Vec<String>) -> Result<(OCamlString, Ast, Env), Error> {
-    Ok(RT.lock().load_files(files)?)
+pub fn load_files(config: ModelConfig) -> Result<(OCamlString, Ast, Env), Error> {
+    Ok(RT.lock().load_files(config)?)
+}
+
+/// Loads Sail files from `sail.json` model configuration.
+pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(OCamlString, Ast, Env), Error> {
+    let config = dbg!(json::ModelConfig::load(config_path.as_ref())?);
+
+    load_files(config)
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        crate::{load_files, RT},
+        crate::{json::ModelConfig, load_files, load_from_config, RT},
         proptest::{bits, collection::vec, prelude::*},
     };
 
@@ -75,18 +86,22 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
-        insta::assert_json_snapshot!(load_files(vec![]).unwrap());
+        insta::assert_json_snapshot!(load_files(ModelConfig {
+            files: vec![],
+            options: Default::default()
+        })
+        .unwrap());
     }
 
     #[test]
-    fn load_files_prelude() {
-        let path = "../testdata/sail-arm/arm-v8.5-a/model/prelude.sail".to_owned();
+    fn load_from_config_arm() {
+        let res = load_from_config("../testdata/sail-arm.json").unwrap();
 
         insta::with_settings!({filters => vec![
             (r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#, r#""kind_identifier": {}"#),
             (r#""kind_identifier": \{\s*"Vec": \[[\s,0-9]*\]\s*\}"#, r#""kind_identifier": {}"#),
         ]}, {
-            insta::assert_json_snapshot!(load_files(vec![path]).unwrap());
+            insta::assert_json_snapshot!(res);
         });
     }
 }

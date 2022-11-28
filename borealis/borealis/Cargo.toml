@@ -14,4 +14,4 @@ color-eyre = { version = "0.6.2", default-features = false }
 clap = { version = "4.0.27", features = ["derive"] }
 
 [dev-dependencies]
-insta = "1.21.1"
+insta = "1.21.2"

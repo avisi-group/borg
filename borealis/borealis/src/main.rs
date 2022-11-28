@@ -8,6 +8,10 @@ use {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// Path to Sail JSON config
+    #[arg(short)]
+    input: PathBuf,
+
     /// Path to empty folder where GenC description files will be emitted.
     #[arg(short)]
     output: PathBuf,
@@ -15,16 +19,6 @@ struct Args {
     #[arg(long)]
     /// Warning! Disables checking that output directory is empty before writing files.
     force: bool,
-
-    /// Path(s) to Sail files
-    #[arg(
-        short,
-        required = true,
-        use_value_delimiter = true,
-        value_delimiter = ' ',
-        num_args(0..)
-    )]
-    input: Vec<String>,
 }
 
 fn main() -> Result<()> {
@@ -33,12 +27,10 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = Args::parse();
 
+    dbg!(sail::load_from_config(args.input).wrap_err("Failed to load Sail files")?);
+
     export(&Description::empty(), args.output, args.force)
         .wrap_err("Error while exporting GenC description")?;
-
-    sail::json::ModelConfig::load("sail.json")?;
-
-    dbg!(sail::load_files(args.input).wrap_err("Failed to parse Sail files")?);
 
     Ok(())
 }

@@ -3,7 +3,10 @@ source: sail/src/json.rs
 expression: "ModelConfig::load(\"../testdata/sail-arm/arm-v8.5-a/model/sail.json\").unwrap()"
 ---
 ModelConfig {
-    options: "-non_lexical_flow -no_lexp_bounds_check",
+    options: Options {
+        non_lexical_flow: true,
+        no_lexp_bounds_check: true,
+    },
     files: [
         "../testdata/sail-arm/arm-v8.5-a/model/prelude.sail",
         "../testdata/sail-arm/arm-v8.5-a/model/no_devices.sail",

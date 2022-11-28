@@ -16,16 +16,16 @@ use {
 /// Main `sail` crate error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
-    /// Error returned by OCaml function
+    /// OCaml function error
     OCamlFunction(#[from] OCamlError),
 
     /// Error when communicating with runtime worker thread
     RuntimeCommunication(#[from] ChannelError),
 
-    /// Error returned by Sail wrapper function
+    /// Sail wrapper function error
     Wrapper(#[from] WrapperError),
 
-    /// Error while loading Sail JSON
+    /// Sail JSON loading error
     ModelConfig(#[from] crate::json::Error),
 }
 

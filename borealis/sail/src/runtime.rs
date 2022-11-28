@@ -14,6 +14,7 @@ use {
     crate::{
         ast::Ast,
         error::{Error, WrapperError},
+        json::ModelConfig,
         type_check::Env,
         types::OCamlString,
     },
@@ -22,8 +23,27 @@ use {
         interop::{BoxRoot, ToOCaml},
         List, Runtime as OCamlRuntime, Value,
     },
-    std::{sync::mpsc, thread},
+    std::{os::unix::prelude::OsStringExt, sync::mpsc, thread},
 };
+
+ocaml::import! {
+    fn internal_util_dedup(l: List<Value>) -> Result<List<i32>, WrapperError>;
+
+    fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
+
+    // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
+    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Env), WrapperError>;
+
+    pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
+
+    pub fn internal_bigint_to_string(input: Value) -> Result<OCamlString, WrapperError>;
+
+    fn internal_add_num(a: String, b: String) -> Result<OCamlString, WrapperError>;
+
+    fn internal_set_non_lexical_flow(b: bool) -> Result<(), WrapperError>;
+
+    fn internal_set_no_lexp_bounds_check(b: bool) -> Result<(), WrapperError>;
+}
 
 /// Wrapper around OCaml runtime
 ///
@@ -103,29 +123,14 @@ impl Runtime {
         }
     }
 
-    pub fn load_files(&self, files: Vec<String>) -> Result<(OCamlString, Ast, Env), Error> {
+    pub fn load_files(&self, config: ModelConfig) -> Result<(OCamlString, Ast, Env), Error> {
         #[allow(irrefutable_let_patterns)] // remove when more non-test variants are added
-        if let Response::LoadFiles(ret) = self.request(Request::LoadFiles(files))? {
+        if let Response::LoadFiles(ret) = self.request(Request::LoadFiles(config))? {
             Ok(ret)
         } else {
             panic!("received different response kind to request");
         }
     }
-}
-
-ocaml::import! {
-    fn internal_util_dedup(l: List<Value>) -> Result<List<i32>, WrapperError>;
-
-    fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
-
-    // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Env), WrapperError>;
-
-    pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
-
-    pub fn internal_bigint_to_string(input: Value) -> Result<OCamlString, WrapperError>;
-
-    fn internal_add_num(a: String, b: String) -> Result<OCamlString, WrapperError>;
 }
 
 /// Request made against runtime
@@ -142,7 +147,7 @@ pub enum Request {
     #[cfg(test)]
     AddNum((String, String)),
 
-    LoadFiles(Vec<String>),
+    LoadFiles(ModelConfig),
 }
 
 /// Response from runtime.
@@ -186,15 +191,19 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
         #[cfg(test)]
         Request::AddNum((a, b)) => Ok(Response::AddNum(unsafe { internal_add_num(rt, a, b) }??)),
 
-        Request::LoadFiles(files) => {
+        Request::LoadFiles(ModelConfig { options, files }) => {
             let env = unsafe { internal_type_check_initial_env(rt)?? };
 
             let mut file_list = List::empty();
 
-            for file in files.iter().rev() {
-                let file_rooted: BoxRoot<String> = file.to_boxroot(rt);
+            for path in files.into_iter().rev() {
+                let path = unsafe { String::from_utf8_unchecked(path.into_os_string().into_vec()) };
+                let file_rooted: BoxRoot<String> = path.to_boxroot(rt);
                 file_list = unsafe { file_list.add(rt, &file_rooted) };
             }
+
+            unsafe { internal_set_non_lexical_flow(rt, options.non_lexical_flow) }??;
+            unsafe { internal_set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
 
             Ok(Response::LoadFiles(unsafe {
                 internal_process_file_load_files(rt, false, List::empty(), env, file_list)??

@@ -13,27 +13,11 @@ use {
     },
 };
 
-/// JSON model config error
-#[derive(Debug, displaydoc::Display, thiserror::Error)]
-pub enum Error {
-    /// IO error
-    Io(#[from] ErrCtx<io::Error>),
-
-    /// JSON serialisation/deserialisation error
-    Json(#[from] ErrCtx<serde_json::Error>),
-
-    /// Failed to find parent for {0:?}
-    NoParent(PathBuf),
-
-    /// Path in `files` is not a file: {0:?}
-    NotFile(PathBuf),
-}
-
 /// Configuration for a Sail model
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct ModelConfig {
     /// Sail compiler options as list of space-separated flags
-    pub options: String,
+    pub options: Options,
     /// Ordered list of paths to Sail files
     pub files: Vec<PathBuf>,
 }
@@ -43,10 +27,21 @@ impl ModelConfig {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let path = path.as_ref();
 
-        // read from JSON
-        let mut config: ModelConfig =
+        #[derive(Deserialize)]
+        struct Intermediate {
+            options: String,
+            files: Vec<PathBuf>,
+        }
+
+        // read from JSON (using intermediate private struct to parse command line options)
+        let Intermediate { options, files } =
             serde_json::from_reader(fs::File::open(path).map_err(ErrCtx::f(&path))?)
                 .map_err(ErrCtx::f(&path))?;
+
+        let mut config = ModelConfig {
+            options: options.as_str().try_into()?,
+            files,
+        };
 
         // if all the paths are just filenames then prepend the directory the config file is in to each
         if config
@@ -73,6 +68,53 @@ impl ModelConfig {
 
         Ok(config)
     }
+}
+
+/// Sail compiler options
+#[derive(Debug, Default)]
+pub struct Options {
+    pub non_lexical_flow: bool,
+    pub no_lexp_bounds_check: bool,
+}
+
+impl TryFrom<&str> for Options {
+    type Error = Error;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        let mut options = Options {
+            non_lexical_flow: false,
+            no_lexp_bounds_check: false,
+        };
+
+        for flag in s.split_ascii_whitespace().into_iter() {
+            match flag {
+                "-non_lexical_flow" => options.non_lexical_flow = true,
+                "-no_lexp_bounds_check" => options.no_lexp_bounds_check = true,
+                s => return Err(Error::UnknownFlag(s.to_owned())),
+            }
+        }
+
+        Ok(options)
+    }
+}
+
+/// JSON model config error
+#[derive(Debug, displaydoc::Display, thiserror::Error)]
+pub enum Error {
+    /// IO error
+    Io(#[from] ErrCtx<io::Error>),
+
+    /// JSON serialisation/deserialisation error
+    Json(#[from] ErrCtx<serde_json::Error>),
+
+    /// Failed to find parent for {0:?}
+    NoParent(PathBuf),
+
+    /// Path in `files` is not a file: {0:?}
+    NotFile(PathBuf),
+
+    /// Encountered unknown or invalid flag in options: {0:?}
+    UnknownFlag(String),
 }
 
 #[cfg(test)]

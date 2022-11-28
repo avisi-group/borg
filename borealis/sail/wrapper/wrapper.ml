@@ -9,6 +9,7 @@ let exception_to_result f =
 let bindings_to_list map = map |> Ast_util.Bindings.to_seq |> List.of_seq
 
 let () =
+  (* Primary functions *)
   Callback.register "internal_util_dedup" (fun a ->
       exception_to_result (fun () -> Util.remove_duplicates a));
 
@@ -23,6 +24,13 @@ let () =
   Callback.register "internal_type_check_initial_env" (fun () ->
       exception_to_result (fun () -> Type_check.initial_env));
 
+  (* CLI options *)
+  Callback.register "internal_set_non_lexical_flow" (fun b ->
+      exception_to_result (fun () -> Nl_flow.opt_nl_flow := b));
+  Callback.register "internal_set_no_lexp_bounds_check" (fun b ->
+      exception_to_result (fun () -> Type_check.opt_no_lexp_bounds_check := b));
+
+  (* Utility *)
   Callback.register "internal_bindings_to_list" (fun a ->
       exception_to_result (fun () -> bindings_to_list a));
 

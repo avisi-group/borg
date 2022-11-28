@@ -28,7 +28,7 @@ unsafe impl FromValue for BigInt {
     fn from_value(v: Value) -> Self {
         let rt = unsafe { ocaml::Runtime::recover_handle() };
 
-        let s = match dbg!(unsafe { internal_bigint_to_string(rt, v) })
+        let s = match unsafe { internal_bigint_to_string(rt, v) }
             .unwrap()
             .unwrap()
         {
