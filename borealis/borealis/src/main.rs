@@ -2,7 +2,7 @@ use {
     borealis::genc::{export, Description},
     clap::Parser,
     color_eyre::eyre::{Result, WrapErr},
-    std::path::PathBuf,
+    std::{io, path::PathBuf},
 };
 
 #[derive(Parser, Debug)]
@@ -27,13 +27,13 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = Args::parse();
 
-    let (name, ast, env) =
+    let (_name, ast, _env) =
         sail::load_from_config(args.input).wrap_err("Failed to load Sail files")?;
 
     export(&Description::empty(), args.output, args.force)
         .wrap_err("Error while exporting GenC description")?;
 
-    dbg!((name, ast, env));
+    serde_json::to_writer_pretty(io::stdout().lock(), &ast).unwrap();
 
     Ok(())
 }

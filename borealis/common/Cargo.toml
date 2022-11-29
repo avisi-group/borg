@@ -2,6 +2,7 @@
 name = "common"
 version = "0.1.0"
 edition = "2021"
+authors = ["AVISI Research Group"]
 
 [dependencies]
 displaydoc = "0.2.3"
