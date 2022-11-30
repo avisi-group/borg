@@ -1,6 +1,7 @@
 //! Types and functions for interfacing with OCaml
 
 use {
+    crate::intern::InternedStringKey,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},
@@ -61,7 +62,7 @@ impl Serialize for OCamlString {
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name
-    pub pos_fname: OCamlString,
+    pub pos_fname: InternedStringKey,
     /// Line number
     pub pos_lnum: Int,
     /// Character offset of beginning of line

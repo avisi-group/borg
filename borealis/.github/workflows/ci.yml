@@ -53,6 +53,7 @@ jobs:
           tags: ghcr.io/${{ github.repository }}:latest
 
       - name: Copy built docs
+        if: github.ref == 'refs/heads/main'
         run: |
           id=$(docker create ghcr.io/${{ github.repository }}:latest)
           docker cp $id:/doc - | tar xf -
