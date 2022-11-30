@@ -32,7 +32,7 @@ ocaml::import! {
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_file_load_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Env), WrapperError>;
+    fn internal_process_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Env), WrapperError>;
 
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
@@ -206,7 +206,7 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
             unsafe { internal_set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
 
             Ok(Response::LoadFiles(unsafe {
-                internal_process_file_load_files(rt, false, List::empty(), env, file_list)??
+                internal_process_files(rt, false, List::empty(), env, file_list)??
             }))
         }
     }
