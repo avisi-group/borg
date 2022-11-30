@@ -14,6 +14,7 @@ use {
 
 pub mod ast;
 pub mod error;
+pub mod intern;
 pub mod json;
 pub mod num;
 mod runtime;

@@ -2,7 +2,11 @@ use {
     borealis::genc::{export, Description},
     clap::Parser,
     color_eyre::eyre::{Result, WrapErr},
-    std::{io, path::PathBuf},
+    deepsize::DeepSizeOf,
+    std::{
+        io::{self, Write},
+        path::PathBuf,
+    },
 };
 
 #[derive(Parser, Debug)]
@@ -32,6 +36,22 @@ fn main() -> Result<()> {
 
     export(&Description::empty(), args.output, args.force)
         .wrap_err("Error while exporting GenC description")?;
+
+    writeln!(
+        io::stderr().lock(),
+        "AST occupies {} bytes",
+        ast.deep_size_of()
+    )?;
+    writeln!(
+        io::stderr().lock(),
+        "Interner size: {} bytes",
+        sail::intern::INTERNER.current_memory_usage()
+    )?;
+    writeln!(
+        io::stderr().lock(),
+        "Interner size: {} strings",
+        sail::intern::INTERNER.len()
+    )?;
 
     bincode::serialize_into(io::stdout().lock(), &ast)?;
 

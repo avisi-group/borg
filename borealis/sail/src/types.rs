@@ -1,97 +1,11 @@
 //! Types and functions for interfacing with OCaml
 
 use {
+    crate::intern::InternedStringKey,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
-    once_cell::sync::Lazy,
     serde::{Deserialize, Serialize},
 };
-
-static INTERNER: Lazy<lasso::ThreadedRodeo> = Lazy::new(lasso::ThreadedRodeo::new);
-
-/// Key for an interned string
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Hash, Ord)]
-pub struct Key(lasso::Spur);
-
-impl Key {
-    /// Create a new interned string
-    pub fn new<A: AsRef<str>>(str: A) -> Self {
-        Self(INTERNER.get_or_intern(str))
-    }
-
-    /// Create a new interned string from a static str
-    pub fn from_static(key: &'static str) -> Self {
-        Self(INTERNER.get_or_intern_static(key))
-    }
-}
-
-impl From<lasso::Spur> for Key {
-    fn from(spur: lasso::Spur) -> Self {
-        Self(spur)
-    }
-}
-
-impl From<String> for Key {
-    fn from(string: String) -> Self {
-        Self::new(string)
-    }
-}
-
-impl From<&'_ str> for Key {
-    fn from(string: &str) -> Self {
-        Self::new(string)
-    }
-}
-
-impl std::fmt::Debug for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        INTERNER.resolve(&self.0).fmt(f)
-    }
-}
-
-impl std::fmt::Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        INTERNER.resolve(&self.0).fmt(f)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Key {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        std::borrow::Cow::<'de, str>::deserialize(deserializer).map(Self::new)
-    }
-}
-
-impl serde::Serialize for Key {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.to_string().serialize(serializer)
-    }
-}
-
-unsafe impl FromValue for Key {
-    fn from_value(v: Value) -> Self {
-        let s = OCamlString::from_value(v);
-        match s {
-            OCamlString::String(s) => Key::new(s),
-            _ => unimplemented!(),
-        }
-    }
-}
-
-impl DeepSizeOf for Key {
-    fn deep_size_of_children(&self, _context: &mut deepsize::Context) -> usize {
-        0
-    }
-
-    fn deep_size_of(&self) -> usize {
-        std::mem::size_of_val(self)
-    }
-}
 
 /// OCaml string
 ///
@@ -148,7 +62,7 @@ impl Serialize for OCamlString {
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name
-    pub pos_fname: Key,
+    pub pos_fname: InternedStringKey,
     /// Line number
     pub pos_lnum: Int,
     /// Character offset of beginning of line
