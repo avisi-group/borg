@@ -33,7 +33,7 @@ fn main() -> Result<()> {
     export(&Description::empty(), args.output, args.force)
         .wrap_err("Error while exporting GenC description")?;
 
-    serde_json::to_writer_pretty(io::stdout().lock(), &ast).unwrap();
+    bincode::serialize_into(io::stdout().lock(), &ast)?;
 
     Ok(())
 }
