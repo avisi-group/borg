@@ -10,6 +10,7 @@ use {
 };
 
 pub mod ast;
+pub mod dot;
 pub mod error;
 pub mod intern;
 pub mod json;
@@ -17,6 +18,7 @@ pub mod num;
 mod runtime;
 pub mod type_check;
 pub mod types;
+pub mod visitor;
 
 /// Global runtime shared by all public functions
 static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));

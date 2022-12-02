@@ -40,7 +40,7 @@ RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs
 RUN eval `opam env` && cargo test --release --no-fail-fast
 
 # build borealis
-RUN eval `opam env` && cargo build --release
+RUN eval `opam env` && cargo build --release --examples
 
 # build docs
 RUN eval `opam env` && cargo doc --release
