@@ -355,15 +355,8 @@ pub struct Pattern(pub Box<PatternAux>, pub Annot);
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct QuantItem(pub QuantItemAux, pub L);
 
-/// Internal syntax for an optional termination measure for a loop
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum InternalLoopMeasureAux {
-    None,
-    Some(Expression),
-}
-
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct InternalLoopMeasure(pub Box<InternalLoopMeasureAux>, pub L);
+pub struct InternalLoopMeasure(pub Option<Box<Expression>>, pub L);
 
 /// Expression
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -672,9 +665,7 @@ pub struct FunctionClause(pub FunctionClauseAux, pub Annot);
 pub struct RecursiveAnnotationOpt(pub RecursiveAnnotationOptAux, pub L);
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum EffectOpt {
-    Inner(EffectAnnotationOptAux, L),
-}
+pub struct EffectOpt(pub EffectAnnotationOptAux, pub L);
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeUnion(pub TypeUnionAux, pub L);
@@ -698,14 +689,12 @@ pub struct IndexRange(pub Box<IndexRangeAux>, pub L);
 
 /// Value type specification
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum ValueSpecificationAux {
-    Inner(
-        TypeScheme,
-        Identifier,
-        LinkedList<(OCamlString, OCamlString)>,
-        bool,
-    ),
-}
+pub struct ValueSpecificationAux(
+    pub TypeScheme,
+    pub Identifier,
+    pub LinkedList<(OCamlString, OCamlString)>,
+    pub bool,
+);
 
 /// Register declarations
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -718,14 +707,12 @@ pub enum DecSpecAux {
 
 /// Function definition
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum FunctionDefinitionAux {
-    Inner(
-        RecursiveAnnotationOpt,
-        TypeAnnotationOpt,
-        EffectOpt,
-        LinkedList<FunctionClause>,
-    ),
-}
+pub struct FunctionDefinitionAux(
+    pub RecursiveAnnotationOpt,
+    pub TypeAnnotationOpt,
+    pub EffectOpt,
+    pub LinkedList<FunctionClause>,
+);
 
 /// default kinding or typing assumption
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -808,9 +795,7 @@ pub enum Prec {
 }
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum LoopMeasure {
-    Loop(Loop, Expression),
-}
+pub struct LoopMeasure(pub Loop, pub Expression);
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct ScatteredDefinition(pub ScatteredDefinitionAux, pub Annot);
