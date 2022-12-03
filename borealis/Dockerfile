@@ -25,16 +25,19 @@ RUN eval `opam env` && opam install --assume-depexts -y sail
 RUN cargo init --lib borealis
 RUN cargo init --lib sail
 RUN cargo init --lib common
+RUN cargo init --lib borealis_macro
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY borealis/Cargo.toml borealis/
 COPY sail/Cargo.toml sail/
 COPY common/Cargo.toml common/
-RUN eval `opam env` && cargo build --release && cargo test --release --no-run && cargo doc --release
+COPY borealis_macro/Cargo.toml borealis_macro/
+RUN > borealis_macro/src/lib.rs
+RUN eval `opam env` && cargo build --release --all-targets && cargo test --release --no-run && cargo doc --release
 
 # copy full source
 COPY . .
-RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs
+RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs borealis_macro/src/lib.rs
 
 # build and run tests
 RUN eval `opam env` && cargo test --release --no-fail-fast

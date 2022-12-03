@@ -3,3 +3,4 @@
 //! Logic and structures shared among many crates in workspace
 
 pub mod error;
+pub mod identifiable;

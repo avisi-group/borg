@@ -8,6 +8,7 @@ use {
         num::{BigInt, Num},
         types::{OCamlString, Position},
     },
+    common::identifiable::identifiable_fromvalue,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int},
     serde::{Deserialize, Serialize},
@@ -868,7 +869,8 @@ pub enum CommentType {
 
 pub struct Comment(pub CommentType, pub Position, pub Position, pub OCamlString);
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[identifiable_fromvalue]
+#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ast {
     pub defs: LinkedList<Definition>,
     pub comments: LinkedList<(OCamlString, LinkedList<Comment>)>,

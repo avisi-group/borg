@@ -5,5 +5,6 @@ edition = "2021"
 authors = ["AVISI Research Group"]
 
 [dependencies]
+borealis_macro = { path = "../borealis_macro" }
 displaydoc = "0.2.3"
 thiserror = "1.0.37"

@@ -1,6 +1,7 @@
 ---
-source: src/lib.rs
-expression: "load_files(vec![]).unwrap()"
+source: sail/src/lib.rs
+assertion_line: 86
+expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
 ---
 [
   {
@@ -8,7 +9,8 @@ expression: "load_files(vec![]).unwrap()"
   },
   {
     "defs": [],
-    "comments": []
+    "comments": [],
+    "id": 0
   },
   {
     "top_val_specs": [

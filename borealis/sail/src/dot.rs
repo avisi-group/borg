@@ -6,12 +6,12 @@ use {
         types::OCamlString,
         visitor::{walk_comment, walk_comment_root, walk_definition, walk_root, Visitor},
     },
+    common::identifiable::Identifiable,
     deepsize::DeepSizeOf,
     dot::{GraphWalk, Labeller},
     std::{
         collections::{HashMap, LinkedList},
         io::{self, Write},
-        sync::atomic::{AtomicU64, Ordering},
     },
 };
 
@@ -19,7 +19,7 @@ use {
 pub fn render<W: Write>(ast: &Ast, w: &mut W) -> io::Result<()> {
     let graph = Graph::new(ast);
 
-    writeln!(io::stderr().lock(), "COUNTER: {}", unique())?;
+    writeln!(io::stderr().lock(), "COUNTER: {}", 0)?;
     writeln!(
         io::stderr().lock(),
         "Graph size: {} labels, {} edges",
@@ -36,13 +36,6 @@ pub fn render<W: Write>(ast: &Ast, w: &mut W) -> io::Result<()> {
     dot::render(&graph, w)?;
 
     Ok(())
-}
-
-/// Gets a new, unique, u64
-fn unique() -> u64 {
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-
-    COUNTER.fetch_add(1, Ordering::SeqCst)
 }
 
 /// Dot graph constructed from walking AST
@@ -67,22 +60,22 @@ impl Graph {
 
 impl Visitor for Graph {
     fn visit_root(&mut self, node: &Ast) {
-        self.nodes.insert(unique(), "AST".to_owned());
+        self.nodes.insert(node.id(), "AST".to_owned());
         walk_root(self, node);
     }
 
     fn visit_definition(&mut self, node: &Definition) {
-        self.nodes.insert(unique(), "Definition".to_owned());
+        self.nodes.insert(0, "Definition".to_owned());
         walk_definition(self, node);
     }
 
     fn visit_comment_root(&mut self, node: &(OCamlString, LinkedList<Comment>)) {
-        self.nodes.insert(unique(), "Comment root".to_owned());
+        self.nodes.insert(0, "Comment root".to_owned());
         walk_comment_root(self, node);
     }
 
     fn visit_comment(&mut self, node: &Comment) {
-        self.nodes.insert(unique(), "Comment".to_owned());
+        self.nodes.insert(0, "Comment".to_owned());
         walk_comment(self, node);
     }
 }

@@ -52,6 +52,11 @@ fn main() -> Result<()> {
         "Interner size: {} strings",
         sail::intern::INTERNER.len()
     )?;
+    writeln!(
+        io::stderr().lock(),
+        "Counter: {} nodes",
+        common::identifiable::unique()
+    )?;
 
     bincode::serialize_into(io::stdout().lock(), &ast)?;
 

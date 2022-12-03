@@ -2,6 +2,7 @@
 
 use {
     crate::intern::InternedStringKey,
+    common::identifiable::identifiable_fromvalue,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},
@@ -59,7 +60,8 @@ impl Serialize for OCamlString {
 /// Position of a character in a source file
 ///
 /// Can be converted from `Lexing.position` value <https://v2.ocaml.org/api/Lexing.html>.
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[identifiable_fromvalue]
+#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name
     pub pos_fname: InternedStringKey,
