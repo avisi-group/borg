@@ -61,8 +61,23 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(OCamlString, 
 mod tests {
     use {
         crate::{load_from_config, RT},
+        once_cell::sync::Lazy,
         proptest::{bits, collection::vec, prelude::*},
     };
+
+    const FILTERS: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
+        vec![
+            (r#""id": [0-9]+"#, r#""id": 0"#),
+            (
+                r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#,
+                r#""kind_identifier": {}"#,
+            ),
+            (
+                r#""kind_identifier": \{\s*"Vec": \[[\s,0-9]*\]\s*\}"#,
+                r#""kind_identifier": {}"#,
+            ),
+        ]
+    });
 
     proptest! {
         /// Checks equivalence between libsail dedup function and Rust stdlib dedup.
@@ -83,18 +98,15 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
-        insta::assert_json_snapshot!(load_from_config("../testdata/empty.json").unwrap());
+        insta::with_settings!({filters => FILTERS.clone()}, {
+            insta::assert_json_snapshot!(load_from_config("../testdata/empty.json").unwrap());
+        });
     }
 
     #[test]
     fn load_from_config_arm() {
-        let res = load_from_config("../testdata/sail-arm-small.json").unwrap();
-
-        insta::with_settings!({filters => vec![
-            (r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#, r#""kind_identifier": {}"#),
-            (r#""kind_identifier": \{\s*"Vec": \[[\s,0-9]*\]\s*\}"#, r#""kind_identifier": {}"#),
-        ]}, {
-            insta::assert_json_snapshot!(res);
+        insta::with_settings!({filters => FILTERS.clone()}, {
+            insta::assert_json_snapshot!(load_from_config("../testdata/sail-arm-small.json").unwrap());
         });
     }
 }

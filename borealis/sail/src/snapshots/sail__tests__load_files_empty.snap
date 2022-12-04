@@ -1,6 +1,6 @@
 ---
 source: sail/src/lib.rs
-assertion_line: 86
+assertion_line: 102
 expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
 ---
 [
@@ -31,9 +31,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                   {
                     "KindedIdentifier": [
                       {
-                        "kind_identifier": {
-                          "String": "\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000"
-                        }
+                        "kind_identifier": {}
                       },
                       "Unknown"
                     ]
@@ -66,9 +64,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                                 {
                                   "Var": [
                                     {
-                                      "kind_identifier": {
-                                        "String": "'n"
-                                      }
+                                      "kind_identifier": {}
                                     },
                                     "Unknown"
                                   ]
@@ -102,9 +98,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                               {
                                 "Var": [
                                   {
-                                    "kind_identifier": {
-                                      "String": "'n"
-                                    }
+                                    "kind_identifier": {}
                                   },
                                   "Unknown"
                                 ]
@@ -146,9 +140,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                   {
                     "KindedIdentifier": [
                       {
-                        "kind_identifier": {
-                          "String": "\u0007\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000"
-                        }
+                        "kind_identifier": {}
                       },
                       "Unknown"
                     ]
@@ -181,9 +173,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                                 {
                                   "Var": [
                                     {
-                                      "kind_identifier": {
-                                        "String": "'ex0#"
-                                      }
+                                      "kind_identifier": {}
                                     },
                                     "Unknown"
                                   ]
@@ -239,9 +229,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                   {
                     "KindedIdentifier": [
                       {
-                        "kind_identifier": {
-                          "String": "\u0003\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0000\u0000\u0000"
-                        }
+                        "kind_identifier": {}
                       },
                       "Unknown"
                     ]
@@ -274,9 +262,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                                 {
                                   "Var": [
                                     {
-                                      "kind_identifier": {
-                                        "String": "'n"
-                                      }
+                                      "kind_identifier": {}
                                     },
                                     "Unknown"
                                   ]
@@ -310,9 +296,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                               {
                                 "Var": [
                                   {
-                                    "kind_identifier": {
-                                      "String": "'n"
-                                    }
+                                    "kind_identifier": {}
                                   },
                                   "Unknown"
                                 ]

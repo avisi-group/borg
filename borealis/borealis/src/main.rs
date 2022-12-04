@@ -55,7 +55,7 @@ fn main() -> Result<()> {
     writeln!(
         io::stderr().lock(),
         "Counter: {} nodes",
-        common::identifiable::unique()
+        common::identifiable::unique_id()
     )?;
 
     bincode::serialize_into(io::stdout().lock(), &ast)?;

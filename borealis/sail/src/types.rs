@@ -2,10 +2,16 @@
 
 use {
     crate::intern::InternedStringKey,
-    common::identifiable::identifiable_fromvalue,
+    common::identifiable::{unique_id, Identifiable},
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},
+    std::{
+        borrow::Cow,
+        ffi::{OsStr, OsString},
+        os::unix::ffi::OsStringExt,
+        path::PathBuf,
+    },
 };
 
 /// OCaml string
@@ -13,8 +19,7 @@ use {
 /// OCaml strings are byte arrays. They *may* contain valid UTF-8 contents or
 /// could be arbitrary bytes. Conversion from opaque `ocaml::Value` will attempt
 /// to parse as a `String`, falling back to `Vec<u8>` on error.
-#[cfg_attr(not(test), derive(Serialize))]
-#[derive(Debug, Clone, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub enum OCamlString {
     /// UTF-8 string
     String(String),
@@ -32,37 +37,12 @@ unsafe impl FromValue for OCamlString {
     }
 }
 
-/// If the OCamlString contains a path to a sail source file, strip absolute all
-/// of path except filename to prevent breaking snapshot tests.
-#[cfg(test)]
-impl Serialize for OCamlString {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            OCamlString::String(s) => {
-                let path = std::path::PathBuf::from(s);
-
-                // if it is a path to a sail file, strip absolute path, otherwise ignore
-                let s = match path.extension().and_then(std::ffi::OsStr::to_str) {
-                    Some("sail") => path.file_name().unwrap().to_string_lossy().to_string(),
-                    _ => s.clone(),
-                };
-
-                serializer.serialize_newtype_variant("OCamlString", 0, "String", &s)
-            }
-            OCamlString::Vec(v) => serializer.serialize_newtype_variant("OCamlString", 0, "Vec", v),
-        }
-    }
-}
-
 /// Position of a character in a source file
 ///
 /// Can be converted from `Lexing.position` value <https://v2.ocaml.org/api/Lexing.html>.
-#[identifiable_fromvalue]
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
+    id: u64,
     /// File name
     pub pos_fname: InternedStringKey,
     /// Line number
@@ -71,4 +51,46 @@ pub struct Position {
     pub pos_bol: Int,
     /// Character offset of the position
     pub pos_cnum: Int,
+}
+
+impl Identifiable for Position {
+    fn id(&self) -> u64 {
+        self.id
+    }
+}
+
+unsafe impl FromValue for Position {
+    fn from_value(v: Value) -> Self {
+        #[derive(FromValue)]
+        struct RawPosition {
+            pos_fname: &'static [u8],
+            pos_lnum: Int,
+            pos_bol: Int,
+            pos_cnum: Int,
+        }
+
+        let raw = RawPosition::from_value(v);
+
+        let path = PathBuf::from(OsString::from_vec(raw.pos_fname.to_owned()).to_owned());
+
+        // if it is a path to a sail file, strip absolute path, otherwise ignore
+        let normalized_path = match path.extension().and_then(OsStr::to_str) {
+            Some("sail") => path.file_name().unwrap(),
+            _ => path.as_os_str(),
+        }
+        .to_string_lossy();
+
+        let pos_fname = match normalized_path {
+            Cow::Borrowed(s) => InternedStringKey::from(s),
+            Cow::Owned(s) => InternedStringKey::from(s),
+        };
+
+        Self {
+            id: unique_id(),
+            pos_fname,
+            pos_lnum: raw.pos_lnum,
+            pos_bol: raw.pos_bol,
+            pos_cnum: raw.pos_cnum,
+        }
+    }
 }

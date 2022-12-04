@@ -48,7 +48,7 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
         #[doc(hidden)]
         #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
         const _: () = {
-            #raw_struct
+
 
             #[allow(unused_extern_crates, clippy::useless_attribute)]
             extern crate common as _common;
@@ -60,10 +60,12 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
 
             unsafe impl ocaml::FromValue for #original_ident {
                 fn from_value(value: ocaml::Value) -> Self {
+                    #raw_struct
+
                     let raw = #raw_ident::from_value(value);
 
                     Self {
-                        id: _common::identifiable::unique(),
+                        id: _common::identifiable::unique_id(),
                         #assignments
                     }
                 }

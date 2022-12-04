@@ -7,7 +7,7 @@ pub use borealis_macro::identifiable_fromvalue;
 
 #[doc(hidden)]
 /// Gets a new, unique, u64
-pub fn unique() -> u64 {
+pub fn unique_id() -> u64 {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     let num = COUNTER.fetch_add(1, Ordering::SeqCst);
