@@ -18,12 +18,12 @@ fn main() -> Result<()> {
     writeln!(
         io::stderr().lock(),
         "Interner size: {} bytes",
-        sail::intern::INTERNER.current_memory_usage()
+        common::intern::INTERNER.current_memory_usage()
     )?;
     writeln!(
         io::stderr().lock(),
         "Interner size: {} strings",
-        sail::intern::INTERNER.len()
+        common::intern::INTERNER.len()
     )?;
 
     serde_json::to_writer_pretty(io::stdout().lock(), &ast)?;

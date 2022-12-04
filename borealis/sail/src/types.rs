@@ -1,8 +1,7 @@
 //! Types and functions for interfacing with OCaml
 
 use {
-    crate::intern::InternedStringKey,
-    common::identifiable::identifiable_fromvalue,
+    common::{identifiable::identifiable_fromvalue, intern::InternedStringKey},
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},

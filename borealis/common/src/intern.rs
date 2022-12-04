@@ -1,7 +1,6 @@
 //! String interning
 
 use {
-    crate::types::OCamlString,
     deepsize::DeepSizeOf,
     fxhash::FxBuildHasher,
     lasso::{Spur, ThreadedRodeo},
@@ -64,13 +63,7 @@ impl<'de> serde::Deserialize<'de> for InternedStringKey {
     where
         D: serde::Deserializer<'de>,
     {
-        OCamlString::deserialize(deserializer).map(|s| {
-            if let OCamlString::String(s) = s {
-                Self::new(s)
-            } else {
-                unimplemented!()
-            }
-        })
+        String::deserialize(deserializer).map(|s| Self::new(s))
     }
 }
 
@@ -79,17 +72,13 @@ impl serde::Serialize for InternedStringKey {
     where
         S: serde::Serializer,
     {
-        OCamlString::String(self.to_string()).serialize(serializer)
+        self.to_string().serialize(serializer)
     }
 }
 
 unsafe impl FromValue for InternedStringKey {
     fn from_value(v: Value) -> Self {
-        let s = OCamlString::from_value(v);
-        match s {
-            OCamlString::String(s) => InternedStringKey::new(s),
-            _ => unimplemented!(),
-        }
+        Self::new(String::from_value(v))
     }
 }
 

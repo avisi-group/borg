@@ -213,7 +213,13 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "borealis_macro",
+ "deepsize",
  "displaydoc",
+ "fxhash",
+ "lasso",
+ "ocaml",
+ "once_cell",
+ "serde",
  "thiserror",
 ]
 
@@ -886,9 +892,7 @@ dependencies = [
  "deepsize",
  "displaydoc",
  "dot",
- "fxhash",
  "insta",
- "lasso",
  "log",
  "num-bigint",
  "ocaml",

@@ -4,3 +4,4 @@
 
 pub mod error;
 pub mod identifiable;
+pub mod intern;
