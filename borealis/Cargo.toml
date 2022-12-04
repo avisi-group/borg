@@ -1,2 +1,8 @@
 [workspace]
 members = ["sail", "borealis", "common", "borealis_macro"]
+
+[profile.dev.package.insta]
+opt-level = 3
+
+[profile.dev.package.similar]
+opt-level = 3
