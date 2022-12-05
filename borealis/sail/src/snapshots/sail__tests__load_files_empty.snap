@@ -15,310 +15,372 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
   {
     "top_val_specs": [
       [
-        [
-          {
+        {
+          "inner": {
             "Identifier": {
               "String": "make_the_value"
             }
           },
-          "Unknown"
-        ],
+          "location": "Unknown",
+          "id": 0
+        },
         [
-          [
-            {
+          {
+            "inner": {
               "Tq": [
-                [
-                  {
-                    "KindedIdentifier": [
-                      {
-                        "kind_identifier": {}
+                {
+                  "inner": {
+                    "KindedIdentifier": {
+                      "inner": {
+                        "kind_identifier": {},
+                        "id": 0
                       },
-                      "Unknown"
-                    ]
+                      "location": "Unknown",
+                      "id": 0
+                    }
                   },
-                  "Unknown"
-                ]
+                  "location": "Unknown",
+                  "id": 0
+                }
               ]
             },
-            "Unknown"
-          ],
-          [
-            {
+            "location": "Unknown",
+            "id": 0
+          },
+          {
+            "inner": {
               "Fn": [
                 [
-                  [
-                    {
+                  {
+                    "inner": {
                       "Application": [
-                        [
-                          {
+                        {
+                          "inner": {
                             "Identifier": {
                               "String": "atom"
                             }
                           },
-                          "Unknown"
-                        ],
+                          "location": "Unknown",
+                          "id": 0
+                        },
                         [
-                          [
-                            {
-                              "NExp": [
-                                {
-                                  "Var": [
-                                    {
-                                      "kind_identifier": {}
+                          {
+                            "inner": {
+                              "NExp": {
+                                "inner": {
+                                  "Var": {
+                                    "inner": {
+                                      "kind_identifier": {},
+                                      "id": 0
                                     },
-                                    "Unknown"
-                                  ]
+                                    "location": "Unknown",
+                                    "id": 0
+                                  }
                                 },
-                                "Unknown"
-                              ]
+                                "location": "Unknown",
+                                "id": 0
+                              }
                             },
-                            "Unknown"
-                          ]
+                            "location": "Unknown",
+                            "id": 0
+                          }
                         ]
                       ]
                     },
-                    "Unknown"
-                  ]
+                    "annotation": "Unknown",
+                    "id": 0
+                  }
                 ],
-                [
-                  {
+                {
+                  "inner": {
                     "Application": [
-                      [
-                        {
+                      {
+                        "inner": {
                           "Identifier": {
                             "String": "itself"
                           }
                         },
-                        "Unknown"
-                      ],
+                        "location": "Unknown",
+                        "id": 0
+                      },
                       [
-                        [
-                          {
-                            "NExp": [
-                              {
-                                "Var": [
-                                  {
-                                    "kind_identifier": {}
+                        {
+                          "inner": {
+                            "NExp": {
+                              "inner": {
+                                "Var": {
+                                  "inner": {
+                                    "kind_identifier": {},
+                                    "id": 0
                                   },
-                                  "Unknown"
-                                ]
+                                  "location": "Unknown",
+                                  "id": 0
+                                }
                               },
-                              "Unknown"
-                            ]
+                              "location": "Unknown",
+                              "id": 0
+                            }
                           },
-                          "Unknown"
-                        ]
+                          "location": "Unknown",
+                          "id": 0
+                        }
                       ]
                     ]
                   },
-                  "Unknown"
-                ],
-                [
-                  [],
-                  "Unknown"
-                ]
+                  "annotation": "Unknown",
+                  "id": 0
+                },
+                {
+                  "inner": {
+                    "inner": [],
+                    "id": 0
+                  },
+                  "location": "Unknown",
+                  "id": 0
+                }
               ]
             },
-            "Unknown"
-          ]
+            "annotation": "Unknown",
+            "id": 0
+          }
         ]
       ],
       [
-        [
-          {
+        {
+          "inner": {
             "Identifier": {
               "String": "sail_assume"
             }
           },
-          "Unknown"
-        ],
+          "location": "Unknown",
+          "id": 0
+        },
         [
-          [
-            {
+          {
+            "inner": {
               "Tq": [
-                [
-                  {
-                    "KindedIdentifier": [
-                      {
-                        "kind_identifier": {}
+                {
+                  "inner": {
+                    "KindedIdentifier": {
+                      "inner": {
+                        "kind_identifier": {},
+                        "id": 0
                       },
-                      "Unknown"
-                    ]
+                      "location": "Unknown",
+                      "id": 0
+                    }
                   },
-                  "Unknown"
-                ]
+                  "location": "Unknown",
+                  "id": 0
+                }
               ]
             },
-            "Unknown"
-          ],
-          [
-            {
+            "location": "Unknown",
+            "id": 0
+          },
+          {
+            "inner": {
               "Fn": [
                 [
-                  [
-                    {
+                  {
+                    "inner": {
                       "Application": [
-                        [
-                          {
+                        {
+                          "inner": {
                             "Identifier": {
                               "String": "atom_bool"
                             }
                           },
-                          "Unknown"
-                        ],
+                          "location": "Unknown",
+                          "id": 0
+                        },
                         [
-                          [
-                            {
-                              "Bool": [
-                                {
-                                  "Var": [
-                                    {
-                                      "kind_identifier": {}
+                          {
+                            "inner": {
+                              "Bool": {
+                                "inner": {
+                                  "Var": {
+                                    "inner": {
+                                      "kind_identifier": {},
+                                      "id": 0
                                     },
-                                    "Unknown"
-                                  ]
+                                    "location": "Unknown",
+                                    "id": 0
+                                  }
                                 },
-                                "Unknown"
-                              ]
+                                "location": "Unknown",
+                                "id": 0
+                              }
                             },
-                            "Unknown"
-                          ]
+                            "location": "Unknown",
+                            "id": 0
+                          }
                         ]
                       ]
                     },
-                    "Unknown"
-                  ]
+                    "annotation": "Unknown",
+                    "id": 0
+                  }
                 ],
-                [
-                  {
-                    "Id": [
-                      {
+                {
+                  "inner": {
+                    "Id": {
+                      "inner": {
                         "Identifier": {
                           "String": "unit"
                         }
                       },
-                      "Unknown"
-                    ]
+                      "location": "Unknown",
+                      "id": 0
+                    }
                   },
-                  "Unknown"
-                ],
-                [
-                  [],
-                  "Unknown"
-                ]
+                  "annotation": "Unknown",
+                  "id": 0
+                },
+                {
+                  "inner": {
+                    "inner": [],
+                    "id": 0
+                  },
+                  "location": "Unknown",
+                  "id": 0
+                }
               ]
             },
-            "Unknown"
-          ]
+            "annotation": "Unknown",
+            "id": 0
+          }
         ]
       ],
       [
-        [
-          {
+        {
+          "inner": {
             "Identifier": {
               "String": "size_itself_int"
             }
           },
-          "Unknown"
-        ],
+          "location": "Unknown",
+          "id": 0
+        },
         [
-          [
-            {
+          {
+            "inner": {
               "Tq": [
-                [
-                  {
-                    "KindedIdentifier": [
-                      {
-                        "kind_identifier": {}
+                {
+                  "inner": {
+                    "KindedIdentifier": {
+                      "inner": {
+                        "kind_identifier": {},
+                        "id": 0
                       },
-                      "Unknown"
-                    ]
+                      "location": "Unknown",
+                      "id": 0
+                    }
                   },
-                  "Unknown"
-                ]
+                  "location": "Unknown",
+                  "id": 0
+                }
               ]
             },
-            "Unknown"
-          ],
-          [
-            {
+            "location": "Unknown",
+            "id": 0
+          },
+          {
+            "inner": {
               "Fn": [
                 [
-                  [
-                    {
+                  {
+                    "inner": {
                       "Application": [
-                        [
-                          {
+                        {
+                          "inner": {
                             "Identifier": {
                               "String": "itself"
                             }
                           },
-                          "Unknown"
-                        ],
+                          "location": "Unknown",
+                          "id": 0
+                        },
                         [
-                          [
-                            {
-                              "NExp": [
-                                {
-                                  "Var": [
-                                    {
-                                      "kind_identifier": {}
+                          {
+                            "inner": {
+                              "NExp": {
+                                "inner": {
+                                  "Var": {
+                                    "inner": {
+                                      "kind_identifier": {},
+                                      "id": 0
                                     },
-                                    "Unknown"
-                                  ]
+                                    "location": "Unknown",
+                                    "id": 0
+                                  }
                                 },
-                                "Unknown"
-                              ]
+                                "location": "Unknown",
+                                "id": 0
+                              }
                             },
-                            "Unknown"
-                          ]
+                            "location": "Unknown",
+                            "id": 0
+                          }
                         ]
                       ]
                     },
-                    "Unknown"
-                  ]
+                    "annotation": "Unknown",
+                    "id": 0
+                  }
                 ],
-                [
-                  {
+                {
+                  "inner": {
                     "Application": [
-                      [
-                        {
+                      {
+                        "inner": {
                           "Identifier": {
                             "String": "atom"
                           }
                         },
-                        "Unknown"
-                      ],
+                        "location": "Unknown",
+                        "id": 0
+                      },
                       [
-                        [
-                          {
-                            "NExp": [
-                              {
-                                "Var": [
-                                  {
-                                    "kind_identifier": {}
+                        {
+                          "inner": {
+                            "NExp": {
+                              "inner": {
+                                "Var": {
+                                  "inner": {
+                                    "kind_identifier": {},
+                                    "id": 0
                                   },
-                                  "Unknown"
-                                ]
+                                  "location": "Unknown",
+                                  "id": 0
+                                }
                               },
-                              "Unknown"
-                            ]
+                              "location": "Unknown",
+                              "id": 0
+                            }
                           },
-                          "Unknown"
-                        ]
+                          "location": "Unknown",
+                          "id": 0
+                        }
                       ]
                     ]
                   },
-                  "Unknown"
-                ],
-                [
-                  [],
-                  "Unknown"
-                ]
+                  "annotation": "Unknown",
+                  "id": 0
+                },
+                {
+                  "inner": {
+                    "inner": [],
+                    "id": 0
+                  },
+                  "location": "Unknown",
+                  "id": 0
+                }
               ]
             },
-            "Unknown"
-          ]
+            "annotation": "Unknown",
+            "id": 0
+          }
         ]
       ]
     ],
