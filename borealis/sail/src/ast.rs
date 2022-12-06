@@ -6,13 +6,14 @@
 use {
     crate::{
         num::{BigInt, Num},
-        types::{OCamlString, Position},
+        types::{EnumWrapper, OCamlString, Position},
+        visitor::{Visitor, Walkable},
     },
     common::identifiable::identifiable_fromvalue,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int},
     serde::{Deserialize, Serialize},
-    std::collections::LinkedList,
+    std::{collections::LinkedList, fmt::Debug},
 };
 
 /// Location
@@ -168,6 +169,12 @@ pub struct Kind {
 pub struct Identifier {
     pub inner: IdentifierAux,
     pub location: L,
+}
+
+impl Walkable for Identifier {
+    fn walk<V: Visitor>(&self, _: &mut V) {
+        // leaf node
+    }
 }
 
 #[identifiable_fromvalue]
@@ -1061,10 +1068,32 @@ pub enum Definition {
     Pragma(OCamlString, OCamlString, L),
 }
 
+impl Walkable for Definition {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match self {
+            Definition::Type(typedef) => visitor.visit_type_definition(typedef),
+            _ => (),
+        }
+    }
+}
+
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum CommentType {
     Block,
     Line,
+}
+
+#[identifiable_fromvalue]
+#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+pub struct CommentRoot {
+    pub path: OCamlString,
+    pub comments: LinkedList<Comment>,
+}
+
+impl Walkable for CommentRoot {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        self.comments.iter().for_each(|c| visitor.visit_comment(c))
+    }
 }
 
 #[identifiable_fromvalue]
@@ -1077,9 +1106,37 @@ pub struct Comment {
     pub contents: OCamlString,
 }
 
+impl Walkable for Comment {
+    fn walk<V: Visitor>(&self, _: &mut V) {
+        // leaf node
+    }
+}
+
 #[identifiable_fromvalue]
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ast {
-    pub defs: LinkedList<Definition>,
-    pub comments: LinkedList<(OCamlString, LinkedList<Comment>)>,
+    pub defs: LinkedList<EnumWrapper<Definition>>,
+    pub comments: LinkedList<CommentRoot>,
+}
+
+impl Walkable for Ast {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        self.defs
+            .iter()
+            .for_each(|d| visitor.visit_definition(&d.inner));
+        self.comments
+            .iter()
+            .for_each(|c| visitor.visit_comment_root(c));
+    }
+}
+
+impl Walkable for TypeDefinition {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match self.inner {
+            TypeDefinitionAux::Abbreviation(ref ident, _, _) => {
+                visitor.visit_identifier(ident);
+            }
+            _ => (),
+        }
+    }
 }

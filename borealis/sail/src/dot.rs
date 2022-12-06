@@ -2,15 +2,14 @@
 
 use {
     crate::{
-        ast::{Ast, Comment, Definition},
-        types::OCamlString,
-        visitor::{walk_comment, walk_comment_root, walk_definition, walk_root, Visitor},
+        ast::{Ast, Comment, CommentRoot, Definition, Identifier, TypeDefinition},
+        visitor::{Visitor, Walkable},
     },
-    common::identifiable::Identifiable,
+    common::{identifiable::Identifiable, intern::InternedStringKey},
     deepsize::DeepSizeOf,
     dot::{GraphWalk, Labeller},
     std::{
-        collections::{HashMap, LinkedList},
+        collections::HashMap,
         io::{self, Write},
     },
 };
@@ -19,7 +18,11 @@ use {
 pub fn render<W: Write>(ast: &Ast, w: &mut W) -> io::Result<()> {
     let graph = Graph::new(ast);
 
-    writeln!(io::stderr().lock(), "COUNTER: {}", 0)?;
+    writeln!(
+        io::stderr().lock(),
+        "COUNTER: {}",
+        common::identifiable::unique_id()
+    )?;
     writeln!(
         io::stderr().lock(),
         "Graph size: {} labels, {} edges",
@@ -41,7 +44,7 @@ pub fn render<W: Write>(ast: &Ast, w: &mut W) -> io::Result<()> {
 /// Dot graph constructed from walking AST
 #[derive(Debug, DeepSizeOf)]
 struct Graph {
-    nodes: HashMap<u64, String>,
+    nodes: HashMap<u64, InternedStringKey>,
     edges: Vec<(u64, u64)>,
 }
 
@@ -60,30 +63,51 @@ impl Graph {
 
 impl Visitor for Graph {
     fn visit_root(&mut self, node: &Ast) {
-        self.nodes.insert(node.id(), "AST".to_owned());
-        walk_root(self, node);
+        self.nodes.insert(node.id(), "AST".into());
+
+        for def in &node.defs {
+            self.edges.push((node.id(), def.id()));
+        }
+
+        for comment in &node.comments {
+            self.edges.push((node.id(), comment.id()));
+        }
+
+        node.walk(self);
     }
 
     fn visit_definition(&mut self, node: &Definition) {
-        self.nodes.insert(0, "Definition".to_owned());
-        walk_definition(self, node);
+        node.walk(self);
     }
 
-    fn visit_comment_root(&mut self, node: &(OCamlString, LinkedList<Comment>)) {
-        self.nodes.insert(0, "Comment root".to_owned());
-        walk_comment_root(self, node);
+    #[allow(missing_docs)]
+    fn visit_type_definition(&mut self, node: &TypeDefinition) {
+        self.nodes.insert(node.id(), "Type Definition".into());
+
+        node.walk(self);
+    }
+
+    #[allow(missing_docs)]
+    fn visit_identifier(&mut self, node: &Identifier) {
+        self.nodes.insert(node.id(), "Identifier".into());
+        node.walk(self);
+    }
+
+    fn visit_comment_root(&mut self, node: &CommentRoot) {
+        self.nodes.insert(node.id(), "Comment root".into());
+        node.walk(self);
     }
 
     fn visit_comment(&mut self, node: &Comment) {
-        self.nodes.insert(0, "Comment".to_owned());
-        walk_comment(self, node);
+        self.nodes.insert(node.id(), "Comment".into());
+        node.walk(self);
     }
 }
 
-type NodeId<'a> = (u64, &'a str);
-type EdgeId<'a> = (NodeId<'a>, NodeId<'a>);
+type NodeId = (u64, InternedStringKey);
+type EdgeId = (NodeId, NodeId);
 
-impl<'ast> Labeller<'ast, NodeId<'ast>, EdgeId<'ast>> for Graph {
+impl<'ast> Labeller<'ast, NodeId, EdgeId> for Graph {
     fn graph_id(&'ast self) -> dot::Id<'ast> {
         dot::Id::new("AST").unwrap()
     }
@@ -92,14 +116,14 @@ impl<'ast> Labeller<'ast, NodeId<'ast>, EdgeId<'ast>> for Graph {
         dot::Id::new(format!("n{}", n.0)).unwrap()
     }
 
-    fn node_label(&'ast self, n: &NodeId<'ast>) -> dot::LabelText<'ast> {
-        dot::LabelText::LabelStr(n.1.into())
+    fn node_label(&'ast self, n: &NodeId) -> dot::LabelText<'ast> {
+        dot::LabelText::LabelStr(n.1.to_string().into())
     }
 }
 
-impl<'ast> GraphWalk<'ast, NodeId<'ast>, EdgeId<'ast>> for Graph {
+impl<'ast> GraphWalk<'ast, NodeId, EdgeId> for Graph {
     fn nodes(&'ast self) -> dot::Nodes<'ast, NodeId> {
-        self.nodes.iter().map(|(i, s)| (*i, s.as_str())).collect()
+        self.nodes.iter().map(|(&id, &k)| (id, k)).collect()
     }
 
     fn edges(&'ast self) -> dot::Edges<'ast, EdgeId> {
@@ -107,18 +131,18 @@ impl<'ast> GraphWalk<'ast, NodeId<'ast>, EdgeId<'ast>> for Graph {
             .iter()
             .map(|(source, target)| {
                 (
-                    (*source, self.nodes.get(source).unwrap().as_str()),
-                    (*target, self.nodes.get(target).unwrap().as_str()),
+                    (*source, *self.nodes.get(source).unwrap()),
+                    (*target, *self.nodes.get(target).unwrap()),
                 )
             })
             .collect()
     }
 
-    fn source(&'ast self, edge: &EdgeId<'ast>) -> NodeId<'ast> {
+    fn source(&'ast self, edge: &EdgeId) -> NodeId {
         edge.0
     }
 
-    fn target(&'ast self, edge: &EdgeId<'ast>) -> NodeId<'ast> {
+    fn target(&'ast self, edge: &EdgeId) -> NodeId {
         edge.1
     }
 }
