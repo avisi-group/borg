@@ -44,8 +44,8 @@ pub fn render<W: Write>(ast: &Ast, w: &mut W) -> io::Result<()> {
 /// Dot graph constructed from walking AST
 #[derive(Debug, DeepSizeOf)]
 struct Graph {
-    nodes: HashMap<u64, InternedStringKey>,
-    edges: Vec<(u64, u64)>,
+    nodes: HashMap<u32, InternedStringKey>,
+    edges: Vec<(u32, u32)>,
 }
 
 impl Graph {
@@ -104,7 +104,7 @@ impl Visitor for Graph {
     }
 }
 
-type NodeId = (u64, InternedStringKey);
+type NodeId = (u32, InternedStringKey);
 type EdgeId = (NodeId, NodeId);
 
 impl<'ast> Labeller<'ast, NodeId, EdgeId> for Graph {

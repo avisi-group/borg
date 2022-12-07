@@ -53,13 +53,13 @@ pub struct Position {
 /// Wrapper to give enums an ID in the AST without affecting `FromValue`
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct EnumWrapper<T> {
-    id: u64,
+    id: u32,
     /// Inner item
     pub inner: T,
 }
 
 impl<T> Identifiable for EnumWrapper<T> {
-    fn id(&self) -> u64 {
+    fn id(&self) -> u32 {
         self.id
     }
 }

@@ -24,7 +24,7 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
     if let syn::Fields::Named(ref mut fields) = modified_struct.fields {
         fields
             .named
-            .push(syn::Field::parse_named.parse2(quote! { id: u64 }).unwrap());
+            .push(syn::Field::parse_named.parse2(quote! { id: u32 }).unwrap());
     }
 
     // duplicate the original struct
@@ -53,7 +53,7 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
             #[allow(unused_extern_crates, clippy::useless_attribute)]
             extern crate common as _common;
             impl _common::identifiable::Identifiable for #original_ident {
-                fn id(&self) -> u64 {
+                fn id(&self) -> u32 {
                     self.id
                 }
             }
