@@ -2,7 +2,16 @@
 
 use {
     crate::{
-        ast::{Ast, Comment, CommentRoot, Definition, Identifier, TypeDefinition},
+        ast::{
+            AliasSpec, Ast, BaseEffect, Comment, CommentRoot, DecSpec, DefaultSpec, Definition,
+            Effect, EffectOpt, Expression, FieldExpression, FunctionClause, FunctionDefinition,
+            Identifier, IdentifierAux, IndexRange, InternalLoopMeasure, KindIdentifier,
+            KindedIdentifier, LValueExpression, LetBind, Literal, LoopMeasure, MappingClause,
+            MappingDefinition, MappingPattern, MappingPatternExpression, NConstraint,
+            NumericExpression, Order, Pattern, PatternMatch, QuantItem, RecursiveAnnotationOpt,
+            RegisterId, ScatteredDefinition, Typ, TypArg, TypPat, TypQuant, TypeAnnotationOpt,
+            TypeDefinition, TypeScheme, TypeUnion, Value, ValueSpecification,
+        },
         types::EnumWrapper,
         visitor::{Visitor, Walkable},
     },
@@ -29,13 +38,15 @@ pub fn render<W: Write>(ast: &Ast, w: &mut W) -> io::Result<()> {
 struct Graph {
     nodes: HashMap<u32, InternedStringKey>,
     edges: Vec<(u32, u32)>,
+    current_parent: u32,
 }
 
 impl Graph {
     fn new(ast: &Ast) -> Self {
-        let mut celf = Graph {
+        let mut celf = Self {
             nodes: HashMap::new(),
             edges: Vec::new(),
+            current_parent: 0,
         };
 
         celf.visit_root(ast);
@@ -47,15 +58,6 @@ impl Graph {
 impl Visitor for Graph {
     fn visit_root(&mut self, node: &Ast) {
         self.nodes.insert(node.id(), "AST".into());
-
-        for def in &node.defs {
-            self.edges.push((node.id(), def.id()));
-        }
-
-        for comment in &node.comments {
-            self.edges.push((node.id(), comment.id()));
-        }
-
         node.walk(self);
     }
 
@@ -64,16 +66,17 @@ impl Visitor for Graph {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_type_definition(&mut self, node: &TypeDefinition) {
-        self.nodes.insert(node.id(), "Type Definition".into());
-
+        self.nodes.insert(node.id(), "Type definition".into());
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_identifier(&mut self, node: &Identifier) {
-        self.nodes.insert(node.id(), "Identifier".into());
+        let label = match &node.inner {
+            IdentifierAux::Identifier(s) => format!("Identifier({:?})", s),
+            IdentifierAux::Operator(s) => format!("Operator({:?})", s),
+        };
+        self.nodes.insert(node.id(), label.into());
         node.walk(self);
     }
 
@@ -84,6 +87,208 @@ impl Visitor for Graph {
 
     fn visit_comment(&mut self, node: &Comment) {
         self.nodes.insert(node.id(), "Comment".into());
+        node.walk(self);
+    }
+
+    fn visit_typquant(&mut self, node: &TypQuant) {
+        self.nodes.insert(node.id(), "Type quantifier".into());
+        node.walk(self);
+    }
+
+    fn visit_typarg(&mut self, node: &TypArg) {
+        self.nodes.insert(node.id(), "Type argument".into());
+        node.walk(self);
+    }
+
+    fn visit_quantitem(&mut self, node: &QuantItem) {
+        self.nodes.insert(node.id(), "Quant item".into());
+        node.walk(self);
+    }
+
+    fn visit_numeric_expression(&mut self, node: &NumericExpression) {
+        self.nodes.insert(node.id(), "Numeric expression".into());
+        node.walk(self);
+    }
+
+    fn visit_typ(&mut self, node: &Typ) {
+        self.nodes.insert(node.id(), "Typ".into());
+        node.walk(self);
+    }
+
+    fn visit_order(&mut self, node: &Order) {
+        self.nodes.insert(node.id(), "Order".into());
+        node.walk(self)
+    }
+
+    fn visit_nconstraint(&mut self, node: &NConstraint) {
+        self.nodes.insert(node.id(), "NConstraint".into());
+        node.walk(self);
+    }
+
+    fn visit_kinded_identifier(&mut self, node: &KindedIdentifier) {
+        self.nodes.insert(node.id(), "Kinded identifier".into());
+        node.walk(self);
+    }
+
+    fn visit_kind_identifier(&mut self, node: &KindIdentifier) {
+        self.nodes.insert(node.id(), "Kind identifier".into());
+        node.walk(self);
+    }
+
+    fn visit_function_definition(&mut self, node: &FunctionDefinition) {
+        self.nodes.insert(node.id(), "Function definition".into());
+        node.walk(self);
+    }
+
+    fn visit_recursive_annotation_opt(&mut self, node: &RecursiveAnnotationOpt) {
+        self.nodes
+            .insert(node.id(), "Recursive annotation opt".into());
+        node.walk(self);
+    }
+
+    fn visit_type_annotation_opt(&mut self, node: &TypeAnnotationOpt) {
+        self.nodes.insert(node.id(), "Type annotation opt".into());
+        node.walk(self);
+    }
+
+    fn visit_effect_opt(&mut self, node: &EffectOpt) {
+        self.nodes.insert(node.id(), "Effect opt".into());
+        node.walk(self);
+    }
+
+    fn visit_function_clause(&mut self, node: &FunctionClause) {
+        self.nodes.insert(node.id(), "Function clause".into());
+        node.walk(self);
+    }
+
+    fn visit_default_spec(&mut self, node: &DefaultSpec) {
+        self.nodes.insert(node.id(), "Default spec".into());
+        node.walk(self);
+    }
+
+    fn visit_value_specification(&mut self, node: &ValueSpecification) {
+        self.nodes.insert(node.id(), "Value spec".into());
+        node.walk(self);
+    }
+
+    fn visit_type_scheme(&mut self, node: &TypeScheme) {
+        self.nodes.insert(node.id(), "Type scheme".into());
+        node.walk(self);
+    }
+
+    fn visit_effect(&mut self, node: &Effect) {
+        self.nodes.insert(node.id(), "Effect".into());
+        node.walk(self);
+    }
+
+    fn visit_base_effect(&mut self, node: &BaseEffect) {
+        self.nodes.insert(node.id(), "Base effect".into());
+        node.walk(self);
+    }
+
+    fn visit_pattern(&mut self, node: &Pattern) {
+        self.nodes.insert(node.id(), "Pattern".into());
+        node.walk(self);
+    }
+
+    fn visit_expression(&mut self, node: &Expression) {
+        self.nodes.insert(node.id(), "Expression".into());
+        node.walk(self);
+    }
+
+    fn visit_literal(&mut self, node: &Literal) {
+        self.nodes.insert(node.id(), "Literal".into());
+        node.walk(self);
+    }
+
+    fn visit_typpat(&mut self, node: &TypPat) {
+        self.nodes.insert(node.id(), "Typ pat".into());
+        node.walk(self);
+    }
+
+    fn visit_pattern_match(&mut self, node: &PatternMatch) {
+        self.nodes.insert(node.id(), "pattern match".into());
+        node.walk(self);
+    }
+
+    fn visit_internal_loop_measure(&mut self, node: &InternalLoopMeasure) {
+        self.nodes.insert(node.id(), "internal loop measure".into());
+        node.walk(self);
+    }
+
+    fn visit_field_expression(&mut self, node: &FieldExpression) {
+        self.nodes.insert(node.id(), "field expression".into());
+        node.walk(self);
+    }
+
+    fn visit_letbind(&mut self, node: &LetBind) {
+        self.nodes.insert(node.id(), "Let bind".into());
+        node.walk(self);
+    }
+
+    fn visit_lvalue_expression(&mut self, node: &LValueExpression) {
+        self.nodes.insert(node.id(), "LValue Expression".into());
+        node.walk(self);
+    }
+
+    fn visit_value(&mut self, node: &EnumWrapper<Value>) {
+        self.nodes.insert(node.id(), "Value".into());
+        node.walk(self);
+    }
+
+    fn visit_typunion(&mut self, node: &TypeUnion) {
+        self.nodes.insert(node.id(), "Type union".into());
+        node.walk(self);
+    }
+
+    fn visit_indexrange(&mut self, node: &IndexRange) {
+        self.nodes.insert(node.id(), "Index range".into());
+        node.walk(self);
+    }
+
+    fn visit_decspec(&mut self, node: &DecSpec) {
+        self.nodes.insert(node.id(), "Dec spec".into());
+        node.walk(self);
+    }
+
+    fn visit_aliasspec(&mut self, node: &AliasSpec) {
+        self.nodes.insert(node.id(), "Alias spec".into());
+        node.walk(self);
+    }
+
+    fn visit_registerid(&mut self, node: &RegisterId) {
+        self.nodes.insert(node.id(), "Register ID".into());
+        node.walk(self);
+    }
+
+    fn visit_mapping_definition(&mut self, node: &MappingDefinition) {
+        self.nodes.insert(node.id(), "mapping definition".into());
+        node.walk(self);
+    }
+
+    fn visit_scattered_definition(&mut self, node: &ScatteredDefinition) {
+        self.nodes.insert(node.id(), "scattered spec".into());
+        node.walk(self);
+    }
+
+    fn visit_loop_measure(&mut self, node: &LoopMeasure) {
+        self.nodes.insert(node.id(), "Loop measure".into());
+        node.walk(self);
+    }
+
+    fn visit_mapping_clause(&mut self, node: &MappingClause) {
+        self.nodes.insert(node.id(), "mapping clause".into());
+        node.walk(self);
+    }
+
+    fn visit_mapping_pattern_expression(&mut self, node: &MappingPatternExpression) {
+        self.nodes
+            .insert(node.id(), "Mappign pattern expression".into());
+        node.walk(self);
+    }
+
+    fn visit_mapping_pattern(&mut self, node: &MappingPattern) {
+        self.nodes.insert(node.id(), "Mapping pattern".into());
         node.walk(self);
     }
 }

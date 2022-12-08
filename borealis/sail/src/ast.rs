@@ -156,7 +156,7 @@ pub enum KindAux {
     Bool,
 }
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, PartialEq, Eq)]
 pub enum IdentifierAux {
     Identifier(X),
     Operator(X),

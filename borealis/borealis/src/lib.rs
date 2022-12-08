@@ -7,9 +7,8 @@ use {
     std::{io, path::PathBuf},
 };
 
+pub mod decode;
 pub mod genc;
-
-pub use sail;
 
 /// Borealis error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]

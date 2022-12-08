@@ -82,7 +82,7 @@ fn main() -> Result<()> {
     )?;
 
     match args.output {
-        Output::Genc { output, force } => export(&Description::empty(), output, force)
+        Output::Genc { output, force } => export(&Description::from(&ast), output, force)
             .wrap_err("Error while exporting GenC description")?,
         Output::Dot => dot::render(&ast, &mut io::stdout().lock())?,
         Output::Json => serde_json::to_writer_pretty(io::stdout().lock(), &ast)?,

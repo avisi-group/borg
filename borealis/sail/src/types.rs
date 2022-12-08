@@ -16,7 +16,7 @@ use {
 /// OCaml strings are byte arrays. They *may* contain valid UTF-8 contents or
 /// could be arbitrary bytes. Conversion from opaque `ocaml::Value` will attempt
 /// to parse as a `String`, falling back to `Vec<u8>` on error.
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf, PartialEq, Eq)]
 pub enum OCamlString {
     /// UTF-8 string
     String(String),
