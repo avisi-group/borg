@@ -98,15 +98,23 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
+        let (name, ast, env) = load_from_config("../testdata/empty.json").unwrap();
+
+        crate::dot::render(&ast, &mut vec![]).unwrap();
+
         insta::with_settings!({filters => FILTERS.clone()}, {
-            insta::assert_json_snapshot!(load_from_config("../testdata/empty.json").unwrap());
+            insta::assert_json_snapshot!((name, ast, env));
         });
     }
 
     #[test]
     fn load_from_config_arm() {
+        let (name, ast, env) = load_from_config("../testdata/sail-arm-small.json").unwrap();
+
+        crate::dot::render(&ast, &mut vec![]).unwrap();
+
         insta::with_settings!({filters => FILTERS.clone()}, {
-            insta::assert_json_snapshot!(load_from_config("../testdata/sail-arm-small.json").unwrap());
+            insta::assert_json_snapshot!((name, ast, env));
         });
     }
 }

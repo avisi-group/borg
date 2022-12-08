@@ -3,6 +3,7 @@
 use {
     crate::{
         ast::{Ast, Comment, CommentRoot, Definition, Identifier, TypeDefinition},
+        types::EnumWrapper,
         visitor::{Visitor, Walkable},
     },
     common::{identifiable::Identifiable, intern::InternedStringKey},
@@ -17,24 +18,6 @@ use {
 /// Write the rendered DOT graph of the supplied AST to a writer.
 pub fn render<W: Write>(ast: &Ast, w: &mut W) -> io::Result<()> {
     let graph = Graph::new(ast);
-
-    writeln!(
-        io::stderr().lock(),
-        "COUNTER: {}",
-        common::identifiable::unique_id()
-    )?;
-    writeln!(
-        io::stderr().lock(),
-        "Graph size: {} labels, {} edges",
-        graph.nodes.len(),
-        graph.edges.len()
-    )?;
-
-    writeln!(
-        io::stderr().lock(),
-        "Graph size: {} bytes",
-        graph.deep_size_of()
-    )?;
 
     dot::render(&graph, w)?;
 
@@ -76,7 +59,8 @@ impl Visitor for Graph {
         node.walk(self);
     }
 
-    fn visit_definition(&mut self, node: &Definition) {
+    fn visit_definition(&mut self, node: &EnumWrapper<Definition>) {
+        self.nodes.insert(node.id(), "Definition".into());
         node.walk(self);
     }
 

@@ -2,7 +2,11 @@
 //! arithmetic library
 
 use {
-    crate::{runtime::internal_bigint_to_string, types::OCamlString},
+    crate::{
+        runtime::internal_bigint_to_string,
+        types::OCamlString,
+        visitor::{Visitor, Walkable},
+    },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},
@@ -24,6 +28,12 @@ pub enum Num {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BigInt(pub num_bigint::BigInt);
 
+impl Walkable for BigInt {
+    fn walk<V: Visitor>(&self, _: &mut V) {
+        // leaf node
+    }
+}
+
 unsafe impl FromValue for BigInt {
     fn from_value(v: Value) -> Self {
         let rt = unsafe { ocaml::Runtime::recover_handle() };
@@ -41,7 +51,7 @@ unsafe impl FromValue for BigInt {
 }
 
 impl DeepSizeOf for BigInt {
-    fn deep_size_of_children(&self, _context: &mut deepsize::Context) -> usize {
+    fn deep_size_of_children(&self, _: &mut deepsize::Context) -> usize {
         (self.0.bits() / 8) as usize
     }
 }
