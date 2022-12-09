@@ -13,11 +13,12 @@ use {
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int},
     serde::{Deserialize, Serialize},
-    std::{collections::LinkedList, fmt::Debug},
+    std::{collections::LinkedList, fmt::Display},
+    strum::IntoStaticStr,
 };
 
 /// Location
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum L {
     /// Unknown location
     Unknown,
@@ -31,13 +32,22 @@ pub enum L {
     Documented(OCamlString, Box<L>),
 }
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+impl Display for L {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            L::Range(p0, _) => write!(f, "{}", p0),
+            _ => write!(f, "{:?}", self),
+        }
+    }
+}
+
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum Mut {
     Immutable,
     Mutable,
 }
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum Bit {
     B0,
     B1,
@@ -46,7 +56,7 @@ pub enum Bit {
 /// Sail AST Value
 ///
 /// **Not to be confused with `ocaml::Value`**
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum Value {
     Vector(LinkedList<EnumWrapper<Value>>),
     List(LinkedList<EnumWrapper<Value>>),
@@ -88,7 +98,7 @@ impl Walkable for EnumWrapper<Value> {
 pub struct Annot(pub L, ());
 
 /// Loop kind
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum Loop {
     While,
     Until,
@@ -100,7 +110,7 @@ pub type X = OCamlString;
 /// Infix identifier
 pub type Xi = OCamlString;
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum BaseEffectAux {
     /// Read register
     ReadRegister,
@@ -144,7 +154,7 @@ pub struct KindIdentifierAux {
 }
 
 /// Base kind
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum KindAux {
     /// Kind of types
     Type,
@@ -156,7 +166,9 @@ pub enum KindAux {
     Bool,
 }
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr, PartialEq, Eq,
+)]
 pub enum IdentifierAux {
     Identifier(X),
     Operator(X),
@@ -203,6 +215,12 @@ pub struct Identifier {
     pub location: L,
 }
 
+impl Display for Identifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
 impl Walkable for Identifier {
     fn walk<V: Visitor>(&self, _: &mut V) {
         // leaf node
@@ -216,7 +234,7 @@ pub struct EffectAux {
 }
 
 /// Vector order specifications, of kind Order
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum OrderAux {
     Variable(KindIdentifier),
     Increasing,
@@ -232,7 +250,7 @@ pub struct KindedIdentifierAux {
 }
 
 /// Numeric expression, of kind Int
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum NumericExpressionAux {
     /// Abbreviation identifier
     Id(Identifier),
@@ -333,7 +351,7 @@ impl Walkable for KindedIdentifier {
 }
 
 /// Literal constant
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum LiteralAux {
     Unit,
     Zero,
@@ -354,7 +372,7 @@ pub enum LiteralAux {
 }
 
 /// Type expressions, of kind Type
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum TypAux {
     InternalUnknown,
     /// Defined type
@@ -409,7 +427,7 @@ impl Walkable for Typ {
 }
 
 /// Type constructor arguments of all kinds
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum TypArgAux {
     NExp(NumericExpression),
     Typ(Typ),
@@ -436,7 +454,7 @@ impl Walkable for TypArg {
 }
 
 /// Constraint over kind Int
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum NConstraintAux {
     Equal(NumericExpression, NumericExpression),
     BoundedGe(NumericExpression, NumericExpression),
@@ -523,7 +541,7 @@ impl Walkable for Literal {
 }
 
 /// Type pattern
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum TypPatAux {
     Wild,
     Var(KindIdentifier),
@@ -553,7 +571,7 @@ impl Walkable for TypPat {
 }
 
 /// Kinded identifier or Int constraint
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum QuantItemAux {
     /// Optionally kinded identifier
     KindedIdentifier(KindedIdentifier),
@@ -563,7 +581,7 @@ pub enum QuantItemAux {
 }
 
 /// Pattern
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum PatternAux {
     /// Literal constant pattern
     Literal(Literal),
@@ -700,7 +718,7 @@ impl Walkable for InternalLoopMeasure {
 }
 
 /// Expression
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum ExpressionAux {
     /// Sequential block
     Block(LinkedList<Expression>),
@@ -953,7 +971,7 @@ impl Walkable for Expression {
 }
 
 /// l-value expression
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum LValueExpressionAux {
     Identifier(Identifier),
     Deref(Expression),
@@ -1048,7 +1066,7 @@ impl Walkable for FieldExpression {
 /// Pattern match
 ///
 /// `pexp` in Sail source
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum PatternMatchAux {
     Expression(Pattern, Expression),
     When(Pattern, Expression, Expression),
@@ -1107,7 +1125,7 @@ impl Walkable for LetBind {
 /// Mapping pattern
 ///
 /// Mostly the same as normal patterns but only constructible parts
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum MappingPatternAux {
     /// Literal
     Literal(Literal),
@@ -1183,7 +1201,7 @@ impl Walkable for MappingPattern {
 }
 
 /// Type quantifiers and constraints
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum TypQuantAux {
     Tq(LinkedList<QuantItem>),
     /// Sugar, omitting quantifier and constraints
@@ -1197,7 +1215,7 @@ pub struct RegisterIdAux {
 }
 
 /// Mapping pattern expression
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum MappingPatternExpressionAux {
     Pattern(MappingPattern),
     When(MappingPattern, Expression),
@@ -1260,7 +1278,7 @@ pub struct TypeSchemeAux {
     pub typ: Typ,
 }
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum AliasSpecAux {
     SubReg(RegisterId, Identifier),
     Bit(RegisterId, Expression),
@@ -1269,7 +1287,7 @@ pub enum AliasSpecAux {
 }
 
 /// Optional type annotation for functions
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum TypeAnnotationOptAux {
     None,
     Some(TypQuant, Typ),
@@ -1284,7 +1302,7 @@ pub struct FunctionClauseAux {
 }
 
 /// Optional recursive annotation for functions
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum RecursiveAnnotationOptAux {
     /// Non-recursive
     NonRecursive,
@@ -1295,7 +1313,7 @@ pub enum RecursiveAnnotationOptAux {
 }
 
 /// Optional effect annotation for functions
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum EffectAnnotationOptAux {
     /// No effect annotation
     None,
@@ -1303,13 +1321,13 @@ pub enum EffectAnnotationOptAux {
 }
 
 /// Type union constructors
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum TypeUnionAux {
     Identifier(Typ, Identifier),
 }
 
 /// Mapping clause (bidirectional pattern-match)
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum MappingClauseAux {
     Bidirectional(MappingPatternExpression, MappingPatternExpression),
     Forwards(MappingPatternExpression, Expression),
@@ -1474,7 +1492,7 @@ impl Walkable for MappingClause {
 }
 
 /// Index specification, for bitfields in register types
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum IndexRangeAux {
     /// Single index
     Single(NumericExpression),
@@ -1518,7 +1536,7 @@ pub struct ValueSpecificationAux {
 }
 
 /// Register declarations
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum DecSpecAux {
     Register(Effect, Effect, Typ, Identifier),
     Config(Identifier, Typ, Expression),
@@ -1537,14 +1555,14 @@ pub struct FunctionDefinitionAux {
 }
 
 /// default kinding or typing assumption
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum DefaultSpecAux {
     Order(Order),
 }
 
 /// Function and type union definitions that can be spread across a file. Each
 /// one must end in $_$
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum ScatteredDefinitionAux {
     /// Scattered function definition header
     Function(
@@ -1566,7 +1584,7 @@ pub enum ScatteredDefinitionAux {
 }
 
 /// Type definition body
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum TypeDefinitionAux {
     /// Type abbreviation
     Abbreviation(Identifier, TypQuant, TypArg),
@@ -1592,7 +1610,7 @@ pub struct MappingDefinitionAux {
 /// Optional default value for indexed vectors
 ///
 /// To define a default value for any unspecified positions in a sparse map
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum OptionalDefaultAux {
     Empty,
     Dec(Expression),
@@ -1679,7 +1697,7 @@ impl Walkable for DefaultSpec {
     }
 }
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum Prec {
     Infix,
     InfixLeft,
@@ -1811,7 +1829,7 @@ pub struct OptionalDefault {
 }
 
 /// Top-level Sail2 definition
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum Definition {
     /// Type definition
     Type(TypeDefinition),
@@ -1898,7 +1916,7 @@ impl Walkable for EnumWrapper<Definition> {
     }
 }
 
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum CommentType {
     Block,
     Line,

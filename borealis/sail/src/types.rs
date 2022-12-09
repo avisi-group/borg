@@ -8,7 +8,7 @@ use {
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},
-    std::fmt::Debug,
+    std::{fmt::Display, path::PathBuf},
 };
 
 /// OCaml string
@@ -48,6 +48,22 @@ pub struct Position {
     pub pos_bol: Int,
     /// Character offset of the position
     pub pos_cnum: Int,
+}
+
+impl Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}:{}:{}",
+            PathBuf::from(self.pos_fname.to_string())
+                .file_name()
+                .map(|s| s.to_str())
+                .flatten()
+                .unwrap_or("?"),
+            self.pos_lnum,
+            self.pos_cnum - self.pos_bol
+        )
+    }
 }
 
 /// Wrapper to give enums an ID in the AST without affecting `FromValue`

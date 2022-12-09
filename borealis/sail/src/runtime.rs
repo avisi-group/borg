@@ -18,10 +18,10 @@ use {
         type_check::Env,
         types::OCamlString,
     },
-    log::error,
+    log::{error, trace},
     ocaml::{
         interop::{BoxRoot, ToOCaml},
-        List, Runtime as OCamlRuntime, Value,
+        FromValue, List, Runtime as OCamlRuntime, Value,
     },
     std::{os::unix::prelude::OsStringExt, sync::mpsc, thread},
 };
@@ -32,7 +32,7 @@ ocaml::import! {
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
     // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<(OCamlString, Ast, Env), WrapperError>;
+    fn internal_process_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<Value, WrapperError>;
 
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
@@ -58,6 +58,7 @@ pub struct Runtime {
 impl Runtime {
     /// Instantiate a new Runtime with corresponding worker thread
     pub fn new() -> Self {
+        trace!("Creating new OCaml runtime handler");
         let (req_tx, req_rx) = mpsc::channel();
         let (res_tx, res_rx) = mpsc::channel();
 
@@ -68,6 +69,8 @@ impl Runtime {
 
             let requests = req_rx;
             let responses = res_tx;
+
+            trace!("Initialised OCaml runtime handler thread, looping...");
 
             // loop indefinitely processing requests
             loop {
@@ -205,9 +208,18 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
             unsafe { internal_set_non_lexical_flow(rt, options.non_lexical_flow) }??;
             unsafe { internal_set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
 
-            Ok(Response::LoadFiles(unsafe {
-                internal_process_files(rt, false, List::empty(), env, file_list)??
-            }))
+            trace!("Calling internal_process_files");
+
+            let value =
+                unsafe { internal_process_files(rt, false, List::empty(), env, file_list) }??;
+
+            trace!("Converting AST from ocaml::Value");
+
+            let resp = <(OCamlString, Ast, Env)>::from_value(value);
+
+            trace!("Finished converting AST from ocaml::Value");
+
+            Ok(Response::LoadFiles(resp))
         }
     }
 }

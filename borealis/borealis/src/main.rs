@@ -2,12 +2,14 @@ use {
     borealis::genc::{export, Description},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{bail, Result, WrapErr},
+    common::{identifiable::unique_id, intern::INTERNER},
     deepsize::DeepSizeOf,
+    log::{debug, trace},
     sail::dot,
     std::{
         ffi::OsStr,
         fs::File,
-        io::{self, BufReader, Write},
+        io::{self, BufReader},
         path::PathBuf,
     },
 };
@@ -15,6 +17,10 @@ use {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    /// Logging filter string (e.g. "borealis=debug" or "trace")
+    #[arg(long)]
+    log: Option<String>,
+
     /// Path to Sail JSON config or bincode AST
     #[arg(short)]
     input: PathBuf,
@@ -45,49 +51,61 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = Args::parse();
 
+    // set up the logger, defaulting to no output if the CLI flag was not supplied
+    init_logger(args.log.as_deref().unwrap_or(""))?;
+
     // either parse AST from Sail config file or deserialize AST from bincode
     let ast = match args.input.extension().and_then(OsStr::to_str) {
         Some("json") => {
+            debug!("Loading Sail config {:?}", args.input);
             sail::load_from_config(args.input)
                 .wrap_err("Failed to load Sail files")?
                 .1
         }
         Some("bincode") => {
-            let file = File::open(args.input)?;
-            let reader = BufReader::new(file);
-            bincode::deserialize_from(reader)?
+            debug!("Deserializing bincode {:?}", args.input);
+            bincode::deserialize_from(BufReader::new(File::open(args.input)?))?
         }
         _ => bail!("Unrecognised input format {:?}", args.input),
     };
 
-    writeln!(
-        io::stderr().lock(),
-        "AST occupies {} bytes",
-        ast.deep_size_of()
-    )?;
-    writeln!(
-        io::stderr().lock(),
-        "Interner size: {} bytes",
-        common::intern::INTERNER.current_memory_usage()
-    )?;
-    writeln!(
-        io::stderr().lock(),
-        "Interner size: {} strings",
-        common::intern::INTERNER.len()
-    )?;
-    writeln!(
-        io::stderr().lock(),
-        "Counter: {} nodes",
-        common::identifiable::unique_id()
-    )?;
+    trace!(
+        "AST size: {} bytes, ≈{} nodes",
+        ast.deep_size_of(),
+        unique_id(),
+    );
+    trace!(
+        "INTERNER size: {} bytes, {} strings",
+        INTERNER.current_memory_usage(),
+        INTERNER.len()
+    );
 
     match args.output {
-        Output::Genc { output, force } => export(&Description::from(&ast), output, force)
-            .wrap_err("Error while exporting GenC description")?,
-        Output::Dot => dot::render(&ast, &mut io::stdout().lock())?,
-        Output::Json => serde_json::to_writer_pretty(io::stdout().lock(), &ast)?,
-        Output::Bincode => bincode::serialize_into(io::stdout().lock(), &ast)?,
+        Output::Genc { output, force } => {
+            debug!("Compiling to GenC");
+            export(&Description::from(&ast), output, force)
+                .wrap_err("Error while exporting GenC description")?
+        }
+        Output::Dot => {
+            debug!("Printing AST as do graph");
+            dot::render(&ast, &mut io::stdout().lock())?
+        }
+        Output::Json => {
+            debug!("Serializing AST to JSON");
+            serde_json::to_writer_pretty(io::stdout().lock(), &ast)?
+        }
+        Output::Bincode => {
+            debug!("Serializing AST to bincode");
+            bincode::serialize_into(io::stdout().lock(), &ast)?
+        }
     }
 
+    Ok(())
+}
+
+fn init_logger(filters: &str) -> Result<()> {
+    let mut builder = pretty_env_logger::formatted_timed_builder();
+    builder.parse_filters(filters);
+    builder.try_init()?;
     Ok(())
 }
