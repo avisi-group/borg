@@ -2,15 +2,15 @@ use {
     borealis::genc::{export, Description},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{bail, Result, WrapErr},
-    common::{identifiable::unique_id, intern::INTERNER},
+    common::{error::ErrCtx, identifiable::unique_id, intern::INTERNER},
     deepsize::DeepSizeOf,
-    log::{debug, trace},
+    log::{debug, trace, warn},
     sail::dot,
     std::{
         ffi::OsStr,
         fs::File,
-        io::{self, BufReader},
-        path::PathBuf,
+        io::{BufReader, BufWriter},
+        path::{Path, PathBuf},
     },
 };
 
@@ -25,6 +25,10 @@ struct Args {
     #[arg(short)]
     input: PathBuf,
 
+    /// Warning! Disables checking that output directory is empty or output file does not exist before writing.
+    #[arg(long)]
+    force: bool,
+
     #[command(subcommand)]
     output: Output,
 }
@@ -35,14 +39,22 @@ enum Output {
         /// Path to empty folder where GenC description files will be emitted.
         #[arg(short)]
         output: PathBuf,
-
-        #[arg(long)]
-        /// Warning! Disables checking that output directory is empty before writing files.
-        force: bool,
     },
-    Dot,
-    Json,
-    Bincode,
+    Dot {
+        /// Path to DOT file.
+        #[arg(short)]
+        output: PathBuf,
+    },
+    Json {
+        /// Path to JSON file.
+        #[arg(short)]
+        output: PathBuf,
+    },
+    Bincode {
+        /// Path to bincode file.
+        #[arg(short)]
+        output: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -50,6 +62,8 @@ fn main() -> Result<()> {
 
     // parse command line arguments
     let args = Args::parse();
+
+    warn!("Force flag set! May result in data being overwritten!");
 
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or(""))?;
@@ -81,31 +95,55 @@ fn main() -> Result<()> {
     );
 
     match args.output {
-        Output::Genc { output, force } => {
-            debug!("Compiling to GenC");
-            export(&Description::from(&ast), output, force)
+        Output::Genc { output } => {
+            debug!("Converting Sail AST to GenC");
+            let description = Description::from(&ast);
+
+            debug!("Exporting GenC description");
+            export(&description, output, args.force)
                 .wrap_err("Error while exporting GenC description")?
         }
-        Output::Dot => {
+
+        Output::Dot { output } => {
             debug!("Printing AST as do graph");
-            dot::render(&ast, &mut io::stdout().lock())?
+            dot::render(&ast, &mut create_file(output, args.force)?)?
         }
-        Output::Json => {
+
+        Output::Json { output } => {
             debug!("Serializing AST to JSON");
-            serde_json::to_writer_pretty(io::stdout().lock(), &ast)?
+            serde_json::to_writer_pretty(create_file(output, args.force)?, &ast)?
         }
-        Output::Bincode => {
+
+        Output::Bincode { output } => {
             debug!("Serializing AST to bincode");
-            bincode::serialize_into(io::stdout().lock(), &ast)?
+            bincode::serialize_into(create_file(output, args.force)?, &ast)?
         }
     }
+
+    debug!("Finished");
 
     Ok(())
 }
 
+/// Initialize the logger
 fn init_logger(filters: &str) -> Result<()> {
     let mut builder = pretty_env_logger::formatted_timed_builder();
     builder.parse_filters(filters);
-    builder.try_init()?;
+    builder.try_init().wrap_err("Failed to initialise logger")?;
     Ok(())
+}
+
+/// Creates the file supplied in `path`.
+///
+/// If the file at the supplied path already exists and `force` is true it will be overwritten, otherwise an error will be returned.
+fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<BufWriter<File>> {
+    Ok(BufWriter::new(
+        File::options()
+            .write(true) // we want to write to the file
+            .create_new(!force) // fail if it already exists and force is true...
+            .truncate(true) // ...otherwise truncate it before writing
+            .open(path.as_ref())
+            .map_err(ErrCtx::f(path))
+            .wrap_err(format!("Failed to write to file, force = {}", force))?,
+    ))
 }
