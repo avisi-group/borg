@@ -4,6 +4,7 @@ depends: [
   "ocaml"
   "dune" {>= "3.4"}
   "sail"
+  "gmp"
   "odoc" {with-doc}
 ]
 build: [

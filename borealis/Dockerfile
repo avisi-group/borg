@@ -4,28 +4,20 @@ FROM rust:alpine AS builder
 WORKDIR /tmp/build
 
 # install packages
-RUN apk update && apk add opam alpine-sdk findutils zlib-dev gcc m4 z3
-
-# download and build GMP
-RUN curl https://gmplib.org/download/gmp/gmp-6.2.1.tar.lz | tar --lzip -x
-RUN cd gmp-6.2.1; ./configure --prefix /tmp/gmp-prefix && make && make install
-ENV CPPFLAGS=-I/tmp/gmp-prefix/include
-ENV CFLAGS=-I/tmp/gmp-prefix/include
-ENV LDFLAGS=-L/tmp/gmp-prefix/lib
+RUN apk update && apk add opam alpine-sdk zlib-dev xz m4 z3 gmp-dev
 
 # setup OCaml
-RUN opam init --disable-sandboxing --enable-shell-hook -a -y
-RUN opam init --shell-setup
+RUN opam init --disable-sandboxing --bare -y
 RUN opam switch create 4.11.2+musl+static+flambda
 
 # install sail
-RUN eval `opam env` && opam install --assume-depexts -y sail
+RUN eval `opam env` && opam install --assume-depexts -y sail.0.14 gmp
 
-# build and document rust dependencies
-RUN cargo init --lib borealis
-RUN cargo init --lib sail
-RUN cargo init --lib common
-RUN cargo init --lib borealis_macro
+# build and document rust dependencies by creating empty crates
+RUN cargo init --lib borealis && \
+    cargo init --lib sail && \
+    cargo init --lib common && \
+    cargo init --lib borealis_macro
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY borealis/Cargo.toml borealis/
@@ -33,7 +25,10 @@ COPY sail/Cargo.toml sail/
 COPY common/Cargo.toml common/
 COPY borealis_macro/Cargo.toml borealis_macro/
 RUN > borealis_macro/src/lib.rs
-RUN eval `opam env` && cargo build --release --all-targets && cargo test --release --no-run && cargo doc --release
+RUN eval `opam env` && \
+    cargo build --release --all-targets && \
+    cargo test --release --no-run && \
+    cargo doc --release
 
 # copy full source
 COPY . .

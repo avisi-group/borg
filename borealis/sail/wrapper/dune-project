@@ -6,4 +6,4 @@
 
 (package
  (name wrapper)
- (depends ocaml dune sail))
+ (depends ocaml dune sail gmp))

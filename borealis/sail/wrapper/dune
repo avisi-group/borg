@@ -1,12 +1,5 @@
 (executable
  (name wrapper)
  (public_name wrapper)
- (libraries sail)
- (ocamlopt_flags
-  "-I"
-  "/lib/x86_64-linux-gnu/"
-  "-I"
-  "/usr/lib/aarch64-linux-gnu"
-  "-I"
-  "/usr/local/opt/gmp")
+ (libraries sail gmp)
  (modes exe object))
