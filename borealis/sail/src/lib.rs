@@ -3,7 +3,7 @@
 //! Rust interface to `Sail` compiler library
 
 use {
-    crate::{ast::Ast, error::Error, runtime::Runtime, type_check::Env, types::OCamlString},
+    crate::{ast::Ast, error::Error, runtime::Runtime, type_check::Env},
     once_cell::sync::Lazy,
     parking_lot::Mutex,
     std::path::Path,
@@ -50,7 +50,7 @@ static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(OCamlString, Ast, Env), Error> {
+pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(String, Ast, Env), Error> {
     let config = dbg!(json::ModelConfig::load(config_path.as_ref())?);
 
     Ok(RT.lock().load_files(config)?)
@@ -67,14 +67,10 @@ mod tests {
     const FILTERS: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         vec![
             (r#""id": [0-9]+"#, r#""id": 0"#),
-            (r#"(?P<k>".*": )".*/(?P<n>.*\.sail)""#, r#"$k"$n""#),
+            (r#""[0-9a-zA-Z\.\-/+]+/(?P<n>.*\.sail)""#, r#""$n""#),
             (
-                r#""kind_identifier": \{[\s]*"String":.*[\s]*\}"#,
-                r#""kind_identifier": {}"#,
-            ),
-            (
-                r#""kind_identifier": \{\s*"Vec": \[[\s,0-9]*\]\s*\}"#,
-                r#""kind_identifier": {}"#,
+                r#""kind_identifier": \[[\s,0-9]*\]"#,
+                r#""kind_identifier": []"#,
             ),
         ]
     });

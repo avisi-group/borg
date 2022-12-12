@@ -3,6 +3,8 @@
 FROM rust:alpine AS builder
 WORKDIR /tmp/build
 
+ENV RUSTFLAGS="-D warnings"
+
 # install packages
 RUN apk update && apk add opam alpine-sdk zlib-dev xz m4 z3 gmp-dev
 

@@ -1,12 +1,9 @@
 ---
 source: sail/src/lib.rs
-assertion_line: 102
-expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
+expression: "(name, ast, env)"
 ---
 [
-  {
-    "String": "out.sail"
-  },
+  "out.sail",
   {
     "defs": [],
     "comments": [],
@@ -17,9 +14,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
       [
         {
           "inner": {
-            "Identifier": {
-              "String": "make_the_value"
-            }
+            "Identifier": "make_the_value"
           },
           "location": "Unknown",
           "id": 0
@@ -32,7 +27,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                   "inner": {
                     "KindedIdentifier": {
                       "inner": {
-                        "kind_identifier": {},
+                        "kind_identifier": [],
                         "id": 0
                       },
                       "location": "Unknown",
@@ -56,9 +51,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                       "Application": [
                         {
                           "inner": {
-                            "Identifier": {
-                              "String": "atom"
-                            }
+                            "Identifier": "atom"
                           },
                           "location": "Unknown",
                           "id": 0
@@ -70,7 +63,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                                 "inner": {
                                   "Var": {
                                     "inner": {
-                                      "kind_identifier": {},
+                                      "kind_identifier": [],
                                       "id": 0
                                     },
                                     "location": "Unknown",
@@ -96,9 +89,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                     "Application": [
                       {
                         "inner": {
-                          "Identifier": {
-                            "String": "itself"
-                          }
+                          "Identifier": "itself"
                         },
                         "location": "Unknown",
                         "id": 0
@@ -110,7 +101,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                               "inner": {
                                 "Var": {
                                   "inner": {
-                                    "kind_identifier": {},
+                                    "kind_identifier": [],
                                     "id": 0
                                   },
                                   "location": "Unknown",
@@ -148,9 +139,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
       [
         {
           "inner": {
-            "Identifier": {
-              "String": "sail_assume"
-            }
+            "Identifier": "sail_assume"
           },
           "location": "Unknown",
           "id": 0
@@ -163,7 +152,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                   "inner": {
                     "KindedIdentifier": {
                       "inner": {
-                        "kind_identifier": {},
+                        "kind_identifier": [],
                         "id": 0
                       },
                       "location": "Unknown",
@@ -187,9 +176,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                       "Application": [
                         {
                           "inner": {
-                            "Identifier": {
-                              "String": "atom_bool"
-                            }
+                            "Identifier": "atom_bool"
                           },
                           "location": "Unknown",
                           "id": 0
@@ -201,7 +188,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                                 "inner": {
                                   "Var": {
                                     "inner": {
-                                      "kind_identifier": {},
+                                      "kind_identifier": [],
                                       "id": 0
                                     },
                                     "location": "Unknown",
@@ -226,9 +213,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                   "inner": {
                     "Id": {
                       "inner": {
-                        "Identifier": {
-                          "String": "unit"
-                        }
+                        "Identifier": "unit"
                       },
                       "location": "Unknown",
                       "id": 0
@@ -255,9 +240,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
       [
         {
           "inner": {
-            "Identifier": {
-              "String": "size_itself_int"
-            }
+            "Identifier": "size_itself_int"
           },
           "location": "Unknown",
           "id": 0
@@ -270,7 +253,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                   "inner": {
                     "KindedIdentifier": {
                       "inner": {
-                        "kind_identifier": {},
+                        "kind_identifier": [],
                         "id": 0
                       },
                       "location": "Unknown",
@@ -294,9 +277,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                       "Application": [
                         {
                           "inner": {
-                            "Identifier": {
-                              "String": "itself"
-                            }
+                            "Identifier": "itself"
                           },
                           "location": "Unknown",
                           "id": 0
@@ -308,7 +289,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                                 "inner": {
                                   "Var": {
                                     "inner": {
-                                      "kind_identifier": {},
+                                      "kind_identifier": [],
                                       "id": 0
                                     },
                                     "location": "Unknown",
@@ -334,9 +315,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                     "Application": [
                       {
                         "inner": {
-                          "Identifier": {
-                            "String": "atom"
-                          }
+                          "Identifier": "atom"
                         },
                         "location": "Unknown",
                         "id": 0
@@ -348,7 +327,7 @@ expression: "load_from_config(\"../testdata/empty.json\").unwrap()"
                               "inner": {
                                 "Var": {
                                   "inner": {
-                                    "kind_identifier": {},
+                                    "kind_identifier": [],
                                     "id": 0
                                   },
                                   "location": "Unknown",

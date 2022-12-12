@@ -11,26 +11,15 @@ use {
     std::{fmt::Display, path::PathBuf},
 };
 
-/// OCaml string
+/// Kind identifier
 ///
-/// OCaml strings are byte arrays. They *may* contain valid UTF-8 contents or
-/// could be arbitrary bytes. Conversion from opaque `ocaml::Value` will attempt
-/// to parse as a `String`, falling back to `Vec<u8>` on error.
+/// In the Sail AST kind identifiers are strings, but they are invalid Rust Strings and so are represented here as a Vec<u8>.
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf, PartialEq, Eq)]
-pub enum OCamlString {
-    /// UTF-8 string
-    String(String),
-    /// Byte array
-    Vec(Vec<u8>),
-}
+pub struct KindIdentifierInner(Vec<u8>);
 
-unsafe impl FromValue for OCamlString {
+unsafe impl FromValue for KindIdentifierInner {
     fn from_value(v: Value) -> Self {
-        let vec = <&[u8]>::from_value(v).to_owned();
-        match String::from_utf8(vec.clone()) {
-            Ok(s) => Self::String(s),
-            Err(_) => Self::Vec(vec),
-        }
+        Self(<&[u8]>::from_value(v).to_owned())
     }
 }
 

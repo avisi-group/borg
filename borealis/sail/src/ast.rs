@@ -6,10 +6,10 @@
 use {
     crate::{
         num::{BigInt, Num},
-        types::{EnumWrapper, OCamlString, Position},
+        types::{EnumWrapper, KindIdentifierInner, Position},
         visitor::{Visitor, Walkable},
     },
-    common::identifiable::identifiable_fromvalue,
+    common::{identifiable::identifiable_fromvalue, intern::InternedStringKey},
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int},
     serde::{Deserialize, Serialize},
@@ -29,7 +29,7 @@ pub enum L {
     /// Range between two positions
     Range(Position, Position),
     /// Documented location
-    Documented(OCamlString, Box<L>),
+    Documented(InternedStringKey, Box<L>),
 }
 
 impl Display for L {
@@ -66,11 +66,11 @@ pub enum Value {
     Bit(Bit),
     Tuple(LinkedList<EnumWrapper<Value>>),
     Unit,
-    String(OCamlString),
-    Ref(OCamlString),
-    Ctor(OCamlString, LinkedList<EnumWrapper<Value>>),
-    Record(LinkedList<(OCamlString, EnumWrapper<Value>)>),
-    AttemptedRead(OCamlString),
+    String(InternedStringKey),
+    Ref(InternedStringKey),
+    Ctor(InternedStringKey, LinkedList<EnumWrapper<Value>>),
+    Record(LinkedList<(InternedStringKey, EnumWrapper<Value>)>),
+    AttemptedRead(InternedStringKey),
 }
 
 impl Walkable for EnumWrapper<Value> {
@@ -105,10 +105,10 @@ pub enum Loop {
 }
 
 /// Idenitifer
-pub type X = OCamlString;
+pub type X = InternedStringKey;
 
 /// Infix identifier
-pub type Xi = OCamlString;
+pub type Xi = InternedStringKey;
 
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum BaseEffectAux {
@@ -150,7 +150,7 @@ pub enum BaseEffectAux {
 #[identifiable_fromvalue]
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindIdentifierAux {
-    kind_identifier: X,
+    kind_identifier: KindIdentifierInner,
 }
 
 /// Base kind
@@ -361,14 +361,14 @@ pub enum LiteralAux {
     /// Natural number constant
     Num(BigInt),
     /// Bit vector constant, C-style
-    Hex(OCamlString),
+    Hex(InternedStringKey),
     /// Bit vector constant, C-style
-    Bin(OCamlString),
+    Bin(InternedStringKey),
     /// String constant
-    String(OCamlString),
+    String(InternedStringKey),
     /// Undefined value constant
     Undefined,
-    Real(OCamlString),
+    Real(InternedStringKey),
 }
 
 /// Type expressions, of kind Type
@@ -1531,7 +1531,7 @@ impl Walkable for IndexRange {
 pub struct ValueSpecificationAux {
     pub typ_scheme: TypeScheme,
     pub ident: Identifier,
-    pub a: LinkedList<(OCamlString, OCamlString)>,
+    pub a: LinkedList<(InternedStringKey, InternedStringKey)>,
     pub b: bool,
 }
 
@@ -1874,7 +1874,7 @@ pub enum Definition {
     Mutual(LinkedList<FunctionDefinition>),
 
     /// Pragma
-    Pragma(OCamlString, OCamlString, L),
+    Pragma(InternedStringKey, InternedStringKey, L),
 }
 
 impl Walkable for EnumWrapper<Definition> {
@@ -1925,7 +1925,7 @@ pub enum CommentType {
 #[identifiable_fromvalue]
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct CommentRoot {
-    pub path: OCamlString,
+    pub path: InternedStringKey,
     pub comments: LinkedList<Comment>,
 }
 
@@ -1942,7 +1942,7 @@ pub struct Comment {
     pub typ: CommentType,
     pub start_position: Position,
     pub end_position: Position,
-    pub contents: OCamlString,
+    pub contents: InternedStringKey,
 }
 
 impl Walkable for Comment {

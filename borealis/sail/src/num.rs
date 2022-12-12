@@ -4,7 +4,6 @@
 use {
     crate::{
         runtime::internal_bigint_to_string,
-        types::OCamlString,
         visitor::{Visitor, Walkable},
     },
     deepsize::DeepSizeOf,
@@ -38,13 +37,9 @@ unsafe impl FromValue for BigInt {
     fn from_value(v: Value) -> Self {
         let rt = unsafe { ocaml::Runtime::recover_handle() };
 
-        let s = match unsafe { internal_bigint_to_string(rt, v) }
+        let s = unsafe { internal_bigint_to_string(rt, v) }
             .unwrap()
-            .unwrap()
-        {
-            OCamlString::String(s) => s,
-            OCamlString::Vec(_) => panic!("invalid UTF-8 when converting bigint to string"),
-        };
+            .unwrap();
 
         Self(num_bigint::BigInt::from_str(&s).unwrap())
     }
@@ -69,12 +64,7 @@ pub struct Ratio {
 
 #[cfg(test)]
 mod tests {
-    use {
-        crate::{types::OCamlString, RT},
-        num_bigint::BigInt,
-        proptest::prelude::*,
-        std::str::FromStr,
-    };
+    use {crate::RT, num_bigint::BigInt, proptest::prelude::*, std::str::FromStr};
 
     proptest! {
         /// Check passing num_bigint::BigInt to OCaml `Num` and back through string representations
@@ -88,10 +78,7 @@ mod tests {
             let c = {
                 let a_str = a.to_string();
                 let b_str = b.to_string();
-                match RT.lock().add_num(a_str.clone(), b_str.clone()).unwrap() {
-                    OCamlString::String(s) => BigInt::from_str(&s).unwrap(),
-                    OCamlString::Vec(v) => panic!("{:?}", v)
-                }
+                BigInt::from_str(&RT.lock().add_num(a_str.clone(), b_str.clone()).unwrap()).unwrap()
             };
 
             assert_eq!(c_true, c);

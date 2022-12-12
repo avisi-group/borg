@@ -1,11 +1,7 @@
 //! Error handling for Sail interface
 
 use {
-    crate::{
-        ast::L,
-        runtime::Request,
-        types::{OCamlString, Position},
-    },
+    crate::{ast::L, runtime::Request, types::Position},
     ocaml::{CamlError, FromValue, Int},
     std::{
         fmt::Debug,
@@ -176,17 +172,17 @@ pub enum WrapperError {
 #[derive(Debug, displaydoc::Display, thiserror::Error, FromValue)]
 pub enum SailCompilerError {
     /// General error: {1:?} @ {0:?}
-    General(L, OCamlString),
+    General(L, String),
     /// Unreachable error in {1:?}: {3:?} @ {0:?}
-    Unreachable(L, (OCamlString, Int, Int, Int, Int), (), OCamlString),
+    Unreachable(L, (String, Int, Int, Int, Int), (), String),
     /// Todo error: {1:?} @ {0:?}
-    Todo(L, OCamlString),
+    Todo(L, String),
     /// Syntax error: {1:?} @ {0:?}
-    Syntax(Position, OCamlString),
+    Syntax(Position, String),
     /// Syntax location error: {1:?} @ {0:?}
-    SyntaxLocation(L, OCamlString),
+    SyntaxLocation(L, String),
     /// Lexical error: {1:?} @ {0:?}
-    Lexical(Position, OCamlString),
+    Lexical(Position, String),
     /// Type error: {1:?} @ {0:?}
-    Type(L, OCamlString),
+    Type(L, String),
 }

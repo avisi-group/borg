@@ -9,7 +9,6 @@ use {
             LValueExpressionAux, Literal, LiteralAux, NumericExpression, NumericExpressionAux,
             Pattern, PatternAux, PatternMatchAux, TypArgAux, TypAux,
         },
-        types::OCamlString,
         visitor::Visitor,
     },
     std::{
@@ -71,23 +70,25 @@ impl Display for Format {
 
 /// Visitor for building instruction decode strings
 pub struct DecodeStringVisitor {
-    formats: HashMap<InternedStringKey, Format>,
+    _formats: HashMap<InternedStringKey, Format>,
 }
 
 impl DecodeStringVisitor {
     /// Create a new empty instance
     pub fn new() -> Self {
         Self {
-            formats: HashMap::new(),
+            _formats: HashMap::new(),
         }
     }
 }
 
 impl Visitor for DecodeStringVisitor {
     fn visit_function_clause(&mut self, node: &FunctionClause) {
-        if node.inner.identifier.inner
-            == IdentifierAux::Identifier(OCamlString::String("decode64".to_owned()))
-        {
+        let IdentifierAux::Identifier(ident) = node.inner.identifier.inner else {
+            return;
+        };
+
+        if ident.to_string() == "decode64" {
             process_decode_function_clause(node);
         }
     }
@@ -128,10 +129,7 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
         panic!();
     };
 
-    assert_eq!(
-        ident.to_string(),
-        "Identifier(String(\"op_code\"))".to_owned()
-    );
+    assert_eq!(ident.to_string(), "Identifier(\"op_code\")".to_owned());
 
     let patterns = match &**inner {
         PatternAux::Literal(literal) => {
@@ -157,10 +155,14 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
                 };
 
                 match &*typ.inner {
-                    TypAux::Application(ident, typargs) => {
-                        if ident.inner
-                            != IdentifierAux::Identifier(OCamlString::String("bits".to_owned()))
-                        {
+                    TypAux::Application(
+                        Identifier {
+                            inner: IdentifierAux::Identifier(s),
+                            ..
+                        },
+                        typargs,
+                    ) => {
+                        if s.to_string() != "bits" {
                             panic!();
                         }
 
@@ -185,12 +187,12 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
 }
 
 fn literal_to_decode_bits(literal: &Literal) -> Format {
-    let LiteralAux::Bin(OCamlString::String(s)) = &literal.inner else {
+    let LiteralAux::Bin(s) = &literal.inner else {
         panic!("Unexpected literal when decoding instruction format");
     };
 
     let mut decode_bits = Format::new();
-    for char in s.chars() {
+    for char in s.to_string().chars() {
         match char {
             '0' => decode_bits.push(FormatBit::Zero),
             '1' => decode_bits.push(FormatBit::One),
@@ -201,20 +203,20 @@ fn literal_to_decode_bits(literal: &Literal) -> Format {
 }
 
 fn expression_to_named_range(expression: &Expression) -> (InternedStringKey, Range<usize>) {
-    trace!("is SEE assignment = {:?}", is_SEE_assignment(expression));
+    trace!("is SEE assignment = {:?}", is_see_assignment(expression));
 
     ("?".into(), 0..1)
 }
 
 /// Tests whether an expression is an assignment to `SEE`
-fn is_SEE_assignment(expression: &Expression) -> bool {
+fn is_see_assignment(expression: &Expression) -> bool {
     let ExpressionAux::Assign(LValueExpression { inner, ..}, _) = &*expression.inner else {
         return false;
     };
 
-    let LValueExpressionAux::Identifier(Identifier {inner: IdentifierAux::Identifier(OCamlString::String(s)),..}) = &**inner else {
+    let LValueExpressionAux::Identifier(Identifier {inner: IdentifierAux::Identifier(s),..}) = &**inner else {
         return false;
     };
 
-    s == "SEE"
+    s.to_string() == "SEE"
 }

@@ -16,7 +16,6 @@ use {
         error::{Error, WrapperError},
         json::ModelConfig,
         type_check::Env,
-        types::OCamlString,
     },
     log::{error, trace},
     ocaml::{
@@ -36,9 +35,9 @@ ocaml::import! {
 
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
-    pub fn internal_bigint_to_string(input: Value) -> Result<OCamlString, WrapperError>;
+    pub fn internal_bigint_to_string(input: Value) -> Result<String, WrapperError>;
 
-    fn internal_add_num(a: String, b: String) -> Result<OCamlString, WrapperError>;
+    fn internal_add_num(a: String, b: String) -> Result<String, WrapperError>;
 
     fn internal_set_non_lexical_flow(b: bool) -> Result<(), WrapperError>;
 
@@ -118,7 +117,7 @@ impl Runtime {
     }
 
     #[cfg(test)]
-    pub fn add_num(&self, a: String, b: String) -> Result<OCamlString, Error> {
+    pub fn add_num(&self, a: String, b: String) -> Result<String, Error> {
         if let Response::AddNum(c) = self.request(Request::AddNum((a, b)))? {
             Ok(c)
         } else {
@@ -126,7 +125,7 @@ impl Runtime {
         }
     }
 
-    pub fn load_files(&self, config: ModelConfig) -> Result<(OCamlString, Ast, Env), Error> {
+    pub fn load_files(&self, config: ModelConfig) -> Result<(String, Ast, Env), Error> {
         #[allow(irrefutable_let_patterns)] // remove when more non-test variants are added
         if let Response::LoadFiles(ret) = self.request(Request::LoadFiles(config))? {
             Ok(ret)
@@ -163,9 +162,9 @@ enum Response {
     #[cfg(test)]
     Dedup(Vec<i32>),
     #[cfg(test)]
-    AddNum(OCamlString),
+    AddNum(String),
 
-    LoadFiles((OCamlString, Ast, Env)),
+    LoadFiles((String, Ast, Env)),
 }
 
 /// Process a single incoming request by calling the corresponding OCaml
@@ -215,7 +214,7 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
 
             trace!("Converting AST from ocaml::Value");
 
-            let resp = <(OCamlString, Ast, Env)>::from_value(value);
+            let resp = <(String, Ast, Env)>::from_value(value);
 
             trace!("Finished converting AST from ocaml::Value");
 
