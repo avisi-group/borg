@@ -1,5 +1,5 @@
 use {
-    crate::{decode::DecodeStringVisitor, genc::Description},
+    crate::{format::DecodeStringVisitor, genc::Description},
     sail::{ast::Ast, visitor::Visitor},
 };
 

@@ -7,7 +7,7 @@ use {
     std::{io, path::PathBuf},
 };
 
-pub mod decode;
+pub mod format;
 pub mod genc;
 
 /// Borealis error

@@ -19,4 +19,4 @@ pretty_env_logger = "0.4.0"
 log = "0.4.17"
 
 [dev-dependencies]
-insta = "1.22.0"
+insta = "1.23.0"

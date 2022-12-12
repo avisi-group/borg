@@ -1,20 +1,26 @@
-//! Instruction decoding
+//! Instruction format string extraction
 
 use {
+    common::intern::InternedStringKey,
     log::{trace, warn},
     sail::{
         ast::{
-            FunctionClause, IdentifierAux, Literal, LiteralAux, NumericExpression,
-            NumericExpressionAux, Pattern, PatternAux, PatternMatchAux, TypArgAux, TypAux,
+            Expression, ExpressionAux, FunctionClause, Identifier, IdentifierAux, LValueExpression,
+            LValueExpressionAux, Literal, LiteralAux, NumericExpression, NumericExpressionAux,
+            Pattern, PatternAux, PatternMatchAux, TypArgAux, TypAux,
         },
         types::OCamlString,
         visitor::Visitor,
     },
-    std::fmt::{Debug, Display},
+    std::{
+        collections::HashMap,
+        fmt::{Debug, Display},
+        ops::Range,
+    },
 };
 
-/// Bit in an instruction function clause
-pub enum DecodeBit {
+/// Bit in an instruction format
+pub enum FormatBit {
     /// Fixed zero
     Zero,
     /// Fixed one
@@ -23,7 +29,7 @@ pub enum DecodeBit {
     Unknown,
 }
 
-impl Debug for DecodeBit {
+impl Debug for FormatBit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Zero => write!(f, "0"),
@@ -33,28 +39,28 @@ impl Debug for DecodeBit {
     }
 }
 
-/// Ordered collection of decode bits
+/// Sequence of bits corresponding to the machine code representation of an instruction
 #[derive(Debug)]
-pub struct DecodeBits(Vec<DecodeBit>);
+pub struct Format(Vec<FormatBit>);
 
-impl DecodeBits {
+impl Format {
     /// Create a new empty collection
     pub fn new() -> Self {
         Self(vec![])
     }
 
     /// Appends a decode bit to the collection
-    pub fn push(&mut self, bit: DecodeBit) {
+    pub fn push(&mut self, bit: FormatBit) {
         self.0.push(bit)
     }
 
     /// Moves all bits in `other` into `self`
-    pub fn append(&mut self, other: &mut DecodeBits) {
+    pub fn append(&mut self, other: &mut Format) {
         self.0.append(&mut other.0);
     }
 }
 
-impl Display for DecodeBits {
+impl Display for Format {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for bit in &self.0 {
             write!(f, "{bit:?}")?;
@@ -64,12 +70,16 @@ impl Display for DecodeBits {
 }
 
 /// Visitor for building instruction decode strings
-pub struct DecodeStringVisitor {}
+pub struct DecodeStringVisitor {
+    formats: HashMap<InternedStringKey, Format>,
+}
 
 impl DecodeStringVisitor {
     /// Create a new empty instance
     pub fn new() -> Self {
-        Self {}
+        Self {
+            formats: HashMap::new(),
+        }
     }
 }
 
@@ -86,7 +96,7 @@ impl Visitor for DecodeStringVisitor {
 fn process_decode_function_clause(funcl: &FunctionClause) {
     trace!("Processing decode function clause @ {}", funcl.annotation.0);
 
-    let (pat, _body) = match &funcl.inner.pattern_match.inner {
+    let (pat, body) = match &funcl.inner.pattern_match.inner {
         PatternMatchAux::Expression(pat, body) => (pat, body),
         PatternMatchAux::When(pat, _, body) => {
             warn!("Function clause has condition, ignoring...");
@@ -95,12 +105,24 @@ fn process_decode_function_clause(funcl: &FunctionClause) {
     };
 
     let decode_bits = extract_decode_bits(&pat.inner);
-
     trace!("got decode bits: {}", decode_bits);
+
+    let ExpressionAux::Block(expressions) = &*body.inner else {
+        panic!("Body was not Block");
+    };
+
+    let named_ranges = expressions
+        .iter()
+        .map(expression_to_named_range)
+        .collect::<Vec<_>>();
+
+    dbg!(named_ranges);
+
+    panic!();
 }
 
-fn extract_decode_bits(pattern_aux: &PatternAux) -> DecodeBits {
-    let mut decode_bits = DecodeBits::new();
+fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
+    let mut decode_bits = Format::new();
 
     let PatternAux::As(Pattern { inner, .. }, ident) = pattern_aux else {
         panic!();
@@ -147,7 +169,7 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> DecodeBits {
                         {
                             if let NumericExpressionAux::Constant(sail::num::BigInt(big)) = &**n {
                                 for _ in 0..big.to_u64_digits().1[0] {
-                                    decode_bits.push(DecodeBit::Unknown);
+                                    decode_bits.push(FormatBit::Unknown);
                                 }
                             }
                         }
@@ -162,18 +184,37 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> DecodeBits {
     decode_bits
 }
 
-fn literal_to_decode_bits(literal: &Literal) -> DecodeBits {
+fn literal_to_decode_bits(literal: &Literal) -> Format {
     let LiteralAux::Bin(OCamlString::String(s)) = &literal.inner else {
-        panic!();
+        panic!("Unexpected literal when decoding instruction format");
     };
 
-    let mut decode_bits = DecodeBits::new();
+    let mut decode_bits = Format::new();
     for char in s.chars() {
         match char {
-            '0' => decode_bits.push(DecodeBit::Zero),
-            '1' => decode_bits.push(DecodeBit::One),
-            _ => panic!(),
+            '0' => decode_bits.push(FormatBit::Zero),
+            '1' => decode_bits.push(FormatBit::One),
+            c => panic!("Unexpected char {:?} when decoding instruction format", c),
         }
     }
     decode_bits
+}
+
+fn expression_to_named_range(expression: &Expression) -> (InternedStringKey, Range<usize>) {
+    trace!("is SEE assignment = {:?}", is_SEE_assignment(expression));
+
+    ("?".into(), 0..1)
+}
+
+/// Tests whether an expression is an assignment to `SEE`
+fn is_SEE_assignment(expression: &Expression) -> bool {
+    let ExpressionAux::Assign(LValueExpression { inner, ..}, _) = &*expression.inner else {
+        return false;
+    };
+
+    let LValueExpressionAux::Identifier(Identifier {inner: IdentifierAux::Identifier(OCamlString::String(s)),..}) = &**inner else {
+        return false;
+    };
+
+    s == "SEE"
 }

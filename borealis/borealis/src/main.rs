@@ -4,7 +4,7 @@ use {
     color_eyre::eyre::{bail, Result, WrapErr},
     common::{error::ErrCtx, identifiable::unique_id, intern::INTERNER},
     deepsize::DeepSizeOf,
-    log::{debug, trace, warn},
+    log::{info, trace, warn},
     sail::dot,
     std::{
         ffi::OsStr,
@@ -71,13 +71,13 @@ fn main() -> Result<()> {
     // either parse AST from Sail config file or deserialize AST from bincode
     let ast = match args.input.extension().and_then(OsStr::to_str) {
         Some("json") => {
-            debug!("Loading Sail config {:?}", args.input);
+            info!("Loading Sail config {:?}", args.input);
             sail::load_from_config(args.input)
                 .wrap_err("Failed to load Sail files")?
                 .1
         }
         Some("bincode") => {
-            debug!("Deserializing bincode {:?}", args.input);
+            info!("Deserializing bincode {:?}", args.input);
             bincode::deserialize_from(BufReader::new(File::open(args.input)?))?
         }
         _ => bail!("Unrecognised input format {:?}", args.input),
@@ -96,31 +96,29 @@ fn main() -> Result<()> {
 
     match args.output {
         Output::Genc { output } => {
-            debug!("Converting Sail AST to GenC");
+            info!("Converting Sail AST to GenC");
             let description = Description::from(&ast);
 
-            debug!("Exporting GenC description");
+            info!("Exporting GenC description");
             export(&description, output, args.force)
                 .wrap_err("Error while exporting GenC description")?
         }
 
         Output::Dot { output } => {
-            debug!("Printing AST as do graph");
+            info!("Printing AST as do graph");
             dot::render(&ast, &mut create_file(output, args.force)?)?
         }
 
         Output::Json { output } => {
-            debug!("Serializing AST to JSON");
+            info!("Serializing AST to JSON");
             serde_json::to_writer_pretty(create_file(output, args.force)?, &ast)?
         }
 
         Output::Bincode { output } => {
-            debug!("Serializing AST to bincode");
+            info!("Serializing AST to bincode");
             bincode::serialize_into(create_file(output, args.force)?, &ast)?
         }
     }
-
-    debug!("Finished");
 
     Ok(())
 }
