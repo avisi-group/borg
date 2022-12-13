@@ -3,12 +3,14 @@
 use {
     common::intern::InternedStringKey,
     log::{trace, warn},
+    num_bigint::Sign,
     sail::{
         ast::{
             Expression, ExpressionAux, FunctionClause, Identifier, IdentifierAux, LValueExpression,
             LValueExpressionAux, Literal, LiteralAux, NumericExpression, NumericExpressionAux,
             Pattern, PatternAux, PatternMatchAux, TypArgAux, TypAux,
         },
+        num::BigInt,
         visitor::Visitor,
     },
     std::{
@@ -68,6 +70,24 @@ impl Display for Format {
     }
 }
 
+impl From<&Literal> for Format {
+    fn from(literal: &Literal) -> Self {
+        let LiteralAux::Bin(s) = &literal.inner else {
+            panic!("Unexpected literal when decoding instruction format");
+        };
+
+        let mut decode_bits = Format::new();
+        for char in s.to_string().chars() {
+            match char {
+                '0' => decode_bits.push(FormatBit::Zero),
+                '1' => decode_bits.push(FormatBit::One),
+                c => panic!("Unexpected char {:?} when decoding instruction format", c),
+            }
+        }
+        decode_bits
+    }
+}
+
 /// Visitor for building instruction decode strings
 pub struct DecodeStringVisitor {
     _formats: HashMap<InternedStringKey, Format>,
@@ -105,24 +125,29 @@ fn process_decode_function_clause(funcl: &FunctionClause) {
         }
     };
 
-    let decode_bits = extract_decode_bits(&pat.inner);
+    let decode_bits = extract_format(&pat.inner);
     trace!("got decode bits: {}", decode_bits);
 
     let ExpressionAux::Block(expressions) = &*body.inner else {
         panic!("Body was not Block");
     };
 
+    let expression_count = expressions.len();
+
+    assert!(is_see_assignment(expressions.front().unwrap()));
+    //   assert!(is_instruction_impl_function_call(expressions.back().unwrap()));
+
     let named_ranges = expressions
         .iter()
-        .map(expression_to_named_range)
+        .take(expression_count - 1) // skip last expression
+        .skip(1) // skip first expression
+        .filter_map(expression_to_named_range)
         .collect::<Vec<_>>();
 
-    dbg!(named_ranges);
-
-    panic!();
+    trace!("ranges: {:?}", named_ranges);
 }
 
-fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
+fn extract_format(pattern_aux: &PatternAux) -> Format {
     let mut decode_bits = Format::new();
 
     let PatternAux::As(Pattern { inner, .. }, ident) = pattern_aux else {
@@ -134,7 +159,7 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
     let patterns = match &**inner {
         PatternAux::Literal(literal) => {
             trace!("op_code was a single literal!");
-            return literal_to_decode_bits(literal);
+            return Format::from(literal);
         }
         PatternAux::VectorConcat(patterns) => patterns,
         v => panic!(
@@ -146,7 +171,7 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
     for pattern in patterns {
         match &*pattern.inner {
             PatternAux::Literal(literal) => {
-                decode_bits.append(&mut literal_to_decode_bits(literal));
+                decode_bits.append(&mut Format::from(literal));
             }
             PatternAux::Type(typ, pat) => {
                 match &*pat.inner {
@@ -186,26 +211,33 @@ fn extract_decode_bits(pattern_aux: &PatternAux) -> Format {
     decode_bits
 }
 
-fn literal_to_decode_bits(literal: &Literal) -> Format {
-    let LiteralAux::Bin(s) = &literal.inner else {
-        panic!("Unexpected literal when decoding instruction format");
+fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringKey, Range<usize>)> {
+    let ExpressionAux::Assign(LValueExpression { inner: lvalue, ..}, Expression { inner: expression_aux, .. }) = &*expression.inner else {
+        panic!("ExpressionAux not an Assign");
+
     };
 
-    let mut decode_bits = Format::new();
-    for char in s.to_string().chars() {
-        match char {
-            '0' => decode_bits.push(FormatBit::Zero),
-            '1' => decode_bits.push(FormatBit::One),
-            c => panic!("Unexpected char {:?} when decoding instruction format", c),
+    let name = {
+        let LValueExpressionAux::Cast(_, ident) = &**lvalue else {
+            panic!("LValueExpression not a Cast");
+        };
+
+        ident.get_string()
+    };
+
+    let range = match &**expression_aux {
+        ExpressionAux::Vector(expressions) => {
+            assert_eq!(expressions.len(), 1);
+            bitvector_access_to_range(&*expressions.front().unwrap().inner)
         }
-    }
-    decode_bits
-}
+        ExpressionAux::Application(_, _) => vector_subrange_to_range(expression_aux),
+        exp => panic!(
+            "Unexpected Expression variant {:?}",
+            <&'static str>::from(exp)
+        ),
+    };
 
-fn expression_to_named_range(expression: &Expression) -> (InternedStringKey, Range<usize>) {
-    trace!("is SEE assignment = {:?}", is_see_assignment(expression));
-
-    ("?".into(), 0..1)
+    Some((name, range))
 }
 
 /// Tests whether an expression is an assignment to `SEE`
@@ -219,4 +251,64 @@ fn is_see_assignment(expression: &Expression) -> bool {
     };
 
     s.to_string() == "SEE"
+}
+
+fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
+    let ExpressionAux::Application(ident, expressions) = exp else {
+        panic!("not an application");
+    };
+    assert_eq!(ident.get_string(), "bitvector_access_A".into());
+
+    let mut iter = expressions.iter();
+
+    // first expression should be the `op_code` identifier
+    let ExpressionAux::Identifier(ident) = &*iter.next().unwrap().inner else {
+        panic!("first expression was not identifier");
+    };
+    assert_eq!(ident.get_string(), "op_code".into());
+
+    let start = expression_to_usize(iter.next().unwrap());
+    let end = start + 1;
+
+    assert!(iter.next().is_none());
+
+    start..end
+}
+
+fn vector_subrange_to_range(exp: &ExpressionAux) -> Range<usize> {
+    let ExpressionAux::Application(ident, expressions) = exp else {
+        panic!("not an application");
+    };
+    assert_eq!(ident.get_string(), "vector_subrange_A".into());
+
+    let mut iter = expressions.iter();
+
+    // first expression should be the `op_code` identifier
+    let ExpressionAux::Identifier(ident) = &*iter.next().unwrap().inner else {
+        panic!("first expression was not identifier");
+    };
+    assert_eq!(ident.get_string(), "op_code".into());
+
+    let start = expression_to_usize(iter.next().unwrap());
+    let end = expression_to_usize(iter.next().unwrap());
+
+    assert!(iter.next().is_none());
+
+    start..end
+}
+
+fn expression_to_usize(expression: &Expression) -> usize {
+    let ExpressionAux::Literal(Literal { inner: LiteralAux::Num(BigInt(bigint)), .. }) = &*expression.inner else {
+        panic!("expression was not a num literal");
+    };
+
+    let (sign, digits) = bigint.to_u64_digits();
+
+    assert!(sign != Sign::Minus);
+
+    match digits.len() {
+        0 => 0,
+        1 => usize::try_from(digits[0]).unwrap(),
+        _ => panic!("bigint {:?} too large", bigint),
+    }
 }

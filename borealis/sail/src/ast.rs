@@ -215,6 +215,15 @@ pub struct Identifier {
     pub location: L,
 }
 
+impl Identifier {
+    pub fn get_string(&self) -> InternedStringKey {
+        match self.inner {
+            IdentifierAux::Identifier(s) => s,
+            IdentifierAux::Operator(s) => s,
+        }
+    }
+}
+
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.inner)

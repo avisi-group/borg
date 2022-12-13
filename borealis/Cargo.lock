@@ -111,6 +111,7 @@ dependencies = [
  "displaydoc",
  "insta",
  "log",
+ "num-bigint",
  "pretty_env_logger",
  "sail",
  "serde_json",
