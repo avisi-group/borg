@@ -5,6 +5,7 @@
 [![CI](https://github.com/avisi-group/borealis/actions/workflows/ci.yml/badge.svg)](https://github.com/avisi-group/borealis/actions/workflows/ci.yml)
 [![borealis docs](https://img.shields.io/badge/docs-borealis-blue)](https://avisi.org.uk/borealis/borealis/)
 [![sail docs](https://img.shields.io/badge/docs-sail-blue)](https://avisi.org.uk/borealis/sail/)
+[![Lines of code](https://tokei.rs/b1/github/avisi-group/borealis)](https://github.com/avisi-group/borealis)
 
 ## Build Requirements
 
