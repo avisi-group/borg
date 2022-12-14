@@ -1,3 +1,5 @@
+use crate::genc::Instruction;
+
 use {
     crate::{format::DecodeStringVisitor, genc::Description},
     sail::{ast::Ast, visitor::Visitor},
@@ -5,7 +7,27 @@ use {
 
 impl From<&Ast> for Description {
     fn from(ast: &Ast) -> Self {
-        DecodeStringVisitor::new().visit_root(ast);
-        todo!();
+        let formats = {
+            let mut visitor = DecodeStringVisitor::new();
+            visitor.visit_root(ast);
+            visitor.formats
+        };
+
+        let mut description = Description::empty();
+
+        description.instructions = formats
+            .into_iter()
+            .map(|(name, format)| {
+                (
+                    name.to_string(),
+                    Instruction {
+                        format,
+                        execute: "".to_owned(),
+                    },
+                )
+            })
+            .collect();
+
+        description
     }
 }

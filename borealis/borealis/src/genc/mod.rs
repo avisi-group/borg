@@ -2,7 +2,10 @@
 
 use {
     crate::{
-        genc::ir::{Execute, Files, Format, Function, FunctionKind, Isa, Main},
+        genc::{
+            format::{InstructionFormat, Segment, SegmentContent},
+            ir::{Execute, Files, Format, Function, FunctionKind, Isa, Main},
+        },
         Error,
     },
     common::error::ErrCtx,
@@ -15,6 +18,7 @@ use {
     },
 };
 
+pub mod format;
 mod from_ast;
 mod ir;
 
@@ -114,7 +118,7 @@ impl Description {
             .map(|(instruction_ident, Instruction { format, .. })| Format {
                 format_ident: format!("fmt_{}", instruction_ident),
                 instruction_ident: instruction_ident.clone(),
-                contents: format.clone(),
+                contents: format.to_string(),
             })
             .collect();
 
@@ -252,7 +256,40 @@ impl Description {
             instructions: HashMap::from([(
                 "addi".to_owned(),
                 Instruction {
-                    format: "%sf:1 %op:1 %S:1 0x11:5 %shift:2 %imm12:12 %rn:5 %rd:5".to_owned(),
+                    format: InstructionFormat(vec![
+                        Segment {
+                            content: SegmentContent::Variable("sf".into()),
+                            length: 1,
+                        },
+                        Segment {
+                            content: SegmentContent::Variable("op".into()),
+                            length: 1,
+                        },
+                        Segment {
+                            content: SegmentContent::Variable("S".into()),
+                            length: 1,
+                        },
+                        Segment {
+                            content: SegmentContent::Constant(0x11),
+                            length: 5,
+                        },
+                        Segment {
+                            content: SegmentContent::Variable("shift".into()),
+                            length: 2,
+                        },
+                        Segment {
+                            content: SegmentContent::Variable("imm12".into()),
+                            length: 12,
+                        },
+                        Segment {
+                            content: SegmentContent::Variable("rn".into()),
+                            length: 5,
+                        },
+                        Segment {
+                            content: SegmentContent::Variable("rd".into()),
+                            length: 5,
+                        },
+                    ]),
                     execute: "return;".to_owned(),
                 },
             )]),
@@ -364,7 +401,7 @@ pub enum Typ {
 #[derive(Debug, Clone)]
 pub struct Instruction {
     /// Instruction format string used for decoding
-    pub format: String,
+    pub format: InstructionFormat,
     /// GenC execution behaviour
     pub execute: String,
 }

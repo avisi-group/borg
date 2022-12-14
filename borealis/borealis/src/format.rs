@@ -1,7 +1,10 @@
 //! Instruction format string extraction
 
+use crate::genc::format::{Segment, SegmentContent};
+
 use {
-    common::intern::InternedStringKey,
+    crate::genc::format::InstructionFormat as GenCFormat,
+    common::{identifiable::unique_id, intern::InternedStringKey},
     log::{trace, warn},
     num_bigint::Sign,
     sail::{
@@ -14,13 +17,14 @@ use {
         visitor::Visitor,
     },
     std::{
-        collections::HashMap,
+        collections::{HashMap, LinkedList},
         fmt::{Debug, Display},
         ops::Range,
     },
 };
 
 /// Bit in an instruction format
+#[derive(PartialEq, Eq)]
 pub enum FormatBit {
     /// Fixed zero
     Zero,
@@ -28,6 +32,19 @@ pub enum FormatBit {
     One,
     /// Unknown bit
     Unknown,
+}
+
+impl FormatBit {
+    fn is_unknown(&self) -> bool {
+        match self {
+            Self::Zero | Self::One => false,
+            Self::Unknown => true,
+        }
+    }
+
+    fn is_fixed(&self) -> bool {
+        !self.is_unknown()
+    }
 }
 
 impl Debug for FormatBit {
@@ -58,6 +75,12 @@ impl Format {
     /// Moves all bits in `other` into `self`
     pub fn append(&mut self, other: &mut Format) {
         self.0.append(&mut other.0);
+    }
+
+    /// Finish building a sequence of format bits
+    pub fn finish(mut self) -> Vec<FormatBit> {
+        self.0.reverse();
+        self.0
     }
 }
 
@@ -90,14 +113,15 @@ impl From<&Literal> for Format {
 
 /// Visitor for building instruction decode strings
 pub struct DecodeStringVisitor {
-    _formats: HashMap<InternedStringKey, Format>,
+    /// Decoded instruction formats
+    pub formats: HashMap<InternedStringKey, GenCFormat>,
 }
 
 impl DecodeStringVisitor {
     /// Create a new empty instance
     pub fn new() -> Self {
         Self {
-            _formats: HashMap::new(),
+            formats: HashMap::new(),
         }
     }
 }
@@ -109,12 +133,12 @@ impl Visitor for DecodeStringVisitor {
         };
 
         if ident.to_string() == "decode64" {
-            process_decode_function_clause(node);
+            process_decode_function_clause(self, node);
         }
     }
 }
 
-fn process_decode_function_clause(funcl: &FunctionClause) {
+fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &FunctionClause) {
     trace!("Processing decode function clause @ {}", funcl.annotation.0);
 
     let (pat, body) = match &funcl.inner.pattern_match.inner {
@@ -125,8 +149,7 @@ fn process_decode_function_clause(funcl: &FunctionClause) {
         }
     };
 
-    let decode_bits = extract_format(&pat.inner);
-    trace!("got decode bits: {}", decode_bits);
+    let format_bits = extract_format(&pat.inner);
 
     let ExpressionAux::Block(expressions) = &*body.inner else {
         panic!("Body was not Block");
@@ -137,17 +160,133 @@ fn process_decode_function_clause(funcl: &FunctionClause) {
     assert!(is_see_assignment(expressions.front().unwrap()));
     //   assert!(is_instruction_impl_function_call(expressions.back().unwrap()));
 
-    let named_ranges = expressions
+    let mut named_ranges = expressions
         .iter()
         .take(expression_count - 1) // skip last expression
         .skip(1) // skip first expression
         .filter_map(expression_to_named_range)
         .collect::<Vec<_>>();
 
-    trace!("ranges: {:?}", named_ranges);
+    // named ranges may not be contiguous, so fill any holes with padding ranges (these should not contain any unknown bits)
+    {
+        let mut padding_ranges = vec![];
+        let mut last_end = 0;
+        for (_, range) in &named_ranges {
+            if range.start != last_end {
+                // insert new range from last_end to range.start
+                let padding = (
+                    format!("padding{}", unique_id()).into(),
+                    last_end..range.start,
+                );
+                warn!("inserting new padding range: {:?}", padding);
+                padding_ranges.push(padding);
+            }
+            last_end = range.end;
+        }
+
+        if last_end != format_bits.len() {
+            let padding = (
+                format!("padding{}", unique_id()).into(),
+                last_end..format_bits.len(),
+            );
+            warn!("inserting final padding range: {:?}", padding);
+            padding_ranges.push(padding);
+        }
+
+        named_ranges.append(&mut padding_ranges);
+        named_ranges.sort_by(|(_, a), (_, b)| a.start.cmp(&b.start));
+    }
+
+    trace!("named_ranges: {:?}", named_ranges);
+
+    let homogenised_ranges = named_ranges
+        .clone()
+        .into_iter()
+        .map(|(n, r)| {
+            let bits = &format_bits[r.clone()];
+
+            // determine locations where bit kind changes
+            let delta = bits
+                .windows(2)
+                .map(|window| window[0].is_unknown() != window[1].is_unknown())
+                .collect::<Vec<_>>();
+
+            // indexes where ranges must be split
+            let split_indexes = delta
+                .iter()
+                .enumerate()
+                .filter_map(|(i, x)| match x {
+                    true => Some(i + 1),
+                    false => None,
+                })
+                .collect::<Vec<_>>();
+
+            let mut new_ranges = vec![];
+            let mut current_start = r.start;
+            for split_index in split_indexes {
+                new_ranges.push(current_start..r.start + split_index);
+                current_start = r.start + split_index;
+            }
+            new_ranges.push(current_start..r.end);
+
+            new_ranges.into_iter().enumerate().map(move |(i, range)| {
+                if i == 0 {
+                    (n, range)
+                } else {
+                    (format!("{}_part{}", &n, i).into(), range)
+                }
+            })
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+
+    trace!("homogenised_ranges: {:?}", homogenised_ranges);
+
+    let homogenised_bits = homogenised_ranges
+        .into_iter()
+        .map(|(n, r)| (n, &format_bits[r.clone()]))
+        .collect::<Vec<_>>();
+
+    trace!("homogenised_bits: {:?}", homogenised_bits);
+
+    let inner = homogenised_bits
+        .into_iter()
+        .map(|(n, bits)| {
+            let content = if bits.iter().all(FormatBit::is_unknown) {
+                SegmentContent::Variable(n)
+            } else if bits.iter().all(FormatBit::is_fixed) {
+                let mut binary_string = "".to_owned();
+                for bit in bits {
+                    match bit {
+                        FormatBit::Zero => binary_string.push('0'),
+                        FormatBit::One => binary_string.push('1'),
+                        FormatBit::Unknown => panic!(),
+                    }
+                }
+
+                SegmentContent::Constant(u64::from_str_radix(&binary_string, 2).unwrap())
+            } else {
+                panic!();
+            };
+
+            Segment {
+                content,
+                length: bits.len(),
+            }
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(inner.iter().map(|s| s.length).sum::<usize>(), 32);
+
+    let format = GenCFormat(inner);
+    trace!("genc format: {}", format);
+
+    visitor
+        .formats
+        .insert(format!("instruction{}", unique_id()).into(), format);
 }
 
-fn extract_format(pattern_aux: &PatternAux) -> Format {
+fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
     let mut decode_bits = Format::new();
 
     let PatternAux::As(Pattern { inner, .. }, ident) = pattern_aux else {
@@ -159,7 +298,7 @@ fn extract_format(pattern_aux: &PatternAux) -> Format {
     let patterns = match &**inner {
         PatternAux::Literal(literal) => {
             trace!("op_code was a single literal!");
-            return Format::from(literal);
+            return Format::from(literal).finish();
         }
         PatternAux::VectorConcat(patterns) => patterns,
         v => panic!(
@@ -208,7 +347,9 @@ fn extract_format(pattern_aux: &PatternAux) -> Format {
         }
     }
 
-    decode_bits
+    trace!("got decode bits: {}", decode_bits);
+
+    decode_bits.finish()
 }
 
 fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringKey, Range<usize>)> {
@@ -230,7 +371,7 @@ fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringK
             assert_eq!(expressions.len(), 1);
             bitvector_access_to_range(&*expressions.front().unwrap().inner)
         }
-        ExpressionAux::Application(_, _) => vector_subrange_to_range(expression_aux),
+        ExpressionAux::Application(ident, exps) => vector_subrange_to_range(ident, exps),
         exp => panic!(
             "Unexpected Expression variant {:?}",
             <&'static str>::from(exp)
@@ -253,6 +394,7 @@ fn is_see_assignment(expression: &Expression) -> bool {
     s.to_string() == "SEE"
 }
 
+/// Extracts a range from a `bitvector_access` function application
 fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
     let ExpressionAux::Application(ident, expressions) = exp else {
         panic!("not an application");
@@ -275,10 +417,11 @@ fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
     start..end
 }
 
-fn vector_subrange_to_range(exp: &ExpressionAux) -> Range<usize> {
-    let ExpressionAux::Application(ident, expressions) = exp else {
-        panic!("not an application");
-    };
+/// Extracts a range from a `vector_subrange` function application
+fn vector_subrange_to_range(
+    ident: &Identifier,
+    expressions: &LinkedList<Expression>,
+) -> Range<usize> {
     assert_eq!(ident.get_string(), "vector_subrange_A".into());
 
     let mut iter = expressions.iter();
@@ -289,14 +432,15 @@ fn vector_subrange_to_range(exp: &ExpressionAux) -> Range<usize> {
     };
     assert_eq!(ident.get_string(), "op_code".into());
 
+    let end = expression_to_usize(iter.next().unwrap()) + 1;
     let start = expression_to_usize(iter.next().unwrap());
-    let end = expression_to_usize(iter.next().unwrap());
 
     assert!(iter.next().is_none());
 
     start..end
 }
 
+/// Extracts a `usize` from a Literal expression
 fn expression_to_usize(expression: &Expression) -> usize {
     let ExpressionAux::Literal(Literal { inner: LiteralAux::Num(BigInt(bigint)), .. }) = &*expression.inner else {
         panic!("expression was not a num literal");
