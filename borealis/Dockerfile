@@ -5,6 +5,9 @@ WORKDIR /tmp/build
 
 ENV RUSTFLAGS="-D warnings"
 
+# add rustfmt component
+RUN rustup component add rustfmt
+
 # install packages
 RUN apk update && apk add opam alpine-sdk zlib-dev xz m4 z3 gmp-dev
 
@@ -35,6 +38,9 @@ RUN eval `opam env` && \
 # copy full source
 COPY . .
 RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs borealis_macro/src/lib.rs
+
+# check formatting
+RUN cargo fmt --all -- --check
 
 # build and run tests
 RUN eval `opam env` && cargo test --release --no-fail-fast
