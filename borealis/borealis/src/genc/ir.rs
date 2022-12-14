@@ -252,9 +252,11 @@ pub struct Execute(pub Vec<Function>);
 impl Display for Execute {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write_header(f)?;
+
         for func in &self.0 {
             writeln!(f, "{}", func)?;
         }
+
         Ok(())
     }
 }
@@ -266,9 +268,11 @@ pub struct Behaviours(pub Vec<Function>);
 impl Display for Behaviours {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write_header(f)?;
+
         for func in &self.0 {
             writeln!(f, "{}", func)?;
         }
+
         Ok(())
     }
 }

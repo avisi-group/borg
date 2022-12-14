@@ -8,6 +8,7 @@ use {
 };
 
 pub mod format;
+mod from_ast;
 pub mod genc;
 
 /// Borealis error

@@ -19,7 +19,6 @@ use {
 };
 
 pub mod format;
-mod from_ast;
 mod ir;
 
 const MAIN_FILENAME: &str = "main.genc";
