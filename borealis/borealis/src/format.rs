@@ -138,6 +138,7 @@ impl Visitor for DecodeStringVisitor {
     }
 }
 
+/// Main function clause processing
 fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &FunctionClause) {
     trace!("Processing decode function clause @ {}", funcl.annotation.0);
 
@@ -166,6 +167,14 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
         .skip(1) // skip first expression
         .filter_map(expression_to_named_range)
         .collect::<Vec<_>>();
+
+    let instruction_name = {
+        let Some(Expression { inner, .. }) = expressions.back() else { panic!() };
+
+        let ExpressionAux::Application(ident, ..) = &**inner else { panic!() };
+
+        ident.get_string()
+    };
 
     // named ranges may not be contiguous, so fill any holes with padding ranges (these should not contain any unknown bits)
     {
@@ -249,7 +258,7 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
 
     trace!("homogenised_bits: {:?}", homogenised_bits);
 
-    let inner = homogenised_bits
+    let mut inner = homogenised_bits
         .into_iter()
         .map(|(n, bits)| {
             let content = if bits.iter().all(FormatBit::is_unknown) {
@@ -276,18 +285,19 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
         })
         .collect::<Vec<_>>();
 
+    inner.reverse();
+
     assert_eq!(inner.iter().map(|s| s.length).sum::<usize>(), 32);
 
+    let name = format!("{}{}", instruction_name, unique_id()).into();
     let format = GenCFormat(inner);
-    trace!("genc format: {}", format);
+    trace!("{} genc format: {}", name, format);
 
-    visitor
-        .formats
-        .insert(format!("instruction{}", unique_id()).into(), format);
+    visitor.formats.insert(name, format);
 }
 
 fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
-    let mut decode_bits = Format::new();
+    let mut format_bits = Format::new();
 
     let PatternAux::As(Pattern { inner, .. }, ident) = pattern_aux else {
         panic!();
@@ -310,7 +320,7 @@ fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
     for pattern in patterns {
         match &*pattern.inner {
             PatternAux::Literal(literal) => {
-                decode_bits.append(&mut Format::from(literal));
+                format_bits.append(&mut Format::from(literal));
             }
             PatternAux::Type(typ, pat) => {
                 match &*pat.inner {
@@ -335,7 +345,7 @@ fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
                         {
                             if let NumericExpressionAux::Constant(sail::num::BigInt(big)) = &**n {
                                 for _ in 0..big.to_u64_digits().1[0] {
-                                    decode_bits.push(FormatBit::Unknown);
+                                    format_bits.push(FormatBit::Unknown);
                                 }
                             }
                         }
@@ -347,9 +357,9 @@ fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
         }
     }
 
-    trace!("got decode bits: {}", decode_bits);
+    trace!("got format bits: {}", format_bits);
 
-    decode_bits.finish()
+    format_bits.finish()
 }
 
 fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringKey, Range<usize>)> {
