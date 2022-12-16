@@ -2,3 +2,8 @@ target
 **/.DS_Store
 **/_build
 .vscode
+testharness/*.o
+testharness/*.bin
+testharness/test
+testharness/aarch64-decode.h
+testharness/aarch64-decode.cpp
