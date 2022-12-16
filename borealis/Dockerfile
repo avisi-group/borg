@@ -5,6 +5,11 @@ WORKDIR /tmp/build
 
 ENV RUSTFLAGS="-D warnings"
 
+# print some version information
+RUN rustc -V
+RUN cargo -V
+RUN uname -a
+
 # add rustfmt component
 RUN rustup component add rustfmt
 
