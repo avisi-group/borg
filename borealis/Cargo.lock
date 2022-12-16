@@ -101,7 +101,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
 name = "borealis"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bincode",
  "clap",
@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "borealis_macro"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -211,7 +211,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "borealis_macro",
  "deepsize",
