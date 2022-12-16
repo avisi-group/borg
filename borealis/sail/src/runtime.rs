@@ -25,6 +25,9 @@ use {
     std::{os::unix::prelude::OsStringExt, sync::mpsc, thread},
 };
 
+/// Default runtime thread stack size, as the ARM AST uses 4-8 MiB
+const DEFAULT_RUNTIME_THREAD_STACK_SIZE: usize = 64 * 1024 * 1024; // 64MiB
+
 ocaml::import! {
     fn internal_util_dedup(l: List<Value>) -> Result<List<i32>, WrapperError>;
 
@@ -61,8 +64,10 @@ impl Runtime {
         let (req_tx, req_rx) = mpsc::channel();
         let (res_tx, res_rx) = mpsc::channel();
 
+        let builder = thread::Builder::new().stack_size(DEFAULT_RUNTIME_THREAD_STACK_SIZE);
+
         // handle dropped implicitly by not assigning detaches thread
-        thread::spawn(move || {
+        builder.spawn(move || {
             // initialise runtime *once* in a *single* thread
             let mut rt = ocaml::runtime::init();
 
@@ -93,7 +98,7 @@ impl Runtime {
                     }
                 }
             }
-        });
+        }).expect("Failed to spawn runtime thread");
 
         Self {
             request: req_tx,
