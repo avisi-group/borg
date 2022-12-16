@@ -139,7 +139,8 @@ fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<BufWriter<File>> 
         File::options()
             .write(true) // we want to write to the file
             .create_new(!force) // fail if it already exists and force is true...
-            .truncate(true) // ...otherwise truncate it before writing
+            .create(true) // ...otherwise create...
+            .truncate(true) // ...and truncate before writing
             .open(path.as_ref())
             .map_err(ErrCtx::f(path))
             .wrap_err(format!("Failed to write to file, force = {}", force))?,
