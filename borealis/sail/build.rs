@@ -1,5 +1,8 @@
 use {
-    color_eyre::{eyre::ensure, Result},
+    color_eyre::{
+        eyre::{ensure, WrapErr},
+        Result,
+    },
     std::{
         env, fs,
         path::PathBuf,
@@ -12,7 +15,7 @@ const PROJECT_NAME: &str = "wrapper";
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    check_build_environment()?;
+    check_build_environment().wrap_err("Checking build environment")?;
 
     let source_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?).join(PROJECT_NAME);
     let build_path = PathBuf::from(env::var("OUT_DIR")?).join(PROJECT_NAME);
@@ -23,7 +26,7 @@ fn main() -> Result<()> {
             .arg("build")
             .env("DUNE_BUILD_DIR", &build_path)
             .current_dir(&source_path)
-            .status()?
+            .status().wrap_err("Failed to execute dune build")?
             .success(),
         format!("Failed to build OCaml wrapper library at source path {source_path:?} and build path {build_path:?}")
     );
@@ -32,7 +35,8 @@ fn main() -> Result<()> {
 
     let search_path = build_path.join("default");
 
-    fs::read_dir(search_path)?
+    fs::read_dir(&search_path)
+        .wrap_err(format!("Failed to read dir {:?}", &search_path))?
         .map(|f| f.unwrap().path())
         .filter(|p| p.extension().is_some())
         .filter(|p| p.extension().unwrap() == "o")
@@ -61,18 +65,20 @@ fn check_build_environment() -> Result<()> {
         Command::new("opam")
             .arg("--version")
             .stdout(Stdio::null())
-            .status()?
+            .status()
+            .wrap_err("Failed to execute opam, is it installed and in the PATH?")?
             .success(),
-        "Failed to execute opam, is it installed and in the PATH?"
+        "opam did not exit successfully"
     );
 
     ensure!(
         Command::new("dune")
             .arg("--version")
             .stdout(Stdio::null())
-            .status()?
+            .status()
+            .wrap_err("Failed to execute dune, is it installed and in the PATH?")?
             .success(),
-        "Failed to execute dune, is it installed and in the PATH?"
+        "dune did not exit successfully"
     );
 
     Ok(())
