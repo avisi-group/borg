@@ -45,8 +45,8 @@ fn main() -> Result<()> {
     // Fix linker errors on aarch64 macOS
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
     {
-        println!("cargo:rustc-link-arg=-lgmp");
-        println!("cargo:rustc-link-arg=-L/opt/homebrew/lib");
+        println!("cargo:rustc-link-search=/opt/homebrew/lib");
+        println!("cargo:rustc-link-lib=gmp");
     }
 
     // rebuild if OCaml package is modified
