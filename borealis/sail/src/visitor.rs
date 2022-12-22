@@ -4,14 +4,13 @@
 
 use crate::{
     ast::{
-        AliasSpec, Ast, BaseEffect, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, Effect,
-        EffectOpt, Expression, FieldExpression, FunctionClause, FunctionDefinition, Identifier,
-        IndexRange, InternalLoopMeasure, KindIdentifier, KindedIdentifier, LValueExpression,
-        LetBind, Literal, LoopMeasure, MappingClause, MappingDefinition, MappingPattern,
-        MappingPatternExpression, NConstraint, NumericExpression, Order, Pattern, PatternMatch,
-        QuantItem, RecursiveAnnotationOpt, RegisterId, ScatteredDefinition, Typ, TypArg, TypPat,
-        TypQuant, TypeAnnotationOpt, TypeDefinition, TypeScheme, TypeUnion, Value,
-        ValueSpecification,
+        Ast, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, Expression, FieldExpression,
+        FunctionClause, FunctionDefinition, Identifier, IndexRange, InternalLoopMeasure,
+        KindIdentifier, KindedIdentifier, LValueExpression, LetBind, Literal, LoopMeasure,
+        MappingClause, MappingDefinition, MappingPattern, MappingPatternExpression, NConstraint,
+        NumericExpression, Order, Pattern, PatternMatch, QuantItem, RecursiveAnnotationOpt,
+        ScatteredDefinition, Typ, TypArg, TypPat, TypQuant, TypeAnnotationOpt, TypeDefinition,
+        TypeScheme, TypeUnion, Value, ValueSpecification,
     },
     num::BigInt,
     types::EnumWrapper,
@@ -115,11 +114,6 @@ pub trait Visitor: Sized {
     }
 
     #[allow(missing_docs)]
-    fn visit_effect_opt(&mut self, node: &EffectOpt) {
-        node.walk(self);
-    }
-
-    #[allow(missing_docs)]
     fn visit_function_clause(&mut self, node: &FunctionClause) {
         node.walk(self);
     }
@@ -136,16 +130,6 @@ pub trait Visitor: Sized {
 
     #[allow(missing_docs)]
     fn visit_type_scheme(&mut self, node: &TypeScheme) {
-        node.walk(self);
-    }
-
-    #[allow(missing_docs)]
-    fn visit_effect(&mut self, node: &Effect) {
-        node.walk(self);
-    }
-
-    #[allow(missing_docs)]
-    fn visit_base_effect(&mut self, node: &BaseEffect) {
         node.walk(self);
     }
 
@@ -211,16 +195,6 @@ pub trait Visitor: Sized {
 
     #[allow(missing_docs)]
     fn visit_decspec(&mut self, node: &DecSpec) {
-        node.walk(self);
-    }
-
-    #[allow(missing_docs)]
-    fn visit_aliasspec(&mut self, node: &AliasSpec) {
-        node.walk(self);
-    }
-
-    #[allow(missing_docs)]
-    fn visit_registerid(&mut self, node: &RegisterId) {
         node.walk(self);
     }
 

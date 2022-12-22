@@ -1,8 +1,6 @@
-use proc_macro2::Group;
-
 use {
     proc_macro::{self, TokenStream},
-    proc_macro2::{Span, TokenTree},
+    proc_macro2::{Group, Span, TokenTree},
     quote::quote,
     syn::{
         parse::{self, Parser},

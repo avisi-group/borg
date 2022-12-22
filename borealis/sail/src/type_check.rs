@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        ast::{Effect, Identifier, Mut, Typ, TypQuant, TypeUnion},
+        ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
         runtime::internal_bindings_to_list,
     },
     deepsize::DeepSizeOf,
@@ -19,13 +19,14 @@ struct RawEnv {
     locals: Value,
     _top_letbinds: Value,
     union_ids: Value,
-    registers: Value,
+    _registers: Value,
     variants: Value,
     scattered_variant_envs: Value,
     mappings: Value,
     _typ_vars: Value,
     _shadow_vars: Value,
     _typ_synonyms: Value,
+    _typ_params: Value,
     _overloads: Value,
     _enums: Value,
     _records: Value,
@@ -41,6 +42,10 @@ struct RawEnv {
     _prove: Option<Value>,
     allow_unknowns: bool,
     _bitfields: Value,
+    _top_level: Value,
+    _outcomes: Value,
+    _outcome_typschm: Value,
+    _outcome_instantiation: Value,
 }
 
 /// Type check environment
@@ -58,7 +63,7 @@ pub struct Env {
     pub union_ids: LinkedList<(Identifier, (TypQuant, Typ))>,
 
     /// Registers
-    pub registers: LinkedList<(Identifier, (Effect, Effect, Typ))>,
+    //pub registers: LinkedList<(Identifier, (Value, Effect, Typ))>,
 
     /// Variants
     pub variants: LinkedList<(Identifier, (TypQuant, LinkedList<TypeUnion>))>,
@@ -129,12 +134,6 @@ unsafe impl FromValue for Env {
             .into(),
             union_ids: unsafe {
                 internal_bindings_to_list(rt, raw_env.union_ids)
-                    .unwrap()
-                    .unwrap()
-            }
-            .into(),
-            registers: unsafe {
-                internal_bindings_to_list(rt, raw_env.registers)
                     .unwrap()
                     .unwrap()
             }

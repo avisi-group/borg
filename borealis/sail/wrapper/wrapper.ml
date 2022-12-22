@@ -1,3 +1,5 @@
+open Libsail
+
 type error = Err_exception of string * string | Err_sail of Reporting.error
 
 let exception_to_result f =
@@ -13,14 +15,13 @@ let () =
   Callback.register "internal_util_dedup" (fun a ->
       exception_to_result (fun () -> Util.remove_duplicates a));
 
-  Callback.register "internal_process_files"
-    (fun check options env file_paths ->
+  Callback.register "internal_load_files"
+    (fun default_sail_dir options type_envs file_paths ->
       exception_to_result (fun () ->
-          let name, ast, type_envs =
-            Process_file.load_files ?check options env file_paths
-          in
-          let ast, type_envs = Process_file.descatter type_envs ast in
-          (name, ast, type_envs)));
+          Frontend.load_files default_sail_dir options type_envs file_paths));
+
+  Callback.register "internal_descatter" (fun effect_info env ast ->
+      exception_to_result (fun () -> Frontend.descatter effect_info env ast));
 
   Callback.register "internal_type_check_initial_env" (fun () ->
       exception_to_result (fun () -> Type_check.initial_env));

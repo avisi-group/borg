@@ -3,7 +3,7 @@ source: sail/src/lib.rs
 expression: "(name, ast, env)"
 ---
 [
-  "out.sail",
+  "",
   {
     "defs": [],
     "comments": [],
@@ -120,14 +120,6 @@ expression: "(name, ast, env)"
                   },
                   "annotation": "Unknown",
                   "id": 0
-                },
-                {
-                  "inner": {
-                    "inner": [],
-                    "id": 0
-                  },
-                  "location": "Unknown",
-                  "id": 0
                 }
               ]
             },
@@ -220,14 +212,6 @@ expression: "(name, ast, env)"
                     }
                   },
                   "annotation": "Unknown",
-                  "id": 0
-                },
-                {
-                  "inner": {
-                    "inner": [],
-                    "id": 0
-                  },
-                  "location": "Unknown",
                   "id": 0
                 }
               ]
@@ -346,14 +330,6 @@ expression: "(name, ast, env)"
                   },
                   "annotation": "Unknown",
                   "id": 0
-                },
-                {
-                  "inner": {
-                    "inner": [],
-                    "id": 0
-                  },
-                  "location": "Unknown",
-                  "id": 0
                 }
               ]
             },
@@ -365,7 +341,6 @@ expression: "(name, ast, env)"
     ],
     "locals": [],
     "union_ids": [],
-    "registers": [],
     "variants": [],
     "scattered_variant_envs": [],
     "mappings": [],

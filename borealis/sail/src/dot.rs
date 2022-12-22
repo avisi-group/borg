@@ -3,14 +3,13 @@
 use {
     crate::{
         ast::{
-            AliasSpec, Ast, BaseEffect, Comment, CommentRoot, DecSpec, DefaultSpec, Definition,
-            Effect, EffectOpt, Expression, FieldExpression, FunctionClause, FunctionDefinition,
-            Identifier, IdentifierAux, IndexRange, InternalLoopMeasure, KindIdentifier,
-            KindedIdentifier, LValueExpression, LetBind, Literal, LoopMeasure, MappingClause,
-            MappingDefinition, MappingPattern, MappingPatternExpression, NConstraint,
-            NumericExpression, Order, Pattern, PatternMatch, QuantItem, RecursiveAnnotationOpt,
-            RegisterId, ScatteredDefinition, Typ, TypArg, TypPat, TypQuant, TypeAnnotationOpt,
-            TypeDefinition, TypeScheme, TypeUnion, Value, ValueSpecification,
+            Ast, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, Expression,
+            FieldExpression, FunctionClause, FunctionDefinition, Identifier, IdentifierAux,
+            IndexRange, InternalLoopMeasure, KindIdentifier, KindedIdentifier, LValueExpression,
+            LetBind, Literal, LoopMeasure, MappingClause, MappingDefinition, MappingPattern,
+            MappingPatternExpression, NConstraint, NumericExpression, Order, Pattern, PatternMatch,
+            QuantItem, RecursiveAnnotationOpt, ScatteredDefinition, Typ, TypArg, TypPat, TypQuant,
+            TypeAnnotationOpt, TypeDefinition, TypeScheme, TypeUnion, Value, ValueSpecification,
         },
         types::EnumWrapper,
         visitor::{Visitor, Walkable},
@@ -151,11 +150,6 @@ impl Visitor for Graph {
         node.walk(self);
     }
 
-    fn visit_effect_opt(&mut self, node: &EffectOpt) {
-        self.nodes.insert(node.id(), "Effect opt".into());
-        node.walk(self);
-    }
-
     fn visit_function_clause(&mut self, node: &FunctionClause) {
         self.nodes.insert(node.id(), "Function clause".into());
         node.walk(self);
@@ -173,16 +167,6 @@ impl Visitor for Graph {
 
     fn visit_type_scheme(&mut self, node: &TypeScheme) {
         self.nodes.insert(node.id(), "Type scheme".into());
-        node.walk(self);
-    }
-
-    fn visit_effect(&mut self, node: &Effect) {
-        self.nodes.insert(node.id(), "Effect".into());
-        node.walk(self);
-    }
-
-    fn visit_base_effect(&mut self, node: &BaseEffect) {
-        self.nodes.insert(node.id(), "Base effect".into());
         node.walk(self);
     }
 
@@ -248,16 +232,6 @@ impl Visitor for Graph {
 
     fn visit_decspec(&mut self, node: &DecSpec) {
         self.nodes.insert(node.id(), "Dec spec".into());
-        node.walk(self);
-    }
-
-    fn visit_aliasspec(&mut self, node: &AliasSpec) {
-        self.nodes.insert(node.id(), "Alias spec".into());
-        node.walk(self);
-    }
-
-    fn visit_registerid(&mut self, node: &RegisterId) {
-        self.nodes.insert(node.id(), "Register ID".into());
         node.walk(self);
     }
 

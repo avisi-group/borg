@@ -21,7 +21,7 @@ RUN opam init --disable-sandboxing --bare -y
 RUN opam switch create 4.11.2+musl+static+flambda
 
 # install sail
-RUN eval `opam env` && opam install --assume-depexts -y sail.0.14 gmp
+RUN eval `opam env` && opam install --assume-depexts -y sail=0.15 gmp
 
 # build and document rust dependencies by creating empty crates
 RUN cargo init --lib borealis && \

@@ -25,6 +25,8 @@ use {
     std::{os::unix::prelude::OsStringExt, sync::mpsc, thread},
 };
 
+const DEFAULT_SAIL_DIR: &'static str = "../sail/wrapper";
+
 /// Default runtime thread stack size, as the ARM AST uses 4-8 MiB
 const DEFAULT_RUNTIME_THREAD_STACK_SIZE: usize = 64 * 1024 * 1024; // 64MiB
 
@@ -33,8 +35,21 @@ ocaml::import! {
 
     fn internal_type_check_initial_env() -> Result<Value, WrapperError>;
 
-    // val load_files : ?check:bool -> (Arg.key * Arg.spec * Arg.doc) list -> Type_check.Env.t -> string list -> (string * Type_check.tannot ast * Type_check.Env.t)
-    fn internal_process_files(check: bool, options: List<Value>, env: Value, files: List<BoxRoot<String>>) -> Result<Value, WrapperError>;
+    // val load_files :
+    //     ?target:Target.target ->
+    //     string ->
+    //     (Stdlib.Arg.key * Stdlib.Arg.spec * Stdlib.Arg.doc) list ->
+    //     Type_check.Env.t ->
+    //     string list ->
+    //     Type_check.tannot Ast_defs.ast * Type_check.Env.t * Effects.side_effect_info
+    fn internal_load_files(default_sail_dir: BoxRoot<String>, options: List<Value>, type_envs: Value, file_paths: List<BoxRoot<String>>) -> Result<(Value, Value, Value), WrapperError>;
+
+    // val descatter :
+    //     Effects.side_effect_info ->
+    //     Type_check.Env.t ->
+    //     Type_check.tannot Ast_defs.ast ->
+    //     Type_check.tannot Ast_defs.ast * Type_check.Env.t
+    fn internal_descatter(effect_info: Value, env: Value, ast: Value)  -> Result<(Value, Value), WrapperError>;
 
     pub fn internal_bindings_to_list(input: Value) -> Result<Value, WrapperError>;
 
@@ -212,18 +227,28 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
             unsafe { internal_set_non_lexical_flow(rt, options.non_lexical_flow) }??;
             unsafe { internal_set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
 
-            trace!("Calling internal_process_files");
+            let default_sail_dir: BoxRoot<String> = DEFAULT_SAIL_DIR.to_owned().to_boxroot(rt);
 
-            let value =
-                unsafe { internal_process_files(rt, false, List::empty(), env, file_list) }??;
+            trace!("Calling internal_load_files");
+
+            // opaque `Value`s here
+            let (ast, env, effect_info) = unsafe {
+                internal_load_files(rt, default_sail_dir, List::empty(), env, file_list)
+            }??;
+
+            trace!("Calling internal_descatter");
+
+            let (ast, env) = unsafe { internal_descatter(rt, effect_info, env, ast) }??;
 
             trace!("Converting AST from ocaml::Value");
-
-            let resp = <(String, Ast, Env)>::from_value(value);
-
+            let ast = Ast::from_value(ast);
             trace!("Finished converting AST from ocaml::Value");
 
-            Ok(Response::LoadFiles(resp))
+            trace!("Converting Env from ocaml::Value");
+            let env = Env::from_value(env);
+            trace!("Finished converting Env from ocaml::Value");
+
+            Ok(Response::LoadFiles(("".to_owned(), ast, env)))
         }
     }
 }
