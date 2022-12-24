@@ -74,7 +74,7 @@ fn main() -> Result<()> {
             info!("Loading Sail config {:?}", args.input);
             sail::load_from_config(args.input)
                 .wrap_err("Failed to load Sail files")?
-                .1
+                .0
         }
         Some("bincode") => {
             info!("Deserializing bincode {:?}", args.input);

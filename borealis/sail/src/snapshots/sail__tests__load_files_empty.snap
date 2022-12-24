@@ -1,9 +1,8 @@
 ---
 source: sail/src/lib.rs
-expression: "(name, ast, env)"
+expression: "(ast, env)"
 ---
 [
-  "",
   {
     "defs": [],
     "comments": [],

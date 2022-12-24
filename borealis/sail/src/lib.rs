@@ -50,8 +50,8 @@ static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(String, Ast, Env), Error> {
-    let config = dbg!(json::ModelConfig::load(config_path.as_ref())?);
+pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Error> {
+    let config = json::ModelConfig::load(config_path.as_ref())?;
 
     Ok(RT.lock().load_files(config)?)
 }
@@ -94,23 +94,23 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
-        let (name, ast, env) = load_from_config("../testdata/empty.json").unwrap();
+        let (ast, env) = load_from_config("../testdata/empty.json").unwrap();
 
         crate::dot::render(&ast, &mut vec![]).unwrap();
 
         insta::with_settings!({filters => FILTERS.clone()}, {
-            insta::assert_json_snapshot!((name, ast, env));
+            insta::assert_json_snapshot!((ast, env));
         });
     }
 
     #[test]
     fn load_from_config_arm() {
-        let (name, ast, env) = load_from_config("../testdata/sail-arm-small.json").unwrap();
+        let (ast, env) = load_from_config("../testdata/sail-arm-small.json").unwrap();
 
         crate::dot::render(&ast, &mut vec![]).unwrap();
 
         insta::with_settings!({filters => FILTERS.clone()}, {
-            insta::assert_json_snapshot!((name, ast, env));
+            insta::assert_json_snapshot!((ast, env));
         });
     }
 }

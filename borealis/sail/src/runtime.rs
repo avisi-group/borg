@@ -145,7 +145,7 @@ impl Runtime {
         }
     }
 
-    pub fn load_files(&self, config: ModelConfig) -> Result<(String, Ast, Env), Error> {
+    pub fn load_files(&self, config: ModelConfig) -> Result<(Ast, Env), Error> {
         #[allow(irrefutable_let_patterns)] // remove when more non-test variants are added
         if let Response::LoadFiles(ret) = self.request(Request::LoadFiles(config))? {
             Ok(ret)
@@ -184,7 +184,7 @@ enum Response {
     #[cfg(test)]
     AddNum(String),
 
-    LoadFiles((String, Ast, Env)),
+    LoadFiles((Ast, Env)),
 }
 
 /// Process a single incoming request by calling the corresponding OCaml
@@ -248,7 +248,7 @@ fn process_request(rt: &mut OCamlRuntime, req: Request) -> Result<Response, Erro
             let env = Env::from_value(env);
             trace!("Finished converting Env from ocaml::Value");
 
-            Ok(Response::LoadFiles(("".to_owned(), ast, env)))
+            Ok(Response::LoadFiles((ast, env)))
         }
     }
 }
