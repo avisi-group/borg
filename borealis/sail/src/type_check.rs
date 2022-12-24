@@ -3,7 +3,7 @@
 use {
     crate::{
         ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
-        runtime::internal_bindings_to_list,
+        wrapper::internal_bindings_to_list,
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Value},

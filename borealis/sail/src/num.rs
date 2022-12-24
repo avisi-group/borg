@@ -3,8 +3,8 @@
 
 use {
     crate::{
-        runtime::internal_bigint_to_string,
         visitor::{Visitor, Walkable},
+        wrapper::internal_bigint_to_string,
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
@@ -64,7 +64,18 @@ pub struct Ratio {
 
 #[cfg(test)]
 mod tests {
-    use {crate::RT, num_bigint::BigInt, proptest::prelude::*, std::str::FromStr};
+    use {
+        crate::{wrapper::internal_add_num, RT},
+        num_bigint::BigInt,
+        proptest::prelude::*,
+        std::str::FromStr,
+    };
+
+    fn runtime_add_num(a: String, b: String) -> String {
+        RT.lock()
+            .execute(move |rt| unsafe { internal_add_num(rt, a, b) }.unwrap().unwrap())
+            .unwrap()
+    }
 
     proptest! {
         /// Check passing num_bigint::BigInt to OCaml `Num` and back through string representations
@@ -78,7 +89,7 @@ mod tests {
             let c = {
                 let a_str = a.to_string();
                 let b_str = b.to_string();
-                BigInt::from_str(&RT.lock().add_num(a_str.clone(), b_str.clone()).unwrap()).unwrap()
+                BigInt::from_str(&runtime_add_num(a_str.clone(), b_str.clone())).unwrap()
             };
 
             assert_eq!(c_true, c);

@@ -3,10 +3,25 @@
 //! Rust interface to `Sail` compiler library
 
 use {
-    crate::{ast::Ast, error::Error, runtime::Runtime, type_check::Env},
+    crate::{
+        ast::Ast,
+        error::Error,
+        json::ModelConfig,
+        runtime::Runtime,
+        type_check::Env,
+        wrapper::{
+            internal_descatter, internal_load_files, internal_set_no_lexp_bounds_check,
+            internal_set_non_lexical_flow, internal_type_check_initial_env,
+        },
+    },
+    log::trace,
+    ocaml::{
+        interop::{BoxRoot, ToOCaml},
+        FromValue, List,
+    },
     once_cell::sync::Lazy,
     parking_lot::Mutex,
-    std::path::Path,
+    std::{os::unix::ffi::OsStringExt, path::Path},
 };
 
 pub mod ast;
@@ -18,9 +33,12 @@ mod runtime;
 pub mod type_check;
 pub mod types;
 pub mod visitor;
+mod wrapper;
 
 /// Global runtime shared by all public functions
 static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
+
+const DEFAULT_SAIL_DIR: &str = "../sail/wrapper";
 
 /// Loads Sail files from `sail.json` model configuration.
 ///
@@ -51,15 +69,51 @@ static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
 pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Error> {
-    let config = json::ModelConfig::load(config_path.as_ref())?;
+    let ModelConfig { options, files } = json::ModelConfig::load(config_path.as_ref())?;
 
-    RT.lock().load_files(config)
+    RT.lock().execute(move |rt| {
+        let env = unsafe { internal_type_check_initial_env(rt)?? };
+
+        let mut file_list = List::empty();
+
+        for path in files.into_iter().rev() {
+            let path = unsafe { String::from_utf8_unchecked(path.into_os_string().into_vec()) };
+            let file_rooted: BoxRoot<String> = path.to_boxroot(rt);
+            file_list = unsafe { file_list.add(rt, &file_rooted) };
+        }
+
+        unsafe { internal_set_non_lexical_flow(rt, options.non_lexical_flow) }??;
+        unsafe { internal_set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
+
+        let default_sail_dir: BoxRoot<String> = DEFAULT_SAIL_DIR.to_owned().to_boxroot(rt);
+
+        trace!("Calling internal_load_files");
+
+        // opaque `Value`s here
+        let (ast, env, effect_info) =
+            unsafe { internal_load_files(rt, default_sail_dir, List::empty(), env, file_list) }??;
+
+        trace!("Calling internal_descatter");
+
+        let (ast, env) = unsafe { internal_descatter(rt, effect_info, env, ast) }??;
+
+        trace!("Converting AST from ocaml::Value");
+        let ast = Ast::from_value(ast);
+        trace!("Finished converting AST from ocaml::Value");
+
+        trace!("Converting Env from ocaml::Value");
+        let env = Env::from_value(env);
+        trace!("Finished converting Env from ocaml::Value");
+
+        Ok((ast, env))
+    })?
 }
 
 #[cfg(test)]
 mod tests {
     use {
-        crate::{load_from_config, RT},
+        crate::{load_from_config, wrapper::internal_util_dedup, RT},
+        ocaml::{List, ToValue},
         once_cell::sync::Lazy,
         proptest::{bits, collection::vec, prelude::*},
     };
@@ -75,6 +129,23 @@ mod tests {
         ]
     });
 
+    fn dedup(list: Vec<i32>) -> Vec<i32> {
+        RT.lock()
+            .execute(|rt| {
+                let mut l = List::empty();
+
+                for element in list {
+                    l = unsafe { l.add(rt, &element.to_value(rt)) };
+                }
+
+                unsafe { internal_util_dedup(rt, l) }
+                    .unwrap()
+                    .unwrap()
+                    .into_vec()
+            })
+            .unwrap()
+    }
+
     proptest! {
         /// Checks equivalence between libsail dedup function and Rust stdlib dedup.
         ///
@@ -86,8 +157,9 @@ mod tests {
 
             v_d.dedup();
 
-            let mut out = RT.lock().dedup(v).unwrap();
+            let mut out = dedup(v);
             out.sort();
+
             assert_eq!(out, v_d);
         }
     }

@@ -1,7 +1,7 @@
 //! Error handling for Sail interface
 
 use {
-    crate::{ast::L, runtime::Request, types::Position},
+    crate::{ast::L, types::Position},
     ocaml::{CamlError, FromValue, Int},
     std::{
         fmt::Debug,
@@ -137,13 +137,13 @@ impl From<&ocaml::CamlError> for OCamlErrorInner {
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum ChannelError {
     /// Sending failed
-    Send(#[from] SendError<Request>),
+    Send(#[from] SendError<()>),
     /// Receiving failed
     Receive(#[from] RecvError),
 }
 
-impl From<SendError<Request>> for Error {
-    fn from(e: SendError<Request>) -> Self {
+impl From<SendError<()>> for Error {
+    fn from(e: SendError<()>) -> Self {
         Error::RuntimeCommunication(e.into())
     }
 }
