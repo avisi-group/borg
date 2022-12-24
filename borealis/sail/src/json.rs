@@ -35,8 +35,8 @@ impl ModelConfig {
 
         // read from JSON (using intermediate private struct to parse command line options)
         let Intermediate { options, files } =
-            serde_json::from_reader(fs::File::open(config_path).map_err(ErrCtx::f(&config_path))?)
-                .map_err(ErrCtx::f(&config_path))?;
+            serde_json::from_reader(fs::File::open(config_path).map_err(ErrCtx::f(config_path))?)
+                .map_err(ErrCtx::f(config_path))?;
 
         let mut config = ModelConfig {
             options: options.as_str().try_into()?,
@@ -44,9 +44,9 @@ impl ModelConfig {
         };
 
         // directory that config file is in
-        let config_dir = dbg!((&config_path)
+        let config_dir = (config_path)
             .parent()
-            .ok_or(Error::NoParent(config_path.to_owned()))?);
+            .ok_or(Error::NoParent(config_path.to_owned()))?;
 
         // if a path is not absolute, prepend the directory the config file is in to each
         for file_path in &mut config.files {
@@ -86,7 +86,7 @@ impl TryFrom<&str> for Options {
             no_lexp_bounds_check: false,
         };
 
-        for flag in s.split_ascii_whitespace().into_iter() {
+        for flag in s.split_ascii_whitespace() {
             match flag {
                 "-non_lexical_flow" => options.non_lexical_flow = true,
                 "-no_lexp_bounds_check" => options.no_lexp_bounds_check = true,

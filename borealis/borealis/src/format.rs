@@ -253,7 +253,7 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
 
     let homogenised_bits = homogenised_ranges
         .into_iter()
-        .map(|(n, r)| (n, &format_bits[r.clone()]))
+        .map(|(n, r)| (n, &format_bits[r]))
         .collect::<Vec<_>>();
 
     trace!("homogenised_bits: {:?}", homogenised_bits);
@@ -379,7 +379,7 @@ fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringK
     let range = match &**expression_aux {
         ExpressionAux::Vector(expressions) => {
             assert_eq!(expressions.len(), 1);
-            bitvector_access_to_range(&*expressions.front().unwrap().inner)
+            bitvector_access_to_range(&expressions.front().unwrap().inner)
         }
         ExpressionAux::Application(ident, exps) => vector_subrange_to_range(ident, exps),
         exp => panic!(

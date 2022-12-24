@@ -34,7 +34,7 @@ pub fn export<P: AsRef<Path>>(
 ) -> Result<(), Error> {
     let path = path.as_ref();
 
-    let count = read_dir(&path)
+    let count = read_dir(path)
         .map_err(|e| {
             if e.kind() == io::ErrorKind::NotFound {
                 Error::OutDirectoryNotFound(path.to_owned())

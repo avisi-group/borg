@@ -63,7 +63,7 @@ impl<'de> serde::Deserialize<'de> for InternedStringKey {
     where
         D: serde::Deserializer<'de>,
     {
-        String::deserialize(deserializer).map(|s| Self::new(s))
+        String::deserialize(deserializer).map(Self::new)
     }
 }
 

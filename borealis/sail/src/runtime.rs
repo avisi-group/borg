@@ -25,7 +25,7 @@ use {
     std::{os::unix::prelude::OsStringExt, sync::mpsc, thread},
 };
 
-const DEFAULT_SAIL_DIR: &'static str = "../sail/wrapper";
+const DEFAULT_SAIL_DIR: &str = "../sail/wrapper";
 
 /// Default runtime thread stack size, as the ARM AST uses 4-8 MiB
 const DEFAULT_RUNTIME_THREAD_STACK_SIZE: usize = 64 * 1024 * 1024; // 64MiB

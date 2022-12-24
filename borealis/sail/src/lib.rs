@@ -53,7 +53,7 @@ static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Error> {
     let config = json::ModelConfig::load(config_path.as_ref())?;
 
-    Ok(RT.lock().load_files(config)?)
+    RT.lock().load_files(config)
 }
 
 #[cfg(test)]

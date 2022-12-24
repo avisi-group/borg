@@ -40,7 +40,7 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
         assignments.extend([quote!(#name: raw.#name,)]);
     }
 
-    return quote! {
+    quote! {
         #modified_struct
 
         #[doc(hidden)]
@@ -70,7 +70,7 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
             }
         };
     }
-    .into();
+    .into()
 }
 
 /// `#[derive(FromValue)]` attribute

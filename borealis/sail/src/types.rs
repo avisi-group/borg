@@ -8,7 +8,7 @@ use {
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
     serde::{Deserialize, Serialize},
-    std::{fmt::Display, path::PathBuf},
+    std::{ffi::OsStr, fmt::Display, path::PathBuf},
 };
 
 /// Kind identifier
@@ -46,8 +46,7 @@ impl Display for Position {
             "{}:{}:{}",
             PathBuf::from(self.pos_fname.to_string())
                 .file_name()
-                .map(|s| s.to_str())
-                .flatten()
+                .and_then(OsStr::to_str)
                 .unwrap_or("?"),
             self.pos_lnum,
             self.pos_cnum - self.pos_bol

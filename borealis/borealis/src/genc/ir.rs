@@ -64,15 +64,15 @@ impl Display for Main {
             "\tac_mem Fetch({}, {}, {}, {});",
             self.wordsize, self.wordsize, self.endianness, 1
         )?;
-        writeln!(f, "")?;
+        writeln!(f)?;
         writeln!(f, "\tac_wordsize {};", self.wordsize)?;
-        writeln!(f, "")?;
+        writeln!(f)?;
 
         for register in &self.registers {
             write!(f, "{}", register)?;
         }
 
-        writeln!(f, "")?;
+        writeln!(f)?;
 
         writeln!(f, "\tARCH_CTOR(arm) {{")?;
         writeln!(f, "\t\tac_isa(\"{}\");", ISA_FILENAME)?;
@@ -191,7 +191,7 @@ impl Display for Isa {
             write!(f, "{}", format)?;
         }
 
-        writeln!(f, "")?;
+        writeln!(f)?;
         writeln!(f, "\tISA_CTOR(arm) {{")?;
 
         for Format {

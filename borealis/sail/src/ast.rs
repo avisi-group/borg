@@ -97,7 +97,7 @@ impl Walkable for EnumWrapper<Value> {
 
 /// Annotation with generic value (ignored as unit here)
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct Annot(pub L, ());
+pub struct Annot(pub L);
 
 /// Loop kind
 #[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
@@ -656,9 +656,9 @@ pub struct InternalLoopMeasure {
 
 impl Walkable for InternalLoopMeasure {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        self.inner
-            .as_ref()
-            .map(|exp| visitor.visit_expression(&*exp));
+        if let Some(exp) = &self.inner {
+            visitor.visit_expression(exp)
+        }
     }
 }
 
