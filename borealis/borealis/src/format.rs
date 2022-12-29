@@ -113,6 +113,7 @@ impl From<&Literal> for Format {
 pub struct DecodeStringVisitor {
     /// Decoded instruction formats
     pub formats: HashMap<InternedStringKey, GenCFormat>,
+    counters: HashMap<InternedStringKey, u32>,
 }
 
 impl DecodeStringVisitor {
@@ -120,7 +121,15 @@ impl DecodeStringVisitor {
     pub fn new() -> Self {
         Self {
             formats: HashMap::new(),
+            counters: HashMap::new(),
         }
+    }
+
+    fn increment_count(&mut self, key: InternedStringKey) -> u32 {
+        let current = self.counters.get(&key).copied().unwrap_or(0);
+        let last = self.counters.insert(key, current + 1);
+        assert!(last == Some(current) || last == None);
+        current
     }
 }
 
@@ -292,7 +301,9 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
 
     assert_eq!(inner.iter().map(|s| s.length).sum::<usize>(), 32);
 
-    let name = format!("{}{}", instruction_name, unique_id()).into();
+    let count = visitor.increment_count(instruction_name);
+
+    let name = format!("{}{}", instruction_name, count).into();
     let format = GenCFormat(inner);
     trace!("{} genc format: {}", name, format);
 
