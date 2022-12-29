@@ -29,29 +29,34 @@ struct Args {
     #[arg(long)]
     force: bool,
 
+    /// Output format
     #[command(subcommand)]
     output: Output,
 }
 
 #[derive(Subcommand, Debug)]
 enum Output {
+    /// Output a GenC description of the instruction set architecture
     Genc {
         /// Path to empty folder where GenC description files will be emitted.
         #[arg(short)]
         output: PathBuf,
     },
+    /// Output a DOT graph of the input AST
     Dot {
         /// Path to DOT file.
         #[arg(short)]
         output: PathBuf,
     },
+    /// Serialize the AST to JSON
     Json {
         /// Path to JSON file.
         #[arg(short)]
         output: PathBuf,
     },
+    /// Serialize the AST to Bincode
     Bincode {
-        /// Path to bincode file.
+        /// Path to Bincode file.
         #[arg(short)]
         output: PathBuf,
     },
