@@ -1,9 +1,7 @@
 //! Instruction format string extraction
 
-use crate::genc::format::{Segment, SegmentContent};
-
 use {
-    crate::genc::format::InstructionFormat as GenCFormat,
+    crate::genc::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
     common::{identifiable::unique_id, intern::InternedStringKey},
     log::{trace, warn},
     num_bigint::Sign,
@@ -63,7 +61,7 @@ pub struct Format(Vec<FormatBit>);
 
 impl Format {
     /// Create a new empty collection
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self(vec![])
     }
 
@@ -99,7 +97,7 @@ impl From<&Literal> for Format {
             panic!("Unexpected literal when decoding instruction format");
         };
 
-        let mut decode_bits = Format::new();
+        let mut decode_bits = Format::empty();
         for char in s.to_string().chars() {
             match char {
                 '0' => decode_bits.push(FormatBit::Zero),
@@ -123,6 +121,12 @@ impl DecodeStringVisitor {
         Self {
             formats: HashMap::new(),
         }
+    }
+}
+
+impl Default for DecodeStringVisitor {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -156,20 +160,20 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
         panic!("Body was not Block");
     };
 
-    let expression_count = expressions.len();
+    assert_eq!(expressions.len(), 2);
 
     assert!(is_see_assignment(expressions.front().unwrap()));
-    //   assert!(is_instruction_impl_function_call(expressions.back().unwrap()));
+
+    let expressions = flatten_expression(expressions.back().unwrap());
 
     let mut named_ranges = expressions
         .iter()
-        .take(expression_count - 1) // skip last expression
-        .skip(1) // skip first expression
+        .take(expressions.len() - 1) // skip last expression
         .filter_map(expression_to_named_range)
         .collect::<Vec<_>>();
 
     let instruction_name = {
-        let Some(Expression { inner, .. }) = expressions.back() else { panic!() };
+        let Some(Expression { inner, .. }) = expressions.last() else { panic!() };
 
         let ExpressionAux::Application(ident, ..) = &**inner else { panic!() };
 
@@ -211,7 +215,7 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
     let homogenised_ranges = named_ranges
         .clone()
         .into_iter()
-        .map(|(n, r)| {
+        .flat_map(|(n, r)| {
             let bits = &format_bits[r.clone()];
 
             // determine locations where bit kind changes
@@ -246,7 +250,6 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
                 }
             })
         })
-        .flatten()
         .collect::<Vec<_>>();
 
     trace!("homogenised_ranges: {:?}", homogenised_ranges);
@@ -296,8 +299,41 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
     visitor.formats.insert(name, format);
 }
 
+fn flatten_expression(expression: &Expression) -> Vec<Expression> {
+    let mut exps = vec![];
+
+    let mut current_expression = expression.clone();
+
+    loop {
+        let (lhs, rhs, exp1) = match *current_expression.inner {
+            ExpressionAux::Var(lhs, rhs, exp1) => (lhs, rhs, exp1),
+            ExpressionAux::Application(..) => {
+                exps.push(current_expression);
+                break;
+            }
+            _ => panic!("{}", <&'static str>::from(*current_expression.inner)),
+        };
+
+        current_expression.inner = Box::new(ExpressionAux::Assign(lhs.clone(), rhs.clone()));
+
+        exps.push(current_expression);
+
+        let ExpressionAux::Block(expressions) = &*exp1.inner else { panic!() };
+
+        match expressions.len() {
+            0 => break,
+            1 => {
+                current_expression = expressions.front().unwrap().clone();
+            }
+            _ => panic!(),
+        }
+    }
+
+    exps
+}
+
 fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
-    let mut format_bits = Format::new();
+    let mut format_bits = Format::empty();
 
     let PatternAux::As(Pattern { inner, .. }, ident) = pattern_aux else {
         panic!();
@@ -328,29 +364,27 @@ fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
                     n => warn!("found non-wildcard: {}", Into::<&'static str>::into(n)),
                 };
 
-                match &*typ.inner {
-                    TypAux::Application(
-                        Identifier {
-                            inner: IdentifierAux::Identifier(s),
-                            ..
-                        },
-                        typargs,
-                    ) => {
-                        if s.to_string() != "bits" {
-                            panic!();
-                        }
+                if let TypAux::Application(
+                    Identifier {
+                        inner: IdentifierAux::Identifier(s),
+                        ..
+                    },
+                    typargs,
+                ) = &*typ.inner
+                {
+                    if s.to_string() != "bits" {
+                        panic!();
+                    }
 
-                        if let TypArgAux::NExp(NumericExpression { inner: n, .. }) =
-                            &typargs.front().unwrap().inner
-                        {
-                            if let NumericExpressionAux::Constant(sail::num::BigInt(big)) = &**n {
-                                for _ in 0..big.to_u64_digits().1[0] {
-                                    format_bits.push(FormatBit::Unknown);
-                                }
+                    if let TypArgAux::NExp(NumericExpression { inner: n, .. }) =
+                        &typargs.front().unwrap().inner
+                    {
+                        if let NumericExpressionAux::Constant(sail::num::BigInt(big)) = &**n {
+                            for _ in 0..big.to_u64_digits().1[0] {
+                                format_bits.push(FormatBit::Unknown);
                             }
                         }
                     }
-                    _ => (),
                 }
             }
             pat => warn!("pattern aux was type {}", Into::<&'static str>::into(pat)),
@@ -365,7 +399,6 @@ fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
 fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringKey, Range<usize>)> {
     let ExpressionAux::Assign(LValueExpression { inner: lvalue, ..}, Expression { inner: expression_aux, .. }) = &*expression.inner else {
         panic!("ExpressionAux not an Assign");
-
     };
 
     let name = {

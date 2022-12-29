@@ -1,6 +1,5 @@
 //! Trait and derive macro for uniquely identifying nodes
 
-use core::panic;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 pub use borealis_macro::identifiable_fromvalue;

@@ -1,7 +1,8 @@
-use crate::genc::Instruction;
-
 use {
-    crate::{format::DecodeStringVisitor, genc::Description},
+    crate::{
+        format::DecodeStringVisitor,
+        genc::{Description, Instruction},
+    },
     sail::{ast::Ast, visitor::Visitor},
 };
 
