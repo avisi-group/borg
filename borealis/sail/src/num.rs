@@ -4,7 +4,7 @@
 use {
     crate::{
         visitor::{Visitor, Walkable},
-        wrapper::internal_bigint_to_string,
+        wrapper::bigint_to_string,
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, Value},
@@ -37,9 +37,7 @@ unsafe impl FromValue for BigInt {
     fn from_value(v: Value) -> Self {
         let rt = unsafe { ocaml::Runtime::recover_handle() };
 
-        let s = unsafe { internal_bigint_to_string(rt, v) }
-            .unwrap()
-            .unwrap();
+        let s = unsafe { bigint_to_string(rt, v) }.unwrap().unwrap();
 
         Self(num_bigint::BigInt::from_str(&s).unwrap())
     }
@@ -65,7 +63,7 @@ pub struct Ratio {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{wrapper::internal_add_num, RT},
+        crate::{runtime::RT, wrapper},
         num_bigint::BigInt,
         proptest::prelude::*,
         std::str::FromStr,
@@ -73,7 +71,7 @@ mod tests {
 
     fn runtime_add_num(a: String, b: String) -> String {
         RT.lock()
-            .execute(move |rt| unsafe { internal_add_num(rt, a, b) }.unwrap().unwrap())
+            .execute(move |rt| unsafe { wrapper::add_num(rt, a, b) }.unwrap().unwrap())
             .unwrap()
     }
 

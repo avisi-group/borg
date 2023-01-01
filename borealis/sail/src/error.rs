@@ -2,9 +2,11 @@
 
 use {
     crate::{ast::L, types::Position},
+    common::error::ErrCtx,
     ocaml::{CamlError, FromValue, Int},
     std::{
         fmt::Debug,
+        io,
         sync::mpsc::{RecvError, SendError},
     },
 };
@@ -12,6 +14,9 @@ use {
 /// Main `sail` crate error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
+    /// IO error
+    Io(#[from] ErrCtx<io::Error>),
+
     /// OCaml function error
     OCamlFunction(#[from] OCamlError),
 
@@ -174,7 +179,7 @@ pub enum SailCompilerError {
     /// General error: {1:?} @ {0:?}
     General(L, String),
     /// Unreachable error in {1:?}: {3:?} @ {0:?}
-    Unreachable(L, (String, Int, Int, Int, Int), (), String),
+    Unreachable(L, (String, Int, Int, Int), (), String),
     /// Todo error: {1:?} @ {0:?}
     Todo(L, String),
     /// Syntax error: {1:?} @ {0:?}
@@ -183,6 +188,6 @@ pub enum SailCompilerError {
     SyntaxLocation(L, String),
     /// Lexical error: {1:?} @ {0:?}
     Lexical(Position, String),
-    /// Type error: {1:?} @ {0:?}
-    Type(L, String),
+    /// Type error: {1:?} {2:?} @ {0}
+    Type(L, Option<String>, String),
 }

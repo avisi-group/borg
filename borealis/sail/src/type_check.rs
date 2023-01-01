@@ -3,7 +3,7 @@
 use {
     crate::{
         ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
-        wrapper::internal_bindings_to_list,
+        wrapper::bindings_to_list,
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Value},
@@ -109,7 +109,7 @@ unsafe impl FromValue for Env {
 
         let mut scattered_variant_envs = vec![];
         for (id, value) in unsafe {
-            internal_bindings_to_list(rt, raw_env.scattered_variant_envs)
+            bindings_to_list(rt, raw_env.scattered_variant_envs)
                 .unwrap()
                 .unwrap()
         }
@@ -121,36 +121,16 @@ unsafe impl FromValue for Env {
 
         Self {
             top_val_specs: unsafe {
-                internal_bindings_to_list(rt, raw_env.top_val_specs)
+                bindings_to_list(rt, raw_env.top_val_specs)
                     .unwrap()
                     .unwrap()
             }
             .into(),
-            locals: unsafe {
-                internal_bindings_to_list(rt, raw_env.locals)
-                    .unwrap()
-                    .unwrap()
-            }
-            .into(),
-            union_ids: unsafe {
-                internal_bindings_to_list(rt, raw_env.union_ids)
-                    .unwrap()
-                    .unwrap()
-            }
-            .into(),
-            variants: unsafe {
-                internal_bindings_to_list(rt, raw_env.variants)
-                    .unwrap()
-                    .unwrap()
-            }
-            .into(),
+            locals: unsafe { bindings_to_list(rt, raw_env.locals).unwrap().unwrap() }.into(),
+            union_ids: unsafe { bindings_to_list(rt, raw_env.union_ids).unwrap().unwrap() }.into(),
+            variants: unsafe { bindings_to_list(rt, raw_env.variants).unwrap().unwrap() }.into(),
             scattered_variant_envs,
-            mappings: unsafe {
-                internal_bindings_to_list(rt, raw_env.mappings)
-                    .unwrap()
-                    .unwrap()
-            }
-            .into(),
+            mappings: unsafe { bindings_to_list(rt, raw_env.mappings).unwrap().unwrap() }.into(),
             casts: raw_env.casts,
             allow_casts: raw_env.allow_casts,
             allow_bindings: raw_env.allow_bindings,

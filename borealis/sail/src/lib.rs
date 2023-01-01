@@ -2,26 +2,24 @@
 
 //! Rust interface to `Sail` compiler library
 
+use std::collections::LinkedList;
+
 use {
     crate::{
         ast::Ast,
         error::Error,
         json::ModelConfig,
-        runtime::Runtime,
+        runtime::RT,
         type_check::Env,
         wrapper::{
-            internal_descatter, internal_load_files, internal_set_no_lexp_bounds_check,
-            internal_set_non_lexical_flow, internal_type_check_initial_env,
+            descatter, parse_file, preprocess, process, set_no_lexp_bounds_check,
+            set_non_lexical_flow, type_check_initial_env,
         },
     },
+    common::error::ErrCtx,
     log::trace,
-    ocaml::{
-        interop::{BoxRoot, ToOCaml},
-        FromValue, List,
-    },
-    once_cell::sync::Lazy,
-    parking_lot::Mutex,
-    std::{os::unix::ffi::OsStringExt, path::Path},
+    ocaml::{FromValue, List},
+    std::{fs::read_to_string, path::Path},
 };
 
 pub mod ast;
@@ -35,10 +33,7 @@ pub mod types;
 pub mod visitor;
 mod wrapper;
 
-/// Global runtime shared by all public functions
-static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
-
-const DEFAULT_SAIL_DIR: &str = "../sail/wrapper";
+const DEFAULT_SAIL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/wrapper");
 
 /// Loads Sail files from `sail.json` model configuration.
 ///
@@ -72,30 +67,52 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Er
     let ModelConfig { options, files } = json::ModelConfig::load(config_path.as_ref())?;
 
     RT.lock().execute(move |rt| {
-        let env = unsafe { internal_type_check_initial_env(rt)?? };
+        let env = unsafe { type_check_initial_env(rt)?? };
 
-        let mut file_list = List::empty();
+        unsafe { set_non_lexical_flow(rt, options.non_lexical_flow) }??;
+        unsafe { set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
 
-        for path in files.into_iter().rev() {
-            let path = unsafe { String::from_utf8_unchecked(path.into_os_string().into_vec()) };
-            let file_rooted: BoxRoot<String> = path.to_boxroot(rt);
-            file_list = unsafe { file_list.add(rt, &file_rooted) };
+        trace!("Parsing files");
+
+        let mut parsed_files = vec![];
+        let mut comments = LinkedList::new();
+
+        for file_path in files {
+            let contents = read_to_string(&file_path).map_err(ErrCtx::f(&file_path))?;
+
+            // file path used for AST location annotation
+            let path = file_path.as_os_str().to_string_lossy().to_string();
+
+            let (file_comments, file_ast) = unsafe { parse_file(rt, contents, path.clone()) }??;
+
+            parsed_files.push((path.clone(), file_ast));
+            comments.push_back((path, file_comments));
         }
 
-        unsafe { internal_set_non_lexical_flow(rt, options.non_lexical_flow) }??;
-        unsafe { internal_set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
+        let mut defs = LinkedList::new();
+        for (path, file_defs) in parsed_files {
+            trace!("Preprocessing {:?}", path);
 
-        let default_sail_dir: BoxRoot<String> = DEFAULT_SAIL_DIR.to_owned().to_boxroot(rt);
+            let file_defs = unsafe {
+                preprocess(
+                    rt,
+                    DEFAULT_SAIL_DIR.to_owned(),
+                    None,
+                    List::empty(),
+                    file_defs,
+                )
+            }??;
 
-        trace!("Calling internal_load_files");
+            defs.push_back((path, file_defs));
+        }
 
-        // opaque `Value`s here
-        let (ast, env, effect_info) =
-            unsafe { internal_load_files(rt, default_sail_dir, List::empty(), env, file_list) }??;
+        trace!("Calling process");
 
-        trace!("Calling internal_descatter");
+        let (ast, type_envs, side_effects) = unsafe { process(rt, defs, comments, env) }??;
 
-        let (ast, env) = unsafe { internal_descatter(rt, effect_info, env, ast) }??;
+        trace!("Calling descatter");
+
+        let (ast, env) = unsafe { descatter(rt, side_effects, type_envs, ast) }??;
 
         trace!("Converting AST from ocaml::Value");
         let ast = Ast::from_value(ast);
@@ -112,7 +129,7 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Er
 #[cfg(test)]
 mod tests {
     use {
-        crate::{load_from_config, wrapper::internal_util_dedup, RT},
+        crate::{load_from_config, wrapper::util_dedup, RT},
         ocaml::{List, ToValue},
         once_cell::sync::Lazy,
         proptest::{bits, collection::vec, prelude::*},
@@ -138,10 +155,7 @@ mod tests {
                     l = unsafe { l.add(rt, &element.to_value(rt)) };
                 }
 
-                unsafe { internal_util_dedup(rt, l) }
-                    .unwrap()
-                    .unwrap()
-                    .into_vec()
+                unsafe { util_dedup(rt, l) }.unwrap().unwrap().into_vec()
             })
             .unwrap()
     }

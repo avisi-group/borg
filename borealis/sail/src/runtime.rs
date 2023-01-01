@@ -14,12 +14,17 @@ use {
     crate::error::Error,
     log::{error, trace},
     ocaml::Runtime as OCamlRuntime,
+    once_cell::sync::Lazy,
+    parking_lot::Mutex,
     std::{
         any::{Any, TypeId},
         sync::mpsc,
         thread,
     },
 };
+
+/// Global runtime shared by all public functions
+pub static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 
 /// Default runtime thread stack size
 ///

@@ -128,7 +128,7 @@ impl DecodeStringVisitor {
     fn increment_count(&mut self, key: InternedStringKey) -> u32 {
         let current = self.counters.get(&key).copied().unwrap_or(0);
         let last = self.counters.insert(key, current + 1);
-        assert!(last == Some(current) || last == None);
+        assert!(last == Some(current) || last.is_none());
         current
     }
 }
