@@ -5,7 +5,6 @@ use {
     common::{error::ErrCtx, identifiable::unique_id, intern::INTERNER},
     deepsize::DeepSizeOf,
     log::{info, trace, warn},
-    sail::dot,
     std::{
         ffi::OsStr,
         fs::File,
@@ -39,12 +38,6 @@ enum Output {
     /// Output a GenC description of the instruction set architecture
     Genc {
         /// Path to empty folder where GenC description files will be emitted.
-        #[arg(short)]
-        output: PathBuf,
-    },
-    /// Output a DOT graph of the input AST
-    Dot {
-        /// Path to DOT file.
         #[arg(short)]
         output: PathBuf,
     },
@@ -107,11 +100,6 @@ fn main() -> Result<()> {
             info!("Exporting GenC description");
             export(&description, output, args.force)
                 .wrap_err("Error while exporting GenC description")?
-        }
-
-        Output::Dot { output } => {
-            info!("Printing AST as do graph");
-            dot::render(&ast, &mut create_file(output, args.force)?)?
         }
 
         Output::Json { output } => {

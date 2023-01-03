@@ -21,7 +21,6 @@ use {
 };
 
 pub mod ast;
-pub mod dot;
 pub mod error;
 pub mod json;
 pub mod num;
@@ -179,8 +178,6 @@ mod tests {
         ))
         .unwrap();
 
-        crate::dot::render(&ast, &mut vec![]).unwrap();
-
         insta::with_settings!({filters => FILTERS.clone()}, {
             insta::assert_json_snapshot!((ast, env));
         });
@@ -193,8 +190,6 @@ mod tests {
             "/../testdata/sail-arm-small.json"
         ))
         .unwrap();
-
-        crate::dot::render(&ast, &mut vec![]).unwrap();
 
         insta::with_settings!({filters => FILTERS.clone()}, {
             insta::assert_json_snapshot!((ast, env));
