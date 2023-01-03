@@ -4,16 +4,16 @@
 use {
     crate::{
         visitor::{Visitor, Walkable},
-        wrapper::bigint_to_string,
+        wrapper::{bigint_to_string, string_to_bigint},
     },
     deepsize::DeepSizeOf,
-    ocaml::{FromValue, Int, Value},
+    ocaml::{FromValue, Int, ToValue, Value},
     serde::{Deserialize, Serialize},
     std::str::FromStr,
 };
 
 /// Arbitrary precision number from `Num.num` OCaml type
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum Num {
     /// Integer
     Int(Int),
@@ -24,7 +24,7 @@ pub enum Num {
 }
 
 /// Signed big integer from `Nat_big_num.num` OCaml type
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BigInt(pub num_bigint::BigInt);
 
 impl Walkable for BigInt {
@@ -43,6 +43,13 @@ unsafe impl FromValue for BigInt {
     }
 }
 
+unsafe impl ToValue for BigInt {
+    fn to_value(&self, rt: &ocaml::Runtime) -> Value {
+        let s = num_bigint::BigInt::to_string(&self.0);
+        unsafe { string_to_bigint(rt, s) }.unwrap().unwrap()
+    }
+}
+
 impl DeepSizeOf for BigInt {
     fn deep_size_of_children(&self, _: &mut deepsize::Context) -> usize {
         (self.0.bits() / 8) as usize
@@ -50,7 +57,7 @@ impl DeepSizeOf for BigInt {
 }
 
 /// Ratio of big integers from `num.Ratio.ratio` OCaml type
-#[derive(Debug, Clone, FromValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ratio {
     /// Numerator
     pub numerator: BigInt,
@@ -63,32 +70,28 @@ pub struct Ratio {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{runtime::RT, wrapper},
-        num_bigint::BigInt,
+        crate::{num::BigInt, runtime::RT, wrapper},
         proptest::prelude::*,
-        std::str::FromStr,
     };
-
-    fn runtime_add_num(a: String, b: String) -> String {
-        RT.lock()
-            .execute(move |rt| unsafe { wrapper::add_num(rt, a, b) }.unwrap().unwrap())
-            .unwrap()
-    }
 
     proptest! {
         /// Check passing num_bigint::BigInt to OCaml `Num` and back through string representations
         #[test]
         fn add_num(a: Vec<u8>, b: Vec<u8>) {
-            let a = BigInt::from_signed_bytes_be(&a);
-            let b = BigInt::from_signed_bytes_be(&b);
+            let a = num_bigint::BigInt::from_signed_bytes_be(&a);
+            let b = num_bigint::BigInt::from_signed_bytes_be(&b);
             let c_true = &a + &b;
 
             // calculate by passing into OCaml
-            let c = {
-                let a_str = a.to_string();
-                let b_str = b.to_string();
-                BigInt::from_str(&runtime_add_num(a_str.clone(), b_str.clone())).unwrap()
-            };
+            let c = RT
+                .lock()
+                .execute(move |rt| {
+                    unsafe { wrapper::add_num(rt, BigInt(a), BigInt(b)) }
+                        .unwrap()
+                        .unwrap()
+                })
+                .unwrap()
+                .0;
 
             assert_eq!(c_true, c);
         }

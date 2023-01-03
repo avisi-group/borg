@@ -1,27 +1,36 @@
 //! Imported OCaml functions
 
 use {
-    crate::error::WrapperError,
-    ocaml::{List, Value},
+    crate::{ast::Ast, error::WrapperError, num::BigInt, type_check::Env},
+    ocaml::Value,
     std::collections::LinkedList,
 };
 
 ocaml::import! {
     // PRIMARY FUNCTIONS
-    pub fn util_dedup(l: List<Value>) -> Result<List<i32>, WrapperError>;
+    pub fn util_dedup(l: LinkedList<i32>) -> Result<LinkedList<i32>, WrapperError>;
 
-    pub fn parse_file(contents: String, filename: String) -> Result<(Value, Value), WrapperError>;
+    // ?loc:Parse_ast.l -> string -> string -> Lexer.comment list * Parse_ast.def list
+    pub fn parse_file(contents: String, filename: String) -> Result<(LinkedList<Value>, LinkedList<Value>), WrapperError>;
 
-    pub fn preprocess(sail_dir: String, target: Option<Value>, options: List<Value>, file_ast: Value) -> Result<List<Value>, WrapperError>;
+    // string ->
+    // string option ->
+    // (Arg.key * Arg.spec * Arg.doc) list ->
+    // Parse_ast.def list -> Parse_ast.def list
+    pub fn preprocess(sail_dir: String, target: Option<Value>, options: LinkedList<Value>, file_ast: Value) -> Result<LinkedList<Value>, WrapperError>;
 
-    pub fn process(defs: LinkedList<(String, List<Value>)>, comments: LinkedList<(String, Value)>, type_env: Value) -> Result<(Value, Value, Value), WrapperError>;
+    // (string * Parse_ast.def list) list ->
+    // (string * Lexer.comment list) list ->
+    // Type_check.env ->
+    // Type_check.tannot Ast_defs.ast * Type_check.env * Effects.side_effect_info
+    pub fn process(defs: LinkedList<(String, LinkedList<Value>)>, comments: LinkedList<(String, LinkedList<Value>)>, type_env: Value) -> Result<(Value, Value, Value), WrapperError>;
 
     // val descatter :
     //     Effects.side_effect_info ->
     //     Type_check.Env.t ->
     //     Type_check.tannot Ast_defs.ast ->
     //     Type_check.tannot Ast_defs.ast * Type_check.Env.t
-    pub fn descatter(effect_info: Value, env: Value, ast: Value) -> Result<(Value, Value), WrapperError>;
+    pub fn descatter(effect_info: Value, env: Value, ast: Value) -> Result<(Ast, Env), WrapperError>;
 
     pub fn type_check_initial_env() -> Result<Value, WrapperError>;
 
@@ -37,6 +46,7 @@ ocaml::import! {
 
     pub fn bigint_to_string(input: Value) -> Result<String, WrapperError>;
 
-    pub fn add_num(a: String, b: String) -> Result<String, WrapperError>;
+    pub fn string_to_bigint(input: String) -> Result<Value, WrapperError>;
 
+    pub fn add_num(a: BigInt, b: BigInt) -> Result<BigInt, WrapperError>;
 }

@@ -7,7 +7,7 @@ authors = ["AVISI Research Group"]
 [dependencies]
 borealis_macro = { path = "../borealis_macro" }
 
-ocaml = { version = "1.0.0-beta.4", features = ["no-panic-hook"] }
+ocaml = { git = "https://github.com/zshipko/ocaml-rs", rev = "e64c890", features = ["no-panic-hook"] }
 deepsize = "0.2.0"
 fxhash = "0.2.1"
 lasso = { version = "0.6.0", features = ["multi-threaded"] }

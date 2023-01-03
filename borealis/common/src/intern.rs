@@ -4,7 +4,7 @@ use {
     deepsize::DeepSizeOf,
     fxhash::FxBuildHasher,
     lasso::{Spur, ThreadedRodeo},
-    ocaml::{FromValue, Value},
+    ocaml::{FromValue, ToValue, Value},
     once_cell::sync::Lazy,
 };
 
@@ -79,6 +79,12 @@ impl serde::Serialize for InternedStringKey {
 unsafe impl FromValue for InternedStringKey {
     fn from_value(v: Value) -> Self {
         Self::new(String::from_value(v))
+    }
+}
+
+unsafe impl ToValue for InternedStringKey {
+    fn to_value(&self, rt: &ocaml::Runtime) -> Value {
+        self.to_string().to_value(rt)
     }
 }
 

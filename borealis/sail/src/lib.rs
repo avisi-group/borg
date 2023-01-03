@@ -2,8 +2,6 @@
 
 //! Rust interface to `Sail` compiler library
 
-use std::collections::LinkedList;
-
 use {
     crate::{
         ast::Ast,
@@ -18,8 +16,8 @@ use {
     },
     common::error::ErrCtx,
     log::trace,
-    ocaml::{FromValue, List},
-    std::{fs::read_to_string, path::Path},
+    ocaml::{FromValue, ToValue},
+    std::{collections::LinkedList, fs::read_to_string, path::Path},
 };
 
 pub mod ast;
@@ -98,8 +96,8 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Er
                     rt,
                     DEFAULT_SAIL_DIR.to_owned(),
                     None,
-                    List::empty(),
-                    file_defs,
+                    LinkedList::new(),
+                    file_defs.to_value(rt),
                 )
             }??;
 
@@ -110,17 +108,15 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Er
 
         let (ast, type_envs, side_effects) = unsafe { process(rt, defs, comments, env) }??;
 
+        let b = Ast::from_value(ast.clone());
+        let c = b.to_value(rt);
+        let _d = Ast::from_value(c);
+
+        //  assert_eq!(b, d);
+
         trace!("Calling descatter");
 
         let (ast, env) = unsafe { descatter(rt, side_effects, type_envs, ast) }??;
-
-        trace!("Converting AST from ocaml::Value");
-        let ast = Ast::from_value(ast);
-        trace!("Finished converting AST from ocaml::Value");
-
-        trace!("Converting Env from ocaml::Value");
-        let env = Env::from_value(env);
-        trace!("Finished converting Env from ocaml::Value");
 
         Ok((ast, env))
     })?
@@ -130,7 +126,6 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Er
 mod tests {
     use {
         crate::{load_from_config, wrapper::util_dedup, RT},
-        ocaml::{List, ToValue},
         once_cell::sync::Lazy,
         proptest::{bits, collection::vec, prelude::*},
     };
@@ -149,13 +144,11 @@ mod tests {
     fn dedup(list: Vec<i32>) -> Vec<i32> {
         RT.lock()
             .execute(|rt| {
-                let mut l = List::empty();
-
-                for element in list {
-                    l = unsafe { l.add(rt, &element.to_value(rt)) };
-                }
-
-                unsafe { util_dedup(rt, l) }.unwrap().unwrap().into_vec()
+                unsafe { util_dedup(rt, list.into_iter().collect()) }
+                    .unwrap()
+                    .unwrap()
+                    .into_iter()
+                    .collect::<Vec<_>>()
             })
             .unwrap()
     }
@@ -180,7 +173,11 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
-        let (ast, env) = load_from_config("../testdata/empty.json").unwrap();
+        let (ast, env) = load_from_config(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../testdata/empty.json"
+        ))
+        .unwrap();
 
         crate::dot::render(&ast, &mut vec![]).unwrap();
 
@@ -191,7 +188,11 @@ mod tests {
 
     #[test]
     fn load_from_config_arm() {
-        let (ast, env) = load_from_config("../testdata/sail-arm-small.json").unwrap();
+        let (ast, env) = load_from_config(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../testdata/sail-arm-small.json"
+        ))
+        .unwrap();
 
         crate::dot::render(&ast, &mut vec![]).unwrap();
 

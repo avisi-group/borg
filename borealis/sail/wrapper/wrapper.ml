@@ -42,9 +42,6 @@ let parse_file ?loc:(l = Parse_ast.Unknown) (s : string) (filename : string) :
 
 let () =
   (* Primary functions *)
-  Callback.register "util_dedup" (fun a ->
-      exception_to_result (fun () -> Util.remove_duplicates a));
-
   Callback.register "parse_file" (fun contents filename ->
       exception_to_result (fun () -> parse_file contents filename));
 
@@ -81,8 +78,8 @@ let () =
       exception_to_result (fun () -> Type_check.opt_no_lexp_bounds_check := b));
 
   (* Utility *)
-  Callback.register "Lexing_from_string" (fun string ->
-      exception_to_result (fun () -> Lexing.from_string string));
+  Callback.register "util_dedup" (fun a ->
+      exception_to_result (fun () -> Util.remove_duplicates a));
 
   Callback.register "bindings_to_list" (fun a ->
       exception_to_result (fun () -> bindings_to_list a));
@@ -90,7 +87,8 @@ let () =
   Callback.register "bigint_to_string" (fun i ->
       exception_to_result (fun () -> Nat_big_num.to_string i));
 
+  Callback.register "string_to_bigint" (fun i ->
+      exception_to_result (fun () -> Nat_big_num.of_string i));
+
   Callback.register "add_num" (fun a b ->
-      exception_to_result (fun () ->
-          Num.string_of_num
-            (Num.add_num (Num.num_of_string a) (Num.num_of_string b))))
+      exception_to_result (fun () -> Nat_big_num.add a b))

@@ -1,6 +1,6 @@
 use {
     proc_macro::{self, TokenStream},
-    proc_macro2::{Group, Span, TokenTree},
+    proc_macro2::{Group, Punct, Spacing, Span, TokenTree},
     quote::quote,
     syn::{
         parse::{self, Parser},
@@ -29,15 +29,21 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
     let original_ident = raw_struct.ident.clone();
     let raw_ident = Ident::new(&format!("Raw{}", original_ident), Span::call_site());
     raw_struct.ident = raw_ident.clone();
-    raw_struct.attrs.push(derive_fromvalue_attr());
+    raw_struct.attrs.push(derive_tofromvalue_attr());
 
     // TODO: ensuring it derives FromValue
 
     // assign all fields of raw struct to modified struct
-    let mut assignments = quote!();
+    let mut raw_assignments = quote!();
     for field in &raw_struct.fields {
         let name = field.ident.clone().unwrap();
-        assignments.extend([quote!(#name: raw.#name,)]);
+        raw_assignments.extend([quote!(#name: raw.#name,)]);
+    }
+
+    let mut self_assignments = quote!();
+    for field in &raw_struct.fields {
+        let name = field.ident.clone().unwrap();
+        self_assignments.extend([quote!(#name: self.#name.clone(),)]);
     }
 
     quote! {
@@ -46,7 +52,7 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
         #[doc(hidden)]
         #[allow(non_upper_case_globals, unused_attributes, unused_qualifications)]
         const _: () = {
-
+            use ocaml::{ToValue, FromValue};
 
             #[allow(unused_extern_crates, clippy::useless_attribute)]
             extern crate common as _common;
@@ -64,8 +70,19 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
 
                     Self {
                         id: _common::identifiable::unique_id(),
-                        #assignments
+                        #raw_assignments
                     }
+                }
+            }
+
+            unsafe impl ocaml::ToValue for #original_ident {
+                fn to_value(&self, rt: &ocaml::Runtime) -> ocaml::Value {
+                    #raw_struct
+
+                    #raw_ident {
+                        #self_assignments
+                    }.to_value(rt)
+
                 }
             }
         };
@@ -73,8 +90,8 @@ pub fn identifiable_fromvalue(args: TokenStream, input: TokenStream) -> TokenStr
     .into()
 }
 
-/// `#[derive(FromValue)]` attribute
-fn derive_fromvalue_attr() -> Attribute {
+/// `#[derive(FromValue, ToValue)]` attribute
+fn derive_tofromvalue_attr() -> Attribute {
     let mut segments = Punctuated::new();
     segments.push_value(PathSegment {
         ident: Ident::new("derive", Span::call_site()),
@@ -83,7 +100,11 @@ fn derive_fromvalue_attr() -> Attribute {
 
     let tokens = TokenTree::Group(Group::new(
         proc_macro2::Delimiter::Parenthesis,
-        TokenTree::Ident(Ident::new("FromValue", Span::call_site())).into(),
+        proc_macro2::TokenStream::from_iter([
+            TokenTree::Ident(Ident::new("FromValue", Span::call_site())),
+            TokenTree::Punct(Punct::new(',', Spacing::Alone)),
+            TokenTree::Ident(Ident::new("ToValue", Span::call_site())),
+        ]),
     ))
     .into();
 

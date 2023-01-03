@@ -6,7 +6,7 @@ use {
         intern::InternedStringKey,
     },
     deepsize::DeepSizeOf,
-    ocaml::{FromValue, Int, Value},
+    ocaml::{FromValue, Int, ToValue, Value},
     serde::{Deserialize, Serialize},
     std::{ffi::OsStr, fmt::Display, path::PathBuf},
 };
@@ -23,11 +23,17 @@ unsafe impl FromValue for KindIdentifierInner {
     }
 }
 
+unsafe impl ToValue for KindIdentifierInner {
+    fn to_value(&self, rt: &ocaml::Runtime) -> Value {
+        self.0.as_slice().to_value(rt)
+    }
+}
+
 /// Position of a character in a source file
 ///
 /// Can be converted from `Lexing.position` value <https://v2.ocaml.org/api/Lexing.html>.
 #[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name
     pub pos_fname: InternedStringKey,
@@ -55,7 +61,7 @@ impl Display for Position {
 }
 
 /// Wrapper to give enums an ID in the AST without affecting `FromValue`
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
 pub struct EnumWrapper<T> {
     id: u32,
     /// Inner item
@@ -75,5 +81,11 @@ unsafe impl<T: FromValue> FromValue for EnumWrapper<T> {
             id: unique_id(),
             inner,
         }
+    }
+}
+
+unsafe impl<T: ToValue> ToValue for EnumWrapper<T> {
+    fn to_value(&self, rt: &ocaml::Runtime) -> Value {
+        self.inner.to_value(rt)
     }
 }
