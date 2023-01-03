@@ -29,15 +29,12 @@ RUN cd /tmp && cargo init --lib empty && cd empty && cargo add libc && cargo bui
 # build and document rust dependencies by creating empty crates
 RUN cargo init --lib borealis && \
     cargo init --lib sail && \
-    cargo init --lib common && \
-    cargo init --lib borealis_macro
+    cargo init --lib common
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY borealis/Cargo.toml borealis/
 COPY sail/Cargo.toml sail/
 COPY common/Cargo.toml common/
-COPY borealis_macro/Cargo.toml borealis_macro/
-RUN > borealis_macro/src/lib.rs
 RUN eval `opam env` && \
     cargo build --release --all-targets && \
     cargo test --release --no-run && \
@@ -45,7 +42,7 @@ RUN eval `opam env` && \
 
 # copy full source
 COPY . .
-RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs borealis_macro/src/lib.rs
+RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs
 
 # check formatting
 RUN cargo fmt --all -- --check

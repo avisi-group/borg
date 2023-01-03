@@ -131,7 +131,6 @@ mod tests {
 
     const FILTERS: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         vec![
-            (r#""id": [0-9]+"#, r#""id": 0"#),
             (r#""[0-9a-zA-Z\.\-/+]+/(?P<n>.*\.sail)""#, r#""$n""#),
             (
                 r#""kind_identifier": \[[\s,0-9]*\]"#,

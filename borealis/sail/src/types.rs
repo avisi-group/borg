@@ -1,10 +1,7 @@
 //! Types and functions for interfacing with OCaml
 
 use {
-    common::{
-        identifiable::{identifiable_fromvalue, unique_id, Identifiable},
-        intern::InternedStringKey,
-    },
+    common::intern::InternedStringKey,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
     serde::{Deserialize, Serialize},
@@ -32,8 +29,8 @@ unsafe impl ToValue for KindIdentifierInner {
 /// Position of a character in a source file
 ///
 /// Can be converted from `Lexing.position` value <https://v2.ocaml.org/api/Lexing.html>.
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, FromValue, ToValue, PartialEq, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name
     pub pos_fname: InternedStringKey,
@@ -63,24 +60,14 @@ impl Display for Position {
 /// Wrapper to give enums an ID in the AST without affecting `FromValue`
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
 pub struct EnumWrapper<T> {
-    id: u32,
     /// Inner item
     pub inner: T,
-}
-
-impl<T> Identifiable for EnumWrapper<T> {
-    fn id(&self) -> u32 {
-        self.id
-    }
 }
 
 unsafe impl<T: FromValue> FromValue for EnumWrapper<T> {
     fn from_value(v: ocaml::Value) -> Self {
         let inner = T::from_value(v);
-        Self {
-            id: unique_id(),
-            inner,
-        }
+        Self { inner }
     }
 }
 

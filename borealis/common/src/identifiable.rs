@@ -2,8 +2,6 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
-pub use borealis_macro::identifiable_fromvalue;
-
 #[doc(hidden)]
 /// Gets a new, unique, u64
 pub fn unique_id() -> u32 {
@@ -16,10 +14,4 @@ pub fn unique_id() -> u32 {
     }
 
     num
-}
-
-/// Trait for identifying items
-pub trait Identifiable {
-    /// Gets the unique identifier
-    fn id(&self) -> u32;
 }

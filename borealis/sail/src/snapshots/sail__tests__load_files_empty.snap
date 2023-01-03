@@ -1,12 +1,12 @@
 ---
 source: sail/src/lib.rs
+assertion_line: 182
 expression: "(ast, env)"
 ---
 [
   {
     "defs": [],
-    "comments": [],
-    "id": 0
+    "comments": []
   },
   {
     "top_val_specs": [
@@ -15,8 +15,7 @@ expression: "(ast, env)"
           "inner": {
             "Identifier": "make_the_value"
           },
-          "location": "Unknown",
-          "id": 0
+          "location": "Unknown"
         },
         [
           {
@@ -26,20 +25,16 @@ expression: "(ast, env)"
                   "inner": {
                     "KindedIdentifier": {
                       "inner": {
-                        "kind_identifier": [],
-                        "id": 0
+                        "kind_identifier": []
                       },
-                      "location": "Unknown",
-                      "id": 0
+                      "location": "Unknown"
                     }
                   },
-                  "location": "Unknown",
-                  "id": 0
+                  "location": "Unknown"
                 }
               ]
             },
-            "location": "Unknown",
-            "id": 0
+            "location": "Unknown"
           },
           {
             "inner": {
@@ -52,8 +47,7 @@ expression: "(ast, env)"
                           "inner": {
                             "Identifier": "atom"
                           },
-                          "location": "Unknown",
-                          "id": 0
+                          "location": "Unknown"
                         },
                         [
                           {
@@ -62,25 +56,20 @@ expression: "(ast, env)"
                                 "inner": {
                                   "Var": {
                                     "inner": {
-                                      "kind_identifier": [],
-                                      "id": 0
+                                      "kind_identifier": []
                                     },
-                                    "location": "Unknown",
-                                    "id": 0
+                                    "location": "Unknown"
                                   }
                                 },
-                                "location": "Unknown",
-                                "id": 0
+                                "location": "Unknown"
                               }
                             },
-                            "location": "Unknown",
-                            "id": 0
+                            "location": "Unknown"
                           }
                         ]
                       ]
                     },
-                    "annotation": "Unknown",
-                    "id": 0
+                    "annotation": "Unknown"
                   }
                 ],
                 {
@@ -90,8 +79,7 @@ expression: "(ast, env)"
                         "inner": {
                           "Identifier": "itself"
                         },
-                        "location": "Unknown",
-                        "id": 0
+                        "location": "Unknown"
                       },
                       [
                         {
@@ -100,30 +88,24 @@ expression: "(ast, env)"
                               "inner": {
                                 "Var": {
                                   "inner": {
-                                    "kind_identifier": [],
-                                    "id": 0
+                                    "kind_identifier": []
                                   },
-                                  "location": "Unknown",
-                                  "id": 0
+                                  "location": "Unknown"
                                 }
                               },
-                              "location": "Unknown",
-                              "id": 0
+                              "location": "Unknown"
                             }
                           },
-                          "location": "Unknown",
-                          "id": 0
+                          "location": "Unknown"
                         }
                       ]
                     ]
                   },
-                  "annotation": "Unknown",
-                  "id": 0
+                  "annotation": "Unknown"
                 }
               ]
             },
-            "annotation": "Unknown",
-            "id": 0
+            "annotation": "Unknown"
           }
         ]
       ],
@@ -132,8 +114,7 @@ expression: "(ast, env)"
           "inner": {
             "Identifier": "sail_assume"
           },
-          "location": "Unknown",
-          "id": 0
+          "location": "Unknown"
         },
         [
           {
@@ -143,20 +124,16 @@ expression: "(ast, env)"
                   "inner": {
                     "KindedIdentifier": {
                       "inner": {
-                        "kind_identifier": [],
-                        "id": 0
+                        "kind_identifier": []
                       },
-                      "location": "Unknown",
-                      "id": 0
+                      "location": "Unknown"
                     }
                   },
-                  "location": "Unknown",
-                  "id": 0
+                  "location": "Unknown"
                 }
               ]
             },
-            "location": "Unknown",
-            "id": 0
+            "location": "Unknown"
           },
           {
             "inner": {
@@ -169,8 +146,7 @@ expression: "(ast, env)"
                           "inner": {
                             "Identifier": "atom_bool"
                           },
-                          "location": "Unknown",
-                          "id": 0
+                          "location": "Unknown"
                         },
                         [
                           {
@@ -179,25 +155,20 @@ expression: "(ast, env)"
                                 "inner": {
                                   "Var": {
                                     "inner": {
-                                      "kind_identifier": [],
-                                      "id": 0
+                                      "kind_identifier": []
                                     },
-                                    "location": "Unknown",
-                                    "id": 0
+                                    "location": "Unknown"
                                   }
                                 },
-                                "location": "Unknown",
-                                "id": 0
+                                "location": "Unknown"
                               }
                             },
-                            "location": "Unknown",
-                            "id": 0
+                            "location": "Unknown"
                           }
                         ]
                       ]
                     },
-                    "annotation": "Unknown",
-                    "id": 0
+                    "annotation": "Unknown"
                   }
                 ],
                 {
@@ -206,17 +177,14 @@ expression: "(ast, env)"
                       "inner": {
                         "Identifier": "unit"
                       },
-                      "location": "Unknown",
-                      "id": 0
+                      "location": "Unknown"
                     }
                   },
-                  "annotation": "Unknown",
-                  "id": 0
+                  "annotation": "Unknown"
                 }
               ]
             },
-            "annotation": "Unknown",
-            "id": 0
+            "annotation": "Unknown"
           }
         ]
       ],
@@ -225,8 +193,7 @@ expression: "(ast, env)"
           "inner": {
             "Identifier": "size_itself_int"
           },
-          "location": "Unknown",
-          "id": 0
+          "location": "Unknown"
         },
         [
           {
@@ -236,20 +203,16 @@ expression: "(ast, env)"
                   "inner": {
                     "KindedIdentifier": {
                       "inner": {
-                        "kind_identifier": [],
-                        "id": 0
+                        "kind_identifier": []
                       },
-                      "location": "Unknown",
-                      "id": 0
+                      "location": "Unknown"
                     }
                   },
-                  "location": "Unknown",
-                  "id": 0
+                  "location": "Unknown"
                 }
               ]
             },
-            "location": "Unknown",
-            "id": 0
+            "location": "Unknown"
           },
           {
             "inner": {
@@ -262,8 +225,7 @@ expression: "(ast, env)"
                           "inner": {
                             "Identifier": "itself"
                           },
-                          "location": "Unknown",
-                          "id": 0
+                          "location": "Unknown"
                         },
                         [
                           {
@@ -272,25 +234,20 @@ expression: "(ast, env)"
                                 "inner": {
                                   "Var": {
                                     "inner": {
-                                      "kind_identifier": [],
-                                      "id": 0
+                                      "kind_identifier": []
                                     },
-                                    "location": "Unknown",
-                                    "id": 0
+                                    "location": "Unknown"
                                   }
                                 },
-                                "location": "Unknown",
-                                "id": 0
+                                "location": "Unknown"
                               }
                             },
-                            "location": "Unknown",
-                            "id": 0
+                            "location": "Unknown"
                           }
                         ]
                       ]
                     },
-                    "annotation": "Unknown",
-                    "id": 0
+                    "annotation": "Unknown"
                   }
                 ],
                 {
@@ -300,8 +257,7 @@ expression: "(ast, env)"
                         "inner": {
                           "Identifier": "atom"
                         },
-                        "location": "Unknown",
-                        "id": 0
+                        "location": "Unknown"
                       },
                       [
                         {
@@ -310,30 +266,24 @@ expression: "(ast, env)"
                               "inner": {
                                 "Var": {
                                   "inner": {
-                                    "kind_identifier": [],
-                                    "id": 0
+                                    "kind_identifier": []
                                   },
-                                  "location": "Unknown",
-                                  "id": 0
+                                  "location": "Unknown"
                                 }
                               },
-                              "location": "Unknown",
-                              "id": 0
+                              "location": "Unknown"
                             }
                           },
-                          "location": "Unknown",
-                          "id": 0
+                          "location": "Unknown"
                         }
                       ]
                     ]
                   },
-                  "annotation": "Unknown",
-                  "id": 0
+                  "annotation": "Unknown"
                 }
               ]
             },
-            "annotation": "Unknown",
-            "id": 0
+            "annotation": "Unknown"
           }
         ]
       ]

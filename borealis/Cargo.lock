@@ -119,15 +119,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "borealis_macro"
-version = "0.0.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -213,7 +204,6 @@ dependencies = [
 name = "common"
 version = "0.0.0"
 dependencies = [
- "borealis_macro",
  "deepsize",
  "fxhash",
  "lasso",

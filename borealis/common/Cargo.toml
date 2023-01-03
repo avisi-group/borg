@@ -5,8 +5,6 @@ edition = "2021"
 authors = ["AVISI Research Group"]
 
 [dependencies]
-borealis_macro = { path = "../borealis_macro" }
-
 ocaml = { git = "https://github.com/zshipko/ocaml-rs", rev = "e64c890", features = ["no-panic-hook"] }
 deepsize = "0.2.0"
 fxhash = "0.2.1"

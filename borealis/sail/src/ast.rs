@@ -9,7 +9,7 @@ use {
         types::{EnumWrapper, KindIdentifierInner, Position},
         visitor::{Visitor, Walkable},
     },
-    common::{identifiable::identifiable_fromvalue, intern::InternedStringKey},
+    common::intern::InternedStringKey,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
     serde::{Deserialize, Serialize},
@@ -112,16 +112,15 @@ pub type X = InternedStringKey;
 /// Infix identifier
 pub type Xi = InternedStringKey;
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 struct Extern {
     pure: bool,
     bindings: LinkedList<(InternedStringKey, InternedStringKey)>,
 }
 
 /// kinded IDs: Type, Int, and Order variables
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindIdentifierAux {
     kind_identifier: KindIdentifierInner,
 }
@@ -156,8 +155,7 @@ pub enum IdentifierAux {
     Operator(X),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindIdentifier {
     pub inner: KindIdentifierAux,
     pub location: L,
@@ -170,15 +168,14 @@ impl Walkable for KindIdentifier {
 }
 
 /// Base kind
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Kind {
     pub inner: KindAux,
     pub location: L,
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Identifier {
     pub inner: IdentifierAux,
     pub location: L,
@@ -214,8 +211,8 @@ pub enum OrderAux {
 }
 
 /// Optionally kind-annotated identifier
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindedIdentifierAux {
     pub kind: Kind,
     pub kind_identifier: KindIdentifier,
@@ -239,8 +236,7 @@ pub enum NumericExpressionAux {
     Negation(NumericExpression),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct NumericExpression {
     pub inner: Box<NumericExpressionAux>,
     pub location: L,
@@ -276,8 +272,7 @@ impl Walkable for NumericExpression {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Order {
     pub inner: OrderAux,
     pub location: L,
@@ -293,8 +288,8 @@ impl Walkable for Order {
 }
 
 /// Optionally kind-annotated identifier
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindedIdentifier {
     pub inner: KindIdentifierAux,
     pub location: L,
@@ -345,8 +340,7 @@ pub enum TypAux {
     Exist(LinkedList<KindedIdentifier>, NConstraint, Typ),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Typ {
     pub inner: Box<TypAux>,
     pub annotation: L,
@@ -389,8 +383,7 @@ pub enum TypArgAux {
     Bool(NConstraint),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypArg {
     pub inner: TypArgAux,
     pub location: L,
@@ -425,8 +418,7 @@ pub enum NConstraintAux {
     False,
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct NConstraint {
     pub inner: Box<NConstraintAux>,
     pub location: L,
@@ -481,8 +473,7 @@ impl Walkable for NConstraint {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Literal {
     pub inner: LiteralAux,
     pub location: L,
@@ -502,8 +493,7 @@ pub enum TypPatAux {
     App(Identifier, LinkedList<TypPat>),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypPat {
     pub inner: TypPatAux,
     pub location: L,
@@ -585,8 +575,7 @@ pub enum PatternAux {
     StringAppend(LinkedList<Pattern>),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Pattern {
     pub inner: Box<PatternAux>,
     pub annotation: Annot,
@@ -637,8 +626,8 @@ impl Walkable for Pattern {
 }
 
 /// Either a kinded identifier or a nexp constraint for a typquant
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct QuantItem {
     pub inner: QuantItemAux,
     pub location: L,
@@ -656,8 +645,7 @@ impl Walkable for QuantItem {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct InternalLoopMeasure {
     pub inner: Option<Box<Expression>>,
     pub location: L,
@@ -793,8 +781,8 @@ pub enum ExpressionAux {
 }
 
 /// Expression
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Expression {
     pub inner: Box<ExpressionAux>,
     pub annotation: Annot,
@@ -950,8 +938,7 @@ pub enum LValueExpressionAux {
     Field(LValueExpression, Identifier),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct LValueExpression {
     pub inner: Box<LValueExpressionAux>,
     pub annotation: Annot,
@@ -1002,16 +989,16 @@ impl Walkable for LValueExpression {
 }
 
 /// Field Expression
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct FieldExpressionAux {
     pub identifier: Identifier,
     pub expression: Expression,
 }
 
 /// Field Expression
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct FieldExpression {
     pub inner: FieldExpressionAux,
     pub annotation: Annot,
@@ -1036,8 +1023,8 @@ pub enum PatternMatchAux {
 /// Pattern match
 ///
 /// `pexp` in Sail source
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct PatternMatch {
     pub inner: PatternMatchAux,
     pub annotation: Annot,
@@ -1062,15 +1049,14 @@ impl Walkable for PatternMatch {
 /// Value binding
 ///
 /// Implicit type, pattern must be total
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct LetBindAux {
     pub pattern: Pattern,
     pub expression: Expression,
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct LetBind {
     pub let_bind: LetBindAux,
     pub annotation: Annot,
@@ -1112,8 +1098,7 @@ pub enum MappingPatternAux {
     As(MappingPattern, Identifier),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct MappingPattern {
     pub inner: Box<MappingPatternAux>,
     pub annotation: Annot,
@@ -1176,8 +1161,7 @@ pub enum MappingPatternExpressionAux {
     When(MappingPattern, Expression),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypQuant {
     pub inner: TypQuantAux,
     pub location: L,
@@ -1193,8 +1177,7 @@ impl Walkable for TypQuant {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct MappingPatternExpression {
     pub inner: MappingPatternExpressionAux,
     pub annotation: Annot,
@@ -1213,8 +1196,8 @@ impl Walkable for MappingPatternExpression {
 }
 
 /// Type scheme
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeSchemeAux {
     pub typ_quantifier: TypQuant,
     pub typ: Typ,
@@ -1228,8 +1211,8 @@ pub enum TypeAnnotationOptAux {
 }
 
 /// Function clause
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct FunctionClauseAux {
     pub identifier: Identifier,
     pub pattern_match: PatternMatch,
@@ -1260,8 +1243,7 @@ pub enum RecursiveAnnotationOptAux {
     Measure(Pattern, Expression),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeScheme {
     pub inner: TypeSchemeAux,
     pub location: L,
@@ -1274,8 +1256,7 @@ impl Walkable for TypeScheme {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeAnnotationOpt {
     pub inner: TypeAnnotationOptAux,
     pub location: L,
@@ -1293,8 +1274,7 @@ impl Walkable for TypeAnnotationOpt {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct FunctionClause {
     pub inner: FunctionClauseAux,
     pub annotation: Annot,
@@ -1307,8 +1287,7 @@ impl Walkable for FunctionClause {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct RecursiveAnnotationOpt {
     pub inner: RecursiveAnnotationOptAux,
     pub location: L,
@@ -1326,8 +1305,7 @@ impl Walkable for RecursiveAnnotationOpt {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeUnion {
     pub inner: TypeUnionAux,
     pub location: L,
@@ -1344,8 +1322,7 @@ impl Walkable for TypeUnion {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct MappingClause {
     pub inner: MappingClauseAux,
     pub annotation: Annot,
@@ -1381,8 +1358,7 @@ pub enum IndexRangeAux {
     Concat(IndexRange, IndexRange),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct IndexRange {
     pub inner: Box<IndexRangeAux>,
     pub location: L,
@@ -1458,8 +1434,8 @@ pub enum SubstitutionAux {
 }
 
 /// Mapping definition (bidirectional pattern-match function)
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct MappingDefinitionAux {
     pub ident: Identifier,
     pub typ_annotation: TypeAnnotationOpt,
@@ -1467,8 +1443,8 @@ pub struct MappingDefinitionAux {
 }
 
 /// Value type specification
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct ValueSpecificationAux {
     pub typ_scheme: TypeScheme,
     pub ident: Identifier,
@@ -1489,8 +1465,8 @@ pub enum DefaultSpecAux {
 }
 
 /// Function definition
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct FunctionDefinitionAux {
     pub recursive_annotation: RecursiveAnnotationOpt,
     pub type_annotation: TypeAnnotationOpt,
@@ -1506,8 +1482,7 @@ pub enum OptionalDefaultAux {
     Dec(Expression),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct ScatteredDefinition {
     pub inner: ScatteredDefinitionAux,
     pub annotation: Annot,
@@ -1544,15 +1519,13 @@ impl Walkable for ScatteredDefinition {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct InstantiationSpecification {
     pub inner: InstantiationSpecificationAux,
     pub annotation: Annot,
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeDefinition {
     pub inner: TypeDefinitionAux,
     pub annotation: Annot,
@@ -1599,8 +1572,7 @@ impl Walkable for TypeDefinition {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct DecSpec {
     pub inner: DecSpecAux,
     pub annotation: Annot,
@@ -1621,15 +1593,13 @@ impl Walkable for DecSpec {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Substitution {
     pub inner: SubstitutionAux,
     pub location: L,
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct MappingDefinition {
     pub inner: MappingDefinitionAux,
     pub annotation: Annot,
@@ -1646,8 +1616,7 @@ impl Walkable for MappingDefinition {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct ValueSpecification {
     pub inner: ValueSpecificationAux,
     pub annotation: Annot,
@@ -1659,8 +1628,7 @@ impl Walkable for ValueSpecification {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct OutcomeSpecification {
     pub inner: OutcomeSpecificationAux,
     pub location: L,
@@ -1673,8 +1641,7 @@ pub enum Prec {
     InfixRight,
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct DefaultSpec {
     pub inner: DefaultSpecAux,
     pub location: L,
@@ -1688,8 +1655,7 @@ impl Walkable for DefaultSpec {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct LoopMeasure {
     pub loop0: Loop,
     pub expression: Expression,
@@ -1701,8 +1667,7 @@ impl Walkable for LoopMeasure {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct FunctionDefinition {
     pub inner: FunctionDefinitionAux,
     pub annotation: Annot,
@@ -1724,8 +1689,7 @@ pub enum ImplDefintionAux {
     Impl(FunctionClause),
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct OptionalDefault {
     pub inner: OptionalDefaultAux,
     pub annotation: Annot,
@@ -1838,8 +1802,7 @@ pub enum CommentType {
     Line,
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct CommentRoot {
     pub path: InternedStringKey,
     pub comments: LinkedList<Comment>,
@@ -1851,8 +1814,7 @@ impl Walkable for CommentRoot {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 
 pub struct Comment {
     pub typ: CommentType,
@@ -1867,8 +1829,7 @@ impl Walkable for Comment {
     }
 }
 
-#[identifiable_fromvalue]
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
+#[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ast {
     pub defs: LinkedList<EnumWrapper<Definition>>,
     pub comments: LinkedList<CommentRoot>,
