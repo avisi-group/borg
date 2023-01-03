@@ -6,7 +6,7 @@
 use {
     crate::{
         num::{BigInt, Num},
-        types::{EnumWrapper, KindIdentifierInner, Position},
+        types::{KindIdentifierInner, Position},
         visitor::{Visitor, Walkable},
     },
     common::intern::InternedStringKey,
@@ -60,24 +60,24 @@ pub enum Bit {
 /// **Not to be confused with `ocaml::Value`**
 #[derive(Debug, Clone, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr)]
 pub enum Value {
-    Vector(LinkedList<EnumWrapper<Value>>),
-    List(LinkedList<EnumWrapper<Value>>),
+    Vector(LinkedList<Value>),
+    List(LinkedList<Value>),
     Int(BigInt),
     Real(Num),
     Bool(bool),
     Bit(Bit),
-    Tuple(LinkedList<EnumWrapper<Value>>),
+    Tuple(LinkedList<Value>),
     Unit,
     String(InternedStringKey),
     Ref(InternedStringKey),
-    Ctor(InternedStringKey, LinkedList<EnumWrapper<Value>>),
-    Record(LinkedList<(InternedStringKey, EnumWrapper<Value>)>),
+    Ctor(InternedStringKey, LinkedList<Value>),
+    Record(LinkedList<(InternedStringKey, Value)>),
     AttemptedRead(InternedStringKey),
 }
 
-impl Walkable for EnumWrapper<Value> {
+impl Walkable for Value {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
+        match &self {
             Value::Vector(vals) => vals.iter().for_each(|val| visitor.visit_value(val)),
             Value::List(vals) => vals.iter().for_each(|val| visitor.visit_value(val)),
             Value::Int(_) => (),
@@ -772,7 +772,7 @@ pub enum ExpressionAux {
 
     /// For internal use in interpreter to wrap pre-evaluated values when
     /// returning an action
-    InternalValue(EnumWrapper<Value>),
+    InternalValue(Value),
 
     /// Internal node for additional type checker assumptions
     InternalAssume(NConstraint, Expression),
@@ -1754,9 +1754,9 @@ pub enum Definition {
     Pragma(InternedStringKey, InternedStringKey, L),
 }
 
-impl Walkable for EnumWrapper<Definition> {
+impl Walkable for Definition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
+        match &self {
             Definition::Type(typedef) => visitor.visit_type_definition(typedef),
             Definition::Function(funcdef) => visitor.visit_function_definition(funcdef),
             Definition::Mapping(mapdef) => visitor.visit_mapping_definition(mapdef),
@@ -1831,7 +1831,7 @@ impl Walkable for Comment {
 
 #[derive(Debug, Clone, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ast {
-    pub defs: LinkedList<EnumWrapper<Definition>>,
+    pub defs: LinkedList<Definition>,
     pub comments: LinkedList<CommentRoot>,
 }
 

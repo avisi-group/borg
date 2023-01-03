@@ -13,7 +13,6 @@ use crate::{
         TypeScheme, TypeUnion, Value, ValueSpecification,
     },
     num::BigInt,
-    types::EnumWrapper,
 };
 
 /// Visitor trait for interacting with Sail AST
@@ -24,7 +23,7 @@ pub trait Visitor: Sized {
     }
 
     #[allow(missing_docs)]
-    fn visit_definition(&mut self, node: &EnumWrapper<Definition>) {
+    fn visit_definition(&mut self, node: &Definition) {
         node.walk(self);
     }
 
@@ -179,7 +178,7 @@ pub trait Visitor: Sized {
     }
 
     #[allow(missing_docs)]
-    fn visit_value(&mut self, node: &EnumWrapper<Value>) {
+    fn visit_value(&mut self, node: &Value) {
         node.walk(self);
     }
 

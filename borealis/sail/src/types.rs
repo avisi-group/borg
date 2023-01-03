@@ -56,23 +56,3 @@ impl Display for Position {
         )
     }
 }
-
-/// Wrapper to give enums an ID in the AST without affecting `FromValue`
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
-pub struct EnumWrapper<T> {
-    /// Inner item
-    pub inner: T,
-}
-
-unsafe impl<T: FromValue> FromValue for EnumWrapper<T> {
-    fn from_value(v: ocaml::Value) -> Self {
-        let inner = T::from_value(v);
-        Self { inner }
-    }
-}
-
-unsafe impl<T: ToValue> ToValue for EnumWrapper<T> {
-    fn to_value(&self, rt: &ocaml::Runtime) -> Value {
-        self.inner.to_value(rt)
-    }
-}
