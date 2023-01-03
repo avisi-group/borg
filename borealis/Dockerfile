@@ -23,6 +23,9 @@ RUN opam switch create 4.11.2+musl+static+flambda
 # install sail
 RUN eval `opam env` && opam install --assume-depexts -y sail=0.15 gmp
 
+# fetch crates index
+RUN cd /tmp && cargo init --lib empty && cd empty && cargo add libc && cargo build
+
 # build and document rust dependencies by creating empty crates
 RUN cargo init --lib borealis && \
     cargo init --lib sail && \
