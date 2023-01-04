@@ -14,6 +14,7 @@ let exception_to_result f =
       Error (Err_exception (Printexc.to_string e, Printexc.get_backtrace ()))
 
 let bindings_to_list map = map |> Ast_util.Bindings.to_seq |> List.of_seq
+let list_to_bindings list = list |> List.to_seq |> Ast_util.Bindings.of_seq
 
 let get_lexbuf_string s filename =
   let lexbuf = Lexing.from_string s in
@@ -83,10 +84,16 @@ let () =
 
   Callback.register "bindings_to_list" (fun a ->
       exception_to_result (fun () -> bindings_to_list a));
+  Callback.register "list_to_bindings" (fun a ->
+      exception_to_result (fun () -> list_to_bindings a));
+
+  Callback.register "effectset_elements" (fun set ->
+      exception_to_result (fun () -> Effects.EffectSet.elements set));
+  Callback.register "effectset_of_list" (fun list ->
+      exception_to_result (fun () -> Effects.EffectSet.of_list list));
 
   Callback.register "bigint_to_string" (fun i ->
       exception_to_result (fun () -> Nat_big_num.to_string i));
-
   Callback.register "string_to_bigint" (fun i ->
       exception_to_result (fun () -> Nat_big_num.of_string i));
 

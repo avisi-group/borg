@@ -86,32 +86,32 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Er
             comments.push_back((path, file_comments));
         }
 
-        let mut defs = LinkedList::new();
-        for (path, file_defs) in parsed_files {
-            trace!("Preprocessing {:?}", path);
+        let defs = parsed_files
+            .into_iter()
+            .flat_map(|(path, file_defs)| {
+                trace!("Preprocessing {:?}", path);
 
-            let file_defs = unsafe {
-                preprocess(
-                    rt,
-                    DEFAULT_SAIL_DIR.to_owned(),
-                    None,
-                    LinkedList::new(),
-                    file_defs.to_value(rt),
-                )
-            }??;
-
-            defs.push_back((path, file_defs));
-        }
+                unsafe {
+                    preprocess(
+                        rt,
+                        DEFAULT_SAIL_DIR.to_owned(),
+                        None,
+                        LinkedList::new(),
+                        file_defs.to_value(rt),
+                    )
+                }
+                .map(|res| res.map(|defs| (path, defs)))
+            })
+            .collect::<Result<_, _>>()?;
 
         trace!("Calling process");
 
         let (ast, type_envs, side_effects) = unsafe { process(rt, defs, comments, env) }??;
 
-        let b = Ast::from_value(ast.clone());
-        let c = b.to_value(rt);
-        let _d = Ast::from_value(c);
-
-        //  assert_eq!(b, d);
+        assert_eq!(
+            Ast::from_value(Ast::from_value(ast.clone()).to_value(rt)),
+            Ast::from_value(ast.clone()),
+        );
 
         trace!("Calling descatter");
 

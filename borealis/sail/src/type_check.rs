@@ -1,12 +1,14 @@
 //! Type checking
 
+use crate::wrapper::{effectset_of_list, list_to_bindings};
+
 use {
     crate::{
         ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
-        wrapper::bindings_to_list,
+        wrapper::{bindings_to_list, effectset_elements},
     },
     deepsize::DeepSizeOf,
-    ocaml::{FromValue, Value},
+    ocaml::{FromValue, Runtime, ToValue, Value},
     serde::{Deserialize, Serialize},
     std::{collections::LinkedList, fmt::Debug},
 };
@@ -137,4 +139,102 @@ unsafe impl FromValue for Env {
             allow_unknowns: raw_env.allow_unknowns,
         }
     }
+}
+
+/// Side effect
+#[derive(Debug, Clone, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub enum SideEffect {
+    /// Throws exception
+    Throw,
+    /// Exit statement
+    Exit,
+    /// Incomplete pattern match
+    IncompleteMatch,
+    /// Register access
+    Register,
+    /// Calls external function not marked pure
+    External,
+    /// Contains undefined literal
+    Undefined,
+    /// Scattered function
+    Scattered,
+    /// Not executable
+    NonExec,
+    /// Outcome
+    Outcome(Identifier),
+}
+
+/// Side effect info
+#[derive(Debug, Clone)]
+pub struct SideEffectInfo {
+    /// Function side effects
+    pub functions: LinkedList<(Identifier, LinkedList<SideEffect>)>,
+    /// Letbind side effects
+    pub letbinds: LinkedList<(Identifier, LinkedList<SideEffect>)>,
+    /// Mapping side effects
+    pub mappings: LinkedList<(Identifier, LinkedList<SideEffect>)>,
+}
+
+unsafe impl FromValue for SideEffectInfo {
+    fn from_value(v: Value) -> Self {
+        let rt = unsafe { ocaml::Runtime::recover_handle() };
+
+        let raw = <(Value, Value, Value)>::from_value(v);
+
+        Self {
+            functions: effectset_bindings_to_list(rt, raw.0),
+            letbinds: effectset_bindings_to_list(rt, raw.1),
+            mappings: effectset_bindings_to_list(rt, raw.2),
+        }
+    }
+}
+
+fn effectset_bindings_to_list(
+    rt: &Runtime,
+    value: Value,
+) -> LinkedList<(Identifier, LinkedList<SideEffect>)> {
+    <LinkedList<(Identifier, Value)>>::from_value(
+        unsafe { bindings_to_list(rt, value) }.unwrap().unwrap(),
+    )
+    .into_iter()
+    .map(|(id, value)| {
+        (
+            id,
+            unsafe { effectset_elements(rt, value) }
+                .unwrap()
+                .unwrap()
+                .into(),
+        )
+    })
+    .collect()
+}
+
+unsafe impl ToValue for SideEffectInfo {
+    fn to_value(&self, rt: &Runtime) -> Value {
+        let functions = list_to_effectset_bindings(rt, &self.functions);
+        let letbinds = list_to_effectset_bindings(rt, &self.letbinds);
+        let mappings = list_to_effectset_bindings(rt, &self.mappings);
+
+        (functions, letbinds, mappings).to_value(rt)
+    }
+}
+
+fn list_to_effectset_bindings(
+    rt: &Runtime,
+    list: &LinkedList<(Identifier, LinkedList<SideEffect>)>,
+) -> Value {
+    let list = list
+        .into_iter()
+        .map(|(id, effects)| {
+            (
+                id,
+                unsafe { effectset_of_list(rt, effects.to_value(rt)) }
+                    .unwrap()
+                    .unwrap(),
+            )
+        })
+        .collect::<LinkedList<_>>()
+        .to_value(rt);
+
+    unsafe { list_to_bindings(rt, list) }.unwrap().unwrap()
 }

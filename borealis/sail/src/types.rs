@@ -22,7 +22,7 @@ unsafe impl FromValue for KindIdentifierInner {
 
 unsafe impl ToValue for KindIdentifierInner {
     fn to_value(&self, rt: &ocaml::Runtime) -> Value {
-        self.0.as_slice().to_value(rt)
+        (self.0.as_slice()).to_value(rt)
     }
 }
 

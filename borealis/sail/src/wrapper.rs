@@ -1,5 +1,7 @@
 //! Imported OCaml functions
 
+use crate::type_check::SideEffectInfo;
+
 use {
     crate::{ast::Ast, error::WrapperError, num::BigInt, type_check::Env},
     ocaml::Value,
@@ -23,14 +25,14 @@ ocaml::import! {
     // (string * Lexer.comment list) list ->
     // Type_check.env ->
     // Type_check.tannot Ast_defs.ast * Type_check.env * Effects.side_effect_info
-    pub fn process(defs: LinkedList<(String, LinkedList<Value>)>, comments: LinkedList<(String, LinkedList<Value>)>, type_env: Value) -> Result<(Value, Value, Value), WrapperError>;
+    pub fn process(defs: LinkedList<(String, LinkedList<Value>)>, comments: LinkedList<(String, LinkedList<Value>)>, type_env: Value) -> Result<(Value, Value, SideEffectInfo), WrapperError>;
 
     // val descatter :
     //     Effects.side_effect_info ->
     //     Type_check.Env.t ->
     //     Type_check.tannot Ast_defs.ast ->
     //     Type_check.tannot Ast_defs.ast * Type_check.Env.t
-    pub fn descatter(effect_info: Value, env: Value, ast: Value) -> Result<(Ast, Env), WrapperError>;
+    pub fn descatter(effect_info: SideEffectInfo, env: Value, ast: Value) -> Result<(Ast, Env), WrapperError>;
 
     pub fn type_check_initial_env() -> Result<Value, WrapperError>;
 
@@ -43,6 +45,12 @@ ocaml::import! {
     // UTILITY
 
     pub fn bindings_to_list(input: Value) -> Result<Value, WrapperError>;
+
+    pub fn list_to_bindings(input: Value) -> Result<Value, WrapperError>;
+
+    pub fn effectset_elements(input: Value) -> Result<Value, WrapperError>;
+
+    pub fn effectset_of_list(input: Value) -> Result<Value, WrapperError>;
 
     pub fn bigint_to_string(input: Value) -> Result<String, WrapperError>;
 
