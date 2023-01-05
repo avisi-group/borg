@@ -2,142 +2,24 @@
 
 //! Rust interface to `Sail` compiler library
 
-use {
-    crate::{
-        ast::Ast,
-        error::Error,
-        json::ModelConfig,
-        runtime::RT,
-        type_check::Env,
-        wrapper::{
-            descatter, parse_file, preprocess, process, set_no_lexp_bounds_check,
-            set_non_lexical_flow, type_check_initial_env,
-        },
-    },
-    common::error::ErrCtx,
-    log::trace,
-    ocaml::{FromValue, ToValue},
-    std::{collections::LinkedList, fs::read_to_string, path::Path},
-};
-
 pub mod ast;
 pub mod error;
 pub mod json;
+pub mod load;
 pub mod num;
-mod runtime;
+pub mod parse_ast;
+pub mod runtime;
 pub mod type_check;
 pub mod types;
 pub mod visitor;
 mod wrapper;
 
-const DEFAULT_SAIL_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/wrapper");
-
-/// Loads Sail files from `sail.json` model configuration.
-///
-/// Parses supplied Sail files and returns the AST
-///
-/// From Sail internal docs:
-///
-/// This function parses all the files passed to Sail, and then concatenates
-/// their ASTs. The pre-processor is then run, which evaluates `$directive`
-/// statements in Sail, such as
-///
-/// ```sail
-/// $include <prelude.sail>
-/// ```
-///
-/// Unlike the C pre-processor the Sail pre-processor operates over actual
-/// Sail ASTs rather than strings. This can recursively include other
-/// files into the AST, as well as add/remove parts of the AST with
-/// `$ifdef` etc. Directives that are used are preserved in the AST, so
-/// they also function as a useful way to pass auxiliary information to
-/// the various Sail backends.
-///
-/// The initial check mentioned above is then run to desugar the AST, and
-/// then the type-checker is run which produces a fully type-checked
-/// AST. Type annotations are attached to every node (for which an
-/// annotation makes sense) using the aux constructors.
-///
-/// After type-checking the Sail scattered definitions are de-scattered
-/// into single functions.
-pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Error> {
-    let ModelConfig { options, files } = json::ModelConfig::load(config_path.as_ref())?;
-
-    RT.lock().execute(move |rt| {
-        let env = unsafe { type_check_initial_env(rt)?? };
-
-        unsafe { set_non_lexical_flow(rt, options.non_lexical_flow) }??;
-        unsafe { set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
-
-        trace!("Parsing files");
-
-        let mut parsed_files = vec![];
-        let mut comments = LinkedList::new();
-
-        for file_path in files {
-            let contents = read_to_string(&file_path).map_err(ErrCtx::f(&file_path))?;
-
-            // file path used for AST location annotation
-            let path = file_path.as_os_str().to_string_lossy().to_string();
-
-            let (file_comments, file_ast) = unsafe { parse_file(rt, contents, path.clone()) }??;
-
-            parsed_files.push((path.clone(), file_ast));
-            comments.push_back((path, file_comments));
-        }
-
-        let defs = parsed_files
-            .into_iter()
-            .flat_map(|(path, file_defs)| {
-                trace!("Preprocessing {:?}", path);
-
-                unsafe {
-                    preprocess(
-                        rt,
-                        DEFAULT_SAIL_DIR.to_owned(),
-                        None,
-                        LinkedList::new(),
-                        file_defs.to_value(rt),
-                    )
-                }
-                .map(|res| res.map(|defs| (path, defs)))
-            })
-            .collect::<Result<_, _>>()?;
-
-        trace!("Calling process");
-
-        let (ast, type_envs, side_effects) = unsafe { process(rt, defs, comments, env) }??;
-
-        assert_eq!(
-            Ast::from_value(Ast::from_value(ast.clone()).to_value(rt)),
-            Ast::from_value(ast.clone()),
-        );
-
-        trace!("Calling descatter");
-
-        let (ast, env) = unsafe { descatter(rt, side_effects, type_envs, ast) }??;
-
-        Ok((ast, env))
-    })?
-}
-
 #[cfg(test)]
 mod tests {
     use {
-        crate::{load_from_config, wrapper::util_dedup, RT},
-        once_cell::sync::Lazy,
+        crate::{runtime::RT, wrapper::util_dedup},
         proptest::{bits, collection::vec, prelude::*},
     };
-
-    const FILTERS: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
-        vec![
-            (r#""[0-9a-zA-Z\.\-/+]+/(?P<n>.*\.sail)""#, r#""$n""#),
-            (
-                r#""kind_identifier": \[[\s,0-9]*\]"#,
-                r#""kind_identifier": []"#,
-            ),
-        ]
-    });
 
     fn dedup(list: Vec<i32>) -> Vec<i32> {
         RT.lock()
@@ -167,31 +49,5 @@ mod tests {
 
             assert_eq!(out, v_d);
         }
-    }
-
-    #[test]
-    fn load_files_empty() {
-        let (ast, env) = load_from_config(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../testdata/empty.json"
-        ))
-        .unwrap();
-
-        insta::with_settings!({filters => FILTERS.clone()}, {
-            insta::assert_json_snapshot!((ast, env));
-        });
-    }
-
-    #[test]
-    fn load_from_config_arm() {
-        let (ast, env) = load_from_config(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../testdata/sail-arm-small.json"
-        ))
-        .unwrap();
-
-        insta::with_settings!({filters => FILTERS.clone()}, {
-            insta::assert_json_snapshot!((ast, env));
-        });
     }
 }

@@ -28,6 +28,9 @@ pub enum Error {
 
     /// Sail JSON loading error
     ModelConfig(#[from] crate::json::Error),
+
+    /// Failed to find {0:?} referenced by `$include` pragma in {1}
+    MissingIncludeFile(String, L),
 }
 
 impl From<ocaml::Error> for Error {

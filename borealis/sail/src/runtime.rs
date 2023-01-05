@@ -119,3 +119,9 @@ impl Runtime {
         Ok(*boxed.downcast().unwrap())
     }
 }
+
+impl Default for Runtime {
+    fn default() -> Self {
+        Self::new()
+    }
+}

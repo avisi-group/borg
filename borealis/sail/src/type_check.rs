@@ -224,7 +224,7 @@ fn list_to_effectset_bindings(
     list: &LinkedList<(Identifier, LinkedList<SideEffect>)>,
 ) -> Value {
     let list = list
-        .into_iter()
+        .iter()
         .map(|(id, effects)| {
             (
                 id,

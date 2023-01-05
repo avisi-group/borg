@@ -60,4 +60,4 @@ RUN echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; URL=
 FROM scratch
 COPY --from=builder /tmp/build/target/doc /doc
 COPY --from=builder /tmp/build/target/release/borealis .
-ENTRYPOINT [ "./borealis", "-o", ".", "--force" ]
+ENTRYPOINT [ "./borealis", "--force", "--log", "trace", "-i", "model/sail.json", "genc", "-o", "target" ]

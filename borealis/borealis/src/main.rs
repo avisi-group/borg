@@ -5,6 +5,7 @@ use {
     common::{error::ErrCtx, identifiable::unique_id, intern::INTERNER},
     deepsize::DeepSizeOf,
     log::{info, trace, warn},
+    sail::load::load_from_config,
     std::{
         ffi::OsStr,
         fs::File,
@@ -70,7 +71,7 @@ fn main() -> Result<()> {
     let ast = match args.input.extension().and_then(OsStr::to_str) {
         Some("json") => {
             info!("Loading Sail config {:?}", args.input);
-            sail::load_from_config(args.input)
+            load_from_config(args.input)
                 .wrap_err("Failed to load Sail files")?
                 .0
         }
