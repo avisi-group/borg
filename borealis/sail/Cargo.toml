@@ -11,6 +11,7 @@ repository = "https://github.com/avisi-group/borealis"
 common = { path = "../common" }
 
 ocaml = { git = "https://github.com/zshipko/ocaml-rs", rev = "e64c890", features = ["no-panic-hook"] }
+errctx = { git = "https://github.com/fmckeogh/errctx" }
 
 once_cell = "1.17.0"
 parking_lot = "0.12.1"

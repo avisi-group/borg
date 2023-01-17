@@ -13,7 +13,8 @@ use {
             set_non_lexical_flow, type_check_initial_env,
         },
     },
-    common::{error::ErrCtx, intern::InternedStringKey},
+    common::intern::InternedStringKey,
+    errctx::PathCtx,
     log::trace,
     ocaml::{FromValue, Runtime, ToValue, Value},
     phf::{phf_map, Map},
@@ -90,7 +91,7 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, Env), Er
 
         for path in files {
             trace!("Preprocessing {:?}", path);
-            let contents = read_to_string(&path).map_err(ErrCtx::f(&path))?;
+            let contents = read_to_string(&path).map_err(PathCtx::f(&path))?;
 
             // file path used for AST location annotation
             let path = path.as_os_str().to_string_lossy().to_string();

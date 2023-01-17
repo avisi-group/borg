@@ -5,7 +5,7 @@
 //! Some of the path-modifying code is potentially fragile. I was unable to find detailed specifications for `sail.json` files; unfortunately this means there is a *very* wide range of possible inputs for the array of paths to files (absolute, relative, non-UTF8, etc).
 
 use {
-    common::error::ErrCtx,
+    errctx::PathCtx,
     serde::Deserialize,
     std::{
         fs, io,
@@ -35,8 +35,8 @@ impl ModelConfig {
 
         // read from JSON (using intermediate private struct to parse command line options)
         let Intermediate { options, files } =
-            serde_json::from_reader(fs::File::open(config_path).map_err(ErrCtx::f(config_path))?)
-                .map_err(ErrCtx::f(config_path))?;
+            serde_json::from_reader(fs::File::open(config_path).map_err(PathCtx::f(config_path))?)
+                .map_err(PathCtx::f(config_path))?;
 
         let mut config = ModelConfig {
             options: options.as_str().try_into()?,
@@ -58,7 +58,7 @@ impl ModelConfig {
             *file_path = config_dir.join(&file_path);
 
             // verify that each path is valid and points to a file
-            let attr = fs::metadata(&file_path).map_err(ErrCtx::f(&file_path))?;
+            let attr = fs::metadata(&file_path).map_err(PathCtx::f(&file_path))?;
             if !attr.is_file() {
                 return Err(Error::NotFile(file_path.clone()));
             }
@@ -102,10 +102,10 @@ impl TryFrom<&str> for Options {
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
     /// IO error
-    Io(#[from] ErrCtx<io::Error>),
+    Io(#[from] PathCtx<io::Error>),
 
     /// JSON serialisation/deserialisation error
-    Json(#[from] ErrCtx<serde_json::Error>),
+    Json(#[from] PathCtx<serde_json::Error>),
 
     /// Failed to find parent for {0:?}
     NoParent(PathBuf),

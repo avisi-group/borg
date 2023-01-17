@@ -2,7 +2,7 @@
 
 use {
     crate::{ast::L, types::Position},
-    common::error::ErrCtx,
+    errctx::PathCtx,
     ocaml::{CamlError, FromValue, Int},
     std::{
         fmt::Debug,
@@ -15,7 +15,7 @@ use {
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
     /// IO error
-    Io(#[from] ErrCtx<io::Error>),
+    Io(#[from] PathCtx<io::Error>),
 
     /// OCaml function error
     OCamlFunction(#[from] OCamlError),
