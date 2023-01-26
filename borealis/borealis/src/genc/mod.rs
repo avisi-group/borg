@@ -8,7 +8,7 @@ use {
         },
         Error,
     },
-    common::error::ErrCtx,
+    errctx::PathCtx,
     std::{
         collections::HashMap,
         fmt::Display,
@@ -39,7 +39,7 @@ pub fn export<P: AsRef<Path>>(
             if e.kind() == io::ErrorKind::NotFound {
                 Error::OutDirectoryNotFound(path.to_owned())
             } else {
-                ErrCtx::new(e, path).into()
+                PathCtx::f(path)(e).into()
             }
         })?
         .count();
@@ -66,8 +66,8 @@ pub fn export<P: AsRef<Path>>(
 
 /// Creates and writes an value implementing `Display` to a file at the supplied path.
 fn write_file<D: Display>(contents: D, path: PathBuf) -> Result<(), Error> {
-    let mut file = File::create(&path).map_err(ErrCtx::f(&path))?;
-    writeln!(file, "{}", contents).map_err(ErrCtx::f(&path))?;
+    let mut file = File::create(&path).map_err(PathCtx::f(&path))?;
+    writeln!(file, "{}", contents).map_err(PathCtx::f(&path))?;
     Ok(())
 }
 

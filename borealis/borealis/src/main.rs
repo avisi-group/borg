@@ -2,8 +2,9 @@ use {
     borealis::genc::{export, Description},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{bail, Result, WrapErr},
-    common::{error::ErrCtx, identifiable::unique_id, intern::INTERNER},
+    common::{identifiable::unique_id, intern::INTERNER},
     deepsize::DeepSizeOf,
+    errctx::PathCtx,
     log::{info, trace, warn},
     sail::load::load_from_config,
     std::{
@@ -136,7 +137,7 @@ fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<BufWriter<File>> 
             .create(true) // ...otherwise create...
             .truncate(true) // ...and truncate before writing
             .open(path.as_ref())
-            .map_err(ErrCtx::f(path))
+            .map_err(PathCtx::f(path))
             .wrap_err(format!("Failed to write to file, force = {}", force))?,
     ))
 }
