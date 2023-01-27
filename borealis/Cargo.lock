@@ -592,8 +592,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml"
-version = "1.0.0-beta.4"
-source = "git+https://github.com/zshipko/ocaml-rs?rev=e64c890#e64c890fd68f85506e1d2878c8f594f8e245b983"
+version = "1.0.0-beta.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "871da589fac01351dda8c8b26a5132b90d8accd5382424cd072902584ffe0c02"
 dependencies = [
  "ocaml-boxroot-sys",
  "ocaml-derive",
@@ -612,13 +613,13 @@ dependencies = [
 
 [[package]]
 name = "ocaml-derive"
-version = "1.0.0-beta.4"
-source = "git+https://github.com/zshipko/ocaml-rs?rev=e64c890#e64c890fd68f85506e1d2878c8f594f8e245b983"
+version = "1.0.0-beta.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5cdffd393e5e346c52509608ac6c3be178523931bf9f50c18d23836474521d17"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "synstructure",
 ]
 
 [[package]]
@@ -644,7 +645,8 @@ dependencies = [
 [[package]]
 name = "ocaml-sys"
 version = "0.23.0"
-source = "git+https://github.com/zshipko/ocaml-rs?rev=e64c890#e64c890fd68f85506e1d2878c8f594f8e245b983"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc814766094de5f0f1c7e027027eb05c603cd7e235cc04ae195185fddecc1285"
 dependencies = [
  "cc",
  "cty",
@@ -1081,18 +1083,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "synstructure"
-version = "0.12.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f36bdaa60a83aca3921b5259d5400cbf5e90fc51931376a9bd4a0eb79aa7210f"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
- "unicode-xid",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1191,12 +1181,6 @@ name = "unicode-ident"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84a22b9f218b40614adcb3f4ff08b703773ad44fa9423e4e0d346d5db86e4ebc"
-
-[[package]]
-name = "unicode-xid"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "valuable"

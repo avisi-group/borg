@@ -153,7 +153,10 @@ impl Visitor for DecodeStringVisitor {
 
 /// Main function clause processing
 fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &FunctionClause) {
-    trace!("Processing decode function clause @ {}", funcl.annotation.0);
+    trace!(
+        "Processing decode function clause @ {}",
+        funcl.annotation.location
+    );
 
     let (pat, body) = match &funcl.inner.pattern_match.inner {
         PatternMatchAux::Expression(pat, body) => (pat, body),

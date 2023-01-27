@@ -5,8 +5,7 @@ edition = "2021"
 authors = ["AVISI Research Group"]
 
 [dependencies]
-ocaml = { git = "https://github.com/zshipko/ocaml-rs", rev = "e64c890", features = ["no-panic-hook"] }
-
+ocaml = { version = "1.0.0-beta.5", features = ["no-panic-hook"] }
 deepsize = "0.2.0"
 fxhash = "0.2.1"
 lasso = { version = "0.6.0", features = ["multi-threaded"] }

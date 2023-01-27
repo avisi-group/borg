@@ -2,7 +2,7 @@
 
 use {
     crate::{
-        ast::L,
+        ast::Location,
         runtime::{BoxAny, ExecutableFunction},
         types::Position,
     },
@@ -34,7 +34,7 @@ pub enum Error {
     ModelConfig(#[from] crate::json::Error),
 
     /// Failed to find {0:?} referenced by `$include` pragma in {1}
-    MissingIncludeFile(String, L),
+    MissingIncludeFile(String, Location),
 }
 
 impl From<ocaml::Error> for Error {
@@ -184,17 +184,17 @@ pub enum WrapperError {
 #[derive(Debug, displaydoc::Display, thiserror::Error, FromValue)]
 pub enum SailCompilerError {
     /// General error: {1:?} @ {0:?}
-    General(L, String),
+    General(Location, String),
     /// Unreachable error in {1:?}: {3:?} @ {0:?}
-    Unreachable(L, (String, Int, Int, Int), (), String),
+    Unreachable(Location, (String, Int, Int, Int), (), String),
     /// Todo error: {1:?} @ {0:?}
-    Todo(L, String),
+    Todo(Location, String),
     /// Syntax error: {1:?} @ {0:?}
     Syntax(Position, String),
     /// Syntax location error: {1:?} @ {0:?}
-    SyntaxLocation(L, String),
+    SyntaxLocation(Location, String),
     /// Lexical error: {1:?} @ {0:?}
     Lexical(Position, String),
     /// Type error: {1:?} {2:?} @ {0}
-    Type(L, Option<String>, String),
+    Type(Location, Option<String>, String),
 }

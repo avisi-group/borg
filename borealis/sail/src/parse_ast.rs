@@ -2,7 +2,7 @@
 //! which itself is generated from `l2_parse.ott`.
 
 use {
-    crate::ast::L,
+    crate::ast::Location,
     common::intern::InternedStringKey,
     ocaml::{FromValue, ToValue, Value},
     std::collections::LinkedList,
@@ -58,7 +58,7 @@ pub enum Definition {
     Register(Value),
 
     /// Pragma
-    Pragma(InternedStringKey, InternedStringKey, L),
+    Pragma(InternedStringKey, InternedStringKey, Location),
 
     /// Internal mutrec
     Mutual(LinkedList<Value>),
