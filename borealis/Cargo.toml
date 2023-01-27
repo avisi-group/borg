@@ -1,5 +1,5 @@
 [workspace]
-members = ["sail", "borealis", "common"]
+members = ["sail", "borealis", "common", "decoder_harness"]
 
 [profile.dev.package.insta]
 opt-level = 3
