@@ -16,11 +16,7 @@ use {
     ocaml::Runtime as OCamlRuntime,
     once_cell::sync::Lazy,
     parking_lot::Mutex,
-    std::{
-        any::{Any, TypeId},
-        sync::mpsc,
-        thread,
-    },
+    std::{any::Any, sync::mpsc, thread},
 };
 
 /// Global runtime shared by all public functions
@@ -31,9 +27,11 @@ pub static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 /// Converting from the ARM AST takes 4-8 MiB and resulted in overflowing the default 2MiB stack size.
 const DEFAULT_RUNTIME_THREAD_STACK_SIZE: usize = 64 * 1024 * 1024; // 64MiB
 
-type ExecutableFunction<T> = Box<dyn FnOnce(&mut OCamlRuntime) -> T + Send + Sync>;
+/// Closure that may be executed on the runtime
+pub type ExecutableFunction<T> = Box<dyn FnOnce(&mut OCamlRuntime) -> T + Send + Sync>;
 
-type BoxAny = Box<dyn Any + Send + Sync>;
+/// Dynamic type
+pub type BoxAny = Box<dyn Any + Send + Sync>;
 
 /// Wrapper around OCaml runtime
 ///
@@ -107,16 +105,13 @@ impl Runtime {
             Box::new(move |rt: &mut OCamlRuntime| Box::new(f(rt)));
 
         // send closure
-        self.request.send(boxed_return).unwrap();
+        self.request.send(boxed_return)?;
 
         // receive Box<dyn Any>
         let boxed = self.response.recv()?;
 
-        // assert type id is as expected
-        assert_eq!((*boxed).type_id(), TypeId::of::<RET>());
-
         // downcast
-        Ok(*boxed.downcast().unwrap())
+        Ok(*boxed.downcast().expect("downcasting to return type"))
     }
 }
 
