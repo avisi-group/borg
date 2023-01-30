@@ -10,7 +10,7 @@ use {
 
 /// Kind identifier
 ///
-/// In the Sail AST kind identifiers are strings, but they are invalid Rust Strings and so are represented here as a Vec<u8>.
+/// In the Sail AST kind identifiers are strings, but they are invalid Rust `String`s and so are represented here as a `Vec<u8>`.
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf, PartialEq, Eq)]
 pub struct KindIdentifierInner(Vec<u8>);
 
