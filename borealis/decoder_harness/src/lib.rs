@@ -38,3 +38,12 @@ pub mod ffi {
         ) -> *const c_char;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn assert_disassemble() {
+        // todo test that snapshot tests disassembled binary
+        panic!();
+    }
+}

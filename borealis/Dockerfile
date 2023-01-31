@@ -79,6 +79,6 @@ RUN eval `opam env` && cargo build --release --workspace --all-targets
 
 # prepare final image
 FROM scratch
-COPY --from=builder /tmp/build/target/doc /doc
-COPY --from=builder /tmp/build/target/release/borealis .
+COPY --from=harness /tmp/build/target/doc /doc
+COPY --from=harness /tmp/build/target/release/borealis .
 ENTRYPOINT [ "./borealis", "--force", "--log", "trace", "-i", "model/sail.json", "genc", "-o", "target" ]
