@@ -2,8 +2,8 @@ target
 **/.DS_Store
 **/_build
 .vscode
-testharness/*.o
-testharness/*.bin
-testharness/test
-testharness/aarch64-decode.h
-testharness/aarch64-decode.cpp
+
+decoder_harness/include/arm64-decode.h
+decoder_harness/include/arm64-decode.cpp
+decoder_harness/include/arm64-disasm.h
+decoder_harness/include/arm64-disasm.cpp

@@ -1,17 +1,23 @@
 #pragma once
 
 #include <memory>
-#include <aarch64-decode.h>
+#include <arm64-decode.h>
+#include <arm64-disasm.h>
 
 using namespace std;
-using namespace captive::arch::aarch64;
+using namespace captive::arch::arm64;
 
-unique_ptr<aarch64_decode> new_decoder()
+unique_ptr<arm64_decode> new_decoder()
 {
-    return unique_ptr<aarch64_decode>(new aarch64_decode());
+    return unique_ptr<arm64_decode>(new arm64_decode());
 }
 
-uint64_t opcode(const aarch64_decode &decoder)
+int32_t opcode(const arm64_decode &decoder)
 {
-    return (uint64_t)decoder.opcode;
+    return (int32_t)decoder.opcode;
+}
+
+unique_ptr<arm64_disasm> new_disassembler()
+{
+    return unique_ptr<arm64_disasm>(new arm64_disasm());
 }

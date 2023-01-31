@@ -38,9 +38,9 @@ COPY sail/Cargo.toml sail/
 COPY common/Cargo.toml common/
 COPY decoder_harness/Cargo.toml decoder_harness/
 RUN eval `opam env` && \
-    cargo build --release --all-targets && \
-    cargo test --release --no-run && \
-    cargo doc --release
+    cargo build --release --workspace --all-targets && \
+    cargo test --release --workspace --no-run && \
+    cargo doc --release --workspace
 
 # copy full source
 COPY . .
@@ -59,6 +59,25 @@ RUN eval `opam env` && cargo build --release --all-targets
 RUN eval `opam env` && cargo doc --release
 RUN echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; URL=/borealis/borealis" /></head></html>' > target/doc/index.html
 
+# run E2E test
+FROM builder as borealis_genc
+RUN mkdir target/genc
+RUN cargo r --release -- --force --log trace -i testdata/sail-arm/arm-v8.5-a/model/sail.json genc -o target/genc
+
+FROM ghcr.io/fmckeogh/gensim:latest as gensim
+WORKDIR /tmp/build
+COPY --from=borealis_genc /tmp/build/target/genc .
+RUN /gensim/gensim --verbose -a main.genc -t output -s captive_decoder,captive_cpu,captive_jitv2,captive_disasm -o captive_decoder.GenerateDotGraph=1,captive_decoder.OptimisationEnabled=1,captive_decoder.OptimisationMinPrefixLength=8,captive_decoder.OptimisationMinPrefixMembers=4,captive_decoder.InlineHints=1
+
+FROM builder as harness
+COPY --from=gensim /tmp/build/output/arm64-decode.cpp decoder_harness/include
+COPY --from=gensim /tmp/build/output/arm64-decode.h decoder_harness/include
+COPY --from=gensim /tmp/build/output/arm64-disasm.cpp decoder_harness/include
+COPY --from=gensim /tmp/build/output/arm64-disasm.h decoder_harness/include
+RUN eval `opam env` && cargo build --release --workspace --all-targets
+# TODO snapshot test disassembled output
+
+# prepare final image
 FROM scratch
 COPY --from=builder /tmp/build/target/doc /doc
 COPY --from=builder /tmp/build/target/release/borealis .

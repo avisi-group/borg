@@ -210,7 +210,7 @@ impl Description {
     #[doc(hidden)]
     pub fn empty() -> Self {
         Description {
-            name: "aarch64".to_owned(),
+            name: "arm64".to_owned(),
             endianness: Endianness::LittleEndian,
             wordsize: 64,
             fetchsize: 32,
