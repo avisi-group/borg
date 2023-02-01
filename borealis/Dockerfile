@@ -30,13 +30,13 @@ RUN cd /tmp && cargo init --lib empty && cd empty && cargo add itoa && cargo bui
 RUN cargo init --lib borealis && \
     cargo init --lib sail && \
     cargo init --lib common && \
-    cargo init --lib decoder_harness
+    cargo init --lib libarch-sys
 COPY Cargo.lock .
 COPY Cargo.toml .
 COPY borealis/Cargo.toml borealis/
 COPY sail/Cargo.toml sail/
 COPY common/Cargo.toml common/
-COPY decoder_harness/Cargo.toml decoder_harness/
+COPY libarch-sys/Cargo.toml libarch-sys/
 RUN eval `opam env` && \
     cargo build --release --workspace --all-targets && \
     cargo test --release --workspace --no-run && \
@@ -44,7 +44,7 @@ RUN eval `opam env` && \
 
 # copy full source
 COPY . .
-RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs decoder_harness/src/lib.rs
+RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs libarch-sys/src/lib.rs
 
 # check formatting
 RUN cargo fmt --all -- --check
@@ -70,12 +70,12 @@ COPY --from=borealis_genc /tmp/build/target/genc .
 RUN /gensim/gensim --verbose -a main.genc -t output -s captive_decoder,captive_cpu,captive_jitv2,captive_disasm -o captive_decoder.GenerateDotGraph=1,captive_decoder.OptimisationEnabled=1,captive_decoder.OptimisationMinPrefixLength=8,captive_decoder.OptimisationMinPrefixMembers=4,captive_decoder.InlineHints=1
 
 FROM builder as harness
-COPY --from=gensim /tmp/build/output/arm64-decode.cpp decoder_harness/include
-COPY --from=gensim /tmp/build/output/arm64-decode.h decoder_harness/include
-COPY --from=gensim /tmp/build/output/arm64-disasm.cpp decoder_harness/include
-COPY --from=gensim /tmp/build/output/arm64-disasm.h decoder_harness/include
-RUN cd decoder_harness && cargo build --release --all-targets
-RUN cd decoder_harness && cargo test --release --no-fail-fast
+COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
+COPY --from=gensim /tmp/build/output/arm64-decode.h libarch-sys/include
+COPY --from=gensim /tmp/build/output/arm64-disasm.cpp libarch-sys/include
+COPY --from=gensim /tmp/build/output/arm64-disasm.h libarch-sys/include
+RUN cd libarch-sys && cargo build --release --all-targets
+RUN cd libarch-sys && cargo test --release --no-fail-fast
 
 # prepare final image
 FROM scratch

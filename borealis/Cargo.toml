@@ -1,5 +1,5 @@
 [workspace]
-members = ["sail", "borealis", "common", "decoder_harness"]
+members = ["sail", "borealis", "common", "libarch-sys"]
 default-members = ["sail", "borealis", "common"]
 
 [profile.dev.package.insta]

@@ -1,11 +1,15 @@
 use {
     color_eyre::Result,
-    decoder_harness::ffi::{arm64_decode, new_decoder, new_disassembler, opcode},
-    std::ffi::CStr,
+    libarch_sys::root::{
+        captive::arch::arm64::{arm64_decode_decode, arm64_disasm_disassemble},
+        new_decoder, new_disassembler,
+    },
+    std::ffi::{c_void, CStr},
 };
 
 fn main() -> Result<()> {
     color_eyre::install()?;
+
     let data = [
         0x1F, 0x20, 0x03, 0xD5, 0x1D, 0x00, 0x80, 0xD2, 0x1E, 0x00, 0x80, 0xD2, 0xE5, 0x03, 0x00,
         0xAA, 0xE1, 0x03, 0x40, 0xF9, 0xE2, 0x23, 0x00, 0x91, 0xE6, 0x03, 0x00, 0x91, 0x80, 0x00,
@@ -36,24 +40,21 @@ fn main() -> Result<()> {
         0x80, 0x52, 0x8A, 0xFF, 0xFF, 0x97, 0x00, 0x00, 0x80, 0x52, 0x78, 0xFF, 0xFF, 0x97,
     ];
 
-    let mut decoder = new_decoder();
-    let mut disassembler = new_disassembler();
+    let decoder = unsafe { new_decoder() };
+    let disassembler = unsafe { new_disassembler() };
 
     for chunk in data.chunks_exact(4) {
-        unsafe { decoder.pin_mut().decode(0, 0, &chunk[0]) };
+        unsafe { arm64_decode_decode(decoder as *mut c_void, 0, 0, &chunk[0]) };
 
-        let s = unsafe {
-            disassembler.pin_mut().disassemble(
-                0,
-                (decoder.pin_mut().into_ref().get_ref() as *const arm64_decode) as *const u8,
-            )
+        let str_ptr = unsafe {
+            arm64_disasm_disassemble(disassembler as *mut c_void, 0, decoder as *const u8)
         };
 
         println!(
-            "{:08X}: {:#4?}: {:?}",
+            "{:08X}: {:?}: {:?}",
             unsafe { std::mem::transmute::<_, &u32>(&chunk[0]) },
-            opcode(&decoder),
-            unsafe { CStr::from_ptr(s) }
+            unsafe { *decoder }.opcode,
+            unsafe { CStr::from_ptr(str_ptr) }
         );
     }
 

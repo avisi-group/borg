@@ -2,7 +2,7 @@
 #pragma once
 
 #include <string.h>
-#include <cstdio>
+#include <stdio.h>
 
 namespace captive
 {

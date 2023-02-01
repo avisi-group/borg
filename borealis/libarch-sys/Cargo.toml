@@ -1,17 +1,16 @@
 [package]
-name = "decoder_harness"
+name = "libarch-sys"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 errctx = { git = "https://github.com/fmckeogh/errctx" }
-
 color-eyre = "0.6.2"
-cxx = "1.0.88"
 memmap2 = "0.5.8"
-
-[build-dependencies]
-cxx-build = "1.0.88"
 
 [dev-dependencies]
 insta = "1.26.0"
+
+[build-dependencies]
+bindgen = "0.63.0"
+cc = "1.0.79"
