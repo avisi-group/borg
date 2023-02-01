@@ -74,8 +74,8 @@ COPY --from=gensim /tmp/build/output/arm64-decode.cpp decoder_harness/include
 COPY --from=gensim /tmp/build/output/arm64-decode.h decoder_harness/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.cpp decoder_harness/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.h decoder_harness/include
-RUN eval `opam env` && cargo build --release --workspace --all-targets
-# TODO snapshot test disassembled output
+RUN cd decoder_harness && cargo build --release --all-targets
+RUN cd decoder_harness && cargo test --release --no-fail-fast
 
 # prepare final image
 FROM scratch

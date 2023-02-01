@@ -304,6 +304,7 @@ dependencies = [
  "cxx",
  "cxx-build",
  "errctx",
+ "insta",
  "memmap2",
 ]
 
