@@ -73,6 +73,8 @@ FROM rust as harness
 WORKDIR /tmp/build
 RUN apt-get update && apt-get install -yy libclang-dev
 
+# copy index, source, and gensim output
+COPY --from=builder /usr/local/cargo /usr/local/cargo
 COPY --from=builder /tmp/build /tmp/build
 COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
