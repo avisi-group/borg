@@ -86,6 +86,7 @@ RUN cd libarch-sys && cargo test --release --no-fail-fast && cargo doc --release
 
 # prepare final image
 FROM scratch
-COPY --from=harness /tmp/build/target/doc /doc
-COPY --from=harness /tmp/build/target/release/borealis .
+COPY --from=builder /tmp/build/target/doc /doc
+COPY --from=harness /tmp/build/target/doc/libarch_sys /doc/libarch_sys
+COPY --from=builder /tmp/build/target/release/borealis .
 ENTRYPOINT [ "./borealis", "--force", "--log", "trace", "-i", "model/sail.json", "genc", "-o", "target" ]
