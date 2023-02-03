@@ -39,7 +39,7 @@ Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes
 
 Rust does not support cyclic dependencies among crates so this crate contains types and logic shared by multiple other crates in the workspace.
 
-### `decoder_harness`
+### `libarch-sys`
 
 Rust wrapper around the GenSim-emitted C++ source. Currently used for debugging instruction decoder and disassembler.
 

@@ -10,12 +10,17 @@ arm64_decode *new_decoder()
     return new arm64_decode();
 }
 
-// int32_t opcode(const arm64_decode &decoder)
-// {
-//     return (int32_t)decoder.opcode;
-// }
-
 arm64_disasm *new_disassembler()
 {
     return new arm64_disasm();
+}
+
+void destruct_decoder(arm64_decode *decoder)
+{
+    delete decoder;
+}
+
+void destruct_disassembler(arm64_disasm *disassembler)
+{
+    delete disassembler;
 }

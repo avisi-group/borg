@@ -1,4 +1,4 @@
-# Included for reference and testing that targeting ARM64 / MUSL is not entirely broken, as it is not tested in CI
+# Reference build and deployment environment for Borealis, x86_64 tested in CI
 
 FROM rust:alpine AS builder
 WORKDIR /tmp/build
@@ -69,12 +69,17 @@ WORKDIR /tmp/build
 COPY --from=borealis_genc /tmp/build/target/genc .
 RUN /gensim/gensim --verbose -a main.genc -t output -s captive_decoder,captive_cpu,captive_jitv2,captive_disasm -o captive_decoder.GenerateDotGraph=1,captive_decoder.OptimisationEnabled=1,captive_decoder.OptimisationMinPrefixLength=8,captive_decoder.OptimisationMinPrefixMembers=4,captive_decoder.InlineHints=1
 
-FROM builder as harness
+FROM rust as harness
+WORKDIR /tmp/build
+RUN apt-get update && apt-get install -yy libclang-dev
+
+COPY --from=builder /tmp/build /tmp/build
+COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-decode.h libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.h libarch-sys/include
-RUN cd libarch-sys && cargo build --release --all-targets
+
 RUN cd libarch-sys && cargo test --release --no-fail-fast
 
 # prepare final image
