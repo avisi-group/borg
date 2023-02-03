@@ -3,7 +3,7 @@ target
 **/_build
 .vscode
 
-decoder_harness/include/arm64-decode.h
-decoder_harness/include/arm64-decode.cpp
-decoder_harness/include/arm64-disasm.h
-decoder_harness/include/arm64-disasm.cpp
+libarch-sys/include/arm64-decode.h
+libarch-sys/include/arm64-decode.cpp
+libarch-sys/include/arm64-disasm.h
+libarch-sys/include/arm64-disasm.cpp
