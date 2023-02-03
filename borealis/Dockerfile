@@ -82,7 +82,7 @@ COPY --from=gensim /tmp/build/output/arm64-decode.h libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.h libarch-sys/include
 
-RUN cd libarch-sys && cargo test --release --no-fail-fast
+RUN cd libarch-sys && cargo test --release --no-fail-fast && cargo doc --release
 
 # prepare final image
 FROM scratch
