@@ -5,6 +5,7 @@ use {
     common::{identifiable::unique_id, intern::InternedStringKey},
     log::{trace, warn},
     num_bigint::Sign,
+    once_cell::sync::Lazy,
     sail::{
         ast::{
             Expression, ExpressionAux, FunctionClause, Identifier, IdentifierAux, LValueExpression,
@@ -12,14 +13,34 @@ use {
             Pattern, PatternAux, PatternMatchAux, TypArgAux, TypAux,
         },
         num::BigInt,
-        visitor::Visitor,
     },
     std::{
         collections::{HashMap, LinkedList},
         fmt::{Debug, Display},
         ops::Range,
+        sync::Mutex,
     },
 };
+
+static NAME_COUNTER: Lazy<NameCounter> = Lazy::new(|| NameCounter::new());
+
+struct NameCounter(Mutex<HashMap<InternedStringKey, u32>>);
+
+impl NameCounter {
+    /// Create a new empty instance
+    fn new() -> Self {
+        Self(Mutex::new(HashMap::new()))
+    }
+
+    fn increment_count(&self, key: InternedStringKey) -> u32 {
+        let mut counters = self.0.lock().unwrap();
+
+        let current = counters.get(&key).copied().unwrap_or(0);
+        let last = counters.insert(key, current + 1);
+        assert!(last == Some(current) || last.is_none());
+        current
+    }
+}
 
 /// Bit in an instruction format
 #[derive(PartialEq, Eq)]
@@ -109,50 +130,8 @@ impl From<&Literal> for Format {
     }
 }
 
-/// Visitor for building instruction decode strings
-pub struct DecodeStringVisitor {
-    /// Decoded instruction formats
-    pub formats: HashMap<InternedStringKey, GenCFormat>,
-    counters: HashMap<InternedStringKey, u32>,
-}
-
-impl DecodeStringVisitor {
-    /// Create a new empty instance
-    pub fn new() -> Self {
-        Self {
-            formats: HashMap::new(),
-            counters: HashMap::new(),
-        }
-    }
-
-    fn increment_count(&mut self, key: InternedStringKey) -> u32 {
-        let current = self.counters.get(&key).copied().unwrap_or(0);
-        let last = self.counters.insert(key, current + 1);
-        assert!(last == Some(current) || last.is_none());
-        current
-    }
-}
-
-impl Default for DecodeStringVisitor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Visitor for DecodeStringVisitor {
-    fn visit_function_clause(&mut self, node: &FunctionClause) {
-        let IdentifierAux::Identifier(ident) = node.inner.identifier.inner else {
-            return;
-        };
-
-        if ident.to_string() == "decode64" {
-            process_decode_function_clause(self, node);
-        }
-    }
-}
-
 /// Main function clause processing
-fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &FunctionClause) {
+pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedStringKey, GenCFormat) {
     trace!(
         "Processing decode function clause @ {}",
         funcl.annotation.location
@@ -304,13 +283,13 @@ fn process_decode_function_clause(visitor: &mut DecodeStringVisitor, funcl: &Fun
 
     assert_eq!(inner.iter().map(|s| s.length).sum::<usize>(), 32);
 
-    let count = visitor.increment_count(instruction_name);
+    let count = NAME_COUNTER.increment_count(instruction_name);
 
     let name = format!("{}{}", instruction_name, count).into();
     let format = GenCFormat(inner);
     trace!("{} genc format: {}", name, format);
 
-    visitor.formats.insert(name, format);
+    (name, format)
 }
 
 fn flatten_expression(expression: &Expression) -> Vec<Expression> {

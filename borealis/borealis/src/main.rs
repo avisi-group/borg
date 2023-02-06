@@ -1,5 +1,5 @@
 use {
-    borealis::genc::{export, Description},
+    borealis::{genc, sail_to_genc},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{bail, Result, WrapErr},
     common::{identifiable::unique_id, intern::INTERNER},
@@ -97,10 +97,10 @@ fn main() -> Result<()> {
     match args.output {
         Output::Genc { output } => {
             info!("Converting Sail AST to GenC");
-            let description = Description::from(&ast);
+            let description = sail_to_genc(&ast);
 
             info!("Exporting GenC description");
-            export(&description, output, args.force)
+            genc::export(&description, output, args.force)
                 .wrap_err("Error while exporting GenC description")?
         }
 

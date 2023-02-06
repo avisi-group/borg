@@ -3,13 +3,17 @@
 //! Sail frontend for GenSim
 
 use {
+    crate::{
+        genc::{Description, Instruction},
+        instruction::{get_instructions, process_instruction},
+    },
     errctx::PathCtx,
+    sail::ast::Ast,
     std::{io, path::PathBuf},
 };
 
-pub mod format;
-mod from_ast;
 pub mod genc;
+pub mod instruction;
 
 /// Borealis error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
@@ -22,4 +26,19 @@ pub enum Error {
     OutDirectoryNotFound(PathBuf),
     /// GenC export directory {0:?} not empty
     OutDirectoryNotEmpty(PathBuf),
+}
+
+/// Compiles a Sail ISA specification to a GenC description
+pub fn sail_to_genc(ast: &Ast) -> Description {
+    let instructions = get_instructions(ast);
+
+    let mut description = Description::empty();
+
+    description.instructions = instructions
+        .into_iter()
+        .map(|clause| process_instruction(ast, &clause))
+        .map(|(name, format, execute)| (name.to_string(), Instruction { format, execute }))
+        .collect();
+
+    description
 }
