@@ -1,5 +1,3 @@
-use std::env::args;
-
 use {
     color_eyre::Result,
     errctx::PathCtx,
@@ -9,6 +7,7 @@ use {
     },
     memmap2::Mmap,
     std::{
+        env::args,
         ffi::{c_void, CStr},
         fs::File,
     },
