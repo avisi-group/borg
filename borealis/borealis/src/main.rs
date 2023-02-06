@@ -138,6 +138,6 @@ fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<BufWriter<File>> 
             .truncate(true) // ...and truncate before writing
             .open(path.as_ref())
             .map_err(PathCtx::f(path))
-            .wrap_err(format!("Failed to write to file, force = {}", force))?,
+            .wrap_err(format!("Failed to write to file, force = {force}"))?,
     ))
 }

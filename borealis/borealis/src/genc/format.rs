@@ -10,10 +10,10 @@ impl Display for InstructionFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0.first() {
             Some(segment) => {
-                write!(f, "{}", segment)?;
+                write!(f, "{segment}")?;
 
                 for segment in &self.0[1..] {
-                    write!(f, " {}", segment)?;
+                    write!(f, " {segment}")?;
                 }
 
                 Ok(())
@@ -53,8 +53,8 @@ pub enum SegmentContent {
 impl Display for SegmentContent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SegmentContent::Variable(s) => write!(f, "%{}", s),
-            SegmentContent::Constant(x) => write!(f, "{:#x}", x),
+            SegmentContent::Variable(s) => write!(f, "%{s}"),
+            SegmentContent::Constant(x) => write!(f, "{x:#x}"),
         }
     }
 }

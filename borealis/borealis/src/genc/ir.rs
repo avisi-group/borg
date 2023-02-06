@@ -69,13 +69,13 @@ impl Display for Main {
         writeln!(f)?;
 
         for register in &self.registers {
-            write!(f, "{}", register)?;
+            write!(f, "{register}")?;
         }
 
         writeln!(f)?;
 
         writeln!(f, "\tARCH_CTOR(arm) {{")?;
-        writeln!(f, "\t\tac_isa(\"{}\");", ISA_FILENAME)?;
+        writeln!(f, "\t\tac_isa(\"{ISA_FILENAME}\");")?;
         writeln!(f, "\t\tset_endian(\"{}\");", self.endianness)?;
         writeln!(f, "\t}};")?;
 
@@ -89,7 +89,7 @@ impl Display for RegisterSpace {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         writeln!(f, "\tac_regspace({}) {{", self.size)?;
         for view in &self.views {
-            write!(f, "{}", view)?;
+            write!(f, "{view}")?;
         }
         writeln!(f, "\t}}")
     }
@@ -98,8 +98,8 @@ impl Display for RegisterSpace {
 impl Display for View {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
-            View::Bank(bank) => write!(f, "{}", bank),
-            View::Slot(slot) => write!(f, "{}", slot),
+            View::Bank(bank) => write!(f, "{bank}"),
+            View::Slot(slot) => write!(f, "{slot}"),
         }
     }
 }
@@ -113,7 +113,7 @@ impl Display for Slot {
         )?;
 
         if let Some(tag) = &self.tag {
-            write!(f, " {}", tag)?;
+            write!(f, " {tag}")?;
         }
 
         writeln!(f, ";")?;
@@ -188,7 +188,7 @@ impl Display for Isa {
         )?;
 
         for format in &self.formats {
-            write!(f, "{}", format)?;
+            write!(f, "{format}")?;
         }
 
         writeln!(f)?;
@@ -198,16 +198,15 @@ impl Display for Isa {
             instruction_ident, ..
         } in &self.formats
         {
-            writeln!(f, "\t\t{}.set_decoder();", instruction_ident)?;
+            writeln!(f, "\t\t{instruction_ident}.set_decoder();")?;
             writeln!(
                 f,
-                "\t\t{}.set_behaviour({});",
-                instruction_ident, instruction_ident
+                "\t\t{instruction_ident}.set_behaviour({instruction_ident});",
             )?;
         }
 
-        writeln!(f, "\t\tac_behaviours(\"{}\");", BEHAVIOURS_FILENAME)?;
-        writeln!(f, "\t\tac_execute(\"{}\");", EXECUTE_FILENAME)?;
+        writeln!(f, "\t\tac_behaviours(\"{BEHAVIOURS_FILENAME}\");")?;
+        writeln!(f, "\t\tac_execute(\"{EXECUTE_FILENAME}\");")?;
         writeln!(f, "\t}};")?;
 
         writeln!(f, "}};")?;
@@ -254,7 +253,7 @@ impl Display for Execute {
         write_header(f)?;
 
         for func in &self.0 {
-            writeln!(f, "{}", func)?;
+            writeln!(f, "{func}")?;
         }
 
         Ok(())
@@ -270,7 +269,7 @@ impl Display for Behaviours {
         write_header(f)?;
 
         for func in &self.0 {
-            writeln!(f, "{}", func)?;
+            writeln!(f, "{func}")?;
         }
 
         Ok(())

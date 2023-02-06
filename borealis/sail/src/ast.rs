@@ -39,8 +39,8 @@ pub enum Location {
 impl Display for Location {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Location::Range(p0, _) => write!(f, "{}", p0),
-            _ => write!(f, "{:?}", self),
+            Location::Range(p0, _) => write!(f, "{p0}"),
+            _ => write!(f, "{self:?}"),
         }
     }
 }

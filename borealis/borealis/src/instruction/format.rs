@@ -22,7 +22,7 @@ use {
     },
 };
 
-static NAME_COUNTER: Lazy<NameCounter> = Lazy::new(|| NameCounter::new());
+static NAME_COUNTER: Lazy<NameCounter> = Lazy::new(NameCounter::new);
 
 struct NameCounter(Mutex<HashMap<InternedStringKey, u32>>);
 
@@ -123,7 +123,7 @@ impl From<&Literal> for Format {
             match char {
                 '0' => decode_bits.push(FormatBit::Zero),
                 '1' => decode_bits.push(FormatBit::One),
-                c => panic!("Unexpected char {:?} when decoding instruction format", c),
+                c => panic!("Unexpected char {c:?} when decoding instruction format"),
             }
         }
         decode_bits
@@ -285,7 +285,7 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedString
 
     let count = NAME_COUNTER.increment_count(instruction_name);
 
-    let name = format!("{}{}", instruction_name, count).into();
+    let name = format!("{instruction_name}{count}").into();
     let format = GenCFormat(inner);
     trace!("{} genc format: {}", name, format);
 
@@ -489,6 +489,6 @@ fn expression_to_usize(expression: &Expression) -> usize {
     match digits.len() {
         0 => 0,
         1 => usize::try_from(digits[0]).unwrap(),
-        _ => panic!("bigint {:?} too large", bigint),
+        _ => panic!("bigint {bigint:?} too large"),
     }
 }

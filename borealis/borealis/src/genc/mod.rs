@@ -67,7 +67,7 @@ pub fn export<P: AsRef<Path>>(
 /// Creates and writes an value implementing `Display` to a file at the supplied path.
 fn write_file<D: Display>(contents: D, path: PathBuf) -> Result<(), Error> {
     let mut file = File::create(&path).map_err(PathCtx::f(&path))?;
-    writeln!(file, "{}", contents).map_err(PathCtx::f(&path))?;
+    writeln!(file, "{contents}").map_err(PathCtx::f(&path))?;
     Ok(())
 }
 
@@ -115,7 +115,7 @@ impl Description {
             .instructions
             .iter()
             .map(|(instruction_ident, Instruction { format, .. })| Format {
-                format_ident: format!("fmt_{}", instruction_ident),
+                format_ident: format!("fmt_{instruction_ident}"),
                 instruction_ident: instruction_ident.clone(),
                 contents: format.to_string(),
             })

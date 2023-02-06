@@ -122,7 +122,7 @@ impl From<&ocaml::CamlError> for OCamlErrorInner {
             CamlError::InvalidArgument(s) => Self::InvalidArgument(s),
             CamlError::OutOfMemory => Self::OutOfMemory,
             CamlError::StackOverflow => Self::StackOverflow,
-            CamlError::SysError(v) => Self::SysError(format!("{:?}", v)),
+            CamlError::SysError(v) => Self::SysError(format!("{v:?}")),
             CamlError::EndOfFile => Self::EndOfFile,
             CamlError::ZeroDivide => Self::ZeroDivide,
             CamlError::ArrayBoundError => Self::ArrayBoundError,
@@ -130,17 +130,12 @@ impl From<&ocaml::CamlError> for OCamlErrorInner {
             CamlError::Exception(v) => {
                 // unsafe if `from` is called outside of the worker thread
                 let msg = unsafe { v.exception_to_string() }.unwrap_or_else(|e| {
-                    format!(
-                        "Failed to convert exception to string due to UTF-8 error: {}",
-                        e
-                    )
+                    format!("Failed to convert exception to string due to UTF-8 error: {e}",)
                 });
 
                 Self::Exception(msg)
             }
-            CamlError::WithArg(typ, arg) => {
-                Self::WithArg(format!("{:?}", typ), format!("{:?}", arg))
-            }
+            CamlError::WithArg(typ, arg) => Self::WithArg(format!("{typ:?}"), format!("{arg:?}")),
         }
     }
 }
