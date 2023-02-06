@@ -180,6 +180,12 @@ pub struct Kind {
     pub location: Location,
 }
 
+impl Walkable for Kind {
+    fn walk<V: Visitor>(&self, _: &mut V) {
+        // leaf node
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Identifier {
     pub inner: IdentifierAux,
@@ -1586,6 +1592,14 @@ pub struct InstantiationSpecification {
     pub annotation: Annot,
 }
 
+impl Walkable for InstantiationSpecification {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            InstantiationSpecificationAux::Id(id) => visitor.visit_identifier(id),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeDefinition {
     pub inner: TypeDefinitionAux,
@@ -1658,6 +1672,21 @@ impl Walkable for DecSpec {
 pub struct Substitution {
     pub inner: SubstitutionAux,
     pub location: Location,
+}
+
+impl Walkable for Substitution {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            SubstitutionAux::Typ(kid, typ) => {
+                visitor.visit_kind_identifier(kid);
+                visitor.visit_typ(typ);
+            }
+            SubstitutionAux::Id(id0, id1) => {
+                visitor.visit_identifier(id0);
+                visitor.visit_identifier(id1);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -1758,6 +1787,14 @@ pub enum ImplDefintionAux {
 pub struct OptionalDefault {
     pub inner: OptionalDefaultAux,
     pub annotation: Annot,
+}
+
+impl Walkable for OptionalDefault {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        if let OptionalDefaultAux::Dec(exp) = &self.inner {
+            visitor.visit_expression(exp);
+        }
+    }
 }
 
 /// Top-level Sail2 definition

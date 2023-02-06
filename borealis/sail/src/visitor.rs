@@ -5,12 +5,13 @@
 use crate::{
     ast::{
         Ast, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, Expression, FieldExpression,
-        FunctionClause, FunctionDefinition, Identifier, IndexRange, InternalLoopMeasure,
-        KindIdentifier, KindedIdentifier, LValueExpression, LetBind, Literal, LoopMeasure,
-        MappingClause, MappingDefinition, MappingPattern, MappingPatternExpression, NConstraint,
-        NumericExpression, Order, Pattern, PatternMatch, QuantItem, RecursiveAnnotationOpt,
-        ScatteredDefinition, Typ, TypArg, TypPat, TypQuant, TypeAnnotationOpt, TypeDefinition,
-        TypeScheme, TypeUnion, Value, ValueSpecification,
+        FunctionClause, FunctionDefinition, Identifier, IndexRange, InstantiationSpecification,
+        InternalLoopMeasure, Kind, KindIdentifier, KindedIdentifier, LValueExpression, LetBind,
+        Literal, LoopMeasure, MappingClause, MappingDefinition, MappingPattern,
+        MappingPatternExpression, NConstraint, NumericExpression, OptionalDefault, Order, Pattern,
+        PatternMatch, QuantItem, RecursiveAnnotationOpt, ScatteredDefinition, Substitution, Typ,
+        TypArg, TypPat, TypQuant, TypeAnnotationOpt, TypeDefinition, TypeScheme, TypeUnion, Value,
+        ValueSpecification,
     },
     num::BigInt,
 };
@@ -224,6 +225,26 @@ pub trait Visitor: Sized {
 
     #[allow(missing_docs)]
     fn visit_mapping_pattern(&mut self, node: &MappingPattern) {
+        node.walk(self);
+    }
+
+    #[allow(missing_docs)]
+    fn visit_substitution(&mut self, node: &Substitution) {
+        node.walk(self);
+    }
+
+    #[allow(missing_docs)]
+    fn visit_optional_default(&mut self, node: &OptionalDefault) {
+        node.walk(self);
+    }
+
+    #[allow(missing_docs)]
+    fn visit_kind(&mut self, node: &Kind) {
+        node.walk(self);
+    }
+
+    #[allow(missing_docs)]
+    fn visit_instantiation_specification(&mut self, node: &InstantiationSpecification) {
         node.walk(self);
     }
 }
