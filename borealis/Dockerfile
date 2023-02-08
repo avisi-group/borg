@@ -67,7 +67,7 @@ RUN cargo r --release -- --force --log trace -i testdata/sail-arm/arm-v8.5-a/mod
 FROM ghcr.io/fmckeogh/gensim:latest as gensim
 WORKDIR /tmp/build
 COPY --from=borealis_genc /tmp/build/target/genc .
-RUN /gensim/gensim --verbose -a main.genc -t output -s captive_decoder,captive_cpu,captive_jitv2,captive_disasm -o captive_decoder.GenerateDotGraph=1,captive_decoder.OptimisationEnabled=1,captive_decoder.OptimisationMinPrefixLength=8,captive_decoder.OptimisationMinPrefixMembers=4,captive_decoder.InlineHints=1
+RUN gensim --verbose -a main.genc -t output -s captive_decoder,captive_cpu,captive_jitv2,captive_disasm -o captive_decoder.GenerateDotGraph=1,captive_decoder.OptimisationEnabled=1,captive_decoder.OptimisationMinPrefixLength=8,captive_decoder.OptimisationMinPrefixMembers=4,captive_decoder.InlineHints=1
 
 FROM rust as harness
 WORKDIR /tmp/build
@@ -76,7 +76,6 @@ RUN apt-get update && apt-get install -yy libclang-dev
 # copy index, source, and gensim output
 COPY --from=builder /usr/local/cargo /usr/local/cargo
 COPY --from=builder /tmp/build /tmp/build
-COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-decode.h libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.cpp libarch-sys/include
