@@ -1,0 +1,37 @@
+---
+source: libarch-sys/src/tests.rs
+expression: output
+---
+A9BC7BFD: ???
+910003FD: integer_arithmetic_addsub_immediate_decode0
+90000000: ???
+F9400000: ???
+F9400001: ???
+F9001FE1: ???
+D2800001: branch_unconditional_immediate_decode1
+90000000: ???
+91000001: integer_arithmetic_addsub_immediate_decode0
+9100A3E0: integer_arithmetic_addsub_immediate_decode0
+F9400022: ???
+F9000002: ???
+F8405021: memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode7
+F8005001: memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode0
+52801400: branch_unconditional_immediate_decode0
+B9001FE0: ???
+B9401FE1: ???
+2A0103E0: memory_pair_general_postidx_memory_pair_general_postidx__decode0
+531D7000: branch_unconditional_immediate_decode0
+4B010000: ???
+B90023E0: ???
+B9401FE1: ???
+B94023E0: ???
+1AC00820: integer_arithmetic_addsub_shiftedreg_decode2
+B90027E0: ???
+9100A3E0: integer_arithmetic_addsub_immediate_decode0
+D28001A2: branch_unconditional_immediate_decode1
+AA0003E1: memory_pair_general_postidx_memory_pair_general_postidx__decode0
+52800000: branch_unconditional_immediate_decode0
+94000000: ???
+52800000: branch_unconditional_immediate_decode0
+94000000: ???
+

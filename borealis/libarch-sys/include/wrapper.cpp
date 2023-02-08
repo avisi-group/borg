@@ -1,26 +1,18 @@
 #include "wrapper.h"
+
 #include <arm64-decode.h>
 #include <arm64-disasm.h>
+#include <new>
 
 using namespace std;
 using namespace captive::arch::arm64;
 
-arm64_decode *new_decoder()
+arm64_decode *new_decoder(void *buf)
 {
-    return new arm64_decode();
+    return new (buf) arm64_decode();
 }
 
-arm64_disasm *new_disassembler()
+arm64_disasm *new_disassembler(void *buf)
 {
-    return new arm64_disasm();
-}
-
-void destruct_decoder(arm64_decode *decoder)
-{
-    delete decoder;
-}
-
-void destruct_disassembler(arm64_disasm *disassembler)
-{
-    delete disassembler;
+    return new (buf) arm64_disasm();
 }

@@ -3,7 +3,7 @@ use {
     errctx::PathCtx,
     libarch_sys::root::{
         captive::arch::arm64::{arm64_decode_decode, arm64_disasm_disassemble},
-        destruct_decoder, destruct_disassembler, new_decoder, new_disassembler,
+        new_decoder, new_disassembler,
     },
     memmap2::Mmap,
     std::{
@@ -21,8 +21,11 @@ fn main() -> Result<()> {
     let file = File::open(&path).map_err(PathCtx::f(&path)).unwrap();
     let mmap = unsafe { Mmap::map(&file) }.unwrap();
 
-    let decoder = unsafe { new_decoder() };
-    let disassembler = unsafe { new_disassembler() };
+    let mut decode_data = [0u8; 128];
+    let mut disasm_data = [0u8; 128];
+
+    let decoder = unsafe { new_decoder(&mut decode_data as *mut u8 as *mut c_void) };
+    let disassembler = unsafe { new_disassembler(&mut disasm_data as *mut u8 as *mut c_void) };
 
     for chunk in mmap.chunks_exact(4) {
         unsafe { arm64_decode_decode(decoder as *mut c_void, 0, 0, &chunk[0]) };
@@ -37,9 +40,6 @@ fn main() -> Result<()> {
             unsafe { CStr::from_ptr(str_ptr) }.to_str().unwrap()
         );
     }
-
-    unsafe { destruct_decoder(decoder) };
-    unsafe { destruct_disassembler(disassembler) };
 
     Ok(())
 }
