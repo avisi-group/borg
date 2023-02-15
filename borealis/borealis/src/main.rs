@@ -6,6 +6,7 @@ use {
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{info, trace, warn},
+    lz4_flex::frame::{FrameDecoder as Lz4Decoder, FrameEncoder as Lz4Encoder},
     sail::load::load_from_config,
     std::{
         ffi::OsStr,
@@ -76,9 +77,9 @@ fn main() -> Result<()> {
                 .wrap_err("Failed to load Sail files")?
                 .0
         }
-        Some("bincode") => {
-            info!("Deserializing bincode {:?}", args.input);
-            bincode::deserialize_from(BufReader::new(File::open(args.input)?))?
+        Some("lz4") => {
+            info!("Deserializing compressed bincode {:?}", args.input);
+            bincode::deserialize_from(Lz4Decoder::new(BufReader::new(File::open(args.input)?)))?
         }
         _ => bail!("Unrecognised input format {:?}", args.input),
     };
@@ -106,12 +107,14 @@ fn main() -> Result<()> {
 
         Output::Json { output } => {
             info!("Serializing AST to JSON");
-            serde_json::to_writer_pretty(create_file(output, args.force)?, &ast)?
+            serde_json::to_writer_pretty(BufWriter::new(create_file(output, args.force)?), &ast)?
         }
 
         Output::Bincode { output } => {
-            info!("Serializing AST to bincode");
-            bincode::serialize_into(create_file(output, args.force)?, &ast)?
+            info!("Serializing AST to compressed bincode");
+            let mut encoder = Lz4Encoder::new(create_file(output, args.force)?);
+            bincode::serialize_into(&mut encoder, &ast)?;
+            encoder.finish()?;
         }
     }
 
@@ -129,15 +132,13 @@ fn init_logger(filters: &str) -> Result<()> {
 /// Creates the file supplied in `path`.
 ///
 /// If the file at the supplied path already exists and `force` is true it will be overwritten, otherwise an error will be returned.
-fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<BufWriter<File>> {
-    Ok(BufWriter::new(
-        File::options()
-            .write(true) // we want to write to the file
-            .create_new(!force) // fail if it already exists and force is true...
-            .create(true) // ...otherwise create...
-            .truncate(true) // ...and truncate before writing
-            .open(path.as_ref())
-            .map_err(PathCtx::f(path))
-            .wrap_err(format!("Failed to write to file, force = {force}"))?,
-    ))
+fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<File> {
+    Ok(File::options()
+        .write(true) // we want to write to the file
+        .create_new(!force) // fail if it already exists and force is true...
+        .create(true) // ...otherwise create...
+        .truncate(true) // ...and truncate before writing
+        .open(path.as_ref())
+        .map_err(PathCtx::f(path))
+        .wrap_err(format!("Failed to write to file, force = {force}"))?)
 }
