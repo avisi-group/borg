@@ -1,12 +1,12 @@
 use {
-    borealis::{genc, sail_to_genc},
+    borealis::{deserialize_compressed_ast, genc, sail_to_genc},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{bail, Result, WrapErr},
     common::{identifiable::unique_id, intern::INTERNER},
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{info, trace, warn},
-    lz4_flex::frame::{FrameDecoder as Lz4Decoder, FrameEncoder as Lz4Encoder},
+    lz4_flex::frame::FrameEncoder as Lz4Encoder,
     sail::load::load_from_config,
     std::{
         ffi::OsStr,
@@ -79,7 +79,7 @@ fn main() -> Result<()> {
         }
         Some("lz4") => {
             info!("Deserializing compressed bincode {:?}", args.input);
-            bincode::deserialize_from(Lz4Decoder::new(BufReader::new(File::open(args.input)?)))?
+            deserialize_compressed_ast(BufReader::new(File::open(args.input)?))?
         }
         _ => bail!("Unrecognised input format {:?}", args.input),
     };
@@ -133,12 +133,12 @@ fn init_logger(filters: &str) -> Result<()> {
 ///
 /// If the file at the supplied path already exists and `force` is true it will be overwritten, otherwise an error will be returned.
 fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<File> {
-    Ok(File::options()
+    File::options()
         .write(true) // we want to write to the file
         .create_new(!force) // fail if it already exists and force is true...
         .create(true) // ...otherwise create...
         .truncate(true) // ...and truncate before writing
         .open(path.as_ref())
         .map_err(PathCtx::f(path))
-        .wrap_err(format!("Failed to write to file, force = {force}"))?)
+        .wrap_err(format!("Failed to write to file, force = {force}"))
 }

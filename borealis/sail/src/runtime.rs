@@ -25,7 +25,7 @@ pub static RT: Lazy<Mutex<Runtime>> = Lazy::new(|| Mutex::new(Runtime::new()));
 /// Default runtime thread stack size
 ///
 /// Converting from the ARM AST takes 4-8 MiB and resulted in overflowing the default 2MiB stack size.
-const DEFAULT_RUNTIME_THREAD_STACK_SIZE: usize = 64 * 1024 * 1024; // 64MiB
+pub const DEFAULT_RUNTIME_THREAD_STACK_SIZE: usize = 64 * 1024 * 1024; // 64MiB
 
 /// Closure that may be executed on the runtime
 pub type ExecutableFunction<T> = Box<dyn FnOnce(&mut OCamlRuntime) -> T + Send + Sync>;

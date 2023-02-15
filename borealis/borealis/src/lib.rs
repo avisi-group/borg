@@ -7,9 +7,11 @@ use {
         genc::{Description, Instruction},
         instruction::{get_instructions, process_instruction},
     },
+    color_eyre::{eyre::eyre, Result},
     errctx::PathCtx,
-    sail::ast::Ast,
-    std::{io, path::PathBuf},
+    lz4_flex::frame::FrameDecoder as Lz4Decoder,
+    sail::{ast::Ast, runtime::DEFAULT_RUNTIME_THREAD_STACK_SIZE},
+    std::{io, path::PathBuf, thread},
 };
 
 pub mod genc;
@@ -41,4 +43,20 @@ pub fn sail_to_genc(ast: &Ast) -> Description {
         .collect();
 
     description
+}
+
+/// Deserializes an AST from a compressed bincode reader.
+///
+/// Internally, deserialization is performed on a new thread with a sufficient stack size to perform the deserialization.
+pub fn deserialize_compressed_ast<R: io::Read + Send + 'static>(reader: R) -> Result<Ast> {
+    let thread = thread::Builder::new().stack_size(DEFAULT_RUNTIME_THREAD_STACK_SIZE);
+
+    let handle =
+        thread.spawn(move || bincode::deserialize_from::<_, Ast>(Lz4Decoder::new(reader)))?;
+
+    let ast = handle
+        .join()
+        .map_err(|_| eyre!("Failed to join aassociated thread"))??;
+
+    Ok(ast)
 }
