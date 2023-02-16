@@ -105,8 +105,7 @@ impl Format {
     }
 
     /// Finish building a sequence of format bits
-    pub fn finish(mut self) -> Vec<FormatBit> {
-        self.0.reverse();
+    pub fn finish(self) -> Vec<FormatBit> {
         self.0
     }
 }
@@ -260,16 +259,14 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedString
 
     trace!("homogenised_bits: {:?}", homogenised_bits);
 
-    let mut inner = homogenised_bits
+    let inner = homogenised_bits
         .into_iter()
         .map(|(n, bits)| {
             let content = if bits.iter().all(FormatBit::is_unknown) {
                 SegmentContent::Variable(n)
             } else if bits.iter().all(FormatBit::is_fixed) {
                 SegmentContent::Constant(
-                    bits.iter()
-                        .rev()
-                        .fold(0, |acc, bit| acc << 1 | bit.fixed_value()),
+                    bits.iter().fold(0, |acc, bit| acc << 1 | bit.fixed_value()),
                 )
             } else {
                 panic!();
@@ -282,8 +279,7 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedString
         })
         .collect::<Vec<_>>();
 
-    inner.reverse();
-
+    // all ARM instructions are 32 bits long
     assert_eq!(inner.iter().map(|s| s.length).sum::<usize>(), 32);
 
     let count = NAME_COUNTER.increment_count(instruction_name);
