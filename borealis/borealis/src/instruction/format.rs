@@ -335,7 +335,7 @@ pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
 ///
 /// to
 ///
-/// ```rust
+/// ```text
 /// 1x1110000x1xxxxx000000xxxxx11111
 /// ```
 pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
@@ -412,8 +412,8 @@ pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
 ///
 /// will be converted to
 ///
-/// ```rust
-/// Some("Ra", 10..15)
+/// ```text
+/// Some(("Ra", 10..15))
 /// ```
 pub fn expression_to_named_range(
     expression: &Expression,
@@ -468,7 +468,7 @@ pub fn is_see_assignment(expression: &Expression) -> bool {
 ///
 /// will be converted to
 ///
-/// ```rust
+/// ```text
 /// 10..15
 /// ```
 pub fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
@@ -503,7 +503,7 @@ pub fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
 ///
 /// will be converted to
 ///
-/// ```rust
+/// ```text
 /// 30..31
 /// ```
 pub fn vector_subrange_to_range(
