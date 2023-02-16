@@ -64,6 +64,14 @@ impl FormatBit {
     fn is_fixed(&self) -> bool {
         !self.is_unknown()
     }
+
+    fn fixed_value(&self) -> u64 {
+        match self {
+            FormatBit::Zero => 0,
+            FormatBit::One => 1,
+            FormatBit::Unknown => panic!("unknown bit has no value"),
+        }
+    }
 }
 
 impl Debug for FormatBit {
@@ -258,16 +266,11 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedString
             let content = if bits.iter().all(FormatBit::is_unknown) {
                 SegmentContent::Variable(n)
             } else if bits.iter().all(FormatBit::is_fixed) {
-                let mut binary_string = "".to_owned();
-                for bit in bits {
-                    match bit {
-                        FormatBit::Zero => binary_string.push('0'),
-                        FormatBit::One => binary_string.push('1'),
-                        FormatBit::Unknown => panic!(),
-                    }
-                }
-
-                SegmentContent::Constant(u64::from_str_radix(&binary_string, 2).unwrap())
+                SegmentContent::Constant(
+                    bits.iter()
+                        .rev()
+                        .fold(0, |acc, bit| acc << 1 | bit.fixed_value()),
+                )
             } else {
                 panic!();
             };
@@ -292,7 +295,8 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedString
     (name, format)
 }
 
-fn flatten_expression(expression: &Expression) -> Vec<Expression> {
+/// Flattens nested expressions
+pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
     let mut exps = vec![];
 
     let mut current_expression = expression.clone();
@@ -325,7 +329,20 @@ fn flatten_expression(expression: &Expression) -> Vec<Expression> {
     exps
 }
 
-fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
+/// Extracts a sequence of format bits from function clause pattern.
+///
+/// For example the AST for the following pattern
+///
+/// ```sail
+/// (0b1 @ _ : bits(1) @ 0b1110000 @ _ : bits(1) @ 0b1 @ _ : bits(5) @ 0b000000 @ _ : bits(5) @ 0b11111 as op_code
+/// ```
+///
+/// to
+///
+/// ```rust
+/// 1x1110000x1xxxxx000000xxxxx11111
+/// ```
+pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
     let mut format_bits = Format::empty();
 
     let PatternAux::As(Pattern { inner, .. }, ident) = pattern_aux else {
@@ -389,7 +406,22 @@ fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
     format_bits.finish()
 }
 
-fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringKey, Range<usize>)> {
+/// Converts a vector access expression to a range and name of the assigned variable.
+///
+/// For example the AST for the following expression
+///
+/// ```sail
+/// Ra : bits(5) = op_code[14 .. 10];
+/// ```
+///
+/// will be converted to
+///
+/// ```rust
+/// Some("Ra", 10..15)
+/// ```
+pub fn expression_to_named_range(
+    expression: &Expression,
+) -> Option<(InternedStringKey, Range<usize>)> {
     let ExpressionAux::Assign(LValueExpression { inner: lvalue, ..}, Expression { inner: expression_aux, .. }) = &*expression.inner else {
         panic!("ExpressionAux not an Assign");
     };
@@ -418,7 +450,7 @@ fn expression_to_named_range(expression: &Expression) -> Option<(InternedStringK
 }
 
 /// Tests whether an expression is an assignment to `SEE`
-fn is_see_assignment(expression: &Expression) -> bool {
+pub fn is_see_assignment(expression: &Expression) -> bool {
     let ExpressionAux::Assign(LValueExpression { inner, ..}, _) = &*expression.inner else {
         return false;
     };
@@ -431,7 +463,19 @@ fn is_see_assignment(expression: &Expression) -> bool {
 }
 
 /// Extracts a range from a `bitvector_access` function application
-fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
+///
+/// For example the AST for the following expression
+///
+/// ```sail
+/// op_code[14 .. 10]
+/// ```
+///
+/// will be converted to
+///
+/// ```rust
+/// 10..15
+/// ```
+pub fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
     let ExpressionAux::Application(ident, expressions) = exp else {
         panic!("not an application");
     };
@@ -454,7 +498,19 @@ fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
 }
 
 /// Extracts a range from a `vector_subrange` function application
-fn vector_subrange_to_range(
+///
+/// For example the AST for the following expression
+///
+/// ```sail
+/// [op_code[30]]
+/// ```
+///
+/// will be converted to
+///
+/// ```rust
+/// 30..31
+/// ```
+pub fn vector_subrange_to_range(
     ident: &Identifier,
     expressions: &LinkedList<Expression>,
 ) -> Range<usize> {
@@ -477,7 +533,7 @@ fn vector_subrange_to_range(
 }
 
 /// Extracts a `usize` from a Literal expression
-fn expression_to_usize(expression: &Expression) -> usize {
+pub fn expression_to_usize(expression: &Expression) -> usize {
     let ExpressionAux::Literal(Literal { inner: LiteralAux::Num(BigInt(bigint)), .. }) = &*expression.inner else {
         panic!("expression was not a num literal");
     };

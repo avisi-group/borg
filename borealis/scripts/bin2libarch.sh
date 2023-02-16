@@ -3,7 +3,7 @@
 ### Helper script for running the borealis toolchain from Sail AST parsing onwards (parsing the ARM v8.5 spec is slow).
 
 # export genc from bincode
-cargo r --release -- --force --log trace -i target/arm-v8.5-a.bincode genc -o target/genc/
+cargo r --release -- --force --log trace -i testdata/arm-v8.5-a.bincode.lz4 genc -o target/genc/
 
 # execute gensim on genc
 cd target/genc
@@ -18,5 +18,5 @@ cp target/genc/output/arm64-disasm.h libarch-sys/include/
 
 # run libarch on sample
 cd libarch-sys
-cargo r --release -- ../target/asm/input.bin
+cargo t
 cd ..

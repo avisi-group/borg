@@ -8,11 +8,13 @@ pub struct InstructionFormat(pub Vec<Segment>);
 
 impl Display for InstructionFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.0.first() {
+        let mut segments = self.0.iter();
+
+        match segments.next() {
             Some(segment) => {
                 write!(f, "{segment}")?;
 
-                for segment in &self.0[1..] {
+                for segment in segments {
                     write!(f, " {segment}")?;
                 }
 
