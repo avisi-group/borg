@@ -12,7 +12,7 @@ use {
     std::{
         collections::HashMap,
         fmt::Display,
-        fs::{read_dir, File},
+        fs::{create_dir_all, read_dir, File},
         io::{self, Write as _},
         path::{Path, PathBuf},
     },
@@ -33,6 +33,10 @@ pub fn export<P: AsRef<Path>>(
     force: bool,
 ) -> Result<(), Error> {
     let path = path.as_ref();
+
+    if force {
+        create_dir_all(path).map_err(PathCtx::f(path))?;
+    }
 
     let count = read_dir(path)
         .map_err(|e| {

@@ -6,6 +6,8 @@ fn main() {
 
     cc::Build::new()
         .cpp(true)
+        .flag("-std=gnu++20")
+        .flag("-xc++")
         .file("./include/arm64-decode.cpp")
         .file("./include/arm64-disasm.cpp")
         .file("./include/wrapper.cpp")
