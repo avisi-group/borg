@@ -1,11 +1,9 @@
 //! Type checking
 
-use crate::wrapper::{effectset_of_list, list_to_bindings};
-
 use {
     crate::{
         ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
-        wrapper::{bindings_to_list, effectset_elements},
+        ffi::{bindings_to_list, effectset_elements, effectset_of_list, list_to_bindings},
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Runtime, ToValue, Value},

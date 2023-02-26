@@ -1,4 +1,5 @@
 open Libsail
+open Sail_plugin_isla
 
 type error = Err_exception of string * string | Err_sail of Reporting.error
 
@@ -71,6 +72,47 @@ let () =
 
   Callback.register "type_check_initial_env" (fun () ->
       exception_to_result (fun () -> Type_check.initial_env));
+
+  Callback.register "register_isla_target" (fun () ->
+      exception_to_result (fun () ->
+          Target.register ~name:"isla" ~options:isla_options
+            ~pre_parse_hook:isla_initialize ~rewrites:isla_rewrites isla_target));
+
+  Callback.register "move_loop_measures" (fun ast ->
+      exception_to_result (fun () -> Rewrites.move_loop_measures ast));
+
+  Callback.register "target_run_pre_parse_hook" (fun target ->
+      exception_to_result (fun () -> Target.run_pre_parse_hook target ()));
+
+  Callback.register "target_asserts_termination" (fun target ->
+      exception_to_result (fun () -> Target.asserts_termination target));
+
+  Callback.register "effects_infer_side_effects" (fun asserts_termination ast ->
+      exception_to_result (fun () ->
+          Effects.infer_side_effects asserts_termination ast));
+
+  Callback.register "target_rewrites" (fun target ->
+      exception_to_result (fun () -> Target.rewrites target));
+
+  Callback.register "rewrites_rewrite"
+    (fun effect_info env rewrite_sequence ast ->
+      exception_to_result (fun () ->
+          Rewrites.rewrite effect_info env rewrite_sequence ast));
+
+  Callback.register "generate_jib" (fun ast effect_info env ->
+      exception_to_result (fun () ->
+          let props = Property.find_properties ast in
+          Ast_util.Bindings.bindings props
+          |> List.map fst |> Ast_util.IdSet.of_list
+          |> Specialize.add_initial_calls;
+
+          (* let ast, env = Specialize.(specialize typ_ord_specialization env ast) in *)
+          let cdefs, ctx = jib_of_ast env ast effect_info in
+          let cdefs, _ = Jib_optimize.remove_tuples cdefs ctx in
+          let cdefs = remove_casts cdefs |> remove_extern_impls |> fix_cons in
+          let buf = Buffer.create 256 in
+          Jib_ir.Flat_ir_formatter.output_defs buf cdefs;
+          Buffer.contents buf));
 
   (* CLI options *)
   Callback.register "set_non_lexical_flow" (fun b ->

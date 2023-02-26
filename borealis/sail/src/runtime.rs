@@ -120,3 +120,41 @@ impl Default for Runtime {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use {
+        crate::{ffi::util_dedup, runtime::RT},
+        proptest::{bits, collection::vec, prelude::*},
+    };
+
+    fn dedup(list: Vec<i32>) -> Vec<i32> {
+        RT.lock()
+            .execute(|rt| {
+                unsafe { util_dedup(rt, list.into_iter().collect()) }
+                    .unwrap()
+                    .unwrap()
+                    .into_iter()
+                    .collect::<Vec<_>>()
+            })
+            .unwrap()
+    }
+
+    proptest! {
+        /// Checks equivalence between libsail dedup function and Rust stdlib dedup.
+        ///
+        /// Used as smoke test that OCaml interop is functioning correctly (intentionally doing a lot of allocating, many function calls, etc).
+        #[test]
+        fn smoke_test(v in vec(bits::i32::ANY, 0..1000)) {
+            let mut v_d = v.clone();
+            v_d.sort();
+
+            v_d.dedup();
+
+            let mut out = dedup(v);
+            out.sort();
+
+            assert_eq!(out, v_d);
+        }
+    }
+}

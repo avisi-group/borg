@@ -3,8 +3,8 @@
 
 use {
     crate::{
+        ffi::{bigint_to_string, string_to_bigint},
         visitor::{Visitor, Walkable},
-        wrapper::{bigint_to_string, string_to_bigint},
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
@@ -70,7 +70,7 @@ pub struct Ratio {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{num::BigInt, runtime::RT, wrapper},
+        crate::{ffi, num::BigInt, runtime::RT},
         proptest::prelude::*,
     };
 
@@ -86,7 +86,7 @@ mod tests {
             let c = RT
                 .lock()
                 .execute(move |rt| {
-                    unsafe { wrapper::add_num(rt, BigInt(a), BigInt(b)) }
+                    unsafe { ffi::add_num(rt, BigInt(a), BigInt(b)) }
                         .unwrap()
                         .unwrap()
                 })

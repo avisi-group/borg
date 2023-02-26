@@ -31,7 +31,7 @@ pub enum Error {
 }
 
 /// Compiles a Sail ISA specification to a GenC description
-pub fn sail_to_genc(ast: &Ast) -> Description {
+pub fn sail_to_genc(ast: &Ast, _jib: &str) -> Description {
     let instructions = get_instructions(ast);
 
     let mut description = Description::empty();
@@ -48,15 +48,17 @@ pub fn sail_to_genc(ast: &Ast) -> Description {
 /// Deserializes an AST from a compressed bincode reader.
 ///
 /// Internally, deserialization is performed on a new thread with a sufficient stack size to perform the deserialization.
-pub fn deserialize_compressed_ast<R: io::Read + Send + 'static>(reader: R) -> Result<Ast> {
+pub fn deserialize_compressed_ast<R: io::Read + Send + 'static>(
+    reader: R,
+) -> Result<(Ast, String)> {
     let thread = thread::Builder::new().stack_size(DEFAULT_RUNTIME_THREAD_STACK_SIZE);
 
-    let handle =
-        thread.spawn(move || bincode::deserialize_from::<_, Ast>(Lz4Decoder::new(reader)))?;
+    let handle = thread
+        .spawn(move || bincode::deserialize_from::<_, (Ast, String)>(Lz4Decoder::new(reader)))?;
 
-    let ast = handle
+    let out = handle
         .join()
         .map_err(|_| eyre!("Failed to join aassociated thread"))??;
 
-    Ok(ast)
+    Ok(out)
 }

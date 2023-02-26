@@ -2,12 +2,12 @@ use {
     borealis::{deserialize_compressed_ast, genc, sail_to_genc},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{bail, Result, WrapErr},
-    common::{identifiable::unique_id, intern::INTERNER},
+    common::intern::INTERNER,
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{info, trace, warn},
     lz4_flex::frame::FrameEncoder as Lz4Encoder,
-    sail::load::load_from_config,
+    sail::load_from_config,
     std::{
         ffi::OsStr,
         fs::File,
@@ -70,12 +70,10 @@ fn main() -> Result<()> {
     init_logger(args.log.as_deref().unwrap_or(""))?;
 
     // either parse AST from Sail config file or deserialize AST from bincode
-    let ast = match args.input.extension().and_then(OsStr::to_str) {
+    let (ast, jib) = match args.input.extension().and_then(OsStr::to_str) {
         Some("json") => {
             info!("Loading Sail config {:?}", args.input);
-            load_from_config(args.input)
-                .wrap_err("Failed to load Sail files")?
-                .0
+            load_from_config(args.input).wrap_err("Failed to load Sail files")?
         }
         Some("lz4") => {
             info!("Deserializing compressed bincode {:?}", args.input);
@@ -84,11 +82,7 @@ fn main() -> Result<()> {
         _ => bail!("Unrecognised input format {:?}", args.input),
     };
 
-    trace!(
-        "AST size: {} bytes, ≈{} nodes",
-        ast.deep_size_of(),
-        unique_id(),
-    );
+    trace!("AST size: {} bytes", ast.deep_size_of());
     trace!(
         "INTERNER size: {} bytes, {} strings",
         INTERNER.current_memory_usage(),
@@ -98,7 +92,7 @@ fn main() -> Result<()> {
     match args.output {
         Output::Genc { output } => {
             info!("Converting Sail AST to GenC");
-            let description = sail_to_genc(&ast);
+            let description = sail_to_genc(&ast, &jib);
 
             info!("Exporting GenC description");
             genc::export(&description, output, args.force)
@@ -107,13 +101,16 @@ fn main() -> Result<()> {
 
         Output::Json { output } => {
             info!("Serializing AST to JSON");
-            serde_json::to_writer_pretty(BufWriter::new(create_file(output, args.force)?), &ast)?
+            serde_json::to_writer_pretty(
+                BufWriter::new(create_file(output, args.force)?),
+                &(ast, jib),
+            )?
         }
 
         Output::Bincode { output } => {
             info!("Serializing AST to compressed bincode");
             let mut encoder = Lz4Encoder::new(create_file(output, args.force)?);
-            bincode::serialize_into(&mut encoder, &ast)?;
+            bincode::serialize_into(&mut encoder, &(ast, jib))?;
             encoder.finish()?;
         }
     }
