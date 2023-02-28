@@ -12,6 +12,7 @@ use {
             set_non_lexical_flow, target_asserts_termination, target_rewrites,
             target_run_pre_parse_hook, type_check_initial_env,
         },
+        jib::CDef,
         json::ModelConfig,
         parse_ast::Definition,
         runtime::RT,
@@ -27,6 +28,7 @@ use {
 pub mod ast;
 pub mod error;
 pub mod ffi;
+pub mod jib;
 pub mod json;
 pub mod num;
 pub mod parse_ast;
@@ -91,7 +93,7 @@ const SAIL_LIB: Map<&'static str, &'static str> = phf_map! {
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, String), Error> {
+pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, LinkedList<CDef>), Error> {
     let ModelConfig { options, files } = ModelConfig::load(config_path.as_ref())?;
 
     RT.lock().execute(move |rt| {
@@ -152,7 +154,10 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, String),
         trace!("Generating JIB IR");
         let jib = unsafe { generate_jib(rt, ast, effect_info, env) }??;
 
-        Ok((Ast::from_value(descattered_ast), jib))
+        Ok((
+            Ast::from_value(descattered_ast),
+            LinkedList::<CDef>::from_value(jib),
+        ))
     })?
 }
 

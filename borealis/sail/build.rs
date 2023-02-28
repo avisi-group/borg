@@ -24,6 +24,8 @@ fn main() -> Result<()> {
     ensure!(
         Command::new("dune")
             .arg("build")
+            .arg("--profile")
+            .arg("release")
             .env("DUNE_BUILD_DIR", &build_path)
             .current_dir(&source_path)
             .status().wrap_err("Failed to execute dune build")?

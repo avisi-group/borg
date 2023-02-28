@@ -6,7 +6,7 @@ use {
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{info, trace, warn},
-    lz4_flex::frame::FrameEncoder as Lz4Encoder,
+    lz4_flex::frame::{BlockMode, FrameEncoder as Lz4Encoder, FrameInfo},
     sail::load_from_config,
     std::{
         ffi::OsStr,
@@ -82,7 +82,11 @@ fn main() -> Result<()> {
         _ => bail!("Unrecognised input format {:?}", args.input),
     };
 
-    trace!("AST size: {} bytes", ast.deep_size_of());
+    trace!(
+        "Size: AST {} bytes, JIB {} bytes",
+        ast.deep_size_of(),
+        jib.deep_size_of()
+    );
     trace!(
         "INTERNER size: {} bytes, {} strings",
         INTERNER.current_memory_usage(),
@@ -109,9 +113,14 @@ fn main() -> Result<()> {
 
         Output::Bincode { output } => {
             info!("Serializing AST to compressed bincode");
-            let mut encoder = Lz4Encoder::new(create_file(output, args.force)?);
+
+            let mut frame_info = FrameInfo::new();
+            frame_info.block_mode = BlockMode::Linked;
+            let mut encoder =
+                Lz4Encoder::with_frame_info(frame_info, create_file(output, args.force)?);
             bincode::serialize_into(&mut encoder, &(ast, jib))?;
             encoder.finish()?;
+            info!("done");
         }
     }
 

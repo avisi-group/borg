@@ -65,7 +65,7 @@ ocaml::import! {
     // Effects.side_effect_info ->
     // Type_check.env ->
     // string
-    pub fn generate_jib(ast: Value, effect_info: Value, env: Value) -> Result<String, WrapperError>;
+    pub fn generate_jib(ast: Value, effect_info: Value, env: Value) -> Result<Value, WrapperError>;
 
     // CLI options
     pub fn set_non_lexical_flow(b: bool) -> Result<(), WrapperError>;

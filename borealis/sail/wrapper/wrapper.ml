@@ -110,9 +110,8 @@ let () =
           let cdefs, ctx = jib_of_ast env ast effect_info in
           let cdefs, _ = Jib_optimize.remove_tuples cdefs ctx in
           let cdefs = remove_casts cdefs |> remove_extern_impls |> fix_cons in
-          let buf = Buffer.create 256 in
-          Jib_ir.Flat_ir_formatter.output_defs buf cdefs;
-          Buffer.contents buf));
+
+          cdefs));
 
   (* CLI options *)
   Callback.register "set_non_lexical_flow" (fun b ->

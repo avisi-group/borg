@@ -1,0 +1,15 @@
+{
+    "options": "-non_lexical_flow -no_lexp_bounds_check",
+    "files": [
+        "sail-arm/arm-v8.5-a/model/prelude.sail",
+        "sail-arm/arm-v8.5-a/model/devices.sail",
+        "sail-arm/arm-v8.5-a/model/aarch_types.sail",
+        "sail-arm/arm-v8.5-a/model/aarch_mem.sail",
+        "sail-arm/arm-v8.5-a/model/aarch64.sail",
+        "sail-arm/arm-v8.5-a/model/aarch64_float.sail",
+        "sail-arm/arm-v8.5-a/model/aarch64_vector.sail",
+        "sail-arm/arm-v8.5-a/model/aarch32.sail",
+        "sail-arm/arm-v8.5-a/model/aarch_decode.sail",
+        "sail-arm/arm-v8.5-a/model/main.sail"
+    ]
+}
