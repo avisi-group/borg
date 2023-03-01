@@ -3,17 +3,19 @@
 use {
     crate::{
         genc::format::InstructionFormat,
-        instruction::{format::process_decode_function_clause, symbolic::SymbolicExecutor},
+        instruction::{execute::jib_func_to_genc, format::process_decode_function_clause},
     },
     common::intern::InternedStringKey,
     sail::{
         ast::{Ast, FunctionClause, IdentifierAux},
+        jib::CDef,
         visitor::Visitor,
     },
+    std::collections::LinkedList,
 };
 
+pub mod execute;
 pub mod format;
-pub mod symbolic;
 
 /// Finds all instructions in a Sail definition
 pub fn get_instructions(ast: &Ast) -> Vec<FunctionClause> {
@@ -40,14 +42,16 @@ pub fn get_instructions(ast: &Ast) -> Vec<FunctionClause> {
     finder.clauses
 }
 
-/// Compiles an individual instruction definition into an intermediate format
+/// Compiles an individual instruction definition to GenC
 pub fn process_instruction(
-    ast: &Ast,
+    jib: &LinkedList<CDef>,
     instruction: &FunctionClause,
 ) -> (InternedStringKey, InstructionFormat, String) {
-    let (name, format) = process_decode_function_clause(instruction);
+    // determine instruction format
+    let (name, instruction_name, format) = process_decode_function_clause(instruction);
 
-    let execute = SymbolicExecutor::new(ast).run(instruction);
+    // compile JIB to GenC for the execute definition
+    let execute = jib_func_to_genc(instruction_name, jib);
 
     (name, format, execute)
 }

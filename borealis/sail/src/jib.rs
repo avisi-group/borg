@@ -152,8 +152,8 @@ pub enum CVal {
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Iannot {
-    i: Int,
-    l: Location,
+    pub i: Int,
+    pub l: Location,
 }
 
 /// C type definition
@@ -204,8 +204,8 @@ pub enum InstrAux {
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Instruction {
-    inner: InstrAux,
-    annot: Iannot,
+    pub inner: InstrAux,
+    pub annot: Iannot,
 }
 
 #[allow(missing_docs)]

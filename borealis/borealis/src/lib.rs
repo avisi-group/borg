@@ -31,14 +31,14 @@ pub enum Error {
 }
 
 /// Compiles a Sail ISA specification to a GenC description
-pub fn sail_to_genc(ast: &Ast, _jib: &LinkedList<CDef>) -> Description {
-    let instructions = get_instructions(ast);
+pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<CDef>) -> Description {
+    let instructions = get_instructions(sail_ast);
 
     let mut description = Description::empty();
 
     description.instructions = instructions
         .into_iter()
-        .map(|clause| process_instruction(ast, &clause))
+        .map(|clause| process_instruction(jib_ast, &clause))
         .map(|(name, format, execute)| (name.to_string(), Instruction { format, execute }))
         .collect();
 

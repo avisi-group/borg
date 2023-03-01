@@ -138,7 +138,9 @@ impl From<&Literal> for Format {
 }
 
 /// Main function clause processing
-pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedStringKey, GenCFormat) {
+pub fn process_decode_function_clause(
+    funcl: &FunctionClause,
+) -> (InternedStringKey, InternedStringKey, GenCFormat) {
     trace!(
         "Processing decode function clause @ {}",
         funcl.annotation.location
@@ -288,7 +290,7 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> (InternedString
     let format = GenCFormat(inner);
     trace!("{} genc format: {}", name, format);
 
-    (name, format)
+    (name, instruction_name, format)
 }
 
 /// Flattens nested expressions
