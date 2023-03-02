@@ -1,19 +1,16 @@
 //! Visitor pattern for Sail AST
 //!
-//! Vistitor trait has overridable methods
+//! Visitor trait has overridable methods
 
-use crate::{
-    ast::{
-        Ast, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, Expression, FieldExpression,
-        FunctionClause, FunctionDefinition, Identifier, IndexRange, InstantiationSpecification,
-        InternalLoopMeasure, Kind, KindIdentifier, KindedIdentifier, LValueExpression, LetBind,
-        Literal, LoopMeasure, MappingClause, MappingDefinition, MappingPattern,
-        MappingPatternExpression, NConstraint, NumericExpression, OptionalDefault, Order, Pattern,
-        PatternMatch, QuantItem, RecursiveAnnotationOpt, ScatteredDefinition, Substitution, Typ,
-        TypArg, TypPat, TypQuant, TypeAnnotationOpt, TypeDefinition, TypeScheme, TypeUnion, Value,
-        ValueSpecification,
-    },
-    num::BigInt,
+use crate::sail_ast::{
+    Ast, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, Expression, FieldExpression,
+    FunctionClause, FunctionDefinition, Identifier, IndexRange, InstantiationSpecification,
+    InternalLoopMeasure, Kind, KindIdentifier, KindedIdentifier, LValueExpression, LetBind,
+    Literal, LoopMeasure, MappingClause, MappingDefinition, MappingPattern,
+    MappingPatternExpression, NConstraint, NumericExpression, OptionalDefault, Order, Pattern,
+    PatternMatch, QuantItem, RecursiveAnnotationOpt, ScatteredDefinition, Substitution, Typ,
+    TypArg, TypPat, TypQuant, TypeAnnotationOpt, TypeDefinition, TypeScheme, TypeUnion, Value,
+    ValueSpecification,
 };
 
 /// Visitor trait for interacting with Sail AST
@@ -90,11 +87,6 @@ pub trait Visitor: Sized {
 
     #[allow(missing_docs)]
     fn visit_kind_identifier(&mut self, node: &KindIdentifier) {
-        node.walk(self);
-    }
-
-    #[allow(missing_docs)]
-    fn visit_big_int(&mut self, node: &BigInt) {
         node.walk(self);
     }
 

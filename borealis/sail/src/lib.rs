@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        ast::Ast,
         error::Error,
         ffi::{
             descatter, effects_infer_side_effects, generate_jib, move_loop_measures, parse_file,
@@ -12,10 +11,10 @@ use {
             set_non_lexical_flow, target_asserts_termination, target_rewrites,
             target_run_pre_parse_hook, type_check_initial_env,
         },
-        jib::CDef,
         json::ModelConfig,
         parse_ast::Definition,
         runtime::RT,
+        sail_ast::Ast,
     },
     common::intern::InternedStringKey,
     errctx::PathCtx,
@@ -25,17 +24,16 @@ use {
     std::{collections::LinkedList, fs::read_to_string, path::Path},
 };
 
-pub mod ast;
 pub mod error;
 pub mod ffi;
-pub mod jib;
+pub mod jib_ast;
 pub mod json;
 pub mod num;
 pub mod parse_ast;
 pub mod runtime;
+pub mod sail_ast;
 pub mod type_check;
 pub mod types;
-pub mod visitor;
 
 /// Sail standard library files
 const SAIL_LIB: Map<&'static str, &'static str> = phf_map! {
@@ -93,7 +91,9 @@ const SAIL_LIB: Map<&'static str, &'static str> = phf_map! {
 ///
 /// After type-checking the Sail scattered definitions are de-scattered
 /// into single functions.
-pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, LinkedList<CDef>), Error> {
+pub fn load_from_config<P: AsRef<Path>>(
+    config_path: P,
+) -> Result<(Ast, LinkedList<jib_ast::Definition>), Error> {
     let ModelConfig { options, files } = ModelConfig::load(config_path.as_ref())?;
 
     RT.lock().execute(move |rt| {
@@ -156,7 +156,7 @@ pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<(Ast, LinkedLi
 
         Ok((
             Ast::from_value(descattered_ast),
-            LinkedList::<CDef>::from_value(jib),
+            LinkedList::<jib_ast::Definition>::from_value(jib),
         ))
     })?
 }

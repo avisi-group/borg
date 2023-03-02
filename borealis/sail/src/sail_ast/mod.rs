@@ -6,8 +6,8 @@
 use {
     crate::{
         num::{BigInt, Num},
+        sail_ast::visitor::{Visitor, Walkable},
         types::{KindIdentifierInner, Position},
-        visitor::{Visitor, Walkable},
     },
     common::intern::InternedStringKey,
     deepsize::DeepSizeOf,
@@ -16,6 +16,8 @@ use {
     std::{collections::LinkedList, fmt::Display},
     strum::IntoStaticStr,
 };
+
+pub mod visitor;
 
 /// Location
 #[derive(
@@ -262,7 +264,7 @@ impl Walkable for NumericExpression {
         match &*self.inner {
             NumericExpressionAux::Id(id) => visitor.visit_identifier(id),
             NumericExpressionAux::Var(kid) => visitor.visit_kind_identifier(kid),
-            NumericExpressionAux::Constant(bi) => visitor.visit_big_int(bi),
+            NumericExpressionAux::Constant(_) => (),
             NumericExpressionAux::Application(id, nexps) => {
                 visitor.visit_identifier(id);
                 nexps
@@ -474,9 +476,8 @@ impl Walkable for NConstraint {
                 visitor.visit_numeric_expression(n1);
                 visitor.visit_numeric_expression(n2);
             }
-            NConstraintAux::Set(ki, bigints) => {
+            NConstraintAux::Set(ki, _) => {
                 visitor.visit_kind_identifier(ki);
-                bigints.iter().for_each(|bi| visitor.visit_big_int(bi));
             }
             NConstraintAux::Or(n1, n2) => {
                 visitor.visit_nconstraint(n1);

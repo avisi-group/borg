@@ -10,7 +10,7 @@ use {
     color_eyre::{eyre::eyre, Result},
     errctx::PathCtx,
     lz4_flex::frame::FrameDecoder as Lz4Decoder,
-    sail::{ast::Ast, jib::CDef, runtime::DEFAULT_RUNTIME_THREAD_STACK_SIZE},
+    sail::{jib_ast::Definition, runtime::DEFAULT_RUNTIME_THREAD_STACK_SIZE, sail_ast::Ast},
     std::{collections::LinkedList, io, path::PathBuf, thread},
 };
 
@@ -31,7 +31,7 @@ pub enum Error {
 }
 
 /// Compiles a Sail ISA specification to a GenC description
-pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<CDef>) -> Description {
+pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Description {
     let instructions = get_instructions(sail_ast);
 
     let mut description = Description::empty();
@@ -50,7 +50,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<CDef>) -> Description {
 /// Internally, deserialization is performed on a new thread with a sufficient stack size to perform the deserialization.
 pub fn deserialize_compressed_ast<R: io::Read + Send + 'static>(
     reader: R,
-) -> Result<(Ast, LinkedList<CDef>)> {
+) -> Result<(Ast, LinkedList<Definition>)> {
     let thread = thread::Builder::new().stack_size(DEFAULT_RUNTIME_THREAD_STACK_SIZE);
 
     let handle = thread.spawn(move || bincode::deserialize_from(Lz4Decoder::new(reader)))?;

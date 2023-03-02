@@ -2,8 +2,8 @@
 
 use {
     crate::{
-        ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
         ffi::{bindings_to_list, effectset_elements, effectset_of_list, list_to_bindings},
+        sail_ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Runtime, ToValue, Value},

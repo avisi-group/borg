@@ -2,8 +2,8 @@
 
 use {
     crate::{
-        ast::Location,
         runtime::{BoxAny, ExecutableFunction},
+        sail_ast::Location,
         types::Position,
     },
     errctx::PathCtx,

@@ -2,10 +2,7 @@
 //! arithmetic library
 
 use {
-    crate::{
-        ffi::{bigint_to_string, string_to_bigint},
-        visitor::{Visitor, Walkable},
-    },
+    crate::ffi::{bigint_to_string, string_to_bigint},
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
     serde::{Deserialize, Serialize},
@@ -26,12 +23,6 @@ pub enum Num {
 /// Signed big integer from `Nat_big_num.num` OCaml type
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BigInt(pub num_bigint::BigInt);
-
-impl Walkable for BigInt {
-    fn walk<V: Visitor>(&self, _: &mut V) {
-        // leaf node
-    }
-}
 
 unsafe impl FromValue for BigInt {
     fn from_value(v: Value) -> Self {

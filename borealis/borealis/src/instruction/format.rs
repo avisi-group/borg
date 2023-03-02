@@ -7,12 +7,12 @@ use {
     num_bigint::Sign,
     once_cell::sync::Lazy,
     sail::{
-        ast::{
+        num::BigInt,
+        sail_ast::{
             Expression, ExpressionAux, FunctionClause, Identifier, IdentifierAux, LValueExpression,
             LValueExpressionAux, Literal, LiteralAux, NumericExpression, NumericExpressionAux,
             Pattern, PatternAux, PatternMatchAux, TypArgAux, TypAux,
         },
-        num::BigInt,
     },
     std::{
         collections::{HashMap, LinkedList},

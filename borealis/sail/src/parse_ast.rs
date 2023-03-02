@@ -2,7 +2,7 @@
 //! which itself is generated from `l2_parse.ott`.
 
 use {
-    crate::ast::Location,
+    crate::sail_ast::Location,
     common::intern::InternedStringKey,
     ocaml::{FromValue, ToValue, Value},
     std::collections::LinkedList,

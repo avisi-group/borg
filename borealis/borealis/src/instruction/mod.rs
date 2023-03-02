@@ -7,9 +7,8 @@ use {
     },
     common::intern::InternedStringKey,
     sail::{
-        ast::{Ast, FunctionClause, IdentifierAux},
-        jib::CDef,
-        visitor::Visitor,
+        jib_ast::Definition,
+        sail_ast::{visitor::Visitor, Ast, FunctionClause, IdentifierAux},
     },
     std::collections::LinkedList,
 };
@@ -44,7 +43,7 @@ pub fn get_instructions(ast: &Ast) -> Vec<FunctionClause> {
 
 /// Compiles an individual instruction definition to GenC
 pub fn process_instruction(
-    jib: &LinkedList<CDef>,
+    jib: &LinkedList<Definition>,
     instruction: &FunctionClause,
 ) -> (InternedStringKey, InstructionFormat, String) {
     // determine instruction format
