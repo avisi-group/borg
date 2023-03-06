@@ -1,8 +1,15 @@
 //! JIB AST pretty printing
 
 use {
-    sail::jib_ast::{visitor::Visitor, Expression, Instruction, InstructionAux, Name, Type, Value},
+    sail::{
+        jib_ast::{
+            visitor::Visitor, Definition, Expression, Instruction, InstructionAux, Name, Type,
+            Value,
+        },
+        sail_ast::Identifier,
+    },
     std::{
+        collections::LinkedList,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -10,15 +17,22 @@ use {
 
 const PADDING: &str = "  ";
 
-/// Pretty-print a sequence of instructions
-pub fn print_instructions<'a, I: IntoIterator<Item = &'a Instruction>>(instructions: I) {
+/// Pretty-print a sequence of definition
+pub fn print_definitions<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
     let mut visitor = JibPrettyPrinter {
         indent: Rc::new(AtomicUsize::from(0)),
     };
 
-    instructions
-        .into_iter()
-        .for_each(|i| visitor.visit_instruction(&i));
+    iter.into_iter().for_each(|i| visitor.visit_definition(&i));
+}
+
+/// Pretty-print a sequence of instructions
+pub fn print_instructions<'a, I: IntoIterator<Item = &'a Instruction>>(iter: I) {
+    let mut visitor = JibPrettyPrinter {
+        indent: Rc::new(AtomicUsize::from(0)),
+    };
+
+    iter.into_iter().for_each(|i| visitor.visit_instruction(&i));
 }
 
 /// Pretty-print JIB AST
@@ -27,7 +41,7 @@ struct JibPrettyPrinter {
 }
 
 impl JibPrettyPrinter {
-    pub fn print<'a, T: AsRef<str>>(&self, s: T) {
+    fn prindent<'a, T: AsRef<str>>(&self, s: T) {
         print!(
             "{}{}",
             PADDING.repeat(self.indent.load(Ordering::SeqCst)),
@@ -35,15 +49,34 @@ impl JibPrettyPrinter {
         );
     }
 
-    pub fn println<'a, T: AsRef<str>>(&self, s: T) {
-        self.print(s);
+    fn prindentln<'a, T: AsRef<str>>(&self, s: T) {
+        self.prindent(s);
         println!();
     }
 
-    pub fn indent(&self) -> IndentHandle {
+    fn indent(&self) -> IndentHandle {
         self.indent.fetch_add(1, Ordering::SeqCst);
         IndentHandle {
             indent: self.indent.clone(),
+        }
+    }
+
+    fn print_uid(&mut self, id: &Identifier, typs: &LinkedList<Type>) {
+        print!("{}", id.get_string());
+
+        if !typs.is_empty() {
+            print!("<");
+
+            let mut typs = typs.iter();
+            if let Some(typ) = typs.next() {
+                self.visit_type(typ);
+            }
+            for typ in typs {
+                print!(", ");
+                self.visit_type(typ);
+            }
+
+            print!(">");
         }
     }
 }
@@ -59,39 +92,76 @@ impl Drop for IndentHandle {
 }
 
 impl Visitor for JibPrettyPrinter {
+    fn visit_definition(&mut self, node: &Definition) {
+        match node {
+            Definition::RegDec(id, typ, body) => {
+                self.prindent(format!("register {} : ", id.get_string()));
+                self.visit_type(typ);
+                dbg!(body);
+                panic!();
+            }
+            Definition::Type(_) => todo!(),
+            Definition::Let(_, _, _) => todo!(),
+            Definition::Spec(_, _, _, _) => todo!(),
+            Definition::Fundef(name, _, args, body) => {
+                self.prindent(format!("fn {}(", name.get_string()));
+
+                let mut args = args.iter();
+                if let Some(arg) = args.next() {
+                    print!("{}", arg.get_string());
+                }
+                for arg in args {
+                    print!(", {}", arg.get_string());
+                }
+
+                println!(") {{");
+
+                {
+                    let _h = self.indent();
+                    body.iter().for_each(|i| self.visit_instruction(i));
+                }
+
+                self.prindentln("}\n");
+            }
+            Definition::Startup(_, _) => todo!(),
+            Definition::Finish(_, _) => todo!(),
+            Definition::Pragma(_, _) => todo!(),
+        }
+    }
+
     fn visit_instruction(&mut self, node: &Instruction) {
         match &node.inner {
             InstructionAux::Block(instructions) => {
-                self.println("block {");
+                self.prindentln("block {");
 
                 {
                     let _h = self.indent();
                     instructions.iter().for_each(|i| self.visit_instruction(i));
                 }
 
-                self.println("}");
+                self.prindentln("}");
             }
             InstructionAux::Decl(typ, name) => {
-                self.print("");
+                self.prindent("");
                 self.visit_name(name);
                 print!(": ");
                 self.visit_type(typ);
                 println!();
             }
             InstructionAux::Copy(exp, val) => {
-                self.print("");
+                self.prindent("");
                 self.visit_expression(exp);
                 print!(" = ");
                 self.visit_value(val);
                 println!();
             }
             InstructionAux::Clear(_, name) => {
-                self.print("clear(");
+                self.prindent("clear(");
                 self.visit_name(name);
                 println!(")");
             }
             InstructionAux::Funcall(exp, _, (name, _), args) => {
-                self.print("");
+                self.prindent("");
                 self.visit_expression(exp);
                 print!(" = {}(", name.get_string());
 
@@ -108,42 +178,55 @@ impl Visitor for JibPrettyPrinter {
                 println!(")");
             }
             InstructionAux::Goto(label) => {
-                self.println(format!("goto \"{label}\""));
+                self.prindentln(format!("goto \"{label}\""));
             }
             InstructionAux::Label(label) => {
-                self.println(format!("label \"{label}\""));
+                self.prindentln(format!("label \"{label}\""));
             }
             InstructionAux::If(condition, if_body, else_body, _) => {
-                self.print("if (");
+                self.prindent("if (");
                 self.visit_value(condition);
-                self.println(") {");
+                println!(") {{");
 
                 {
                     let _h = self.indent();
                     if_body.iter().for_each(|i| self.visit_instruction(i));
                 }
 
-                self.println("} else {");
+                self.prindentln("} else {");
 
                 {
                     let _h = self.indent();
                     else_body.iter().for_each(|i| self.visit_instruction(i));
                 }
 
-                self.println("}");
+                self.prindentln("}");
             }
             InstructionAux::Init(_, _, _) => todo!(),
-            InstructionAux::Jump(_, _) => todo!(),
-            InstructionAux::Undefined(_) => self.println("undefined"),
-            InstructionAux::Exit(s) => self.println(format!("exit({s})")),
+            InstructionAux::Jump(value, s) => {
+                self.prindent(format!("jump {} ", s));
+                self.visit_value(value);
+                println!();
+            }
+            InstructionAux::Undefined(_) => self.prindentln("undefined"),
+            InstructionAux::Exit(s) => self.prindentln(format!("exit({s})")),
             InstructionAux::End(name) => {
-                self.print("end(");
+                self.prindent("end(");
                 self.visit_name(name);
                 println!(")");
             }
-            InstructionAux::TryBlock(_) => todo!(),
+            InstructionAux::TryBlock(body) => {
+                self.prindentln("try {");
+
+                {
+                    let _h = self.indent();
+                    body.iter().for_each(|i| self.visit_instruction(i));
+                }
+
+                self.prindentln("}");
+            }
             InstructionAux::Throw(_) => todo!(),
-            InstructionAux::Comment(s) => self.println(format!("// {s}")),
+            InstructionAux::Comment(s) => self.prindentln(format!("// {s}")),
             InstructionAux::Raw(_) => todo!(),
             InstructionAux::Return(_) => todo!(),
             InstructionAux::Reset(_, _) => todo!(),
@@ -163,11 +246,37 @@ impl Visitor for JibPrettyPrinter {
                 print!(")")
             }
             Value::Tuple(_, _) => todo!(),
-            Value::Struct(_, _) => todo!(),
-            Value::CtorKind(_, _, _, _) => todo!(),
-            Value::CtorUnwrap(_, _, _) => todo!(),
+            Value::Struct(fields, Type::Struct(ident, _)) => {
+                self.prindentln(format!("struct {} {{", ident.get_string()));
+
+                {
+                    let _h = self.indent();
+                    fields.iter().for_each(|((ident, _), value)| {
+                        self.prindent(format!("{}: ", ident.get_string()));
+                        self.visit_value(value);
+                        println!(",");
+                    });
+                }
+
+                self.prindentln("}")
+            }
+            Value::Struct(_, _) => panic!("encountered struct with non-struct type"),
+            Value::CtorKind(f, ctor, unifiers, _) => {
+                self.visit_value(f);
+                print!(" is ");
+                self.print_uid(ctor, unifiers);
+            }
+            Value::CtorUnwrap(f, (ctor, unifiers), _) => {
+                self.visit_value(f);
+                print!(" as ");
+                self.print_uid(ctor, unifiers);
+            }
             Value::TupleMember(_, _, _) => todo!(),
-            Value::Field(_, _) => todo!(),
+            Value::Field(value, (ident, _)) => {
+                self.visit_value(value);
+                print!(".");
+                print!("{}", ident.get_string());
+            }
         }
     }
 
@@ -175,8 +284,15 @@ impl Visitor for JibPrettyPrinter {
         match node {
             Expression::Id(name, _) => self.visit_name(name),
             Expression::Rmw(_, _, _) => todo!(),
-            Expression::Field(_, _) => todo!(),
-            Expression::Addr(_) => todo!(),
+            Expression::Field(expression, (ident, _)) => {
+                self.visit_expression(expression);
+                print!(".");
+                print!("{}", ident.get_string());
+            }
+            Expression::Addr(inner) => {
+                print!("*");
+                self.visit_expression(inner);
+            }
             Expression::Tuple(_, _) => todo!(),
             Expression::Void => todo!(),
         }

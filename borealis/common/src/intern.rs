@@ -28,6 +28,12 @@ impl InternedStringKey {
     }
 }
 
+impl AsRef<str> for InternedStringKey {
+    fn as_ref(&self) -> &str {
+        INTERNER.resolve(&self.0)
+    }
+}
+
 impl From<Spur> for InternedStringKey {
     fn from(spur: Spur) -> Self {
         Self(spur)

@@ -5,7 +5,9 @@
 use {
     crate::{
         genc::{Description, Instruction},
-        instruction::{get_instructions, process_instruction},
+        instruction::{
+            execute::pretty_print::print_definitions, get_instructions, process_instruction,
+        },
     },
     color_eyre::{eyre::eyre, Result},
     errctx::PathCtx,
@@ -32,6 +34,18 @@ pub enum Error {
 
 /// Compiles a Sail ISA specification to a GenC description
 pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Description {
+    {
+        let fundefs = jib_ast.iter().filter(|def| {
+            if let Definition::Fundef(..) = def {
+                true
+            } else {
+                false
+            }
+        });
+
+        print_definitions(fundefs);
+    }
+
     let instructions = get_instructions(sail_ast);
 
     let mut description = Description::empty();
