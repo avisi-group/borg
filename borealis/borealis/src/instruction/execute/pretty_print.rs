@@ -1,15 +1,16 @@
 //! JIB AST pretty printing
 
 use {
+    common::intern::InternedStringKey,
     sail::{
         jib_ast::{
             visitor::Visitor, Definition, Expression, Instruction, InstructionAux, Name, Type,
-            Value,
+            TypeDefinition, Value,
         },
         sail_ast::Identifier,
     },
     std::{
-        collections::LinkedList,
+        collections::{HashSet, LinkedList},
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -17,27 +18,20 @@ use {
 
 const PADDING: &str = "  ";
 
-/// Pretty-print a sequence of definition
-pub fn print_definitions<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
+/// Pretty-print JIB AST (sequence of definitions)
+pub fn print_ast<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
     let mut visitor = JibPrettyPrinter {
         indent: Rc::new(AtomicUsize::from(0)),
+        abstract_functions: HashSet::new(),
     };
 
     iter.into_iter().for_each(|i| visitor.visit_definition(&i));
 }
 
-/// Pretty-print a sequence of instructions
-pub fn print_instructions<'a, I: IntoIterator<Item = &'a Instruction>>(iter: I) {
-    let mut visitor = JibPrettyPrinter {
-        indent: Rc::new(AtomicUsize::from(0)),
-    };
-
-    iter.into_iter().for_each(|i| visitor.visit_instruction(&i));
-}
-
 /// Pretty-print JIB AST
 struct JibPrettyPrinter {
     indent: Rc<AtomicUsize>,
+    abstract_functions: HashSet<InternedStringKey>,
 }
 
 impl JibPrettyPrinter {
@@ -94,15 +88,94 @@ impl Drop for IndentHandle {
 impl Visitor for JibPrettyPrinter {
     fn visit_definition(&mut self, node: &Definition) {
         match node {
-            Definition::RegDec(id, typ, body) => {
+            Definition::RegDec(id, typ, _) => {
                 self.prindent(format!("register {} : ", id.get_string()));
                 self.visit_type(typ);
-                dbg!(body);
-                panic!();
             }
-            Definition::Type(_) => todo!(),
-            Definition::Let(_, _, _) => todo!(),
-            Definition::Spec(_, _, _, _) => todo!(),
+            Definition::Type(TypeDefinition::Enum(id, ids)) => {
+                self.prindentln(format!("enum {} {{", id.get_string()));
+
+                {
+                    let _h = self.indent();
+                    ids.iter()
+                        .for_each(|id| self.prindentln(format!("{},", id.get_string())));
+                }
+
+                self.prindentln("}");
+            }
+            Definition::Type(TypeDefinition::Struct(id, ids)) => {
+                self.prindentln(format!("struct {} {{", id.get_string()));
+
+                {
+                    let _h = self.indent();
+                    ids.iter().for_each(|((id, _), typ)| {
+                        self.prindent(format!("{}: ", id.get_string()));
+                        self.visit_type(typ);
+                        println!(",");
+                    });
+                }
+
+                self.prindentln("}");
+            }
+            Definition::Type(TypeDefinition::Variant(id, ids)) => {
+                self.prindentln(format!("union {} {{", id.get_string()));
+
+                {
+                    let _h = self.indent();
+                    ids.iter().for_each(|((id, _), typ)| {
+                        self.prindent(format!("{}: ", id.get_string()));
+                        self.visit_type(typ);
+                        println!(",");
+                    });
+                }
+
+                self.prindentln("}");
+            }
+            Definition::Let(_, bindings, instructions) => {
+                self.prindent("let (");
+
+                let mut bindings = bindings.iter();
+                if let Some((ident, _)) = bindings.next() {
+                    print!("{}", ident.get_string());
+                }
+                for (ident, _) in bindings {
+                    print!(", ");
+                    print!("{}", ident.get_string());
+                }
+
+                println!(") {{");
+
+                {
+                    let _h = self.indent();
+                    instructions.iter().for_each(|i| self.visit_instruction(i));
+                }
+
+                println!("}}");
+            }
+            Definition::Spec(id, ext, typs, typ) => {
+                let keyword =
+                    if let Some(true) = ext.map(|ext| self.abstract_functions.contains(&ext)) {
+                        "abstract"
+                    } else {
+                        "val"
+                    };
+
+                self.prindent(format!("{keyword} {} : (", id.get_string()));
+
+                let mut typs = typs.iter();
+                if let Some(typ) = typs.next() {
+                    self.visit_type(typ);
+                }
+                for typ in typs {
+                    print!(", ");
+                    self.visit_type(typ);
+                }
+
+                print!(") -> ");
+                self.visit_type(typ);
+
+                println!();
+            }
             Definition::Fundef(name, _, args, body) => {
                 self.prindent(format!("fn {}(", name.get_string()));
 
@@ -125,7 +198,13 @@ impl Visitor for JibPrettyPrinter {
             }
             Definition::Startup(_, _) => todo!(),
             Definition::Finish(_, _) => todo!(),
-            Definition::Pragma(_, _) => todo!(),
+            Definition::Pragma(key, value) => {
+                if *key == "abstract".into() {
+                    self.abstract_functions.insert(*value);
+                } else {
+                    self.prindentln(format!("#{key} {value}"));
+                }
+            }
         }
     }
 
@@ -300,8 +379,56 @@ impl Visitor for JibPrettyPrinter {
 
     fn visit_type(&mut self, node: &Type) {
         match node {
-            Type::Variant(ident, _) => print!("{}", ident.get_string()),
-            _ => print!("{:?}", node),
+            Type::Lint => print!("%i"),
+            Type::Fint(n) => print!("%i{n}"),
+            Type::Constant(bi) => print!("{}", bi.0),
+            Type::Lbits(_) => print!("%bv"),
+            Type::Sbits(n, _) => print!("%sbv{n}"),
+            Type::Fbits(n, _) => print!("%bv{n}"),
+            Type::Unit => print!("%unit"),
+            Type::Bool => print!("%bool"),
+            Type::Bit => print!("%bit"),
+            Type::String => print!("%string"),
+            Type::Real => print!("%real"),
+            Type::Float(n) => print!("%f{n}"),
+            Type::RoundingMode => print!("%rounding_mode"),
+            Type::Tup(typs) => {
+                print!("(");
+                let mut typs = typs.iter();
+                if let Some(typ) = typs.next() {
+                    self.visit_type(typ);
+                }
+                for typ in typs {
+                    print!(", ");
+                    self.visit_type(typ);
+                }
+                print!(")");
+            }
+
+            Type::Enum(ident, _) => print!("enum {}", ident.get_string()),
+            Type::Struct(ident, _) => print!("struct {}", ident.get_string()),
+            Type::Variant(ident, _) => print!("union {}", ident.get_string()),
+
+            Type::Vector(_, typ) => {
+                print!("%vec<");
+                self.visit_type(typ);
+                print!(">");
+            }
+            Type::Fvector(n, _, typ) => {
+                print!("%fvec<{n}, ");
+                self.visit_type(typ);
+                print!(">");
+            }
+            Type::List(inner) => {
+                print!("list<");
+                self.visit_type(inner);
+                print!(">");
+            }
+            Type::Ref(inner) => {
+                print!("&");
+                self.visit_type(inner);
+            }
+            Type::Poly(kid) => print!("{:?}", kid.inner),
         }
     }
 
