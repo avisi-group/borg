@@ -25,7 +25,7 @@ pub fn print_ast<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
         abstract_functions: HashSet::new(),
     };
 
-    iter.into_iter().for_each(|i| visitor.visit_definition(&i));
+    iter.into_iter().for_each(|i| visitor.visit_definition(i));
 }
 
 /// Pretty-print JIB AST
@@ -35,7 +35,7 @@ struct JibPrettyPrinter {
 }
 
 impl JibPrettyPrinter {
-    fn prindent<'a, T: AsRef<str>>(&self, s: T) {
+    fn prindent<T: AsRef<str>>(&self, s: T) {
         print!(
             "{}{}",
             PADDING.repeat(self.indent.load(Ordering::SeqCst)),
@@ -43,7 +43,7 @@ impl JibPrettyPrinter {
         );
     }
 
-    fn prindentln<'a, T: AsRef<str>>(&self, s: T) {
+    fn prindentln<T: AsRef<str>>(&self, s: T) {
         self.prindent(s);
         println!();
     }

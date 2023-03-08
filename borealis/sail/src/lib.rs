@@ -140,7 +140,7 @@ pub fn load_from_config<P: AsRef<Path>>(
         }??;
 
         trace!("Rewriting");
-        let rewrite_sequence = unsafe { target_rewrites(rt, target.clone()) }??;
+        let rewrite_sequence = unsafe { target_rewrites(rt, target) }??;
         let (ast, effect_info, env) = unsafe {
             rewrites_rewrite(
                 rt,
