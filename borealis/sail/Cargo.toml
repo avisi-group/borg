@@ -16,7 +16,7 @@ parking_lot = "0.12.1"
 displaydoc = "0.2.3"
 thiserror = "1.0.39"
 log = "0.4.17"
-serde = { version = "1.0.153", features = ["derive"] }
+serde = { version = "1.0.154", features = ["derive"] }
 deepsize = "0.2.0"
 num-bigint = { version = "0.4.3", features = ["serde"] }
 serde_json = "1.0.94"

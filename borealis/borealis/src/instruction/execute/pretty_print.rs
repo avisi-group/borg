@@ -194,7 +194,7 @@ impl Visitor for JibPrettyPrinter {
                     body.iter().for_each(|i| self.visit_instruction(i));
                 }
 
-                self.prindentln("}\n");
+                self.prindentln("}");
             }
             Definition::Startup(_, _) => todo!(),
             Definition::Finish(_, _) => todo!(),
@@ -202,10 +202,12 @@ impl Visitor for JibPrettyPrinter {
                 if *key == "abstract".into() {
                     self.abstract_functions.insert(*value);
                 } else {
-                    self.prindentln(format!("#{key} {value}"));
+                    self.prindent(format!("#{key} {value}"));
                 }
             }
         }
+
+        println!();
     }
 
     fn visit_instruction(&mut self, node: &Instruction) {
