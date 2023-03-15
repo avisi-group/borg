@@ -2,7 +2,7 @@
 
 use {
     crate::genc::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
-    common::{identifiable::unique_id, intern::InternedStringKey},
+    common::{identifiable::unique_id, intern::InternedString},
     log::{trace, warn},
     num_bigint::Sign,
     once_cell::sync::Lazy,
@@ -24,7 +24,7 @@ use {
 
 static NAME_COUNTER: Lazy<NameCounter> = Lazy::new(NameCounter::new);
 
-struct NameCounter(Mutex<HashMap<InternedStringKey, u32>>);
+struct NameCounter(Mutex<HashMap<InternedString, u32>>);
 
 impl NameCounter {
     /// Create a new empty instance
@@ -32,7 +32,7 @@ impl NameCounter {
         Self(Mutex::new(HashMap::new()))
     }
 
-    fn increment_count(&self, key: InternedStringKey) -> u32 {
+    fn increment_count(&self, key: InternedString) -> u32 {
         let mut counters = self.0.lock().unwrap();
 
         let current = counters.get(&key).copied().unwrap_or(0);
@@ -140,7 +140,7 @@ impl From<&Literal> for Format {
 /// Main function clause processing
 pub fn process_decode_function_clause(
     funcl: &FunctionClause,
-) -> (InternedStringKey, InternedStringKey, GenCFormat) {
+) -> (InternedString, InternedString, GenCFormat) {
     trace!(
         "Processing decode function clause @ {}",
         funcl.annotation.location
@@ -419,7 +419,7 @@ pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
 /// ```
 pub fn expression_to_named_range(
     expression: &Expression,
-) -> Option<(InternedStringKey, Range<usize>)> {
+) -> Option<(InternedString, Range<usize>)> {
     let ExpressionAux::Assign(LValueExpression { inner: lvalue, ..}, Expression { inner: expression_aux, .. }) = &*expression.inner else {
         panic!("ExpressionAux not an Assign");
     };

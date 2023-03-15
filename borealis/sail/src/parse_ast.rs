@@ -3,7 +3,7 @@
 
 use {
     crate::sail_ast::Location,
-    common::intern::InternedStringKey,
+    common::intern::InternedString,
     ocaml::{FromValue, ToValue, Value},
     std::collections::LinkedList,
     strum::IntoStaticStr,
@@ -58,7 +58,7 @@ pub enum Definition {
     Register(Value),
 
     /// Pragma
-    Pragma(InternedStringKey, InternedStringKey, Location),
+    Pragma(InternedString, InternedString, Location),
 
     /// Internal mutrec
     Mutual(LinkedList<Value>),

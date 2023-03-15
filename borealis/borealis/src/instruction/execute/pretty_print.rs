@@ -1,7 +1,7 @@
 //! JIB AST pretty printing
 
 use {
-    common::intern::InternedStringKey,
+    common::intern::InternedString,
     sail::{
         jib_ast::{
             visitor::Visitor, Definition, Expression, Instruction, InstructionAux, Name, Type,
@@ -31,7 +31,7 @@ pub fn print_ast<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
 /// Pretty-print JIB AST
 struct JibPrettyPrinter {
     indent: Rc<AtomicUsize>,
-    abstract_functions: HashSet<InternedStringKey>,
+    abstract_functions: HashSet<InternedString>,
 }
 
 impl JibPrettyPrinter {
@@ -372,6 +372,7 @@ impl Visitor for JibPrettyPrinter {
             }
             Expression::Addr(inner) => {
                 print!("*");
+                dbg!(inner);
                 self.visit_expression(inner);
             }
             Expression::Tuple(_, _) => todo!(),

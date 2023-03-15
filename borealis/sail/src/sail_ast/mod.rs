@@ -9,7 +9,7 @@ use {
         sail_ast::visitor::{Visitor, Walkable},
         types::{KindIdentifierInner, Position},
     },
-    common::intern::InternedStringKey,
+    common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
     serde::{Deserialize, Serialize},
@@ -31,11 +31,11 @@ pub enum Location {
     /// Generated location
     Generated(Box<Location>),
     /// Hint
-    Hint(InternedStringKey, Box<Location>, Box<Location>),
+    Hint(InternedString, Box<Location>, Box<Location>),
     /// Range between two positions
     Range(Position, Position),
     /// Documented location
-    Documented(InternedStringKey, Box<Location>),
+    Documented(InternedString, Box<Location>),
 }
 
 impl Display for Location {
@@ -78,11 +78,11 @@ pub enum Value {
     Bit(Bit),
     Tuple(LinkedList<Value>),
     Unit,
-    String(InternedStringKey),
-    Ref(InternedStringKey),
-    Ctor(InternedStringKey, LinkedList<Value>),
-    Record(LinkedList<(InternedStringKey, Value)>),
-    AttemptedRead(InternedStringKey),
+    String(InternedString),
+    Ref(InternedString),
+    Ctor(InternedString, LinkedList<Value>),
+    Record(LinkedList<(InternedString, Value)>),
+    AttemptedRead(InternedString),
 }
 
 impl Walkable for Value {
@@ -121,15 +121,15 @@ pub enum Loop {
 }
 
 /// Idenitifer
-pub type X = InternedStringKey;
+pub type X = InternedString;
 
 /// Infix identifier
-pub type Xi = InternedStringKey;
+pub type Xi = InternedString;
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 struct Extern {
     pure: bool,
-    bindings: LinkedList<(InternedStringKey, InternedStringKey)>,
+    bindings: LinkedList<(InternedString, InternedString)>,
 }
 
 /// kinded IDs: Type, Int, and Order variables
@@ -195,7 +195,7 @@ pub struct Identifier {
 }
 
 impl Identifier {
-    pub fn get_string(&self) -> InternedStringKey {
+    pub fn get_string(&self) -> InternedString {
         match self.inner {
             IdentifierAux::Identifier(s) => s,
             IdentifierAux::Operator(s) => s,
@@ -331,14 +331,14 @@ pub enum LiteralAux {
     /// Natural number constant
     Num(BigInt),
     /// Bit vector constant, C-style
-    Hex(InternedStringKey),
+    Hex(InternedString),
     /// Bit vector constant, C-style
-    Bin(InternedStringKey),
+    Bin(InternedString),
     /// String constant
-    String(InternedStringKey),
+    String(InternedString),
     /// Undefined value constant
     Undefined,
-    Real(InternedStringKey),
+    Real(InternedString),
 }
 
 /// Type expressions, of kind Type
@@ -1856,7 +1856,7 @@ pub enum Definition {
     Mutual(LinkedList<FunctionDefinition>),
 
     /// Pragma
-    Pragma(InternedStringKey, InternedStringKey, Location),
+    Pragma(InternedString, InternedString, Location),
 }
 
 impl Walkable for Definition {
@@ -1911,7 +1911,7 @@ pub enum CommentType {
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct CommentRoot {
-    pub path: InternedStringKey,
+    pub path: InternedString,
     pub comments: LinkedList<Comment>,
 }
 
@@ -1927,7 +1927,7 @@ pub struct Comment {
     pub typ: CommentType,
     pub start_position: Position,
     pub end_position: Position,
-    pub contents: InternedStringKey,
+    pub contents: InternedString,
 }
 
 impl Walkable for Comment {

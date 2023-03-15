@@ -16,7 +16,7 @@ use {
         runtime::RT,
         sail_ast::Ast,
     },
-    common::intern::InternedStringKey,
+    common::intern::InternedString,
     errctx::PathCtx,
     log::trace,
     ocaml::{FromValue, Runtime, Value},
@@ -194,7 +194,7 @@ fn resolve_includes(
             continue;
         };
 
-        if *key != InternedStringKey::from_static("include") {
+        if *key != InternedString::from_static("include") {
             out_defs.push_back(def);
             continue;
         }

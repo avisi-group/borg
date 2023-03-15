@@ -5,7 +5,7 @@ use {
         genc::format::InstructionFormat,
         instruction::{execute::jib_func_to_genc, format::process_decode_function_clause},
     },
-    common::intern::InternedStringKey,
+    common::intern::InternedString,
     sail::{
         jib_ast::Definition,
         sail_ast::{visitor::Visitor, Ast, FunctionClause, IdentifierAux},
@@ -45,7 +45,7 @@ pub fn get_instructions(ast: &Ast) -> Vec<FunctionClause> {
 pub fn process_instruction(
     jib: &LinkedList<Definition>,
     instruction: &FunctionClause,
-) -> (InternedStringKey, InstructionFormat, String) {
+) -> (InternedString, InstructionFormat, String) {
     // determine instruction format
     let (name, instruction_name, format) = process_decode_function_clause(instruction);
 

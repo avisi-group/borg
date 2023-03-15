@@ -1,6 +1,6 @@
 //! GenC instruction formatting
 
-use {common::intern::InternedStringKey, std::fmt::Display};
+use {common::intern::InternedString, std::fmt::Display};
 
 /// Format describing the binary coding of an instruction
 #[derive(Debug, Clone)]
@@ -44,7 +44,7 @@ impl Display for Segment {
 #[derive(Debug, Clone)]
 pub enum SegmentContent {
     /// Variable name
-    Variable(InternedStringKey),
+    Variable(InternedString),
     /// Constant value
     ///
     /// * Will be truncated to the length described in the Segment.

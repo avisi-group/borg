@@ -9,7 +9,7 @@ use {
         num::BigInt,
         sail_ast::{Identifier, KindIdentifier, Location},
     },
-    common::intern::InternedStringKey,
+    common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
     serde::{Deserialize, Serialize},
@@ -35,11 +35,11 @@ pub enum Vl {
     Bool(bool),
     Unit,
     Int(BigInt),
-    String(InternedStringKey),
-    Real(InternedStringKey),
+    String(InternedString),
+    Real(InternedString),
     EmptyList,
-    Enum(InternedStringKey),
-    Ref(InternedStringKey),
+    Enum(InternedString),
+    Ref(InternedString),
     Undefined,
 }
 
@@ -311,9 +311,9 @@ impl Walkable for TypeDefinition {
 pub enum InstructionAux {
     Decl(Type, Name),
     Init(Type, Name, Value),
-    Jump(Value, InternedStringKey),
-    Goto(InternedStringKey),
-    Label(InternedStringKey),
+    Jump(Value, InternedString),
+    Goto(InternedString),
+    Label(InternedString),
     Funcall(
         Expression,
         bool,
@@ -323,7 +323,7 @@ pub enum InstructionAux {
     Copy(Expression, Value),
     Clear(Type, Name),
     Undefined(Type),
-    Exit(InternedStringKey),
+    Exit(InternedString),
     End(Name),
     If(
         Value,
@@ -334,8 +334,8 @@ pub enum InstructionAux {
     Block(LinkedList<Instruction>),
     TryBlock(LinkedList<Instruction>),
     Throw(Value),
-    Comment(InternedStringKey),
-    Raw(InternedStringKey),
+    Comment(InternedString),
+    Raw(InternedString),
     Return(Value),
     Reset(Type, Name),
     Reinit(Type, Name, Value),
@@ -418,12 +418,7 @@ pub enum Definition {
     RegDec(Identifier, Type, LinkedList<Instruction>),
     Type(TypeDefinition),
     Let(Int, LinkedList<(Identifier, Type)>, LinkedList<Instruction>),
-    Spec(
-        Identifier,
-        Option<InternedStringKey>,
-        LinkedList<Type>,
-        Type,
-    ),
+    Spec(Identifier, Option<InternedString>, LinkedList<Type>, Type),
     Fundef(
         Identifier,
         Option<Identifier>,
@@ -432,7 +427,7 @@ pub enum Definition {
     ),
     Startup(Identifier, LinkedList<Instruction>),
     Finish(Identifier, LinkedList<Instruction>),
-    Pragma(InternedStringKey, InternedStringKey),
+    Pragma(InternedString, InternedString),
 }
 
 impl Walkable for Definition {

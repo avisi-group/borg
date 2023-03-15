@@ -1,7 +1,7 @@
 //! Types and functions for interfacing with OCaml
 
 use {
-    common::intern::InternedStringKey,
+    common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
     serde::{Deserialize, Serialize},
@@ -33,7 +33,7 @@ unsafe impl ToValue for KindIdentifierInner {
 #[derive(Debug, Clone, FromValue, ToValue, PartialEq, Serialize, Deserialize, DeepSizeOf)]
 pub struct Position {
     /// File name
-    pub pos_fname: InternedStringKey,
+    pub pos_fname: InternedString,
     /// Line number
     pub pos_lnum: Int,
     /// Character offset of beginning of line
