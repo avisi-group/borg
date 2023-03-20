@@ -177,7 +177,7 @@ pub fn process_decode_function_clause(
 
         let ExpressionAux::Application(ident, ..) = &**inner else { panic!() };
 
-        ident.get_string()
+        ident.as_interned()
     };
 
     // named ranges may not be contiguous, so fill any holes with padding ranges (these should not contain any unknown bits)
@@ -429,7 +429,7 @@ pub fn expression_to_named_range(
             panic!("LValueExpression not a Cast");
         };
 
-        ident.get_string()
+        ident.as_interned()
     };
 
     let range = match &**expression_aux {
@@ -477,7 +477,7 @@ pub fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
     let ExpressionAux::Application(ident, expressions) = exp else {
         panic!("not an application");
     };
-    assert_eq!(ident.get_string(), "bitvector_access_A".into());
+    assert_eq!(ident.as_interned(), "bitvector_access_A".into());
 
     let mut iter = expressions.iter();
 
@@ -485,7 +485,7 @@ pub fn bitvector_access_to_range(exp: &ExpressionAux) -> Range<usize> {
     let ExpressionAux::Identifier(ident) = &*iter.next().unwrap().inner else {
         panic!("first expression was not identifier");
     };
-    assert_eq!(ident.get_string(), "op_code".into());
+    assert_eq!(ident.as_interned(), "op_code".into());
 
     let start = expression_to_usize(iter.next().unwrap());
     let end = start + 1;
@@ -512,7 +512,7 @@ pub fn vector_subrange_to_range(
     ident: &Identifier,
     expressions: &LinkedList<Expression>,
 ) -> Range<usize> {
-    assert_eq!(ident.get_string(), "vector_subrange_A".into());
+    assert_eq!(ident.as_interned(), "vector_subrange_A".into());
 
     let mut iter = expressions.iter();
 
@@ -520,7 +520,7 @@ pub fn vector_subrange_to_range(
     let ExpressionAux::Identifier(ident) = &*iter.next().unwrap().inner else {
         panic!("first expression was not identifier");
     };
-    assert_eq!(ident.get_string(), "op_code".into());
+    assert_eq!(ident.as_interned(), "op_code".into());
 
     let end = expression_to_usize(iter.next().unwrap()) + 1;
     let start = expression_to_usize(iter.next().unwrap());

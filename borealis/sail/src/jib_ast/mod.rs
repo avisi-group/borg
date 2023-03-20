@@ -463,17 +463,3 @@ impl Walkable for Definition {
         }
     }
 }
-
-#[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct Ast {
-    definitions: LinkedList<Definition>,
-}
-
-impl Walkable for Ast {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        self.definitions
-            .iter()
-            .for_each(|d| visitor.visit_definition(d));
-    }
-}

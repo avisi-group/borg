@@ -56,7 +56,7 @@ impl JibPrettyPrinter {
     }
 
     fn print_uid(&mut self, id: &Identifier, typs: &LinkedList<Type>) {
-        print!("{}", id.get_string());
+        print!("{}", id.as_interned());
 
         if !typs.is_empty() {
             print!("<");
@@ -89,27 +89,27 @@ impl Visitor for JibPrettyPrinter {
     fn visit_definition(&mut self, node: &Definition) {
         match node {
             Definition::RegDec(id, typ, _) => {
-                self.prindent(format!("register {} : ", id.get_string()));
+                self.prindent(format!("register {} : ", id.as_interned()));
                 self.visit_type(typ);
             }
             Definition::Type(TypeDefinition::Enum(id, ids)) => {
-                self.prindentln(format!("enum {} {{", id.get_string()));
+                self.prindentln(format!("enum {} {{", id.as_interned()));
 
                 {
                     let _h = self.indent();
                     ids.iter()
-                        .for_each(|id| self.prindentln(format!("{},", id.get_string())));
+                        .for_each(|id| self.prindentln(format!("{},", id.as_interned())));
                 }
 
                 self.prindentln("}");
             }
             Definition::Type(TypeDefinition::Struct(id, ids)) => {
-                self.prindentln(format!("struct {} {{", id.get_string()));
+                self.prindentln(format!("struct {} {{", id.as_interned()));
 
                 {
                     let _h = self.indent();
                     ids.iter().for_each(|((id, _), typ)| {
-                        self.prindent(format!("{}: ", id.get_string()));
+                        self.prindent(format!("{}: ", id.as_interned()));
                         self.visit_type(typ);
                         println!(",");
                     });
@@ -118,12 +118,12 @@ impl Visitor for JibPrettyPrinter {
                 self.prindentln("}");
             }
             Definition::Type(TypeDefinition::Variant(id, ids)) => {
-                self.prindentln(format!("union {} {{", id.get_string()));
+                self.prindentln(format!("union {} {{", id.as_interned()));
 
                 {
                     let _h = self.indent();
                     ids.iter().for_each(|((id, _), typ)| {
-                        self.prindent(format!("{}: ", id.get_string()));
+                        self.prindent(format!("{}: ", id.as_interned()));
                         self.visit_type(typ);
                         println!(",");
                     });
@@ -136,11 +136,11 @@ impl Visitor for JibPrettyPrinter {
 
                 let mut bindings = bindings.iter();
                 if let Some((ident, _)) = bindings.next() {
-                    print!("{}", ident.get_string());
+                    print!("{}", ident.as_interned());
                 }
                 for (ident, _) in bindings {
                     print!(", ");
-                    print!("{}", ident.get_string());
+                    print!("{}", ident.as_interned());
                 }
 
                 println!(") {{");
@@ -160,7 +160,7 @@ impl Visitor for JibPrettyPrinter {
                         "val"
                     };
 
-                self.prindent(format!("{keyword} {} : (", id.get_string()));
+                self.prindent(format!("{keyword} {} : (", id.as_interned()));
 
                 let mut typs = typs.iter();
                 if let Some(typ) = typs.next() {
@@ -177,14 +177,14 @@ impl Visitor for JibPrettyPrinter {
                 println!();
             }
             Definition::Fundef(name, _, args, body) => {
-                self.prindent(format!("fn {}(", name.get_string()));
+                self.prindent(format!("fn {}(", name.as_interned()));
 
                 let mut args = args.iter();
                 if let Some(arg) = args.next() {
-                    print!("{}", arg.get_string());
+                    print!("{}", arg.as_interned());
                 }
                 for arg in args {
-                    print!(", {}", arg.get_string());
+                    print!(", {}", arg.as_interned());
                 }
 
                 println!(") {{");
@@ -244,7 +244,7 @@ impl Visitor for JibPrettyPrinter {
             InstructionAux::Funcall(exp, _, (name, _), args) => {
                 self.prindent("");
                 self.visit_expression(exp);
-                print!(" = {}(", name.get_string());
+                print!(" = {}(", name.as_interned());
 
                 // print correct number of commas
                 let mut args = args.iter();
@@ -328,12 +328,12 @@ impl Visitor for JibPrettyPrinter {
             }
             Value::Tuple(_, _) => todo!(),
             Value::Struct(fields, Type::Struct(ident, _)) => {
-                self.prindentln(format!("struct {} {{", ident.get_string()));
+                self.prindentln(format!("struct {} {{", ident.as_interned()));
 
                 {
                     let _h = self.indent();
                     fields.iter().for_each(|((ident, _), value)| {
-                        self.prindent(format!("{}: ", ident.get_string()));
+                        self.prindent(format!("{}: ", ident.as_interned()));
                         self.visit_value(value);
                         println!(",");
                     });
@@ -356,7 +356,7 @@ impl Visitor for JibPrettyPrinter {
             Value::Field(value, (ident, _)) => {
                 self.visit_value(value);
                 print!(".");
-                print!("{}", ident.get_string());
+                print!("{}", ident.as_interned());
             }
         }
     }
@@ -368,11 +368,10 @@ impl Visitor for JibPrettyPrinter {
             Expression::Field(expression, (ident, _)) => {
                 self.visit_expression(expression);
                 print!(".");
-                print!("{}", ident.get_string());
+                print!("{}", ident.as_interned());
             }
             Expression::Addr(inner) => {
                 print!("*");
-                dbg!(inner);
                 self.visit_expression(inner);
             }
             Expression::Tuple(_, _) => todo!(),
@@ -408,9 +407,9 @@ impl Visitor for JibPrettyPrinter {
                 print!(")");
             }
 
-            Type::Enum(ident, _) => print!("enum {}", ident.get_string()),
-            Type::Struct(ident, _) => print!("struct {}", ident.get_string()),
-            Type::Variant(ident, _) => print!("union {}", ident.get_string()),
+            Type::Enum(ident, _) => print!("enum {}", ident.as_interned()),
+            Type::Struct(ident, _) => print!("struct {}", ident.as_interned()),
+            Type::Variant(ident, _) => print!("union {}", ident.as_interned()),
 
             Type::Vector(_, typ) => {
                 print!("%vec<");
@@ -438,7 +437,7 @@ impl Visitor for JibPrettyPrinter {
     fn visit_name(&mut self, node: &Name) {
         match node {
             Name::Global(ident, _) | Name::Name(ident, _) => {
-                print!("{}", ident.get_string())
+                print!("{}", ident.as_interned())
             }
             Name::HaveException(_) | Name::CurrentException(_) => print!("exception"),
             Name::ThrowLocation(_) => print!("throw"),

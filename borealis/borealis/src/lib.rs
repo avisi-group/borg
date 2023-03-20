@@ -34,6 +34,8 @@ pub enum Error {
 /// Compiles a Sail ISA specification to a GenC description
 pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Description {
     // crate::instruction::execute::pretty_print::print_ast(jib_ast);
+    boom::Ast::from_jib(jib_ast);
+    panic!();
 
     let instructions = get_instructions(sail_ast);
 

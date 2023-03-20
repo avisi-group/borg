@@ -195,7 +195,7 @@ pub struct Identifier {
 }
 
 impl Identifier {
-    pub fn get_string(&self) -> InternedString {
+    pub fn as_interned(&self) -> InternedString {
         match self.inner {
             IdentifierAux::Identifier(s) => s,
             IdentifierAux::Operator(s) => s,
