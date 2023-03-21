@@ -84,6 +84,13 @@ pub struct NamedType {
     pub typ: Type,
 }
 
+/// Name and type of a union field, struct field, or function parameter
+#[derive(Debug)]
+pub struct NamedValue {
+    pub name: InternedString,
+    pub value: Value,
+}
+
 /// Type
 #[derive(Debug)]
 pub enum Type {
@@ -145,6 +152,11 @@ pub enum Statement {
         arguments: Vec<Value>,
     },
     Label(InternedString),
+    Goto(InternedString),
+    Jump {
+        condition: Value,
+        target: InternedString,
+    },
     End(InternedString),
     Undefined,
     If {
@@ -152,6 +164,8 @@ pub enum Statement {
         if_body: Vec<Statement>,
         else_body: Vec<Statement>,
     },
+    Exit(InternedString),
+    Comment(InternedString),
 }
 
 /// Expression
@@ -159,7 +173,7 @@ pub enum Statement {
 pub enum Expression {
     Identifier(InternedString),
     Field {
-        name: InternedString,
+        expression: Box<Self>,
         field: InternedString,
     },
     Address(InternedString),
@@ -169,12 +183,37 @@ pub enum Expression {
 pub enum Value {
     Identifier(InternedString),
     Literal(Literal),
+    Operation(Operation),
+    Struct {
+        name: InternedString,
+        fields: Vec<NamedValue>,
+    },
+    Field {
+        value: Box<Self>,
+        field_name: InternedString,
+    },
 }
 
 #[derive(Debug)]
 pub enum Literal {
     Int(BigInt),
+    Bits(Vec<Bit>),
+    Bool(bool),
+    String(InternedString),
+    Unit,
 }
 
 #[derive(Debug)]
-pub enum Op {}
+pub enum Operation {
+    Not(Box<Value>),
+    LessThan(Box<Value>, Box<Value>),
+    Subtract(Box<Value>, Box<Value>),
+    Equal(Box<Value>, Box<Value>),
+}
+
+#[derive(Debug)]
+pub enum Bit {
+    _0,
+    _1,
+    Unknown,
+}

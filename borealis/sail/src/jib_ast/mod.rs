@@ -67,6 +67,8 @@ impl Walkable for Name {
     }
 }
 
+type FieldType = ((Identifier, LinkedList<Type>), Box<Type>);
+
 /// C type
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
@@ -86,14 +88,8 @@ pub enum Type {
     RoundingMode,
     Tup(LinkedList<Self>),
     Enum(Identifier, LinkedList<Identifier>),
-    Struct(
-        Identifier,
-        LinkedList<((Identifier, LinkedList<Self>), Box<Self>)>,
-    ),
-    Variant(
-        Identifier,
-        LinkedList<((Identifier, LinkedList<Self>), Box<Self>)>,
-    ),
+    Struct(Identifier, LinkedList<FieldType>),
+    Variant(Identifier, LinkedList<FieldType>),
     Fvector(Int, bool, Box<Self>),
     Vector(bool, Box<Self>),
     List(Box<Self>),

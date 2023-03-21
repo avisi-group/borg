@@ -321,7 +321,12 @@ impl Visitor for JibPrettyPrinter {
             Value::Lit(val, _) => print!("{val:?}"),
             Value::Call(op, vals) => {
                 print!("{op:?}(");
+                let mut vals = vals.iter();
+                if let Some(val) = vals.next() {
+                    self.visit_value(val);
+                }
                 for val in vals {
+                    print!(", ");
                     self.visit_value(val);
                 }
                 print!(")")
