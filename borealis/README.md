@@ -54,6 +54,10 @@ On several systems we have experienced linker errors relating to GMP as `conf-gm
 
 Additionally, on macOS, `-lgmp` must be supplied as well as the path to the Homebrew `/lib` folder, which is done in the `build.rs` inside conditional compilation flags.
 
+### Wrong OCaml Version
+
+Currently only version 4.14.0 is supported (or whichever version is in the Dockerfile). Until the `ocaml-rs` crate is updated to depend on the latest `ocaml-boxroot-sys`, building with OCaml 5 will result in several warnings and an error `vendor/boxroot/boxroot.c:821:7: error: too few arguments to function ‘action’` from `ocaml-boxroot-sys`.
+
 ### Missing Opam/Dune Binaries
 
 If the `opam` or `dune` binary is not in `PATH` then you may experience the following errors in `ocaml-rs` or `sail` respectively:
