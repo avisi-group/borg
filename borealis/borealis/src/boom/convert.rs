@@ -33,7 +33,7 @@ impl BoomEmitter {
     }
 
     pub fn finish(self) -> boom::Ast {
-        todo!()
+        self.generated_ast
     }
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
@@ -201,7 +201,9 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> boom::Statement {
         jib_ast::InstructionAux::Block(instrs) => boom::Statement::Block {
             body: convert_body(instrs),
         },
-        jib_ast::InstructionAux::TryBlock(_) => todo!(),
+        jib_ast::InstructionAux::TryBlock(instrs) => boom::Statement::Try {
+            body: convert_body(instrs),
+        },
         jib_ast::InstructionAux::Throw(_) => todo!(),
         jib_ast::InstructionAux::Comment(s) => boom::Statement::Comment(*s),
         jib_ast::InstructionAux::Raw(_) => todo!(),
@@ -230,7 +232,9 @@ fn convert_expression(expression: &jib_ast::Expression) -> boom::Expression {
             expression: Box::new(convert_expression(expression)),
             field: ident.as_interned(),
         },
-        jib_ast::Expression::Addr(_) => todo!(),
+        jib_ast::Expression::Addr(expr) => {
+            boom::Expression::Address(Box::new(convert_expression(expr)))
+        }
         jib_ast::Expression::Tuple(_, _) => todo!(),
         jib_ast::Expression::Void => todo!(),
     }
@@ -252,42 +256,44 @@ fn convert_value(value: &jib_ast::Value) -> boom::Value {
                 .collect(),
         },
         jib_ast::Value::Struct(_, _) => panic!("encountered struct with non-struct type"),
-        jib_ast::Value::CtorKind(_, _, _, _) => todo!(),
-        jib_ast::Value::CtorUnwrap(_, _, _) => todo!(),
+        jib_ast::Value::CtorKind(value, ctor, unifiers, _) => boom::Value::CtorKind {
+            value: Box::new(convert_value(value)),
+            identifier: ctor.as_interned(),
+            types: unifiers.iter().map(convert_type).collect(),
+        },
+        jib_ast::Value::CtorUnwrap(value, (ctor, unifiers), _) => boom::Value::CtorUnwrap {
+            value: Box::new(convert_value(value)),
+            identifier: ctor.as_interned(),
+            types: unifiers.iter().map(convert_type).collect(),
+        },
         jib_ast::Value::TupleMember(_, _, _) => todo!(),
         jib_ast::Value::Call(op, values) => {
+            let values = values
+                .iter()
+                .map(convert_value)
+                .map(Box::new)
+                .collect::<Vec<_>>();
+
             let op = match op {
-                jib_ast::Op::Bnot => {
-                    boom::Operation::Not(Box::new(convert_value(values.front().unwrap())))
-                }
+                jib_ast::Op::Bnot => boom::Operation::Not(values[0].clone()),
                 jib_ast::Op::Bor => todo!(),
                 jib_ast::Op::Band => todo!(),
                 jib_ast::Op::ListHead => todo!(),
                 jib_ast::Op::ListTail => todo!(),
                 jib_ast::Op::Eq => todo!(),
-                jib_ast::Op::Neq => {
-                    let mut values = values.iter();
-                    let a = Box::new(convert_value(values.next().unwrap()));
-                    let b = Box::new(convert_value(values.next().unwrap()));
-                    boom::Operation::Not(Box::new(boom::Value::Operation(boom::Operation::Equal(
-                        a, b,
-                    ))))
-                }
-                jib_ast::Op::Ilt => {
-                    let mut values = values.iter();
-                    let a = Box::new(convert_value(values.next().unwrap()));
-                    let b = Box::new(convert_value(values.next().unwrap()));
-                    boom::Operation::LessThan(a, b)
-                }
+                jib_ast::Op::Neq => boom::Operation::Not(Box::new(boom::Value::Operation(
+                    boom::Operation::Equal(values[0].clone(), values[1].clone()),
+                ))),
+                jib_ast::Op::Ilt => boom::Operation::LessThan(values[0].clone(), values[1].clone()),
+
                 jib_ast::Op::Ilteq => todo!(),
-                jib_ast::Op::Igt => todo!(),
+                jib_ast::Op::Igt => {
+                    boom::Operation::GreaterThan(values[0].clone(), values[1].clone())
+                }
                 jib_ast::Op::Igteq => todo!(),
-                jib_ast::Op::Iadd => todo!(),
+                jib_ast::Op::Iadd => boom::Operation::Add(values[0].clone(), values[1].clone()),
                 jib_ast::Op::Isub => {
-                    let mut values = values.iter();
-                    let a = Box::new(convert_value(values.next().unwrap()));
-                    let b = Box::new(convert_value(values.next().unwrap()));
-                    boom::Operation::Subtract(a, b)
+                    boom::Operation::Subtract(values[0].clone(), values[1].clone())
                 }
                 jib_ast::Op::Unsigned(_) => todo!(),
                 jib_ast::Op::Signed(_) => todo!(),
@@ -318,7 +324,7 @@ fn convert_value(value: &jib_ast::Value) -> boom::Value {
 fn convert_literal(literal: &jib_ast::Vl) -> boom::Literal {
     match literal {
         jib_ast::Vl::Bits(bits, _) => boom::Literal::Bits(bits.iter().map(convert_bit).collect()),
-        jib_ast::Vl::Bit(_) => todo!(),
+        jib_ast::Vl::Bit(bit) => boom::Literal::Bit(convert_bit(bit)),
         jib_ast::Vl::Bool(b) => boom::Literal::Bool(*b),
         jib_ast::Vl::Unit => boom::Literal::Unit,
         jib_ast::Vl::Int(bigint) => boom::Literal::Int(bigint.0.clone()),
@@ -326,7 +332,7 @@ fn convert_literal(literal: &jib_ast::Vl) -> boom::Literal {
         jib_ast::Vl::Real(_) => todo!(),
         jib_ast::Vl::EmptyList => todo!(),
         jib_ast::Vl::Enum(_) => todo!(),
-        jib_ast::Vl::Ref(_) => todo!(),
+        jib_ast::Vl::Ref(s) => boom::Literal::Reference(*s),
         jib_ast::Vl::Undefined => todo!(),
     }
 }

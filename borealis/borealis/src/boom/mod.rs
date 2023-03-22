@@ -14,7 +14,7 @@ use {
 pub mod convert;
 
 /// Root AST node
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ast {
     /// Sequence of definitions
     pub definitions: Vec<Definition>,
@@ -30,7 +30,7 @@ impl Ast {
 }
 
 /// Top-level definition of a BOOM item
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Definition {
     /// Register definition
     Register {
@@ -78,21 +78,21 @@ pub enum Definition {
 }
 
 /// Name and type of a union field, struct field, or function parameter
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NamedType {
     pub name: InternedString,
     pub typ: Type,
 }
 
 /// Name and type of a union field, struct field, or function parameter
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NamedValue {
     pub name: InternedString,
     pub value: Value,
 }
 
 /// Type
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Type {
     Unit,
     Bool,
@@ -130,13 +130,16 @@ pub enum Type {
     Reference(Box<Self>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     TypeDeclaration {
         name: InternedString,
         typ: Type,
     },
     Block {
+        body: Vec<Statement>,
+    },
+    Try {
         body: Vec<Statement>,
     },
     Copy {
@@ -169,17 +172,17 @@ pub enum Statement {
 }
 
 /// Expression
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Identifier(InternedString),
     Field {
         expression: Box<Self>,
         field: InternedString,
     },
-    Address(InternedString),
+    Address(Box<Self>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Identifier(InternedString),
     Literal(Literal),
@@ -192,26 +195,40 @@ pub enum Value {
         value: Box<Self>,
         field_name: InternedString,
     },
+    CtorKind {
+        value: Box<Self>,
+        identifier: InternedString,
+        types: Vec<Type>,
+    },
+    CtorUnwrap {
+        value: Box<Self>,
+        identifier: InternedString,
+        types: Vec<Type>,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     Int(BigInt),
     Bits(Vec<Bit>),
+    Bit(Bit),
     Bool(bool),
     String(InternedString),
     Unit,
+    Reference(InternedString),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Operation {
     Not(Box<Value>),
-    LessThan(Box<Value>, Box<Value>),
-    Subtract(Box<Value>, Box<Value>),
     Equal(Box<Value>, Box<Value>),
+    LessThan(Box<Value>, Box<Value>),
+    GreaterThan(Box<Value>, Box<Value>),
+    Subtract(Box<Value>, Box<Value>),
+    Add(Box<Value>, Box<Value>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Bit {
     _0,
     _1,
