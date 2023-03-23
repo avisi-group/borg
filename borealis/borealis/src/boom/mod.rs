@@ -8,7 +8,7 @@
 
 use {
     crate::boom::convert::BoomEmitter, common::intern::InternedString, num_bigint::BigInt,
-    sail::jib_ast, std::collections::HashSet,
+    sail::jib_ast, std::collections::HashMap,
 };
 
 pub mod convert;
@@ -18,7 +18,10 @@ pub mod convert;
 pub struct Ast {
     /// Sequence of definitions
     pub definitions: Vec<Definition>,
-    pub labels: HashSet<InternedString>,
+    /// Register types by identifier
+    pub registers: HashMap<InternedString, Type>,
+    /// Function definitions by identifier
+    pub functions: HashMap<InternedString, FunctionDefinition>,
 }
 
 impl Ast {
@@ -32,22 +35,6 @@ impl Ast {
 /// Top-level definition of a BOOM item
 #[derive(Debug, Clone)]
 pub enum Definition {
-    /// Register definition
-    Register {
-        /// Name of the register
-        name: InternedString,
-        /// Type of the register
-        typ: Type,
-    },
-
-    /// Function definition
-    Function {
-        name: InternedString,
-        parameters: Vec<NamedType>,
-        return_type: Type,
-        body: Vec<Statement>,
-    },
-
     /// Enum definition
     Enum {
         name: InternedString,
@@ -75,6 +62,20 @@ pub enum Definition {
         bindings: Vec<NamedType>,
         body: Vec<Statement>,
     },
+}
+
+/// Function signature and body
+#[derive(Debug, Clone)]
+pub struct FunctionDefinition {
+    pub signature: FunctionSignature,
+    pub body: Vec<Statement>,
+}
+
+/// Function parameter and return types
+#[derive(Debug, Clone)]
+pub struct FunctionSignature {
+    pub parameters: Vec<NamedType>,
+    pub return_type: Type,
 }
 
 /// Name and type of a union field, struct field, or function parameter

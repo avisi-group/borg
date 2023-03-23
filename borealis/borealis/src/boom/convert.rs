@@ -1,26 +1,28 @@
 use {
-    crate::boom::{self, NamedType},
+    crate::boom::{self, FunctionSignature, NamedType},
     common::intern::InternedString,
     sail::{jib_ast, sail_ast},
     std::{
         borrow::Borrow,
-        collections::{HashMap, HashSet, LinkedList},
+        collections::{HashMap, LinkedList},
     },
 };
 
 #[derive(Debug)]
 pub struct BoomEmitter {
-    generated_ast: boom::Ast,
-    // stored temporarily as spec and function definitions are separate
+    /// BOOM AST being constructed by walker
+    ast: boom::Ast,
+    // Temporarily stored type signatures as spec and function definitions are separate
     function_types: HashMap<InternedString, (Vec<boom::Type>, boom::Type)>,
 }
 
 impl BoomEmitter {
     pub fn new() -> Self {
         Self {
-            generated_ast: boom::Ast {
+            ast: boom::Ast {
                 definitions: vec![],
-                labels: HashSet::new(),
+                registers: HashMap::new(),
+                functions: HashMap::new(),
             },
             function_types: HashMap::new(),
         }
@@ -33,17 +35,15 @@ impl BoomEmitter {
     }
 
     pub fn finish(self) -> boom::Ast {
-        self.generated_ast
+        self.ast
     }
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
         match definition {
             jib_ast::Definition::RegDec(ident, typ, _) => {
-                let def = boom::Definition::Register {
-                    name: ident.as_interned(),
-                    typ: convert_type(typ),
-                };
-                self.generated_ast.definitions.push(def);
+                self.ast
+                    .registers
+                    .insert(ident.as_interned(), convert_type(typ));
             }
             jib_ast::Definition::Type(type_def) => {
                 let def = match type_def {
@@ -60,10 +60,10 @@ impl BoomEmitter {
                         fields: convert_fields(fields),
                     },
                 };
-                self.generated_ast.definitions.push(def);
+                self.ast.definitions.push(def);
             }
             jib_ast::Definition::Let(_, bindings, body) => {
-                self.generated_ast.definitions.push(boom::Definition::Let {
+                self.ast.definitions.push(boom::Definition::Let {
                     bindings: bindings
                         .iter()
                         .map(|(ident, typ)| NamedType {
@@ -94,19 +94,21 @@ impl BoomEmitter {
                     .map(|(name, typ)| NamedType { name, typ })
                     .collect();
 
-                self.generated_ast
-                    .definitions
-                    .push(boom::Definition::Function {
-                        name: name.as_interned(),
-                        parameters,
-                        return_type,
+                self.ast.functions.insert(
+                    name.as_interned(),
+                    boom::FunctionDefinition {
+                        signature: FunctionSignature {
+                            parameters,
+                            return_type,
+                        },
                         body: convert_body(body),
-                    });
+                    },
+                );
             }
             jib_ast::Definition::Startup(_, _) => todo!(),
             jib_ast::Definition::Finish(_, _) => todo!(),
             &jib_ast::Definition::Pragma(key, value) => self
-                .generated_ast
+                .ast
                 .definitions
                 .push(boom::Definition::Pragma { key, value }),
         };
