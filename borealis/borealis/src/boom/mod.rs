@@ -18,9 +18,10 @@ use {
 };
 
 pub mod convert;
+pub mod passes;
 pub mod visitor;
 
-/// Root AST node
+/// BOOM AST
 #[derive(Debug, Clone)]
 pub struct Ast {
     /// Sequence of definitions
