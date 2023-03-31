@@ -22,7 +22,7 @@ pub mod passes;
 pub mod visitor;
 
 /// BOOM AST
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Ast {
     /// Sequence of definitions
     pub definitions: Vec<Definition>,

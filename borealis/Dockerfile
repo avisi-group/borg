@@ -62,7 +62,7 @@ RUN echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; URL=
 # run E2E test
 FROM builder as borealis_genc
 RUN mkdir target/genc
-RUN cargo r --release -- --force --log trace -i testdata/arm-v8.5-a.bincode.lz4 genc -o target/genc
+RUN cargo r --release -- --force --log trace sail2genc testdata/arm-v8.5-a.bincode.lz4 target/genc/
 
 FROM ghcr.io/fmckeogh/gensim:latest as gensim
 WORKDIR /tmp/build

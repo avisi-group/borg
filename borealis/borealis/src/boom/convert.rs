@@ -8,7 +8,7 @@ use {
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct BoomEmitter {
     /// BOOM AST being constructed by walker
     ast: boom::Ast,
@@ -18,14 +18,7 @@ pub struct BoomEmitter {
 
 impl BoomEmitter {
     pub fn new() -> Self {
-        Self {
-            ast: boom::Ast {
-                definitions: vec![],
-                registers: HashMap::new(),
-                functions: HashMap::new(),
-            },
-            function_types: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn process<'a, I: IntoIterator<Item = &'a jib_ast::Definition>>(&mut self, definitions: I) {

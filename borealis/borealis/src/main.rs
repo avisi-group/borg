@@ -1,17 +1,12 @@
 use {
-    borealis::{deserialize_compressed_ast, genc, sail_to_genc},
+    borealis::{genc, load_sail, sail_to_genc},
     clap::{Parser, Subcommand},
-    color_eyre::eyre::{bail, Result, WrapErr},
-    common::intern::INTERNER,
-    deepsize::DeepSizeOf,
+    color_eyre::eyre::{Result, WrapErr},
     errctx::PathCtx,
-    log::{info, trace, warn},
+    log::{info, warn},
     lz4_flex::frame::{BlockMode, FrameEncoder as Lz4Encoder, FrameInfo},
-    sail::load_from_config,
     std::{
-        ffi::OsStr,
         fs::File,
-        io::{BufReader, BufWriter},
         path::{Path, PathBuf},
     },
 };
@@ -23,37 +18,30 @@ struct Args {
     #[arg(long)]
     log: Option<String>,
 
-    /// Path to Sail JSON config or bincode AST
-    #[arg(short)]
-    input: PathBuf,
-
     /// Warning! Disables checking that output directory is empty or output file does not exist before writing.
     #[arg(long)]
     force: bool,
 
-    /// Output format
+    /// Borealis command
     #[command(subcommand)]
-    output: Output,
+    command: Command,
 }
 
 #[derive(Subcommand, Debug)]
-enum Output {
-    /// Output a GenC description of the instruction set architecture
-    Genc {
+enum Command {
+    /// Compile a Sail ISA specification to GenC
+    Sail2genc {
+        /// Path to Sail JSON config or bincode AST
+        input: PathBuf,
         /// Path to empty folder where GenC description files will be emitted.
-        #[arg(short)]
         output: PathBuf,
     },
-    /// Serialize the AST to JSON
-    Json {
-        /// Path to JSON file.
-        #[arg(short)]
-        output: PathBuf,
-    },
-    /// Serialize the AST to Bincode
-    Bincode {
+
+    /// Serialize a Sail ISA specification to a compressed bincode file
+    Sail2bincode {
+        /// Path to Sail JSON config or bincode AST
+        input: PathBuf,
         /// Path to Bincode file.
-        #[arg(short)]
         output: PathBuf,
     },
 }
@@ -69,32 +57,10 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or(""))?;
 
-    // either parse AST from Sail config file or deserialize AST from bincode
-    let (ast, jib) = match args.input.extension().and_then(OsStr::to_str) {
-        Some("json") => {
-            info!("Loading Sail config {:?}", args.input);
-            load_from_config(args.input).wrap_err("Failed to load Sail files")?
-        }
-        Some("lz4") => {
-            info!("Deserializing compressed bincode {:?}", args.input);
-            deserialize_compressed_ast(BufReader::new(File::open(args.input)?))?
-        }
-        _ => bail!("Unrecognised input format {:?}", args.input),
-    };
+    match args.command {
+        Command::Sail2genc { input, output } => {
+            let (ast, jib) = load_sail(input)?;
 
-    trace!(
-        "Size: AST {} bytes, JIB {} bytes",
-        ast.deep_size_of(),
-        jib.deep_size_of()
-    );
-    trace!(
-        "INTERNER size: {} bytes, {} strings",
-        INTERNER.current_memory_usage(),
-        INTERNER.len()
-    );
-
-    match args.output {
-        Output::Genc { output } => {
             info!("Converting Sail AST to GenC");
             let description = sail_to_genc(&ast, &jib);
 
@@ -102,16 +68,9 @@ fn main() -> Result<()> {
             genc::export(&description, output, args.force)
                 .wrap_err("Error while exporting GenC description")?
         }
+        Command::Sail2bincode { input, output } => {
+            let (ast, jib) = load_sail(input)?;
 
-        Output::Json { output } => {
-            info!("Serializing AST to JSON");
-            serde_json::to_writer_pretty(
-                BufWriter::new(create_file(output, args.force)?),
-                &(ast, jib),
-            )?
-        }
-
-        Output::Bincode { output } => {
             info!("Serializing AST to compressed bincode");
 
             let mut frame_info = FrameInfo::new();
