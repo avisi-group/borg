@@ -4,7 +4,9 @@ use {
     sail::{jib_ast, sail_ast},
     std::{
         borrow::Borrow,
+        cell::RefCell,
         collections::{HashMap, LinkedList},
+        rc::Rc,
     },
 };
 
@@ -87,10 +89,13 @@ impl BoomEmitter {
                     .map(|(name, typ)| NamedType { name, typ })
                     .collect();
 
+                let name = name.as_interned();
+
                 self.ast.functions.insert(
-                    name.as_interned(),
+                    name,
                     boom::FunctionDefinition {
                         signature: FunctionSignature {
+                            name,
                             parameters,
                             return_type,
                         },
@@ -151,10 +156,12 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> boom::Type {
     }
 }
 
-fn convert_body(instructions: &LinkedList<jib_ast::Instruction>) -> Vec<boom::Statement> {
+fn convert_body(
+    instructions: &LinkedList<jib_ast::Instruction>,
+) -> Vec<Rc<RefCell<boom::Statement>>> {
     instructions
         .iter()
-        .map(|instr| convert_statement(&instr.inner))
+        .map(|instr| Rc::new(RefCell::new(convert_statement(&instr.inner))))
         .collect()
 }
 

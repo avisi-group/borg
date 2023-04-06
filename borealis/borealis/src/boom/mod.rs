@@ -14,11 +14,12 @@ use {
     common::intern::InternedString,
     num_bigint::BigInt,
     sail::jib_ast,
-    std::collections::HashMap,
+    std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
 
 pub mod convert;
 pub mod passes;
+pub mod pretty_print;
 pub mod visitor;
 
 /// BOOM AST
@@ -33,10 +34,12 @@ pub struct Ast {
 }
 
 impl Ast {
-    pub fn from_jib<'a, I: IntoIterator<Item = &'a jib_ast::Definition>>(iter: I) -> Self {
+    pub fn from_jib<'a, I: IntoIterator<Item = &'a jib_ast::Definition>>(
+        iter: I,
+    ) -> Rc<RefCell<Self>> {
         let mut emitter = BoomEmitter::new();
         emitter.process(iter);
-        emitter.finish()
+        Rc::new(RefCell::new(emitter.finish()))
     }
 }
 
@@ -68,7 +71,7 @@ pub enum Definition {
 
     Let {
         bindings: Vec<NamedType>,
-        body: Vec<Statement>,
+        body: Vec<Rc<RefCell<Statement>>>,
     },
 }
 
@@ -89,7 +92,7 @@ impl Walkable for Definition {
                     .for_each(|named_type| visitor.visit_named_type(named_type));
 
                 body.iter()
-                    .for_each(|statement| visitor.visit_statement(statement));
+                    .for_each(|statement| visitor.visit_statement(statement.clone()));
             }
         }
     }
@@ -99,7 +102,7 @@ impl Walkable for Definition {
 #[derive(Debug, Clone)]
 pub struct FunctionDefinition {
     pub signature: FunctionSignature,
-    pub body: Vec<Statement>,
+    pub body: Vec<Rc<RefCell<Statement>>>,
 }
 
 impl Walkable for FunctionDefinition {
@@ -107,13 +110,14 @@ impl Walkable for FunctionDefinition {
         visitor.visit_function_signature(&self.signature);
         self.body
             .iter()
-            .for_each(|statement| visitor.visit_statement(statement));
+            .for_each(|statement| visitor.visit_statement(statement.clone()));
     }
 }
 
 /// Function parameter and return types
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
+    pub name: InternedString,
     pub parameters: Vec<NamedType>,
     pub return_type: Type,
 }
@@ -227,10 +231,10 @@ pub enum Statement {
         typ: Type,
     },
     Block {
-        body: Vec<Statement>,
+        body: Vec<Rc<RefCell<Statement>>>,
     },
     Try {
-        body: Vec<Statement>,
+        body: Vec<Rc<RefCell<Statement>>>,
     },
     Copy {
         expression: Expression,
@@ -254,8 +258,8 @@ pub enum Statement {
     Undefined,
     If {
         condition: Value,
-        if_body: Vec<Statement>,
-        else_body: Vec<Statement>,
+        if_body: Vec<Rc<RefCell<Statement>>>,
+        else_body: Vec<Rc<RefCell<Statement>>>,
     },
     Exit(InternedString),
     Comment(InternedString),
@@ -267,7 +271,7 @@ impl Walkable for Statement {
             Self::TypeDeclaration { typ, .. } => visitor.visit_type(typ),
             Self::Block { body } | Self::Try { body } => body
                 .iter()
-                .for_each(|statement| visitor.visit_statement(statement)),
+                .for_each(|statement| visitor.visit_statement(statement.clone())),
             Self::Copy { expression, value } => {
                 visitor.visit_expression(expression);
                 visitor.visit_value(value);
@@ -296,10 +300,10 @@ impl Walkable for Statement {
                 visitor.visit_value(condition);
                 if_body
                     .iter()
-                    .for_each(|statement| visitor.visit_statement(statement));
+                    .for_each(|statement| visitor.visit_statement(statement.clone()));
                 else_body
                     .iter()
-                    .for_each(|statement| visitor.visit_statement(statement));
+                    .for_each(|statement| visitor.visit_statement(statement.clone()));
             }
             Self::Exit(_) => (),
             Self::Comment(_) => (),
@@ -420,4 +424,16 @@ pub enum Bit {
     _0,
     _1,
     Unknown,
+}
+
+/// Enum containing all possible node kinds
+#[derive(Debug, Clone)]
+pub enum NodeKind {
+    Statement(Rc<RefCell<Statement>>),
+    Expression(Rc<RefCell<Expression>>),
+    Value(Rc<RefCell<Value>>),
+    Literal(Rc<RefCell<Literal>>),
+    Operation(Rc<RefCell<Operation>>),
+    Type(Rc<RefCell<Type>>),
+    NamedValue(Rc<RefCell<NamedValue>>),
 }

@@ -2,9 +2,12 @@
 //!
 //! Visitor trait has overridable methods
 
-use crate::boom::{
-    Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType, NamedValue,
-    Operation, Statement, Type, Value,
+use {
+    crate::boom::{
+        Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
+        NamedValue, Operation, Statement, Type, Value,
+    },
+    std::{cell::RefCell, rc::Rc},
 };
 
 /// Visitor trait for interacting with Sail AST
@@ -40,8 +43,8 @@ pub trait Visitor: Sized {
     }
 
     #[allow(missing_docs)]
-    fn visit_statement(&mut self, node: &Statement) {
-        node.walk(self);
+    fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
+        node.borrow().walk(self);
     }
 
     #[allow(missing_docs)]

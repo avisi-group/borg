@@ -4,24 +4,29 @@
 //! * Logic for "raising" unstructured BOOM control flow back into structure if-else, match, and for loops
 //! * Builtin function handling
 
-use crate::boom::{
-    passes::{builtin_fns::AddBuiltinFns, match_raiser::MatchRaiser},
-    Ast,
+use {
+    crate::boom::{
+        passes::{builtin_fns::AddBuiltinFns, match_raiser::MatchRaiser},
+        Ast,
+    },
+    std::{cell::RefCell, rc::Rc},
 };
 
 pub mod builtin_fns;
 pub mod match_raiser;
 
-pub fn execute_passes(ast: &mut Ast) {
+pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
+    //crate::boom::pretty_print::print_ast(&*ast.borrow());
+
     [
-        Box::new(AddBuiltinFns) as Box<dyn Pass>,
-        Box::new(MatchRaiser),
+        AddBuiltinFns::new_boxed(ast.clone()),
+        MatchRaiser::new_boxed(),
     ]
     .into_iter()
-    .for_each(|mut pass| pass.run(ast));
+    .for_each(|mut pass| pass.run(ast.clone()));
 }
 
 pub trait Pass {
     /// Run the pass on the supplied AST
-    fn run(&mut self, ast: &mut Ast);
+    fn run(&mut self, ast: Rc<RefCell<Ast>>);
 }
