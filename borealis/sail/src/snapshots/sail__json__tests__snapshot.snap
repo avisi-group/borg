@@ -1,6 +1,6 @@
 ---
 source: sail/src/json.rs
-expression: "ModelConfig::load(\"../testdata/sail-arm/arm-v8.5-a/model/sail.json\").unwrap()"
+expression: "ModelConfig::load(\"../data/sail-arm/arm-v8.5-a/model/sail.json\").unwrap()"
 ---
 ModelConfig {
     options: Options {
@@ -8,14 +8,14 @@ ModelConfig {
         no_lexp_bounds_check: true,
     },
     files: [
-        "../testdata/sail-arm/arm-v8.5-a/model/prelude.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/no_devices.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch_types.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch_mem.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch64.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch64_float.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch64_vector.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch32.sail",
-        "../testdata/sail-arm/arm-v8.5-a/model/aarch_decode.sail",
+        "../data/sail-arm/arm-v8.5-a/model/prelude.sail",
+        "../data/sail-arm/arm-v8.5-a/model/no_devices.sail",
+        "../data/sail-arm/arm-v8.5-a/model/aarch_types.sail",
+        "../data/sail-arm/arm-v8.5-a/model/aarch_mem.sail",
+        "../data/sail-arm/arm-v8.5-a/model/aarch64.sail",
+        "../data/sail-arm/arm-v8.5-a/model/aarch64_float.sail",
+        "../data/sail-arm/arm-v8.5-a/model/aarch64_vector.sail",
+        "../data/sail-arm/arm-v8.5-a/model/aarch32.sail",
+        "../data/sail-arm/arm-v8.5-a/model/aarch_decode.sail",
     ],
 }

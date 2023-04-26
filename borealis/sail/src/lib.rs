@@ -254,11 +254,8 @@ mod tests {
 
     #[test]
     fn load_files_empty() {
-        let (ast, _) = load_from_config(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../testdata/empty.json"
-        ))
-        .unwrap();
+        let (ast, _) =
+            load_from_config(concat!(env!("CARGO_MANIFEST_DIR"), "/../data/empty.json")).unwrap();
 
         insta::with_settings!({filters => FILTERS.clone()}, {
             insta::assert_json_snapshot!((ast));

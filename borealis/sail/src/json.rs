@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn snapshot() {
         insta::assert_debug_snapshot!(ModelConfig::load(
-            "../testdata/sail-arm/arm-v8.5-a/model/sail.json"
+            "../data/sail-arm/arm-v8.5-a/model/sail.json"
         )
         .unwrap());
     }
