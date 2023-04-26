@@ -18,7 +18,7 @@ RUN apk update && apk add opam alpine-sdk zlib-dev xz m4 z3 gmp-dev
 
 # setup OCaml
 RUN opam init --disable-sandboxing --bare -y
-RUN opam switch create 4.11.2+musl+static+flambda
+RUN opam switch create 4.14.1+options --packages ocaml-variants.4.14.1+options,ocaml-option-static,ocaml-option-musl,ocaml-option-flambda
 
 # install sail
 RUN eval `opam env` && opam install --assume-depexts -y sail=0.15 gmp
