@@ -16,8 +16,6 @@ pub mod builtin_fns;
 pub mod match_raiser;
 
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
-    //crate::boom::pretty_print::print_ast(&*ast.borrow());
-
     [
         AddBuiltinFns::new_boxed(ast.clone()),
         MatchRaiser::new_boxed(),

@@ -63,7 +63,7 @@ impl Visitor for AddBuiltinFns {
                 generic_functions::HANDLERS.get(name).unwrap_or_else(|| panic!(
                     "Generic function call \'{}<{}>\' found without definition or builtin function behaviour",
                     name, typ
-                ))(&self.ast.borrow(), &*node.borrow(), typ)
+                ))(&self.ast.borrow(), &node.borrow(), typ)
             }
             None => {
                 // found non-generic function
@@ -72,7 +72,7 @@ impl Visitor for AddBuiltinFns {
                         "Function call {:?} found without definition or builtin function behaviour",
                         name
                     )
-                })(&self.ast.borrow(), &*node.borrow())
+                })(&self.ast.borrow(), &node.borrow())
             }
         }
 

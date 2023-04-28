@@ -4,7 +4,7 @@ set -e
 ### Helper script for running the borealis toolchain from Sail AST parsing onwards (parsing the ARM v8.5 spec is slow).
 
 # export genc from bincode
-cargo r --release -- --force --log trace sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
+cargo r --release -- --force --log debug sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
 
 # execute gensim on genc
 cd target/genc

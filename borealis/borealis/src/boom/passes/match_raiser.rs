@@ -16,7 +16,7 @@ pub struct MatchRaiser {
 
 impl MatchRaiser {
     pub fn new_boxed() -> Box<dyn Pass> {
-        Box::new(Self::default())
+        Box::<Self>::default()
     }
 }
 
@@ -54,6 +54,7 @@ impl Visitor for MatchRaiser {
         }
 
         node.borrow().walk(self);
+
         self.stack.pop().unwrap();
     }
 }

@@ -8,6 +8,7 @@
 
 use {
     crate::boom::{
+        control_flow::ControlFlowGraph,
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
     },
@@ -17,6 +18,7 @@ use {
     std::{cell::RefCell, collections::HashMap, rc::Rc},
 };
 
+pub mod control_flow;
 pub mod convert;
 pub mod passes;
 pub mod pretty_print;
@@ -103,6 +105,7 @@ impl Walkable for Definition {
 pub struct FunctionDefinition {
     pub signature: FunctionSignature,
     pub body: Vec<Rc<RefCell<Statement>>>,
+    pub control_flow: ControlFlowGraph,
 }
 
 impl Walkable for FunctionDefinition {

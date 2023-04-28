@@ -1,6 +1,7 @@
 use {
-    crate::boom::{self, FunctionSignature, NamedType},
+    crate::boom::{self, control_flow::ControlFlowGraph, FunctionSignature, NamedType},
     common::intern::InternedString,
+    log::debug,
     sail::{jib_ast, sail_ast},
     std::{
         borrow::Borrow,
@@ -87,9 +88,14 @@ impl BoomEmitter {
                     .map(sail_ast::Identifier::as_interned)
                     .zip(parameter_types)
                     .map(|(name, typ)| NamedType { name, typ })
-                    .collect();
+                    .collect::<Vec<_>>();
 
                 let name = name.as_interned();
+
+                let body = convert_body(body);
+
+                debug!("building new control flow graph for {name}");
+                let control_flow = ControlFlowGraph::from_statements(&body);
 
                 self.ast.functions.insert(
                     name,
@@ -99,7 +105,8 @@ impl BoomEmitter {
                             parameters,
                             return_type,
                         },
-                        body: convert_body(body),
+                        body,
+                        control_flow,
                     },
                 );
             }

@@ -2,8 +2,6 @@
 members = ["sail", "borealis", "common", "libarch-sys"]
 default-members = ["sail", "borealis", "common"]
 
-[profile.dev.package.insta]
-opt-level = 3
-
-[profile.dev.package.similar]
+[profile.dev]
+# deserializing/converting the AST takes forever without optimisations
 opt-level = 3

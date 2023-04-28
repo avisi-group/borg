@@ -42,7 +42,7 @@ pub fn print_ast(
 
 /// Pretty-print JIB AST
 #[derive(Default)]
-struct BoomPrettyPrinter {
+pub struct BoomPrettyPrinter {
     indent: Rc<AtomicUsize>,
 }
 
@@ -170,7 +170,7 @@ impl Visitor for BoomPrettyPrinter {
 
     fn visit_function_definition(&mut self, node: &FunctionDefinition) {
         self.visit_function_signature(&node.signature);
-        println!("{{");
+        println!(" {{");
 
         {
             let _h = self.indent();
