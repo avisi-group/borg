@@ -4,3 +4,4 @@
 
 pub mod identifiable;
 pub mod intern;
+pub mod shared_key;

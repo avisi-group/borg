@@ -22,7 +22,7 @@ impl AddBuiltinFns {
     pub fn new_boxed(ast: Rc<RefCell<Ast>>) -> Box<dyn Pass> {
         Box::new(Self {
             ast,
-            generic_fn_regex: Regex::new("([a-z_]+)<(.+)>").unwrap(),
+            generic_fn_regex: Regex::new("([a-z_]+)<(.+)>").expect("failed to build regex"),
         })
     }
 }
@@ -60,19 +60,19 @@ impl Visitor for AddBuiltinFns {
                 let typ = captures.get(2).unwrap().as_str();
 
                 // found generic function
-                generic_functions::HANDLERS.get(name).unwrap_or_else(|| panic!(
-                    "Generic function call \'{}<{}>\' found without definition or builtin function behaviour",
-                    name, typ
-                ))(&self.ast.borrow(), &node.borrow(), typ)
+                generic_functions::HANDLERS.get(name).unwrap_or_else(||
+                    panic!(
+                        "Generic function call \'{name}<{typ}>\' found without definition or builtin function behaviour"
+                    )
+                )(&self.ast.borrow(), &node.borrow(), typ);
             }
             None => {
                 // found non-generic function
                 functions::HANDLERS.get(&name).unwrap_or_else(|| {
                     panic!(
-                        "Function call {:?} found without definition or builtin function behaviour",
-                        name
+                        "Function call {name:?} found without definition or builtin function behaviour"
                     )
-                })(&self.ast.borrow(), &node.borrow())
+                })(&self.ast.borrow(), &node.borrow());
             }
         }
 

@@ -1,7 +1,6 @@
 use {
     color_eyre::Result,
     errctx::PathCtx,
-    libarch_sys,
     memmap2::Mmap,
     std::{env::args, fs::File},
 };
@@ -9,7 +8,7 @@ use {
 fn main() -> Result<()> {
     color_eyre::install()?;
 
-    let path = args().skip(1).next().unwrap();
+    let path = args().nth(1).unwrap();
 
     let file = File::open(&path).map_err(PathCtx::f(&path)).unwrap();
     let mmap = unsafe { Mmap::map(&file) }.unwrap();

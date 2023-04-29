@@ -295,7 +295,7 @@ pub fn process_decode_function_clause(
 
 /// Flattens nested expressions
 pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
-    let mut exps = vec![];
+    let mut expressions = vec![];
 
     let mut current_expression = expression.clone();
 
@@ -303,7 +303,7 @@ pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
         let (lhs, rhs, exp1) = match *current_expression.inner {
             ExpressionAux::Var(lhs, rhs, exp1) => (lhs, rhs, exp1),
             ExpressionAux::Application(..) => {
-                exps.push(current_expression);
+                expressions.push(current_expression);
                 break;
             }
             _ => panic!("{}", <&'static str>::from(*current_expression.inner)),
@@ -311,7 +311,7 @@ pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
 
         current_expression.inner = Box::new(ExpressionAux::Assign(lhs.clone(), rhs.clone()));
 
-        exps.push(current_expression);
+        expressions.push(current_expression);
 
         let ExpressionAux::Block(expressions) = &*exp1.inner else { panic!() };
 
@@ -324,7 +324,7 @@ pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
         }
     }
 
-    exps
+    expressions
 }
 
 /// Extracts a sequence of format bits from function clause pattern.

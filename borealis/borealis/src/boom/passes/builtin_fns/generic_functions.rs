@@ -9,10 +9,10 @@ pub static HANDLERS: Map<&str, fn(&Ast, &Statement, &str)> = phf_map! {
     "eq_anything" => eq_anything,
 };
 
-fn internal_pick(_ast: &Ast, _node: &Statement, _typ: &str) {
-    trace!("internal_pick<{}>", _typ);
+fn internal_pick(_ast: &Ast, _node: &Statement, typ: &str) {
+    trace!("internal_pick<{}>", typ);
 }
 
-fn eq_anything(_ast: &Ast, _node: &Statement, _typ: &str) {
-    trace!("eq_anything<{}>", _typ);
+fn eq_anything(_ast: &Ast, _node: &Statement, typ: &str) {
+    trace!("eq_anything<{}>", typ);
 }
