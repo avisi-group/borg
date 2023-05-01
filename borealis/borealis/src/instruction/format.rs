@@ -6,6 +6,7 @@ use {
     log::{trace, warn},
     num_bigint::Sign,
     once_cell::sync::Lazy,
+    pretty_assertions::assert_eq,
     sail::{
         num::BigInt,
         sail_ast::{

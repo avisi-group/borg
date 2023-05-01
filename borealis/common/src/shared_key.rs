@@ -47,6 +47,7 @@ impl<T> Display for SharedKey<T> {
 mod test {
     use {
         super::SharedKey,
+        pretty_assertions::{assert_eq, assert_ne},
         std::{
             cell::RefCell,
             collections::hash_map::DefaultHasher,

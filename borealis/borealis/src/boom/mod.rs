@@ -2,8 +2,6 @@
 //!
 //! Internal intermediate representation used to convert JIB AST to GenC AST.
 
-//! TODO USE A STACK TO STORE PARENTS
-
 #![allow(missing_docs)]
 
 use {
