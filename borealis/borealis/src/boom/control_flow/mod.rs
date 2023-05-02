@@ -9,8 +9,15 @@ use {
     crate::boom::Statement,
     common::{intern::InternedString, shared_key::SharedKey},
     log::warn,
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
+    std::{
+        cell::RefCell,
+        collections::HashMap,
+        io::{self, Write},
+        rc::Rc,
+    },
 };
+
+mod dot;
 
 /// Control flow graph of a BOOM function
 #[derive(Debug, Clone)]
@@ -33,6 +40,10 @@ impl ControlFlowGraph {
 
         Self { entry_block }
     }
+
+    pub fn as_dot<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        dot::render(w, &self.entry_block)
+    }
 }
 
 /// Node in a control flow graph, contains a basic block of statements and a terminator
@@ -50,6 +61,12 @@ impl ControlFlowBlock {
             statements: vec![],
             terminator: Terminator::Return,
         }))
+    }
+}
+
+impl Drop for ControlFlowBlock {
+    fn drop(&mut self) {
+        println!("DROPPING CONTROLFLOWBLOCK")
     }
 }
 

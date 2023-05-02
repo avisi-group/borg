@@ -25,8 +25,10 @@ impl Pass for MatchRaiser {
         let ast = ast.borrow();
         let def = ast
             .functions
-            .get(&("integer_arithmetic_addsub_immediate".into()))
+            .get(&("integer_arithmetic_addsub_immediate_decode".into()))
             .unwrap();
+
+        // def.control_flow.as_dot(&mut std::io::stdout()).unwrap();
 
         self.visit_function_definition(def);
 

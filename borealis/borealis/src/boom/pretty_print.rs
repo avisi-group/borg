@@ -40,9 +40,14 @@ pub fn print_ast(
         .for_each(|(_, fundef)| visitor.visit_function_definition(fundef));
 }
 
+pub fn print_statement(statement: Rc<RefCell<Statement>>) {
+    let mut visitor = BoomPrettyPrinter::default();
+    visitor.visit_statement(statement);
+}
+
 /// Pretty-print JIB AST
 #[derive(Default)]
-pub struct BoomPrettyPrinter {
+struct BoomPrettyPrinter {
     indent: Rc<AtomicUsize>,
 }
 
