@@ -6,7 +6,7 @@
 //! 2. Recursive resolution to convert maybe-unresolved to resolved blocks.
 
 use {
-    crate::boom::Statement,
+    crate::boom::{Statement, Value},
     common::{intern::InternedString, shared_key::SharedKey},
     log::warn,
     std::{
@@ -49,6 +49,8 @@ impl ControlFlowGraph {
 /// Node in a control flow graph, contains a basic block of statements and a terminator
 #[derive(Debug, Clone)]
 pub struct ControlFlowBlock {
+    /// Optional block label, otherwise the `SharedKey` `Display` format should be used
+    label: Option<InternedString>,
     /// Sequence of statements within the block
     pub statements: Vec<Rc<RefCell<Statement>>>,
     /// Block terminator
@@ -58,15 +60,18 @@ pub struct ControlFlowBlock {
 impl ControlFlowBlock {
     fn new() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
+            label: None,
             statements: vec![],
             terminator: Terminator::Return,
         }))
     }
-}
 
-impl Drop for ControlFlowBlock {
-    fn drop(&mut self) {
-        println!("DROPPING CONTROLFLOWBLOCK")
+    fn label(block: Rc<RefCell<Self>>) -> String {
+        block
+            .borrow()
+            .label
+            .map(|label| label.to_string())
+            .unwrap_or(SharedKey::from(block.clone()).to_string())
     }
 }
 
@@ -79,7 +84,7 @@ pub enum Terminator {
     Return,
     /// If condition evaluates to true, then jump to target, otherwise jump to fallthrough
     Conditional {
-        condition: Rc<RefCell<Statement>>,
+        condition: Value,
         target: Rc<RefCell<ControlFlowBlock>>,
         fallthrough: Rc<RefCell<ControlFlowBlock>>,
     },
@@ -113,8 +118,6 @@ impl ControlFlowGraphBuilder {
 
     fn process_statements(&mut self, statements: &[Rc<RefCell<Statement>>]) {
         for statement in statements {
-            self.current_block.borrow_mut().add_statement(statement);
-
             match &*statement.borrow() {
                 Statement::Label(label) => {
                     let next = MaybeUnresolvedControlFlowBlock::new();
@@ -129,10 +132,12 @@ impl ControlFlowGraphBuilder {
                         ),
                     );
                     self.current_block = next;
+                    self.current_block.borrow_mut().label = Some(*label);
                 }
-                Statement::Block { body } => self.process_statements(body),
                 Statement::If {
-                    if_body, else_body, ..
+                    if_body,
+                    else_body,
+                    condition,
                 } => {
                     let if_block = MaybeUnresolvedControlFlowBlock::new();
                     let else_block = MaybeUnresolvedControlFlowBlock::new();
@@ -140,7 +145,7 @@ impl ControlFlowGraphBuilder {
 
                     self.current_block.borrow_mut().set_terminator(
                         MaybeUnresolvedTerminator::Conditional {
-                            condition: statement.clone(),
+                            condition: condition.clone(),
                             target: MaybeUnresolvedJumpTarget::Resolved {
                                 target: if_block.clone(),
                             },
@@ -172,11 +177,11 @@ impl ControlFlowGraphBuilder {
 
                     self.current_block = post_block;
                 }
-                Statement::Jump { target, .. } => {
+                Statement::Jump { target, condition } => {
                     let fallthrough_block = MaybeUnresolvedControlFlowBlock::new();
                     self.current_block.borrow_mut().set_terminator(
                         MaybeUnresolvedTerminator::Conditional {
-                            condition: statement.clone(),
+                            condition: condition.clone(),
                             target: MaybeUnresolvedJumpTarget::Unresolved { label: *target },
                             fallthrough: MaybeUnresolvedJumpTarget::Resolved {
                                 target: fallthrough_block.clone(),
@@ -206,8 +211,7 @@ impl ControlFlowGraphBuilder {
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
                 }
-                // statement already added at beginning of for loop, so this arm can be a no-op
-                _ => (),
+                _ => self.current_block.borrow_mut().add_statement(statement),
             }
         }
     }
@@ -244,6 +248,8 @@ impl ControlFlowGraphBuilder {
         {
             panic!("unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}")
         }
+
+        resolved.borrow_mut().label = unresolved.borrow().label;
 
         // clone the statements across
         resolved.borrow_mut().statements = unresolved.borrow().statements.clone();
@@ -291,6 +297,7 @@ impl ControlFlowGraphBuilder {
 
 #[derive(Debug, Clone, Default)]
 struct MaybeUnresolvedControlFlowBlock {
+    label: Option<InternedString>,
     statements: Vec<Rc<RefCell<Statement>>>,
     terminator: MaybeUnresolvedTerminator,
 }
@@ -328,7 +335,7 @@ impl MaybeUnresolvedControlFlowBlock {
 enum MaybeUnresolvedTerminator {
     Return,
     Conditional {
-        condition: Rc<RefCell<Statement>>,
+        condition: Value,
         target: MaybeUnresolvedJumpTarget,
         fallthrough: MaybeUnresolvedJumpTarget,
     },

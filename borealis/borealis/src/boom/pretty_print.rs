@@ -32,9 +32,9 @@ pub fn print_ast<W: Write>(
         .for_each(|def| visitor.visit_definition(def));
 
     registers.iter().for_each(|(name, typ)| {
-        write!(visitor.writer, "register {name}: ");
+        write!(visitor.writer, "register {name}: ").unwrap();
         visitor.visit_type(typ);
-        writeln!(visitor.writer);
+        writeln!(visitor.writer).unwrap();
     });
 
     functions
@@ -69,12 +69,13 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
             "{}{}",
             PADDING.repeat(self.indent.load(Ordering::SeqCst)),
             s.as_ref()
-        );
+        )
+        .unwrap();
     }
 
     fn prindentln<T: AsRef<str>>(&mut self, s: T) {
         self.prindent(s);
-        writeln!(self.writer);
+        writeln!(self.writer).unwrap();
     }
 
     fn indent(&self) -> IndentHandle {
@@ -85,21 +86,21 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
     }
 
     fn print_uid(&mut self, id: InternedString, typs: &Vec<Type>) {
-        write!(self.writer, "{id}");
+        write!(self.writer, "{id}").unwrap();
 
         if !typs.is_empty() {
-            write!(self.writer, "<");
+            write!(self.writer, "<").unwrap();
 
             let mut typs = typs.iter();
             if let Some(typ) = typs.next() {
                 self.visit_type(typ);
             }
             for typ in typs {
-                write!(self.writer, ", ");
+                write!(self.writer, ", ").unwrap();
                 self.visit_type(typ);
             }
 
-            write!(self.writer, ">");
+            write!(self.writer, ">").unwrap();
         }
     }
 }
@@ -137,7 +138,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
                         self.visit_type(typ);
-                        writeln!(self.writer, ",");
+                        writeln!(self.writer, ",").unwrap();
                     });
                 }
 
@@ -151,7 +152,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
                         self.visit_type(typ);
-                        writeln!(self.writer, ",");
+                        writeln!(self.writer, ",").unwrap();
                     });
                 }
 
@@ -165,14 +166,14 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
 
                 let mut bindings = bindings.iter();
                 if let Some(NamedType { name, .. }) = bindings.next() {
-                    write!(self.writer, "{name}");
+                    write!(self.writer, "{name}").unwrap();
                 }
                 for NamedType { name, .. } in bindings {
-                    write!(self.writer, ", ");
-                    write!(self.writer, "{name}");
+                    write!(self.writer, ", ").unwrap();
+                    write!(self.writer, "{name}").unwrap();
                 }
 
-                writeln!(self.writer, ") {{");
+                writeln!(self.writer, ") {{").unwrap();
 
                 {
                     let _h = self.indent();
@@ -180,23 +181,13 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                         .for_each(|statement| self.visit_statement(statement.clone()));
                 }
 
-                writeln!(self.writer, "}}");
+                writeln!(self.writer, "}}").unwrap();
             }
         }
     }
 
     fn visit_function_definition(&mut self, node: &FunctionDefinition) {
         self.visit_function_signature(&node.signature);
-        writeln!(self.writer, " {{");
-
-        {
-            let _h = self.indent();
-            node.body
-                .iter()
-                .for_each(|statement| self.visit_statement(statement.clone()));
-        }
-
-        self.prindentln("}");
     }
 
     fn visit_function_signature(
@@ -214,21 +205,21 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             self.visit_named_type(param);
         }
         for param in parameters {
-            write!(self.writer, ", ");
+            write!(self.writer, ", ").unwrap();
             self.visit_named_type(param);
         }
 
-        write!(self.writer, ") -> ");
+        write!(self.writer, ") -> ").unwrap();
         self.visit_type(return_type);
     }
 
     fn visit_named_type(&mut self, NamedType { name, typ }: &NamedType) {
-        write!(self.writer, "{name}: ");
+        write!(self.writer, "{name}: ").unwrap();
         self.visit_type(typ);
     }
 
     fn visit_named_value(&mut self, NamedValue { name, value }: &NamedValue) {
-        write!(self.writer, "{name}: ");
+        write!(self.writer, "{name}: ").unwrap();
         self.visit_value(value);
     }
 
@@ -249,12 +240,12 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             Type::Union { name, .. } => write!(self.writer, "union {name}"),
             Type::Struct { name, .. } => write!(self.writer, "struct {name}"),
             Type::List { element_type } => {
-                write!(self.writer, "list<");
+                write!(self.writer, "list<").unwrap();
                 self.visit_type(element_type);
                 write!(self.writer, ">")
             }
             Type::Vector { element_type } => {
-                write!(self.writer, "vec<");
+                write!(self.writer, "vec<").unwrap();
                 self.visit_type(element_type);
                 write!(self.writer, ">")
             }
@@ -262,17 +253,17 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                 length,
                 element_type,
             } => {
-                write!(self.writer, "fvec<{length}, ");
+                write!(self.writer, "fvec<{length}, ").unwrap();
                 self.visit_type(element_type);
                 write!(self.writer, ">")
             }
             Type::Reference(inner) => {
-                write!(self.writer, "&");
+                write!(self.writer, "&").unwrap();
                 self.visit_type(inner);
                 Ok(())
             }
         }
-        .ok();
+        .unwrap();
     }
 
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
@@ -280,7 +271,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             Statement::TypeDeclaration { name, typ } => {
                 self.prindent(format!("{name}: "));
                 self.visit_type(typ);
-                writeln!(self.writer,);
+                writeln!(self.writer).unwrap();
             }
 
             Statement::Try { body } => {
@@ -294,9 +285,9 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             Statement::Copy { expression, value } => {
                 self.prindent("");
                 self.visit_expression(expression);
-                write!(self.writer, " = ");
+                write!(self.writer, " = ").unwrap();
                 self.visit_value(value);
-                writeln!(self.writer,);
+                writeln!(self.writer).unwrap();
             }
             Statement::Clear { identifier } => self.prindentln(format!("clear({identifier})")),
             Statement::FunctionCall {
@@ -306,7 +297,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             } => {
                 self.prindent("");
                 self.visit_expression(expression);
-                write!(self.writer, " = {name}(");
+                write!(self.writer, " = {name}(").unwrap();
 
                 // print correct number of commas
                 let mut args = arguments.iter();
@@ -314,18 +305,18 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     self.visit_value(arg);
                 }
                 for arg in args {
-                    write!(self.writer, ", ");
+                    write!(self.writer, ", ").unwrap();
                     self.visit_value(arg);
                 }
 
-                writeln!(self.writer, ")");
+                writeln!(self.writer, ")").unwrap();
             }
             Statement::Label(label) => self.prindentln(format!("label \"{label}\"")),
             Statement::Goto(label) => self.prindentln(format!("goto \"{label}\"")),
             Statement::Jump { condition, target } => {
                 self.prindent(format!("jump {} ", target));
                 self.visit_value(condition);
-                writeln!(self.writer,);
+                writeln!(self.writer).unwrap();
             }
             Statement::End(label) => self.prindentln(format!("end \"{label}\"")),
             Statement::Undefined => self.prindentln("undefined"),
@@ -336,7 +327,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             } => {
                 self.prindent("if (");
                 self.visit_value(condition);
-                writeln!(self.writer, ") {{");
+                writeln!(self.writer, ") {{").unwrap();
 
                 {
                     let _h = self.indent();
@@ -361,14 +352,16 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
 
     fn visit_expression(&mut self, node: &Expression) {
         match node {
-            Expression::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
+            Expression::Identifier(ident) => {
+                write!(self.writer, "{ident}").unwrap();
+            }
             Expression::Field { expression, field } => {
                 self.visit_expression(expression);
-                write!(self.writer, ".");
-                write!(self.writer, "{field}");
+                write!(self.writer, ".").unwrap();
+                write!(self.writer, "{field}").unwrap();
             }
             Expression::Address(exp) => {
-                write!(self.writer, "*");
+                write!(self.writer, "*").unwrap();
                 self.visit_expression(exp);
             }
         }
@@ -387,7 +380,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     fields.iter().for_each(|NamedValue { name, value }| {
                         self.prindent(format!("{name}: "));
                         self.visit_value(value);
-                        writeln!(self.writer, ",");
+                        writeln!(self.writer, ",").unwrap();
                     });
                 }
 
@@ -395,7 +388,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             }
             Value::Field { value, field_name } => {
                 self.visit_value(value);
-                write!(self.writer, ".{field_name}");
+                write!(self.writer, ".{field_name}").unwrap();
             }
             Value::CtorKind {
                 value,
@@ -403,7 +396,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                 types,
             } => {
                 self.visit_value(value);
-                write!(self.writer, " is ");
+                write!(self.writer, " is ").unwrap();
                 self.print_uid(*identifier, types);
             }
             Value::CtorUnwrap {
@@ -412,7 +405,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                 types,
             } => {
                 self.visit_value(value);
-                write!(self.writer, " as ");
+                write!(self.writer, " as ").unwrap();
                 self.print_uid(*identifier, types);
             }
         }
@@ -428,38 +421,38 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             Literal::Unit => write!(self.writer, "()"),
             Literal::Reference(s) => write!(self.writer, "&{s}"),
         }
-        .ok();
+        .unwrap();
     }
 
     fn visit_operation(&mut self, node: &Operation) {
         match node {
             Operation::Not(value) => {
-                write!(self.writer, "!");
+                write!(self.writer, "!").unwrap();
                 self.visit_value(value);
             }
             Operation::Equal(lhs, rhs) => {
                 self.visit_value(lhs);
-                write!(self.writer, " == ");
+                write!(self.writer, " == ").unwrap();
                 self.visit_value(rhs);
             }
             Operation::LessThan(lhs, rhs) => {
                 self.visit_value(lhs);
-                write!(self.writer, " < ");
+                write!(self.writer, " < ").unwrap();
                 self.visit_value(rhs);
             }
             Operation::GreaterThan(lhs, rhs) => {
                 self.visit_value(lhs);
-                write!(self.writer, " > ");
+                write!(self.writer, " > ").unwrap();
                 self.visit_value(rhs);
             }
             Operation::Subtract(lhs, rhs) => {
                 self.visit_value(lhs);
-                write!(self.writer, " - ");
+                write!(self.writer, " - ").unwrap();
                 self.visit_value(rhs);
             }
             Operation::Add(lhs, rhs) => {
                 self.visit_value(lhs);
-                write!(self.writer, " + ");
+                write!(self.writer, " + ").unwrap();
                 self.visit_value(rhs);
             }
         }

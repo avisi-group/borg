@@ -15,7 +15,7 @@ use {
 pub struct BoomEmitter {
     /// BOOM AST being constructed by walker
     ast: boom::Ast,
-    // Temporarily stored type signatures as spec and function definitions are separate
+    /// Temporarily stored type signatures as spec and function definitions are separate
     function_types: HashMap<InternedString, (Vec<boom::Type>, boom::Type)>,
 }
 
@@ -105,7 +105,6 @@ impl BoomEmitter {
                             parameters,
                             return_type,
                         },
-                        body,
                         control_flow,
                     },
                 );
@@ -168,12 +167,16 @@ fn convert_body(
 ) -> Vec<Rc<RefCell<boom::Statement>>> {
     instructions
         .iter()
-        .map(|instr| Rc::new(RefCell::new(convert_statement(&instr.inner))))
+        .flat_map(|instr| convert_statement(&instr.inner))
         .collect()
 }
 
-fn convert_statement(statement: &jib_ast::InstructionAux) -> boom::Statement {
-    match statement {
+fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom::Statement>>> {
+    if let jib_ast::InstructionAux::Block(instructions) = statement {
+        return convert_body(instructions);
+    }
+
+    vec![Rc::new(RefCell::new(match statement {
         jib_ast::InstructionAux::Decl(typ, name) => boom::Statement::TypeDeclaration {
             name: convert_name(name),
             typ: convert_type(typ),
@@ -207,9 +210,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> boom::Statement {
             if_body: convert_body(if_body),
             else_body: convert_body(else_body),
         },
-        jib_ast::InstructionAux::Block(instrs) => boom::Statement::Block {
-            body: convert_body(instrs),
-        },
+        jib_ast::InstructionAux::Block(..) => unimplemented!(),
         jib_ast::InstructionAux::TryBlock(instrs) => boom::Statement::Try {
             body: convert_body(instrs),
         },
@@ -219,7 +220,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> boom::Statement {
         jib_ast::InstructionAux::Return(_) => todo!(),
         jib_ast::InstructionAux::Reset(_, _) => todo!(),
         jib_ast::InstructionAux::Reinit(_, _, _) => todo!(),
-    }
+    }))]
 }
 
 fn convert_name(name: &jib_ast::Name) -> InternedString {

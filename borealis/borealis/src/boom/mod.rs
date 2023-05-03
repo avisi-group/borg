@@ -102,16 +102,12 @@ impl Walkable for Definition {
 #[derive(Debug, Clone)]
 pub struct FunctionDefinition {
     pub signature: FunctionSignature,
-    pub body: Vec<Rc<RefCell<Statement>>>,
     pub control_flow: ControlFlowGraph,
 }
 
 impl Walkable for FunctionDefinition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_function_signature(&self.signature);
-        self.body
-            .iter()
-            .for_each(|statement| visitor.visit_statement(statement.clone()));
     }
 }
 
@@ -231,9 +227,6 @@ pub enum Statement {
         name: InternedString,
         typ: Type,
     },
-    Block {
-        body: Vec<Rc<RefCell<Statement>>>,
-    },
     Try {
         body: Vec<Rc<RefCell<Statement>>>,
     },
@@ -270,7 +263,7 @@ impl Walkable for Statement {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
             Self::TypeDeclaration { typ, .. } => visitor.visit_type(typ),
-            Self::Block { body } | Self::Try { body } => body
+            Self::Try { body } => body
                 .iter()
                 .for_each(|statement| visitor.visit_statement(statement.clone())),
             Self::Copy { expression, value } => {

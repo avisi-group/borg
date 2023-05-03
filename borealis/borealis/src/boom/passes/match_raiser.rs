@@ -28,16 +28,9 @@ impl Pass for MatchRaiser {
             .get(&("integer_arithmetic_addsub_immediate_decode".into()))
             .unwrap();
 
-        // def.control_flow.as_dot(&mut std::io::stdout()).unwrap();
-
-        self.visit_function_definition(def);
-
-        for (label, depth) in &self.gotos {
-            for _ in 0..*depth {
-                print!(" ");
-            }
-            println!("{label}");
-        }
+        def.control_flow
+            .as_dot(&mut std::fs::File::create("target/controlflow.dot").unwrap())
+            .unwrap();
     }
 }
 

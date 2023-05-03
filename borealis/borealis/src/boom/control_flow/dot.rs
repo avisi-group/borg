@@ -1,7 +1,12 @@
 use {
-    crate::boom::control_flow::{ControlFlowBlock, Terminator},
+    crate::boom::{
+        control_flow::{ControlFlowBlock, Terminator},
+        pretty_print::BoomPrettyPrinter,
+        visitor::Visitor,
+        Statement,
+    },
     common::shared_key::SharedKey,
-    dot::{GraphWalk, Labeller},
+    dot::{GraphWalk, LabelText, Labeller},
     std::{
         cell::RefCell,
         collections::HashMap,
@@ -22,7 +27,8 @@ pub fn render<W: Write>(w: &mut W, block: &Rc<RefCell<ControlFlowBlock>>) -> io:
 struct Graph {
     nodes: Vec<NodeId>,
     edges: Vec<EdgeId>,
-    labels: HashMap<NodeId, String>,
+    node_labels: HashMap<NodeId, String>,
+    edge_labels: HashMap<EdgeId, &'static str>,
 }
 
 impl Graph {
@@ -38,29 +44,60 @@ impl Graph {
             return;
         }
 
-        let (children, label) = match &node.borrow().terminator {
-            Terminator::Return => (vec![], "return".to_owned()),
+        let node_label = {
+            let statements = {
+                let mut label = vec![];
+                let mut printer = BoomPrettyPrinter::new(&mut label);
+
+                for statement in &node.borrow().statements {
+                    if let Statement::If { condition, .. } = &*statement.borrow() {
+                        printer.visit_value(condition);
+                    } else {
+                        printer.visit_statement(statement.clone());
+                    }
+                }
+                String::from_utf8(label).unwrap()
+            };
+
+            let terminator = match &node.borrow().terminator {
+                Terminator::Return => "return".to_owned(),
+                Terminator::Conditional { condition, .. } => {
+                    let mut buf = vec![];
+                    BoomPrettyPrinter::new(&mut buf).visit_value(condition);
+                    format!("if {}", String::from_utf8_lossy(&buf))
+                }
+                Terminator::Unconditional { .. } => "goto".to_owned(),
+            };
+
+            format!(
+                "{{{}|{statements}|{terminator}}}",
+                ControlFlowBlock::label(node.clone())
+            )
+        };
+
+        let children = match &node.borrow().terminator {
+            Terminator::Return => vec![],
             Terminator::Conditional {
                 target,
                 fallthrough,
                 ..
-            } => (
-                vec![target.clone(), fallthrough.clone()],
-                format!("conditional"),
-            ),
-            Terminator::Unconditional { target } => {
-                (vec![target.clone()], "unconditional".to_owned())
-            }
+            } => vec![
+                (target.clone(), "target"),
+                (fallthrough.clone(), "fallthrough"),
+            ],
+            Terminator::Unconditional { target } => vec![(target.clone(), "")],
         };
 
         for child in &children {
-            self.edges.push((id.clone(), child.clone().into()));
+            let id = (id.clone(), child.0.clone().into());
+            self.edges.push(id.clone());
+            self.edge_labels.insert(id, child.1);
         }
         self.nodes.push(id.clone());
-        self.labels.insert(id, label);
+        self.node_labels.insert(id, node_label);
 
         for child in children {
-            self.process_node(child);
+            self.process_node(child.0);
         }
     }
 }
@@ -78,7 +115,27 @@ impl<'ast> Labeller<'ast, NodeId, EdgeId> for Graph {
     }
 
     fn node_label(&'ast self, n: &NodeId) -> dot::LabelText<'ast> {
-        dot::LabelText::LabelStr(self.labels.get(n).map(String::as_str).unwrap_or("?").into())
+        let label = self
+            .node_labels
+            .get(n)
+            .map(|s| {
+                s.replace('%', "pcnt")
+                    .replace("->", "_to_")
+                    .replace("<", r#"\<"#)
+                    .replace(">", r#"\>"#)
+                    .replace('\n', r#"\l"#)
+            })
+            .unwrap_or("?".to_owned());
+
+        dot::LabelText::EscStr(label.into())
+    }
+
+    fn node_shape(&'ast self, _: &NodeId) -> Option<LabelText<'ast>> {
+        Some(LabelText::LabelStr("record".into()))
+    }
+
+    fn edge_label(&'ast self, e: &EdgeId) -> dot::LabelText<'ast> {
+        dot::LabelText::LabelStr(self.edge_labels.get(e).copied().unwrap_or("?").into())
     }
 }
 
