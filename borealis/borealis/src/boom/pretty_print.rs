@@ -8,6 +8,7 @@ use {
     common::intern::InternedString,
     std::{
         cell::RefCell,
+        io::Write,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -16,23 +17,24 @@ use {
 const PADDING: &str = "  ";
 
 /// Pretty-print JIB AST (sequence of definitions)
-pub fn print_ast(
+pub fn print_ast<W: Write>(
+    w: &mut W,
     Ast {
         definitions,
         registers,
         functions,
     }: &Ast,
 ) {
-    let mut visitor = BoomPrettyPrinter::default();
+    let mut visitor = BoomPrettyPrinter::new(w);
 
     definitions
         .iter()
         .for_each(|def| visitor.visit_definition(def));
 
     registers.iter().for_each(|(name, typ)| {
-        print!("register {name}: ");
+        write!(visitor.writer, "register {name}: ");
         visitor.visit_type(typ);
-        println!();
+        writeln!(visitor.writer);
     });
 
     functions
@@ -40,29 +42,39 @@ pub fn print_ast(
         .for_each(|(_, fundef)| visitor.visit_function_definition(fundef));
 }
 
-pub fn print_statement(statement: Rc<RefCell<Statement>>) {
-    let mut visitor = BoomPrettyPrinter::default();
+pub fn print_statement<W: Write>(w: &mut W, statement: Rc<RefCell<Statement>>) {
+    let mut visitor = BoomPrettyPrinter::new(w);
     visitor.visit_statement(statement);
 }
 
 /// Pretty-print JIB AST
-#[derive(Default)]
-struct BoomPrettyPrinter {
+pub struct BoomPrettyPrinter<'writer, W> {
     indent: Rc<AtomicUsize>,
+    writer: &'writer mut W,
 }
 
-impl BoomPrettyPrinter {
-    fn prindent<T: AsRef<str>>(&self, s: T) {
-        print!(
+impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
+    pub fn new(writer: &'writer mut W) -> Self {
+        Self {
+            indent: Rc::new(AtomicUsize::new(0)),
+            writer,
+        }
+    }
+}
+
+impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
+    fn prindent<T: AsRef<str>>(&mut self, s: T) {
+        write!(
+            self.writer,
             "{}{}",
             PADDING.repeat(self.indent.load(Ordering::SeqCst)),
             s.as_ref()
         );
     }
 
-    fn prindentln<T: AsRef<str>>(&self, s: T) {
+    fn prindentln<T: AsRef<str>>(&mut self, s: T) {
         self.prindent(s);
-        println!();
+        writeln!(self.writer);
     }
 
     fn indent(&self) -> IndentHandle {
@@ -73,21 +85,21 @@ impl BoomPrettyPrinter {
     }
 
     fn print_uid(&mut self, id: InternedString, typs: &Vec<Type>) {
-        print!("{id}");
+        write!(self.writer, "{id}");
 
         if !typs.is_empty() {
-            print!("<");
+            write!(self.writer, "<");
 
             let mut typs = typs.iter();
             if let Some(typ) = typs.next() {
                 self.visit_type(typ);
             }
             for typ in typs {
-                print!(", ");
+                write!(self.writer, ", ");
                 self.visit_type(typ);
             }
 
-            print!(">");
+            write!(self.writer, ">");
         }
     }
 }
@@ -102,7 +114,7 @@ impl Drop for IndentHandle {
     }
 }
 
-impl Visitor for BoomPrettyPrinter {
+impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
     fn visit_definition(&mut self, node: &Definition) {
         match node {
             Definition::Enum { name, variants } => {
@@ -125,7 +137,7 @@ impl Visitor for BoomPrettyPrinter {
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
                         self.visit_type(typ);
-                        println!(",");
+                        writeln!(self.writer, ",");
                     });
                 }
 
@@ -139,7 +151,7 @@ impl Visitor for BoomPrettyPrinter {
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
                         self.visit_type(typ);
-                        println!(",");
+                        writeln!(self.writer, ",");
                     });
                 }
 
@@ -153,14 +165,14 @@ impl Visitor for BoomPrettyPrinter {
 
                 let mut bindings = bindings.iter();
                 if let Some(NamedType { name, .. }) = bindings.next() {
-                    print!("{name}");
+                    write!(self.writer, "{name}");
                 }
                 for NamedType { name, .. } in bindings {
-                    print!(", ");
-                    print!("{name}");
+                    write!(self.writer, ", ");
+                    write!(self.writer, "{name}");
                 }
 
-                println!(") {{");
+                writeln!(self.writer, ") {{");
 
                 {
                     let _h = self.indent();
@@ -168,14 +180,14 @@ impl Visitor for BoomPrettyPrinter {
                         .for_each(|statement| self.visit_statement(statement.clone()));
                 }
 
-                println!("}}");
+                writeln!(self.writer, "}}");
             }
         }
     }
 
     fn visit_function_definition(&mut self, node: &FunctionDefinition) {
         self.visit_function_signature(&node.signature);
-        println!(" {{");
+        writeln!(self.writer, " {{");
 
         {
             let _h = self.indent();
@@ -202,63 +214,65 @@ impl Visitor for BoomPrettyPrinter {
             self.visit_named_type(param);
         }
         for param in parameters {
-            print!(", ");
+            write!(self.writer, ", ");
             self.visit_named_type(param);
         }
 
-        print!(") -> ");
+        write!(self.writer, ") -> ");
         self.visit_type(return_type);
     }
 
     fn visit_named_type(&mut self, NamedType { name, typ }: &NamedType) {
-        print!("{name}: ");
+        write!(self.writer, "{name}: ");
         self.visit_type(typ);
     }
 
     fn visit_named_value(&mut self, NamedValue { name, value }: &NamedValue) {
-        print!("{name}: ");
+        write!(self.writer, "{name}: ");
         self.visit_value(value);
     }
 
     fn visit_type(&mut self, node: &Type) {
         match node {
-            Type::Unit => print!("()"),
-            Type::Bool => print!("bool"),
-            Type::String => print!("String"),
-            Type::Real => print!("real"),
-            Type::Float => print!("float"),
-            Type::Constant(bi) => print!("constant<{bi}>"),
-            Type::Lint => print!("int"),
-            Type::Fint(size) => print!("int<{size}>"),
-            Type::Fbits(size, _) => print!("bitvector<{size}>"),
-            Type::Lbits(_) => print!("bitvector"),
-            Type::Bit => print!("bit"),
-            Type::Enum { name, .. } => print!("enum {name}"),
-            Type::Union { name, .. } => print!("union {name}"),
-            Type::Struct { name, .. } => print!("struct {name}"),
+            Type::Unit => write!(self.writer, "()"),
+            Type::Bool => write!(self.writer, "bool"),
+            Type::String => write!(self.writer, "String"),
+            Type::Real => write!(self.writer, "real"),
+            Type::Float => write!(self.writer, "float"),
+            Type::Constant(bi) => write!(self.writer, "constant<{bi}>"),
+            Type::Lint => write!(self.writer, "int"),
+            Type::Fint(size) => write!(self.writer, "int<{size}>"),
+            Type::Fbits(size, _) => write!(self.writer, "bitvector<{size}>"),
+            Type::Lbits(_) => write!(self.writer, "bitvector"),
+            Type::Bit => write!(self.writer, "bit"),
+            Type::Enum { name, .. } => write!(self.writer, "enum {name}"),
+            Type::Union { name, .. } => write!(self.writer, "union {name}"),
+            Type::Struct { name, .. } => write!(self.writer, "struct {name}"),
             Type::List { element_type } => {
-                print!("list<");
+                write!(self.writer, "list<");
                 self.visit_type(element_type);
-                print!(">");
+                write!(self.writer, ">")
             }
             Type::Vector { element_type } => {
-                print!("vec<");
+                write!(self.writer, "vec<");
                 self.visit_type(element_type);
-                print!(">");
+                write!(self.writer, ">")
             }
             Type::FVector {
                 length,
                 element_type,
             } => {
-                print!("fvec<{length}, ");
+                write!(self.writer, "fvec<{length}, ");
                 self.visit_type(element_type);
-                print!(">");
+                write!(self.writer, ">")
             }
             Type::Reference(inner) => {
-                print!("&");
+                write!(self.writer, "&");
                 self.visit_type(inner);
+                Ok(())
             }
         }
+        .ok();
     }
 
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
@@ -266,16 +280,9 @@ impl Visitor for BoomPrettyPrinter {
             Statement::TypeDeclaration { name, typ } => {
                 self.prindent(format!("{name}: "));
                 self.visit_type(typ);
-                println!();
+                writeln!(self.writer,);
             }
-            Statement::Block { body } => {
-                self.prindentln("block {");
-                {
-                    let _h = self.indent();
-                    body.iter().for_each(|s| self.visit_statement(s.clone()));
-                }
-                self.prindentln("}");
-            }
+
             Statement::Try { body } => {
                 self.prindentln("try {");
                 {
@@ -287,9 +294,9 @@ impl Visitor for BoomPrettyPrinter {
             Statement::Copy { expression, value } => {
                 self.prindent("");
                 self.visit_expression(expression);
-                print!(" = ");
+                write!(self.writer, " = ");
                 self.visit_value(value);
-                println!();
+                writeln!(self.writer,);
             }
             Statement::Clear { identifier } => self.prindentln(format!("clear({identifier})")),
             Statement::FunctionCall {
@@ -299,7 +306,7 @@ impl Visitor for BoomPrettyPrinter {
             } => {
                 self.prindent("");
                 self.visit_expression(expression);
-                print!(" = {name}(");
+                write!(self.writer, " = {name}(");
 
                 // print correct number of commas
                 let mut args = arguments.iter();
@@ -307,18 +314,18 @@ impl Visitor for BoomPrettyPrinter {
                     self.visit_value(arg);
                 }
                 for arg in args {
-                    print!(", ");
+                    write!(self.writer, ", ");
                     self.visit_value(arg);
                 }
 
-                println!(")");
+                writeln!(self.writer, ")");
             }
             Statement::Label(label) => self.prindentln(format!("label \"{label}\"")),
             Statement::Goto(label) => self.prindentln(format!("goto \"{label}\"")),
             Statement::Jump { condition, target } => {
                 self.prindent(format!("jump {} ", target));
                 self.visit_value(condition);
-                println!();
+                writeln!(self.writer,);
             }
             Statement::End(label) => self.prindentln(format!("end \"{label}\"")),
             Statement::Undefined => self.prindentln("undefined"),
@@ -329,7 +336,7 @@ impl Visitor for BoomPrettyPrinter {
             } => {
                 self.prindent("if (");
                 self.visit_value(condition);
-                println!(") {{");
+                writeln!(self.writer, ") {{");
 
                 {
                     let _h = self.indent();
@@ -354,14 +361,14 @@ impl Visitor for BoomPrettyPrinter {
 
     fn visit_expression(&mut self, node: &Expression) {
         match node {
-            Expression::Identifier(ident) => print!("{ident}"),
+            Expression::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
             Expression::Field { expression, field } => {
                 self.visit_expression(expression);
-                print!(".");
-                print!("{field}");
+                write!(self.writer, ".");
+                write!(self.writer, "{field}");
             }
             Expression::Address(exp) => {
-                print!("*");
+                write!(self.writer, "*");
                 self.visit_expression(exp);
             }
         }
@@ -369,7 +376,7 @@ impl Visitor for BoomPrettyPrinter {
 
     fn visit_value(&mut self, node: &Value) {
         match node {
-            Value::Identifier(ident) => print!("{ident}"),
+            Value::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
             Value::Literal(literal) => self.visit_literal(literal),
             Value::Operation(op) => self.visit_operation(op),
             Value::Struct { name, fields } => {
@@ -380,7 +387,7 @@ impl Visitor for BoomPrettyPrinter {
                     fields.iter().for_each(|NamedValue { name, value }| {
                         self.prindent(format!("{name}: "));
                         self.visit_value(value);
-                        println!(",");
+                        writeln!(self.writer, ",");
                     });
                 }
 
@@ -388,7 +395,7 @@ impl Visitor for BoomPrettyPrinter {
             }
             Value::Field { value, field_name } => {
                 self.visit_value(value);
-                print!(".{field_name}");
+                write!(self.writer, ".{field_name}");
             }
             Value::CtorKind {
                 value,
@@ -396,7 +403,7 @@ impl Visitor for BoomPrettyPrinter {
                 types,
             } => {
                 self.visit_value(value);
-                print!(" is ");
+                write!(self.writer, " is ");
                 self.print_uid(*identifier, types);
             }
             Value::CtorUnwrap {
@@ -405,7 +412,7 @@ impl Visitor for BoomPrettyPrinter {
                 types,
             } => {
                 self.visit_value(value);
-                print!(" as ");
+                write!(self.writer, " as ");
                 self.print_uid(*identifier, types);
             }
         }
@@ -413,45 +420,46 @@ impl Visitor for BoomPrettyPrinter {
 
     fn visit_literal(&mut self, node: &Literal) {
         match node {
-            Literal::Int(bi) => print!("{bi}"),
-            Literal::Bits(bits) => print!("{bits:?}"),
-            Literal::Bit(bit) => print!("{bit:?}"),
-            Literal::Bool(bool) => print!("{bool}"),
-            Literal::String(s) => print!("{s:?}"),
-            Literal::Unit => print!("()"),
-            Literal::Reference(s) => print!("&{s}"),
+            Literal::Int(bi) => write!(self.writer, "{bi}"),
+            Literal::Bits(bits) => write!(self.writer, "{bits:?}"),
+            Literal::Bit(bit) => write!(self.writer, "{bit:?}"),
+            Literal::Bool(bool) => write!(self.writer, "{bool}"),
+            Literal::String(s) => write!(self.writer, "{s:?}"),
+            Literal::Unit => write!(self.writer, "()"),
+            Literal::Reference(s) => write!(self.writer, "&{s}"),
         }
+        .ok();
     }
 
     fn visit_operation(&mut self, node: &Operation) {
         match node {
             Operation::Not(value) => {
-                print!("!");
+                write!(self.writer, "!");
                 self.visit_value(value);
             }
             Operation::Equal(lhs, rhs) => {
                 self.visit_value(lhs);
-                print!(" == ");
+                write!(self.writer, " == ");
                 self.visit_value(rhs);
             }
             Operation::LessThan(lhs, rhs) => {
                 self.visit_value(lhs);
-                print!(" < ");
+                write!(self.writer, " < ");
                 self.visit_value(rhs);
             }
             Operation::GreaterThan(lhs, rhs) => {
                 self.visit_value(lhs);
-                print!(" > ");
+                write!(self.writer, " > ");
                 self.visit_value(rhs);
             }
             Operation::Subtract(lhs, rhs) => {
                 self.visit_value(lhs);
-                print!(" - ");
+                write!(self.writer, " - ");
                 self.visit_value(rhs);
             }
             Operation::Add(lhs, rhs) => {
                 self.visit_value(lhs);
-                print!(" + ");
+                write!(self.writer, " + ");
                 self.visit_value(rhs);
             }
         }
