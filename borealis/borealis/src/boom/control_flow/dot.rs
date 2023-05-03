@@ -6,7 +6,7 @@ use {
         Statement,
     },
     common::shared_key::SharedKey,
-    dot::{GraphWalk, LabelText, Labeller},
+    dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
     std::{
         cell::RefCell,
         collections::HashMap,
@@ -121,30 +121,30 @@ impl<'ast> Labeller<'ast, NodeId, EdgeId> for Graph {
             .map(|s| {
                 s.replace('%', "pcnt")
                     .replace("->", "_to_")
-                    .replace("<", r#"\<"#)
-                    .replace(">", r#"\>"#)
+                    .replace('<', r#"\<"#)
+                    .replace('>', r#"\>"#)
                     .replace('\n', r#"\l"#)
             })
             .unwrap_or("?".to_owned());
 
-        dot::LabelText::EscStr(label.into())
+        LabelText::EscStr(label.into())
     }
 
     fn node_shape(&'ast self, _: &NodeId) -> Option<LabelText<'ast>> {
         Some(LabelText::LabelStr("record".into()))
     }
 
-    fn edge_label(&'ast self, e: &EdgeId) -> dot::LabelText<'ast> {
-        dot::LabelText::LabelStr(self.edge_labels.get(e).copied().unwrap_or("?").into())
+    fn edge_label(&'ast self, e: &EdgeId) -> LabelText<'ast> {
+        LabelText::LabelStr(self.edge_labels.get(e).copied().unwrap_or("?").into())
     }
 }
 
 impl<'ast> GraphWalk<'ast, NodeId, EdgeId> for Graph {
-    fn nodes(&'ast self) -> dot::Nodes<'ast, NodeId> {
+    fn nodes(&'ast self) -> Nodes<'ast, NodeId> {
         (&self.nodes).into()
     }
 
-    fn edges(&'ast self) -> dot::Edges<'ast, EdgeId> {
+    fn edges(&'ast self) -> Edges<'ast, EdgeId> {
         (&self.edges).into()
     }
 
