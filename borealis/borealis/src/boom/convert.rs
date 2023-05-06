@@ -1,7 +1,6 @@
 use {
     crate::boom::{self, control_flow::ControlFlowGraph, FunctionSignature, NamedType},
     common::intern::InternedString,
-    log::debug,
     sail::{jib_ast, sail_ast},
     std::{
         borrow::Borrow,
@@ -94,7 +93,7 @@ impl BoomEmitter {
 
                 let body = convert_body(body);
 
-                debug!("building new control flow graph for {name}");
+                //debug!("building new control flow graph for {name}");
                 let control_flow = ControlFlowGraph::from_statements(&body);
 
                 self.ast.functions.insert(

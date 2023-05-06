@@ -6,17 +6,16 @@
 //! 2. Recursive resolution to convert maybe-unresolved to resolved blocks.
 
 use {
-    crate::boom::{Statement, Value},
+    crate::boom::{control_flow::builder::ControlFlowGraphBuilder, Statement, Value},
     common::{intern::InternedString, shared_key::SharedKey},
-    log::warn,
     std::{
         cell::RefCell,
-        collections::HashMap,
         io::{self, Write},
-        rc::Rc,
+        rc::{Rc, Weak},
     },
 };
 
+mod builder;
 mod dot;
 
 /// Control flow graph of a BOOM function
@@ -31,16 +30,12 @@ impl ControlFlowGraph {
     ///
     /// This should be called per BOOM function.
     pub fn from_statements(statements: &[Rc<RefCell<Statement>>]) -> Self {
-        let mut builder = ControlFlowGraphBuilder::new();
-
-        builder.process_statements(statements);
-
-        // resolves all label targets to block targets
-        let entry_block = builder.resolve();
+        let entry_block = ControlFlowGraphBuilder::from_statements(statements);
 
         Self { entry_block }
     }
 
+    /// Renders a `ControlFlowGraph` to DOT syntax.
     pub fn as_dot<W: Write>(&self, w: &mut W) -> io::Result<()> {
         dot::render(w, &self.entry_block)
     }
@@ -51,27 +46,67 @@ impl ControlFlowGraph {
 pub struct ControlFlowBlock {
     /// Optional block label, otherwise the `SharedKey` `Display` format should be used
     label: Option<InternedString>,
+    /// Parents of the current node
+    parents: Vec<Weak<RefCell<ControlFlowBlock>>>,
     /// Sequence of statements within the block
     pub statements: Vec<Rc<RefCell<Statement>>>,
     /// Block terminator
-    pub terminator: Terminator,
+    terminator: Terminator,
 }
 
 impl ControlFlowBlock {
     fn new() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self {
             label: None,
+            parents: vec![],
             statements: vec![],
             terminator: Terminator::Return,
         }))
     }
 
-    fn label(block: Rc<RefCell<Self>>) -> String {
+    pub fn label(block: Rc<RefCell<Self>>) -> String {
         block
             .borrow()
             .label
             .map(|label| label.to_string())
             .unwrap_or(SharedKey::from(block.clone()).to_string())
+    }
+
+    /// Gets the parents of this control flow block
+    pub fn parents(&self) -> impl Iterator<Item = Rc<RefCell<Self>>> + '_ {
+        self.parents.iter().filter_map(Weak::upgrade)
+    }
+
+    /// Adds a parent to this control flow block
+    pub fn add_parent(&mut self, parent: &Rc<RefCell<Self>>) {
+        // remove dropped weak pointers
+        self.parents.retain(|weak| weak.upgrade().is_some());
+
+        // add new weak pointer
+        self.parents.push(Rc::downgrade(&parent));
+    }
+
+    /// Gets the terminator of this control flow block
+    pub fn terminator(&self) -> &Terminator {
+        &self.terminator
+    }
+
+    /// Sets the terminator of this control flow block (and also the weak parental references of any children)
+    pub fn set_terminator(block: &Rc<RefCell<Self>>, terminator: Terminator) {
+        match &terminator {
+            Terminator::Return | Terminator::Undefined => (),
+            Terminator::Conditional {
+                target,
+                fallthrough,
+                ..
+            } => {
+                target.borrow_mut().add_parent(block);
+                fallthrough.borrow_mut().add_parent(block);
+            }
+            Terminator::Unconditional { target } => target.borrow_mut().add_parent(block),
+        }
+
+        block.borrow_mut().terminator = terminator;
     }
 }
 
@@ -92,269 +127,5 @@ pub enum Terminator {
     Unconditional {
         target: Rc<RefCell<ControlFlowBlock>>,
     },
-}
-
-/// Builder structure for a control flow graph
-///
-/// Contains state required to build the control flow graph, resolving labels and block terminators
-struct ControlFlowGraphBuilder {
-    labels: HashMap<InternedString, Rc<RefCell<MaybeUnresolvedControlFlowBlock>>>,
-    resolved_blocks:
-        HashMap<SharedKey<MaybeUnresolvedControlFlowBlock>, Rc<RefCell<ControlFlowBlock>>>,
-    entry_block: Rc<RefCell<MaybeUnresolvedControlFlowBlock>>,
-    current_block: Rc<RefCell<MaybeUnresolvedControlFlowBlock>>,
-}
-
-impl ControlFlowGraphBuilder {
-    fn new() -> Self {
-        let entry_block = MaybeUnresolvedControlFlowBlock::new();
-        Self {
-            labels: HashMap::new(),
-            resolved_blocks: HashMap::new(),
-            current_block: entry_block.clone(),
-            entry_block,
-        }
-    }
-
-    fn process_statements(&mut self, statements: &[Rc<RefCell<Statement>>]) {
-        for statement in statements {
-            match &*statement.borrow() {
-                Statement::Label(label) => {
-                    let next = MaybeUnresolvedControlFlowBlock::new();
-
-                    self.labels.insert(*label, next.clone());
-
-                    self.current_block.borrow_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
-                            MaybeUnresolvedJumpTarget::Resolved {
-                                target: next.clone(),
-                            },
-                        ),
-                    );
-                    self.current_block = next;
-                    self.current_block.borrow_mut().label = Some(*label);
-                }
-                Statement::If {
-                    if_body,
-                    else_body,
-                    condition,
-                } => {
-                    let if_block = MaybeUnresolvedControlFlowBlock::new();
-                    let else_block = MaybeUnresolvedControlFlowBlock::new();
-                    let post_block = MaybeUnresolvedControlFlowBlock::new();
-
-                    self.current_block.borrow_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Conditional {
-                            condition: condition.clone(),
-                            target: MaybeUnresolvedJumpTarget::Resolved {
-                                target: if_block.clone(),
-                            },
-                            fallthrough: MaybeUnresolvedJumpTarget::Resolved {
-                                target: else_block.clone(),
-                            },
-                        },
-                    );
-
-                    self.current_block = if_block;
-                    self.process_statements(if_body);
-                    self.current_block.borrow_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
-                            MaybeUnresolvedJumpTarget::Resolved {
-                                target: post_block.clone(),
-                            },
-                        ),
-                    );
-
-                    self.current_block = else_block;
-                    self.process_statements(else_body);
-                    self.current_block.borrow_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
-                            MaybeUnresolvedJumpTarget::Resolved {
-                                target: post_block.clone(),
-                            },
-                        ),
-                    );
-
-                    self.current_block = post_block;
-                }
-                Statement::Jump { target, condition } => {
-                    let fallthrough_block = MaybeUnresolvedControlFlowBlock::new();
-                    self.current_block.borrow_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Conditional {
-                            condition: condition.clone(),
-                            target: MaybeUnresolvedJumpTarget::Unresolved { label: *target },
-                            fallthrough: MaybeUnresolvedJumpTarget::Resolved {
-                                target: fallthrough_block.clone(),
-                            },
-                        },
-                    );
-
-                    self.current_block = fallthrough_block;
-                }
-                Statement::Goto(label) => {
-                    // end current block
-                    self.current_block.borrow_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
-                            MaybeUnresolvedJumpTarget::Unresolved { label: *label },
-                        ),
-                    );
-
-                    // start new, "detached" block
-                    self.current_block = MaybeUnresolvedControlFlowBlock::new();
-                }
-                Statement::End(_) => {
-                    // end current block
-                    self.current_block
-                        .borrow_mut()
-                        .set_terminator(MaybeUnresolvedTerminator::Return);
-
-                    // start new, "detached" block
-                    self.current_block = MaybeUnresolvedControlFlowBlock::new();
-                }
-                _ => self.current_block.borrow_mut().add_statement(statement),
-            }
-        }
-    }
-
-    /// Converts unresolved blocks into resolved blocks, errors if any target labels were not present in the labels map
-    fn resolve(mut self) -> Rc<RefCell<ControlFlowBlock>> {
-        self.resolve_block(self.entry_block.clone())
-    }
-
-    fn resolve_block(
-        &mut self,
-        unresolved: Rc<RefCell<MaybeUnresolvedControlFlowBlock>>,
-    ) -> Rc<RefCell<ControlFlowBlock>> {
-        // if block is already resolved, return that
-        if let Some(resolved) = self.resolved_blocks.get(&unresolved.clone().into()) {
-            return resolved.clone();
-        }
-
-        // create a new control flow block
-        let resolved = ControlFlowBlock::new();
-
-        // insert the new resolved control flow block into the map, panicking if it was already
-        // resolved
-        //
-        // it's not populated with the correct statements or terminator at this point, but because
-        // it's an Rc-RefCell we can mutate it without modifying the map.
-        //
-        // we need to insert it here so that the recursive calls as part of the terminator
-        // resolution can acquire a reference to the resolved block, if we inserted the correctly
-        // resolved block after the recursive call, it would loop forever.
-        if let Some(block) = self
-            .resolved_blocks
-            .insert(unresolved.clone().into(), resolved.clone())
-        {
-            panic!("unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}")
-        }
-
-        resolved.borrow_mut().label = unresolved.borrow().label;
-
-        // clone the statements across
-        resolved.borrow_mut().statements = unresolved.borrow().statements.clone();
-
-        //
-        resolved.borrow_mut().terminator = match &unresolved.borrow().terminator {
-            MaybeUnresolvedTerminator::Return => Terminator::Return,
-            MaybeUnresolvedTerminator::Conditional {
-                condition,
-                target,
-                fallthrough,
-            } => Terminator::Conditional {
-                condition: condition.clone(),
-                target: self.resolve_jump_target(target),
-                fallthrough: self.resolve_jump_target(fallthrough),
-            },
-            MaybeUnresolvedTerminator::Unconditional(target) => Terminator::Unconditional {
-                target: self.resolve_jump_target(target),
-            },
-            MaybeUnresolvedTerminator::Unknown => {
-                warn!("encountered unknown terminator during resolution");
-                Terminator::Return
-            }
-        };
-
-        resolved
-    }
-
-    fn resolve_jump_target(
-        &mut self,
-        target: &MaybeUnresolvedJumpTarget,
-    ) -> Rc<RefCell<ControlFlowBlock>> {
-        let block = match target {
-            MaybeUnresolvedJumpTarget::Resolved { target } => target.clone(),
-            MaybeUnresolvedJumpTarget::Unresolved { label } => self
-                .labels
-                .get(label)
-                .cloned()
-                .unwrap_or_else(|| panic!("no entry in label map found for {label:?}")),
-        };
-
-        self.resolve_block(block)
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-struct MaybeUnresolvedControlFlowBlock {
-    label: Option<InternedString>,
-    statements: Vec<Rc<RefCell<Statement>>>,
-    terminator: MaybeUnresolvedTerminator,
-}
-
-impl MaybeUnresolvedControlFlowBlock {
-    fn new() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self::default()))
-    }
-
-    fn add_statement(&mut self, statement: &Rc<RefCell<Statement>>) {
-        assert!(
-            !self.has_terminator(),
-            "attempted to add statement to block with terminator"
-        );
-        self.statements.push(statement.clone());
-    }
-
-    fn has_terminator(&self) -> bool {
-        !matches!(self.terminator, MaybeUnresolvedTerminator::Unknown)
-    }
-
-    fn set_terminator(&mut self, terminator: MaybeUnresolvedTerminator) {
-        if self.has_terminator() {
-            panic!(
-                "attempted to set terminator to block with terminator: \n{self:#?}\n{terminator:#?}"
-            )
-        } else {
-            self.terminator = terminator;
-        }
-    }
-}
-
-/// Possibly-unresolved block terminator statement
-#[derive(Debug, Clone)]
-enum MaybeUnresolvedTerminator {
-    Return,
-    Conditional {
-        condition: Value,
-        target: MaybeUnresolvedJumpTarget,
-        fallthrough: MaybeUnresolvedJumpTarget,
-    },
-    Unconditional(MaybeUnresolvedJumpTarget),
-    Unknown,
-}
-
-impl Default for MaybeUnresolvedTerminator {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
-
-#[derive(Debug, Clone)]
-enum MaybeUnresolvedJumpTarget {
-    Resolved {
-        target: Rc<RefCell<MaybeUnresolvedControlFlowBlock>>,
-    },
-    Unresolved {
-        label: InternedString,
-    },
+    Undefined,
 }

@@ -67,6 +67,7 @@ impl Graph {
                     format!("if {}", String::from_utf8_lossy(&buf))
                 }
                 Terminator::Unconditional { .. } => "goto".to_owned(),
+                Terminator::Undefined => "undefined".to_owned(),
             };
 
             format!(
@@ -76,7 +77,7 @@ impl Graph {
         };
 
         let children = match &node.borrow().terminator {
-            Terminator::Return => vec![],
+            Terminator::Return | Terminator::Undefined => vec![],
             Terminator::Conditional {
                 target,
                 fallthrough,
@@ -93,6 +94,7 @@ impl Graph {
             self.edges.push(id.clone());
             self.edge_labels.insert(id, child.1);
         }
+
         self.nodes.push(id.clone());
         self.node_labels.insert(id, node_label);
 

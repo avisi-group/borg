@@ -6,19 +6,24 @@
 
 use {
     crate::boom::{
-        passes::{builtin_fns::AddBuiltinFns, match_raiser::MatchRaiser},
+        passes::{
+            builtin_fns::AddBuiltinFns, fold_unconditionals::FoldUnconditionals,
+            if_raiser::IfRaiser,
+        },
         Ast,
     },
     std::{cell::RefCell, rc::Rc},
 };
 
 pub mod builtin_fns;
-pub mod match_raiser;
+pub mod fold_unconditionals;
+pub mod if_raiser;
 
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
     [
+        FoldUnconditionals::new_boxed(),
+        IfRaiser::new_boxed(),
         AddBuiltinFns::new_boxed(ast.clone()),
-        MatchRaiser::new_boxed(),
     ]
     .into_iter()
     .for_each(|mut pass| pass.run(ast.clone()));

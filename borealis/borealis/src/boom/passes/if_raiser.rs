@@ -9,32 +9,22 @@ use {
 };
 
 #[derive(Debug, Default)]
-pub struct MatchRaiser {
+pub struct IfRaiser {
     stack: Vec<NodeKind>,
     gotos: Vec<(InternedString, usize)>,
 }
 
-impl MatchRaiser {
+impl IfRaiser {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::<Self>::default()
     }
 }
 
-impl Pass for MatchRaiser {
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) {
-        let ast = ast.borrow();
-        let def = ast
-            .functions
-            .get(&("integer_arithmetic_addsub_immediate_decode".into()))
-            .unwrap();
-
-        def.control_flow
-            .as_dot(&mut std::fs::File::create("target/controlflow.dot").unwrap())
-            .unwrap();
-    }
+impl Pass for IfRaiser {
+    fn run(&mut self, _ast: Rc<RefCell<Ast>>) {}
 }
 
-impl Visitor for MatchRaiser {
+impl Visitor for IfRaiser {
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
         self.stack.push(NodeKind::Statement(node.clone()));
 
