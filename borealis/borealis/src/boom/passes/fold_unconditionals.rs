@@ -4,14 +4,14 @@ use {
         passes::Pass,
         Ast,
     },
-    common::shared_key::SharedKey,
     log::trace,
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    std::{cell::RefCell, collections::HashSet, fs::File, rc::Rc},
 };
 
+/// Control flow blocks with only one parent and one child (unconditional jump to target) are folded into their parent
 #[derive(Debug, Default)]
 pub struct FoldUnconditionals {
-    visited: HashSet<SharedKey<ControlFlowBlock>>,
+    visited: HashSet<ControlFlowBlock>,
 }
 
 impl FoldUnconditionals {
@@ -19,43 +19,35 @@ impl FoldUnconditionals {
         Box::<Self>::default()
     }
 
-    fn fold(&mut self, node: Rc<RefCell<ControlFlowBlock>>) {
-        let key = SharedKey::from(node.clone());
-        trace!("folding {key}");
+    fn fold(&mut self, node: ControlFlowBlock) {
+        trace!("folding {node}");
 
-        if self.visited.contains(&key) {
+        if self.visited.contains(&node) {
             return;
         }
-        self.visited.insert(SharedKey::from(node.clone()));
 
         // flag for whether we mutated the current node and therefore need to attempt folding again
         let mut did_change = false;
 
         // check if the current node jumps unconditionally to the child (target) node
-        let terminator = node.borrow().terminator().clone();
+        let terminator = node.terminator();
         if let Terminator::Unconditional { target } = terminator {
-            let parents = target.borrow().parents().collect::<Vec<_>>();
+            let parents = target.parents();
 
             // check if the child has only 1 parent (the current node)
             if parents.len() == 1 {
                 // smoke test that the child's parent is the current node
-                assert_eq!(
-                    SharedKey::from(node.clone()),
-                    SharedKey::from(parents[0].clone())
-                );
+                assert_eq!(node, parents[0]);
                 // smoke test that the child is not the current node
-                assert_ne!(
-                    SharedKey::from(node.clone()),
-                    SharedKey::from(target.clone())
-                );
+                assert_ne!(node, target);
 
                 did_change = true;
 
                 // move all statements and the terminator from the child to the parent (child will be deallocated automatically)
-                node.borrow_mut()
-                    .statements
-                    .append(&mut target.borrow_mut().statements);
-                ControlFlowBlock::set_terminator(&node, target.borrow().terminator().clone());
+                let mut statements = node.statements();
+                statements.append(&mut target.statements());
+                node.set_statements(statements);
+                ControlFlowBlock::set_terminator(&node, target.terminator());
             }
         }
 
@@ -65,7 +57,8 @@ impl FoldUnconditionals {
         }
 
         // recurse into children
-        match node.borrow().terminator().clone() {
+        self.visited.insert(node.clone());
+        match node.terminator() {
             Terminator::Return | Terminator::Undefined => (),
             Terminator::Conditional {
                 target,
@@ -84,20 +77,17 @@ impl FoldUnconditionals {
 
 impl Pass for FoldUnconditionals {
     fn run(&mut self, ast: Rc<RefCell<Ast>>) {
-        let ast = ast.borrow();
-        let def = ast
-            .functions
-            .get(&("integer_arithmetic_addsub_immediate_decode".into()))
-            .unwrap();
+        ast.borrow().functions.iter().for_each(|(name, def)| {
+            trace!("folding {name}");
+            def.control_flow
+                .as_dot(&mut File::create(format!("target/dot/{name}.dot")).unwrap())
+                .unwrap();
 
-        def.control_flow
-            .as_dot(&mut std::fs::File::create("target/controlflow.dot").unwrap())
-            .unwrap();
+            self.fold(def.control_flow.entry_block.clone());
 
-        self.fold(def.control_flow.entry_block.clone());
-
-        def.control_flow
-            .as_dot(&mut std::fs::File::create("target/controlflow_folded.dot").unwrap())
-            .unwrap();
+            def.control_flow
+                .as_dot(&mut File::create(format!("target/dot/{name}_folded.dot")).unwrap())
+                .unwrap();
+        });
     }
 }

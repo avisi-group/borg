@@ -5,17 +5,14 @@ use {
         visitor::Visitor,
         Statement,
     },
-    common::shared_key::SharedKey,
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
     std::{
-        cell::RefCell,
         collections::HashMap,
         io::{self, Write},
-        rc::Rc,
     },
 };
 
-pub fn render<W: Write>(w: &mut W, block: &Rc<RefCell<ControlFlowBlock>>) -> io::Result<()> {
+pub fn render<W: Write>(w: &mut W, block: &ControlFlowBlock) -> io::Result<()> {
     let mut graph = Graph::new();
 
     graph.process_node(block.clone());
@@ -36,8 +33,8 @@ impl Graph {
         Self::default()
     }
 
-    fn process_node(&mut self, node: Rc<RefCell<ControlFlowBlock>>) {
-        let id: NodeId = node.clone().into();
+    fn process_node(&mut self, node: ControlFlowBlock) {
+        let id: NodeId = node.clone();
 
         if self.nodes.contains(&id) {
             // already visited
@@ -49,7 +46,7 @@ impl Graph {
                 let mut label = vec![];
                 let mut printer = BoomPrettyPrinter::new(&mut label);
 
-                for statement in &node.borrow().statements {
+                for statement in node.statements() {
                     if let Statement::If { condition, .. } = &*statement.borrow() {
                         printer.visit_value(condition);
                     } else {
@@ -59,38 +56,32 @@ impl Graph {
                 String::from_utf8(label).unwrap()
             };
 
-            let terminator = match &node.borrow().terminator {
+            let terminator = match node.terminator() {
                 Terminator::Return => "return".to_owned(),
                 Terminator::Conditional { condition, .. } => {
                     let mut buf = vec![];
-                    BoomPrettyPrinter::new(&mut buf).visit_value(condition);
+                    BoomPrettyPrinter::new(&mut buf).visit_value(&condition);
                     format!("if {}", String::from_utf8_lossy(&buf))
                 }
                 Terminator::Unconditional { .. } => "goto".to_owned(),
                 Terminator::Undefined => "undefined".to_owned(),
             };
 
-            format!(
-                "{{{}|{statements}|{terminator}}}",
-                ControlFlowBlock::label(node.clone())
-            )
+            format!("{{{}|{statements}|{terminator}}}", node)
         };
 
-        let children = match &node.borrow().terminator {
+        let children = match node.terminator() {
             Terminator::Return | Terminator::Undefined => vec![],
             Terminator::Conditional {
                 target,
                 fallthrough,
                 ..
-            } => vec![
-                (target.clone(), "target"),
-                (fallthrough.clone(), "fallthrough"),
-            ],
-            Terminator::Unconditional { target } => vec![(target.clone(), "")],
+            } => vec![(target, "target"), (fallthrough, "fallthrough")],
+            Terminator::Unconditional { target } => vec![(target, "")],
         };
 
         for child in &children {
-            let id = (id.clone(), child.0.clone().into());
+            let id = (id.clone(), child.0.clone());
             self.edges.push(id.clone());
             self.edge_labels.insert(id, child.1);
         }
@@ -104,7 +95,7 @@ impl Graph {
     }
 }
 
-type NodeId = SharedKey<ControlFlowBlock>;
+type NodeId = ControlFlowBlock;
 type EdgeId = (NodeId, NodeId);
 
 impl<'ast> Labeller<'ast, NodeId, EdgeId> for Graph {

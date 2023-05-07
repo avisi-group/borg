@@ -12,14 +12,13 @@ use {
 /// Contains state required to build the control flow graph, resolving labels and block terminators
 pub struct ControlFlowGraphBuilder {
     labels: HashMap<InternedString, Rc<RefCell<MaybeUnresolvedControlFlowBlock>>>,
-    resolved_blocks:
-        HashMap<SharedKey<MaybeUnresolvedControlFlowBlock>, Rc<RefCell<ControlFlowBlock>>>,
+    resolved_blocks: HashMap<SharedKey<MaybeUnresolvedControlFlowBlock>, ControlFlowBlock>,
     entry_block: Rc<RefCell<MaybeUnresolvedControlFlowBlock>>,
     current_block: Rc<RefCell<MaybeUnresolvedControlFlowBlock>>,
 }
 
 impl ControlFlowGraphBuilder {
-    pub fn from_statements(statements: &[Rc<RefCell<Statement>>]) -> Rc<RefCell<ControlFlowBlock>> {
+    pub fn from_statements(statements: &[Rc<RefCell<Statement>>]) -> ControlFlowBlock {
         let entry_block = MaybeUnresolvedControlFlowBlock::new();
 
         let mut celf = Self {
@@ -146,14 +145,14 @@ impl ControlFlowGraphBuilder {
     }
 
     /// Converts unresolved blocks into resolved blocks, errors if any target labels were not present in the labels map
-    pub fn resolve(mut self) -> Rc<RefCell<ControlFlowBlock>> {
+    pub fn resolve(mut self) -> ControlFlowBlock {
         self.resolve_block(self.entry_block.clone())
     }
 
     fn resolve_block(
         &mut self,
         unresolved: Rc<RefCell<MaybeUnresolvedControlFlowBlock>>,
-    ) -> Rc<RefCell<ControlFlowBlock>> {
+    ) -> ControlFlowBlock {
         // if block is already resolved, return that
         if let Some(resolved) = self.resolved_blocks.get(&unresolved.clone().into()) {
             return resolved.clone();
@@ -178,10 +177,10 @@ impl ControlFlowGraphBuilder {
             panic!("unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}")
         }
 
-        resolved.borrow_mut().label = unresolved.borrow().label;
+        resolved.set_label(unresolved.borrow().label);
 
         // clone the statements across
-        resolved.borrow_mut().statements = unresolved.borrow().statements.clone();
+        resolved.set_statements(unresolved.borrow().statements.clone());
 
         // resolve each kind of terminator
         let terminator = match &unresolved.borrow().terminator {
@@ -200,7 +199,6 @@ impl ControlFlowGraphBuilder {
             },
             MaybeUnresolvedTerminator::Undefined => Terminator::Undefined,
             MaybeUnresolvedTerminator::Unknown => {
-                dbg!(&resolved.borrow_mut().statements);
                 panic!("encountered unknown terminator during resolution");
             }
         };
@@ -209,10 +207,7 @@ impl ControlFlowGraphBuilder {
         resolved
     }
 
-    fn resolve_jump_target(
-        &mut self,
-        target: &MaybeUnresolvedJumpTarget,
-    ) -> Rc<RefCell<ControlFlowBlock>> {
+    fn resolve_jump_target(&mut self, target: &MaybeUnresolvedJumpTarget) -> ControlFlowBlock {
         let block = match target {
             MaybeUnresolvedJumpTarget::Resolved { target } => target.clone(),
             MaybeUnresolvedJumpTarget::Unresolved { label } => self

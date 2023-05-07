@@ -8,19 +8,21 @@ use {
     crate::boom::{
         passes::{
             builtin_fns::AddBuiltinFns, fold_unconditionals::FoldUnconditionals,
-            if_raiser::IfRaiser,
+            if_raiser::IfRaiser, remove_empty::RemoveEmpty,
         },
         Ast,
     },
     std::{cell::RefCell, rc::Rc},
 };
 
-pub mod builtin_fns;
-pub mod fold_unconditionals;
-pub mod if_raiser;
+mod builtin_fns;
+mod fold_unconditionals;
+mod if_raiser;
+mod remove_empty;
 
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
     [
+        RemoveEmpty::new_boxed(),
         FoldUnconditionals::new_boxed(),
         IfRaiser::new_boxed(),
         AddBuiltinFns::new_boxed(ast.clone()),

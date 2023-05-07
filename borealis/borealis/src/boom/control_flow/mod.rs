@@ -7,10 +7,15 @@
 
 use {
     crate::boom::{control_flow::builder::ControlFlowGraphBuilder, Statement, Value},
-    common::{intern::InternedString, shared_key::SharedKey},
+    common::intern::InternedString,
     std::{
         cell::RefCell,
+        collections::hash_map::DefaultHasher,
+        fmt::Display,
+        fmt::{self, Formatter},
+        hash::{Hash, Hasher},
         io::{self, Write},
+        ptr,
         rc::{Rc, Weak},
     },
 };
@@ -22,7 +27,7 @@ mod dot;
 #[derive(Debug, Clone)]
 pub struct ControlFlowGraph {
     /// Function entrypoint
-    pub entry_block: Rc<RefCell<ControlFlowBlock>>,
+    pub entry_block: ControlFlowBlock,
 }
 
 impl ControlFlowGraph {
@@ -43,56 +48,84 @@ impl ControlFlowGraph {
 
 /// Node in a control flow graph, contains a basic block of statements and a terminator
 #[derive(Debug, Clone)]
-pub struct ControlFlowBlock {
+pub struct ControlFlowBlock(Rc<RefCell<ControlFlowBlockInner>>);
+
+#[derive(Debug)]
+struct ControlFlowBlockInner {
     /// Optional block label, otherwise the `SharedKey` `Display` format should be used
     label: Option<InternedString>,
     /// Parents of the current node
-    parents: Vec<Weak<RefCell<ControlFlowBlock>>>,
+    parents: Vec<ControlFlowBlockWeak>,
     /// Sequence of statements within the block
-    pub statements: Vec<Rc<RefCell<Statement>>>,
+    statements: Vec<Rc<RefCell<Statement>>>,
     /// Block terminator
     terminator: Terminator,
 }
 
+impl Hash for ControlFlowBlock {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        ptr::hash(self.0.as_ptr(), state)
+    }
+}
+
+impl PartialEq for ControlFlowBlock {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for ControlFlowBlock {}
+
 impl ControlFlowBlock {
-    fn new() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self {
+    fn new() -> Self {
+        Self(Rc::new(RefCell::new(ControlFlowBlockInner {
             label: None,
             parents: vec![],
             statements: vec![],
             terminator: Terminator::Return,
-        }))
+        })))
     }
 
-    pub fn label(block: Rc<RefCell<Self>>) -> String {
-        block
-            .borrow()
-            .label
-            .map(|label| label.to_string())
-            .unwrap_or(SharedKey::from(block.clone()).to_string())
+    pub fn downgrade(&self) -> ControlFlowBlockWeak {
+        ControlFlowBlockWeak(Rc::downgrade(&self.0))
+    }
+
+    pub fn label(&self) -> Option<InternedString> {
+        self.0.borrow().label
+    }
+
+    pub fn set_label(&self, label: Option<InternedString>) {
+        self.0.borrow_mut().label = label;
     }
 
     /// Gets the parents of this control flow block
-    pub fn parents(&self) -> impl Iterator<Item = Rc<RefCell<Self>>> + '_ {
-        self.parents.iter().filter_map(Weak::upgrade)
+    pub fn parents(&self) -> Vec<ControlFlowBlock> {
+        self.0
+            .borrow()
+            .parents
+            .iter()
+            .filter_map(ControlFlowBlockWeak::upgrade)
+            .collect()
     }
 
     /// Adds a parent to this control flow block
-    pub fn add_parent(&mut self, parent: &Rc<RefCell<Self>>) {
+    pub fn add_parent(&self, parent: &Self) {
+        let parents = &mut self.0.borrow_mut().parents;
+
         // remove dropped weak pointers
-        self.parents.retain(|weak| weak.upgrade().is_some());
+        parents.retain(|weak| weak.upgrade().is_some());
 
         // add new weak pointer
-        self.parents.push(Rc::downgrade(&parent));
+        parents.push(parent.downgrade());
     }
 
     /// Gets the terminator of this control flow block
-    pub fn terminator(&self) -> &Terminator {
-        &self.terminator
+    pub fn terminator(&self) -> Terminator {
+        self.0.borrow().terminator.clone()
     }
 
     /// Sets the terminator of this control flow block (and also the weak parental references of any children)
-    pub fn set_terminator(block: &Rc<RefCell<Self>>, terminator: Terminator) {
+    pub fn set_terminator(&self, terminator: Terminator) {
         match &terminator {
             Terminator::Return | Terminator::Undefined => (),
             Terminator::Conditional {
@@ -100,13 +133,43 @@ impl ControlFlowBlock {
                 fallthrough,
                 ..
             } => {
-                target.borrow_mut().add_parent(block);
-                fallthrough.borrow_mut().add_parent(block);
+                target.add_parent(self);
+                fallthrough.add_parent(self);
             }
-            Terminator::Unconditional { target } => target.borrow_mut().add_parent(block),
+            Terminator::Unconditional { target } => target.add_parent(self),
         }
 
-        block.borrow_mut().terminator = terminator;
+        self.0.borrow_mut().terminator = terminator;
+    }
+
+    pub fn statements(&self) -> Vec<Rc<RefCell<Statement>>> {
+        self.0.borrow().statements.clone()
+    }
+
+    pub fn set_statements(&self, statements: Vec<Rc<RefCell<Statement>>>) {
+        self.0.borrow_mut().statements = statements;
+    }
+}
+
+impl Display for ControlFlowBlock {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.0.borrow().label {
+            Some(label) => write!(f, "{label}"),
+            None => {
+                let mut state = DefaultHasher::new();
+                self.hash(&mut state);
+                write!(f, "{:016X}", state.finish())
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ControlFlowBlockWeak(Weak<RefCell<ControlFlowBlockInner>>);
+
+impl ControlFlowBlockWeak {
+    pub fn upgrade(&self) -> Option<ControlFlowBlock> {
+        self.0.upgrade().map(ControlFlowBlock)
     }
 }
 
@@ -120,12 +183,12 @@ pub enum Terminator {
     /// If condition evaluates to true, then jump to target, otherwise jump to fallthrough
     Conditional {
         condition: Value,
-        target: Rc<RefCell<ControlFlowBlock>>,
-        fallthrough: Rc<RefCell<ControlFlowBlock>>,
+        target: ControlFlowBlock,
+        fallthrough: ControlFlowBlock,
     },
     /// Unconditionally jump to target
     Unconditional {
-        target: Rc<RefCell<ControlFlowBlock>>,
+        target: ControlFlowBlock,
     },
     Undefined,
 }
