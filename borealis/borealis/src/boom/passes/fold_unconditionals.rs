@@ -77,6 +77,8 @@ impl FoldUnconditionals {
 
 impl Pass for FoldUnconditionals {
     fn run(&mut self, ast: Rc<RefCell<Ast>>) {
+        std::fs::create_dir_all("target/dot").unwrap();
+
         ast.borrow().functions.iter().for_each(|(name, def)| {
             trace!("folding {name}");
             def.control_flow
