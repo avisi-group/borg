@@ -5,7 +5,7 @@ use {
         Ast,
     },
     log::trace,
-    std::{cell::RefCell, collections::HashSet, fs::File, rc::Rc},
+    std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
 
 /// Control flow blocks with only one parent and one child (unconditional jump to target) are folded into their parent
@@ -76,20 +76,24 @@ impl FoldUnconditionals {
 }
 
 impl Pass for FoldUnconditionals {
+    fn name(&self) -> &'static str {
+        "FoldUnconditionals"
+    }
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) {
         std::fs::create_dir_all("target/dot").unwrap();
 
         ast.borrow().functions.iter().for_each(|(name, def)| {
             trace!("folding {name}");
-            def.control_flow
-                .as_dot(&mut File::create(format!("target/dot/{name}.dot")).unwrap())
-                .unwrap();
+            // def.control_flow
+            //     .as_dot(&mut File::create(format!("target/dot/{name}.dot")).unwrap())
+            //     .unwrap();
 
             self.fold(def.control_flow.entry_block.clone());
 
-            def.control_flow
-                .as_dot(&mut File::create(format!("target/dot/{name}_folded.dot")).unwrap())
-                .unwrap();
+            // def.control_flow
+            //     .as_dot(&mut File::create(format!("target/dot/{name}_folded.dot")).unwrap())
+            //     .unwrap();
         });
     }
 }

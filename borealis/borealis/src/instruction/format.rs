@@ -3,7 +3,7 @@
 use {
     crate::genc::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
     common::{identifiable::unique_id, intern::InternedString},
-    log::{trace, warn},
+    log::{debug, trace, warn},
     num_bigint::Sign,
     once_cell::sync::Lazy,
     pretty_assertions::assert_eq,
@@ -150,7 +150,7 @@ pub fn process_decode_function_clause(
     let (pat, body) = match &funcl.inner.pattern_match.inner {
         PatternMatchAux::Expression(pat, body) => (pat, body),
         PatternMatchAux::When(pat, _, body) => {
-            warn!("Function clause has condition, ignoring...");
+            debug!("Function clause has condition, ignoring...");
             (pat, body)
         }
     };
@@ -192,7 +192,7 @@ pub fn process_decode_function_clause(
                     format!("padding{}", unique_id()).into(),
                     last_end..range.start,
                 );
-                warn!("inserting new padding range: {:?}", padding);
+                trace!("inserting new padding range: {:?}", padding);
                 padding_ranges.push(padding);
             }
             last_end = range.end;
@@ -203,7 +203,7 @@ pub fn process_decode_function_clause(
                 format!("padding{}", unique_id()).into(),
                 last_end..format_bits.len(),
             );
-            warn!("inserting final padding range: {:?}", padding);
+            trace!("inserting final padding range: {:?}", padding);
             padding_ranges.push(padding);
         }
 

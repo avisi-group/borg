@@ -21,6 +21,10 @@ impl IfRaiser {
 }
 
 impl Pass for IfRaiser {
+    fn name(&self) -> &'static str {
+        "IfRaiser"
+    }
+
     fn run(&mut self, _ast: Rc<RefCell<Ast>>) {}
 }
 

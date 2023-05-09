@@ -28,6 +28,10 @@ impl AddBuiltinFns {
 }
 
 impl Pass for AddBuiltinFns {
+    fn name(&self) -> &'static str {
+        "AddBuiltinFns"
+    }
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) {
         // walk AST, inspecting each function call
         // if the function call references an already-defined function, ignore

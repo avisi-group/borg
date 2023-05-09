@@ -12,6 +12,7 @@ use {
         },
         Ast,
     },
+    log::info,
     std::{cell::RefCell, rc::Rc},
 };
 
@@ -28,10 +29,15 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         AddBuiltinFns::new_boxed(ast.clone()),
     ]
     .into_iter()
-    .for_each(|mut pass| pass.run(ast.clone()));
+    .for_each(|mut pass| {
+        info!("{}", pass.name());
+        pass.run(ast.clone())
+    });
 }
 
 pub trait Pass {
+    fn name(&self) -> &'static str;
+
     /// Run the pass on the supplied AST
     fn run(&mut self, ast: Rc<RefCell<Ast>>);
 }

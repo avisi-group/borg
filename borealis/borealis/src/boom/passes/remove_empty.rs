@@ -14,5 +14,9 @@ impl RemoveEmpty {
 }
 
 impl Pass for RemoveEmpty {
+    fn name(&self) -> &'static str {
+        "RemoveEmpty"
+    }
+
     fn run(&mut self, _ast: Rc<RefCell<Ast>>) {}
 }
