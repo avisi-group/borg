@@ -2,6 +2,9 @@
 members = ["sail", "borealis", "common", "libarch-sys"]
 default-members = ["sail", "borealis", "common"]
 
+# deserializing/converting the AST takes forever and overflows the stack without optimisations
 [profile.dev]
-# deserializing/converting the AST takes forever without optimisations
 opt-level = 3
+
+[profile.release]
+lto = "fat" # made it around 5% faster
