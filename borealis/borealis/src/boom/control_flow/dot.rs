@@ -76,7 +76,7 @@ impl Graph {
                 target,
                 fallthrough,
                 ..
-            } => vec![(target, "target"), (fallthrough, "fallthrough")],
+            } => vec![(target, "if"), (fallthrough, "else")],
             Terminator::Unconditional { target } => vec![(target, "")],
         };
 

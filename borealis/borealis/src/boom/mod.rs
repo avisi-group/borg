@@ -10,10 +10,14 @@ use {
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, shared_key::SharedKey},
     num_bigint::BigInt,
     sail::jib_ast,
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
+    std::{
+        cell::RefCell,
+        collections::{HashMap, HashSet},
+        rc::Rc,
+    },
 };
 
 pub mod control_flow;
@@ -40,6 +44,39 @@ impl Ast {
         let mut emitter = BoomEmitter::new();
         emitter.process(iter);
         Rc::new(RefCell::new(emitter.finish()))
+    }
+
+    /// Collects all statements in the AST into a HashSet
+    ///
+    /// Used to verify that none have been lost during the passes
+    pub fn statements(&self) -> HashSet<SharedKey<Statement>> {
+        let mut statements = HashSet::new();
+
+        self.definitions.iter().for_each(|def| {
+            if let Definition::Let { body, .. } = def {
+                statements.extend(body.iter().cloned().map(Into::into));
+            }
+        });
+
+        self.functions
+            .values()
+            .for_each(|FunctionDefinition { control_flow, .. }| {
+                let mut visited = HashSet::new();
+                let mut to_visit = vec![control_flow.entry_block.clone()];
+
+                while let Some(current) = to_visit.pop() {
+                    if visited.contains(&current) {
+                        return;
+                    }
+
+                    visited.insert(current.clone());
+                    to_visit.extend(current.terminator().targets());
+
+                    statements.extend(current.statements().into_iter().map(Into::into));
+                }
+            });
+
+        statements
     }
 }
 

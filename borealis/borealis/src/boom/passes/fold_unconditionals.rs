@@ -43,7 +43,7 @@ impl FoldUnconditionals {
 
                 did_change = true;
 
-                // move all statements and the terminator from the child to the parent (child will be deallocated automatically)
+                // move all statements and the terminator from the child to the current node (child will be deallocated automatically)
                 let mut statements = node.statements();
                 statements.append(&mut target.statements());
                 node.set_statements(statements);
@@ -58,20 +58,10 @@ impl FoldUnconditionals {
 
         // recurse into children
         self.visited.insert(node.clone());
-        match node.terminator() {
-            Terminator::Return | Terminator::Undefined => (),
-            Terminator::Conditional {
-                target,
-                fallthrough,
-                ..
-            } => {
-                self.fold(target);
-                self.fold(fallthrough);
-            }
-            Terminator::Unconditional { target } => {
-                self.fold(target);
-            }
-        }
+        node.terminator()
+            .targets()
+            .into_iter()
+            .for_each(|target| self.fold(target));
     }
 }
 
@@ -85,15 +75,8 @@ impl Pass for FoldUnconditionals {
 
         ast.borrow().functions.iter().for_each(|(name, def)| {
             trace!("folding {name}");
-            // def.control_flow
-            //     .as_dot(&mut File::create(format!("target/dot/{name}.dot")).unwrap())
-            //     .unwrap();
 
             self.fold(def.control_flow.entry_block.clone());
-
-            // def.control_flow
-            //     .as_dot(&mut File::create(format!("target/dot/{name}_folded.dot")).unwrap())
-            //     .unwrap();
         });
     }
 }

@@ -8,7 +8,7 @@ use {
     crate::boom::{
         passes::{
             builtin_fns::AddBuiltinFns, fold_unconditionals::FoldUnconditionals,
-            if_raiser::IfRaiser, remove_empty::RemoveEmpty,
+            if_raiser::IfRaiser,
         },
         Ast,
     },
@@ -24,11 +24,17 @@ use {
 mod builtin_fns;
 mod fold_unconditionals;
 mod if_raiser;
-mod remove_empty;
 
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
+    dump_func_dot(
+        &ast,
+        "integer_arithmetic_addsub_immediate_decode",
+        "target/dot/addsub_initial.dot",
+    );
+
+    let initial_statements = ast.borrow().statements();
+
     [
-        RemoveEmpty::new_boxed(),
         FoldUnconditionals::new_boxed(),
         IfRaiser::new_boxed(),
         AddBuiltinFns::new_boxed(ast.clone()),
@@ -45,6 +51,9 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             format!("target/dot/addsub_{}.dot", pass.name()),
         );
     });
+
+    // currently, passes should not modify any statements so we smoke test that they are all still there
+    assert_eq!(initial_statements, ast.borrow().statements());
 }
 
 pub trait Pass {

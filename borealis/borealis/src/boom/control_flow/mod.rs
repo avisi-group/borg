@@ -48,7 +48,9 @@ impl ControlFlowGraph {
 
 /// Node in a control flow graph, contains a basic block of statements and a terminator
 #[derive(Debug, Clone)]
-pub struct ControlFlowBlock(Rc<RefCell<ControlFlowBlockInner>>);
+pub struct ControlFlowBlock {
+    inner: Rc<RefCell<ControlFlowBlockInner>>,
+}
 
 #[derive(Debug)]
 struct ControlFlowBlockInner {
@@ -64,13 +66,13 @@ struct ControlFlowBlockInner {
 
 impl Hash for ControlFlowBlock {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        ptr::hash(self.0.as_ptr(), state)
+        ptr::hash(self.inner.as_ptr(), state)
     }
 }
 
 impl PartialEq for ControlFlowBlock {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        Rc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
@@ -78,29 +80,31 @@ impl Eq for ControlFlowBlock {}
 
 impl ControlFlowBlock {
     fn new() -> Self {
-        Self(Rc::new(RefCell::new(ControlFlowBlockInner {
-            label: None,
-            parents: vec![],
-            statements: vec![],
-            terminator: Terminator::Return,
-        })))
+        Self {
+            inner: Rc::new(RefCell::new(ControlFlowBlockInner {
+                label: None,
+                parents: vec![],
+                statements: vec![],
+                terminator: Terminator::Return,
+            })),
+        }
     }
 
     pub fn downgrade(&self) -> ControlFlowBlockWeak {
-        ControlFlowBlockWeak(Rc::downgrade(&self.0))
+        ControlFlowBlockWeak(Rc::downgrade(&self.inner))
     }
 
     pub fn label(&self) -> Option<InternedString> {
-        self.0.borrow().label
+        self.inner.borrow().label
     }
 
     pub fn set_label(&self, label: Option<InternedString>) {
-        self.0.borrow_mut().label = label;
+        self.inner.borrow_mut().label = label;
     }
 
     /// Gets the parents of this control flow block
     pub fn parents(&self) -> Vec<ControlFlowBlock> {
-        self.0
+        self.inner
             .borrow()
             .parents
             .iter()
@@ -110,7 +114,7 @@ impl ControlFlowBlock {
 
     /// Adds a parent to this control flow block
     pub fn add_parent(&self, parent: &Self) {
-        let parents = &mut self.0.borrow_mut().parents;
+        let parents = &mut self.inner.borrow_mut().parents;
 
         // remove dropped weak pointers
         parents.retain(|weak| weak.upgrade().is_some());
@@ -121,7 +125,7 @@ impl ControlFlowBlock {
 
     /// Gets the terminator of this control flow block
     pub fn terminator(&self) -> Terminator {
-        self.0.borrow().terminator.clone()
+        self.inner.borrow().terminator.clone()
     }
 
     /// Sets the terminator of this control flow block (and also the weak parental references of any children)
@@ -139,21 +143,21 @@ impl ControlFlowBlock {
             Terminator::Unconditional { target } => target.add_parent(self),
         }
 
-        self.0.borrow_mut().terminator = terminator;
+        self.inner.borrow_mut().terminator = terminator;
     }
 
     pub fn statements(&self) -> Vec<Rc<RefCell<Statement>>> {
-        self.0.borrow().statements.clone()
+        self.inner.borrow().statements.clone()
     }
 
     pub fn set_statements(&self, statements: Vec<Rc<RefCell<Statement>>>) {
-        self.0.borrow_mut().statements = statements;
+        self.inner.borrow_mut().statements = statements;
     }
 }
 
 impl Display for ControlFlowBlock {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.0.borrow().label {
+        match self.inner.borrow().label {
             Some(label) => write!(f, "{label}"),
             None => {
                 let mut state = DefaultHasher::new();
@@ -169,7 +173,7 @@ pub struct ControlFlowBlockWeak(Weak<RefCell<ControlFlowBlockInner>>);
 
 impl ControlFlowBlockWeak {
     pub fn upgrade(&self) -> Option<ControlFlowBlock> {
-        self.0.upgrade().map(ControlFlowBlock)
+        self.0.upgrade().map(|inner| ControlFlowBlock { inner })
     }
 }
 
@@ -191,4 +195,18 @@ pub enum Terminator {
         target: ControlFlowBlock,
     },
     Undefined,
+}
+
+impl Terminator {
+    pub fn targets(&self) -> Vec<ControlFlowBlock> {
+        match self {
+            Terminator::Return | Terminator::Undefined => vec![],
+            Terminator::Conditional {
+                target,
+                fallthrough,
+                ..
+            } => vec![target.clone(), fallthrough.clone()],
+            Terminator::Unconditional { target } => vec![target.clone()],
+        }
+    }
 }
