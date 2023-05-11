@@ -29,7 +29,7 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
     dump_func_dot(
         &ast,
         "integer_arithmetic_addsub_immediate_decode",
-        "target/dot/addsub_initial.dot",
+        "target/dot/addsub.dot",
     );
 
     let initial_statements = ast.borrow().statements();

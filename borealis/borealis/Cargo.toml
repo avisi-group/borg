@@ -32,4 +32,4 @@ dot = "0.1.4"
 [dev-dependencies]
 insta = "1.29.0"
 reqwest = { version = "0.11.17", default-features = false, features = ["blocking", "rustls-tls", "json"] }
-serde = { version = "1.0.162", features = ["derive"] }
+serde = { version = "1.0.163", features = ["derive"] }

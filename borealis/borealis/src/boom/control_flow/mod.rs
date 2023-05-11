@@ -10,7 +10,7 @@ use {
     common::intern::InternedString,
     std::{
         cell::RefCell,
-        collections::hash_map::DefaultHasher,
+        collections::{hash_map::DefaultHasher, HashSet},
         fmt::Display,
         fmt::{self, Formatter},
         hash::{Hash, Hasher},
@@ -57,7 +57,7 @@ struct ControlFlowBlockInner {
     /// Optional block label, otherwise the `SharedKey` `Display` format should be used
     label: Option<InternedString>,
     /// Parents of the current node
-    parents: Vec<ControlFlowBlockWeak>,
+    parents: HashSet<ControlFlowBlockWeak>,
     /// Sequence of statements within the block
     statements: Vec<Rc<RefCell<Statement>>>,
     /// Block terminator
@@ -78,12 +78,25 @@ impl PartialEq for ControlFlowBlock {
 
 impl Eq for ControlFlowBlock {}
 
+impl Display for ControlFlowBlock {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.inner.borrow().label {
+            Some(label) => write!(f, "{label}"),
+            None => {
+                let mut state = DefaultHasher::new();
+                self.hash(&mut state);
+                write!(f, "{:016X}", state.finish())
+            }
+        }
+    }
+}
+
 impl ControlFlowBlock {
     fn new() -> Self {
         Self {
             inner: Rc::new(RefCell::new(ControlFlowBlockInner {
                 label: None,
-                parents: vec![],
+                parents: HashSet::new(),
                 statements: vec![],
                 terminator: Terminator::Return,
             })),
@@ -120,7 +133,7 @@ impl ControlFlowBlock {
         parents.retain(|weak| weak.upgrade().is_some());
 
         // add new weak pointer
-        parents.push(parent.downgrade());
+        parents.insert(parent.downgrade());
     }
 
     /// Gets the terminator of this control flow block
@@ -153,18 +166,10 @@ impl ControlFlowBlock {
     pub fn set_statements(&self, statements: Vec<Rc<RefCell<Statement>>>) {
         self.inner.borrow_mut().statements = statements;
     }
-}
 
-impl Display for ControlFlowBlock {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.inner.borrow().label {
-            Some(label) => write!(f, "{label}"),
-            None => {
-                let mut state = DefaultHasher::new();
-                self.hash(&mut state);
-                write!(f, "{:016X}", state.finish())
-            }
-        }
+    /// Renders a `ControlFlowBlock` to DOT syntax.
+    pub fn as_dot<W: Write>(&self, w: &mut W) -> io::Result<()> {
+        dot::render(w, self)
     }
 }
 
@@ -176,6 +181,20 @@ impl ControlFlowBlockWeak {
         self.0.upgrade().map(|inner| ControlFlowBlock { inner })
     }
 }
+
+impl Hash for ControlFlowBlockWeak {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        ptr::hash(self.0.as_ptr(), state)
+    }
+}
+
+impl PartialEq for ControlFlowBlockWeak {
+    fn eq(&self, other: &Self) -> bool {
+        Weak::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for ControlFlowBlockWeak {}
 
 /// Block terminator
 ///

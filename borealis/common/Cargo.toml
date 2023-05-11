@@ -10,6 +10,6 @@ deepsize = "0.2.0"
 fxhash = "0.2.1"
 lasso = { version = "0.7.0", features = ["multi-threaded"] }
 once_cell = "1.17.1"
-serde = { version = "1.0.162", features = ["derive"] }
+serde = { version = "1.0.163", features = ["derive"] }
 thiserror = "1.0.40"
 pretty_assertions = "1.3.0"
