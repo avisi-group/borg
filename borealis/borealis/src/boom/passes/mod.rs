@@ -7,8 +7,8 @@
 use {
     crate::boom::{
         passes::{
-            builtin_fns::AddBuiltinFns, fold_unconditionals::FoldUnconditionals,
-            if_raiser::IfRaiser,
+            builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
+            fold_unconditionals::FoldUnconditionals,
         },
         Ast,
     },
@@ -16,27 +16,21 @@ use {
     std::{
         cell::RefCell,
         fs::{create_dir_all, File},
-        path::Path,
+        path::PathBuf,
         rc::Rc,
     },
 };
 
 mod builtin_fns;
+mod cycle_finder;
 mod fold_unconditionals;
-mod if_raiser;
 
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
-    dump_func_dot(
-        &ast,
-        "integer_arithmetic_addsub_immediate_decode",
-        "target/dot/addsub.dot",
-    );
-
     let initial_statements = ast.borrow().statements();
 
     [
         FoldUnconditionals::new_boxed(),
-        IfRaiser::new_boxed(),
+        CycleFinder::new_boxed(),
         AddBuiltinFns::new_boxed(ast.clone()),
     ]
     .into_iter()
@@ -44,13 +38,11 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         info!("{}", pass.name());
 
         pass.run(ast.clone());
-
-        dump_func_dot(
-            &ast,
-            "integer_arithmetic_addsub_immediate_decode",
-            format!("target/dot/addsub_{}.dot", pass.name()),
-        );
     });
+
+    dump_func_dot(&ast, "__Reset");
+    dump_func_dot(&ast, "__EndCycle");
+    dump_func_dot(&ast, "__ListConfig");
 
     // currently, passes should not modify any statements so we smoke test that they are all still there
     assert_eq!(initial_statements, ast.borrow().statements());
@@ -63,16 +55,16 @@ pub trait Pass {
     fn run(&mut self, ast: Rc<RefCell<Ast>>);
 }
 
-fn dump_func_dot<P: AsRef<Path>>(ast: &Rc<RefCell<Ast>>, func: &'static str, path: P) {
-    if let Some(parent) = path.as_ref().parent() {
-        create_dir_all(parent).unwrap();
-    }
+fn dump_func_dot(ast: &Rc<RefCell<Ast>>, func: &'static str) {
+    let path = PathBuf::from(format!("target/dot/{func}.dot"));
+
+    create_dir_all(path.parent().unwrap()).unwrap();
 
     ast.borrow()
         .functions
         .get(&func.into())
         .unwrap()
-        .control_flow
+        .entry_block
         .as_dot(&mut File::create(path).unwrap())
         .unwrap()
 }

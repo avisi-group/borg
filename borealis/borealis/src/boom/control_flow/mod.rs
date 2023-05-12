@@ -8,9 +8,10 @@
 use {
     crate::boom::{control_flow::builder::ControlFlowGraphBuilder, Statement, Value},
     common::intern::InternedString,
+    log::trace,
     std::{
         cell::RefCell,
-        collections::{hash_map::DefaultHasher, HashSet},
+        collections::{hash_map::DefaultHasher, HashSet, LinkedList},
         fmt::Display,
         fmt::{self, Formatter},
         hash::{Hash, Hasher},
@@ -23,27 +24,11 @@ use {
 mod builder;
 mod dot;
 
-/// Control flow graph of a BOOM function
-#[derive(Debug, Clone)]
-pub struct ControlFlowGraph {
-    /// Function entrypoint
-    pub entry_block: ControlFlowBlock,
-}
-
-impl ControlFlowGraph {
-    /// Creates a control flow graph from a slice of statements.
-    ///
-    /// This should be called per BOOM function.
-    pub fn from_statements(statements: &[Rc<RefCell<Statement>>]) -> Self {
-        let entry_block = ControlFlowGraphBuilder::from_statements(statements);
-
-        Self { entry_block }
-    }
-
-    /// Renders a `ControlFlowGraph` to DOT syntax.
-    pub fn as_dot<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        dot::render(w, &self.entry_block)
-    }
+/// Creates a control flow graph from a slice of statements.
+///
+/// This should be called per BOOM function.
+pub fn build_graph(statements: &[Rc<RefCell<Statement>>]) -> ControlFlowBlock {
+    ControlFlowGraphBuilder::from_statements(statements)
 }
 
 /// Node in a control flow graph, contains a basic block of statements and a terminator
@@ -170,6 +155,39 @@ impl ControlFlowBlock {
     /// Renders a `ControlFlowBlock` to DOT syntax.
     pub fn as_dot<W: Write>(&self, w: &mut W) -> io::Result<()> {
         dot::render(w, self)
+    }
+
+    pub fn contains_cycles(&self) -> bool {
+        let mut processed = HashSet::new();
+        let mut currently_processing = HashSet::new();
+        let mut to_visit = LinkedList::new();
+        to_visit.push_back(self.clone());
+
+        // continue until all no nodes are left to visit
+        while let Some(current) = to_visit.pop_front() {
+            trace!("processing {}", current);
+
+            // continue if we have already processed the current node
+            if processed.contains(&current) {
+                continue;
+            }
+
+            processed.insert(current.clone());
+            currently_processing.insert(current.clone());
+
+            // Visit children of the current node
+            for child in current.terminator().targets() {
+                if currently_processing.contains(&child) {
+                    // Found a cycle!
+                    return true;
+                }
+                to_visit.push_back(child);
+            }
+
+            currently_processing.remove(&current);
+        }
+
+        false
     }
 }
 

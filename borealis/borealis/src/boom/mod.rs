@@ -6,7 +6,7 @@
 
 use {
     crate::boom::{
-        control_flow::ControlFlowGraph,
+        control_flow::ControlFlowBlock,
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
     },
@@ -58,11 +58,13 @@ impl Ast {
             }
         });
 
-        self.functions
-            .values()
-            .for_each(|FunctionDefinition { control_flow, .. }| {
+        self.functions.values().for_each(
+            |FunctionDefinition {
+                 entry_block: control_flow,
+                 ..
+             }| {
                 let mut visited = HashSet::new();
-                let mut to_visit = vec![control_flow.entry_block.clone()];
+                let mut to_visit = vec![control_flow.clone()];
 
                 while let Some(current) = to_visit.pop() {
                     if visited.contains(&current) {
@@ -74,7 +76,8 @@ impl Ast {
 
                     statements.extend(current.statements().into_iter().map(Into::into));
                 }
-            });
+            },
+        );
 
         statements
     }
@@ -138,8 +141,10 @@ impl Walkable for Definition {
 /// Function signature and body
 #[derive(Debug, Clone)]
 pub struct FunctionDefinition {
+    /// Function type signature
     pub signature: FunctionSignature,
-    pub control_flow: ControlFlowGraph,
+    /// Entry block into the control flow graph
+    pub entry_block: ControlFlowBlock,
 }
 
 impl Walkable for FunctionDefinition {

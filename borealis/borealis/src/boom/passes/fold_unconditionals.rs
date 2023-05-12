@@ -26,7 +26,7 @@ impl Pass for FoldUnconditionals {
     fn run(&mut self, ast: Rc<RefCell<Ast>>) {
         ast.borrow().functions.iter().for_each(|(name, def)| {
             debug!("folding {name}");
-            fold_graph(def.control_flow.entry_block.clone());
+            fold_graph(def.entry_block.clone());
         });
     }
 }
