@@ -121,6 +121,15 @@ impl ControlFlowBlock {
         parents.insert(parent.downgrade());
     }
 
+    fn remove_parent(&self, parent_to_remove: &Self) {
+        let parent_to_remove = parent_to_remove.downgrade();
+        let parents = &mut self.inner.borrow_mut().parents;
+
+        assert!(parents.contains(&parent_to_remove));
+
+        parents.retain(|p| *p != parent_to_remove);
+    }
+
     /// Gets the terminator of this control flow block
     pub fn terminator(&self) -> Terminator {
         self.inner.borrow().terminator.clone()
@@ -128,6 +137,12 @@ impl ControlFlowBlock {
 
     /// Sets the terminator of this control flow block (and also the weak parental references of any children)
     pub fn set_terminator(&self, terminator: Terminator) {
+        // remove ourselves as a parent from all children
+        self.terminator()
+            .targets()
+            .iter()
+            .for_each(|child| child.remove_parent(self));
+
         match &terminator {
             Terminator::Return | Terminator::Undefined => (),
             Terminator::Conditional {

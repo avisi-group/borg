@@ -30,5 +30,5 @@ color-eyre = "0.6.2"
 [dev-dependencies]
 color-eyre = { version = "0.6.2", default-features = false }
 insta = { version = "1.29.0", features = ["json", "filters"] }
-proptest = "1.1.0"
+proptest = "1.2.0"
 serde_json = "1.0.96"

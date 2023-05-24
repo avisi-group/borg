@@ -46,6 +46,9 @@ fn fold_graph(entry_block: ControlFlowBlock) {
 
         if let Terminator::Unconditional { target: child } = current.terminator() {
             trace!("node is unconditional with child {child}");
+            for parent in child.parents() {
+                trace!("has parent {}", parent);
+            }
 
             // check if the child has only 1 parent (the current node)
             if child.parents().len() == 1 {
@@ -60,7 +63,7 @@ fn fold_graph(entry_block: ControlFlowBlock) {
                 let mut statements = current.statements();
                 statements.append(&mut child.statements());
                 current.set_statements(statements);
-                ControlFlowBlock::set_terminator(&current, child.terminator());
+                current.set_terminator(child.terminator());
 
                 // modified the node so visit it again
                 to_visit.push(current.clone());

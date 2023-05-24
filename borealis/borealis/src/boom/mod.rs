@@ -394,6 +394,48 @@ pub enum Value {
     },
 }
 
+impl Value {
+    pub fn evaluate_bool(&self, ctx: &ControlFlowBlock) -> Option<bool> {
+        match &self {
+            Self::Identifier(identifier) => {
+                let defs = ctx
+                    .statements()
+                    .iter()
+                    .filter_map(|statement| {
+                        if let Statement::Copy {
+                            expression: Expression::Identifier(target_identifier),
+                            value,
+                        } = &*statement.borrow()
+                        {
+                            if identifier == target_identifier {
+                                Some(value.clone())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                // probably a function parameter, or assignment of result of function
+                if defs.len() == 0 {
+                    return None;
+                }
+
+                // variable should be assigned to exactly once
+                assert!(defs.len() == 1);
+
+                defs[0].evaluate_bool(ctx)
+            }
+            Self::Literal(Literal::Bool(value)) => Some(*value),
+            Self::Literal(_) => None,
+            // Self::Operation(op) => op.evaluate_bool(),
+            _ => None,
+        }
+    }
+}
+
 impl Walkable for Value {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
