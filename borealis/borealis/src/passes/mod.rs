@@ -57,23 +57,17 @@ pub trait Pass {
 
 /// Run each pass until it does not mutate the AST, and run the whole sequence of passes until no pass mutates the AST
 fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
+    // ironically, we *do* want to short-circuit here
+    // behaviour is "keep running the passes in order until none change"
     loop {
-        let mut ast_did_change = false;
-
-        passes.into_iter().for_each(|pass| loop {
-            info!("{}", pass.name());
-
-            let pass_ast_did_change = pass.run(ast.clone());
-
-            // finish once the pass no longer mutates the AST
-            if !pass_ast_did_change {
-                break;
-            } else {
-                ast_did_change = true;
-            }
-        });
-
-        if !ast_did_change {
+        if !passes
+            .into_iter()
+            .map(|pass| {
+                info!("{}", pass.name());
+                pass.run(ast.clone())
+            })
+            .any(|did_change| did_change)
+        {
             break;
         }
     }
