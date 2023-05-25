@@ -15,14 +15,15 @@ impl CycleFinder {
 
 impl Pass for CycleFinder {
     fn name(&self) -> &'static str {
-        "IfRaiser"
+        "CycleFinder"
     }
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) {
+    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         ast.borrow().functions.iter().for_each(|(name, def)| {
             if def.entry_block.contains_cycles() {
                 warn!("{name} has cycles");
             }
         });
+        false
     }
 }

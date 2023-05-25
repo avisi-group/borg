@@ -4,7 +4,7 @@
 use {
     crate::boom::{
         control_flow::{ControlFlowBlock, Terminator},
-        passes::Pass,
+        passes::{any::AnyExt as _, Pass},
         Ast,
     },
     log::{debug, trace},
@@ -26,15 +26,20 @@ impl Pass for RemoveConstBranch {
         "RemoveConstBranch"
     }
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) {
-        ast.borrow().functions.iter().for_each(|(name, def)| {
-            debug!("removing const branch {name}");
-            remove_const_branch(def.entry_block.clone());
-        });
+    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
+        ast.borrow()
+            .functions
+            .iter()
+            .map(|(name, def)| {
+                debug!("removing const branch {name}");
+                remove_const_branch(def.entry_block.clone())
+            })
+            .any()
     }
 }
 
-fn remove_const_branch(entry_block: ControlFlowBlock) {
+fn remove_const_branch(entry_block: ControlFlowBlock) -> bool {
+    let mut did_change = false;
     let mut processed = HashSet::new();
     let mut to_visit = vec![entry_block];
 
@@ -72,5 +77,9 @@ fn remove_const_branch(entry_block: ControlFlowBlock) {
                 target: fallthrough,
             });
         }
+
+        did_change = true;
     }
+
+    did_change
 }

@@ -32,7 +32,7 @@ impl Pass for AddBuiltinFns {
         "AddBuiltinFns"
     }
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) {
+    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         // walk AST, inspecting each function call
         // if the function call references an already-defined function, ignore
         // otherwise, lookup function in functions and execute behaviour (either in place modification or inserting new function definition)
@@ -41,6 +41,8 @@ impl Pass for AddBuiltinFns {
             .functions
             .values()
             .for_each(|def| self.visit_function_definition(def));
+
+        false
     }
 }
 

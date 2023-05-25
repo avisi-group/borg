@@ -1,7 +1,7 @@
 use {
     crate::boom::{
         control_flow::{ControlFlowBlock, Terminator},
-        passes::Pass,
+        passes::{any::AnyExt as _, Pass},
         Ast,
     },
     log::{debug, trace},
@@ -23,15 +23,21 @@ impl Pass for FoldUnconditionals {
         "FoldUnconditionals"
     }
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) {
-        ast.borrow().functions.iter().for_each(|(name, def)| {
-            debug!("folding {name}");
-            fold_graph(def.entry_block.clone());
-        });
+    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
+        ast.borrow()
+            .functions
+            .iter()
+            .map(|(name, def)| {
+                debug!("folding {name}");
+
+                fold_graph(def.entry_block.clone())
+            })
+            .any()
     }
 }
 
-fn fold_graph(entry_block: ControlFlowBlock) {
+fn fold_graph(entry_block: ControlFlowBlock) -> bool {
+    let mut did_change = false;
     let mut processed = HashSet::new();
     let mut to_visit = vec![entry_block];
 
@@ -67,6 +73,7 @@ fn fold_graph(entry_block: ControlFlowBlock) {
 
                 // modified the node so visit it again
                 to_visit.push(current.clone());
+                did_change = true;
                 continue;
             }
 
@@ -118,6 +125,7 @@ fn fold_graph(entry_block: ControlFlowBlock) {
 
                 // revisit parents
                 to_visit.extend(current.parents());
+                did_change = true;
                 continue;
             }
         }
@@ -128,4 +136,6 @@ fn fold_graph(entry_block: ControlFlowBlock) {
         // push children to visit
         to_visit.extend(current.terminator().targets());
     }
+
+    did_change
 }
