@@ -4,9 +4,9 @@
 
 use {
     crate::{
-        boom::passes::execute_passes,
         genc::{Description, Instruction},
         instruction::{get_instructions, process_instruction},
+        passes::execute_passes,
     },
     common::intern::INTERNER,
     deepsize::DeepSizeOf,
@@ -30,6 +30,7 @@ use {
 pub mod boom;
 pub mod genc;
 pub mod instruction;
+pub mod passes;
 
 /// Borealis error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]

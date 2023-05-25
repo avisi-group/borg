@@ -5,12 +5,12 @@
 //! * Builtin function handling
 
 use {
-    crate::boom::{
+    crate::{
+        boom::Ast,
         passes::{
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
         },
-        Ast,
     },
     log::info,
     std::{
@@ -27,6 +27,7 @@ mod cycle_finder;
 mod fold_unconditionals;
 mod remove_const_branch;
 
+/// Executes the optimisation and raising passes on an AST
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
     dump_func_dot(&ast, "__Reset", None);
     dump_func_dot(&ast, "system_sysops", None);
@@ -45,7 +46,9 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
     dump_func_dot(&ast, "system_sysops", Some("system_sysops_after"));
 }
 
+/// Pass that performs an operation on an AST
 pub trait Pass {
+    /// Gets the name of the pass
     fn name(&self) -> &'static str;
 
     /// Run the pass on the supplied AST, returning whether the AST was changed

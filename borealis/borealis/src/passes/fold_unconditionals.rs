@@ -1,8 +1,10 @@
 use {
-    crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
+    crate::{
+        boom::{
+            control_flow::{ControlFlowBlock, Terminator},
+            Ast,
+        },
         passes::{any::AnyExt as _, Pass},
-        Ast,
     },
     log::{debug, trace},
     std::{cell::RefCell, collections::HashSet, rc::Rc},

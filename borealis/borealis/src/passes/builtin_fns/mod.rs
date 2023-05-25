@@ -1,10 +1,12 @@
 //! Pass for implementing builtin (as in, provided by the Sail compiler) functions in BOOM
 
 use {
-    crate::boom::{
+    crate::{
+        boom::{
+            visitor::{Visitor, Walkable},
+            Ast, Statement,
+        },
         passes::Pass,
-        visitor::{Visitor, Walkable},
-        Ast, Statement,
     },
     regex::Regex,
     std::{cell::RefCell, rc::Rc},

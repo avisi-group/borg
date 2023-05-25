@@ -1,5 +1,5 @@
 use {
-    crate::boom::{passes::Pass, Ast},
+    crate::{boom::Ast, passes::Pass},
     log::warn,
     std::{cell::RefCell, rc::Rc},
 };

@@ -22,7 +22,6 @@ use {
 
 pub mod control_flow;
 pub mod convert;
-pub mod passes;
 pub mod pretty_print;
 pub mod visitor;
 
