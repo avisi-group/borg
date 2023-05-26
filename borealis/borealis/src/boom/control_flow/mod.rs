@@ -88,14 +88,17 @@ impl ControlFlowBlock {
         }
     }
 
+    /// Creates a new weak pointer to a `ControlFlowBlock`
     pub fn downgrade(&self) -> ControlFlowBlockWeak {
         ControlFlowBlockWeak(Rc::downgrade(&self.inner))
     }
 
+    /// Gets the label of a `ControlFlowBlock`
     pub fn label(&self) -> Option<InternedString> {
         self.inner.borrow().label
     }
 
+    /// Sets the label of a `ControlFlowBlock`
     pub fn set_label(&self, label: Option<InternedString>) {
         self.inner.borrow_mut().label = label;
     }
@@ -159,10 +162,12 @@ impl ControlFlowBlock {
         self.inner.borrow_mut().terminator = terminator;
     }
 
+    /// Gets the statements of a `ControlFlowBlock`
     pub fn statements(&self) -> Vec<Rc<RefCell<Statement>>> {
         self.inner.borrow().statements.clone()
     }
 
+    /// Sets the statements of a `ControlFlowBlock`
     pub fn set_statements(&self, statements: Vec<Rc<RefCell<Statement>>>) {
         self.inner.borrow_mut().statements = statements;
     }
@@ -172,6 +177,7 @@ impl ControlFlowBlock {
         dot::render(w, self)
     }
 
+    /// Determines whether the current `ControlFlowBlock` and it's children contain any cycles
     pub fn contains_cycles(&self) -> bool {
         let mut processed = HashSet::new();
         let mut currently_processing = HashSet::new();
@@ -206,10 +212,12 @@ impl ControlFlowBlock {
     }
 }
 
+/// Non-owning reference to a `ControlFlowBlock`
 #[derive(Debug)]
 pub struct ControlFlowBlockWeak(Weak<RefCell<ControlFlowBlockInner>>);
 
 impl ControlFlowBlockWeak {
+    /// Attempts to upgrade to a strong reference to a `ControlFlowBlock`
     pub fn upgrade(&self) -> Option<ControlFlowBlock> {
         self.0.upgrade().map(|inner| ControlFlowBlock { inner })
     }
@@ -238,18 +246,24 @@ pub enum Terminator {
     Return,
     /// If condition evaluates to true, then jump to target, otherwise jump to fallthrough
     Conditional {
+        /// Condition
         condition: Value,
+        /// Target if condition is `true`
         target: ControlFlowBlock,
+        /// Fallthrough if condition is `false`
         fallthrough: ControlFlowBlock,
     },
     /// Unconditionally jump to target
     Unconditional {
+        /// Target to branch to
         target: ControlFlowBlock,
     },
+    /// Undefined terminator, distinct from the internal `Unknown` variant.
     Undefined,
 }
 
 impl Terminator {
+    /// Gets the targets of a terminator
     pub fn targets(&self) -> Vec<ControlFlowBlock> {
         match self {
             Terminator::Return | Terminator::Undefined => vec![],

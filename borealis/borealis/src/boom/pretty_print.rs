@@ -42,6 +42,7 @@ pub fn print_ast<W: Write>(
         .for_each(|(_, fundef)| visitor.visit_function_definition(fundef));
 }
 
+/// Pretty-print JIB statement
 pub fn print_statement<W: Write>(w: &mut W, statement: Rc<RefCell<Statement>>) {
     let mut visitor = BoomPrettyPrinter::new(w);
     visitor.visit_statement(statement);
@@ -54,6 +55,7 @@ pub struct BoomPrettyPrinter<'writer, W> {
 }
 
 impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
+    /// Creates a new `BoomPrettyPrinter` with the supplied writer
     pub fn new(writer: &'writer mut W) -> Self {
         Self {
             indent: Rc::new(AtomicUsize::new(0)),

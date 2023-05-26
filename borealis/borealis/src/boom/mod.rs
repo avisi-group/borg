@@ -37,6 +37,7 @@ pub struct Ast {
 }
 
 impl Ast {
+    /// Converts JIB AST into BOOM AST
     pub fn from_jib<'a, I: IntoIterator<Item = &'a jib_ast::Definition>>(
         iter: I,
     ) -> Rc<RefCell<Self>> {
@@ -501,16 +502,4 @@ pub enum Bit {
     _0,
     _1,
     Unknown,
-}
-
-/// Enum containing all possible node kinds
-#[derive(Debug, Clone)]
-pub enum NodeKind {
-    Statement(Rc<RefCell<Statement>>),
-    Expression(Rc<RefCell<Expression>>),
-    Value(Rc<RefCell<Value>>),
-    Literal(Rc<RefCell<Literal>>),
-    Operation(Rc<RefCell<Operation>>),
-    Type(Rc<RefCell<Type>>),
-    NamedValue(Rc<RefCell<NamedValue>>),
 }

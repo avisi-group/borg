@@ -1,3 +1,5 @@
+//! JIB to BOOM conversion
+
 use {
     crate::boom::{self, control_flow::build_graph, FunctionSignature, NamedType},
     common::intern::InternedString,
@@ -10,6 +12,7 @@ use {
     },
 };
 
+/// Consumes JIB AST and produces BOOM
 #[derive(Debug, Default)]
 pub struct BoomEmitter {
     /// BOOM AST being constructed by walker
@@ -19,16 +22,19 @@ pub struct BoomEmitter {
 }
 
 impl BoomEmitter {
+    /// Create a new `BoomEmitter`
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Process a sequence of JIB definitions
     pub fn process<'a, I: IntoIterator<Item = &'a jib_ast::Definition>>(&mut self, definitions: I) {
         definitions
             .into_iter()
             .for_each(|def| self.process_definition(def));
     }
 
+    /// Emit BOOM AST
     pub fn finish(self) -> boom::Ast {
         self.ast
     }
