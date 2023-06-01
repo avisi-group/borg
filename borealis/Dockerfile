@@ -38,13 +38,16 @@ COPY sail/Cargo.toml sail/
 COPY common/Cargo.toml common/
 COPY libarch-sys/Cargo.toml libarch-sys/
 RUN eval `opam env` && \
-    cargo build --release --workspace --all-targets && \
-    cargo test --release --workspace --no-run && \
-    cargo doc --release --workspace
+    cargo build --release  && \
+    cargo test --release --no-run && \
+    cargo doc --release
 
 # copy full source
-COPY . .
-RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs libarch-sys/src/lib.rs
+COPY borealis borealis
+COPY common common
+COPY sail sail
+COPY data data
+RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs
 
 # check formatting
 RUN cargo fmt --all -- --check
@@ -53,7 +56,7 @@ RUN cargo fmt --all -- --check
 RUN eval `opam env` && cargo test --release --no-fail-fast
 
 # build borealis
-RUN eval `opam env` && cargo build --release --all-targets
+RUN eval `opam env` && cargo build --release
 
 # build docs
 RUN eval `opam env` && cargo doc --release
@@ -62,7 +65,7 @@ RUN echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; URL=
 # run E2E test
 FROM builder as borealis_genc
 RUN mkdir target/genc
-RUN cargo r --release -- --force sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
+RUN cargo r --release -- --force sail2genc data/sail-arm-full.json target/genc/
 
 FROM ghcr.io/fmckeogh/gensim:latest as gensim
 WORKDIR /tmp/build
@@ -73,9 +76,14 @@ FROM rust as harness
 WORKDIR /tmp/build
 RUN apt-get update && apt-get install -yy libclang-dev
 
-# copy index, source, and gensim output
+# copy index and workspace
 COPY --from=builder /usr/local/cargo /usr/local/cargo
 COPY --from=builder /tmp/build /tmp/build
+
+# copy libarch rust source
+COPY libarch-sys libarch-sys
+
+# copy gensim output
 COPY --from=gensim /tmp/build/output/arm64-decode.cpp libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-decode.h libarch-sys/include
 COPY --from=gensim /tmp/build/output/arm64-disasm.cpp libarch-sys/include
