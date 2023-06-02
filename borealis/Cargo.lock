@@ -424,7 +424,8 @@ dependencies = [
 [[package]]
 name = "errctx"
 version = "1.0.0"
-source = "git+https://github.com/fmckeogh/errctx#fac8e02dada4b7f084424d6a7af73fff41fe8d61"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1bbf25a08b1f946e35b7d9191adb32e9a885d7cefda25d001fef025ce3d97516"
 dependencies = [
  "thiserror",
 ]

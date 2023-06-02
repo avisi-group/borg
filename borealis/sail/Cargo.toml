@@ -9,12 +9,12 @@ repository = "https://github.com/avisi-group/borealis"
 
 [dependencies]
 common = { path = "../common" }
-errctx = { git = "https://github.com/fmckeogh/errctx" }
 ocaml = { version = "1.0.0-beta.5", features = ["no-panic-hook"] }
 once_cell = "1.17.2"
 parking_lot = "0.12.1"
 displaydoc = "0.2.4"
 thiserror = "1.0.40"
+errctx = "1.0.0"
 log = "0.4.18"
 serde = { version = "1.0.163", features = ["derive"] }
 deepsize = "0.2.0"
