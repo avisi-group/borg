@@ -54,7 +54,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     // crate::instruction::execute::pretty_print::print_ast(jib_ast);
     info!("Converting JIB to BOOM");
     let ast = boom::Ast::from_jib(jib_ast);
-    execute_passes(ast);
+    execute_passes(ast.clone());
 
     let instructions = get_instructions(sail_ast);
 
@@ -62,7 +62,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
 
     description.instructions = instructions
         .into_iter()
-        .map(|clause| process_instruction(jib_ast, &clause))
+        .map(|clause| process_instruction(ast.clone(), &clause))
         .map(|(name, format, execute)| (name.to_string(), Instruction { format, execute }))
         .collect();
 

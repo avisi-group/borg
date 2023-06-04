@@ -1,14 +1,14 @@
 //! JIB AST pretty printing
 
 use {
-    common::intern::InternedString,
-    sail::{
+    crate::{
         jib_ast::{
             visitor::Visitor, Definition, Expression, Instruction, InstructionAux, Name, Type,
             TypeDefinition, Value,
         },
         sail_ast::Identifier,
     },
+    common::intern::InternedString,
     std::{
         collections::{HashSet, LinkedList},
         rc::Rc,

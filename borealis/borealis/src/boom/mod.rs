@@ -8,6 +8,7 @@ use {
     crate::boom::{
         control_flow::ControlFlowBlock,
         convert::BoomEmitter,
+        pretty_print::BoomPrettyPrinter,
         visitor::{Visitor, Walkable},
     },
     common::{intern::InternedString, shared_key::SharedKey},
@@ -16,6 +17,7 @@ use {
     std::{
         cell::RefCell,
         collections::{HashMap, HashSet},
+        fmt::{self, Display, Formatter},
         rc::Rc,
     },
 };
@@ -263,6 +265,15 @@ impl Walkable for Type {
     }
 }
 
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut buf = vec![];
+        let mut visitor = BoomPrettyPrinter::new(&mut buf);
+        visitor.visit_type(self);
+        write!(f, "{}", String::from_utf8_lossy(&buf))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Statement {
     TypeDeclaration {
@@ -419,7 +430,7 @@ impl Value {
                     .collect::<Vec<_>>();
 
                 // probably a function parameter, or assignment of result of function
-                if defs.len() == 0 {
+                if defs.is_empty() {
                     return None;
                 }
 

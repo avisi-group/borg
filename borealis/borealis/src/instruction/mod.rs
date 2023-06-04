@@ -2,22 +2,20 @@
 
 use {
     crate::{
+        boom,
         genc::format::InstructionFormat,
-        instruction::{execute::jib_func_to_genc, format::process_decode_function_clause},
+        instruction::{execute::boom_fn_to_genc, format::process_decode_function_clause},
     },
     common::intern::InternedString,
-    sail::{
-        jib_ast::Definition,
-        sail_ast::{visitor::Visitor, Ast, FunctionClause, IdentifierAux},
-    },
-    std::collections::LinkedList,
+    sail::sail_ast::{self, visitor::Visitor, FunctionClause, IdentifierAux},
+    std::{cell::RefCell, rc::Rc},
 };
 
 pub mod execute;
 pub mod format;
 
 /// Finds all instructions in a Sail definition
-pub fn get_instructions(ast: &Ast) -> Vec<FunctionClause> {
+pub fn get_instructions(ast: &sail_ast::Ast) -> Vec<FunctionClause> {
     struct InstructionFinder {
         clauses: Vec<FunctionClause>,
     }
@@ -43,14 +41,19 @@ pub fn get_instructions(ast: &Ast) -> Vec<FunctionClause> {
 
 /// Compiles an individual instruction definition to GenC
 pub fn process_instruction(
-    jib: &LinkedList<Definition>,
+    ast: Rc<RefCell<boom::Ast>>,
     instruction: &FunctionClause,
 ) -> (InternedString, InstructionFormat, String) {
     // determine instruction format
-    let (name, instruction_name, format) = process_decode_function_clause(instruction);
+    let (mangled_name, instruction_name, format) = process_decode_function_clause(instruction);
 
     // compile JIB to GenC for the execute definition
-    let execute = jib_func_to_genc(instruction_name, jib);
+    let ast = ast.borrow();
+    let def = ast
+        .functions
+        .get(&instruction_name)
+        .unwrap_or_else(|| panic!("could not find function {:?}", instruction_name));
+    let execute = boom_fn_to_genc(def);
 
-    (name, format, execute)
+    (mangled_name, format, execute)
 }

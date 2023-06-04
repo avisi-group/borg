@@ -227,7 +227,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
 
     fn visit_type(&mut self, node: &Type) {
         match node {
-            Type::Unit => write!(self.writer, "()"),
+            Type::Unit => write!(self.writer, "void"),
             Type::Bool => write!(self.writer, "bool"),
             Type::String => write!(self.writer, "String"),
             Type::Real => write!(self.writer, "real"),

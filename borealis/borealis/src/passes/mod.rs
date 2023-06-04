@@ -61,7 +61,7 @@ fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
     // behaviour is "keep running the passes in order until none change"
     loop {
         if !passes
-            .into_iter()
+            .iter_mut()
             .map(|pass| {
                 info!("{}", pass.name());
                 pass.run(ast.clone())

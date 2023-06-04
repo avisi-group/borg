@@ -16,6 +16,7 @@ use {
     std::collections::LinkedList,
 };
 
+pub mod pretty_print;
 pub mod visitor;
 
 #[allow(missing_docs)]
