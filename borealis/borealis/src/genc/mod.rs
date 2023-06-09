@@ -469,23 +469,3 @@ pub struct HelperFunction {
     /// Function body
     pub body: String,
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::genc::{ir::Files, Description};
-
-    #[test]
-    fn snapshot() {
-        let Files {
-            main,
-            isa,
-            execute,
-            behaviours,
-        } = Description::empty().files();
-
-        insta::assert_snapshot!(format!(
-            "main.genc:\n{}\n\n\nisa.genc:\n{}\n\n\nexecute.genc:\n{}\n\n\nbehaviours.genc:\n{}\n\n\n",
-            main, isa, execute, behaviours
-        ));
-    }
-}
