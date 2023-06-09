@@ -141,7 +141,12 @@ impl From<&Literal> for Format {
 /// Main function clause processing
 pub fn process_decode_function_clause(
     funcl: &FunctionClause,
-) -> (InternedString, InternedString, GenCFormat) {
+) -> (
+    InternedString,
+    InternedString,
+    GenCFormat,
+    HashMap<InternedString, u64>,
+) {
     trace!(
         "Processing decode function clause @ {}",
         funcl.annotation.location
@@ -262,6 +267,21 @@ pub fn process_decode_function_clause(
 
     trace!("homogenised_bits: {:?}", homogenised_bits);
 
+    let constants = homogenised_bits
+        .iter()
+        .filter_map(|(name, bits)| {
+            // only need to test the first bit because they will be homogenous
+            if bits[0].is_fixed() {
+                Some((
+                    name.clone(),
+                    bits.iter().fold(0, |acc, bit| acc << 1 | bit.fixed_value()),
+                ))
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let inner = homogenised_bits
         .into_iter()
         .map(|(n, bits)| {
@@ -291,7 +311,7 @@ pub fn process_decode_function_clause(
     let format = GenCFormat(inner);
     trace!("{} genc format: {}", name, format);
 
-    (name, instruction_name, format)
+    (name, instruction_name, format, constants)
 }
 
 /// Flattens nested expressions

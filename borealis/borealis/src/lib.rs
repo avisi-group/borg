@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        genc::{Description, Instruction},
+        genc::{Description, HelperFunction, Instruction},
         instruction::{get_instructions, process_instruction},
         passes::execute_passes,
     },
@@ -60,6 +60,14 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
 
     let mut description = Description::empty();
 
+    description.helpers.push(HelperFunction {
+        return_type: "void".to_owned(),
+        parameters: "uint16 a, uint16 b, uint16 c, uint16 d, uint16 e, uint16 f, uint16 g"
+            .to_owned(),
+        name: "integer_arithmetic_addsub_immediate_decode0".to_owned(),
+        body: "return;".to_owned(),
+    });
+
     description.instructions = instructions
         .into_iter()
         .map(|clause| process_instruction(ast.clone(), &clause))
@@ -105,12 +113,12 @@ pub fn load_sail<P: AsRef<Path>>(path: P) -> Result<(Ast, LinkedList<Definition>
 pub fn deserialize_compressed_ast<P: AsRef<Path>>(
     path: P,
 ) -> Result<(Ast, LinkedList<Definition>), Error> {
-    let reader = BufReader::new(File::open(&path).map_err(PathCtx::f(&path))?);
+    let file_reader = BufReader::new(File::open(&path).map_err(PathCtx::f(&path))?);
 
     let thread = thread::Builder::new().stack_size(DEFAULT_RUNTIME_THREAD_STACK_SIZE);
 
     let handle = thread
-        .spawn(move || bincode::deserialize_from(Lz4Decoder::new(reader)))
+        .spawn(move || bincode::deserialize_from(Lz4Decoder::new(file_reader)))
         .map_err(PathCtx::f(&path))?;
 
     let out = handle

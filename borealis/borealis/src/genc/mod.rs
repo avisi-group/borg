@@ -4,7 +4,7 @@ use {
     crate::{
         genc::{
             format::{InstructionFormat, Segment, SegmentContent},
-            ir::{Execute, Files, Format, Function, FunctionKind, Isa, Main},
+            ir::{Execute, Files, Format, Function, Isa, Main},
         },
         Error,
     },
@@ -99,8 +99,11 @@ pub struct Description {
     /// Instruction definitions
     pub instructions: HashMap<String, Instruction>,
 
-    ///
+    /// GenC behaviours
     pub behaviours: Behaviours,
+
+    /// Helper functions
+    pub helpers: Vec<HelperFunction>,
 }
 
 impl Description {
@@ -138,54 +141,66 @@ impl Description {
             self.instructions
                 .iter()
                 .map(
-                    |(instruction_ident, Instruction { execute, .. })| Function {
-                        kind: FunctionKind::Execute,
+                    |(instruction_ident, Instruction { execute, .. })| Function::Execute {
                         name: instruction_ident.clone(),
                         body: execute.clone(),
                     },
                 )
+                .chain(self.helpers.iter().cloned().map(
+                    |HelperFunction {
+                         return_type,
+                         parameters,
+                         name,
+                         body,
+                     }| Function::Helper {
+                        return_type,
+                        parameters,
+                        name,
+                        body,
+                    },
+                ))
                 .collect(),
         );
 
         let required_behaviours = [
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "handle_exception".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "handle_exception".into(),
                 body: self.behaviours.handle_exception.clone(),
             },
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "reset".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "reset".into(),
                 body: self.behaviours.reset.clone(),
             },
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "irq".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "irq".into(),
                 body: self.behaviours.irq.clone(),
             },
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "mmu_fault".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "mmu_fault".into(),
                 body: self.behaviours.mmu_fault.clone(),
             },
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "page_fault".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "page_fault".into(),
                 body: self.behaviours.page_fault.clone(),
             },
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "undefined_instruction".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "undefined_instruction".into(),
                 body: self.behaviours.undefined_instruction.clone(),
             },
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "single_step".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "single_step".into(),
                 body: self.behaviours.single_step.clone(),
             },
-            Function {
-                kind: FunctionKind::Behaviour,
-                name: "undef".to_owned(),
+            Function::Behaviour {
+                global: true,
+                name: "undef".into(),
                 body: self.behaviours.undef.clone(),
             },
         ];
@@ -194,10 +209,10 @@ impl Description {
             self.behaviours
                 .custom
                 .iter()
-                .map(|CustomBehaviour { name, body }| ir::Function {
-                    kind: FunctionKind::Behaviour,
+                .map(|CustomBehaviour { name, body }| Function::Behaviour {
                     name: name.clone(),
                     body: body.clone(),
+                    global: false,
                 })
                 .chain(required_behaviours.into_iter())
                 .collect::<Vec<_>>(),
@@ -310,6 +325,7 @@ impl Description {
                     body: "return;".to_owned(),
                 }],
             },
+            helpers: vec![],
         }
     }
 }
@@ -436,6 +452,19 @@ pub struct Behaviours {
 #[derive(Debug, Clone)]
 pub struct CustomBehaviour {
     /// Name of behaviour
+    pub name: String,
+    /// Function body
+    pub body: String,
+}
+
+/// GenC internal helper function
+#[derive(Debug, Clone)]
+pub struct HelperFunction {
+    /// Function return type
+    pub return_type: String,
+    /// Function parameters
+    pub parameters: String,
+    /// Function name
     pub name: String,
     /// Function body
     pub body: String,

@@ -1,23 +1,26 @@
-//! Instruction execute behaviour
-
 use crate::boom::{
     control_flow::ControlFlowBlock, FunctionDefinition, FunctionSignature, NamedType,
 };
 
+struct GenCEmitter {
+    entry_block: ControlFlowBlock,
+}
+
+impl GenCEmitter {
+    pub fn _new(entry_block: ControlFlowBlock) -> Self {
+        Self { entry_block }
+    }
+}
+
 /// Emit a BOOM function as a GenC function
-pub fn boom_fn_to_genc(
-    FunctionDefinition {
-        signature,
-        entry_block,
-    }: &FunctionDefinition,
-) -> String {
+pub fn _boom_fn_to_genc(FunctionDefinition { signature, .. }: &FunctionDefinition) -> String {
     let FunctionSignature {
         name,
         parameters,
         return_type,
     } = signature;
 
-    let body = emit_body(&entry_block);
+    let body = "emit_body(&entry_block);".to_owned();
 
     let parameters = {
         let mut s = String::new();
@@ -40,8 +43,4 @@ pub fn boom_fn_to_genc(
         }}
         "#
     )
-}
-
-fn emit_body(_entry_block: &ControlFlowBlock) -> String {
-    "println(\"hello\")".to_owned()
 }

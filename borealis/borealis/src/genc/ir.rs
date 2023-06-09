@@ -239,6 +239,7 @@ impl Display for Format {
             self.format_ident, self.instruction_ident
         )?;
         writeln!(f, "\tac_behaviour {};", self.instruction_ident)?;
+        writeln!(f)?;
 
         Ok(())
     }
@@ -277,36 +278,52 @@ impl Display for Behaviours {
 }
 
 #[derive(Debug, Clone)]
-pub struct Function {
-    pub kind: FunctionKind,
-    pub name: String,
-    pub body: String,
+pub enum Function {
+    Behaviour {
+        name: String,
+        body: String,
+        global: bool,
+    },
+    Execute {
+        name: String,
+        body: String,
+    },
+    Helper {
+        return_type: String,
+        parameters: String,
+        name: String,
+        body: String,
+    },
 }
 
 impl Display for Function {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        writeln!(f, "{}({}) {{", self.kind, self.name)?;
-        writeln!(f, "{}", self.body)?;
-        writeln!(f, "}}")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum FunctionKind {
-    Behaviour,
-    Execute,
-}
-
-impl Display for FunctionKind {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Behaviour => "behaviour",
-                Self::Execute => "execute",
+        match self {
+            Function::Behaviour { name, body, global } => {
+                writeln!(
+                    f,
+                    "behaviour({name}) {}{{",
+                    if *global { "global " } else { "" }
+                )?;
+                writeln!(f, "{body}")?;
+                writeln!(f, "}}")
             }
-        )
+            Function::Execute { name, body } => {
+                writeln!(f, "execute({name}) {{")?;
+                writeln!(f, "{body}")?;
+                writeln!(f, "}}")
+            }
+            Function::Helper {
+                return_type,
+                parameters,
+                name,
+                body,
+            } => {
+                writeln!(f, "internal helper {return_type} {name}({parameters}) {{")?;
+                writeln!(f, "{body}")?;
+                writeln!(f, "}}")
+            }
+        }
     }
 }
 

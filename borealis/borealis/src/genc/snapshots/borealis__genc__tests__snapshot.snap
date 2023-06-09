@@ -41,6 +41,7 @@ AC_ISA(arm64)
 	ac_instr<fmt_addi> addi;
 	ac_behaviour addi;
 
+
 	ISA_CTOR(arm) {
 		addi.set_decoder();
 		addi.set_behaviour(addi);
@@ -70,35 +71,35 @@ behaviour(custom) {
 return;
 }
 
-behaviour(handle_exception) {
+behaviour(handle_exception) global {
 
 }
 
-behaviour(reset) {
+behaviour(reset) global {
 
 }
 
-behaviour(irq) {
+behaviour(irq) global {
 
 }
 
-behaviour(mmu_fault) {
+behaviour(mmu_fault) global {
 
 }
 
-behaviour(page_fault) {
+behaviour(page_fault) global {
 
 }
 
-behaviour(undefined_instruction) {
+behaviour(undefined_instruction) global {
 
 }
 
-behaviour(single_step) {
+behaviour(single_step) global {
 
 }
 
-behaviour(undef) {
+behaviour(undef) global {
 
 }
 
