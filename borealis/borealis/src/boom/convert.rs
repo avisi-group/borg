@@ -17,7 +17,8 @@ use {
 pub struct BoomEmitter {
     /// BOOM AST being constructed by walker
     ast: boom::Ast,
-    /// Temporarily stored type signatures as spec and function definitions are separate
+    /// Temporarily stored type signatures as spec and function definitions are
+    /// separate
     function_types: HashMap<InternedString, (Vec<boom::Type>, boom::Type)>,
 }
 
@@ -370,7 +371,9 @@ fn convert_variants(variants: &LinkedList<sail_ast::Identifier>) -> Vec<Interned
 
 /// Converts fields of a struct or union from JIB to BOOM
 ///
-/// Generics are required to be able to convert from `LinkedList<((Identifier, LinkedList<Type>), Box<Type>)>` *and* `LinkedList<((Identifier, LinkedList<Type>), Type)>`.
+/// Generics are required to be able to convert from `LinkedList<((Identifier,
+/// LinkedList<Type>), Box<Type>)>` *and* `LinkedList<((Identifier,
+/// LinkedList<Type>), Type)>`.
 fn convert_fields<
     'a,
     TYPE: Borrow<jib_ast::Type> + 'a,

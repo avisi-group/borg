@@ -48,7 +48,8 @@ pub enum SegmentContent {
     /// Constant value
     ///
     /// * Will be truncated to the length described in the Segment.
-    /// * `u64` should really be a `Vec<u8>` or `BigInt`, there should be no technical limitation on size of a constant.
+    /// * `u64` should really be a `Vec<u8>` or `BigInt`, there should be no
+    ///   technical limitation on size of a constant.
     Constant(u64),
 }
 

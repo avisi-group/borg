@@ -68,7 +68,8 @@ pub fn export<P: AsRef<Path>>(
     Ok(())
 }
 
-/// Creates and writes an value implementing `Display` to a file at the supplied path.
+/// Creates and writes an value implementing `Display` to a file at the supplied
+/// path.
 fn write_file<D: Display>(contents: D, path: PathBuf) -> Result<(), Error> {
     let mut file = File::create(&path).map_err(PathCtx::f(&path))?;
     writeln!(file, "{contents}").map_err(PathCtx::f(&path))?;

@@ -1,9 +1,12 @@
 //! Generating control flow graph from BOOM
 //!
-//! Needs to be restructured due to two main areas of complexity, both caused by block targets being unresolved during building (IE. visiting a jump before the label it references is created):
+//! Needs to be restructured due to two main areas of complexity, both caused by
+//! block targets being unresolved during building (IE. visiting a jump before
+//! the label it references is created):
 //!
-//! 1. Two sets of types, internal maybe-unresolved and public resolved to enforce resolution at type level.
-//! 2. Recursive resolution to convert maybe-unresolved to resolved blocks.
+//! 1. Two sets of types, internal maybe-unresolved and public resolved to
+//! enforce resolution at type level. 2. Recursive resolution to convert
+//! maybe-unresolved to resolved blocks.
 
 use {
     crate::boom::{control_flow::builder::ControlFlowGraphBuilder, Statement, Value},
@@ -12,8 +15,7 @@ use {
     std::{
         cell::RefCell,
         collections::{hash_map::DefaultHasher, HashSet, LinkedList},
-        fmt::Display,
-        fmt::{self, Formatter},
+        fmt::{self, Display, Formatter},
         hash::{Hash, Hasher},
         io::{self, Write},
         ptr,
@@ -32,7 +34,8 @@ pub fn build_graph(statements: &[Rc<RefCell<Statement>>]) -> ControlFlowBlock {
     ControlFlowGraphBuilder::from_statements(statements)
 }
 
-/// Node in a control flow graph, contains a basic block of statements and a terminator
+/// Node in a control flow graph, contains a basic block of statements and a
+/// terminator
 #[derive(Debug, Clone)]
 pub struct ControlFlowBlock {
     inner: Rc<RefCell<ControlFlowBlockInner>>,
@@ -40,7 +43,8 @@ pub struct ControlFlowBlock {
 
 #[derive(Debug)]
 struct ControlFlowBlockInner {
-    /// Optional block label, otherwise the `SharedKey` `Display` format should be used
+    /// Optional block label, otherwise the `SharedKey` `Display` format should
+    /// be used
     label: Option<InternedString>,
     /// Parents of the current node
     parents: HashSet<ControlFlowBlockWeak>,
@@ -139,7 +143,8 @@ impl ControlFlowBlock {
         self.inner.borrow().terminator.clone()
     }
 
-    /// Sets the terminator of this control flow block (and also the weak parental references of any children)
+    /// Sets the terminator of this control flow block (and also the weak
+    /// parental references of any children)
     pub fn set_terminator(&self, terminator: Terminator) {
         // remove ourselves as a parent from all children
         self.terminator()
@@ -178,7 +183,8 @@ impl ControlFlowBlock {
         dot::render(w, self)
     }
 
-    /// Determines whether the current `ControlFlowBlock` and it's children contain any cycles
+    /// Determines whether the current `ControlFlowBlock` and it's children
+    /// contain any cycles
     pub fn contains_cycles(&self) -> bool {
         let mut processed = HashSet::new();
         let mut currently_processing = HashSet::new();
@@ -245,7 +251,8 @@ impl Eq for ControlFlowBlockWeak {}
 pub enum Terminator {
     /// Function return
     Return,
-    /// If condition evaluates to true, then jump to target, otherwise jump to fallthrough
+    /// If condition evaluates to true, then jump to target, otherwise jump to
+    /// fallthrough
     Conditional {
         /// Condition
         condition: Value,

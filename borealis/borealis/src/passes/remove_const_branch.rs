@@ -1,5 +1,4 @@
 //! Branches with a constant condition can be removed
-//!
 
 use {
     crate::{
@@ -13,7 +12,8 @@ use {
     std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
 
-/// Control flow blocks with only one parent and one child (unconditional jump to target) are folded into their parent
+/// Control flow blocks with only one parent and one child (unconditional jump
+/// to target) are folded into their parent
 #[derive(Debug, Default)]
 pub struct RemoveConstBranch;
 
@@ -49,7 +49,8 @@ fn remove_const_branch(entry_block: ControlFlowBlock) -> bool {
     while let Some(current) = to_visit.pop() {
         trace!("processing {current}");
 
-        // continue (try next unvisited node) if we have already processed the current node
+        // continue (try next unvisited node) if we have already processed the current
+        // node
         if processed.contains(&current) {
             continue;
         }

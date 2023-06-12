@@ -10,7 +10,8 @@ use {
     std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
 
-/// Control flow blocks with only one parent and one child (unconditional jump to target) are folded into their parent
+/// Control flow blocks with only one parent and one child (unconditional jump
+/// to target) are folded into their parent
 #[derive(Debug, Default)]
 pub struct FoldUnconditionals;
 

@@ -1,7 +1,8 @@
 //! Infrastructure for executing passes over BOOM.
 //!
 //! Includes:
-//! * Logic for "raising" unstructured BOOM control flow back into structure if-else, match, and for loops
+//! * Logic for "raising" unstructured BOOM control flow back into structure
+//!   if-else, match, and for loops
 //! * Builtin function handling
 
 use {
@@ -55,7 +56,8 @@ pub trait Pass {
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool;
 }
 
-/// Run each pass until it does not mutate the AST, and run the whole sequence of passes until no pass mutates the AST
+/// Run each pass until it does not mutate the AST, and run the whole sequence
+/// of passes until no pass mutates the AST
 fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
     // ironically, we *do* want to short-circuit here
     // behaviour is "keep running the passes in order until none change"

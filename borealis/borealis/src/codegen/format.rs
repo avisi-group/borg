@@ -85,7 +85,8 @@ impl Debug for FormatBit {
     }
 }
 
-/// Sequence of bits corresponding to the machine code representation of an instruction
+/// Sequence of bits corresponding to the machine code representation of an
+/// instruction
 #[derive(Debug)]
 pub struct Format(Vec<FormatBit>);
 
@@ -186,7 +187,8 @@ pub fn process_decode_function_clause(
         ident.as_interned()
     };
 
-    // named ranges may not be contiguous, so fill any holes with padding ranges (these should not contain any unknown bits)
+    // named ranges may not be contiguous, so fill any holes with padding ranges
+    // (these should not contain any unknown bits)
     {
         let mut padding_ranges = vec![];
         let mut last_end = 0;
@@ -425,7 +427,8 @@ pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
     format_bits.finish()
 }
 
-/// Converts a vector access expression to a range and name of the assigned variable.
+/// Converts a vector access expression to a range and name of the assigned
+/// variable.
 ///
 /// For example the AST for the following expression
 ///

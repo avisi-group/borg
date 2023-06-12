@@ -1,4 +1,5 @@
-//! Pass for implementing builtin (as in, provided by the Sail compiler) functions in BOOM
+//! Pass for implementing builtin (as in, provided by the Sail compiler)
+//! functions in BOOM
 
 use {
     crate::{
@@ -37,7 +38,8 @@ impl Pass for AddBuiltinFns {
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         // walk AST, inspecting each function call
         // if the function call references an already-defined function, ignore
-        // otherwise, lookup function in functions and execute behaviour (either in place modification or inserting new function definition)
+        // otherwise, lookup function in functions and execute behaviour (either in
+        // place modification or inserting new function definition)
 
         ast.borrow()
             .functions

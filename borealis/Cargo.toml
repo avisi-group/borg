@@ -8,3 +8,4 @@ opt-level = 3
 
 [profile.release]
 lto = "fat" # made it around 5% faster
+debug = true

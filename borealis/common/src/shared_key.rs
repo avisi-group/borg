@@ -11,7 +11,8 @@ use std::{
 
 /// Wrapper around a shared, mutable memory location, hashed by address
 ///
-/// Used so that you can place `Rc<RefCell<T>>`'s into a `HashMap` directly, instead of needing to associate some new key with each `T`.
+/// Used so that you can place `Rc<RefCell<T>>`'s into a `HashMap` directly,
+/// instead of needing to associate some new key with each `T`.
 #[derive(Debug, Clone)]
 pub struct SharedKey<T>(Rc<RefCell<T>>);
 

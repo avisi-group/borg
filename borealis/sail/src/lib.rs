@@ -181,7 +181,8 @@ fn preprocess_file(
     Ok((comments, defs))
 }
 
-/// Finds `$include <filename.sail>` pragmas and replaces with the parsed AST of the referenced Sail standard library file
+/// Finds `$include <filename.sail>` pragmas and replaces with the parsed AST of
+/// the referenced Sail standard library file
 fn resolve_includes(
     rt: &Runtime,
     file_ast: LinkedList<Definition>,

@@ -1,10 +1,11 @@
-//! Sail instruction-level syntax (format) and semantic (determined through symbolic execution) extraction
+//! Sail instruction-level syntax (format) and semantic (determined through
+//! symbolic execution) extraction
 
 use {
     crate::{
         boom::{self, NamedType},
+        codegen::format::process_decode_function_clause,
         genc::format::{InstructionFormat, SegmentContent},
-        instruction::format::process_decode_function_clause,
     },
     common::intern::InternedString,
     log::warn,
@@ -12,10 +13,8 @@ use {
     std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
 
-pub mod format;
-
 /// Finds all instructions in a Sail definition
-pub fn get_instructions(ast: &sail_ast::Ast) -> Vec<FunctionClause> {
+pub fn get_instruction_entrypoint_fns(ast: &sail_ast::Ast) -> Vec<FunctionClause> {
     struct InstructionFinder {
         clauses: Vec<FunctionClause>,
     }
@@ -39,8 +38,13 @@ pub fn get_instructions(ast: &sail_ast::Ast) -> Vec<FunctionClause> {
     finder.clauses
 }
 
-/// Compiles an individual instruction definition to GenC
-pub fn process_instruction(
+/// Generates the execute entrypoint for an individual instruction
+///
+/// This "adapts" the GenC `instr` struct containing all the operands into a
+/// call to the instructions `XXX_decode` function. Since the instruction format
+/// may contain a mixture of constants and variables, the original Sail
+/// bitvector range access semantics must be reconstructed.
+pub fn generate_execute_entrypoint(
     ast: Rc<RefCell<boom::Ast>>,
     instruction: &FunctionClause,
 ) -> (InternedString, InstructionFormat, String) {

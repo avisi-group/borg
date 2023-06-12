@@ -2,8 +2,10 @@
 //!
 //! This means we can do two things:
 //!
-//! 1. Maintain a clear, understandable user-facing structure for a GenC description (`crate::genc::Description`)
-//! 2. Use `std::fmt::Display` and recursion to generate each file (a nice pattern), without requiring globals or external state
+//! 1. Maintain a clear, understandable user-facing structure for a GenC
+//! description (`crate::genc::Description`) 2. Use `std::fmt::Display` and
+//! recursion to generate each file (a nice pattern), without requiring globals
+//! or external state
 
 use {
     crate::genc::{
@@ -13,9 +15,11 @@ use {
     std::fmt::{self, Display, Formatter},
 };
 
-/// GenC files which may be rendered using only the `std::fmt::Display` trait, achieved by duplicating several pieces of information between structs.
+/// GenC files which may be rendered using only the `std::fmt::Display` trait,
+/// achieved by duplicating several pieces of information between structs.
 ///
-/// Only for internal use; users of library should use `crate::genc::Description` which does not contain duplicated information.
+/// Only for internal use; users of library should use
+/// `crate::genc::Description` which does not contain duplicated information.
 #[derive(Debug, Clone)]
 pub struct Files {
     pub main: Main,

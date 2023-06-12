@@ -18,7 +18,8 @@ struct Args {
     #[arg(long)]
     log: Option<String>,
 
-    /// Warning! Disables checking that output directory is empty or output file does not exist before writing.
+    /// Warning! Disables checking that output directory is empty or output file
+    /// does not exist before writing.
     #[arg(long)]
     force: bool,
 
@@ -61,7 +62,7 @@ fn main() -> Result<()> {
         Command::Sail2genc { input, output } => {
             let (ast, jib) = load_sail(input)?;
 
-            info!("Converting Sail AST to GenC");
+            info!("Converting Sail model to GenC");
             let description = sail_to_genc(&ast, &jib);
 
             info!("Exporting GenC description");
@@ -71,7 +72,7 @@ fn main() -> Result<()> {
         Command::Sail2bincode { input, output } => {
             let (ast, jib) = load_sail(input)?;
 
-            info!("Serializing AST to compressed bincode");
+            info!("Serializing Sail model to compressed bincode");
 
             let mut frame_info = FrameInfo::new();
             frame_info.block_mode = BlockMode::Linked;
@@ -96,7 +97,8 @@ fn init_logger(filters: &str) -> Result<()> {
 
 /// Creates the file supplied in `path`.
 ///
-/// If the file at the supplied path already exists and `force` is true it will be overwritten, otherwise an error will be returned.
+/// If the file at the supplied path already exists and `force` is true it will
+/// be overwritten, otherwise an error will be returned.
 fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<File> {
     File::options()
         .write(true) // we want to write to the file

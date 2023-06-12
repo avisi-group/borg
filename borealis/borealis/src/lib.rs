@@ -4,8 +4,8 @@
 
 use {
     crate::{
+        codegen::instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
         genc::{Description, HelperFunction, Instruction},
-        instruction::{get_instructions, process_instruction},
         passes::execute_passes,
     },
     common::intern::INTERNER,
@@ -28,8 +28,8 @@ use {
 };
 
 pub mod boom;
+pub mod codegen;
 pub mod genc;
-pub mod instruction;
 pub mod passes;
 
 /// Borealis error
@@ -52,11 +52,14 @@ pub enum Error {
 /// Compiles a Sail ISA specification to a GenC description
 pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Description {
     // crate::instruction::execute::pretty_print::print_ast(jib_ast);
-    info!("Converting JIB to BOOM");
+
+    info!("Generating BOOM from JIB");
     let ast = boom::Ast::from_jib(jib_ast);
+
+    info!("Running passes on BOOM");
     execute_passes(ast.clone());
 
-    let instructions = get_instructions(sail_ast);
+    let instructions = get_instruction_entrypoint_fns(sail_ast);
 
     let mut description = Description::empty();
 
@@ -70,14 +73,15 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
 
     description.instructions = instructions
         .into_iter()
-        .map(|clause| process_instruction(ast.clone(), &clause))
+        .map(|clause| generate_execute_entrypoint(ast.clone(), &clause))
         .map(|(name, format, execute)| (name.to_string(), Instruction { format, execute }))
         .collect();
 
     description
 }
 
-/// Load Sail model AST and JIB from either a `sail.json` or compressed bincode-serialised format, at the supplied path.
+/// Load Sail model AST and JIB from either a `sail.json` or compressed
+/// bincode-serialised format, at the supplied path.
 pub fn load_sail<P: AsRef<Path>>(path: P) -> Result<(Ast, LinkedList<Definition>), Error> {
     let path = path.as_ref();
 
@@ -109,7 +113,8 @@ pub fn load_sail<P: AsRef<Path>>(path: P) -> Result<(Ast, LinkedList<Definition>
 
 /// Deserializes an AST from a compressed bincode reader.
 ///
-/// Internally, deserialization is performed on a new thread with a sufficient stack size to perform the deserialization.
+/// Internally, deserialization is performed on a new thread with a sufficient
+/// stack size to perform the deserialization.
 pub fn deserialize_compressed_ast<P: AsRef<Path>>(
     path: P,
 ) -> Result<(Ast, LinkedList<Definition>), Error> {

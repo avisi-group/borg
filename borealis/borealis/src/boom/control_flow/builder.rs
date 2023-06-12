@@ -9,7 +9,8 @@ use {
 
 /// Builder structure for a control flow graph
 ///
-/// Contains state required to build the control flow graph, resolving labels and block terminators
+/// Contains state required to build the control flow graph, resolving labels
+/// and block terminators
 pub struct ControlFlowGraphBuilder {
     labels: HashMap<InternedString, Rc<RefCell<MaybeUnresolvedControlFlowBlock>>>,
     resolved_blocks: HashMap<SharedKey<MaybeUnresolvedControlFlowBlock>, ControlFlowBlock>,
@@ -144,7 +145,8 @@ impl ControlFlowGraphBuilder {
         }
     }
 
-    /// Converts unresolved blocks into resolved blocks, errors if any target labels were not present in the labels map
+    /// Converts unresolved blocks into resolved blocks, errors if any target
+    /// labels were not present in the labels map
     pub fn resolve(mut self) -> ControlFlowBlock {
         self.resolve_block(self.entry_block.clone())
     }
@@ -161,15 +163,17 @@ impl ControlFlowGraphBuilder {
         // create a new control flow block
         let resolved = ControlFlowBlock::new();
 
-        // insert the new resolved control flow block into the map, panicking if it was already
-        // resolved
+        // insert the new resolved control flow block into the map, panicking if it was
+        // already resolved
         //
-        // it's not populated with the correct statements or terminator at this point, but because
-        // it's an Rc-RefCell we can mutate it without modifying the map.
+        // it's not populated with the correct statements or terminator at this point,
+        // but because it's an Rc-RefCell we can mutate it without modifying the
+        // map.
         //
-        // we need to insert it here so that the recursive calls as part of the terminator
-        // resolution can acquire a reference to the resolved block, if we inserted the correctly
-        // resolved block after the recursive call, it would loop forever.
+        // we need to insert it here so that the recursive calls as part of the
+        // terminator resolution can acquire a reference to the resolved block,
+        // if we inserted the correctly resolved block after the recursive call,
+        // it would loop forever.
         if let Some(block) = self
             .resolved_blocks
             .insert(unresolved.clone().into(), resolved.clone())

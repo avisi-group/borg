@@ -2,7 +2,10 @@
 //!
 //! ## Developer's Notes
 //!
-//! Some of the path-modifying code is potentially fragile. I was unable to find detailed specifications for `sail.json` files; unfortunately this means there is a *very* wide range of possible inputs for the array of paths to files (absolute, relative, non-UTF8, etc).
+//! Some of the path-modifying code is potentially fragile. I was unable to find
+//! detailed specifications for `sail.json` files; unfortunately this means
+//! there is a *very* wide range of possible inputs for the array of paths to
+//! files (absolute, relative, non-UTF8, etc).
 
 use {
     errctx::PathCtx,
@@ -33,7 +36,8 @@ impl ModelConfig {
             files: Vec<PathBuf>,
         }
 
-        // read from JSON (using intermediate private struct to parse command line options)
+        // read from JSON (using intermediate private struct to parse command line
+        // options)
         let Intermediate { options, files } =
             serde_json::from_reader(fs::File::open(config_path).map_err(PathCtx::f(config_path))?)
                 .map_err(PathCtx::f(config_path))?;
@@ -48,7 +52,8 @@ impl ModelConfig {
             .parent()
             .ok_or(Error::NoParent(config_path.to_owned()))?;
 
-        // if a path is not absolute, prepend the directory the config file is in to each
+        // if a path is not absolute, prepend the directory the config file is in to
+        // each
         for file_path in &mut config.files {
             // if path is absolute, no changes necessary
             if file_path.has_root() {

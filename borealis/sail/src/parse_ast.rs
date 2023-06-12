@@ -1,5 +1,5 @@
-//! Sail abstract syntax tree corresponding to data structures in `parse_ast.ml`,
-//! which itself is generated from `l2_parse.ott`.
+//! Sail abstract syntax tree corresponding to data structures in
+//! `parse_ast.ml`, which itself is generated from `l2_parse.ott`.
 
 use {
     crate::sail_ast::Location,
