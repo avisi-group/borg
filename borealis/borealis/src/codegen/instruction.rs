@@ -8,6 +8,7 @@ use {
         genc::format::{InstructionFormat, SegmentContent},
     },
     common::intern::InternedString,
+    itertools::Itertools,
     log::warn,
     sail::sail_ast::{self, visitor::Visitor, FunctionClause, IdentifierAux},
     std::{cell::RefCell, collections::HashSet, rc::Rc},
@@ -68,14 +69,15 @@ pub fn generate_execute_entrypoint(
         .get(&instruction_name)
         .unwrap_or_else(|| panic!("could not find function {:?}", instruction_name));
 
-    let mut parameters_iter = def
+    #[allow(unstable_name_collisions)]
+    let parameters = def
         .signature
         .parameters
         .iter()
         .map(|NamedType { name, .. }| name)
         .map(|name| {
             if format_variables.contains(name) {
-                name
+                format!("inst.{name}")
             } else {
                 let parts = format_variables
                     .iter()
@@ -85,38 +87,30 @@ pub fn generate_execute_entrypoint(
                 match parts.len() {
                     0 => {
                         if constants.get(name).is_some() {
-                            name
+                            name.to_string()
                         } else {
                             panic!("parameter {name} did not correspond to any format segment or constant")
                         }
                     },
-                    1 => parts[0],
+                    1 => format!("inst.{}",parts[0]),
                     _ => {
                         warn!("parameter {name} corresponded to multiple format segments");
-                        parts[0]
+                        format!("inst.{}",parts[0])
                     },
                 }
             }
-        });
+        }).intersperse(", ".to_owned()).collect::<String>();
 
-    let parameters_string = {
-        let mut s = String::new();
+    let execute = {
+        let mut buf = String::new();
 
-        if let Some(name) = parameters_iter.next() {
-            s += &format!("inst.{name}");
-        }
-        for name in parameters_iter {
-            s += ", ";
-            s += &format!("inst.{name}");
+        for (name, value) in constants {
+            buf.push_str(&format!("\tuint64 {name} = {value};\n"));
         }
 
-        s
-    };
+        buf.push_str(&format!("\t{instruction_name}({parameters});"));
 
-    let execute = if mangled_name == "integer_arithmetic_addsub_immediate_decode0".into() {
-        format!("\t{mangled_name}({parameters_string});")
-    } else {
-        "".to_owned()
+        buf
     };
 
     (mangled_name, format, execute)

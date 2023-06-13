@@ -12,8 +12,14 @@ use {
     common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
+    once_cell::sync::Lazy,
+    parking_lot::Mutex,
+    regex::Regex,
     serde::{Deserialize, Serialize},
-    std::{collections::LinkedList, fmt::Display},
+    std::{
+        collections::{HashMap, LinkedList},
+        fmt::Display,
+    },
     strum::IntoStaticStr,
 };
 
@@ -196,10 +202,42 @@ pub struct Identifier {
 
 impl Identifier {
     pub fn as_interned(&self) -> InternedString {
-        match self.inner {
+        static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
+        static NORMALIZED: Lazy<Mutex<HashMap<InternedString, InternedString>>> =
+            Lazy::new(|| Mutex::new(HashMap::new()));
+
+        let raw = match self.inner {
             IdentifierAux::Identifier(s) => s,
             IdentifierAux::Operator(s) => s,
+        };
+
+        if let Some(&normalized) = NORMALIZED.lock().get(&raw) {
+            return normalized;
         }
+
+        let s = raw.as_ref();
+
+        let mut buf = String::with_capacity(s.len());
+
+        for ch in s.chars() {
+            match ch {
+                '%' => buf.push_str("_pcnt_"),
+                '&' => buf.push_str("_ref_"),
+                '?' => buf.push_str("_unknown_"),
+                '-' | '<' | '>' | '#' | ' ' => buf.push('_'),
+                _ => buf.push(ch),
+            }
+        }
+
+        if !VALIDATOR.is_match(buf.as_ref()) {
+            panic!("identifier {buf:?} not normalized");
+        }
+
+        let normalized = InternedString::from(buf);
+
+        NORMALIZED.lock().insert(raw, normalized);
+
+        normalized
     }
 }
 

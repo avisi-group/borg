@@ -4,8 +4,11 @@
 
 use {
     crate::{
-        codegen::instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
-        genc::{Description, HelperFunction, Instruction},
+        codegen::{
+            functions::generate_fns,
+            instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
+        },
+        genc::{Description, Instruction},
         passes::execute_passes,
     },
     common::intern::INTERNER,
@@ -59,23 +62,25 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     info!("Running passes on BOOM");
     execute_passes(ast.clone());
 
-    let instructions = get_instruction_entrypoint_fns(sail_ast);
-
-    let mut description = Description::empty();
-
-    description.helpers.push(HelperFunction {
-        return_type: "void".to_owned(),
-        parameters: "uint16 a, uint16 b, uint16 c, uint16 d, uint16 e, uint16 f, uint16 g"
-            .to_owned(),
-        name: "integer_arithmetic_addsub_immediate_decode0".to_owned(),
-        body: "return;".to_owned(),
-    });
-
-    description.instructions = instructions
+    // set up entrypoints in GenC execute behaviours
+    let instructions = get_instruction_entrypoint_fns(sail_ast)
         .into_iter()
         .map(|clause| generate_execute_entrypoint(ast.clone(), &clause))
         .map(|(name, format, execute)| (name.to_string(), Instruction { format, execute }))
         .collect();
+
+    // generate all functions
+    let mut functions = generate_fns(ast);
+
+    // generate register spaces
+    let _registers = 0;
+
+    // create empty GenC description
+    let mut description = Description::empty();
+
+    description.helpers.append(&mut functions);
+
+    description.instructions = instructions;
 
     description
 }

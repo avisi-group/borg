@@ -173,7 +173,7 @@ impl Walkable for FunctionSignature {
 }
 
 /// Name and type of a union field, struct field, or function parameter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NamedType {
     pub name: InternedString,
     pub typ: Type,
@@ -199,7 +199,7 @@ impl Walkable for NamedValue {
 }
 
 /// Type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Unit,
     Bool,

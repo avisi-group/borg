@@ -28,6 +28,7 @@ lz4_flex = { version = "0.10", default-features = false, features = ["frame"]}
 phf = { version = "0.11.1", features = ["macros"] }
 regex = "1.8.4"
 dot = "0.1.4"
+itertools = "0.10.5"
 
 [dev-dependencies]
 insta = "1.29.0"
