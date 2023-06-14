@@ -9,7 +9,6 @@ use {
     },
     common::intern::InternedString,
     itertools::Itertools,
-    log::warn,
     sail::sail_ast::{self, visitor::Visitor, FunctionClause, IdentifierAux},
     std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
@@ -53,65 +52,57 @@ pub fn generate_execute_entrypoint(
     let (mangled_name, instruction_name, format, constants) =
         process_decode_function_clause(instruction);
 
-    let format_variables = format
-        .0
-        .iter()
-        .filter_map(|segment| match segment.content {
-            SegmentContent::Variable(s) => Some(s),
-            SegmentContent::Constant(_) => None,
-        })
-        .collect::<HashSet<_>>();
-
-    // compile JIB to GenC for the execute definition
-    let ast = ast.borrow();
-    let def = ast
-        .functions
-        .get(&instruction_name)
-        .unwrap_or_else(|| panic!("could not find function {:?}", instruction_name));
-
+    // generates the *arguments* to the instruction's execute function from the function signatures *parameters*.
     #[allow(unstable_name_collisions)]
-    let parameters = def
-        .signature
-        .parameters
-        .iter()
-        .map(|NamedType { name, .. }| name)
-        .map(|name| {
-            if format_variables.contains(name) {
-                format!("inst.{name}")
-            } else {
-                let parts = format_variables
-                    .iter()
-                    .filter(|variable| variable.to_string().split("_part").next().unwrap().starts_with(&name.to_string()))
-                    .collect::<Vec<_>>();
+    let arguments = {
+        // collect names of all format variables
+        let variables = format
+            .0
+            .iter()
+            .filter_map(|segment| match segment.content {
+                SegmentContent::Variable(s) => Some(s),
+                SegmentContent::Constant(_) => None,
+            })
+            .collect::<HashSet<_>>();
 
-                match parts.len() {
-                    0 => {
-                        if constants.get(name).is_some() {
-                            name.to_string()
-                        } else {
-                            panic!("parameter {name} did not correspond to any format segment or constant")
-                        }
-                    },
-                    1 => format!("inst.{}",parts[0]),
-                    _ => {
-                        warn!("parameter {name} corresponded to multiple format segments");
-                        format!("inst.{}",parts[0])
-                    },
+        let ast = ast.borrow();
+        ast.functions
+            // get the instruction's entrypoint function
+            .get(&instruction_name)
+            .unwrap_or_else(|| panic!("could not find function {:?}", instruction_name))
+            .signature
+            // iterate over the parameters of this function
+            .parameters
+            .iter()
+            .map(|NamedType { name, .. }| name)
+            .map(|name| {
+                if variables.contains(name) {
+                    // if the parameter name is a format variable, access it from the `inst` struct.
+                    format!("inst.{name}")
+                } else {
+                    // if the parameter name is a format constant, or exists as a combination of multiple format constants or variables, access the generated local variable.
+                    name.to_string()
                 }
-            }
-        }).intersperse(", ".to_owned()).collect::<String>();
+            })
+            .intersperse(", ".to_owned())
+            .collect::<String>()
+    };
 
-    let execute = {
+    // the body of the execute function contains local variable assignments for constants and combination variables
+    let body = {
         let mut buf = String::new();
 
         for (name, value) in constants {
             buf.push_str(&format!("\tuint64 {name} = {value};\n"));
         }
 
-        buf.push_str(&format!("\t{instruction_name}({parameters});"));
+        // insert bitshifts to calculate spans across format segments
+        // nevermind, apparently we do not need this
+
+        buf.push_str(&format!("\t{instruction_name}({arguments});"));
 
         buf
     };
 
-    (mangled_name, format, execute)
+    (mangled_name, format, body)
 }

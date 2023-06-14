@@ -85,6 +85,14 @@ impl Debug for FormatBit {
     }
 }
 
+fn bits_to_int<B: AsRef<[FormatBit]>>(bits: B) -> u64 {
+    let bits = bits.as_ref();
+
+    assert!(bits.iter().all(FormatBit::is_fixed));
+
+    bits.iter().fold(0, |acc, bit| acc << 1 | bit.fixed_value())
+}
+
 /// Sequence of bits corresponding to the machine code representation of an
 /// instruction
 #[derive(Debug)]
@@ -274,10 +282,7 @@ pub fn process_decode_function_clause(
         .filter_map(|(name, bits)| {
             // only need to test the first bit because they will be homogenous
             if bits[0].is_fixed() {
-                Some((
-                    name.clone(),
-                    bits.iter().fold(0, |acc, bit| acc << 1 | bit.fixed_value()),
-                ))
+                Some((*name, bits_to_int(bits)))
             } else {
                 None
             }
@@ -290,9 +295,7 @@ pub fn process_decode_function_clause(
             let content = if bits.iter().all(FormatBit::is_unknown) {
                 SegmentContent::Variable(n)
             } else if bits.iter().all(FormatBit::is_fixed) {
-                SegmentContent::Constant(
-                    bits.iter().fold(0, |acc, bit| acc << 1 | bit.fixed_value()),
-                )
+                SegmentContent::Constant(bits_to_int(bits))
             } else {
                 panic!();
             };
