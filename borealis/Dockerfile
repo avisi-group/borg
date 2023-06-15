@@ -1,6 +1,6 @@
 # Reference build and deployment environment for Borealis, x86_64 tested in CI
 
-FROM rust:alpine AS builder
+FROM rust:1.70-alpine AS builder
 WORKDIR /tmp/build
 
 ENV RUSTFLAGS="-D warnings"

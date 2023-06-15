@@ -47,7 +47,7 @@ pub fn get_instruction_entrypoint_fns(ast: &sail_ast::Ast) -> Vec<FunctionClause
 pub fn generate_execute_entrypoint(
     ast: Rc<RefCell<boom::Ast>>,
     instruction: &FunctionClause,
-) -> (InternedString, InstructionFormat, String) {
+) -> (InternedString, InternedString, InstructionFormat, String) {
     // determine instruction format
     let (mangled_name, instruction_name, format, constants) =
         process_decode_function_clause(instruction);
@@ -104,5 +104,5 @@ pub fn generate_execute_entrypoint(
         buf
     };
 
-    (mangled_name, format, body)
+    (instruction_name, mangled_name, format, body)
 }

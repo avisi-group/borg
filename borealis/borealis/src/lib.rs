@@ -63,14 +63,19 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     execute_passes(ast.clone());
 
     // set up entrypoints in GenC execute behaviours
-    let instructions = get_instruction_entrypoint_fns(sail_ast)
+    let (instruction_names, instructions) = get_instruction_entrypoint_fns(sail_ast)
         .into_iter()
         .map(|clause| generate_execute_entrypoint(ast.clone(), &clause))
-        .map(|(name, format, execute)| (name.to_string(), Instruction { format, execute }))
-        .collect();
+        .map(|(instruction_name, mangled_name, format, execute)| {
+            (
+                instruction_name,
+                (mangled_name.to_string(), Instruction { format, execute }),
+            )
+        })
+        .unzip();
 
-    // generate all functions
-    let mut functions = generate_fns(ast);
+    // generate all functions, using the names of the
+    let mut functions = generate_fns(ast, instruction_names);
 
     // generate register spaces
     let _registers = 0;
