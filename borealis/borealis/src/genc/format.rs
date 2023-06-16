@@ -1,27 +1,23 @@
 //! GenC instruction formatting
 
-use {common::intern::InternedString, std::fmt::Display};
+use {common::intern::InternedString, itertools::Itertools, std::fmt::Display};
 
 /// Format describing the binary coding of an instruction
 #[derive(Debug, Clone)]
 pub struct InstructionFormat(pub Vec<Segment>);
 
 impl Display for InstructionFormat {
+    #[allow(unstable_name_collisions)]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut segments = self.0.iter();
-
-        match segments.next() {
-            Some(segment) => {
-                write!(f, "{segment}")?;
-
-                for segment in segments {
-                    write!(f, " {segment}")?;
-                }
-
-                Ok(())
-            }
-            None => Ok(()),
-        }
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(ToString::to_string)
+                .intersperse(" ".to_owned())
+                .collect::<String>()
+        )
     }
 }
 
