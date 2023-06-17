@@ -1,9 +1,11 @@
 //! GenC function generation from BOOM
 
-use crate::boom::control_flow::ControlFlowBlock;
-
 use {
-    crate::{boom::Ast, codegen::genc::Render, genc::HelperFunction},
+    crate::{
+        boom::{control_flow::ControlFlowBlock, Ast},
+        codegen::genc::Render,
+        genc::HelperFunction,
+    },
     common::intern::InternedString,
     itertools::Itertools,
     std::{cell::RefCell, collections::HashMap, rc::Rc},

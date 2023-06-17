@@ -313,7 +313,9 @@ pub fn process_decode_function_clause(
     let count = NAME_COUNTER.increment_count(instruction_name);
 
     let name = format!("{instruction_name}{count}").into();
+
     let format = GenCFormat(inner);
+
     trace!("{} genc format: {}", name, format);
 
     (name, instruction_name, format, constants)

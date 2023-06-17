@@ -52,7 +52,8 @@ pub fn generate_execute_entrypoint(
     let (mangled_name, instruction_name, format, constants) =
         process_decode_function_clause(instruction);
 
-    // generates the *arguments* to the instruction's execute function from the function signatures *parameters*.
+    // generates the *arguments* to the instruction's execute function from the
+    // function signatures *parameters*.
     #[allow(unstable_name_collisions)]
     let arguments = {
         // collect names of all format variables
@@ -80,7 +81,8 @@ pub fn generate_execute_entrypoint(
                     // if the parameter name is a format variable, access it from the `inst` struct.
                     format!("inst.{name}")
                 } else {
-                    // if the parameter name is a format constant, or exists as a combination of multiple format constants or variables, access the generated local variable.
+                    // if the parameter name is a format constant, or exists as a combination of
+                    // multiple format constants or variables, access the generated local variable.
                     name.to_string()
                 }
             })
@@ -88,7 +90,8 @@ pub fn generate_execute_entrypoint(
             .collect::<String>()
     };
 
-    // the body of the execute function contains local variable assignments for constants and combination variables
+    // the body of the execute function contains local variable assignments for
+    // constants and combination variables
     let body = {
         let mut buf = String::new();
 
