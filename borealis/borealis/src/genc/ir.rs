@@ -199,13 +199,16 @@ impl Display for Isa {
         writeln!(f, "\tISA_CTOR(arm) {{")?;
 
         for Format {
-            instruction_ident, ..
+            instruction_ident,
+            disasm,
+            ..
         } in &self.formats
         {
             writeln!(f, "\t\t{instruction_ident}.set_decoder();")?;
+            writeln!(f, "\t\t{instruction_ident}.set_asm({disasm});")?;
             writeln!(
                 f,
-                "\t\t{instruction_ident}.set_behaviour({instruction_ident});",
+                "\t\t{instruction_ident}.set_behaviour({instruction_ident});\n",
             )?;
         }
 
@@ -228,6 +231,8 @@ pub struct Format {
     pub instruction_ident: String,
     /// Format string
     pub contents: String,
+    /// Disassembly string
+    pub disasm: String,
 }
 
 impl Display for Format {

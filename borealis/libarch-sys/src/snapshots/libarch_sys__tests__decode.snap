@@ -2,36 +2,36 @@
 source: libarch-sys/src/lib.rs
 expression: "crate::disassemble(&data)"
 ---
-A9BC7BFD: memory_pair_general_preidx_memory_pair_general_postidx__decode2
-910003FD: integer_arithmetic_addsub_immediate_decode0
-90000000: integer_arithmetic_address_pcrel_decode0
-F9400000: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode4
-F9400001: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode4
-F9001FE1: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode1
-D2800001: integer_insext_insert_movewide_decode1
-90000000: integer_arithmetic_address_pcrel_decode0
-91000001: integer_arithmetic_addsub_immediate_decode0
-9100A3E0: integer_arithmetic_addsub_immediate_decode0
-F9400022: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode4
-F9000002: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode1
-F8405021: memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode1
-F8005001: memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode0
-52801400: integer_insext_insert_movewide_decode1
-B9001FE0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode1
-B9401FE1: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode4
-2A0103E0: integer_logical_shiftedreg_decode6
-531D7000: integer_bitfield_decode2
-4B010000: integer_arithmetic_addsub_shiftedreg_decode0
-B90023E0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode1
-B9401FE1: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode4
-B94023E0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode4
-1AC00820: integer_arithmetic_div_decode1
-B90027E0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode1
-9100A3E0: integer_arithmetic_addsub_immediate_decode0
-D28001A2: integer_insext_insert_movewide_decode1
-AA0003E1: integer_logical_shiftedreg_decode6
-52800000: integer_insext_insert_movewide_decode1
-94000000: branch_unconditional_immediate_decode1
-52800000: integer_insext_insert_movewide_decode1
-94000000: branch_unconditional_immediate_decode1
+A9BC7BFD: memory_pair_general_preidx_memory_pair_general_postidx__decode Rt: 0x1, 5, 6, Rt2: 0x1e, imm7: 0x1e, L: 0x1, padding1446: 0x7, V: 0x1, padding1447: 0x7, opc: 0x1, 
+910003FD: integer_arithmetic_addsub_immediate_decode Rd: 0x1, 2, 1, Rn_part1: 0x0, imm12: 0x0, shift: 0x3, padding130: 0x1f, S: 0x1, op: 0x0, sf: 0x1, 
+90000000: integer_arithmetic_address_pcrel_decode 1, Rd_part1: 0x0, 2, 0, immhi_part1: 0x0, padding1275: 0x0, immlo: 0x0, op: 0x0, 
+F9400000: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x1, 7, 5, imm12: 0x0, opc: 0x0, padding1758: 0x0, V: 0x0, padding1759: 0x0, size: 0x0, 
+F9400001: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x1, 7, 5, imm12: 0x0, opc: 0x0, padding1758: 0x0, V: 0x0, padding1759: 0x0, size: 0x1, 
+F9001FE1: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x1, 7, 4, imm12: 0x7, opc: 0x3, padding865: 0x3, V: 0x1, padding866: 0x0, size: 0x1, 
+D2800001: integer_insext_insert_movewide_decode Rd: 0x1, 10, 5, imm16_part1: 0x0, hw: 0x0, padding1599: 0x0, opc: 0x0, sf: 0x1, 
+90000000: integer_arithmetic_address_pcrel_decode 1, Rd_part1: 0x0, 2, 0, immhi_part1: 0x0, padding1275: 0x0, immlo: 0x0, op: 0x0, 
+91000001: integer_arithmetic_addsub_immediate_decode Rd: 0x1, 2, 1, Rn_part1: 0x0, imm12: 0x0, shift: 0x0, padding130: 0x0, S: 0x0, op: 0x0, sf: 0x1, 
+9100A3E0: integer_arithmetic_addsub_immediate_decode Rd: 0x1, 2, 1, Rn_part1: 0x0, imm12: 0x28, shift: 0x3, padding130: 0x1c, S: 0x0, op: 0x0, sf: 0x0, 
+F9400022: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x1, 7, 5, imm12: 0x0, opc: 0x0, padding1758: 0x0, V: 0x1, padding1759: 0x0, size: 0x2, 
+F9000002: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x1, 7, 4, imm12: 0x0, opc: 0x0, padding865: 0x0, V: 0x0, padding866: 0x0, size: 0x2, 
+F8405021: memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode 1, Rt_part1: 0x1, 7, 1, 0, padding534_part1: 0x0, imm9: 0x5, 0, 0, opc: 0x0, padding536: 0x0, V: 0x1, padding537: 0x0, size: 0x1, 
+F8005001: memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode 1, Rt_part1: 0x1, 7, 0, 0, padding287_part1: 0x0, imm9: 0x5, 0, 0, opc: 0x0, padding289: 0x0, V: 0x0, padding290: 0x0, size: 0x1, 
+52801400: integer_insext_insert_movewide_decode Rd: 0x0, 10, 5, imm16_part1: 0x2, hw: 0x2, padding1599: 0x0, opc: 0x0, sf: 0x0, 
+B9001FE0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x0, 7, 4, imm12: 0x7, opc: 0x3, padding865: 0x3, V: 0x1, padding866: 0x0, size: 0x0, 
+B9401FE1: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x0, 7, 5, imm12: 0x7, opc: 0x3, padding1758: 0x3, V: 0x1, padding1759: 0x0, size: 0x1, 
+2A0103E0: integer_logical_shiftedreg_decode Rd: 0x0, 5, 2, Rn_part1: 0x0, 0, imm6_part1: 0x1, Rm: 0x0, N: 0x0, shift: 0x3, padding2891: 0x1c, opc: 0x0, sf: 0x0, 
+531D7000: integer_bitfield_decode Rd: 0x0, 10, 6, Rn_part1: 0x0, imms: 0x1d, immr: 0x1c, N: 0x0, padding2592: 0x0, opc: 0x0, sf: 0x0, 
+4B010000: integer_arithmetic_addsub_shiftedreg_decode Rd: 0x0, 9, 3, Rn_part1: 0x0, 0, imm6_part1: 0x1, Rm: 0x0, padding2: 0x0, shift: 0x0, padding3: 0x0, S: 0x0, op: 0x0, sf: 0x0, 
+B90023E0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x0, 7, 4, imm12: 0x8, opc: 0x3, padding865: 0x3, V: 0x1, padding866: 0x0, size: 0x0, 
+B9401FE1: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x0, 7, 5, imm12: 0x7, opc: 0x3, padding1758: 0x3, V: 0x1, padding1759: 0x0, size: 0x1, 
+B94023E0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x0, 7, 5, imm12: 0x8, opc: 0x3, padding1758: 0x3, V: 0x1, padding1759: 0x0, size: 0x0, 
+1AC00820: integer_arithmetic_div_decode Rd: 0x0, 3, 11, 0, opcode2_5_1_: 0x0, 1, 0, padding3072_part1: 0x4, S: 0x0, op: 0x0, sf: 0x0, 
+B90027E0: memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode 1, Rt_part1: 0x0, 7, 4, imm12: 0x9, opc: 0x3, padding865: 0x3, V: 0x1, padding866: 0x0, size: 0x0, 
+9100A3E0: integer_arithmetic_addsub_immediate_decode Rd: 0x1, 2, 1, Rn_part1: 0x0, imm12: 0x28, shift: 0x3, padding130: 0x1c, S: 0x0, op: 0x0, sf: 0x0, 
+D28001A2: integer_insext_insert_movewide_decode Rd: 0x1, 10, 5, imm16_part1: 0x0, hw: 0x0, padding1599: 0x34, opc: 0x1, sf: 0x0, 
+AA0003E1: integer_logical_shiftedreg_decode Rd: 0x1, 5, 2, Rn_part1: 0x0, 0, imm6_part1: 0x0, Rm: 0x0, N: 0x0, shift: 0x3, padding2891: 0x1c, opc: 0x0, sf: 0x1, 
+52800000: integer_insext_insert_movewide_decode Rd: 0x0, 10, 5, imm16_part1: 0x0, hw: 0x0, padding1599: 0x0, opc: 0x0, sf: 0x0, 
+94000000: branch_unconditional_immediate_decode 37, imm26_part1: 0x0, padding2006: 0x0, op: 0x0, 
+52800000: integer_insext_insert_movewide_decode Rd: 0x0, 10, 5, imm16_part1: 0x0, hw: 0x0, padding1599: 0x0, opc: 0x0, sf: 0x0, 
+94000000: branch_unconditional_immediate_decode 37, imm26_part1: 0x0, padding2006: 0x0, op: 0x0, 
 

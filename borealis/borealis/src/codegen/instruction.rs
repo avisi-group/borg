@@ -47,7 +47,13 @@ pub fn get_instruction_entrypoint_fns(ast: &sail_ast::Ast) -> Vec<FunctionClause
 pub fn generate_execute_entrypoint(
     ast: Rc<RefCell<boom::Ast>>,
     instruction: &FunctionClause,
-) -> (InternedString, InternedString, InstructionFormat, String) {
+) -> (
+    InternedString,
+    InternedString,
+    InstructionFormat,
+    String,
+    String,
+) {
     // determine instruction format
     let (mangled_name, instruction_name, format, constants) =
         process_decode_function_clause(instruction);
@@ -107,5 +113,42 @@ pub fn generate_execute_entrypoint(
         buf
     };
 
-    (instruction_name, mangled_name, format, body)
+    let disasm = {
+        let mut buf = String::new();
+
+        buf.push_str("\"");
+        buf.push_str(instruction_name.as_ref());
+        buf.push_str(" ");
+
+        for segment in &format.0 {
+            match segment.content {
+                SegmentContent::Variable(name) => buf.push_str(&format!("{name}: %hex64, ")),
+                SegmentContent::Constant(val) => buf.push_str(&format!("{val}, ")),
+            }
+        }
+
+        buf.push_str("\"");
+
+        let vars = format
+            .0
+            .iter()
+            .filter_map(|segment| {
+                if let SegmentContent::Variable(name) = segment.content {
+                    Some(name.to_string())
+                } else {
+                    None
+                }
+            })
+            .join(", ");
+
+        if !vars.is_empty() {
+            buf.push_str(", ");
+        }
+
+        buf.push_str(&vars);
+
+        buf
+    };
+
+    (instruction_name, mangled_name, format, body, disasm)
 }

@@ -3,7 +3,7 @@
 use {
     crate::{
         genc::{
-            format::{InstructionFormat, Segment, SegmentContent},
+            format::InstructionFormat,
             ir::{Execute, Files, Format, Function, Isa, Main},
         },
         Error,
@@ -122,11 +122,14 @@ impl Description {
         let formats = self
             .instructions
             .iter()
-            .map(|(instruction_ident, Instruction { format, .. })| Format {
-                format_ident: format!("fmt_{instruction_ident}"),
-                instruction_ident: instruction_ident.clone(),
-                contents: format.to_string(),
-            })
+            .map(
+                |(instruction_ident, Instruction { format, disasm, .. })| Format {
+                    format_ident: format!("fmt_{instruction_ident}"),
+                    instruction_ident: instruction_ident.clone(),
+                    contents: format.to_string(),
+                    disasm: disasm.clone(),
+                },
+            )
             .collect();
 
         // `isa.genc` file containg arch info and instruction decoding
@@ -272,46 +275,7 @@ impl Description {
                     })],
                 },
             ],
-            instructions: HashMap::from([(
-                "addi".to_owned(),
-                Instruction {
-                    format: InstructionFormat(vec![
-                        Segment {
-                            content: SegmentContent::Variable("sf".into()),
-                            length: 1,
-                        },
-                        Segment {
-                            content: SegmentContent::Variable("op".into()),
-                            length: 1,
-                        },
-                        Segment {
-                            content: SegmentContent::Variable("S".into()),
-                            length: 1,
-                        },
-                        Segment {
-                            content: SegmentContent::Constant(0x11),
-                            length: 5,
-                        },
-                        Segment {
-                            content: SegmentContent::Variable("shift".into()),
-                            length: 2,
-                        },
-                        Segment {
-                            content: SegmentContent::Variable("imm12".into()),
-                            length: 12,
-                        },
-                        Segment {
-                            content: SegmentContent::Variable("rn".into()),
-                            length: 5,
-                        },
-                        Segment {
-                            content: SegmentContent::Variable("rd".into()),
-                            length: 5,
-                        },
-                    ]),
-                    execute: "return;".to_owned(),
-                },
-            )]),
+            instructions: HashMap::new(),
             behaviours: Behaviours {
                 handle_exception: "".to_owned(),
                 reset: "".to_owned(),
@@ -424,6 +388,8 @@ pub struct Instruction {
     pub format: InstructionFormat,
     /// GenC execution behaviour
     pub execute: String,
+    /// GenC disassembly behaviour
+    pub disasm: String,
 }
 
 /// Required and custom behaviours for architecture

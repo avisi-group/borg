@@ -66,12 +66,21 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     let (instruction_names, instructions) = get_instruction_entrypoint_fns(sail_ast)
         .into_iter()
         .map(|clause| generate_execute_entrypoint(ast.clone(), &clause))
-        .map(|(instruction_name, mangled_name, format, execute)| {
-            (
-                instruction_name,
-                (mangled_name.to_string(), Instruction { format, execute }),
-            )
-        })
+        .map(
+            |(instruction_name, mangled_name, format, execute, disasm)| {
+                (
+                    instruction_name,
+                    (
+                        mangled_name.to_string(),
+                        Instruction {
+                            format,
+                            execute,
+                            disasm,
+                        },
+                    ),
+                )
+            },
+        )
         .unzip();
 
     // generate all functions, using the names of the

@@ -16,8 +16,8 @@ use {
 };
 
 pub fn disassemble(data: &[u8]) -> String {
-    let mut decode_data = [0u8; 128];
-    let mut disasm_data = [0u8; 128];
+    let mut decode_data = [0u8; 512];
+    let mut disasm_data = [0u8; 512];
 
     let decoder = unsafe { new_decoder(&mut decode_data as *mut u8 as *mut c_void) };
     let disassembler = unsafe { new_disassembler(&mut disasm_data as *mut u8 as *mut c_void) };
