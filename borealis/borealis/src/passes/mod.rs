@@ -30,9 +30,6 @@ mod remove_const_branch;
 
 /// Executes the optimisation and raising passes on an AST
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
-    dump_func_dot(&ast, "__Reset", None);
-    dump_func_dot(&ast, "system_sysops", None);
-
     run_fixed_point(
         ast.clone(),
         &mut [
@@ -42,9 +39,6 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             AddBuiltinFns::new_boxed(ast.clone()),
         ],
     );
-
-    dump_func_dot(&ast, "__Reset", Some("__Reset_after"));
-    dump_func_dot(&ast, "system_sysops", Some("system_sysops_after"));
 }
 
 /// Pass that performs an operation on an AST
@@ -75,7 +69,7 @@ fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
     }
 }
 
-fn dump_func_dot(ast: &Rc<RefCell<Ast>>, func: &'static str, filename: Option<&'static str>) {
+fn _dump_func_dot(ast: &Rc<RefCell<Ast>>, func: &'static str, filename: Option<&'static str>) {
     let path = PathBuf::from(format!("target/dot/{}.dot", filename.unwrap_or(func)));
 
     create_dir_all(path.parent().unwrap()).unwrap();

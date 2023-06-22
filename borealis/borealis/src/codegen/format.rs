@@ -90,7 +90,9 @@ fn bits_to_int<B: AsRef<[FormatBit]>>(bits: B) -> u64 {
 
     assert!(bits.iter().all(FormatBit::is_fixed));
 
-    bits.iter().fold(0, |acc, bit| acc << 1 | bit.fixed_value())
+    bits.iter()
+        .rev()
+        .fold(0, |acc, bit| acc << 1 | bit.fixed_value())
 }
 
 /// Sequence of bits corresponding to the machine code representation of an
@@ -115,7 +117,8 @@ impl Format {
     }
 
     /// Finish building a sequence of format bits
-    pub fn finish(self) -> Vec<FormatBit> {
+    pub fn finish(mut self) -> Vec<FormatBit> {
+        self.0.reverse();
         self.0
     }
 }
@@ -289,7 +292,7 @@ pub fn process_decode_function_clause(
         })
         .collect();
 
-    let inner = homogenised_bits
+    let mut inner = homogenised_bits
         .into_iter()
         .map(|(n, bits)| {
             let content = if bits.iter().all(FormatBit::is_unknown) {
@@ -306,6 +309,7 @@ pub fn process_decode_function_clause(
             }
         })
         .collect::<Vec<_>>();
+    inner.reverse();
 
     // all ARM instructions are 32 bits long
     assert_eq!(inner.iter().map(|s| s.length).sum::<usize>(), 32);
