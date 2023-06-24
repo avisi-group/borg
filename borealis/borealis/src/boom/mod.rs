@@ -1,6 +1,5 @@
-//! Borealis Object Of Machine (BOOM)
-//!
-//! Internal intermediate representation used to convert JIB AST to GenC AST.
+//! Borealis Object Of Machine, Internal intermediate representation used to
+//! convert JIB AST to GenC AST
 
 #![allow(missing_docs)]
 

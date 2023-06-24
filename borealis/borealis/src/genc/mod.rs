@@ -1,4 +1,4 @@
-//! GenC description generation
+//! GenC file representation
 
 use {
     crate::{

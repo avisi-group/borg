@@ -7,6 +7,7 @@ use {
         passes::{any::AnyExt as _, Pass},
     },
     log::{debug, trace},
+    pretty_assertions::assert_eq,
     std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
 

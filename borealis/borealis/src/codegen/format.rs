@@ -158,6 +158,7 @@ pub fn process_decode_function_clause(
     InternedString,
     GenCFormat,
     HashMap<InternedString, u64>,
+    HashMap<InternedString, Range<usize>>,
 ) {
     trace!(
         "Processing decode function clause @ {}",
@@ -198,8 +199,10 @@ pub fn process_decode_function_clause(
         ident.as_interned()
     };
 
-    // named ranges may not be contiguous, so fill any holes with padding ranges
-    // (these should not contain any unknown bits)
+    // Named ranges in Sail may not be contiguous but GenC format strings must be,
+    // so fill any "gaps" with padding ranges
+    //
+    // these should only contain fixed bits
     {
         let mut padding_ranges = vec![];
         let mut last_end = 0;
@@ -231,6 +234,8 @@ pub fn process_decode_function_clause(
 
     trace!("named_ranges: {:?}", named_ranges);
 
+    let mut split_variables = HashMap::new();
+
     let homogenised_ranges = named_ranges
         .clone()
         .into_iter()
@@ -261,17 +266,26 @@ pub fn process_decode_function_clause(
             }
             new_ranges.push(current_start..r.end);
 
-            new_ranges.into_iter().enumerate().map(move |(i, range)| {
-                if i == 0 {
-                    (n, range)
-                } else {
-                    (format!("{}_part{}", &n, i).into(), range)
-                }
-            })
+            let iter: Box<dyn Iterator<Item = _>> = if new_ranges.len() == 1 {
+                Box::new([(n, new_ranges[0].clone())].into_iter())
+            } else {
+                split_variables.insert(n, r);
+
+                Box::new(
+                    new_ranges
+                        .into_iter()
+                        .enumerate()
+                        .map(move |(i, range)| (format!("{}_part{}", &n, i).into(), range)),
+                )
+            };
+
+            iter
         })
         .collect::<Vec<_>>();
 
     trace!("homogenised_ranges: {:?}", homogenised_ranges);
+
+    trace!("split_variables: {:?}", split_variables);
 
     let homogenised_bits = homogenised_ranges
         .into_iter()
@@ -309,6 +323,7 @@ pub fn process_decode_function_clause(
             }
         })
         .collect::<Vec<_>>();
+
     inner.reverse();
 
     // all ARM instructions are 32 bits long
@@ -322,7 +337,7 @@ pub fn process_decode_function_clause(
 
     trace!("{} genc format: {}", name, format);
 
-    (name, instruction_name, format, constants)
+    (name, instruction_name, format, constants, split_variables)
 }
 
 /// Flattens nested expressions

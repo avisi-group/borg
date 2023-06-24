@@ -1,4 +1,4 @@
-//! Code generation
+//! BOOM->GenC code generation
 
 pub mod format;
 pub mod functions;
