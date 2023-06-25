@@ -1,3 +1,5 @@
+Earthfile
+
 target
 **/.DS_Store
 **/_build
@@ -7,5 +9,3 @@ libarch-sys/include/arm64-decode.h
 libarch-sys/include/arm64-decode.cpp
 libarch-sys/include/arm64-disasm.h
 libarch-sys/include/arm64-disasm.cpp
-
-Dockerfile

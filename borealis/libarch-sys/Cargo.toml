@@ -9,7 +9,7 @@ color-eyre = "0.6.2"
 memmap2 = "0.6.2"
 
 [dev-dependencies]
-insta = "1.29.0"
+insta = "1.30.0"
 
 [build-dependencies]
 bindgen = "0.65.1"
