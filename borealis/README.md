@@ -22,9 +22,23 @@
 
 `cargo test --release` to run all tests.
 
-## Docker
+## Docker/Earthly
 
-The included `Dockerfile` builds, tests, and generates documentation for `borealis`. It is used by the GitHub Actions workflow for CI. For that reason, the Docker image should always be `x86_64` compatible, while `aarch64` (and non-Linux) support will be provided on a best-effort basis.
+The included `Earthfile` builds, tests, and generates documentation for `borealis`. It is used by the GitHub Actions workflow for CI. For that reason, `borealis` should always be `x86_64` compatible, while `aarch64` (and non-Linux) support will be provided on a best-effort basis.
+
+### Usage
+
+To build:
+
+```
+$ earthly +build
+```
+
+To run both unit and the end-2-end test:
+
+```
+$ earthly +test
+```
 
 ## Workspace Packages
 
