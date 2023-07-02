@@ -26,7 +26,7 @@ base-image:
     # install sail
     RUN eval `opam env` && opam install --assume-depexts -y sail=0.15 gmp
 
-    SAVE IMAGE --push ghcr.io/avisi-group/borealis/baseimage
+    SAVE IMAGE --cache-hint --push ghcr.io/avisi-group/borealis/baseimage
 
 prebuild:
     BUILD +base-image
@@ -51,7 +51,7 @@ prebuild:
         cargo test --target $RUST_TARGET --no-run && \
         cargo doc --target $RUST_TARGET
 
-    SAVE IMAGE --push ghcr.io/avisi-group/borealis/prebuild
+    SAVE IMAGE --cache-hint --push ghcr.io/avisi-group/borealis/prebuild
 
 build:
     BUILD +prebuild
