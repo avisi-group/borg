@@ -53,6 +53,9 @@ jobs:
       - name: Earthly version
         run: earthly --version
 
+      - name: Expand Earthly cache
+        run: earthly config global.cache_size_mb 32768
+
       - name: Run tests
         run: earthly --strict --use-inline-cache --save-inline-cache --remote-cache=ghcr.io/${{ github.repository }}/cache:cache --push +test
 
