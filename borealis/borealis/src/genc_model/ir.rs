@@ -8,7 +8,7 @@
 //! or external state
 
 use {
-    crate::genc::{
+    crate::genc_model::{
         Bank, Endianness, RegisterSpace, Slot, Typ, View, BEHAVIOURS_FILENAME, EXECUTE_FILENAME,
         ISA_FILENAME,
     },

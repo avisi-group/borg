@@ -1,5 +1,5 @@
 use {
-    borealis::{genc, load_sail, sail_to_genc},
+    borealis::{genc_model, load_sail, sail_to_genc},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{Result, WrapErr},
     errctx::PathCtx,
@@ -66,7 +66,7 @@ fn main() -> Result<()> {
             let description = sail_to_genc(&ast, &jib);
 
             info!("Exporting GenC description");
-            genc::export(&description, output, args.force)
+            genc_model::export(&description, output, args.force)
                 .wrap_err("Error while exporting GenC description")?
         }
         Command::Sail2bincode { input, output } => {

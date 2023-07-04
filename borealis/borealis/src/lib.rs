@@ -8,7 +8,7 @@ use {
             functions::generate_fns,
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
         },
-        genc::{Description, Instruction},
+        genc_model::{Description, Instruction},
         passes::execute_passes,
     },
     common::intern::INTERNER,
@@ -32,7 +32,7 @@ use {
 
 pub mod boom;
 pub mod codegen;
-pub mod genc;
+pub mod genc_model;
 pub mod passes;
 
 /// Borealis error

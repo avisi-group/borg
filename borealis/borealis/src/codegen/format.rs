@@ -1,7 +1,7 @@
 //! Instruction format string extraction
 
 use {
-    crate::genc::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
+    crate::genc_model::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
     common::{identifiable::unique_id, intern::InternedString},
     log::{debug, trace, warn},
     num_bigint::Sign,

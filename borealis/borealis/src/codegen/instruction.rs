@@ -5,7 +5,7 @@ use {
     crate::{
         boom::{self, NamedType},
         codegen::format::{process_decode_function_clause, InstructionDecodeInformation},
-        genc::format::{InstructionFormat, SegmentContent},
+        genc_model::format::{InstructionFormat, SegmentContent},
     },
     common::intern::InternedString,
     itertools::Itertools,
@@ -295,7 +295,7 @@ mod tests {
     use {
         crate::{
             codegen::instruction::{get_segments_in_range, VariableSegment::*},
-            genc::format::{InstructionFormat, Segment, SegmentContent},
+            genc_model::format::{InstructionFormat, Segment, SegmentContent},
         },
         once_cell::sync::Lazy,
         pretty_assertions::assert_eq,

@@ -4,7 +4,7 @@ use {
     crate::{
         boom::{control_flow::ControlFlowBlock, Ast},
         codegen::genc::Render,
-        genc::HelperFunction,
+        genc_model::HelperFunction,
     },
     common::intern::InternedString,
     itertools::Itertools,

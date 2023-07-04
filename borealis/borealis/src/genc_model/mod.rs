@@ -1,8 +1,8 @@
-//! GenC file representation
+//! GenC model filesystem representation
 
 use {
     crate::{
-        genc::{
+        genc_model::{
             format::InstructionFormat,
             ir::{Execute, Files, Format, Function, Isa, Main},
         },
