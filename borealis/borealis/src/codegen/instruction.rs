@@ -4,7 +4,7 @@
 use {
     crate::{
         boom::{self, NamedType},
-        codegen::format::process_decode_function_clause,
+        codegen::format::{process_decode_function_clause, InstructionDecodeInformation},
         genc::format::{InstructionFormat, SegmentContent},
     },
     common::intern::InternedString,
@@ -60,8 +60,13 @@ pub fn generate_execute_entrypoint(
     String,
 ) {
     // determine instruction format
-    let (mangled_name, instruction_name, format, constants, split_variables) =
-        process_decode_function_clause(instruction);
+    let InstructionDecodeInformation {
+        mangled_name,
+        execute_function_name,
+        format,
+        constants,
+        split_variable_ranges,
+    } = process_decode_function_clause(instruction);
 
     // generates the *arguments* to the instruction's execute function from the
     // function signatures *parameters*.
@@ -80,8 +85,8 @@ pub fn generate_execute_entrypoint(
         let ast = ast.borrow();
         ast.functions
             // get the instruction's entrypoint function
-            .get(&instruction_name)
-            .unwrap_or_else(|| panic!("could not find function {:?}", instruction_name))
+            .get(&execute_function_name)
+            .unwrap_or_else(|| panic!("could not find function {:?}", execute_function_name))
             .signature
             // iterate over the parameters of this function
             .parameters
@@ -97,8 +102,7 @@ pub fn generate_execute_entrypoint(
                     name.to_string()
                 }
             })
-            .intersperse(", ".to_owned())
-            .collect::<String>()
+            .join(", ")
     };
 
     // the body of the execute function contains local variable assignments for
@@ -111,9 +115,9 @@ pub fn generate_execute_entrypoint(
         }
 
         // insert bitshifts to calculate spans across format segments
-        buf.push_str(&reconstruct_split_vars(&format, &split_variables));
+        buf.push_str(&reconstruct_split_vars(&format, &split_variable_ranges));
 
-        buf.push_str(&format!("\t{instruction_name}({arguments});"));
+        buf.push_str(&format!("\t{execute_function_name}({arguments});"));
 
         buf
     };
@@ -122,7 +126,7 @@ pub fn generate_execute_entrypoint(
         let mut buf = String::new();
 
         buf.push('\"');
-        buf.push_str(instruction_name.as_ref());
+        buf.push_str(execute_function_name.as_ref());
         buf.push(' ');
 
         for segment in &format.0 {
@@ -155,7 +159,7 @@ pub fn generate_execute_entrypoint(
         buf
     };
 
-    (instruction_name, mangled_name, format, body, disasm)
+    (execute_function_name, mangled_name, format, body, disasm)
 }
 
 /// Segment of a split variable

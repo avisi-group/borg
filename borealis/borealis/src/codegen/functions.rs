@@ -34,8 +34,7 @@ pub fn generate_fns(
                 .parameters
                 .iter()
                 .map(Render::render)
-                .intersperse(", ".to_owned())
-                .collect(),
+                .join(", "),
             name: ident.to_string(),
             body: generate_fn_body(definition.entry_block.clone()),
         };

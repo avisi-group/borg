@@ -150,16 +150,22 @@ impl From<&Literal> for Format {
     }
 }
 
+/// Collection of data on a specific instruction decode format acquired from a Sail function clause
+pub struct InstructionDecodeInformation {
+    /// Unique name for this instruction decode format
+    pub mangled_name: InternedString,
+    /// GenC format generated from the function clause
+    pub format: GenCFormat,
+    /// Name of the function called at the end of the decode clause (the execute behaviour for an instruction)
+    pub execute_function_name: InternedString,
+    /// Constant values passed to the execute function
+    pub constants: HashMap<InternedString, u64>,
+    /// Variables which cross format boundaries must be reconstructed, their ranges and a `GenCFormat` is sufficient to reconstruct the original values
+    pub split_variable_ranges: HashMap<InternedString, Range<usize>>,
+}
+
 /// Main function clause processing
-pub fn process_decode_function_clause(
-    funcl: &FunctionClause,
-) -> (
-    InternedString,
-    InternedString,
-    GenCFormat,
-    HashMap<InternedString, u64>,
-    HashMap<InternedString, Range<usize>>,
-) {
+pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDecodeInformation {
     trace!(
         "Processing decode function clause @ {}",
         funcl.annotation.location
@@ -191,7 +197,7 @@ pub fn process_decode_function_clause(
         .filter_map(expression_to_named_range)
         .collect::<Vec<_>>();
 
-    let instruction_name = {
+    let execute_function_name = {
         let Some(Expression { inner, .. }) = expressions.last() else { panic!() };
 
         let ExpressionAux::Application(ident, ..) = &**inner else { panic!() };
@@ -234,7 +240,7 @@ pub fn process_decode_function_clause(
 
     trace!("named_ranges: {:?}", named_ranges);
 
-    let mut split_variables = HashMap::new();
+    let mut split_variable_ranges = HashMap::new();
 
     let homogenised_ranges = named_ranges
         .clone()
@@ -269,7 +275,7 @@ pub fn process_decode_function_clause(
             let iter: Box<dyn Iterator<Item = _>> = if new_ranges.len() == 1 {
                 Box::new([(n, new_ranges[0].clone())].into_iter())
             } else {
-                split_variables.insert(n, r);
+                split_variable_ranges.insert(n, r);
 
                 Box::new(
                     new_ranges
@@ -285,7 +291,7 @@ pub fn process_decode_function_clause(
 
     trace!("homogenised_ranges: {:?}", homogenised_ranges);
 
-    trace!("split_variables: {:?}", split_variables);
+    trace!("split_variables: {:?}", split_variable_ranges);
 
     let homogenised_bits = homogenised_ranges
         .into_iter()
@@ -329,15 +335,21 @@ pub fn process_decode_function_clause(
     // all ARM instructions are 32 bits long
     assert_eq!(inner.iter().map(|s| s.length).sum::<usize>(), 32);
 
-    let count = NAME_COUNTER.increment_count(instruction_name);
+    let count = NAME_COUNTER.increment_count(execute_function_name);
 
-    let name = format!("{instruction_name}{count}").into();
+    let mangled_name = format!("{execute_function_name}{count}").into();
 
     let format = GenCFormat(inner);
 
-    trace!("{} genc format: {}", name, format);
+    trace!("{} genc format: {}", mangled_name, format);
 
-    (name, instruction_name, format, constants, split_variables)
+    InstructionDecodeInformation {
+        mangled_name,
+        execute_function_name,
+        format,
+        constants,
+        split_variable_ranges,
+    }
 }
 
 /// Flattens nested expressions
