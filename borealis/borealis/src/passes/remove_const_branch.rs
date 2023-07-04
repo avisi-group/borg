@@ -65,7 +65,8 @@ fn remove_const_branch(entry_block: ControlFlowBlock) -> bool {
             condition,
             target,
             fallthrough,
-        } = current.terminator() else {
+        } = current.terminator()
+        else {
             continue;
         };
 

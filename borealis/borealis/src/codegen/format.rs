@@ -150,17 +150,21 @@ impl From<&Literal> for Format {
     }
 }
 
-/// Collection of data on a specific instruction decode format acquired from a Sail function clause
+/// Collection of data on a specific instruction decode format acquired from a
+/// Sail function clause
 pub struct InstructionDecodeInformation {
     /// Unique name for this instruction decode format
     pub mangled_name: InternedString,
     /// GenC format generated from the function clause
     pub format: GenCFormat,
-    /// Name of the function called at the end of the decode clause (the execute behaviour for an instruction)
+    /// Name of the function called at the end of the decode clause (the execute
+    /// behaviour for an instruction)
     pub execute_function_name: InternedString,
     /// Constant values passed to the execute function
     pub constants: HashMap<InternedString, u64>,
-    /// Variables which cross format boundaries must be reconstructed, their ranges and a `GenCFormat` is sufficient to reconstruct the original values
+    /// Variables which cross format boundaries must be reconstructed, their
+    /// ranges and a `GenCFormat` is sufficient to reconstruct the original
+    /// values
     pub split_variable_ranges: HashMap<InternedString, Range<usize>>,
 }
 
@@ -198,9 +202,13 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
         .collect::<Vec<_>>();
 
     let execute_function_name = {
-        let Some(Expression { inner, .. }) = expressions.last() else { panic!() };
+        let Some(Expression { inner, .. }) = expressions.last() else {
+            panic!()
+        };
 
-        let ExpressionAux::Application(ident, ..) = &**inner else { panic!() };
+        let ExpressionAux::Application(ident, ..) = &**inner else {
+            panic!()
+        };
 
         ident.as_interned()
     };
@@ -372,7 +380,9 @@ pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
 
         expressions.push(current_expression);
 
-        let ExpressionAux::Block(expressions) = &*exp1.inner else { panic!() };
+        let ExpressionAux::Block(expressions) = &*exp1.inner else {
+            panic!()
+        };
 
         match expressions.len() {
             0 => break,
@@ -480,7 +490,14 @@ pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
 pub fn expression_to_named_range(
     expression: &Expression,
 ) -> Option<(InternedString, Range<usize>)> {
-    let ExpressionAux::Assign(LValueExpression { inner: lvalue, ..}, Expression { inner: expression_aux, .. }) = &*expression.inner else {
+    let ExpressionAux::Assign(
+        LValueExpression { inner: lvalue, .. },
+        Expression {
+            inner: expression_aux,
+            ..
+        },
+    ) = &*expression.inner
+    else {
         panic!("ExpressionAux not an Assign");
     };
 
@@ -509,11 +526,15 @@ pub fn expression_to_named_range(
 
 /// Tests whether an expression is an assignment to `SEE`
 pub fn is_see_assignment(expression: &Expression) -> bool {
-    let ExpressionAux::Assign(LValueExpression { inner, ..}, _) = &*expression.inner else {
+    let ExpressionAux::Assign(LValueExpression { inner, .. }, _) = &*expression.inner else {
         return false;
     };
 
-    let LValueExpressionAux::Identifier(Identifier {inner: IdentifierAux::Identifier(s),..}) = &**inner else {
+    let LValueExpressionAux::Identifier(Identifier {
+        inner: IdentifierAux::Identifier(s),
+        ..
+    }) = &**inner
+    else {
         return false;
     };
 
@@ -592,7 +613,11 @@ pub fn vector_subrange_to_range(
 
 /// Extracts a `usize` from a Literal expression
 pub fn expression_to_usize(expression: &Expression) -> usize {
-    let ExpressionAux::Literal(Literal { inner: LiteralAux::Num(BigInt(bigint)), .. }) = &*expression.inner else {
+    let ExpressionAux::Literal(Literal {
+        inner: LiteralAux::Num(BigInt(bigint)),
+        ..
+    }) = &*expression.inner
+    else {
         panic!("expression was not a num literal");
     };
 

@@ -46,5 +46,30 @@ pub fn generate_fns(
 }
 
 fn generate_fn_body(_entry_block: ControlFlowBlock) -> String {
-    "return;".to_owned()
+    // let mut buf = String::new();
+    // let mut stack = vec![0u8];
+    // let mut indent = 0u32;
+    // let mut current_block = entry_block;
+
+    // // if a block is unconditional, emit the statements and go to the next block
+    // // if a block is conditional, emit an if, else branch, where the if and else
+    // // blocks are indented one more
+
+    // loop {
+    //     //TODO: write current block statements to buf here
+
+    //     match current_block.terminator() {
+    //         Terminator::Return => todo!(),
+    //         Terminator::Conditional {
+    //             condition,
+    //             target,
+    //             fallthrough,
+    //         } => todo!(),
+    //         Terminator::Unconditional { target } => todo!(),
+    //         Terminator::Undefined => todo!(),
+    //     }
+    // }
+
+    // buf
+    "    return;".into()
 }
