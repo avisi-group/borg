@@ -2,7 +2,12 @@
 
 use {
     crate::{
-        boom::{control_flow::ControlFlowBlock, Ast},
+        boom::{
+            control_flow::{ControlFlowBlock, Terminator},
+            pretty_print::BoomPrettyPrinter,
+            visitor::Visitor,
+            Ast,
+        },
         codegen::genc::Render,
         genc_model::HelperFunction,
     },
@@ -28,15 +33,23 @@ pub fn generate_fns(
 
         #[allow(unstable_name_collisions)]
         let generated = HelperFunction {
-            return_type: definition.signature.return_type.render(),
+            name: ident.to_string(),
+
             parameters: definition
                 .signature
                 .parameters
                 .iter()
                 .map(Render::render)
                 .join(", "),
-            name: ident.to_string(),
-            body: generate_fn_body(definition.entry_block.clone()),
+
+            return_type: definition.signature.return_type.render(),
+
+            //TODO: make this work for all functions
+            body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode" {
+                generate_fn_body(definition.entry_block.clone())
+            } else {
+                "return;".to_owned()
+            },
         };
 
         generated_fns.insert(ident, generated);
@@ -45,31 +58,92 @@ pub fn generate_fns(
     generated_fns.into_values().collect()
 }
 
-fn generate_fn_body(_entry_block: ControlFlowBlock) -> String {
-    // let mut buf = String::new();
-    // let mut stack = vec![0u8];
-    // let mut indent = 0u32;
-    // let mut current_block = entry_block;
+fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
+    enum StackItem {
+        Block(ControlFlowBlock),
+        Else,
+        EndElse,
+    }
 
-    // // if a block is unconditional, emit the statements and go to the next block
-    // // if a block is conditional, emit an if, else branch, where the if and else
-    // // blocks are indented one more
+    let mut buf = String::new();
+    let mut stack = vec![StackItem::Block(entry_block)];
+    let mut indent = "    ".to_owned();
 
-    // loop {
-    //     //TODO: write current block statements to buf here
+    // if a block is unconditional, emit the statements and go to the next block
+    // if a block is conditional, emit an if, else branch, where the if and else
+    // blocks are indented one more
 
-    //     match current_block.terminator() {
-    //         Terminator::Return => todo!(),
-    //         Terminator::Conditional {
-    //             condition,
-    //             target,
-    //             fallthrough,
-    //         } => todo!(),
-    //         Terminator::Unconditional { target } => todo!(),
-    //         Terminator::Undefined => todo!(),
-    //     }
-    // }
+    while let Some(item) = stack.pop() {
+        let block = match item {
+            StackItem::Block(block) => block,
+            StackItem::Else => {
+                indent.truncate(indent.len() - 4);
+                buf += &indent;
+                buf += "} else {\n";
+                indent += "    ";
+                continue;
+            }
+            StackItem::EndElse => {
+                indent.truncate(indent.len() - 4);
+                buf += &indent;
+                buf += "}\n";
+                continue;
+            }
+        };
 
-    // buf
-    "    return;".into()
+        //TODO: write current block statements to buf here
+
+        match block.terminator() {
+            Terminator::Return | Terminator::Undefined => {
+                buf += &indent;
+                buf += "return;\n";
+            }
+            Terminator::Unconditional { target } => {
+                stack.push(StackItem::Block(target));
+            }
+            Terminator::Conditional {
+                condition,
+                target,
+                fallthrough,
+            } => {
+                let condition_str = {
+                    let mut condition_buf = vec![];
+                    BoomPrettyPrinter::new(&mut condition_buf).visit_value(&condition);
+                    String::from_utf8(condition_buf).unwrap()
+                };
+
+                if condition_str == "exception" {
+                    continue;
+                }
+
+                // if the condition is a variable, emit an assignment to it
+                if let Some(ident) = condition.get_ident() {
+                    buf += &indent;
+                    buf += "uint8 ";
+                    buf += ident.as_ref();
+                    buf += " = 0;\n";
+                }
+
+                buf += &indent;
+                buf += "if (";
+                buf += &condition_str;
+                buf += ") {\n";
+                indent += "    ";
+
+                // set up stack for processing the rest of the if statement
+
+                stack.extend([
+                    StackItem::EndElse,
+                    StackItem::Block(fallthrough),
+                    StackItem::Else,
+                    StackItem::Block(target),
+                ]);
+            }
+        }
+    }
+
+    buf += &indent;
+    buf += "return;\n";
+
+    buf
 }

@@ -444,6 +444,15 @@ impl Value {
             _ => None,
         }
     }
+
+    /// Gets the identifier of the inner variable, if it exists
+    pub fn get_ident(&self) -> Option<InternedString> {
+        match self {
+            Value::Identifier(ident) => Some(*ident),
+            Value::Operation(Operation::Not(value)) => value.get_ident(),
+            _ => None,
+        }
+    }
 }
 
 impl Walkable for Value {
