@@ -1,6 +1,9 @@
 //! GenC code generation from BOOM structures
 
-use crate::boom;
+use crate::{
+    boom,
+    boom::{pretty_print::BoomPrettyPrinter, visitor::Visitor},
+};
 
 /// Used to render items to GenC strings
 pub trait Render {
@@ -31,5 +34,13 @@ impl Render for boom::Type {
             },
             t => panic!("{t:?}"),
         }
+    }
+}
+
+impl Render for boom::Value {
+    fn render(&self) -> String {
+        let mut condition_buf = vec![];
+        BoomPrettyPrinter::new(&mut condition_buf).visit_value(self);
+        String::from_utf8(condition_buf).unwrap()
     }
 }

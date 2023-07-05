@@ -4,8 +4,6 @@ use {
     crate::{
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
-            pretty_print::BoomPrettyPrinter,
-            visitor::Visitor,
             Ast,
         },
         codegen::genc::Render,
@@ -58,6 +56,40 @@ pub fn generate_fns(
     generated_fns.into_values().collect()
 }
 
+#[derive(Debug)]
+struct Indent {
+    buf: String,
+    num: usize,
+    whitespace: &'static str,
+}
+
+impl Indent {
+    pub fn new(whitespace: &'static str) -> Self {
+        Self {
+            buf: whitespace.to_owned(),
+            num: 1,
+            whitespace,
+        }
+    }
+
+    pub fn inc(&mut self) {
+        self.num += 1;
+
+        while self.buf.len() < self.num * self.whitespace.len() {
+            self.buf += self.whitespace;
+            assert!(self.buf.len() == self.num * self.whitespace.len());
+        }
+    }
+
+    pub fn dec(&mut self) {
+        self.num -= 1;
+    }
+
+    pub fn get(&self) -> &str {
+        &self.buf[..self.num * self.whitespace.len()]
+    }
+}
+
 fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
     enum StackItem {
         Block(ControlFlowBlock),
@@ -67,7 +99,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
 
     let mut buf = String::new();
     let mut stack = vec![StackItem::Block(entry_block)];
-    let mut indent = "    ".to_owned();
+    let mut indent = Indent::new("    ");
 
     // if a block is unconditional, emit the statements and go to the next block
     // if a block is conditional, emit an if, else branch, where the if and else
@@ -77,15 +109,15 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
         let block = match item {
             StackItem::Block(block) => block,
             StackItem::Else => {
-                indent.truncate(indent.len() - 4);
-                buf += &indent;
+                indent.dec();
+                buf += indent.get();
                 buf += "} else {\n";
-                indent += "    ";
+                indent.inc();
                 continue;
             }
             StackItem::EndElse => {
-                indent.truncate(indent.len() - 4);
-                buf += &indent;
+                indent.dec();
+                buf += indent.get();
                 buf += "}\n";
                 continue;
             }
@@ -95,7 +127,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
 
         match block.terminator() {
             Terminator::Return | Terminator::Undefined => {
-                buf += &indent;
+                buf += indent.get();
                 buf += "return;\n";
             }
             Terminator::Unconditional { target } => {
@@ -106,11 +138,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 target,
                 fallthrough,
             } => {
-                let condition_str = {
-                    let mut condition_buf = vec![];
-                    BoomPrettyPrinter::new(&mut condition_buf).visit_value(&condition);
-                    String::from_utf8(condition_buf).unwrap()
-                };
+                let condition_str = condition.render();
 
                 if condition_str == "exception" {
                     continue;
@@ -118,17 +146,17 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
 
                 // if the condition is a variable, emit an assignment to it
                 if let Some(ident) = condition.get_ident() {
-                    buf += &indent;
+                    buf += indent.get();
                     buf += "uint8 ";
                     buf += ident.as_ref();
                     buf += " = 0;\n";
                 }
 
-                buf += &indent;
+                buf += indent.get();
                 buf += "if (";
                 buf += &condition_str;
                 buf += ") {\n";
-                indent += "    ";
+                indent.inc();
 
                 // set up stack for processing the rest of the if statement
 
@@ -142,8 +170,8 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
         }
     }
 
-    buf += &indent;
-    buf += "return;\n";
+    buf += indent.get();
+    buf += "return;";
 
     buf
 }
