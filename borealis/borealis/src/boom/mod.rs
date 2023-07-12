@@ -151,6 +151,7 @@ pub struct FunctionDefinition {
 impl Walkable for FunctionDefinition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_function_signature(&self.signature);
+        visitor.visit_control_flow_block(&self.entry_block);
     }
 }
 
@@ -382,7 +383,7 @@ impl Walkable for Expression {
 #[derive(Debug, Clone)]
 pub enum Value {
     Identifier(InternedString),
-    Literal(Literal),
+    Literal(Rc<RefCell<Literal>>),
     Operation(Operation),
     Struct {
         name: InternedString,
@@ -438,8 +439,11 @@ impl Value {
 
                 defs[0].evaluate_bool(ctx)
             }
-            Self::Literal(Literal::Bool(value)) => Some(*value),
-            Self::Literal(_) => None,
+            Self::Literal(literal) => match &*literal.borrow() {
+                Literal::Bool(value) => Some(*value),
+                _ => None,
+            },
+
             // Self::Operation(op) => op.evaluate_bool(),
             _ => None,
         }
@@ -459,7 +463,7 @@ impl Walkable for Value {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
             Value::Identifier(_) => (),
-            Value::Literal(literal) => visitor.visit_literal(literal),
+            Value::Literal(literal) => visitor.visit_literal(literal.clone()),
             Value::Operation(operation) => visitor.visit_operation(operation),
             Value::Struct { fields, .. } => fields
                 .iter()
@@ -484,7 +488,7 @@ pub enum Literal {
     Reference(InternedString),
 }
 
-impl Walkable for Literal {
+impl Walkable for Rc<RefCell<Literal>> {
     fn walk<V: Visitor>(&self, _: &mut V) {
         // leaf node
     }

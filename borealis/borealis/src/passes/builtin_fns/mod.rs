@@ -4,13 +4,14 @@
 use {
     crate::{
         boom::{
+            control_flow::ControlFlowBlock,
             visitor::{Visitor, Walkable},
             Ast, Statement,
         },
         passes::Pass,
     },
     regex::Regex,
-    std::{cell::RefCell, rc::Rc},
+    std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
 
 pub mod functions;
@@ -19,6 +20,7 @@ pub mod generic_functions;
 pub struct AddBuiltinFns {
     ast: Rc<RefCell<Ast>>,
     generic_fn_regex: Regex,
+    visited_blocks: HashSet<ControlFlowBlock>,
 }
 
 impl AddBuiltinFns {
@@ -26,6 +28,7 @@ impl AddBuiltinFns {
         Box::new(Self {
             ast,
             generic_fn_regex: Regex::new("([a-z_]+)<(.+)>").expect("failed to build regex"),
+            visited_blocks: HashSet::new(),
         })
     }
 }
@@ -87,5 +90,13 @@ impl Visitor for AddBuiltinFns {
         }
 
         node.borrow().walk(self);
+    }
+
+    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
+        self.visited_blocks.contains(block)
+    }
+
+    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
+        self.visited_blocks.insert(block.clone());
     }
 }

@@ -9,7 +9,11 @@
 //! maybe-unresolved to resolved blocks.
 
 use {
-    crate::boom::{control_flow::builder::ControlFlowGraphBuilder, Statement, Value},
+    crate::boom::{
+        control_flow::builder::ControlFlowGraphBuilder,
+        visitor::{Visitor, Walkable},
+        Statement, Value,
+    },
     common::intern::InternedString,
     log::trace,
     std::{
@@ -77,6 +81,20 @@ impl Display for ControlFlowBlock {
                 write!(f, "{:016X}", state.finish())
             }
         }
+    }
+}
+
+impl Walkable for ControlFlowBlock {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        self.statements()
+            .iter()
+            .cloned()
+            .for_each(|statement| visitor.visit_statement(statement));
+
+        self.terminator()
+            .targets()
+            .iter()
+            .for_each(|block| visitor.visit_control_flow_block(block));
     }
 }
 

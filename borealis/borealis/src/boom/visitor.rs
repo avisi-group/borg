@@ -4,13 +4,13 @@
 
 use {
     crate::boom::{
-        Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
-        NamedValue, Operation, Statement, Type, Value,
+        control_flow::ControlFlowBlock, Definition, Expression, FunctionDefinition,
+        FunctionSignature, Literal, NamedType, NamedValue, Operation, Statement, Type, Value,
     },
     std::{cell::RefCell, rc::Rc},
 };
 
-/// Visitor trait for interacting with Sail AST
+/// Visitor trait for interacting with the BOOM AST
 pub trait Visitor: Sized {
     #[allow(missing_docs)]
     fn visit_definition(&mut self, node: &Definition) {
@@ -25,6 +25,20 @@ pub trait Visitor: Sized {
     #[allow(missing_docs)]
     fn visit_function_signature(&mut self, node: &FunctionSignature) {
         node.walk(self);
+    }
+
+    /// Returns whether the supplied ControlFlowBlock has been visited before
+    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool;
+
+    /// Marks the supplied ControlFlowBlock as visited
+    fn set_block_visited(&mut self, block: &ControlFlowBlock);
+
+    #[allow(missing_docs)]
+    fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
+        if !self.is_block_visited(block) {
+            self.set_block_visited(block);
+            block.walk(self);
+        }
     }
 
     #[allow(missing_docs)]
@@ -58,7 +72,7 @@ pub trait Visitor: Sized {
     }
 
     #[allow(missing_docs)]
-    fn visit_literal(&mut self, node: &Literal) {
+    fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
         node.walk(self);
     }
 

@@ -2,12 +2,14 @@
 
 use {
     crate::boom::{
-        visitor::Visitor, Ast, Definition, Expression, FunctionDefinition, FunctionSignature,
-        Literal, NamedType, NamedValue, Operation, Statement, Type, Value,
+        control_flow::ControlFlowBlock, visitor::Visitor, Ast, Definition, Expression,
+        FunctionDefinition, FunctionSignature, Literal, NamedType, NamedValue, Operation,
+        Statement, Type, Value,
     },
     common::intern::InternedString,
     std::{
         cell::RefCell,
+        collections::HashSet,
         io::Write,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
@@ -52,6 +54,7 @@ pub fn print_statement<W: Write>(w: &mut W, statement: Rc<RefCell<Statement>>) {
 pub struct BoomPrettyPrinter<'writer, W> {
     indent: Rc<AtomicUsize>,
     writer: &'writer mut W,
+    visited_blocks: HashSet<ControlFlowBlock>,
 }
 
 impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
@@ -60,6 +63,7 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
         Self {
             indent: Rc::new(AtomicUsize::new(0)),
             writer,
+            visited_blocks: HashSet::new(),
         }
     }
 }
@@ -372,7 +376,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
     fn visit_value(&mut self, node: &Value) {
         match node {
             Value::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
-            Value::Literal(literal) => self.visit_literal(literal),
+            Value::Literal(literal) => self.visit_literal(literal.clone()),
             Value::Operation(op) => self.visit_operation(op),
             Value::Struct { name, fields } => {
                 self.prindentln(format!("struct {name} {{"));
@@ -413,8 +417,8 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
         }
     }
 
-    fn visit_literal(&mut self, node: &Literal) {
-        match node {
+    fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
+        match &*node.borrow() {
             Literal::Int(bi) => write!(self.writer, "{bi}"),
             Literal::Bits(bits) => write!(self.writer, "{bits:?}"),
             Literal::Bit(bit) => write!(self.writer, "{bit:?}"),
@@ -458,5 +462,13 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                 self.visit_value(rhs);
             }
         }
+    }
+
+    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
+        self.visited_blocks.contains(block)
+    }
+
+    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
+        self.visited_blocks.insert(block.clone());
     }
 }
