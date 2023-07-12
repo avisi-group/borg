@@ -19,7 +19,8 @@ pub struct BoomEmitter {
     ast: boom::Ast,
     /// Temporarily stored type signatures as spec and function definitions are
     /// separate
-    function_types: HashMap<InternedString, (Vec<boom::Type>, boom::Type)>,
+    function_types:
+        HashMap<InternedString, (Vec<Rc<RefCell<boom::Type>>>, Rc<RefCell<boom::Type>>)>,
 }
 
 impl BoomEmitter {
@@ -125,8 +126,8 @@ impl BoomEmitter {
     }
 }
 
-fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> boom::Type {
-    match typ.borrow() {
+fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
+    Rc::new(RefCell::new(match typ.borrow() {
         jib_ast::Type::Lint => boom::Type::Lint,
         jib_ast::Type::Fint(i) => boom::Type::Fint(*i),
         jib_ast::Type::Constant(_) => todo!(),
@@ -155,17 +156,17 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> boom::Type {
         },
         jib_ast::Type::Fvector(length, _, typ) => boom::Type::FVector {
             length: *length,
-            element_type: Box::new(convert_type(&**typ)),
+            element_type: convert_type(&**typ),
         },
         jib_ast::Type::Vector(_, typ) => boom::Type::Vector {
-            element_type: Box::new(convert_type(&**typ)),
+            element_type: (convert_type(&**typ)),
         },
         jib_ast::Type::List(typ) => boom::Type::List {
-            element_type: Box::new(convert_type(&**typ)),
+            element_type: (convert_type(&**typ)),
         },
-        jib_ast::Type::Ref(typ) => boom::Type::Reference(Box::new(convert_type(&**typ))),
+        jib_ast::Type::Ref(typ) => boom::Type::Reference(convert_type(&**typ)),
         jib_ast::Type::Poly(_) => todo!(),
-    }
+    }))
 }
 
 fn convert_body(

@@ -52,7 +52,7 @@ pub trait Visitor: Sized {
     }
 
     #[allow(missing_docs)]
-    fn visit_type(&mut self, node: &Type) {
+    fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
         node.walk(self);
     }
 

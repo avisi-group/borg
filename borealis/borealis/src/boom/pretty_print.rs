@@ -35,7 +35,7 @@ pub fn print_ast<W: Write>(
 
     registers.iter().for_each(|(name, typ)| {
         write!(visitor.writer, "register {name}: ").unwrap();
-        visitor.visit_type(typ);
+        visitor.visit_type(typ.clone());
         writeln!(visitor.writer).unwrap();
     });
 
@@ -91,7 +91,7 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
         }
     }
 
-    fn print_uid(&mut self, id: InternedString, typs: &Vec<Type>) {
+    fn print_uid(&mut self, id: InternedString, typs: &Vec<Rc<RefCell<Type>>>) {
         write!(self.writer, "{id}").unwrap();
 
         if !typs.is_empty() {
@@ -99,11 +99,11 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
 
             let mut typs = typs.iter();
             if let Some(typ) = typs.next() {
-                self.visit_type(typ);
+                self.visit_type(typ.clone());
             }
             for typ in typs {
                 write!(self.writer, ", ").unwrap();
-                self.visit_type(typ);
+                self.visit_type(typ.clone());
             }
 
             write!(self.writer, ">").unwrap();
@@ -143,7 +143,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     let _h = self.indent();
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
-                        self.visit_type(typ);
+                        self.visit_type(typ.clone());
                         writeln!(self.writer, ",").unwrap();
                     });
                 }
@@ -157,7 +157,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     let _h = self.indent();
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
-                        self.visit_type(typ);
+                        self.visit_type(typ.clone());
                         writeln!(self.writer, ",").unwrap();
                     });
                 }
@@ -216,12 +216,12 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
         }
 
         write!(self.writer, ") -> ").unwrap();
-        self.visit_type(return_type);
+        self.visit_type(return_type.clone());
     }
 
     fn visit_named_type(&mut self, NamedType { name, typ }: &NamedType) {
         write!(self.writer, "{name}: ").unwrap();
-        self.visit_type(typ);
+        self.visit_type(typ.clone());
     }
 
     fn visit_named_value(&mut self, NamedValue { name, value }: &NamedValue) {
@@ -229,8 +229,8 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
         self.visit_value(value);
     }
 
-    fn visit_type(&mut self, node: &Type) {
-        match node {
+    fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
+        match &*node.borrow() {
             Type::Unit => write!(self.writer, "void"),
             Type::Bool => write!(self.writer, "bool"),
             Type::String => write!(self.writer, "String"),
@@ -247,12 +247,12 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
             Type::Struct { name, .. } => write!(self.writer, "struct {name}"),
             Type::List { element_type } => {
                 write!(self.writer, "list<").unwrap();
-                self.visit_type(element_type);
+                self.visit_type(element_type.clone());
                 write!(self.writer, ">")
             }
             Type::Vector { element_type } => {
                 write!(self.writer, "vec<").unwrap();
-                self.visit_type(element_type);
+                self.visit_type(element_type.clone());
                 write!(self.writer, ">")
             }
             Type::FVector {
@@ -260,12 +260,12 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                 element_type,
             } => {
                 write!(self.writer, "fvec<{length}, ").unwrap();
-                self.visit_type(element_type);
+                self.visit_type(element_type.clone());
                 write!(self.writer, ">")
             }
             Type::Reference(inner) => {
                 write!(self.writer, "&").unwrap();
-                self.visit_type(inner);
+                self.visit_type(inner.clone());
                 Ok(())
             }
         }
@@ -276,7 +276,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
         match &*node.borrow() {
             Statement::TypeDeclaration { name, typ } => {
                 self.prindent(format!("{name}: "));
-                self.visit_type(typ);
+                self.visit_type(typ.clone());
                 writeln!(self.writer).unwrap();
             }
 

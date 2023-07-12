@@ -1,8 +1,11 @@
 //! GenC code generation from BOOM structures
 
-use crate::{
-    boom,
-    boom::{pretty_print::BoomPrettyPrinter, visitor::Visitor},
+use {
+    crate::{
+        boom,
+        boom::{pretty_print::BoomPrettyPrinter, visitor::Visitor},
+    },
+    std::{cell::RefCell, rc::Rc},
 };
 
 /// Used to render items to GenC strings
@@ -17,11 +20,11 @@ impl Render for boom::NamedType {
     }
 }
 
-impl Render for boom::Type {
+impl Render for Rc<RefCell<boom::Type>> {
     fn render(&self) -> String {
         use boom::Type::*;
 
-        match self {
+        match &*self.borrow() {
             Unit => "void".to_string(),
             Fbits(len, _) => match *len {
                 0 => panic!("unexpected 0 length bitvector"),

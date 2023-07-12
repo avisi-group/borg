@@ -32,7 +32,7 @@ pub struct Ast {
     /// Sequence of definitions
     pub definitions: Vec<Definition>,
     /// Register types by identifier
-    pub registers: HashMap<InternedString, Type>,
+    pub registers: HashMap<InternedString, Rc<RefCell<Type>>>,
     /// Function definitions by identifier
     pub functions: HashMap<InternedString, FunctionDefinition>,
 }
@@ -160,7 +160,7 @@ impl Walkable for FunctionDefinition {
 pub struct FunctionSignature {
     pub name: InternedString,
     pub parameters: Vec<NamedType>,
-    pub return_type: Type,
+    pub return_type: Rc<RefCell<Type>>,
 }
 
 impl Walkable for FunctionSignature {
@@ -168,7 +168,7 @@ impl Walkable for FunctionSignature {
         self.parameters
             .iter()
             .for_each(|parameter| visitor.visit_named_type(parameter));
-        visitor.visit_type(&self.return_type);
+        visitor.visit_type(self.return_type.clone());
     }
 }
 
@@ -176,12 +176,12 @@ impl Walkable for FunctionSignature {
 #[derive(Debug, Clone, PartialEq)]
 pub struct NamedType {
     pub name: InternedString,
-    pub typ: Type,
+    pub typ: Rc<RefCell<Type>>,
 }
 
 impl Walkable for NamedType {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_type(&self.typ);
+        visitor.visit_type(self.typ.clone());
     }
 }
 
@@ -225,42 +225,44 @@ pub enum Type {
         fields: Vec<NamedType>,
     },
     List {
-        element_type: Box<Self>,
+        element_type: Rc<RefCell<Self>>,
     },
     Vector {
-        element_type: Box<Self>,
+        element_type: Rc<RefCell<Self>>,
     },
     FVector {
         length: isize,
-        element_type: Box<Self>,
+        element_type: Rc<RefCell<Self>>,
     },
-    Reference(Box<Self>),
+    Reference(Rc<RefCell<Self>>),
 }
 
-impl Walkable for Type {
+impl Walkable for Rc<RefCell<Type>> {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match self {
-            Self::Unit
-            | Self::Bool
-            | Self::String
-            | Self::Real
-            | Self::Float
-            | Self::Constant(_)
-            | Self::Lint
-            | Self::Fint(_)
-            | Self::Fbits(_, _)
-            | Self::Lbits(_)
-            | Self::Bit
-            | Self::Enum { .. } => (),
+        use Type::*;
 
-            Self::Union { fields, .. } | Self::Struct { fields, .. } => fields
+        match &*self.borrow() {
+            Unit
+            | Bool
+            | String
+            | Real
+            | Float
+            | Constant(_)
+            | Lint
+            | Fint(_)
+            | Fbits(_, _)
+            | Lbits(_)
+            | Bit
+            | Enum { .. } => (),
+
+            Union { fields, .. } | Struct { fields, .. } => fields
                 .iter()
                 .for_each(|field| visitor.visit_named_type(field)),
 
-            Self::List { element_type }
-            | Self::Vector { element_type }
-            | Self::FVector { element_type, .. }
-            | Self::Reference(element_type) => visitor.visit_type(element_type),
+            List { element_type }
+            | Vector { element_type }
+            | FVector { element_type, .. }
+            | Reference(element_type) => visitor.visit_type(element_type.clone()),
         }
     }
 }
@@ -269,7 +271,8 @@ impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut buf = vec![];
         let mut visitor = BoomPrettyPrinter::new(&mut buf);
-        visitor.visit_type(self);
+        //TODO: this is probably bad and slow
+        visitor.visit_type(Rc::new(RefCell::new(self.clone())));
         write!(f, "{}", String::from_utf8_lossy(&buf))
     }
 }
@@ -278,7 +281,7 @@ impl Display for Type {
 pub enum Statement {
     TypeDeclaration {
         name: InternedString,
-        typ: Type,
+        typ: Rc<RefCell<Type>>,
     },
     Try {
         body: Vec<Rc<RefCell<Statement>>>,
@@ -315,7 +318,7 @@ pub enum Statement {
 impl Walkable for Statement {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Self::TypeDeclaration { typ, .. } => visitor.visit_type(typ),
+            Self::TypeDeclaration { typ, .. } => visitor.visit_type(typ.clone()),
             Self::Try { body } => body
                 .iter()
                 .for_each(|statement| visitor.visit_statement(statement.clone())),
@@ -396,12 +399,12 @@ pub enum Value {
     CtorKind {
         value: Box<Self>,
         identifier: InternedString,
-        types: Vec<Type>,
+        types: Vec<Rc<RefCell<Type>>>,
     },
     CtorUnwrap {
         value: Box<Self>,
         identifier: InternedString,
-        types: Vec<Type>,
+        types: Vec<Rc<RefCell<Type>>>,
     },
 }
 
@@ -471,7 +474,7 @@ impl Walkable for Value {
             Value::Field { value, .. } => visitor.visit_value(value),
             Value::CtorKind { value, types, .. } | Value::CtorUnwrap { value, types, .. } => {
                 visitor.visit_value(value);
-                types.iter().for_each(|typ| visitor.visit_type(typ));
+                types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
         }
     }
