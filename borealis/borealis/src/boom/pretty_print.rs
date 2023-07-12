@@ -1,16 +1,17 @@
 //! BOOM AST pretty printing
 
 use {
-    crate::boom::{
-        control_flow::ControlFlowBlock, visitor::Visitor, Ast, Definition, Expression,
-        FunctionDefinition, FunctionSignature, Literal, NamedType, NamedValue, Operation,
-        Statement, Type, Value,
+    crate::{
+        boom::{
+            control_flow::ControlFlowBlock, visitor::Visitor, Ast, Definition, FunctionDefinition,
+            FunctionSignature, NamedType, Statement,
+        },
+        codegen::emit::Emit,
     },
-    common::intern::InternedString,
     std::{
         cell::RefCell,
         collections::HashSet,
-        io::Write,
+        fmt::Write,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -18,15 +19,14 @@ use {
 
 const PADDING: &str = "  ";
 
-/// Pretty-print JIB AST (sequence of definitions)
-pub fn print_ast<W: Write>(
-    w: &mut W,
-    Ast {
+/// Pretty-print BOOM AST
+pub fn print_ast<W: Write>(w: &mut W, ast: Rc<RefCell<Ast>>) {
+    let Ast {
         definitions,
         registers,
         functions,
-    }: &Ast,
-) {
+    } = &*ast.borrow();
+
     let mut visitor = BoomPrettyPrinter::new(w);
 
     definitions
@@ -35,7 +35,7 @@ pub fn print_ast<W: Write>(
 
     registers.iter().for_each(|(name, typ)| {
         write!(visitor.writer, "register {name}: ").unwrap();
-        visitor.visit_type(typ.clone());
+        typ.emit(visitor.writer).unwrap();
         writeln!(visitor.writer).unwrap();
     });
 
@@ -90,25 +90,6 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
             indent: self.indent.clone(),
         }
     }
-
-    fn print_uid(&mut self, id: InternedString, typs: &Vec<Rc<RefCell<Type>>>) {
-        write!(self.writer, "{id}").unwrap();
-
-        if !typs.is_empty() {
-            write!(self.writer, "<").unwrap();
-
-            let mut typs = typs.iter();
-            if let Some(typ) = typs.next() {
-                self.visit_type(typ.clone());
-            }
-            for typ in typs {
-                write!(self.writer, ", ").unwrap();
-                self.visit_type(typ.clone());
-            }
-
-            write!(self.writer, ">").unwrap();
-        }
-    }
 }
 
 struct IndentHandle {
@@ -143,7 +124,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     let _h = self.indent();
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
-                        self.visit_type(typ.clone());
+                        typ.emit(self.writer).unwrap();
                         writeln!(self.writer, ",").unwrap();
                     });
                 }
@@ -157,7 +138,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
                     let _h = self.indent();
                     fields.iter().for_each(|NamedType { name, typ }| {
                         self.prindent(format!("{name}: "));
-                        self.visit_type(typ.clone());
+                        typ.emit(self.writer).unwrap();
                         writeln!(self.writer, ",").unwrap();
                     });
                 }
@@ -194,6 +175,13 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
 
     fn visit_function_definition(&mut self, node: &FunctionDefinition) {
         self.visit_function_signature(&node.signature);
+
+        {
+            let _h = self.indent();
+            self.visit_control_flow_block(&node.entry_block);
+        }
+
+        writeln!(self.writer, "}}").unwrap();
     }
 
     fn visit_function_signature(
@@ -208,260 +196,22 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
 
         let mut parameters = parameters.iter();
         if let Some(param) = parameters.next() {
-            self.visit_named_type(param);
+            param.emit(self.writer).unwrap();
         }
         for param in parameters {
             write!(self.writer, ", ").unwrap();
-            self.visit_named_type(param);
+            param.emit(self.writer).unwrap();
         }
 
         write!(self.writer, ") -> ").unwrap();
-        self.visit_type(return_type.clone());
-    }
-
-    fn visit_named_type(&mut self, NamedType { name, typ }: &NamedType) {
-        write!(self.writer, "{name}: ").unwrap();
-        self.visit_type(typ.clone());
-    }
-
-    fn visit_named_value(&mut self, NamedValue { name, value }: &NamedValue) {
-        write!(self.writer, "{name}: ").unwrap();
-        self.visit_value(value);
-    }
-
-    fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
-        match &*node.borrow() {
-            Type::Unit => write!(self.writer, "void"),
-            Type::Bool => write!(self.writer, "bool"),
-            Type::String => write!(self.writer, "String"),
-            Type::Real => write!(self.writer, "real"),
-            Type::Float => write!(self.writer, "float"),
-            Type::Constant(bi) => write!(self.writer, "constant<{bi}>"),
-            Type::Lint => write!(self.writer, "int"),
-            Type::Fint(size) => write!(self.writer, "int<{size}>"),
-            Type::Fbits(size, _) => write!(self.writer, "bitvector<{size}>"),
-            Type::Lbits(_) => write!(self.writer, "bitvector"),
-            Type::Bit => write!(self.writer, "bit"),
-            Type::Enum { name, .. } => write!(self.writer, "enum {name}"),
-            Type::Union { name, .. } => write!(self.writer, "union {name}"),
-            Type::Struct { name, .. } => write!(self.writer, "struct {name}"),
-            Type::List { element_type } => {
-                write!(self.writer, "list<").unwrap();
-                self.visit_type(element_type.clone());
-                write!(self.writer, ">")
-            }
-            Type::Vector { element_type } => {
-                write!(self.writer, "vec<").unwrap();
-                self.visit_type(element_type.clone());
-                write!(self.writer, ">")
-            }
-            Type::FVector {
-                length,
-                element_type,
-            } => {
-                write!(self.writer, "fvec<{length}, ").unwrap();
-                self.visit_type(element_type.clone());
-                write!(self.writer, ">")
-            }
-            Type::Reference(inner) => {
-                write!(self.writer, "&").unwrap();
-                self.visit_type(inner.clone());
-                Ok(())
-            }
-        }
-        .unwrap();
+        return_type.emit(self.writer).unwrap();
+        writeln!(self.writer, " {{").unwrap();
     }
 
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        match &*node.borrow() {
-            Statement::TypeDeclaration { name, typ } => {
-                self.prindent(format!("{name}: "));
-                self.visit_type(typ.clone());
-                writeln!(self.writer).unwrap();
-            }
-
-            Statement::Try { body } => {
-                self.prindentln("try {");
-                {
-                    let _h = self.indent();
-                    body.iter().for_each(|s| self.visit_statement(s.clone()));
-                }
-                self.prindentln("}");
-            }
-            Statement::Copy { expression, value } => {
-                self.prindent("");
-                self.visit_expression(expression);
-                write!(self.writer, " = ").unwrap();
-                self.visit_value(value);
-                writeln!(self.writer).unwrap();
-            }
-            Statement::Clear { identifier } => self.prindentln(format!("clear({identifier})")),
-            Statement::FunctionCall {
-                expression,
-                name,
-                arguments,
-            } => {
-                self.prindent("");
-                self.visit_expression(expression);
-                write!(self.writer, " = {name}(").unwrap();
-
-                // print correct number of commas
-                let mut args = arguments.iter();
-                if let Some(arg) = args.next() {
-                    self.visit_value(arg);
-                }
-                for arg in args {
-                    write!(self.writer, ", ").unwrap();
-                    self.visit_value(arg);
-                }
-
-                writeln!(self.writer, ")").unwrap();
-            }
-            Statement::Label(label) => self.prindentln(format!("label \"{label}\"")),
-            Statement::Goto(label) => self.prindentln(format!("goto \"{label}\"")),
-            Statement::Jump { condition, target } => {
-                self.prindent(format!("jump {} ", target));
-                self.visit_value(condition);
-                writeln!(self.writer).unwrap();
-            }
-            Statement::End(label) => self.prindentln(format!("end \"{label}\"")),
-            Statement::Undefined => self.prindentln("undefined"),
-            Statement::If {
-                condition,
-                if_body,
-                else_body,
-            } => {
-                self.prindent("if (");
-                self.visit_value(condition);
-                writeln!(self.writer, ") {{").unwrap();
-
-                {
-                    let _h = self.indent();
-                    if_body.iter().for_each(|s| self.visit_statement(s.clone()));
-                }
-
-                self.prindentln("} else {");
-
-                {
-                    let _h = self.indent();
-                    else_body
-                        .iter()
-                        .for_each(|s| self.visit_statement(s.clone()));
-                }
-
-                self.prindentln("}");
-            }
-            Statement::Exit(s) => self.prindentln(format!("exit({s})")),
-            Statement::Comment(s) => self.prindentln(format!("// {s}")),
-        }
-    }
-
-    fn visit_expression(&mut self, node: &Expression) {
-        match node {
-            Expression::Identifier(ident) => {
-                write!(self.writer, "{ident}").unwrap();
-            }
-            Expression::Field { expression, field } => {
-                self.visit_expression(expression);
-                write!(self.writer, ".").unwrap();
-                write!(self.writer, "{field}").unwrap();
-            }
-            Expression::Address(exp) => {
-                write!(self.writer, "*").unwrap();
-                self.visit_expression(exp);
-            }
-        }
-    }
-
-    fn visit_value(&mut self, node: &Value) {
-        match node {
-            Value::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
-            Value::Literal(literal) => self.visit_literal(literal.clone()),
-            Value::Operation(op) => self.visit_operation(op),
-            Value::Struct { name, fields } => {
-                self.prindentln(format!("struct {name} {{"));
-
-                {
-                    let _h = self.indent();
-                    fields.iter().for_each(|NamedValue { name, value }| {
-                        self.prindent(format!("{name}: "));
-                        self.visit_value(value);
-                        writeln!(self.writer, ",").unwrap();
-                    });
-                }
-
-                self.prindentln("}")
-            }
-            Value::Field { value, field_name } => {
-                self.visit_value(value);
-                write!(self.writer, ".{field_name}").unwrap();
-            }
-            Value::CtorKind {
-                value,
-                identifier,
-                types,
-            } => {
-                self.visit_value(value);
-                write!(self.writer, " is ").unwrap();
-                self.print_uid(*identifier, types);
-            }
-            Value::CtorUnwrap {
-                value,
-                identifier,
-                types,
-            } => {
-                self.visit_value(value);
-                write!(self.writer, " as ").unwrap();
-                self.print_uid(*identifier, types);
-            }
-        }
-    }
-
-    fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
-        match &*node.borrow() {
-            Literal::Int(bi) => write!(self.writer, "{bi}"),
-            Literal::Bits(bits) => write!(self.writer, "{bits:?}"),
-            Literal::Bit(bit) => write!(self.writer, "{bit:?}"),
-            Literal::Bool(bool) => write!(self.writer, "{bool}"),
-            Literal::String(s) => write!(self.writer, "{s:?}"),
-            Literal::Unit => write!(self.writer, "()"),
-            Literal::Reference(s) => write!(self.writer, "&{s}"),
-        }
-        .unwrap();
-    }
-
-    fn visit_operation(&mut self, node: &Operation) {
-        match node {
-            Operation::Not(value) => {
-                write!(self.writer, "!").unwrap();
-                self.visit_value(value);
-            }
-            Operation::Equal(lhs, rhs) => {
-                self.visit_value(lhs);
-                write!(self.writer, " == ").unwrap();
-                self.visit_value(rhs);
-            }
-            Operation::LessThan(lhs, rhs) => {
-                self.visit_value(lhs);
-                write!(self.writer, " < ").unwrap();
-                self.visit_value(rhs);
-            }
-            Operation::GreaterThan(lhs, rhs) => {
-                self.visit_value(lhs);
-                write!(self.writer, " > ").unwrap();
-                self.visit_value(rhs);
-            }
-            Operation::Subtract(lhs, rhs) => {
-                self.visit_value(lhs);
-                write!(self.writer, " - ").unwrap();
-                self.visit_value(rhs);
-            }
-            Operation::Add(lhs, rhs) => {
-                self.visit_value(lhs);
-                write!(self.writer, " + ").unwrap();
-                self.visit_value(rhs);
-            }
-        }
+        self.prindent("");
+        node.emit(self.writer).unwrap();
+        writeln!(self.writer).unwrap();
     }
 
     fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {

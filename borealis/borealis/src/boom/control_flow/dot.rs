@@ -1,9 +1,10 @@
 use {
-    crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        pretty_print::BoomPrettyPrinter,
-        visitor::Visitor,
-        Statement,
+    crate::{
+        boom::{
+            control_flow::{ControlFlowBlock, Terminator},
+            Statement,
+        },
+        codegen::emit::Emit,
     },
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
     std::{
@@ -43,25 +44,23 @@ impl Graph {
 
         let node_label = {
             let statements = {
-                let mut label = vec![];
-                let mut printer = BoomPrettyPrinter::new(&mut label);
+                let mut label = String::new();
 
                 for statement in node.statements() {
                     if let Statement::If { condition, .. } = &*statement.borrow() {
-                        printer.visit_value(condition);
+                        condition.emit(&mut label).unwrap();
                     } else {
-                        printer.visit_statement(statement.clone());
+                        statement.emit(&mut label).unwrap();
                     }
                 }
-                String::from_utf8(label).unwrap()
+
+                label
             };
 
             let terminator = match node.terminator() {
                 Terminator::Return => "return".to_owned(),
                 Terminator::Conditional { condition, .. } => {
-                    let mut buf = vec![];
-                    BoomPrettyPrinter::new(&mut buf).visit_value(&condition);
-                    format!("if {}", String::from_utf8_lossy(&buf))
+                    format!("if {}", condition.emit_string())
                 }
                 Terminator::Unconditional { .. } => "goto".to_owned(),
                 Terminator::Undefined => "undefined".to_owned(),

@@ -269,11 +269,10 @@ impl Walkable for Rc<RefCell<Type>> {
 
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut buf = vec![];
-        let mut visitor = BoomPrettyPrinter::new(&mut buf);
+        let mut visitor = BoomPrettyPrinter::new(f);
         //TODO: this is probably bad and slow
         visitor.visit_type(Rc::new(RefCell::new(self.clone())));
-        write!(f, "{}", String::from_utf8_lossy(&buf))
+        Ok(())
     }
 }
 

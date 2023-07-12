@@ -1,4 +1,4 @@
-//! BOOM->GenC code generation
+//! GenC code generation
 
 pub mod emit;
 pub mod format;

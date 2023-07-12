@@ -64,6 +64,10 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     info!("Running passes on BOOM");
     execute_passes(ast.clone());
 
+    // let mut buf = String::new();
+    // crate::boom::pretty_print::print_ast(&mut buf, ast.clone());
+    // write!(&mut File::create("target/ast.boom").unwrap(), "{buf}").unwrap();
+
     // set up entrypoints in GenC execute behaviours
     let (instruction_names, instructions) = get_instruction_entrypoint_fns(sail_ast)
         .into_iter()
