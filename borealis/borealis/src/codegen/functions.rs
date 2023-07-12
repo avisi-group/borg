@@ -6,7 +6,7 @@ use {
             control_flow::{ControlFlowBlock, Terminator},
             Ast,
         },
-        codegen::genc::Render,
+        codegen::emit::Emit,
         genc_model::HelperFunction,
     },
     common::intern::InternedString,
@@ -37,10 +37,10 @@ pub fn generate_fns(
                 .signature
                 .parameters
                 .iter()
-                .map(Render::render)
+                .map(Emit::emit_string)
                 .join(", "),
 
-            return_type: definition.signature.return_type.render(),
+            return_type: definition.signature.return_type.emit_string(),
 
             //TODO: make this work for all functions
             body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode" {
@@ -124,6 +124,11 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
         };
 
         //TODO: write current block statements to buf here
+        block.statements().iter().for_each(|stmt| {
+            buf += indent.get();
+            stmt.emit(&mut buf).unwrap();
+            buf += "\n";
+        });
 
         match block.terminator() {
             Terminator::Return | Terminator::Undefined => {
@@ -138,23 +143,9 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 target,
                 fallthrough,
             } => {
-                let condition_str = condition.render();
-
-                if condition_str == "exception" {
-                    continue;
-                }
-
-                // if the condition is a variable, emit an assignment to it
-                if let Some(ident) = condition.get_ident() {
-                    buf += indent.get();
-                    buf += "uint8 ";
-                    buf += ident.as_ref();
-                    buf += " = 0;\n";
-                }
-
                 buf += indent.get();
                 buf += "if (";
-                buf += &condition_str;
+                condition.emit(&mut buf).unwrap();
                 buf += ") {\n";
                 indent.inc();
 
