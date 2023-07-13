@@ -10,12 +10,12 @@ use {
     std::{cell::RefCell, collections::HashSet, rc::Rc},
 };
 
-pub struct RemoveBools {
+pub struct ReplaceBools {
     did_change: bool,
     visited_blocks: HashSet<ControlFlowBlock>,
 }
 
-impl RemoveBools {
+impl ReplaceBools {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
@@ -24,9 +24,9 @@ impl RemoveBools {
     }
 }
 
-impl Pass for RemoveBools {
+impl Pass for ReplaceBools {
     fn name(&self) -> &'static str {
-        "RemoveBools"
+        "ReplaceBools"
     }
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
@@ -42,7 +42,7 @@ impl Pass for RemoveBools {
     }
 }
 
-impl Visitor for RemoveBools {
+impl Visitor for ReplaceBools {
     fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
         let mut node = node.borrow_mut();
 

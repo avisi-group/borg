@@ -35,10 +35,12 @@ pub trait Visitor: Sized {
 
     #[allow(missing_docs)]
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
-        if !self.is_block_visited(block) {
-            self.set_block_visited(block);
-            block.walk(self);
+        if self.is_block_visited(block) {
+            return;
         }
+
+        self.set_block_visited(block);
+        block.walk(self);
     }
 
     #[allow(missing_docs)]

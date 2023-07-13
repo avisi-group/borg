@@ -12,6 +12,9 @@ use {
     },
 };
 
+type Parameters = Vec<Rc<RefCell<boom::Type>>>;
+type Return = Rc<RefCell<boom::Type>>;
+
 /// Consumes JIB AST and produces BOOM
 #[derive(Debug, Default)]
 pub struct BoomEmitter {
@@ -19,8 +22,7 @@ pub struct BoomEmitter {
     ast: boom::Ast,
     /// Temporarily stored type signatures as spec and function definitions are
     /// separate
-    function_types:
-        HashMap<InternedString, (Vec<Rc<RefCell<boom::Type>>>, Rc<RefCell<boom::Type>>)>,
+    function_types: HashMap<InternedString, (Parameters, Return)>,
 }
 
 impl BoomEmitter {

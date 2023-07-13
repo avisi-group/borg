@@ -10,8 +10,8 @@ use {
         boom::Ast,
         passes::{
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-            fold_unconditionals::FoldUnconditionals, remove_bools::RemoveBools,
-            remove_const_branch::RemoveConstBranch,
+            fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
+            remove_unit::RemoveUnits, replace_bools::ReplaceBools,
         },
     },
     log::info,
@@ -28,10 +28,11 @@ mod builtin_fns;
 mod cycle_finder;
 mod destructure;
 mod fold_unconditionals;
-mod remove_bools;
 mod remove_const_branch;
 mod remove_exception;
-mod remove_voids;
+mod remove_unit;
+mod replace_bitvectors;
+mod replace_bools;
 mod resolve_return_assigns;
 
 /// Executes the optimisation and raising passes on an AST
@@ -43,7 +44,8 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             RemoveConstBranch::new_boxed(),
             CycleFinder::new_boxed(),
             AddBuiltinFns::new_boxed(ast),
-            RemoveBools::new_boxed(),
+            ReplaceBools::new_boxed(),
+            RemoveUnits::new_boxed(),
         ],
     );
 }
