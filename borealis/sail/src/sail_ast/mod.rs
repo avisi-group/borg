@@ -202,7 +202,8 @@ pub struct Identifier {
 
 impl Identifier {
     pub fn as_interned(&self) -> InternedString {
-        static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z0-9_]+$").unwrap());
+        static VALIDATOR: Lazy<Regex> =
+            Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
         static NORMALIZED: Lazy<Mutex<HashMap<InternedString, InternedString>>> =
             Lazy::new(|| Mutex::new(HashMap::new()));
 
@@ -229,11 +230,13 @@ impl Identifier {
             }
         }
 
-        if !VALIDATOR.is_match(buf.as_ref()) {
-            panic!("identifier {buf:?} not normalized");
+        let trimmed = buf.trim_start_matches('_');
+
+        if !VALIDATOR.is_match(trimmed) {
+            panic!("identifier {trimmed:?} not normalized");
         }
 
-        let normalized = InternedString::from(buf);
+        let normalized = InternedString::from(trimmed);
 
         NORMALIZED.lock().insert(raw, normalized);
 

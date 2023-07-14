@@ -16,14 +16,16 @@ use {
 };
 
 pub struct RemoveUnits {
+    ast: Rc<RefCell<Ast>>,
     did_change: bool,
     visited_blocks: HashSet<ControlFlowBlock>,
     modified_fns: HashSet<InternedString>,
 }
 
 impl RemoveUnits {
-    pub fn new_boxed() -> Box<dyn Pass> {
+    pub fn new_boxed(ast: Rc<RefCell<Ast>>) -> Box<dyn Pass> {
         Box::new(Self {
+            ast,
             did_change: false,
             visited_blocks: HashSet::new(),
             modified_fns: HashSet::new(),
@@ -64,7 +66,12 @@ impl Visitor for RemoveUnits {
             .statements()
             .into_iter()
             .filter_map(|statement| {
-                statement_filter(&mut deleted_unit_vars, &mut self.modified_fns, statement)
+                statement_filter(
+                    self.ast.clone(),
+                    &mut deleted_unit_vars,
+                    &mut self.modified_fns,
+                    statement,
+                )
             })
             .collect();
 
@@ -83,6 +90,7 @@ impl Visitor for RemoveUnits {
 }
 
 fn statement_filter(
+    ast: Rc<RefCell<Ast>>,
     deleted_unit_vars: &mut HashSet<InternedString>,
     modified_fns: &mut HashSet<InternedString>,
     statement: Rc<RefCell<Statement>>,
@@ -124,7 +132,9 @@ fn statement_filter(
         }
 
         Statement::FunctionCall {
-            name, arguments, ..
+            name,
+            arguments,
+            expression,
         } => {
             // if any of the arguments are unit values, remove them
             if arguments.iter().any(is_unit_value) {
@@ -132,6 +142,15 @@ fn statement_filter(
                     trace!("function {name:?} not currently modified but had unit value");
                 }
                 arguments.retain(|value| !is_unit_value(value));
+            }
+
+            // if the return type is void, make the expression None
+            if let Some(func) = ast.borrow().functions.get(name) {
+                if let Type::Unit = *func.signature.return_type.borrow() {
+                    *expression = None;
+                }
+            } else {
+                trace!("call made to missing function :(");
             }
 
             Some(statement_cloned)
