@@ -199,7 +199,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         jib_ast::InstructionAux::Label(s) => boom::Statement::Label(*s),
         jib_ast::InstructionAux::Funcall(expression, _, (name, _), args) => {
             boom::Statement::FunctionCall {
-                expression: convert_expression(expression),
+                expression: Some(convert_expression(expression)),
                 name: name.as_interned(),
                 arguments: args.iter().map(convert_value).collect(),
             }

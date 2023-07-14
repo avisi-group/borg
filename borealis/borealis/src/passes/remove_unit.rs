@@ -93,9 +93,9 @@ fn statement_filter(
         Statement::TypeDeclaration { name, typ } => {
             if let Type::Unit = &*typ.borrow() {
                 deleted_unit_vars.insert(*name);
-                return None;
+                None
             } else {
-                return Some(statement_cloned);
+                Some(statement_cloned)
             }
         }
 
@@ -103,11 +103,11 @@ fn statement_filter(
             expression,
             ref value,
         } => {
-            if is_unit_value(&value) {
+            if is_unit_value(value) {
                 // statement is an assignment of a unit literal
 
                 if let Expression::Identifier(ident) = expression {
-                    if !deleted_unit_vars.contains(&ident) {
+                    if !deleted_unit_vars.contains(ident) {
                         trace!("removing assignment of unit to {ident:?} before type definitin was removed")
                     }
 
@@ -128,7 +128,7 @@ fn statement_filter(
         } => {
             // if any of the arguments are unit values, remove them
             if arguments.iter().any(is_unit_value) {
-                if !modified_fns.contains(&name) {
+                if !modified_fns.contains(name) {
                     trace!("function {name:?} not currently modified but had unit value");
                 }
                 arguments.retain(|value| !is_unit_value(value));

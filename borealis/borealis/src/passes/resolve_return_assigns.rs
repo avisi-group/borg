@@ -110,7 +110,8 @@ impl Visitor for ResolveReturns {
                 ref mut expression, ..
             }
             | Statement::FunctionCall {
-                ref mut expression, ..
+                expression: Some(ref mut expression),
+                ..
             } => {
                 let Expression::Identifier(ident) = expression else {
                     return;

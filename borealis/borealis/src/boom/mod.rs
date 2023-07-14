@@ -293,7 +293,7 @@ pub enum Statement {
         identifier: InternedString,
     },
     FunctionCall {
-        expression: Expression,
+        expression: Option<Expression>,
         name: InternedString,
         arguments: Vec<Value>,
     },
@@ -331,7 +331,9 @@ impl Walkable for Statement {
                 arguments,
                 ..
             } => {
-                visitor.visit_expression(expression);
+                if let Some(expression) = expression {
+                    visitor.visit_expression(expression);
+                }
                 arguments
                     .iter()
                     .for_each(|argument| visitor.visit_value(argument));

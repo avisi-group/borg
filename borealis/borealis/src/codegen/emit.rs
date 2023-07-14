@@ -148,11 +148,14 @@ impl Emit for Rc<RefCell<Statement>> {
                 name,
                 arguments,
             } => {
-                expression.emit(w)?;
+                if let Some(expression) = expression {
+                    expression.emit(w)?;
+                    write!(w, " = ")?;
+                }
 
                 write!(
                     w,
-                    " = {name}({});",
+                    "{name}({});",
                     arguments.iter().map(Emit::emit_string).join(", ")
                 )
             }
