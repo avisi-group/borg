@@ -188,7 +188,9 @@ impl ControlFlowGraphBuilder {
 
         // resolve each kind of terminator
         let terminator = match &unresolved.borrow().terminator {
-            MaybeUnresolvedTerminator::Return => Terminator::Return,
+            MaybeUnresolvedTerminator::Return | MaybeUnresolvedTerminator::Undefined => {
+                Terminator::Return(None)
+            }
             MaybeUnresolvedTerminator::Conditional {
                 condition,
                 target,
@@ -201,7 +203,7 @@ impl ControlFlowGraphBuilder {
             MaybeUnresolvedTerminator::Unconditional(target) => Terminator::Unconditional {
                 target: self.resolve_jump_target(target),
             },
-            MaybeUnresolvedTerminator::Undefined => Terminator::Undefined,
+
             MaybeUnresolvedTerminator::Unknown => {
                 panic!("encountered unknown terminator during resolution");
             }

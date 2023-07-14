@@ -87,10 +87,11 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 )
             },
         )
-        .unzip();
+        .unzip::<_, _, _, _>();
 
     // generate all functions, using the names of the
-    let mut functions = generate_fns(ast, instruction_names);
+    let mut functions = generate_fns(ast.clone(), instruction_names);
+    functions.append(&mut generate_fns(ast, vec!["_shr_int_general".into()]));
 
     // generate register spaces
     let _registers = 0;

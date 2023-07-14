@@ -43,7 +43,9 @@ pub fn generate_fns(
             return_type: definition.signature.return_type.emit_string(),
 
             //TODO: make this work for all functions
-            body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode" {
+            body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode"
+                || ident.as_ref() == "_shr_int_general"
+            {
                 generate_fn_body(definition.entry_block.clone())
             } else {
                 "return;".to_owned()
@@ -131,9 +133,16 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
         });
 
         match block.terminator() {
-            Terminator::Return | Terminator::Undefined => {
+            Terminator::Return(value) => {
                 buf += indent.get();
-                buf += "return;\n";
+                buf += "return";
+
+                if let Some(value) = value {
+                    buf += " ";
+                    value.emit(&mut buf).unwrap();
+                }
+
+                buf += ";\n";
             }
             Terminator::Unconditional { target } => {
                 stack.push(StackItem::Block(target));

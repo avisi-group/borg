@@ -12,6 +12,7 @@ use {
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
             remove_unit::RemoveUnits, replace_bools::ReplaceBools,
+            resolve_return_assigns::ResolveReturns,
         },
     },
     log::info,
@@ -46,6 +47,7 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             AddBuiltinFns::new_boxed(ast),
             ReplaceBools::new_boxed(),
             RemoveUnits::new_boxed(),
+            ResolveReturns::new_boxed(),
         ],
     );
 }

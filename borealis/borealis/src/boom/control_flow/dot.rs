@@ -58,19 +58,23 @@ impl Graph {
             };
 
             let terminator = match node.terminator() {
-                Terminator::Return => "return".to_owned(),
+                Terminator::Return(value) => {
+                    format!(
+                        "return {:?}",
+                        value.as_ref().map_or("none".to_owned(), Emit::emit_string)
+                    )
+                }
                 Terminator::Conditional { condition, .. } => {
                     format!("if {}", condition.emit_string())
                 }
                 Terminator::Unconditional { .. } => "goto".to_owned(),
-                Terminator::Undefined => "undefined".to_owned(),
             };
 
             format!("{{{}|{statements}|{terminator}}}", node)
         };
 
         let children = match node.terminator() {
-            Terminator::Return | Terminator::Undefined => vec![],
+            Terminator::Return(_) => vec![],
             Terminator::Conditional {
                 target,
                 fallthrough,

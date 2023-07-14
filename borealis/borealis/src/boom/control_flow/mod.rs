@@ -105,7 +105,7 @@ impl ControlFlowBlock {
                 label: None,
                 parents: HashSet::new(),
                 statements: vec![],
-                terminator: Terminator::Return,
+                terminator: Terminator::Return(None),
             })),
         }
     }
@@ -170,7 +170,7 @@ impl ControlFlowBlock {
             .for_each(|child| child.remove_parent(self));
 
         match &terminator {
-            Terminator::Return | Terminator::Undefined => (),
+            Terminator::Return(_) => (),
             Terminator::Conditional {
                 target,
                 fallthrough,
@@ -266,8 +266,8 @@ impl Eq for ControlFlowBlockWeak {}
 /// Describes how one block conditionally or unconditionally jumps to the next
 #[derive(Debug, Clone)]
 pub enum Terminator {
-    /// Function return
-    Return,
+    /// Function return with optional value
+    Return(Option<Value>),
     /// If condition evaluates to true, then jump to target, otherwise jump to
     /// fallthrough
     Conditional {
@@ -283,15 +283,13 @@ pub enum Terminator {
         /// Target to branch to
         target: ControlFlowBlock,
     },
-    /// Undefined terminator, distinct from the internal `Unknown` variant.
-    Undefined,
 }
 
 impl Terminator {
     /// Gets the targets of a terminator
     pub fn targets(&self) -> Vec<ControlFlowBlock> {
         match self {
-            Terminator::Return | Terminator::Undefined => vec![],
+            Terminator::Return(_) => vec![],
             Terminator::Conditional {
                 target,
                 fallthrough,

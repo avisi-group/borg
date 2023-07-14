@@ -135,12 +135,14 @@ impl Emit for Rc<RefCell<Statement>> {
                 typ.emit(w)?;
                 write!(w, " {name};",)
             }
+
             Statement::Copy { expression, value } => {
                 expression.emit(w)?;
                 write!(w, " = ")?;
                 value.emit(w)?;
                 write!(w, ";")
             }
+
             Statement::FunctionCall {
                 expression,
                 name,

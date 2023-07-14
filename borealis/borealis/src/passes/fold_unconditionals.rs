@@ -119,7 +119,7 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                                 panic!("child of parent of current node was not current node");
                             }
                         }
-                        Terminator::Return | Terminator::Undefined => {
+                        Terminator::Return(_) => {
                             panic!("parent of current node has no children")
                         }
                     };
