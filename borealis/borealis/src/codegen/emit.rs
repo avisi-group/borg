@@ -74,10 +74,11 @@ impl Emit for Rc<RefCell<Type>> {
                 65..=128 => "uint128",
                 _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
             },
-            // need to figure out what these mean
-            Lbits(_) | Lint => "uint128",
-            Bool => "bool", // panic!("bools should not exist in the AST after passes"),
+            Bool => panic!("bools should not exist in the AST after passes"),
+            Lint => "uint64",
             Union { .. } => "union",
+
+            // need to figure out what these mean
             _ => "unknown",
         };
 

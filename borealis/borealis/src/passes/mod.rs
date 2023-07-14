@@ -11,8 +11,8 @@ use {
         passes::{
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
-            remove_unit::RemoveUnits, replace_bools::ReplaceBools,
-            resolve_return_assigns::ResolveReturns,
+            remove_unit::RemoveUnits, replace_bitvectors::ReplaceBitvectors,
+            replace_bools::ReplaceBools, resolve_return_assigns::ResolveReturns,
         },
     },
     log::info,
@@ -48,6 +48,7 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             ReplaceBools::new_boxed(),
             RemoveUnits::new_boxed(ast),
             ResolveReturns::new_boxed(),
+            ReplaceBitvectors::new_boxed(),
         ],
     );
 }
