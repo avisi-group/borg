@@ -44,7 +44,7 @@ pub fn generate_fns(
 
             //TODO: make this work for all functions
             body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode"
-                || ident.as_ref() == "_shr_int_general"
+                || ident.as_ref() == "shr_int_general"
             {
                 generate_fn_body(definition.entry_block.clone())
             } else {
