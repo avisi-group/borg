@@ -166,7 +166,7 @@ impl Emit for Rc<RefCell<Statement>> {
             Statement::Exit(str) => write!(w, "// exit {str:?}"),
 
             Statement::Comment(str) => write!(w, "// {str}"),
-            Statement::Clear { identifier } => write!(w, "// clear {identifier:?}"),
+            Statement::Clear { .. } => Ok(()),
 
             Statement::Try { .. } => todo!(),
 

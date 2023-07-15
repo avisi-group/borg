@@ -20,17 +20,7 @@ pub struct RemoveUnits {
     did_change: bool,
     visited_blocks: HashSet<ControlFlowBlock>,
     modified_fns: HashSet<InternedString>,
-}
-
-impl RemoveUnits {
-    pub fn new_boxed(ast: Rc<RefCell<Ast>>) -> Box<dyn Pass> {
-        Box::new(Self {
-            ast,
-            did_change: false,
-            visited_blocks: HashSet::new(),
-            modified_fns: HashSet::new(),
-        })
-    }
+    deleted_unit_vars: HashSet<InternedString>,
 }
 
 impl Pass for RemoveUnits {
@@ -44,7 +34,16 @@ impl Pass for RemoveUnits {
             .values()
             .map(|def| {
                 self.did_change = false;
+                self.visited_blocks = HashSet::new();
+                self.deleted_unit_vars = HashSet::new();
+
+                if *def.signature.return_type.borrow() == Type::Unit {
+                    self.deleted_unit_vars.insert("return_type".into());
+                    self.deleted_unit_vars.insert("return".into());
+                }
+
                 self.visit_function_definition(def);
+
                 self.did_change
             })
             .any()
@@ -60,19 +59,10 @@ impl Visitor for RemoveUnits {
         }
         self.set_block_visited(block);
 
-        let mut deleted_unit_vars = HashSet::new();
-
         let statements = block
             .statements()
             .into_iter()
-            .filter_map(|statement| {
-                statement_filter(
-                    self.ast.clone(),
-                    &mut deleted_unit_vars,
-                    &mut self.modified_fns,
-                    statement,
-                )
-            })
+            .filter_map(|statement| self.statement_filter(statement))
             .collect();
 
         block.set_statements(statements);
@@ -89,74 +79,73 @@ impl Visitor for RemoveUnits {
     }
 }
 
-fn statement_filter(
-    ast: Rc<RefCell<Ast>>,
-    deleted_unit_vars: &mut HashSet<InternedString>,
-    modified_fns: &mut HashSet<InternedString>,
-    statement: Rc<RefCell<Statement>>,
-) -> Option<Rc<RefCell<Statement>>> {
-    let statement_cloned = statement.clone();
+impl RemoveUnits {
+    pub fn new_boxed(ast: Rc<RefCell<Ast>>) -> Box<dyn Pass> {
+        Box::new(Self {
+            ast,
+            did_change: false,
+            visited_blocks: HashSet::new(),
+            modified_fns: HashSet::new(),
+            deleted_unit_vars: HashSet::new(),
+        })
+    }
 
-    match &mut *statement.borrow_mut() {
-        Statement::TypeDeclaration { name, typ } => {
-            if let Type::Unit = &*typ.borrow() {
-                deleted_unit_vars.insert(*name);
-                None
-            } else {
-                Some(statement_cloned)
-            }
-        }
+    fn statement_filter(
+        &mut self,
+        statement: Rc<RefCell<Statement>>,
+    ) -> Option<Rc<RefCell<Statement>>> {
+        let statement_cloned = statement.clone();
 
-        Statement::Copy {
-            expression,
-            ref value,
-        } => {
-            if is_unit_value(value) {
-                // statement is an assignment of a unit literal
-
-                if let Expression::Identifier(ident) = expression {
-                    if !deleted_unit_vars.contains(ident) {
-                        trace!("removing assignment of unit to {ident:?} before type definitin was removed")
-                    }
-
+        match &mut *statement.borrow_mut() {
+            Statement::TypeDeclaration { name, typ } => {
+                if let Type::Unit = &*typ.borrow() {
+                    self.deleted_unit_vars.insert(*name);
                     None
                 } else {
-                    trace!(
-                        "assignment of a unit literal to a non-identifier expression: {expression:?}"
-                    );
                     Some(statement_cloned)
                 }
-            } else {
+            }
+
+            Statement::Copy { expression, .. } => {
+                if let Expression::Identifier(ident) = expression {
+                    // if we are assigning to a deleted unit variable, drop the assignment
+                    if self.deleted_unit_vars.contains(ident) {
+                        None
+                    } else {
+                        Some(statement_cloned)
+                    }
+                } else {
+                    Some(statement_cloned)
+                }
+            }
+
+            Statement::FunctionCall {
+                name,
+                arguments,
+                expression,
+            } => {
+                // if the return type is void, make the expression None
+                if let Some(func) = self.ast.borrow().functions.get(name) {
+                    if let Type::Unit = *func.signature.return_type.borrow() {
+                        *expression = None;
+                    }
+                } else {
+                    trace!("call made to missing function :(");
+                }
+
+                // if any of the arguments are unit values, remove them
+                if arguments.iter().any(is_unit_value) {
+                    if !self.modified_fns.contains(name) {
+                        trace!("function {name:?} not currently modified but had unit value");
+                    }
+                    arguments.retain(|value| !is_unit_value(value));
+                }
+
                 Some(statement_cloned)
             }
+
+            _ => Some(statement_cloned),
         }
-
-        Statement::FunctionCall {
-            name,
-            arguments,
-            expression,
-        } => {
-            // if any of the arguments are unit values, remove them
-            if arguments.iter().any(is_unit_value) {
-                if !modified_fns.contains(name) {
-                    trace!("function {name:?} not currently modified but had unit value");
-                }
-                arguments.retain(|value| !is_unit_value(value));
-            }
-
-            // if the return type is void, make the expression None
-            if let Some(func) = ast.borrow().functions.get(name) {
-                if let Type::Unit = *func.signature.return_type.borrow() {
-                    *expression = None;
-                }
-            } else {
-                trace!("call made to missing function :(");
-            }
-
-            Some(statement_cloned)
-        }
-
-        _ => Some(statement_cloned),
     }
 }
 

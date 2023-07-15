@@ -43,9 +43,7 @@ pub fn generate_fns(
             return_type: definition.signature.return_type.emit_string(),
 
             //TODO: make this work for all functions
-            body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode"
-                || ident.as_ref() == "shr_int_general"
-            {
+            body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode" {
                 generate_fn_body(definition.entry_block.clone())
             } else {
                 "return;".to_owned()

@@ -174,7 +174,7 @@ fn statement_filter(
                     }
                 }
                 "throw" => None,
-
+                "unconditional" => None,
                 _ => Some(statement_cloned),
             }
         }
