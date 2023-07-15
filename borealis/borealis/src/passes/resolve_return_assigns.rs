@@ -57,13 +57,27 @@ impl Pass for ResolveReturns {
                 // if not void, create a new local variable called "return_value",
                 if let Some(typ) = &self.return_type {
                     let mut statements = def.entry_block.statements();
-                    statements.insert(
-                        0,
-                        Rc::new(RefCell::new(Statement::TypeDeclaration {
-                            name: "return_value".into(),
-                            typ: typ.clone(),
-                        })),
-                    );
+
+                    let return_value_exists = statements.iter().any(|statement| {
+                        if let Statement::TypeDeclaration { name, .. } = &*statement.borrow() {
+                            if name.as_ref() == "return_value" {
+                                return true;
+                            }
+                        }
+
+                        false
+                    });
+
+                    if !return_value_exists {
+                        statements.insert(
+                            0,
+                            Rc::new(RefCell::new(Statement::TypeDeclaration {
+                                name: "return_value".into(),
+                                typ: typ.clone(),
+                            })),
+                        );
+                    }
+
                     def.entry_block.set_statements(statements);
                 }
 
@@ -93,6 +107,7 @@ impl Visitor for ResolveReturns {
                     block.set_terminator(Terminator::Return(Some(Value::Identifier(
                         "return_value".into(),
                     ))));
+                    self.did_change = true;
                 }
             }
             Terminator::Return(Some(_)) => {
@@ -119,6 +134,7 @@ impl Visitor for ResolveReturns {
 
                 if ident.as_ref() == "return" {
                     *expression = Expression::Identifier("return_value".into());
+                    self.did_change = true;
                 }
             }
             _ => (),

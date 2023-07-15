@@ -170,8 +170,5 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
         }
     }
 
-    buf += indent.get();
-    buf += "return;";
-
     buf
 }
