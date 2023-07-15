@@ -234,6 +234,42 @@ impl ControlFlowBlock {
 
         false
     }
+
+    /// Returns a set of identifiers of all functions called in this block and
+    /// its children.
+    pub fn get_functions(&self) -> HashSet<InternedString> {
+        let mut functions = HashSet::new();
+
+        let mut processed = HashSet::new();
+        let mut to_visit = vec![self.clone()];
+
+        // continue until all no nodes are left to visit
+        while let Some(current) = to_visit.pop() {
+            trace!("processing {current}");
+
+            // continue if we have already processed the current node
+            if processed.contains(&current) {
+                continue;
+            }
+
+            // add all function calls to functions set
+            functions.extend(current.statements().into_iter().filter_map(|statement| {
+                if let Statement::FunctionCall { name, .. } = *statement.borrow() {
+                    Some(name)
+                } else {
+                    None
+                }
+            }));
+
+            // mark current node as processed
+            processed.insert(current.clone());
+
+            // push children to visit
+            to_visit.extend(current.terminator().targets());
+        }
+
+        functions
+    }
 }
 
 /// Non-owning reference to a `ControlFlowBlock`

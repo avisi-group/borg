@@ -23,11 +23,16 @@ pub fn generate_fns(
     let mut generated_fns = HashMap::new();
 
     while let Some(ident) = remaining_fns.pop() {
+        // skip if already generated
+        if generated_fns.contains_key(&ident) {
+            continue;
+        }
+
         let ast = ast.borrow();
         let definition = ast
             .functions
             .get(&ident)
-            .expect("cannot generate GenC for unknown function");
+            .unwrap_or_else(|| panic!("cannot generate GenC for unknown function {ident:?}"));
 
         #[allow(unstable_name_collisions)]
         let generated = HelperFunction {
@@ -42,15 +47,12 @@ pub fn generate_fns(
 
             return_type: definition.signature.return_type.emit_string(),
 
-            //TODO: make this work for all functions
-            body: if ident.as_ref() == "integer_arithmetic_addsub_immediate_decode" {
-                generate_fn_body(definition.entry_block.clone())
-            } else {
-                "return;".to_owned()
-            },
+            body: generate_fn_body(definition.entry_block.clone()),
         };
 
         generated_fns.insert(ident, generated);
+
+        remaining_fns.extend(definition.entry_block.get_functions());
     }
 
     generated_fns.into_values().collect()
