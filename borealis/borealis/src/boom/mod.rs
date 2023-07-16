@@ -10,12 +10,11 @@ use {
         pretty_print::BoomPrettyPrinter,
         visitor::{Visitor, Walkable},
     },
-    common::{intern::InternedString, shared_key::SharedKey},
+    common::{intern::InternedString, shared_key::SharedKey, HashMap, HashSet},
     num_bigint::BigInt,
     sail::jib_ast,
     std::{
         cell::RefCell,
-        collections::{HashMap, HashSet},
         fmt::{self, Display, Formatter},
         rc::Rc,
     },
@@ -51,7 +50,7 @@ impl Ast {
     ///
     /// Used to verify that none have been lost during the passes
     pub fn statements(&self) -> HashSet<SharedKey<Statement>> {
-        let mut statements = HashSet::new();
+        let mut statements = HashSet::default();
 
         self.definitions.iter().for_each(|def| {
             if let Definition::Let { body, .. } = def {
@@ -64,7 +63,7 @@ impl Ast {
                  entry_block: control_flow,
                  ..
              }| {
-                let mut visited = HashSet::new();
+                let mut visited = HashSet::default();
                 let mut to_visit = vec![control_flow.clone()];
 
                 while let Some(current) = to_visit.pop() {

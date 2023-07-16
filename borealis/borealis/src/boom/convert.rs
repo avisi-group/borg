@@ -2,14 +2,9 @@
 
 use {
     crate::boom::{self, control_flow::build_graph, FunctionSignature, NamedType},
-    common::intern::InternedString,
+    common::{intern::InternedString, HashMap},
     sail::{jib_ast, sail_ast},
-    std::{
-        borrow::Borrow,
-        cell::RefCell,
-        collections::{HashMap, LinkedList},
-        rc::Rc,
-    },
+    std::{borrow::Borrow, cell::RefCell, collections::LinkedList, rc::Rc},
 };
 
 type Parameters = Vec<Rc<RefCell<boom::Type>>>;

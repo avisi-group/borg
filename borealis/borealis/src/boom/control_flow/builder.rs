@@ -3,8 +3,8 @@ use {
         control_flow::{ControlFlowBlock, Terminator},
         Statement, Value,
     },
-    common::{intern::InternedString, shared_key::SharedKey},
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
+    common::{intern::InternedString, shared_key::SharedKey, HashMap},
+    std::{cell::RefCell, rc::Rc},
 };
 
 /// Builder structure for a control flow graph
@@ -23,8 +23,8 @@ impl ControlFlowGraphBuilder {
         let entry_block = MaybeUnresolvedControlFlowBlock::new();
 
         let mut celf = Self {
-            labels: HashMap::new(),
-            resolved_blocks: HashMap::new(),
+            labels: Default::default(),
+            resolved_blocks: Default::default(),
             current_block: entry_block.clone(),
             entry_block,
         };

@@ -6,11 +6,9 @@ use {
         },
         codegen::emit::Emit,
     },
+    common::HashMap,
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
-    std::{
-        collections::HashMap,
-        io::{self, Write},
-    },
+    std::io::{self, Write},
 };
 
 pub fn render<W: Write>(w: &mut W, block: &ControlFlowBlock) -> io::Result<()> {

@@ -9,17 +9,14 @@ use {
         sail_ast::visitor::{Visitor, Walkable},
         types::{KindIdentifierInner, Position},
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashMap},
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
     once_cell::sync::Lazy,
     parking_lot::Mutex,
     regex::Regex,
     serde::{Deserialize, Serialize},
-    std::{
-        collections::{HashMap, LinkedList},
-        fmt::Display,
-    },
+    std::{collections::LinkedList, fmt::Display},
     strum::IntoStaticStr,
 };
 
@@ -205,7 +202,7 @@ impl Identifier {
         static VALIDATOR: Lazy<Regex> =
             Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
         static NORMALIZED: Lazy<Mutex<HashMap<InternedString, InternedString>>> =
-            Lazy::new(|| Mutex::new(HashMap::new()));
+            Lazy::new(|| Mutex::new(HashMap::default()));
 
         let raw = match self.inner {
             IdentifierAux::Identifier(s) => s,

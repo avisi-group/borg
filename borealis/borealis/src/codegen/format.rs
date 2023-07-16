@@ -2,6 +2,7 @@
 
 use {
     crate::genc_model::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
+    common::HashMap,
     common::{identifiable::unique_id, intern::InternedString},
     log::{debug, trace, warn},
     num_bigint::Sign,
@@ -16,7 +17,7 @@ use {
         },
     },
     std::{
-        collections::{HashMap, LinkedList},
+        collections::LinkedList,
         fmt::{Debug, Display},
         ops::Range,
         sync::Mutex,
@@ -25,12 +26,13 @@ use {
 
 static NAME_COUNTER: Lazy<NameCounter> = Lazy::new(NameCounter::new);
 
+#[derive(Default)]
 struct NameCounter(Mutex<HashMap<InternedString, u32>>);
 
 impl NameCounter {
     /// Create a new empty instance
     fn new() -> Self {
-        Self(Mutex::new(HashMap::new()))
+        Default::default()
     }
 
     fn increment_count(&self, key: InternedString) -> u32 {
@@ -248,7 +250,7 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
 
     trace!("named_ranges: {:?}", named_ranges);
 
-    let mut split_variable_ranges = HashMap::new();
+    let mut split_variable_ranges = HashMap::default();
 
     let homogenised_ranges = named_ranges
         .clone()

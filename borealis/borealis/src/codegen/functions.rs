@@ -9,9 +9,9 @@ use {
         codegen::emit::Emit,
         genc_model::HelperFunction,
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashMap},
     itertools::Itertools,
-    std::{cell::RefCell, collections::HashMap, rc::Rc},
+    std::{cell::RefCell, rc::Rc},
 };
 
 /// Generates GenC helper functions from all functions in a BOOM AST
@@ -20,7 +20,7 @@ pub fn generate_fns(
     initial_fns: Vec<InternedString>,
 ) -> Vec<HelperFunction> {
     let mut remaining_fns = initial_fns;
-    let mut generated_fns = HashMap::new();
+    let mut generated_fns = HashMap::default();
 
     while let Some(ident) = remaining_fns.pop() {
         // skip if already generated

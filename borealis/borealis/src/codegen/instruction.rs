@@ -7,15 +7,10 @@ use {
         codegen::format::{process_decode_function_clause, InstructionDecodeInformation},
         genc_model::format::{InstructionFormat, SegmentContent},
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashMap},
     itertools::Itertools,
     sail::sail_ast::{self, visitor::Visitor, FunctionClause, IdentifierAux},
-    std::{
-        cell::RefCell,
-        collections::{HashMap, HashSet},
-        ops::Range,
-        rc::Rc,
-    },
+    std::{cell::RefCell, collections::HashSet, ops::Range, rc::Rc},
 };
 
 /// Finds all instructions in a Sail definition

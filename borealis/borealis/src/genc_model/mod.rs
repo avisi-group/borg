@@ -8,9 +8,9 @@ use {
         },
         Error,
     },
+    common::HashMap,
     errctx::PathCtx,
     std::{
-        collections::HashMap,
         fmt::Display,
         fs::{create_dir_all, read_dir, File},
         io::{self, Write as _},
@@ -275,7 +275,7 @@ impl Description {
                     })],
                 },
             ],
-            instructions: HashMap::new(),
+            instructions: HashMap::default(),
             behaviours: Behaviours {
                 handle_exception: "".to_owned(),
                 reset: "".to_owned(),
