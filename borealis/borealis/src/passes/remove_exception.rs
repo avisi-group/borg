@@ -86,18 +86,18 @@ impl Visitor for RemoveExceptions {
         block.set_statements(statements);
 
         if let Terminator::Conditional {
-            condition, target, ..
+            condition: Value::Identifier(ident),
+            target,
+            ..
         } = block.terminator()
         {
-            if let Value::Identifier(ident) = condition {
-                if ident.as_ref() == "exception" {
-                    target.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
-                        expression: None,
-                        name: "trap".into(),
-                        arguments: vec![],
-                    }))]);
-                    target.set_terminator(Terminator::Return(None));
-                }
+            if ident.as_ref() == "exception" {
+                target.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
+                    expression: None,
+                    name: "trap".into(),
+                    arguments: vec![],
+                }))]);
+                target.set_terminator(Terminator::Return(None));
             }
         }
 

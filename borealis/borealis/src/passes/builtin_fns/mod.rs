@@ -65,9 +65,7 @@ impl Visitor for AddBuiltinFns {
             return;
         }
 
-        let name = name.to_string();
-
-        match self.generic_fn_regex.captures(&name) {
+        match self.generic_fn_regex.captures(name.as_ref()) {
             Some(captures) => {
                 let name = captures.get(1).unwrap().as_str();
                 let typ = captures.get(2).unwrap().as_str();
@@ -81,7 +79,7 @@ impl Visitor for AddBuiltinFns {
             }
             None => {
                 // found non-generic function
-                functions::HANDLERS.get(&name).unwrap_or_else(|| {
+                functions::HANDLERS.get(name.as_ref()).unwrap_or_else(|| {
                     panic!(
                         "Function call {name:?} found without definition or builtin function behaviour"
                     )

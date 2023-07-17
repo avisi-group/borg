@@ -2,8 +2,7 @@
 
 use {
     crate::genc_model::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
-    common::HashMap,
-    common::{identifiable::unique_id, intern::InternedString},
+    common::{identifiable::unique_id, intern::InternedString, HashMap},
     log::{debug, trace, warn},
     num_bigint::Sign,
     once_cell::sync::Lazy,
@@ -141,7 +140,7 @@ impl From<&Literal> for Format {
         };
 
         let mut decode_bits = Format::empty();
-        for char in s.to_string().chars() {
+        for char in s.as_ref().chars() {
             match char {
                 '0' => decode_bits.push(FormatBit::Zero),
                 '1' => decode_bits.push(FormatBit::One),
@@ -451,7 +450,7 @@ pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
                     typargs,
                 ) = &*typ.inner
                 {
-                    if s.to_string() != "bits" {
+                    if s.as_ref() != "bits" {
                         panic!();
                     }
 

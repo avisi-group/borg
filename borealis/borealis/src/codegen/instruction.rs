@@ -25,7 +25,7 @@ pub fn get_instruction_entrypoint_fns(ast: &sail_ast::Ast) -> Vec<FunctionClause
                 return;
             };
 
-            if ident.to_string() == "decode64" {
+            if ident.as_ref() == "decode64" {
                 self.clauses.push(node.clone());
             }
         }
