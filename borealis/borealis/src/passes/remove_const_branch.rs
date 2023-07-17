@@ -8,8 +8,9 @@ use {
         },
         passes::{any::AnyExt as _, Pass},
     },
+    common::HashSet,
     log::{debug, trace},
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    std::{cell::RefCell, rc::Rc},
 };
 
 /// Control flow blocks with only one parent and one child (unconditional jump
@@ -42,7 +43,7 @@ impl Pass for RemoveConstBranch {
 
 fn remove_const_branch(entry_block: ControlFlowBlock) -> bool {
     let mut did_change = false;
-    let mut processed = HashSet::new();
+    let mut processed = HashSet::default();
     let mut to_visit = vec![entry_block];
 
     // continue until all no nodes are left to visit

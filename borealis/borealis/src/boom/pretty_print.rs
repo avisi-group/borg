@@ -8,9 +8,9 @@ use {
         },
         codegen::emit::Emit,
     },
+    common::HashSet,
     std::{
         cell::RefCell,
-        collections::HashSet,
         fmt::Write,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
@@ -63,7 +63,7 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
         Self {
             indent: Rc::new(AtomicUsize::new(0)),
             writer,
-            visited_blocks: HashSet::new(),
+            visited_blocks: HashSet::default(),
         }
     }
 }

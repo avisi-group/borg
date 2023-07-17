@@ -25,8 +25,9 @@ use {
         },
         passes::{any::AnyExt, Pass},
     },
+    common::HashSet,
     num_bigint::BigInt,
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    std::{cell::RefCell, rc::Rc},
 };
 
 pub struct ReplaceBitvectors {
@@ -38,7 +39,7 @@ impl ReplaceBitvectors {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
-            visited_blocks: HashSet::new(),
+            visited_blocks: HashSet::default(),
         })
     }
 }

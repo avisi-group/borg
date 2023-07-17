@@ -10,9 +10,9 @@ use {
         },
         passes::{any::AnyExt, Pass},
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashSet},
     log::trace,
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    std::{cell::RefCell, rc::Rc},
 };
 
 pub struct RemoveUnits {
@@ -34,8 +34,8 @@ impl Pass for RemoveUnits {
             .values()
             .map(|def| {
                 self.did_change = false;
-                self.visited_blocks = HashSet::new();
-                self.deleted_unit_vars = HashSet::new();
+                self.visited_blocks = HashSet::default();
+                self.deleted_unit_vars = HashSet::default();
 
                 if *def.signature.return_type.borrow() == Type::Unit {
                     self.deleted_unit_vars.insert("return_type".into());
@@ -84,9 +84,9 @@ impl RemoveUnits {
         Box::new(Self {
             ast,
             did_change: false,
-            visited_blocks: HashSet::new(),
-            modified_fns: HashSet::new(),
-            deleted_unit_vars: HashSet::new(),
+            visited_blocks: HashSet::default(),
+            modified_fns: HashSet::default(),
+            deleted_unit_vars: HashSet::default(),
         })
     }
 

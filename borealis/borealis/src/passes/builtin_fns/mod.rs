@@ -10,8 +10,9 @@ use {
         },
         passes::Pass,
     },
+    common::HashSet,
     regex::Regex,
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    std::{cell::RefCell, rc::Rc},
 };
 
 pub mod functions;
@@ -28,7 +29,7 @@ impl AddBuiltinFns {
         Box::new(Self {
             ast,
             generic_fn_regex: Regex::new("([a-z_]+)<(.+)>").expect("failed to build regex"),
-            visited_blocks: HashSet::new(),
+            visited_blocks: HashSet::default(),
         })
     }
 }

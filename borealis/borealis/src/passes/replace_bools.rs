@@ -7,7 +7,8 @@ use {
         boom::{control_flow::ControlFlowBlock, visitor::Visitor, Ast, Literal, Type},
         passes::{any::AnyExt, Pass},
     },
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    common::HashSet,
+    std::{cell::RefCell, rc::Rc},
 };
 
 pub struct ReplaceBools {
@@ -19,7 +20,7 @@ impl ReplaceBools {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
-            visited_blocks: HashSet::new(),
+            visited_blocks: HashSet::default(),
         })
     }
 }

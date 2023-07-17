@@ -19,8 +19,8 @@ use {
         },
         passes::{any::AnyExt, Pass},
     },
-    common::intern::InternedString,
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    common::{intern::InternedString, HashSet},
+    std::{cell::RefCell, rc::Rc},
 };
 
 pub struct RemoveExceptions {
@@ -32,7 +32,7 @@ impl RemoveExceptions {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
-            visited_blocks: HashSet::new(),
+            visited_blocks: HashSet::default(),
         })
     }
 }
@@ -75,7 +75,7 @@ impl Visitor for RemoveExceptions {
         }
         self.set_block_visited(block);
 
-        let mut deleted_exception_vars = HashSet::new();
+        let mut deleted_exception_vars = HashSet::default();
 
         let statements = block
             .statements()

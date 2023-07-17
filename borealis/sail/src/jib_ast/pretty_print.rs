@@ -8,9 +8,9 @@ use {
         },
         sail_ast::Identifier,
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashSet},
     std::{
-        collections::{HashSet, LinkedList},
+        collections::LinkedList,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -22,7 +22,7 @@ const PADDING: &str = "  ";
 pub fn print_ast<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
     let mut visitor = JibPrettyPrinter {
         indent: Rc::new(AtomicUsize::from(0)),
-        abstract_functions: HashSet::new(),
+        abstract_functions: HashSet::default(),
     };
 
     iter.into_iter().for_each(|i| visitor.visit_definition(i));

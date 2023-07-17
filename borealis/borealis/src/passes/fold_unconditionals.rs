@@ -6,9 +6,10 @@ use {
         },
         passes::{any::AnyExt as _, Pass},
     },
+    common::HashSet,
     log::{debug, trace},
     pretty_assertions::assert_eq,
-    std::{cell::RefCell, collections::HashSet, rc::Rc},
+    std::{cell::RefCell, rc::Rc},
 };
 
 /// Control flow blocks with only one parent and one child (unconditional jump
@@ -42,7 +43,7 @@ impl Pass for FoldUnconditionals {
 
 fn fold_graph(entry_block: ControlFlowBlock) -> bool {
     let mut did_change = false;
-    let mut processed = HashSet::new();
+    let mut processed = HashSet::default();
     let mut to_visit = vec![entry_block];
 
     // continue until all no nodes are left to visit

@@ -14,11 +14,11 @@ use {
         visitor::{Visitor, Walkable},
         Statement, Value,
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashSet},
     log::trace,
     std::{
         cell::RefCell,
-        collections::{hash_map::DefaultHasher, HashSet, LinkedList},
+        collections::{hash_map::DefaultHasher, LinkedList},
         fmt::{self, Display, Formatter},
         hash::{Hash, Hasher},
         io::{self, Write},
@@ -103,7 +103,7 @@ impl ControlFlowBlock {
         Self {
             inner: Rc::new(RefCell::new(ControlFlowBlockInner {
                 label: None,
-                parents: HashSet::new(),
+                parents: HashSet::default(),
                 statements: vec![],
                 terminator: Terminator::Return(None),
             })),
@@ -203,8 +203,8 @@ impl ControlFlowBlock {
     /// Determines whether the current `ControlFlowBlock` and it's children
     /// contain any cycles
     pub fn contains_cycles(&self) -> bool {
-        let mut processed = HashSet::new();
-        let mut currently_processing = HashSet::new();
+        let mut processed = HashSet::default();
+        let mut currently_processing = HashSet::default();
         let mut to_visit = LinkedList::new();
         to_visit.push_back(self.clone());
 
@@ -238,9 +238,9 @@ impl ControlFlowBlock {
     /// Returns a set of identifiers of all functions called in this block and
     /// its children.
     pub fn get_functions(&self) -> HashSet<InternedString> {
-        let mut functions = HashSet::new();
+        let mut functions = HashSet::default();
 
-        let mut processed = HashSet::new();
+        let mut processed = HashSet::default();
         let mut to_visit = vec![self.clone()];
 
         // continue until all no nodes are left to visit
