@@ -2,15 +2,16 @@
 
 use {
     deepsize::DeepSizeOf,
-    fxhash::FxBuildHasher,
     lasso::{Spur, ThreadedRodeo},
     ocaml::{FromValue, ToValue, Value},
     once_cell::sync::Lazy,
+    std::hash::BuildHasherDefault,
+    twox_hash::XxHash64,
 };
 
 /// String interner instance
-pub static INTERNER: Lazy<ThreadedRodeo<Spur, FxBuildHasher>> =
-    Lazy::new(|| ThreadedRodeo::with_hasher(FxBuildHasher::default()));
+pub static INTERNER: Lazy<ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>>> =
+    Lazy::new(|| ThreadedRodeo::with_hasher(Default::default()));
 
 /// Key for an interned string
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Hash, Ord)]
