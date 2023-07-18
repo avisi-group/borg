@@ -13,13 +13,11 @@ use {
         },
         passes::{any::AnyExt, Pass},
     },
-    common::HashSet,
     std::{cell::RefCell, rc::Rc},
 };
 
 pub struct ResolveReturns {
     did_change: bool,
-    visited_blocks: HashSet<ControlFlowBlock>,
     return_type: Option<Rc<RefCell<Type>>>,
 }
 
@@ -27,7 +25,6 @@ impl ResolveReturns {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
-            visited_blocks: HashSet::default(),
             return_type: None,
         })
     }
@@ -96,11 +93,6 @@ impl Pass for ResolveReturns {
 impl Visitor for ResolveReturns {
     // visit every block: if not void, replace returns with return return_value
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
-        if self.is_block_visited(block) {
-            return;
-        }
-        self.set_block_visited(block);
-
         // only modify returns if the block terminates with a return
         match block.terminator() {
             Terminator::Return(None) => {
@@ -111,10 +103,23 @@ impl Visitor for ResolveReturns {
                     self.did_change = true;
                 }
             }
-            Terminator::Return(Some(_)) => {
-                panic!("return already set");
+            Terminator::Return(Some(Value::Identifier(ident))) => {
+                match self.return_type {
+                    Some(_) => {
+                        if ident.as_ref() != "return_value" {
+                            panic!("return type of function is not void but return value is {ident:?} not \"return_value\"");
+                        }
+                    }
+                    None => {
+                        panic!("return type of function is void but return value is {ident:?} not None");
+                    }
+                }
             }
-            _ => {}
+            Terminator::Return(Some(_)) => {
+                panic!("return already set to non-identifier, should never occur");
+            }
+            // do nothing
+            Terminator::Conditional { .. } | Terminator::Unconditional { .. } => (),
         }
 
         block.walk(self);
@@ -140,13 +145,5 @@ impl Visitor for ResolveReturns {
             }
             _ => (),
         }
-    }
-
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
-        self.visited_blocks.contains(block)
-    }
-
-    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
-        self.visited_blocks.insert(block.clone());
     }
 }

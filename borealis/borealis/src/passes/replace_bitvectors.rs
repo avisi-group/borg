@@ -19,28 +19,22 @@
 use {
     crate::{
         boom::{
-            control_flow::ControlFlowBlock,
             visitor::{Visitor, Walkable},
             Ast, Bit, Literal, Type,
         },
         passes::{any::AnyExt, Pass},
     },
-    common::HashSet,
     num_bigint::BigInt,
     std::{cell::RefCell, rc::Rc},
 };
 
 pub struct ReplaceBitvectors {
     did_change: bool,
-    visited_blocks: HashSet<ControlFlowBlock>,
 }
 
 impl ReplaceBitvectors {
     pub fn new_boxed() -> Box<dyn Pass> {
-        Box::new(Self {
-            did_change: false,
-            visited_blocks: HashSet::default(),
-        })
+        Box::new(Self { did_change: false })
     }
 }
 
@@ -90,13 +84,5 @@ impl Visitor for ReplaceBitvectors {
             }
         }
         node.walk(self);
-    }
-
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
-        self.visited_blocks.contains(block)
-    }
-
-    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
-        self.visited_blocks.insert(block.clone());
     }
 }

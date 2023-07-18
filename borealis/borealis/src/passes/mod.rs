@@ -45,12 +45,12 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
             CycleFinder::new_boxed(),
-            AddBuiltinFns::new_boxed(ast.clone()),
             ReplaceBools::new_boxed(),
             RemoveUnits::new_boxed(ast),
             ResolveReturns::new_boxed(),
             ReplaceBitvectors::new_boxed(),
             RemoveExceptions::new_boxed(),
+            AddBuiltinFns::new_boxed(),
         ],
     );
 }

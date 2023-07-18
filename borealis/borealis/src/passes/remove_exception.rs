@@ -25,15 +25,11 @@ use {
 
 pub struct RemoveExceptions {
     did_change: bool,
-    visited_blocks: HashSet<ControlFlowBlock>,
 }
 
 impl RemoveExceptions {
     pub fn new_boxed() -> Box<dyn Pass> {
-        Box::new(Self {
-            did_change: false,
-            visited_blocks: HashSet::default(),
-        })
+        Box::new(Self { did_change: false })
     }
 }
 
@@ -70,11 +66,6 @@ impl Pass for RemoveExceptions {
 
 impl Visitor for RemoveExceptions {
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
-        if self.is_block_visited(block) {
-            return;
-        }
-        self.set_block_visited(block);
-
         let mut deleted_exception_vars = HashSet::default();
 
         let statements = block
@@ -102,14 +93,6 @@ impl Visitor for RemoveExceptions {
         }
 
         block.walk(self);
-    }
-
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
-        self.visited_blocks.contains(block)
-    }
-
-    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
-        self.visited_blocks.insert(block.clone());
     }
 }
 

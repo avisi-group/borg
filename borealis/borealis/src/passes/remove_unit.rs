@@ -52,13 +52,7 @@ impl Pass for RemoveUnits {
 
 impl Visitor for RemoveUnits {
     // visit function signature, then every callsite
-
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
-        if self.is_block_visited(block) {
-            return;
-        }
-        self.set_block_visited(block);
-
         let statements = block
             .statements()
             .into_iter()
@@ -68,14 +62,6 @@ impl Visitor for RemoveUnits {
         block.set_statements(statements);
 
         block.walk(self);
-    }
-
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
-        self.visited_blocks.contains(block)
-    }
-
-    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
-        self.visited_blocks.insert(block.clone());
     }
 }
 

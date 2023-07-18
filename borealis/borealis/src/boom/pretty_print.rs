@@ -3,12 +3,11 @@
 use {
     crate::{
         boom::{
-            control_flow::ControlFlowBlock, visitor::Visitor, Ast, Definition, FunctionDefinition,
-            FunctionSignature, NamedType, Statement,
+            visitor::Visitor, Ast, Definition, FunctionDefinition, FunctionSignature, NamedType,
+            Statement,
         },
         codegen::emit::Emit,
     },
-    common::HashSet,
     std::{
         cell::RefCell,
         fmt::Write,
@@ -54,7 +53,6 @@ pub fn print_statement<W: Write>(w: &mut W, statement: Rc<RefCell<Statement>>) {
 pub struct BoomPrettyPrinter<'writer, W> {
     indent: Rc<AtomicUsize>,
     writer: &'writer mut W,
-    visited_blocks: HashSet<ControlFlowBlock>,
 }
 
 impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
@@ -63,7 +61,6 @@ impl<'writer, W: Write> BoomPrettyPrinter<'writer, W> {
         Self {
             indent: Rc::new(AtomicUsize::new(0)),
             writer,
-            visited_blocks: HashSet::default(),
         }
     }
 }
@@ -212,13 +209,5 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
         self.prindent("");
         node.emit(self.writer).unwrap();
         writeln!(self.writer).unwrap();
-    }
-
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
-        self.visited_blocks.contains(block)
-    }
-
-    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
-        self.visited_blocks.insert(block.clone());
     }
 }

@@ -1,10 +1,19 @@
 use {
-    crate::boom::{Ast, Statement},
+    crate::boom::{control_flow::ControlFlowBlock, Ast, Statement},
     phf::{phf_map, Map},
+    std::{cell::RefCell, rc::Rc},
 };
 
-pub static HANDLERS: Map<&str, fn(&Ast, &Statement)> = phf_map! {
-    "UInt" => noop,
+type HandlerFunction = fn(Rc<RefCell<Ast>>, ControlFlowBlock, Rc<RefCell<Statement>>);
+
+pub static HANDLERS: Map<&str, HandlerFunction> = phf_map! {
+    // this is a GenC builtin function so can be left as a noop here
+    "trap" => noop,
+
+    "UInt" => |_ast, _entry_block, _statement| {
+        // get_ident_type of paramter and assignment
+    },
+
     "Zeros" => noop,
     "pcnt_i64___pcnt_i" => noop,
     "undefined_bitvector" => noop,
@@ -190,4 +199,9 @@ pub static HANDLERS: Map<&str, fn(&Ast, &Statement)> = phf_map! {
     "internal_pick_EFPRounding_pcnt__" => noop,
 };
 
-pub fn noop(_ast: &Ast, _node: &Statement) {}
+pub fn noop(
+    _ast: Rc<RefCell<Ast>>,
+    _entry_block: ControlFlowBlock,
+    _statement: Rc<RefCell<Statement>>,
+) {
+}

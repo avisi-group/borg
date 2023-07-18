@@ -4,24 +4,19 @@
 
 use {
     crate::{
-        boom::{control_flow::ControlFlowBlock, visitor::Visitor, Ast, Literal, Type},
+        boom::{visitor::Visitor, Ast, Literal, Type},
         passes::{any::AnyExt, Pass},
     },
-    common::HashSet,
     std::{cell::RefCell, rc::Rc},
 };
 
 pub struct ReplaceBools {
     did_change: bool,
-    visited_blocks: HashSet<ControlFlowBlock>,
 }
 
 impl ReplaceBools {
     pub fn new_boxed() -> Box<dyn Pass> {
-        Box::new(Self {
-            did_change: false,
-            visited_blocks: HashSet::default(),
-        })
+        Box::new(Self { did_change: false })
     }
 }
 
@@ -63,13 +58,5 @@ impl Visitor for ReplaceBools {
             *node = Type::Fbits(8, false);
             self.did_change = true;
         }
-    }
-
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
-        self.visited_blocks.contains(block)
-    }
-
-    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
-        self.visited_blocks.insert(block.clone());
     }
 }

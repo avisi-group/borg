@@ -3,34 +3,19 @@
 
 use {
     crate::{
-        boom::{
-            control_flow::ControlFlowBlock,
-            visitor::{Visitor, Walkable},
-            Ast, Statement,
-        },
+        boom::{Ast, FunctionDefinition, Statement},
         passes::Pass,
     },
-    common::HashSet,
-    regex::Regex,
     std::{cell::RefCell, rc::Rc},
 };
 
 pub mod functions;
-pub mod generic_functions;
 
-pub struct AddBuiltinFns {
-    ast: Rc<RefCell<Ast>>,
-    generic_fn_regex: Regex,
-    visited_blocks: HashSet<ControlFlowBlock>,
-}
+pub struct AddBuiltinFns;
 
 impl AddBuiltinFns {
-    pub fn new_boxed(ast: Rc<RefCell<Ast>>) -> Box<dyn Pass> {
-        Box::new(Self {
-            ast,
-            generic_fn_regex: Regex::new("([a-z_]+)<(.+)>").expect("failed to build regex"),
-            visited_blocks: HashSet::default(),
-        })
+    pub fn new_boxed() -> Box<dyn Pass> {
+        Box::new(Self)
     }
 }
 
@@ -48,54 +33,33 @@ impl Pass for AddBuiltinFns {
         ast.borrow()
             .functions
             .values()
-            .for_each(|def| self.visit_function_definition(def));
+            .for_each(|def| process_function_definition(ast.clone(), def));
 
         false
     }
 }
 
-impl Visitor for AddBuiltinFns {
-    fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        // ignore statements that are not function calls
-        let Statement::FunctionCall { name, .. } = *node.borrow() else {
-            return;
-        };
+fn process_function_definition(ast: Rc<RefCell<Ast>>, fn_def: &FunctionDefinition) {
+    fn_def.entry_block.iter().for_each(|block| {
+        block.statements().into_iter().for_each(|statement| {
+            // ignore statements that are not function calls
+            let Statement::FunctionCall { name, .. } = *statement.borrow() else {
+                return;
+            };
 
-        // ignore if the function definition is already in the AST,
-        if self.ast.borrow().functions.contains_key(&name) {
-            return;
-        }
-
-        match self.generic_fn_regex.captures(name.as_ref()) {
-            Some(captures) => {
-                let name = captures.get(1).unwrap().as_str();
-                let typ = captures.get(2).unwrap().as_str();
-
-                // found generic function
-                generic_functions::HANDLERS.get(name).unwrap_or_else(||
-                    panic!(
-                        "Generic function call \'{name}<{typ}>\' found without definition or builtin function behaviour"
-                    )
-                )(&self.ast.borrow(), &node.borrow(), typ);
+            // ignore if the function definition is already in the AST,
+            if ast.borrow().functions.contains_key(&name) {
+                return;
             }
-            None => {
-                // found non-generic function
-                functions::HANDLERS.get(name.as_ref()).unwrap_or_else(|| {
-                    panic!(
-                        "Function call {name:?} found without definition or builtin function behaviour"
-                    )
-                })(&self.ast.borrow(), &node.borrow());
-            }
-        }
 
-        node.borrow().walk(self);
-    }
+            // found builtin function function
+            let handler = functions::HANDLERS.get(name.as_ref()).unwrap_or_else(|| {
+                panic!(
+                    "Function call {name:?} found without definition or builtin function behaviour"
+                )
+            });
 
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool {
-        self.visited_blocks.contains(block)
-    }
-
-    fn set_block_visited(&mut self, block: &ControlFlowBlock) {
-        self.visited_blocks.insert(block.clone());
-    }
+            handler(ast.clone(), fn_def.entry_block.clone(), statement);
+        });
+    });
 }

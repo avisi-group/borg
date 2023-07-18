@@ -150,7 +150,9 @@ pub struct FunctionDefinition {
 impl Walkable for FunctionDefinition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_function_signature(&self.signature);
-        visitor.visit_control_flow_block(&self.entry_block);
+        self.entry_block
+            .iter()
+            .for_each(|block| visitor.visit_control_flow_block(&block));
     }
 }
 

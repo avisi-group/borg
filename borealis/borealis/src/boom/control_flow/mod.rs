@@ -15,13 +15,11 @@ use {
         Statement, Value,
     },
     common::{intern::InternedString, HashSet},
-    log::trace,
     std::{
         cell::RefCell,
-        collections::{hash_map::DefaultHasher, LinkedList},
+        collections::hash_map::DefaultHasher,
         fmt::{self, Display, Formatter},
         hash::{Hash, Hasher},
-        io::{self, Write},
         ptr,
         rc::{Rc, Weak},
     },
@@ -29,6 +27,7 @@ use {
 
 mod builder;
 mod dot;
+mod util;
 
 /// Creates a control flow graph from a slice of statements.
 ///
@@ -90,11 +89,6 @@ impl Walkable for ControlFlowBlock {
             .iter()
             .cloned()
             .for_each(|statement| visitor.visit_statement(statement));
-
-        self.terminator()
-            .targets()
-            .iter()
-            .for_each(|block| visitor.visit_control_flow_block(block));
     }
 }
 
@@ -195,80 +189,8 @@ impl ControlFlowBlock {
         self.inner.borrow_mut().statements = statements;
     }
 
-    /// Renders a `ControlFlowBlock` to DOT syntax.
-    pub fn as_dot<W: Write>(&self, w: &mut W) -> io::Result<()> {
-        dot::render(w, self)
-    }
-
-    /// Determines whether the current `ControlFlowBlock` and it's children
-    /// contain any cycles
-    pub fn contains_cycles(&self) -> bool {
-        let mut processed = HashSet::default();
-        let mut currently_processing = HashSet::default();
-        let mut to_visit = LinkedList::new();
-        to_visit.push_back(self.clone());
-
-        // continue until all no nodes are left to visit
-        while let Some(current) = to_visit.pop_front() {
-            trace!("processing {}", current);
-
-            // continue if we have already processed the current node
-            if processed.contains(&current) {
-                continue;
-            }
-
-            processed.insert(current.clone());
-            currently_processing.insert(current.clone());
-
-            // Visit children of the current node
-            for child in current.terminator().targets() {
-                if currently_processing.contains(&child) {
-                    // Found a cycle!
-                    return true;
-                }
-                to_visit.push_back(child);
-            }
-
-            currently_processing.remove(&current);
-        }
-
-        false
-    }
-
-    /// Returns a set of identifiers of all functions called in this block and
-    /// its children.
-    pub fn get_functions(&self) -> HashSet<InternedString> {
-        let mut functions = HashSet::default();
-
-        let mut processed = HashSet::default();
-        let mut to_visit = vec![self.clone()];
-
-        // continue until all no nodes are left to visit
-        while let Some(current) = to_visit.pop() {
-            trace!("processing {current}");
-
-            // continue if we have already processed the current node
-            if processed.contains(&current) {
-                continue;
-            }
-
-            // add all function calls to functions set
-            functions.extend(current.statements().into_iter().filter_map(|statement| {
-                if let Statement::FunctionCall { name, .. } = *statement.borrow() {
-                    Some(name)
-                } else {
-                    None
-                }
-            }));
-
-            // mark current node as processed
-            processed.insert(current.clone());
-
-            // push children to visit
-            to_visit.extend(current.terminator().targets());
-        }
-
-        functions
+    pub fn iter(&self) -> ControlFlowBlockIterator {
+        ControlFlowBlockIterator::new(self.clone())
     }
 }
 
@@ -333,5 +255,49 @@ impl Terminator {
             } => vec![target.clone(), fallthrough.clone()],
             Terminator::Unconditional { target } => vec![target.clone()],
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct ControlFlowBlockIterator {
+    visited: HashSet<ControlFlowBlock>,
+    remaining: Vec<ControlFlowBlock>,
+}
+
+impl ControlFlowBlockIterator {
+    fn new(start_block: ControlFlowBlock) -> Self {
+        Self {
+            visited: HashSet::default(),
+            remaining: vec![start_block],
+        }
+    }
+}
+
+impl Iterator for ControlFlowBlockIterator {
+    type Item = ControlFlowBlock;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = loop {
+            let Some(current) = self.remaining.pop() else {
+                // if remaining is empty, all blocks have been visited
+                return None;
+            };
+
+            // if we've already visited the node, get the next one
+            if self.visited.contains(&current) {
+                continue;
+            } else {
+                // otherwise return it
+                break current;
+            }
+        };
+
+        // mark current node as processed
+        self.visited.insert(current.clone());
+
+        // push children to visit
+        self.remaining.extend(current.terminator().targets());
+
+        Some(current)
     }
 }

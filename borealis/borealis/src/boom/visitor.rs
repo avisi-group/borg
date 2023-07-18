@@ -27,19 +27,8 @@ pub trait Visitor: Sized {
         node.walk(self);
     }
 
-    /// Returns whether the supplied ControlFlowBlock has been visited before
-    fn is_block_visited(&mut self, block: &ControlFlowBlock) -> bool;
-
-    /// Marks the supplied ControlFlowBlock as visited
-    fn set_block_visited(&mut self, block: &ControlFlowBlock);
-
     #[allow(missing_docs)]
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
-        if self.is_block_visited(block) {
-            return;
-        }
-
-        self.set_block_visited(block);
         block.walk(self);
     }
 
