@@ -3,7 +3,7 @@
 use {
     crate::boom::{
         control_flow::{dot, ControlFlowBlock},
-        Statement, Type,
+        Statement,
     },
     common::{intern::InternedString, HashSet},
     log::trace,
@@ -67,13 +67,5 @@ impl ControlFlowBlock {
                 }
             })
             .collect()
-    }
-
-    /// Gets the type from the type declaration (if it exists) of a local
-    /// variable within a control flow graph
-    pub fn get_ident_type(&self, _ident: InternedString) -> Option<Type> {
-        // search every statement for ident, should only have a single type declaration,
-        // return that type otherwise none
-        None
     }
 }

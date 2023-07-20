@@ -59,7 +59,7 @@ fn process_function_definition(ast: Rc<RefCell<Ast>>, fn_def: &FunctionDefinitio
                 )
             });
 
-            handler(ast.clone(), fn_def.entry_block.clone(), statement);
+            handler(ast.clone(), fn_def.clone(), statement);
         });
     });
 }

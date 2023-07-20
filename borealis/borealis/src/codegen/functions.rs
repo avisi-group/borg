@@ -9,10 +9,17 @@ use {
         codegen::emit::Emit,
         genc_model::HelperFunction,
     },
-    common::{intern::InternedString, HashMap},
+    common::{intern::InternedString, HashMap, HashSet},
     itertools::Itertools,
+    once_cell::sync::Lazy,
     std::{cell::RefCell, rc::Rc},
 };
+
+/// GenC builtin functions that do not need to be generated
+const BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
+    let names = ["trap"];
+    HashSet::from_iter(names.into_iter().map(InternedString::from_static))
+});
 
 /// Generates GenC helper functions from all functions in a BOOM AST
 pub fn generate_fns(
@@ -29,10 +36,9 @@ pub fn generate_fns(
         }
 
         let ast = ast.borrow();
-        let definition = ast
-            .functions
-            .get(&ident)
-            .unwrap_or_else(|| panic!("cannot generate GenC for unknown function {ident:?}"));
+        let Some(definition) = ast.functions.get(&ident) else {
+            panic!("cannot generate GenC for unknown function {ident:?}");
+        };
 
         #[allow(unstable_name_collisions)]
         let generated = HelperFunction {
@@ -52,7 +58,13 @@ pub fn generate_fns(
 
         generated_fns.insert(ident, generated);
 
-        remaining_fns.extend(definition.entry_block.get_functions());
+        remaining_fns.extend(
+            definition
+                .entry_block
+                .get_functions()
+                // ignore builtin functions
+                .difference(&BUILTIN_FNS),
+        );
     }
 
     generated_fns.into_values().collect()

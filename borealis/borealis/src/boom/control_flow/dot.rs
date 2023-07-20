@@ -1,9 +1,6 @@
 use {
     crate::{
-        boom::{
-            control_flow::{ControlFlowBlock, Terminator},
-            Statement,
-        },
+        boom::control_flow::{ControlFlowBlock, Terminator},
         codegen::emit::Emit,
     },
     common::HashMap,
@@ -45,11 +42,8 @@ impl Graph {
                 let mut label = String::new();
 
                 for statement in node.statements() {
-                    if let Statement::If { condition, .. } = &*statement.borrow() {
-                        condition.emit(&mut label).unwrap();
-                    } else {
-                        statement.emit(&mut label).unwrap();
-                    }
+                    statement.emit(&mut label).unwrap();
+                    label += "\n";
                 }
 
                 label
@@ -109,17 +103,7 @@ impl<'ast> Labeller<'ast, NodeId, EdgeId> for Graph {
     }
 
     fn node_label(&'ast self, n: &NodeId) -> dot::LabelText<'ast> {
-        let label = self
-            .node_labels
-            .get(n)
-            .map(|s| {
-                s.replace('%', "pcnt")
-                    .replace("->", "_to_")
-                    .replace('<', r#"\<"#)
-                    .replace('>', r#"\>"#)
-                    .replace('\n', r#"\l"#)
-            })
-            .unwrap_or("?".to_owned());
+        let label = self.node_labels.get(n).cloned().unwrap_or("?".to_owned());
 
         LabelText::EscStr(label.into())
     }

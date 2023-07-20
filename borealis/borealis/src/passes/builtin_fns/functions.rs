@@ -1,18 +1,16 @@
 use {
-    crate::boom::{control_flow::ControlFlowBlock, Ast, Statement},
+    crate::boom::{Ast, Expression, FunctionDefinition, Statement, Type, Value},
     phf::{phf_map, Map},
     std::{cell::RefCell, rc::Rc},
 };
 
-type HandlerFunction = fn(Rc<RefCell<Ast>>, ControlFlowBlock, Rc<RefCell<Statement>>);
+type HandlerFunction = fn(Rc<RefCell<Ast>>, FunctionDefinition, Rc<RefCell<Statement>>);
 
 pub static HANDLERS: Map<&str, HandlerFunction> = phf_map! {
     // this is a GenC builtin function so can be left as a noop here
     "trap" => noop,
 
-    "UInt" => |_ast, _entry_block, _statement| {
-        // get_ident_type of paramter and assignment
-    },
+    "UInt" => uint_handler,
 
     "Zeros" => noop,
     "pcnt_i64___pcnt_i" => noop,
@@ -201,7 +199,52 @@ pub static HANDLERS: Map<&str, HandlerFunction> = phf_map! {
 
 pub fn noop(
     _ast: Rc<RefCell<Ast>>,
-    _entry_block: ControlFlowBlock,
+    _function: FunctionDefinition,
     _statement: Rc<RefCell<Statement>>,
 ) {
+}
+
+/// UInt converts a bitvector into an int
+pub fn uint_handler(
+    _ast: Rc<RefCell<Ast>>,
+    function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    let (expression, arguments) = {
+        let Statement::FunctionCall {
+            expression,
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
+            panic!("these should all be function call statements")
+        };
+
+        (expression.clone(), arguments.clone())
+    };
+
+    let Some(expression) = expression else {
+        panic!("no lhs");
+    };
+
+    let Expression::Identifier(source) = expression else {
+        panic!("non ident expression");
+    };
+
+    assert_eq!(function.get_ident_type(source), Some(Type::Lint));
+
+    assert_eq!(arguments.len(), 1);
+
+    let Value::Identifier(arg) = arguments[0] else {
+        panic!()
+    };
+    if function.get_ident_type(arg) != Some(Type::Fint(64)) {
+        panic!("{:?}", arg);
+    }
+
+    // turn it into a copy
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.clone(),
+        value: Value::Identifier(arg),
+    };
 }

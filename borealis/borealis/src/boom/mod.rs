@@ -156,6 +156,33 @@ impl Walkable for FunctionDefinition {
     }
 }
 
+impl FunctionDefinition {
+    /// Gets the type from the type declaration (if it exists) of a local
+    /// variable within a function
+    pub fn get_ident_type(&self, ident: InternedString) -> Option<Type> {
+        // search every statement for ident, should only have a single type declaration,
+        // return that type otherwise none
+        self.entry_block
+            .iter()
+            .flat_map(|block| block.statements())
+            .filter_map(|statement| {
+                if let Statement::TypeDeclaration { name, typ } = &*statement.borrow() {
+                    Some((*name, typ.clone()))
+                } else {
+                    None
+                }
+            })
+            .chain(
+                self.signature
+                    .parameters
+                    .iter()
+                    .map(|NamedType { name, typ }| (*name, typ.clone())),
+            )
+            .find(|(name, ..)| *name == ident)
+            .map(|(.., typ)| typ.borrow().clone())
+    }
+}
+
 /// Function parameter and return types
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
