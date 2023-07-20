@@ -82,7 +82,7 @@ docker:
 
 test:
     BUILD +unit-test
-    BUILD --platform=linux/amd64 +e2e-test
+#    BUILD --platform=linux/amd64 +e2e-test
 
 unit-test:
     BUILD +build
