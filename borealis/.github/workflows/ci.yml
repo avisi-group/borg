@@ -61,9 +61,11 @@ jobs:
         run: earthly --strict --use-inline-cache --save-inline-cache --remote-cache=ghcr.io/${{ github.repository }}/cache:cache --push +test
 
       - name: Build image
+        if: github.ref == 'refs/heads/main'
         run: earthly --strict --use-inline-cache --save-inline-cache --remote-cache=ghcr.io/${{ github.repository }}/cache:cache --push +docker
 
       - name: Build docs
+        if: github.ref == 'refs/heads/main'
         run: earthly --strict --use-inline-cache --save-inline-cache --remote-cache=ghcr.io/${{ github.repository }}/cache:cache --push +docs
 
   deploy_docs:
@@ -94,7 +96,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull docs
-        if: github.ref == 'refs/heads/main'
+
         run: |
           id=$(docker create ghcr.io/${{ github.repository }}/docs:latest)
           docker cp $id:/docs - | tar xf - -C .
@@ -103,7 +105,6 @@ jobs:
       - run: chmod -c -R +rX ./docs
 
       - name: Upload artifact
-        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v1
         with:
           path: ./docs
