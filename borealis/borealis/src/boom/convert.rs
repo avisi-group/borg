@@ -125,12 +125,12 @@ impl BoomEmitter {
 
 fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
     Rc::new(RefCell::new(match typ.borrow() {
-        jib_ast::Type::Lint => boom::Type::Lint,
-        jib_ast::Type::Fint(i) => boom::Type::Fint(*i),
+        jib_ast::Type::Lint => boom::Type::LargeInt,
+        jib_ast::Type::Fint(i) => boom::Type::FixedInt(*i),
         jib_ast::Type::Constant(_) => todo!(),
-        jib_ast::Type::Lbits(b) => boom::Type::Lbits(*b),
+        jib_ast::Type::Lbits(b) => boom::Type::LargeBits(*b),
         jib_ast::Type::Sbits(_, _) => todo!(),
-        jib_ast::Type::Fbits(i, b) => boom::Type::Fbits(*i, *b),
+        jib_ast::Type::Fbits(i, b) => boom::Type::FixedBits(*i, *b),
         jib_ast::Type::Unit => boom::Type::Unit,
         jib_ast::Type::Bool => boom::Type::Bool,
         jib_ast::Type::Bit => boom::Type::Bit,
@@ -151,7 +151,7 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
             name: name.as_interned(),
             fields: convert_fields(fields),
         },
-        jib_ast::Type::Fvector(length, _, typ) => boom::Type::FVector {
+        jib_ast::Type::Fvector(length, _, typ) => boom::Type::FixedVector {
             length: *length,
             element_type: convert_type(&**typ),
         },
@@ -180,51 +180,56 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         return convert_body(instructions);
     }
 
-    vec![Rc::new(RefCell::new(match statement {
-        jib_ast::InstructionAux::Decl(typ, name) => boom::Statement::TypeDeclaration {
+    let statements = match statement {
+        jib_ast::InstructionAux::Decl(typ, name) => vec![boom::Statement::TypeDeclaration {
             name: convert_name(name),
             typ: convert_type(typ),
-        },
+        }],
         jib_ast::InstructionAux::Init(_, _, _) => todo!(),
-        jib_ast::InstructionAux::Jump(condition, target) => boom::Statement::Jump {
+        jib_ast::InstructionAux::Jump(condition, target) => vec![boom::Statement::Jump {
             condition: convert_value(condition),
             target: *target,
-        },
-        jib_ast::InstructionAux::Goto(s) => boom::Statement::Goto(*s),
-        jib_ast::InstructionAux::Label(s) => boom::Statement::Label(*s),
+        }],
+        jib_ast::InstructionAux::Goto(s) => vec![boom::Statement::Goto(*s)],
+        jib_ast::InstructionAux::Label(s) => vec![boom::Statement::Label(*s)],
         jib_ast::InstructionAux::Funcall(expression, _, (name, _), args) => {
-            boom::Statement::FunctionCall {
+            vec![boom::Statement::FunctionCall {
                 expression: Some(convert_expression(expression)),
                 name: name.as_interned(),
                 arguments: args.iter().map(convert_value).collect(),
-            }
+            }]
         }
-        jib_ast::InstructionAux::Copy(expression, value) => boom::Statement::Copy {
+        jib_ast::InstructionAux::Copy(expression, value) => vec![boom::Statement::Copy {
             expression: convert_expression(expression),
             value: convert_value(value),
-        },
-        jib_ast::InstructionAux::Clear(_, name) => boom::Statement::Clear {
-            identifier: convert_name(name),
-        },
-        jib_ast::InstructionAux::Undefined(_) => boom::Statement::Undefined,
-        jib_ast::InstructionAux::Exit(s) => boom::Statement::Exit(*s),
-        jib_ast::InstructionAux::End(name) => boom::Statement::End(convert_name(name)),
-        jib_ast::InstructionAux::If(condition, if_body, else_body, _) => boom::Statement::If {
-            condition: convert_value(condition),
-            if_body: convert_body(if_body),
-            else_body: convert_body(else_body),
-        },
-        jib_ast::InstructionAux::Block(..) => unimplemented!(),
-        jib_ast::InstructionAux::TryBlock(instrs) => boom::Statement::Try {
-            body: convert_body(instrs),
-        },
+        }],
+        jib_ast::InstructionAux::Clear(_, _) => vec![],
+        jib_ast::InstructionAux::Undefined(_) => vec![boom::Statement::Undefined],
+        jib_ast::InstructionAux::Exit(s) => vec![boom::Statement::Exit(*s)],
+        jib_ast::InstructionAux::End(name) => vec![boom::Statement::End(convert_name(name))],
+        jib_ast::InstructionAux::If(condition, if_body, else_body, _) => {
+            vec![boom::Statement::If {
+                condition: convert_value(condition),
+                if_body: convert_body(if_body),
+                else_body: convert_body(else_body),
+            }]
+        }
+
+        jib_ast::InstructionAux::TryBlock(_) => vec![],
         jib_ast::InstructionAux::Throw(_) => todo!(),
-        jib_ast::InstructionAux::Comment(s) => boom::Statement::Comment(*s),
+        jib_ast::InstructionAux::Comment(s) => vec![boom::Statement::Comment(*s)],
+        jib_ast::InstructionAux::Block(..) => unimplemented!(),
         jib_ast::InstructionAux::Raw(_) => todo!(),
         jib_ast::InstructionAux::Return(_) => todo!(),
         jib_ast::InstructionAux::Reset(_, _) => todo!(),
         jib_ast::InstructionAux::Reinit(_, _, _) => todo!(),
-    }))]
+    };
+
+    statements
+        .into_iter()
+        .map(RefCell::new)
+        .map(Rc::new)
+        .collect()
 }
 
 fn convert_name(name: &jib_ast::Name) -> InternedString {

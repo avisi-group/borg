@@ -16,7 +16,7 @@ use {
 };
 
 /// GenC builtin functions that do not need to be generated
-const BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
+const _BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
     let names = ["trap"];
     HashSet::from_iter(names.into_iter().map(InternedString::from_static))
 });
@@ -37,7 +37,8 @@ pub fn generate_fns(
 
         let ast = ast.borrow();
         let Some(definition) = ast.functions.get(&ident) else {
-            panic!("cannot generate GenC for unknown function {ident:?}");
+            log::warn!("cannot generate GenC for unknown function {ident:?}");
+            continue;
         };
 
         #[allow(unstable_name_collisions)]
@@ -58,13 +59,13 @@ pub fn generate_fns(
 
         generated_fns.insert(ident, generated);
 
-        remaining_fns.extend(
-            definition
-                .entry_block
-                .get_functions()
-                // ignore builtin functions
-                .difference(&BUILTIN_FNS),
-        );
+        // remaining_fns.extend(
+        //     definition
+        //         .entry_block
+        //         .get_functions()
+        //         // ignore builtin functions
+        //         .difference(&BUILTIN_FNS),
+        // );
     }
 
     generated_fns.into_values().collect()

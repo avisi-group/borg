@@ -62,6 +62,9 @@ pub trait Pass {
 
     /// Run the pass on the supplied AST, returning whether the AST was changed
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool;
+
+    /// Resets any state in a pass to it's initial/empty state
+    fn reset(&mut self);
 }
 
 /// Run each pass until it does not mutate the AST, and run the whole sequence
@@ -74,6 +77,7 @@ fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
             .iter_mut()
             .map(|pass| {
                 info!("{}", pass.name());
+                pass.reset();
                 pass.run(ast.clone())
             })
             .any(|did_change| did_change)

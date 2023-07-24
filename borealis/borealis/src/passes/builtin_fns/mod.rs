@@ -37,6 +37,8 @@ impl Pass for AddBuiltinFns {
         "AddBuiltinFns"
     }
 
+    fn reset(&mut self) {}
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         // walk AST, inspecting each function call
         // if the function call references an already-defined function, ignore

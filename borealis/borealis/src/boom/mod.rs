@@ -231,37 +231,47 @@ impl Walkable for NamedValue {
 pub enum Type {
     Unit,
     Bool,
+
     String,
+
     Real,
     Float,
     Constant(BigInt),
-    Lint,
-    Fint(isize),
-    Fbits(isize, bool),
-    Lbits(bool),
+    FixedInt(isize), // int64_t
+    LargeInt,
+
     Bit,
+    FixedBits(isize, bool), // uint64_t
+    LargeBits(bool),
+
     Enum {
         name: InternedString,
         variants: Vec<InternedString>,
     },
+
     Union {
         name: InternedString,
         fields: Vec<NamedType>,
     },
+
     Struct {
         name: InternedString,
         fields: Vec<NamedType>,
     },
+
     List {
         element_type: Rc<RefCell<Self>>,
     },
+
     Vector {
         element_type: Rc<RefCell<Self>>,
     },
-    FVector {
+
+    FixedVector {
         length: isize,
         element_type: Rc<RefCell<Self>>,
     },
+
     Reference(Rc<RefCell<Self>>),
 }
 
@@ -276,10 +286,10 @@ impl Walkable for Rc<RefCell<Type>> {
             | Real
             | Float
             | Constant(_)
-            | Lint
-            | Fint(_)
-            | Fbits(_, _)
-            | Lbits(_)
+            | LargeInt
+            | FixedInt(_)
+            | FixedBits(_, _)
+            | LargeBits(_)
             | Bit
             | Enum { .. } => (),
 
@@ -289,7 +299,7 @@ impl Walkable for Rc<RefCell<Type>> {
 
             List { element_type }
             | Vector { element_type }
-            | FVector { element_type, .. }
+            | FixedVector { element_type, .. }
             | Reference(element_type) => visitor.visit_type(element_type.clone()),
         }
     }
@@ -310,15 +320,9 @@ pub enum Statement {
         name: InternedString,
         typ: Rc<RefCell<Type>>,
     },
-    Try {
-        body: Vec<Rc<RefCell<Statement>>>,
-    },
     Copy {
         expression: Expression,
         value: Value,
-    },
-    Clear {
-        identifier: InternedString,
     },
     FunctionCall {
         expression: Option<Expression>,
@@ -346,14 +350,11 @@ impl Walkable for Statement {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
             Self::TypeDeclaration { typ, .. } => visitor.visit_type(typ.clone()),
-            Self::Try { body } => body
-                .iter()
-                .for_each(|statement| visitor.visit_statement(statement.clone())),
             Self::Copy { expression, value } => {
                 visitor.visit_expression(expression);
                 visitor.visit_value(value);
             }
-            Self::Clear { .. } => (),
+
             Self::FunctionCall {
                 expression,
                 arguments,

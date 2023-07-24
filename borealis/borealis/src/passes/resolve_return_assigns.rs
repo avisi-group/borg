@@ -35,12 +35,17 @@ impl Pass for ResolveReturns {
         "ResolveReturns"
     }
 
+    fn reset(&mut self) {
+        self.did_change = false;
+        self.return_type = None;
+    }
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         ast.borrow()
             .functions
             .values()
             .map(|def| {
-                self.did_change = false;
+                self.reset();
 
                 // get return type of function:
                 // if void, there should be no return assigments

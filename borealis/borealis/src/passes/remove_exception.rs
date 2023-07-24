@@ -38,20 +38,22 @@ impl Pass for RemoveExceptions {
         "RemoveExceptions"
     }
 
+    fn reset(&mut self) {
+        self.did_change = false;
+    }
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         ast.borrow()
             .functions
             .values()
             .map(|def| {
-                self.did_change = false;
-
                 {
                     let mut statements = def.entry_block.statements();
                     statements.insert(
                         0,
                         Rc::new(RefCell::new(Statement::TypeDeclaration {
                             name: "exception".into(),
-                            typ: Rc::new(RefCell::new(Type::Fint(8))),
+                            typ: Rc::new(RefCell::new(Type::FixedInt(8))),
                         })),
                     );
                     def.entry_block.set_statements(statements);

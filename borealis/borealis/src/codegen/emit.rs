@@ -63,9 +63,16 @@ impl Emit for Rc<RefCell<Type>> {
     fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
         use Type::*;
 
+        let tmp: std::string::String;
+
         let str = match &*self.borrow() {
             Unit => "void",
-            Fbits(len, _) | Fint(len) => match *len {
+            LargeBits(_) => "bv",
+            FixedBits(len, _) => {
+                tmp = format!("bv{len}");
+                &tmp
+            }
+            FixedInt(len) => match *len {
                 0 => panic!("unexpected 0 length bitvector"),
                 1..=8 => "uint8",
                 9..=16 => "uint16",
@@ -75,10 +82,10 @@ impl Emit for Rc<RefCell<Type>> {
                 _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
             },
             Bool => panic!("bools should not exist in the AST after passes"),
-            Lint => "uint64",
+            LargeInt => "uint64",
             Union { .. } => "union",
 
-            // need to figure out what these mean
+            // need to figure out what the rest mean
             _ => "unknown",
         };
 
@@ -161,20 +168,18 @@ impl Emit for Rc<RefCell<Statement>> {
                 )
             }
 
-            Statement::End(_) => todo!(),
-            Statement::Undefined => todo!(),
             Statement::Exit(str) => write!(w, "// exit {str:?}"),
 
             Statement::Comment(str) => write!(w, "// {str}"),
-            Statement::Clear { .. } => Ok(()),
-
-            Statement::Try { .. } => todo!(),
 
             Statement::If { .. } | Statement::Jump { .. } | Statement::Goto(_) => {
                 panic!("control flow statements should have been removed by this point")
             }
 
             Statement::Label(label) => write!(w, "// label {label:?}"),
+
+            Statement::End(_) => todo!(),
+            Statement::Undefined => todo!(),
         }
     }
 }

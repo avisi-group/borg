@@ -19,7 +19,6 @@ pub struct RemoveUnits {
     ast: Rc<RefCell<Ast>>,
     did_change: bool,
     visited_blocks: HashSet<ControlFlowBlock>,
-    modified_fns: HashSet<InternedString>,
     deleted_unit_vars: HashSet<InternedString>,
 }
 
@@ -28,14 +27,18 @@ impl Pass for RemoveUnits {
         "RemoveUnit"
     }
 
+    fn reset(&mut self) {
+        self.did_change = false;
+        self.visited_blocks.clear();
+        self.deleted_unit_vars.clear();
+    }
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         ast.borrow()
             .functions
             .values()
             .map(|def| {
-                self.did_change = false;
-                self.visited_blocks = HashSet::default();
-                self.deleted_unit_vars = HashSet::default();
+                self.reset();
 
                 if *def.signature.return_type.borrow() == Type::Unit {
                     self.deleted_unit_vars.insert("return_type".into());
@@ -71,7 +74,6 @@ impl RemoveUnits {
             ast,
             did_change: false,
             visited_blocks: HashSet::default(),
-            modified_fns: HashSet::default(),
             deleted_unit_vars: HashSet::default(),
         })
     }
@@ -121,9 +123,6 @@ impl RemoveUnits {
 
                 // if any of the arguments are unit values, remove them
                 if arguments.iter().any(is_unit_value) {
-                    if !self.modified_fns.contains(name) {
-                        trace!("function {name:?} not currently modified but had unit value");
-                    }
                     arguments.retain(|value| !is_unit_value(value));
                 }
 

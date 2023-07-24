@@ -18,6 +18,8 @@ impl Pass for CycleFinder {
         "CycleFinder"
     }
 
+    fn reset(&mut self) {}
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         ast.borrow().functions.iter().for_each(|(name, def)| {
             if def.entry_block.contains_cycles() {

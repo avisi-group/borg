@@ -28,6 +28,8 @@ impl Pass for FoldUnconditionals {
         "FoldUnconditionals"
     }
 
+    fn reset(&mut self) {}
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         ast.borrow()
             .functions

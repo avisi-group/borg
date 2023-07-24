@@ -78,26 +78,31 @@ pub fn generate_execute_entrypoint(
             .collect::<HashSet<_>>();
 
         let ast = ast.borrow();
-        ast.functions
-            // get the instruction's entrypoint function
-            .get(&execute_function_name)
-            .unwrap_or_else(|| panic!("could not find function {:?}", execute_function_name))
-            .signature
-            // iterate over the parameters of this function
-            .parameters
-            .iter()
-            .map(|NamedType { name, .. }| name)
-            .map(|name| {
-                if variables.contains(name) {
-                    // if the parameter name is a format variable, access it from the `inst` struct.
-                    format!("inst.{name}")
-                } else {
-                    // if the parameter name is a format constant, or exists as a combination of
-                    // multiple format constants or variables, access the generated local variable.
-                    name.to_string()
-                }
-            })
-            .join(", ")
+
+        // get the instruction's entrypoint function
+        if let Some(func) = ast.functions.get(&execute_function_name) {
+            func.signature
+                // iterate over the parameters of this function
+                .parameters
+                .iter()
+                .map(|NamedType { name, .. }| name)
+                .map(|name| {
+                    if variables.contains(name) {
+                        // if the parameter name is a format variable, access it from the `inst`
+                        // struct.
+                        format!("inst.{name}")
+                    } else {
+                        // if the parameter name is a format constant, or exists as a combination of
+                        // multiple format constants or variables, access the generated local
+                        // variable.
+                        name.to_string()
+                    }
+                })
+                .join(", ")
+        } else {
+            log::warn!("could not find function {:?}", execute_function_name);
+            "".to_owned()
+        }
     };
 
     // the body of the execute function contains local variable assignments for

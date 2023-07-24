@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        boom::control_flow::Terminator,
         codegen::{
             functions::generate_fns,
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
@@ -62,6 +61,16 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     info!("Generating BOOM from JIB");
     let ast = boom::Ast::from_jib(jib_ast);
 
+    // filter out non addsub functions
+    let funcs = ast
+        .borrow()
+        .functions
+        .clone()
+        .into_iter()
+        .filter(|(k, _)| k.as_ref() == "integer_arithmetic_addsub_immediate_decode")
+        .collect();
+    ast.borrow_mut().functions = funcs;
+
     info!("Running passes on BOOM");
     execute_passes(ast.clone());
 
@@ -89,25 +98,6 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
             },
         )
         .unzip::<_, _, _, _>();
-
-    // filter out non addsub functions
-    let funcs = ast
-        .borrow()
-        .functions
-        .clone()
-        .into_iter()
-        .map(|(k, v)| {
-            if k.as_ref().ends_with("_decode")
-                && k.as_ref() != "integer_arithmetic_addsub_immediate_decode"
-            {
-                v.entry_block.set_statements(vec![]);
-                v.entry_block.set_terminator(Terminator::Return(None));
-            }
-
-            (k, v)
-        })
-        .collect();
-    ast.borrow_mut().functions = funcs;
 
     // generate all functions, using the names of the instructions as the entrypoint
     let mut functions = generate_fns(ast.clone(), instruction_names);

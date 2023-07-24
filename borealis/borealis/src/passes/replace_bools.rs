@@ -25,12 +25,16 @@ impl Pass for ReplaceBools {
         "ReplaceBools"
     }
 
+    fn reset(&mut self) {
+        self.did_change = false;
+    }
+
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         ast.borrow()
             .functions
             .values()
             .map(|def| {
-                self.did_change = false;
+                self.reset();
                 self.visit_function_definition(def);
                 self.did_change
             })
@@ -55,7 +59,7 @@ impl Visitor for ReplaceBools {
         let mut node = node.borrow_mut();
 
         if let Type::Bool = *node {
-            *node = Type::Fbits(8, false);
+            *node = Type::FixedBits(8, false);
             self.did_change = true;
         }
     }

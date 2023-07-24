@@ -13,7 +13,8 @@ use {
 
 pub const HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
     let mappings = [
-        // this is a GenC builtin function so can be left as a noop here (technically not needed but just being explicit)
+        // this is a GenC builtin function so can be left as a noop here (technically not needed
+        // but just being explicit)
         ("trap", noop as HandlerFunction),
         // requires bitvector conversion logic
         ("UInt", uint_handler),
@@ -273,11 +274,7 @@ pub fn slice_handler(
     _function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
 ) {
-    let Statement::FunctionCall {
-        arguments,
-        ..
-    } = &*statement.borrow()
-    else {
+    let Statement::FunctionCall { arguments, .. } = &*statement.borrow() else {
         panic!("slice handler called on non-function call");
     };
 
