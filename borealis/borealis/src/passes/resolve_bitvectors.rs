@@ -17,40 +17,155 @@
 //! uint64s
 //!
 //! new plan: try to determine the lenght of every non fixed bv at compile time
+//!
+//! Some bv's might be impossible (e.g. imm length is runtime dependant) but
+//! hoping as long as these don't involve concatenation we don't need to know
+//! the length
 
-use crate::boom::Value;
 use {
     crate::{
-        boom::{visitor::Visitor, Ast, Bit, Expression, Literal, NamedType, Statement, Type},
+        boom::{
+            control_flow::ControlFlowBlock,
+            visitor::{Visitor, Walkable},
+            Ast, Bit, Expression, FunctionDefinition, Literal, NamedType, Statement, Type, Value,
+        },
         passes::{any::AnyExt, Pass},
     },
     common::{intern::InternedString, HashMap},
+    itertools::Itertools,
     num_bigint::BigInt,
+    once_cell::sync::Lazy,
     std::{cell::RefCell, rc::Rc},
 };
 
+pub struct ResolveBitvectors {
+    did_change: bool,
+    /// bitvector lengths of local variables in a function
+    lengths: HashMap<InternedString, Length>,
+    current_func: Option<FunctionDefinition>,
+}
+
+/// Length of a bitvector local variable
 enum Length {
+    /// Variable, and a reference to the type so we can modify it when the
+    /// length is known
     Variable(Rc<RefCell<Type>>),
+    /// Fixed, and the length
     Fixed(isize),
 }
 
-pub struct ReplaceBitvectors {
-    did_change: bool,
-    /// bitvector lengths of local variables in a function, `None` represents
-    /// not-yet-calculated lengths
-    lengths: HashMap<InternedString, Length>,
-}
-
-impl ReplaceBitvectors {
+impl ResolveBitvectors {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
             lengths: HashMap::default(),
+            current_func: None,
         })
+    }
+
+    /// Resolves the length of a local variable
+    fn resolve(&mut self, ident: InternedString, length: isize) {
+        let Some(Length::Variable(typ)) = self.lengths.get(&ident) else {
+            panic!("called resolve on non-variable bitvector");
+        };
+
+        *typ.borrow_mut() = Type::FixedBits(length, false);
+        self.lengths.insert(ident, Length::Fixed(length));
+    }
+
+    /// Adds a bitvector type declaration to the mapping
+    fn add_type_declaration(&mut self, name: InternedString, typ: Rc<RefCell<Type>>) {
+        match &*typ.borrow() {
+            // if we encounter a fixed variable,
+            Type::FixedBits(length, _) => {
+                self.lengths.insert(name, Length::Fixed(*length));
+            }
+            Type::LargeBits(_) => {
+                self.lengths.insert(name, Length::Variable(typ.clone()));
+            }
+            _ => {}
+        }
+    }
+
+    /// Try to use the value being assigned to a bitvector to determine it's
+    /// length
+    fn resolve_from_copy(&mut self, expression: &Expression, value: &Value) {
+        let Expression::Identifier(dest) = expression else {
+            return;
+        };
+
+        // if the identifier being copied into is a variable bitvector, try and resolve
+        // it's length
+        if let Some(Length::Variable(_)) = self.lengths.get(dest) {
+            match value {
+                // if the value is an identifier
+                Value::Identifier(source) => {
+                    // and that identifier has a known length
+                    if let Some(Length::Fixed(length)) = self.lengths.get(&source) {
+                        // the source variable must also have that length
+                        self.resolve(*dest, *length);
+                    }
+                }
+
+                Value::Literal(literal) => {
+                    let literal = &mut *literal.borrow_mut();
+                    if let Literal::Bits(bits) = literal {
+                        self.resolve(*dest, bits.len() as isize);
+
+                        // replace bits with constant int
+                        *literal =
+                            Literal::Int(BigInt::from(bits.iter().rev().fold(0, |acc, bit| {
+                                acc << 1
+                                    | match bit {
+                                        Bit::_0 => 0,
+                                        Bit::_1 => 1,
+                                        Bit::Unknown => panic!(),
+                                    }
+                            })));
+                    }
+                }
+
+                _ => (),
+            }
+        }
+    }
+
+    /// Resolves bitvectors in a function call
+    ///
+    /// If the function is a builtin bitvector operation (`eq_vec`, `Zeros`,
+    /// etc), replace it with the corresponding logic.
+    ///
+    /// If the function has variable bitvector parameters, use arguments
+    /// supplied to a function call to generate a monomorphised version of that
+    /// function with fixed bitvector paramaters.
+    fn resolve_fn(
+        &mut self,
+        statement: Rc<RefCell<Statement>>,
+        expression: &Expression,
+        name: InternedString,
+        arguments: &[Value],
+    ) {
+        type HandlerFunction =
+            fn(&mut ResolveBitvectors, Rc<RefCell<Statement>>, &Expression, &[Value]);
+
+        // function handlers
+        const HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
+            let mappings = [("Zeros", zeros_handler as HandlerFunction)]
+                .into_iter()
+                .map(|(s, f)| (InternedString::from_static(s), f));
+
+            HashMap::from_iter(mappings)
+        });
+
+        // execute function handler if the function call is to a builtin bitvector
+        // function
+        if let Some(handler) = HANDLERS.get(&name) {
+            handler(self, statement.clone(), expression, arguments);
+        }
     }
 }
 
-impl Pass for ReplaceBitvectors {
+impl Pass for ResolveBitvectors {
     fn name(&self) -> &'static str {
         "ReplaceBitvectors"
     }
@@ -58,6 +173,7 @@ impl Pass for ReplaceBitvectors {
     fn reset(&mut self) {
         self.did_change = false;
         self.lengths.clear();
+        self.current_func = None;
     }
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
@@ -88,76 +204,104 @@ impl Pass for ReplaceBitvectors {
     }
 }
 
-impl Visitor for ReplaceBitvectors {
+impl Visitor for ResolveBitvectors {
+    fn visit_function_definition(&mut self, node: &FunctionDefinition) {
+        self.current_func = Some(node.clone());
+        node.walk(self);
+    }
+
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        // if a type decl for a bv add it to a list of bv's to be made constant
-
-        match &*node.borrow() {
+        let statement = {
+            let borrow = node.borrow();
+            borrow.clone()
+        };
+        match statement {
             Statement::TypeDeclaration { name, typ } => {
-                match &*typ.borrow() {
-                    // if we encounter a fixed variable,
-                    Type::FixedBits(length, _) => {
-                        println!("typedecl {name} fixed {length}");
-                        self.lengths.insert(*name, Length::Fixed(*length));
-                    }
-                    Type::LargeBits(_) => {
-                        println!("typedecl {name} variable");
-                        self.lengths.insert(*name, Length::Variable(typ.clone()));
-                    }
-                    _ => {}
-                }
+                self.add_type_declaration(name, typ.clone())
             }
-            Statement::Copy { expression, value } => {
-                let Expression::Identifier(dest) = expression else {
-                    return;
-                };
-
-                println!("copy into {dest}");
-
-                // if the identifier being copied into is a variable bitvector, try and resolve
-                // it's length
-                if let Some(Length::Variable(typ)) = self.lengths.get(dest) {
-                    match value {
-                        // if the value is an identifier
-                        Value::Identifier(source) => {
-                            // and that identifier has a known length
-                            if let Some(Length::Fixed(length)) = self.lengths.get(&source) {
-                                // the source variable must also have that length
-                                *typ.borrow_mut() = Type::FixedBits(*length, false);
-                                self.lengths.insert(*dest, Length::Fixed(*length));
-                            }
-                        }
-
-                        Value::Literal(literal) => {
-                            let literal = &mut *literal.borrow_mut();
-                            if let Literal::Bits(bits) = literal {
-                                *typ.borrow_mut() = Type::FixedBits(bits.len() as isize, false);
-                                self.lengths
-                                    .insert(*dest, Length::Fixed(bits.len() as isize));
-
-                                // replace bits with constant int
-                                *literal = Literal::Int(BigInt::from(bits.iter().rev().fold(
-                                    0,
-                                    |acc, bit| {
-                                        acc << 1
-                                            | match bit {
-                                                Bit::_0 => 0,
-                                                Bit::_1 => 1,
-                                                Bit::Unknown => panic!(),
-                                            }
-                                    },
-                                )));
-                            }
-                        }
-
-                        _ => (),
-                    }
-                }
-            }
+            Statement::Copy { expression, value } => self.resolve_from_copy(&expression, &value),
+            Statement::FunctionCall {
+                expression: Some(expression),
+                name,
+                arguments,
+            } => self.resolve_fn(node.clone(), &expression, name, &arguments),
             _ => {}
         }
 
         // use assignments to determine length
         // function calls are special:/ need to think about handling these
     }
+}
+
+fn zeros_handler(
+    celf: &mut ResolveBitvectors,
+    statement: Rc<RefCell<Statement>>,
+    expression: &Expression,
+    arguments: &[Value],
+) {
+    // get assignment to argument to Zeros
+    assert_eq!(arguments.len(), 1);
+    let Value::Identifier(ident) = arguments[0] else {
+        panic!();
+    };
+    let Some(value) = get_assignment(
+        celf.current_func.as_ref().unwrap().entry_block.clone(),
+        ident,
+    ) else {
+        panic!("{ident}");
+    };
+
+    let Value::Literal(literal) = value else {
+        panic!();
+    };
+
+    let Literal::Int(length) = &*literal.borrow() else {
+        panic!();
+    };
+
+    // change type of destination to length
+    let Expression::Identifier(destination) = expression else {
+        panic!();
+    };
+
+    celf.resolve(*destination, isize::try_from(length).unwrap());
+
+    // assign literal 0
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.clone(),
+        value: Value::Literal(Rc::new(RefCell::new(Literal::Int(0.into())))),
+    }
+}
+
+fn get_assignment(entry_block: ControlFlowBlock, ident: InternedString) -> Option<Value> {
+    entry_block
+        .iter()
+        .flat_map(|cfb| cfb.statements())
+        .filter_map(|statement| {
+            let res = {
+                let borrow = statement.borrow();
+                match &*borrow {
+                    Statement::Copy { expression, value } => {
+                        Some((expression.clone(), value.clone()))
+                    }
+                    _ => None,
+                }
+            };
+
+            res
+        })
+        .filter_map(|(expr, value)| {
+            let Expression::Identifier(assign) = expr else {
+                return None;
+            };
+
+            if assign == ident {
+                Some(value)
+            } else {
+                None
+            }
+        })
+        .at_most_one()
+        .unwrap()
 }

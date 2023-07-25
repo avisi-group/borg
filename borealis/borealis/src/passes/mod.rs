@@ -12,7 +12,7 @@ use {
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
             remove_exception::RemoveExceptions, remove_unit::RemoveUnits,
-            replace_bools::ReplaceBools, resolve_bitvectors::ReplaceBitvectors,
+            replace_bools::ReplaceBools, resolve_bitvectors::ResolveBitvectors,
             resolve_return_assigns::ResolveReturns,
         },
     },
@@ -50,7 +50,7 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             ResolveReturns::new_boxed(),
             RemoveExceptions::new_boxed(),
             AddBuiltinFns::new_boxed(),
-            ReplaceBitvectors::new_boxed(),
+            ResolveBitvectors::new_boxed(),
         ],
     );
 }
