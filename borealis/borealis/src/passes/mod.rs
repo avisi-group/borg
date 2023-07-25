@@ -12,7 +12,7 @@ use {
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
             remove_exception::RemoveExceptions, remove_unit::RemoveUnits,
-            replace_bitvectors::ReplaceBitvectors, replace_bools::ReplaceBools,
+            replace_bools::ReplaceBools, resolve_bitvectors::ReplaceBitvectors,
             resolve_return_assigns::ResolveReturns,
         },
     },
@@ -33,8 +33,8 @@ mod fold_unconditionals;
 mod remove_const_branch;
 mod remove_exception;
 mod remove_unit;
-mod replace_bitvectors;
 mod replace_bools;
+mod resolve_bitvectors;
 mod resolve_return_assigns;
 
 /// Executes the optimisation and raising passes on an AST
@@ -48,9 +48,9 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             ReplaceBools::new_boxed(),
             RemoveUnits::new_boxed(ast),
             ResolveReturns::new_boxed(),
-            ReplaceBitvectors::new_boxed(),
             RemoveExceptions::new_boxed(),
             AddBuiltinFns::new_boxed(),
+            ReplaceBitvectors::new_boxed(),
         ],
     );
 }

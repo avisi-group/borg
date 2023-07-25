@@ -1,12 +1,9 @@
 use {
     crate::{
-        boom::{
-            control_flow::ControlFlowBlock, Ast, Expression, FunctionDefinition, Statement, Value,
-        },
+        boom::{Ast, FunctionDefinition, Statement},
         passes::builtin_fns::HandlerFunction,
     },
     common::{intern::InternedString, HashMap},
-    itertools::Itertools,
     once_cell::sync::Lazy,
     std::{cell::RefCell, rc::Rc},
 };
@@ -22,7 +19,7 @@ pub const HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|
         ("pcnt_i___pcnt_i64", replace_with_copy),
         ("pcnt_i64___pcnt_i", replace_with_copy),
         //
-        ("slice", slice_handler),
+        ("slice", noop),
         ("Zeros", noop),
         ("undefined_bitvector", noop),
         ("bitvector_access_A", noop),
@@ -266,51 +263,4 @@ pub fn replace_with_copy(
         expression: expression.clone(),
         value: arguments[0].clone(),
     };
-}
-
-/// Gets a subslice from a bitvector
-pub fn slice_handler(
-    _ast: Rc<RefCell<Ast>>,
-    _function: FunctionDefinition,
-    statement: Rc<RefCell<Statement>>,
-) {
-    let Statement::FunctionCall { arguments, .. } = &*statement.borrow() else {
-        panic!("slice handler called on non-function call");
-    };
-
-    assert_eq!(arguments.len(), 3);
-
-    let _start_ident = arguments[1].get_ident().unwrap();
-    let _end_ident = arguments[2].get_ident().unwrap();
-
-    // get assignments to the start and end values
-    // let start = get_assignment(function.entry_block.clone(), start_ident)
-    //     .unwrap_or_else(|| panic!("couldn't find {start_ident}"));
-    // let end = get_assignment(function.entry_block.clone(), end_ident)
-    //     .unwrap_or_else(|| panic!("couldn't find {end_ident}"));
-
-    // dbg!((start, end));
-}
-
-fn _get_assignment(entry_block: ControlFlowBlock, ident: InternedString) -> Option<Value> {
-    entry_block
-        .iter()
-        .flat_map(|cfb| cfb.statements())
-        .filter_map(|statement| match &*statement.borrow() {
-            Statement::Copy { expression, value } => Some((expression.clone(), value.clone())),
-            _ => None,
-        })
-        .filter_map(|(expr, value)| {
-            let Expression::Identifier(assign) = expr else {
-                return None;
-            };
-
-            if assign == ident {
-                Some(value)
-            } else {
-                None
-            }
-        })
-        .at_most_one()
-        .unwrap()
 }
