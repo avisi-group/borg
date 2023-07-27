@@ -22,17 +22,17 @@
 //! hoping as long as these don't involve concatenation we don't need to know
 //! the length
 
+use crate::boom::Operation;
+
 use {
     crate::{
         boom::{
-            control_flow::ControlFlowBlock,
             visitor::{Visitor, Walkable},
             Ast, Bit, Expression, FunctionDefinition, Literal, NamedType, Statement, Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },
     common::{intern::InternedString, HashMap},
-    itertools::Itertools,
     num_bigint::BigInt,
     once_cell::sync::Lazy,
     std::{cell::RefCell, rc::Rc},
@@ -46,6 +46,7 @@ pub struct ResolveBitvectors {
 }
 
 /// Length of a bitvector local variable
+#[derive(Debug)]
 enum Length {
     /// Variable, and a reference to the type so we can modify it when the
     /// length is known
@@ -150,9 +151,12 @@ impl ResolveBitvectors {
 
         // function handlers
         const HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
-            let mappings = [("Zeros", zeros_handler as HandlerFunction)]
-                .into_iter()
-                .map(|(s, f)| (InternedString::from_static(s), f));
+            let mappings = [
+                ("Zeros", zeros_handler as HandlerFunction),
+                ("bitvector_concat", concat_handler),
+            ]
+            .into_iter()
+            .map(|(s, f)| (InternedString::from_static(s), f));
 
             HashMap::from_iter(mappings)
         });
@@ -211,10 +215,7 @@ impl Visitor for ResolveBitvectors {
     }
 
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        let statement = {
-            let borrow = node.borrow();
-            borrow.clone()
-        };
+        let statement = { node.borrow().clone() };
         match statement {
             Statement::TypeDeclaration { name, typ } => {
                 self.add_type_declaration(name, typ.clone())
@@ -241,13 +242,18 @@ fn zeros_handler(
 ) {
     // get assignment to argument to Zeros
     assert_eq!(arguments.len(), 1);
+
     let Value::Identifier(ident) = arguments[0] else {
         panic!();
     };
-    let Some(value) = get_assignment(
-        celf.current_func.as_ref().unwrap().entry_block.clone(),
-        ident,
-    ) else {
+
+    let Some(value) = celf
+        .current_func
+        .as_ref()
+        .unwrap()
+        .entry_block
+        .get_assignment(ident)
+    else {
         panic!("{ident}");
     };
 
@@ -267,41 +273,57 @@ fn zeros_handler(
     celf.resolve(*destination, isize::try_from(length).unwrap());
 
     // assign literal 0
-
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value: Value::Literal(Rc::new(RefCell::new(Literal::Int(0.into())))),
     }
 }
 
-fn get_assignment(entry_block: ControlFlowBlock, ident: InternedString) -> Option<Value> {
-    entry_block
-        .iter()
-        .flat_map(|cfb| cfb.statements())
-        .filter_map(|statement| {
-            let res = {
-                let borrow = statement.borrow();
-                match &*borrow {
-                    Statement::Copy { expression, value } => {
-                        Some((expression.clone(), value.clone()))
-                    }
-                    _ => None,
-                }
-            };
+fn concat_handler(
+    celf: &mut ResolveBitvectors,
+    statement: Rc<RefCell<Statement>>,
+    expression: &Expression,
+    arguments: &[Value],
+) {
+    // get identifiers and lengths of input bitvectors
+    assert_eq!(arguments.len(), 2);
 
-            res
-        })
-        .filter_map(|(expr, value)| {
-            let Expression::Identifier(assign) = expr else {
-                return None;
-            };
+    let Value::Identifier(left_ident) = arguments[0] else {
+        panic!();
+    };
 
-            if assign == ident {
-                Some(value)
-            } else {
-                None
-            }
-        })
-        .at_most_one()
-        .unwrap()
+    let Value::Identifier(right_ident) = arguments[1] else {
+        panic!();
+    };
+
+    let Some(Length::Fixed(left_length)) = celf.lengths.get(&left_ident) else {
+        panic!();
+    };
+    let Some(Length::Fixed(right_length)) = celf.lengths.get(&right_ident) else {
+        panic!();
+    };
+
+    // calculate length of output
+
+    // generate shifting and & logic
+    // (left << right_length) | right
+    let value = Value::Operation(Operation::Or(
+        Box::new(Value::Operation(Operation::LeftShift(
+            Box::new(Value::Identifier(left_ident)),
+            Box::new(Value::Literal(Rc::new(RefCell::new(Literal::Int(
+                BigInt::from(*right_length),
+            ))))),
+        ))),
+        Box::new(Value::Identifier(right_ident)),
+    ));
+
+    let Expression::Identifier(dest) = expression else {
+        panic!();
+    };
+
+    celf.resolve(*dest, left_length + right_length);
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.clone(),
+        value,
+    }
 }

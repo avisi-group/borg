@@ -218,31 +218,23 @@ impl Emit for Operation {
                 write!(w, "!")?;
                 value.emit(w)
             }
-            Operation::Equal(lhs, rhs) => {
-                lhs.emit(w)?;
-                write!(w, " == ")?;
-                rhs.emit(w)
-            }
-            Operation::LessThan(lhs, rhs) => {
-                lhs.emit(w)?;
-                write!(w, " < ")?;
-                rhs.emit(w)
-            }
-            Operation::GreaterThan(lhs, rhs) => {
-                lhs.emit(w)?;
-                write!(w, " > ")?;
-                rhs.emit(w)
-            }
-            Operation::Subtract(lhs, rhs) => {
-                lhs.emit(w)?;
-                write!(w, " - ")?;
-                rhs.emit(w)
-            }
-            Operation::Add(lhs, rhs) => {
-                lhs.emit(w)?;
-                write!(w, " + ")?;
-                rhs.emit(w)
-            }
+            Operation::Equal(lhs, rhs) => emit_op2(w, lhs, rhs, "=="),
+            Operation::LessThan(lhs, rhs) => emit_op2(w, lhs, rhs, "<"),
+            Operation::GreaterThan(lhs, rhs) => emit_op2(w, lhs, rhs, ">"),
+            Operation::Subtract(lhs, rhs) => emit_op2(w, lhs, rhs, "-"),
+            Operation::Add(lhs, rhs) => emit_op2(w, lhs, rhs, "+"),
+            Operation::Or(lhs, rhs) => emit_op2(w, lhs, rhs, "|"),
+            Operation::And(lhs, rhs) => emit_op2(w, lhs, rhs, "&"),
+            Operation::LeftShift(lhs, rhs) => emit_op2(w, lhs, rhs, "<<"),
+            Operation::RightShift(lhs, rhs) => emit_op2(w, lhs, rhs, ">>"),
         }
     }
+}
+
+fn emit_op2<W: Write>(w: &mut W, lhs: &Value, rhs: &Value, op: &str) -> fmt::Result {
+    write!(w, "(")?;
+    lhs.emit(w)?;
+    write!(w, " {op} ")?;
+    rhs.emit(w)?;
+    write!(w, ")")
 }

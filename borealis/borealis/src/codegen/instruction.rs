@@ -100,7 +100,7 @@ pub fn generate_execute_entrypoint(
                 })
                 .join(", ")
         } else {
-            log::warn!("could not find function {:?}", execute_function_name);
+            log::debug!("could not find function {:?}", execute_function_name);
             "".to_owned()
         }
     };

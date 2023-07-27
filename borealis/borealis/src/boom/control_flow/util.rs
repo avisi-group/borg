@@ -3,9 +3,10 @@
 use {
     crate::boom::{
         control_flow::{dot, ControlFlowBlock},
-        Statement,
+        Expression, Statement, Value,
     },
     common::{intern::InternedString, HashSet},
+    itertools::Itertools,
     log::trace,
     std::{
         collections::LinkedList,
@@ -67,5 +68,36 @@ impl ControlFlowBlock {
                 }
             })
             .collect()
+    }
+
+    pub fn get_assignment(&self, ident: InternedString) -> Option<Value> {
+        self.iter()
+            .flat_map(|cfb| cfb.statements())
+            .filter_map(|statement| {
+                let res = {
+                    let borrow = statement.borrow();
+                    match &*borrow {
+                        Statement::Copy { expression, value } => {
+                            Some((expression.clone(), value.clone()))
+                        }
+                        _ => None,
+                    }
+                };
+
+                res
+            })
+            .filter_map(|(expr, value)| {
+                let Expression::Identifier(assign) = expr else {
+                    return None;
+                };
+
+                if assign == ident {
+                    Some(value)
+                } else {
+                    None
+                }
+            })
+            .at_most_one()
+            .unwrap_or_else(|e| panic!("Multiple assignments to {ident} found: {e}"))
     }
 }

@@ -37,7 +37,7 @@ pub fn generate_fns(
 
         let ast = ast.borrow();
         let Some(definition) = ast.functions.get(&ident) else {
-            log::warn!("cannot generate GenC for unknown function {ident:?}");
+            log::trace!("cannot generate GenC for unknown function {ident:?}");
             continue;
         };
 

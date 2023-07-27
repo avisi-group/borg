@@ -535,6 +535,10 @@ pub enum Operation {
     GreaterThan(Box<Value>, Box<Value>),
     Subtract(Box<Value>, Box<Value>),
     Add(Box<Value>, Box<Value>),
+    Or(Box<Value>, Box<Value>),
+    And(Box<Value>, Box<Value>),
+    LeftShift(Box<Value>, Box<Value>),
+    RightShift(Box<Value>, Box<Value>),
 }
 
 impl Walkable for Operation {
@@ -545,7 +549,11 @@ impl Walkable for Operation {
             | Operation::LessThan(lhs, rhs)
             | Operation::GreaterThan(lhs, rhs)
             | Operation::Subtract(lhs, rhs)
-            | Operation::Add(lhs, rhs) => {
+            | Operation::Add(lhs, rhs)
+            | Operation::Or(lhs, rhs)
+            | Operation::And(lhs, rhs)
+            | Operation::LeftShift(lhs, rhs)
+            | Operation::RightShift(lhs, rhs) => {
                 visitor.visit_value(lhs);
                 visitor.visit_value(rhs);
             }
