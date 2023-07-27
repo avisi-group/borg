@@ -16,7 +16,7 @@ use {
 };
 
 /// GenC builtin functions that do not need to be generated
-const _BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
+static _BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
     let names = ["trap"];
     HashSet::from_iter(names.into_iter().map(InternedString::from_static))
 });

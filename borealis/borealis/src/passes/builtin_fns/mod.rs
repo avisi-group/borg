@@ -16,7 +16,7 @@ pub mod functions;
 type HandlerFunction = fn(Rc<RefCell<Ast>>, FunctionDefinition, Rc<RefCell<Statement>>);
 
 /// Functions to handle in an initial pass, before processing others
-const INITIAL_PASS_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
+static INITIAL_PASS_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
     HashSet::from_iter(
         ["UInt", "pcnt_i___pcnt_i64", "pcnt_i64___pcnt_i"]
             .into_iter()
@@ -90,7 +90,7 @@ fn difference<K: Eq + PartialEq + Hash + Copy, V: Clone>(
     map: &HashMap<K, V>,
     set: &HashSet<K>,
 ) -> HashMap<K, V> {
-    map.into_iter()
+    map.iter()
         .filter(|(k, _)| set.contains(k))
         .map(|(&k, v)| (k, v.clone()))
         .collect()

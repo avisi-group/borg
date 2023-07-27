@@ -102,7 +102,7 @@ impl ResolveBitvectors {
                 // if the value is an identifier
                 Value::Identifier(source) => {
                     // and that identifier has a known length
-                    if let Some(Length::Fixed(length)) = self.lengths.get(&source) {
+                    if let Some(Length::Fixed(length)) = self.lengths.get(source) {
                         // the source variable must also have that length
                         self.resolve(*dest, *length);
                     }
@@ -150,7 +150,7 @@ impl ResolveBitvectors {
             fn(&mut ResolveBitvectors, Rc<RefCell<Statement>>, &Expression, &[Value]);
 
         // function handlers
-        const HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
+        static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
             let mappings = [
                 ("Zeros", zeros_handler as HandlerFunction),
                 ("bitvector_concat", concat_handler),

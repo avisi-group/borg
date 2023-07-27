@@ -8,7 +8,7 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
-pub const HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
+pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
     let mappings = [
         // this is a GenC builtin function so can be left as a noop here (technically not needed
         // but just being explicit)
