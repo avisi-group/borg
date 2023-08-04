@@ -16,7 +16,7 @@ displaydoc = "0.2.4"
 thiserror = "1.0.44"
 errctx = "1.0.0"
 log = "0.4.19"
-serde = { version = "1.0.176", features = ["derive"] }
+serde = { version = "1.0.181", features = ["derive"] }
 deepsize = "0.2.0"
 num-bigint = { version = "0.4.3", features = ["serde"] }
 serde_json = "1.0.104"
@@ -25,7 +25,7 @@ phf = { version = "0.11.2", features = ["macros"] }
 regex = "1.9.1"
 
 [build-dependencies]
-cc = "1.0.79"
+cc = "1.0.81"
 color-eyre = "0.6.2"
 
 [dev-dependencies]

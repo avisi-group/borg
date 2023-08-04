@@ -10,32 +10,6 @@ use {
         rc::Rc,
     },
 };
-
-fn write_uid<W: Write>(
-    w: &mut W,
-    id: InternedString,
-    typs: &Vec<Rc<RefCell<Type>>>,
-) -> fmt::Result {
-    write!(w, "{id}")?;
-
-    if !typs.is_empty() {
-        write!(w, "<")?;
-
-        let mut typs = typs.iter();
-        if let Some(typ) = typs.next() {
-            typ.emit(w)?;
-        }
-        for typ in typs {
-            write!(w, ", ")?;
-            typ.emit(w)?;
-        }
-
-        write!(w, ">")?;
-    }
-
-    Ok(())
-}
-
 /// Used to emit BOOM to GenC strings
 pub trait Emit {
     /// Renders `self` as GenC
@@ -48,91 +22,6 @@ pub trait Emit {
         self.emit(&mut buf).unwrap();
 
         buf
-    }
-}
-
-impl Emit for NamedType {
-    fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
-        self.typ.emit(w)?;
-        write!(w, " {}", self.name)?;
-        Ok(())
-    }
-}
-
-impl Emit for Rc<RefCell<Type>> {
-    fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
-        use Type::*;
-
-        let tmp: std::string::String;
-
-        let str = match &*self.borrow() {
-            Unit => "void",
-            LargeBits(_) => "bv",
-            FixedBits(len, _) => {
-                tmp = format!("bv{len}");
-                &tmp
-            }
-            FixedInt(len) => match *len {
-                0 => panic!("unexpected 0 length bitvector"),
-                1..=8 => "uint8",
-                9..=16 => "uint16",
-                17..=32 => "uint32",
-                33..=64 => "uint64",
-                65..=128 => "uint128",
-                _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
-            },
-            Bool => panic!("bools should not exist in the AST after passes"),
-            LargeInt => "uint64",
-            Union { .. } => "union",
-
-            // need to figure out what the rest mean
-            _ => "unknown",
-        };
-
-        write!(w, "{str}")
-    }
-}
-
-impl Emit for Value {
-    fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
-        match self {
-            Value::Identifier(ident) => write!(w, "{ident}"),
-            Value::Literal(literal) => literal.emit(w),
-            Value::Operation(op) => op.emit(w),
-            Value::Struct { name, fields } => {
-                write!(w, "struct {name} {{")?;
-
-                for NamedValue { name, value } in fields {
-                    write!(w, "{name}: ")?;
-                    value.emit(w)?;
-                    write!(w, ",")?;
-                }
-
-                write!(w, "}}")
-            }
-            Value::Field { value, field_name } => {
-                value.emit(w)?;
-                write!(w, ".{field_name}")
-            }
-            Value::CtorKind {
-                value,
-                identifier,
-                types,
-            } => {
-                value.emit(w)?;
-                write!(w, " is ")?;
-                write_uid(w, *identifier, types)
-            }
-            Value::CtorUnwrap {
-                value,
-                identifier,
-                types,
-            } => {
-                value.emit(w)?;
-                write!(w, " as ")?;
-                write_uid(w, *identifier, types)
-            }
-        }
     }
 }
 
@@ -193,6 +82,114 @@ impl Emit for Expression {
                 write!(w, ".{field}")
             }
             Expression::Address(_) => todo!(),
+        }
+    }
+}
+
+impl Emit for NamedType {
+    fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
+        self.typ.emit(w)?;
+        write!(w, " {}", self.name)?;
+        Ok(())
+    }
+}
+
+impl Emit for Rc<RefCell<Type>> {
+    fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
+        use Type::*;
+
+        let str = match &*self.borrow() {
+            Unit => "void",
+
+            LargeBits(_) => {
+                log::debug!("Emitted unknown length bitvector as uint64!");
+                "uint64"
+            }
+            FixedInt(len) | FixedBits(len, _) => match *len {
+                0 => panic!("unexpected 0 length bitvector"),
+                1..=8 => "uint8",
+                9..=16 => "uint16",
+                17..=32 => "uint32",
+                33..=64 => "uint64",
+                65..=128 => "uint128",
+                _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
+            },
+            Bool => panic!("bools should not exist in the AST after passes"),
+            LargeInt => "uint64",
+            Union { .. } => "union",
+
+            // need to figure out what the rest mean
+            _ => "unknown",
+        };
+
+        write!(w, "{str}")
+    }
+}
+
+impl Emit for Value {
+    fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
+        fn write_uid<W: Write>(
+            w: &mut W,
+            id: InternedString,
+            typs: &Vec<Rc<RefCell<Type>>>,
+        ) -> fmt::Result {
+            write!(w, "{id}")?;
+
+            if !typs.is_empty() {
+                write!(w, "<")?;
+
+                let mut typs = typs.iter();
+                if let Some(typ) = typs.next() {
+                    typ.emit(w)?;
+                }
+                for typ in typs {
+                    write!(w, ", ")?;
+                    typ.emit(w)?;
+                }
+
+                write!(w, ">")?;
+            }
+
+            Ok(())
+        }
+
+        match self {
+            Value::Identifier(ident) => write!(w, "{ident}"),
+            Value::Literal(literal) => literal.emit(w),
+            Value::Operation(op) => op.emit(w),
+            Value::Struct { name, fields } => {
+                write!(w, "struct {name} {{")?;
+
+                for NamedValue { name, value } in fields {
+                    write!(w, "{name}: ")?;
+                    value.emit(w)?;
+                    write!(w, ",")?;
+                }
+
+                write!(w, "}}")
+            }
+            Value::Field { value, field_name } => {
+                value.emit(w)?;
+                write!(w, ".{field_name}")
+            }
+            Value::CtorKind {
+                value,
+                identifier,
+                types,
+            } => {
+                value.emit(w)?;
+                write!(w, " is ")?;
+                write_uid(w, *identifier, types)
+            }
+            Value::CtorUnwrap {
+                value,
+                identifier,
+                types,
+            } => {
+                value.emit(w)?;
+                write!(w, " as ")?;
+                write_uid(w, *identifier, types)
+            }
         }
     }
 }

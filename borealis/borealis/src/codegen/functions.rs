@@ -4,7 +4,7 @@ use {
     crate::{
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
-            Ast,
+            Ast, Statement,
         },
         codegen::emit::Emit,
         genc_model::HelperFunction,
@@ -12,7 +12,7 @@ use {
     common::{intern::InternedString, HashMap, HashSet},
     itertools::Itertools,
     once_cell::sync::Lazy,
-    std::{cell::RefCell, rc::Rc},
+    std::{cell::RefCell, fmt::Write, rc::Rc},
 };
 
 /// GenC builtin functions that do not need to be generated
@@ -138,8 +138,13 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
             }
         };
 
-        //TODO: write current block statements to buf here
+        // write current block statements to buf here
         block.statements().iter().for_each(|stmt| {
+            if let Statement::TypeDeclaration { typ, .. } = &*stmt.borrow() {
+                buf += indent.get();
+                writeln!(buf, "// {typ:?}").unwrap();
+            }
+
             buf += indent.get();
             stmt.emit(&mut buf).unwrap();
             buf += "\n";

@@ -22,13 +22,12 @@
 //! hoping as long as these don't involve concatenation we don't need to know
 //! the length
 
-use crate::boom::Operation;
-
 use {
     crate::{
         boom::{
             visitor::{Visitor, Walkable},
-            Ast, Bit, Expression, FunctionDefinition, Literal, NamedType, Statement, Type, Value,
+            Ast, Bit, Expression, FunctionDefinition, Literal, NamedType, Operation, Statement,
+            Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },
@@ -154,6 +153,7 @@ impl ResolveBitvectors {
             let mappings = [
                 ("Zeros", zeros_handler as HandlerFunction),
                 ("bitvector_concat", concat_handler),
+                ("eq_vec", eq_handler),
             ]
             .into_iter()
             .map(|(s, f)| (InternedString::from_static(s), f));
@@ -303,8 +303,6 @@ fn concat_handler(
         panic!();
     };
 
-    // calculate length of output
-
     // generate shifting and & logic
     // (left << right_length) | right
     let value = Value::Operation(Operation::Or(
@@ -321,7 +319,42 @@ fn concat_handler(
         panic!();
     };
 
+    // calculate length of output
     celf.resolve(*dest, left_length + right_length);
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.clone(),
+        value,
+    }
+}
+
+fn eq_handler(
+    _: &mut ResolveBitvectors,
+    statement: Rc<RefCell<Statement>>,
+    expression: &Expression,
+    arguments: &[Value],
+) {
+    // get identifiers and lengths of input bitvectors
+    assert_eq!(arguments.len(), 2);
+
+    let Value::Identifier(left_ident) = arguments[0] else {
+        panic!();
+    };
+
+    let Value::Identifier(right_ident) = arguments[1] else {
+        panic!();
+    };
+
+    // generate equality operation
+    let value = Value::Operation(Operation::Equal(
+        Box::new(Value::Identifier(left_ident)),
+        Box::new(Value::Identifier(right_ident)),
+    ));
+
+    let Expression::Identifier(_) = expression else {
+        panic!();
+    };
+
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value,

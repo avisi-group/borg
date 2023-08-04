@@ -68,6 +68,7 @@ build:
     RUN eval `opam env` && cargo build --target $RUST_TARGET --release
 
     SAVE ARTIFACT target/$RUST_TARGET/release/borealis borealis
+    # we save the workspace as a copy of all the code with no build artefacts as the e2e-test uses a different target none of that is reusable
     SAVE ARTIFACT . workspace
 
 docker:
