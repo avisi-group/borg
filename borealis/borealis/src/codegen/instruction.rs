@@ -84,6 +84,7 @@ pub fn generate_execute_entrypoint(
             func.signature
                 // iterate over the parameters of this function
                 .parameters
+                .borrow()
                 .iter()
                 .map(|NamedType { name, .. }| name)
                 .map(|name| {

@@ -189,7 +189,7 @@ impl Pass for ResolveBitvectors {
 
                 // insert any bitvector function parameters
                 self.lengths
-                    .extend(func.signature.parameters.iter().filter_map(
+                    .extend(func.signature.parameters.borrow().iter().filter_map(
                         |NamedType { name, typ }| match &*typ.borrow() {
                             Type::FixedBits(length, _) => Some((*name, Length::Fixed(*length))),
                             Type::LargeBits(_) => {

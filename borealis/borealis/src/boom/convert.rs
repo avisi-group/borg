@@ -87,12 +87,14 @@ impl BoomEmitter {
                 let (parameter_types, return_type) =
                     self.function_types.remove(&name.as_interned()).unwrap();
 
-                let parameters = arguments
-                    .iter()
-                    .map(sail_ast::Identifier::as_interned)
-                    .zip(parameter_types)
-                    .map(|(name, typ)| NamedType { name, typ })
-                    .collect::<Vec<_>>();
+                let parameters = Rc::new(RefCell::new(
+                    arguments
+                        .iter()
+                        .map(sail_ast::Identifier::as_interned)
+                        .zip(parameter_types)
+                        .map(|(name, typ)| NamedType { name, typ })
+                        .collect::<Vec<_>>(),
+                ));
 
                 let name = name.as_interned();
 

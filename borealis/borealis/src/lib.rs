@@ -4,6 +4,7 @@
 
 use {
     crate::{
+        boom::control_flow::ControlFlowBlock,
         codegen::{
             functions::generate_fns,
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
@@ -67,7 +68,13 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
         .functions
         .clone()
         .into_iter()
-        .filter(|(k, _)| k.as_ref() == "integer_arithmetic_addsub_immediate_decode")
+        .map(|(k, mut def)| {
+            if k.as_ref() != "integer_arithmetic_addsub_immediate_decode" {
+                def.entry_block = ControlFlowBlock::new();
+            }
+
+            (k, def)
+        })
         .collect();
     ast.borrow_mut().functions = funcs;
 

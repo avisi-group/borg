@@ -38,12 +38,12 @@ pub fn build_graph(statements: &[Rc<RefCell<Statement>>]) -> ControlFlowBlock {
 
 /// Node in a control flow graph, contains a basic block of statements and a
 /// terminator
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ControlFlowBlock {
     inner: Rc<RefCell<ControlFlowBlockInner>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct ControlFlowBlockInner {
     /// Optional block label, otherwise the `SharedKey` `Display` format should
     /// be used
@@ -93,15 +93,8 @@ impl Walkable for ControlFlowBlock {
 }
 
 impl ControlFlowBlock {
-    fn new() -> Self {
-        Self {
-            inner: Rc::new(RefCell::new(ControlFlowBlockInner {
-                label: None,
-                parents: HashSet::default(),
-                statements: vec![],
-                terminator: Terminator::Return(None),
-            })),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Creates a new weak pointer to a `ControlFlowBlock`
@@ -241,6 +234,12 @@ pub enum Terminator {
         /// Target to branch to
         target: ControlFlowBlock,
     },
+}
+
+impl Default for Terminator {
+    fn default() -> Self {
+        Self::Return(None)
+    }
 }
 
 impl Terminator {

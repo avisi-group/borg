@@ -175,6 +175,7 @@ impl FunctionDefinition {
             .chain(
                 self.signature
                     .parameters
+                    .borrow()
                     .iter()
                     .map(|NamedType { name, typ }| (*name, typ.clone())),
             )
@@ -187,13 +188,14 @@ impl FunctionDefinition {
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: InternedString,
-    pub parameters: Vec<NamedType>,
+    pub parameters: Rc<RefCell<Vec<NamedType>>>,
     pub return_type: Rc<RefCell<Type>>,
 }
 
 impl Walkable for FunctionSignature {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         self.parameters
+            .borrow()
             .iter()
             .for_each(|parameter| visitor.visit_named_type(parameter));
         visitor.visit_type(self.return_type.clone());

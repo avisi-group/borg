@@ -1,12 +1,14 @@
 //! Removes unit local variables and assignments, void parameters from function
 //! definitions, and void arguments from function calls
 
+use crate::boom::NamedType;
+
 use {
     crate::{
         boom::{
             control_flow::ControlFlowBlock,
             visitor::{Visitor, Walkable},
-            Ast, Expression, Literal, Statement, Type, Value,
+            Ast, Expression, FunctionDefinition, Literal, Statement, Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },
@@ -54,6 +56,14 @@ impl Pass for RemoveUnits {
 }
 
 impl Visitor for RemoveUnits {
+    fn visit_function_definition(&mut self, node: &FunctionDefinition) {
+        node.signature
+            .parameters
+            .borrow_mut()
+            .retain(|NamedType { typ, .. }| *typ.borrow() != Type::Unit);
+        node.walk(self);
+    }
+
     // visit function signature, then every callsite
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
         let statements = block

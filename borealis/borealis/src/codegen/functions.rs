@@ -16,7 +16,7 @@ use {
 };
 
 /// GenC builtin functions that do not need to be generated
-static _BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
+static BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
     let names = ["trap"];
     HashSet::from_iter(names.into_iter().map(InternedString::from_static))
 });
@@ -48,6 +48,7 @@ pub fn generate_fns(
             parameters: definition
                 .signature
                 .parameters
+                .borrow()
                 .iter()
                 .map(Emit::emit_string)
                 .join(", "),
@@ -59,13 +60,13 @@ pub fn generate_fns(
 
         generated_fns.insert(ident, generated);
 
-        // remaining_fns.extend(
-        //     definition
-        //         .entry_block
-        //         .get_functions()
-        //         // ignore builtin functions
-        //         .difference(&BUILTIN_FNS),
-        // );
+        remaining_fns.extend(
+            definition
+                .entry_block
+                .get_functions()
+                // ignore builtin functions
+                .difference(&BUILTIN_FNS),
+        );
     }
 
     generated_fns.into_values().collect()

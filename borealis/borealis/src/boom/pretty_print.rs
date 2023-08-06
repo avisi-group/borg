@@ -191,6 +191,7 @@ impl<'writer, W: Write> Visitor for BoomPrettyPrinter<'writer, W> {
     ) {
         self.prindent(format!("fn {}(", name));
 
+        let parameters = parameters.borrow();
         let mut parameters = parameters.iter();
         if let Some(param) = parameters.next() {
             param.emit(self.writer).unwrap();
