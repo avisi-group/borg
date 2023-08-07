@@ -154,6 +154,7 @@ impl ResolveBitvectors {
                 ("Zeros", zeros_handler as HandlerFunction),
                 ("bitvector_concat", concat_handler),
                 ("eq_vec", eq_handler),
+                ("undefined_bitvector", undefined_handler),
             ]
             .into_iter()
             .map(|(s, f)| (InternedString::from_static(s), f));
@@ -358,5 +359,20 @@ fn eq_handler(
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value,
+    }
+}
+
+fn undefined_handler(
+    _: &mut ResolveBitvectors,
+    statement: Rc<RefCell<Statement>>,
+    expression: &Expression,
+    _arguments: &[Value],
+) {
+    // TODO: assign dest bitvector length to supplied argument
+    // either by detecting const or evaluating what the value would be at that point in execution (symbolic execution?)
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.clone(),
+        value: Value::Literal(Rc::new(RefCell::new(Literal::Int(BigInt::from(0))))),
     }
 }
