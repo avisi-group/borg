@@ -369,7 +369,8 @@ fn undefined_handler(
     _arguments: &[Value],
 ) {
     // TODO: assign dest bitvector length to supplied argument
-    // either by detecting const or evaluating what the value would be at that point in execution (symbolic execution?)
+    // either by detecting const or evaluating what the value would be at that point
+    // in execution (symbolic execution?)
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),

@@ -12,8 +12,8 @@ use {
     errctx::PathCtx,
     std::{
         fmt::Display,
-        fs::{create_dir_all, read_dir, File},
-        io::{self, Write as _},
+        fs::{create_dir_all, File},
+        io::Write as _,
         path::{Path, PathBuf},
     },
 };
@@ -27,31 +27,10 @@ const EXECUTE_FILENAME: &str = "execute.genc";
 const BEHAVIOURS_FILENAME: &str = "behaviours.genc";
 
 /// Export a GenC description to the supplied empty directory
-pub fn export<P: AsRef<Path>>(
-    description: &Description,
-    path: P,
-    force: bool,
-) -> Result<(), Error> {
+pub fn export<P: AsRef<Path>>(description: &Description, path: P) -> Result<(), Error> {
     let path = path.as_ref();
 
-    if force {
-        create_dir_all(path).map_err(PathCtx::f(path))?;
-    }
-
-    let count = read_dir(path)
-        .map_err(|e| {
-            if e.kind() == io::ErrorKind::NotFound {
-                Error::OutDirectoryNotFound(path.to_owned())
-            } else {
-                PathCtx::f(path)(e).into()
-            }
-        })?
-        .count();
-
-    // if force is not set and count is not zero, return a directory not empty error
-    if !force && count != 0 {
-        return Err(Error::OutDirectoryNotEmpty(path.to_owned()));
-    }
+    create_dir_all(path).map_err(PathCtx::f(path))?;
 
     let Files {
         main,

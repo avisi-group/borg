@@ -3,7 +3,7 @@ use {
     clap::{Parser, Subcommand},
     color_eyre::eyre::{Result, WrapErr},
     errctx::PathCtx,
-    log::{info, warn},
+    log::info,
     lz4_flex::frame::{BlockMode, FrameEncoder as Lz4Encoder, FrameInfo},
     std::{
         fs::File,
@@ -17,11 +17,6 @@ struct Args {
     /// Logging filter string (e.g. "borealis=debug" or "trace")
     #[arg(long)]
     log: Option<String>,
-
-    /// Warning! Disables checking that output directory is empty or output file
-    /// does not exist before writing.
-    #[arg(long)]
-    force: bool,
 
     /// Borealis command
     #[command(subcommand)]
@@ -53,8 +48,6 @@ fn main() -> Result<()> {
     // parse command line arguments
     let args = Args::parse();
 
-    warn!("Force flag set! May result in data being overwritten!");
-
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or(""))?;
 
@@ -66,7 +59,7 @@ fn main() -> Result<()> {
             let description = sail_to_genc(&ast, &jib);
 
             info!("Exporting GenC description");
-            genc_model::export(&description, output, args.force)
+            genc_model::export(&description, output)
                 .wrap_err("Error while exporting GenC description")?
         }
         Command::Sail2bincode { input, output } => {
@@ -76,8 +69,7 @@ fn main() -> Result<()> {
 
             let mut frame_info = FrameInfo::new();
             frame_info.block_mode = BlockMode::Linked;
-            let mut encoder =
-                Lz4Encoder::with_frame_info(frame_info, create_file(output, args.force)?);
+            let mut encoder = Lz4Encoder::with_frame_info(frame_info, create_file(output)?);
             bincode::serialize_into(&mut encoder, &(ast, jib))?;
             encoder.finish()?;
             info!("done");
@@ -97,15 +89,14 @@ fn init_logger(filters: &str) -> Result<()> {
 
 /// Creates the file supplied in `path`.
 ///
-/// If the file at the supplied path already exists and `force` is true it will
-/// be overwritten, otherwise an error will be returned.
-fn create_file<P: AsRef<Path>>(path: P, force: bool) -> Result<File> {
+/// If the file at the supplied path already exists it will
+/// be overwritten.
+fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
     File::options()
-        .write(true) // we want to write to the file
-        .create_new(!force) // fail if it already exists and force is true...
-        .create(true) // ...otherwise create...
+        .write(true) // we want to write to the file...
+        .create(true) // ...creating if it does not exist..
         .truncate(true) // ...and truncate before writing
         .open(path.as_ref())
         .map_err(PathCtx::f(path))
-        .wrap_err(format!("Failed to write to file, force = {force}"))
+        .wrap_err("Failed to write to file")
 }

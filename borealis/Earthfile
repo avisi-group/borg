@@ -96,7 +96,7 @@ e2e-test-borealis-genc:
     # must use alpine instead of +docker due to https://github.com/earthly/earthly/issues/2618
     FROM +docker
     COPY data/arm-v8.5-a.bincode.lz4 arm-v8.5-a.bincode.lz4
-    RUN ./borealis --force sail2genc arm-v8.5-a.bincode.lz4 genc
+    RUN ./borealis sail2genc arm-v8.5-a.bincode.lz4 genc
     SAVE ARTIFACT genc genc
 
 e2e-test-gensim:
