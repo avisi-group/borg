@@ -1,6 +1,7 @@
 //! Instruction format string extraction
 
 use {
+    crate::boom::{bits_to_int, Bit},
     crate::genc_model::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
     common::{identifiable::unique_id, intern::InternedString, HashMap},
     log::{debug, trace, warn},
@@ -44,62 +45,10 @@ impl NameCounter {
     }
 }
 
-/// Bit in an instruction format
-#[derive(PartialEq, Eq)]
-pub enum FormatBit {
-    /// Fixed zero
-    Zero,
-    /// Fixed one
-    One,
-    /// Unknown bit
-    Unknown,
-}
-
-impl FormatBit {
-    fn is_unknown(&self) -> bool {
-        match self {
-            Self::Zero | Self::One => false,
-            Self::Unknown => true,
-        }
-    }
-
-    fn is_fixed(&self) -> bool {
-        !self.is_unknown()
-    }
-
-    fn fixed_value(&self) -> u64 {
-        match self {
-            FormatBit::Zero => 0,
-            FormatBit::One => 1,
-            FormatBit::Unknown => panic!("unknown bit has no value"),
-        }
-    }
-}
-
-impl Debug for FormatBit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Zero => write!(f, "0"),
-            Self::One => write!(f, "1"),
-            Self::Unknown => write!(f, "x"),
-        }
-    }
-}
-
-fn bits_to_int<B: AsRef<[FormatBit]>>(bits: B) -> u64 {
-    let bits = bits.as_ref();
-
-    assert!(bits.iter().all(FormatBit::is_fixed));
-
-    bits.iter()
-        .rev()
-        .fold(0, |acc, bit| acc << 1 | bit.fixed_value())
-}
-
 /// Sequence of bits corresponding to the machine code representation of an
 /// instruction
 #[derive(Debug)]
-pub struct Format(Vec<FormatBit>);
+pub struct Format(Vec<Bit>);
 
 impl Format {
     /// Create a new empty collection
@@ -108,7 +57,7 @@ impl Format {
     }
 
     /// Appends a decode bit to the collection
-    pub fn push(&mut self, bit: FormatBit) {
+    pub fn push(&mut self, bit: Bit) {
         self.0.push(bit)
     }
 
@@ -118,7 +67,7 @@ impl Format {
     }
 
     /// Finish building a sequence of format bits
-    pub fn finish(mut self) -> Vec<FormatBit> {
+    pub fn finish(mut self) -> Vec<Bit> {
         self.0.reverse();
         self.0
     }
@@ -142,8 +91,8 @@ impl From<&Literal> for Format {
         let mut decode_bits = Format::empty();
         for char in s.as_ref().chars() {
             match char {
-                '0' => decode_bits.push(FormatBit::Zero),
-                '1' => decode_bits.push(FormatBit::One),
+                '0' => decode_bits.push(Bit::Zero),
+                '1' => decode_bits.push(Bit::One),
                 c => panic!("Unexpected char {c:?} when decoding instruction format"),
             }
         }
@@ -324,9 +273,9 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
     let mut inner = homogenised_bits
         .into_iter()
         .map(|(n, bits)| {
-            let content = if bits.iter().all(FormatBit::is_unknown) {
+            let content = if bits.iter().all(Bit::is_unknown) {
                 SegmentContent::Variable(n)
-            } else if bits.iter().all(FormatBit::is_fixed) {
+            } else if bits.iter().all(Bit::is_fixed) {
                 SegmentContent::Constant(bits_to_int(bits))
             } else {
                 panic!();
@@ -410,7 +359,7 @@ pub fn flatten_expression(expression: &Expression) -> Vec<Expression> {
 /// ```text
 /// 1x1110000x1xxxxx000000xxxxx11111
 /// ```
-pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
+pub fn extract_format(pattern_aux: &PatternAux) -> Vec<Bit> {
     let mut format_bits = Format::empty();
 
     let PatternAux::As(Pattern { inner, .. }, ident) = pattern_aux else {
@@ -459,7 +408,7 @@ pub fn extract_format(pattern_aux: &PatternAux) -> Vec<FormatBit> {
                     {
                         if let NumericExpressionAux::Constant(sail::num::BigInt(big)) = &**n {
                             for _ in 0..big.to_u64_digits().1[0] {
-                                format_bits.push(FormatBit::Unknown);
+                                format_bits.push(Bit::Unknown);
                             }
                         }
                     }

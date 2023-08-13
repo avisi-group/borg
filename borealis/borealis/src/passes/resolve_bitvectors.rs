@@ -25,9 +25,10 @@
 use {
     crate::{
         boom::{
+            bits_to_int,
             visitor::{Visitor, Walkable},
-            Ast, Bit, Expression, FunctionDefinition, Literal, NamedType, Operation, Statement,
-            Type, Value,
+            Ast, Expression, FunctionDefinition, Literal, NamedType, Operation, Statement, Type,
+            Value,
         },
         passes::{any::AnyExt, Pass},
     },
@@ -113,15 +114,7 @@ impl ResolveBitvectors {
                         self.resolve(*dest, bits.len() as isize);
 
                         // replace bits with constant int
-                        *literal =
-                            Literal::Int(BigInt::from(bits.iter().rev().fold(0, |acc, bit| {
-                                acc << 1
-                                    | match bit {
-                                        Bit::_0 => 0,
-                                        Bit::_1 => 1,
-                                        Bit::Unknown => panic!(),
-                                    }
-                            })));
+                        *literal = Literal::Int(BigInt::from(bits_to_int(bits)));
                     }
                 }
 

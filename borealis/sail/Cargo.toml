@@ -15,17 +15,17 @@ parking_lot = "0.12.1"
 displaydoc = "0.2.4"
 thiserror = "1.0.44"
 errctx = "1.0.0"
-log = "0.4.19"
-serde = { version = "1.0.181", features = ["derive"] }
+log = "0.4.20"
+serde = { version = "1.0.183", features = ["derive"] }
 deepsize = "0.2.0"
 num-bigint = { version = "0.4.3", features = ["serde"] }
 serde_json = "1.0.104"
 strum = { version = "0.25.0", features = ["derive"] }
 phf = { version = "0.11.2", features = ["macros"] }
-regex = "1.9.2"
+regex = "1.9.3"
 
 [build-dependencies]
-cc = "1.0.81"
+cc = "1.0.82"
 color-eyre = "0.6.2"
 
 [dev-dependencies]

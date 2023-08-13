@@ -1,7 +1,9 @@
 //! GenC code generation from BOOM structures
 
 use {
-    crate::boom::{Expression, Literal, NamedType, NamedValue, Operation, Statement, Type, Value},
+    crate::boom::{
+        bits_to_int, Expression, Literal, NamedType, NamedValue, Operation, Statement, Type, Value,
+    },
     common::intern::InternedString,
     itertools::Itertools,
     std::{
@@ -198,8 +200,8 @@ impl Emit for Rc<RefCell<Literal>> {
     fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
         match &*self.borrow() {
             Literal::Int(bi) => write!(w, "{bi}"),
-            Literal::Bits(bits) => write!(w, "{bits:?}"),
-            Literal::Bit(bit) => write!(w, "{bit:?}"),
+            Literal::Bits(bits) => write!(w, "{}", bits_to_int(bits)),
+            Literal::Bit(bit) => write!(w, "{}", bit.value()),
             Literal::Bool(bool) => write!(w, "{bool}"),
             Literal::String(s) => write!(w, "{s:?}"),
             Literal::Unit => write!(w, "()"),

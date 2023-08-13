@@ -146,6 +146,11 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 writeln!(buf, "// {typ:?}").unwrap();
             }
 
+            if let Statement::Copy { expression, value } = &*stmt.borrow() {
+                buf += indent.get();
+                writeln!(buf, "// {expression:?} {value:?}").unwrap();
+            }
+
             buf += indent.get();
             stmt.emit(&mut buf).unwrap();
             buf += "\n";

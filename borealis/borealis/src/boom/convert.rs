@@ -1,7 +1,7 @@
 //! JIB to BOOM conversion
 
 use {
-    crate::boom::{self, control_flow::build_graph, FunctionSignature, NamedType},
+    crate::boom::{self, control_flow::build_graph, Bit, FunctionSignature, NamedType},
     common::{intern::InternedString, HashMap},
     sail::{jib_ast, sail_ast},
     std::{borrow::Borrow, cell::RefCell, collections::LinkedList, rc::Rc},
@@ -360,9 +360,9 @@ fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
 
 fn convert_bit(bit: &jib_ast::BitU) -> boom::Bit {
     match bit {
-        jib_ast::BitU::B0 => boom::Bit::_0,
-        jib_ast::BitU::B1 => boom::Bit::_1,
-        jib_ast::BitU::BU => boom::Bit::Unknown,
+        jib_ast::BitU::B0 => Bit::Zero,
+        jib_ast::BitU::B1 => Bit::One,
+        jib_ast::BitU::BU => Bit::Unknown,
     }
 }
 

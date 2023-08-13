@@ -15,7 +15,7 @@ use {
     sail::jib_ast,
     std::{
         cell::RefCell,
-        fmt::{self, Display, Formatter},
+        fmt::{self, Debug, Display, Formatter},
         rc::Rc,
     },
 };
@@ -563,9 +563,54 @@ impl Walkable for Operation {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Bit
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Bit {
-    _0,
-    _1,
+    /// Fixed zero
+    Zero,
+    /// Fixed one
+    One,
+    /// Unknown bit
     Unknown,
+}
+
+impl Bit {
+    pub fn is_unknown(&self) -> bool {
+        match self {
+            Self::Zero | Self::One => false,
+            Self::Unknown => true,
+        }
+    }
+
+    pub fn is_fixed(&self) -> bool {
+        !self.is_unknown()
+    }
+
+    /// Gets the value of the bit, panicking if unknown
+    pub fn value(&self) -> u64 {
+        match self {
+            Bit::Zero => 0,
+            Bit::One => 1,
+            Bit::Unknown => panic!("unknown bit has no value"),
+        }
+    }
+}
+
+impl Debug for Bit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Zero => write!(f, "0"),
+            Self::One => write!(f, "1"),
+            Self::Unknown => write!(f, "x"),
+        }
+    }
+}
+
+/// Converts a sequence of bits to an integer
+pub fn bits_to_int<B: AsRef<[Bit]>>(bits: B) -> u64 {
+    let bits = bits.as_ref();
+
+    assert!(bits.iter().all(Bit::is_fixed));
+
+    bits.iter().rev().fold(0, |acc, bit| acc << 1 | bit.value())
 }
