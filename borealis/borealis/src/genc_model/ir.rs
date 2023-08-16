@@ -76,6 +76,8 @@ impl Display for Main {
             write!(f, "{register}")?;
         }
 
+        // TODO: structs go here
+
         writeln!(f)?;
 
         writeln!(f, "\tARCH_CTOR(arm) {{")?;

@@ -10,7 +10,7 @@ common = { path = "../common" }
 sail = { path = "../sail" }
 
 displaydoc = "0.2.4"
-thiserror = "1.0.44"
+thiserror = "1.0.45"
 errctx = "1.0.0"
 color-eyre = { version = "0.6.2", default-features = false }
 pretty_assertions = "1.4.0"

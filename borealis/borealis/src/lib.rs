@@ -69,7 +69,13 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
         .clone()
         .into_iter()
         .map(|(k, mut def)| {
-            if k.as_ref() != "integer_arithmetic_addsub_immediate_decode" {
+            // if it's not an allowlisted function, delete the body
+            if ![
+                "integer_arithmetic_addsub_immediate_decode",
+                "integer_arithmetic_addsub_immediate",
+            ]
+            .contains(&k.as_ref())
+            {
                 def.entry_block = ControlFlowBlock::new();
             }
 

@@ -2,6 +2,7 @@
 
 use {
     crate::{
+        boom::NamedType,
         genc_model::{
             format::InstructionFormat,
             ir::{Execute, Files, Format, Function, Isa, Main},
@@ -84,6 +85,9 @@ pub struct Description {
 
     /// Helper functions
     pub helpers: Vec<HelperFunction>,
+
+    /// Struct definitions
+    pub structs: Vec<Struct>,
 }
 
 impl Description {
@@ -270,6 +274,7 @@ impl Description {
                 }],
             },
             helpers: vec![],
+            structs: vec![],
         }
     }
 }
@@ -414,4 +419,13 @@ pub struct HelperFunction {
     pub name: String,
     /// Function body
     pub body: String,
+}
+
+/// Struct definition
+#[derive(Debug)]
+pub struct Struct {
+    /// Name of the struct
+    pub name: String,
+    /// Fields of the struct
+    pub fields: Vec<NamedType>,
 }

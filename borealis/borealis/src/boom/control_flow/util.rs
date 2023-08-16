@@ -9,8 +9,10 @@ use {
     itertools::Itertools,
     log::trace,
     std::{
+        cell::RefCell,
         collections::LinkedList,
         io::{self, Write},
+        rc::Rc,
     },
 };
 
@@ -99,5 +101,26 @@ impl ControlFlowBlock {
             })
             .at_most_one()
             .unwrap_or_else(|e| panic!("Multiple assignments to {ident} found: {e}"))
+    }
+
+    /// Finds the block and index of a statement in a control flow graph
+    pub fn find_statement(
+        &self,
+        target: Rc<RefCell<Statement>>,
+    ) -> Option<(ControlFlowBlock, usize)> {
+        self.iter()
+            .map(|block| (block.clone(), block.statements()))
+            .map(|(block, statements)| {
+                (
+                    block,
+                    statements
+                        .iter()
+                        .position(|statement| Rc::ptr_eq(statement, &target)),
+                )
+            })
+            .filter_map(|(block, index)| index.map(|index| (block, index)))
+            .at_most_one()
+            // this is technically possible, should probably be handled properly if it does occur
+            .expect("found multiple statements matching target")
     }
 }

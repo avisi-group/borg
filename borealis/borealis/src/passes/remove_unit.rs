@@ -1,14 +1,12 @@
 //! Removes unit local variables and assignments, void parameters from function
 //! definitions, and void arguments from function calls
 
-use crate::boom::NamedType;
-
 use {
     crate::{
         boom::{
             control_flow::ControlFlowBlock,
             visitor::{Visitor, Walkable},
-            Ast, Expression, FunctionDefinition, Literal, Statement, Type, Value,
+            Ast, Expression, FunctionDefinition, Literal, NamedType, Statement, Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },

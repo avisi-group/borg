@@ -72,11 +72,6 @@ fn process_function_definition(
                 return;
             };
 
-            // ignore if the function definition is already in the AST,
-            if ast.borrow().functions.contains_key(&name) {
-                return;
-            }
-
             // if the function has a handler, call it
             if let Some(handler) = handlers.get(&name) {
                 handler(ast.clone(), fn_def.clone(), statement);
