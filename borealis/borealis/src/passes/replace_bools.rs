@@ -30,7 +30,19 @@ impl Pass for ReplaceBools {
     }
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow()
+        let defs_did_change = ast
+            .borrow()
+            .definitions
+            .iter()
+            .map(|def| {
+                self.reset();
+                self.visit_definition(def);
+                self.did_change
+            })
+            .any();
+
+        let fns_did_change = ast
+            .borrow()
             .functions
             .values()
             .map(|def| {
@@ -38,7 +50,9 @@ impl Pass for ReplaceBools {
                 self.visit_function_definition(def);
                 self.did_change
             })
-            .any()
+            .any();
+
+        defs_did_change || fns_did_change
     }
 }
 

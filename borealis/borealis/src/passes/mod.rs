@@ -10,7 +10,8 @@ use {
         boom::Ast,
         passes::{
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-            fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
+            fix_struct_return::FixStructReturn, fold_unconditionals::FoldUnconditionals,
+            registers::RegisterHandler, remove_const_branch::RemoveConstBranch,
             remove_exception::RemoveExceptions, remove_unit::RemoveUnits,
             replace_bools::ReplaceBools, resolve_bitvectors::ResolveBitvectors,
             resolve_return_assigns::ResolveReturns,
@@ -29,7 +30,9 @@ mod any;
 mod builtin_fns;
 mod cycle_finder;
 mod destructure;
+mod fix_struct_return;
 mod fold_unconditionals;
+mod registers;
 mod remove_const_branch;
 mod remove_exception;
 mod remove_unit;
@@ -47,10 +50,12 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             CycleFinder::new_boxed(),
             ReplaceBools::new_boxed(),
             RemoveUnits::new_boxed(ast),
+            FixStructReturn::new_boxed(),
             ResolveReturns::new_boxed(),
             RemoveExceptions::new_boxed(),
             AddBuiltinFns::new_boxed(),
             ResolveBitvectors::new_boxed(),
+            RegisterHandler::new_boxed(),
         ],
     );
 }

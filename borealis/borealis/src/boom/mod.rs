@@ -532,6 +532,7 @@ impl Walkable for Rc<RefCell<Literal>> {
 #[derive(Debug, Clone)]
 pub enum Operation {
     Not(Box<Value>),
+    Complement(Box<Value>),
     Equal(Box<Value>, Box<Value>),
     LessThan(Box<Value>, Box<Value>),
     GreaterThan(Box<Value>, Box<Value>),
@@ -546,7 +547,7 @@ pub enum Operation {
 impl Walkable for Operation {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Operation::Not(value) => visitor.visit_value(value),
+            Operation::Not(value) | Operation::Complement(value) => visitor.visit_value(value),
             Operation::Equal(lhs, rhs)
             | Operation::LessThan(lhs, rhs)
             | Operation::GreaterThan(lhs, rhs)
@@ -561,6 +562,20 @@ impl Walkable for Operation {
             }
         }
     }
+}
+
+pub enum OperationKind {
+    Not,
+    Complement,
+    Equal,
+    LessThan,
+    GreaterThan,
+    Subtract,
+    Add,
+    Or,
+    And,
+    LeftShift,
+    RightShift,
 }
 
 /// Bit

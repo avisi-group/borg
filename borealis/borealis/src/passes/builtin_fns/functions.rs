@@ -1,6 +1,6 @@
 use {
     crate::{
-        boom::{Ast, Expression, FunctionDefinition, Statement, Type, Value},
+        boom::{Ast, FunctionDefinition, Operation, OperationKind, Statement, Value},
         passes::builtin_fns::HandlerFunction,
     },
     common::{intern::InternedString, HashMap},
@@ -9,6 +9,7 @@ use {
 };
 
 pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
+    // TODO: switch to hashmap literal
     let mappings = [
         // this is a GenC builtin function so can be left as a noop here (technically not needed
         // but just being explicit)
@@ -18,14 +19,24 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         // we represent integers as u64s so these can be removed
         ("pcnt_i___pcnt_i64", replace_with_copy),
         ("pcnt_i64___pcnt_i", replace_with_copy),
-        ("AddWithCarry", add_with_carry_handler),
+        // replace with equality test
+        ("eq_int", |ast, f, s| {
+            replace_with_infix(ast, f, s, OperationKind::Equal)
+        }),
+        ("eq_vec", |ast, f, s| {
+            replace_with_infix(ast, f, s, OperationKind::Equal)
+        }),
+        ("not_vec", |ast, f, s| {
+            replace_with_infix(ast, f, s, OperationKind::Complement)
+        }),
+        ("not_bool", |ast, f, s| {
+            replace_with_infix(ast, f, s, OperationKind::Not)
+        }),
         //
         ("slice", noop),
         ("Zeros", noop),
         ("undefined_bitvector", noop),
         ("bitvector_access_A", noop),
-        ("eq_vec", noop),
-        ("not_vec", noop),
         ("bitvector_concat", noop),
         ("ZeroExtend__0", noop),
         // non addsub_immediate functions below here
@@ -35,8 +46,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("undefined_string", noop),
         ("undefined_unit", noop),
         ("ediv_int", noop),
-        ("not_bool", noop),
-        ("eq_int", noop),
         ("gteq_int", noop),
         ("lteq_int", noop),
         ("eq_bool", noop),
@@ -266,132 +275,188 @@ pub fn replace_with_copy(
     };
 }
 
-/// Blindly replace function call with assignment
-pub fn add_with_carry_handler(
-    _ast: Rc<RefCell<Ast>>,
-    function: FunctionDefinition,
+/// DEPRECATING TEMPORARILY, GENC INTRINSICS REQUIRED FOR MAX PERF BUT CURRENT
+/// BOREALIS HEURISTICS NOT POWERFUL ENOUGH
+// /// Add with carry handler
+// pub fn add_with_carry_handler(
+//     _ast: Rc<RefCell<Ast>>,
+//     function: FunctionDefinition,
+//     statement: Rc<RefCell<Statement>>,
+// ) { // find the block containing the addwithcarry function call, and it's position // within that
+//   block let (block, idx) = function .entry_block .find_statement(statement.clone()) .unwrap();
+
+//     // get the block statements as a local mutable vec
+//     let mut block_statements = block.statements();
+
+//     // delete statement
+//     block_statements.remove(idx);
+
+//     let Statement::FunctionCall {
+//         expression: Some(expression),
+//         arguments,
+//         ..
+//     } = &*statement.borrow()
+//     else {
+//         panic!()
+//     };
+
+//     let Expression::Identifier(original_target) = expression else {
+//         panic!()
+//     };
+
+//     // remove type declaration for result struct, store names of fields
+//     let index = block_statements
+//         .iter()
+//         .position(|stmt| {
+//             let Statement::TypeDeclaration { name, .. } = &*stmt.borrow() else {
+//                 return false;
+//             };
+
+//             name == original_target
+//         })
+//         .unwrap();
+
+//     let statement = block_statements.remove(index);
+
+//     // remove type declaration
+//     let (result_field, flags_field) = {
+//         let Statement::TypeDeclaration { typ, .. } = &*statement.borrow() else {
+//             panic!();
+//         };
+
+//         let Type::Struct { fields, .. } = &*typ.borrow() else {
+//             panic!();
+//         };
+
+//         (fields[0].name, fields[1].name)
+//     };
+
+//     let id = unique_id();
+//     let flags_ident = InternedString::from(format!("adc_flags{id}"));
+//     let result_ident = InternedString::from(format!("adc_result{id}"));
+
+//     block_statements.splice(
+//         idx..idx,
+//         [
+//             // create local vars for flags and result of the same type as the removed struct
+//             Rc::new(RefCell::new(Statement::TypeDeclaration {
+//                 name: flags_ident,
+//                 typ: Rc::new(RefCell::new(Type::FixedBits(4, false))),
+//             })),
+//             Rc::new(RefCell::new(Statement::TypeDeclaration {
+//                 name: result_ident,
+//                 typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
+//             })),
+//             // create two new statements,genc_adc64_flags and genc_adc64 assigned to local
+//             // vars
+//             Rc::new(RefCell::new(Statement::FunctionCall {
+//                 expression: Some(Expression::Identifier(flags_ident)),
+//                 name: "__builtin_adc64_flags".into(),
+//                 arguments: arguments.clone(),
+//             })),
+//             Rc::new(RefCell::new(Statement::FunctionCall {
+//                 expression: Some(Expression::Identifier(result_ident)),
+//                 name: "__builtin_adc64".into(),
+//                 arguments: arguments.clone(),
+//             })),
+//         ],
+//     );
+
+//     block.set_statements(block_statements);
+
+//     // remove any Field value with the `original_target` identifier (iterating
+//     // over the current block and its children) and replace with ident of local
+//     // var
+//     block
+//         .iter()
+//         .map(|b| b.statements())
+//         .flatten()
+//         .for_each(|stmt| {
+//             let new_value = {
+//                 let Statement::Copy { value, .. } = &*stmt.borrow() else {
+//                     return;
+//                 };
+
+//                 let Value::Field { value, field_name } = value else {
+//                     return;
+//                 };
+
+//                 let Value::Identifier(ident) = **value else {
+//                     return;
+//                 };
+
+//                 if ident != *original_target {
+//                     return;
+//                 }
+
+//                 if *field_name == result_field {
+//                     Value::Identifier(result_ident)
+//                 } else if *field_name == flags_field {
+//                     Value::Identifier(flags_ident)
+//                 } else {
+//                     return;
+//                 }
+//             };
+
+//             let Statement::Copy { value, .. } = &mut *stmt.borrow_mut() else {
+//                 panic!()
+//             };
+
+//             *value = new_value;
+//         });
+// }
+
+///
+pub fn replace_with_infix(
+    _: Rc<RefCell<Ast>>,
+    _: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
+    operator: OperationKind,
 ) {
-    // find the block containing the addwithcarry function call, and it's position
-    // within that block
-    let (block, idx) = function
-        .entry_block
-        .find_statement(statement.clone())
-        .unwrap();
+    // assert there are two arguments, lhs and rhs
+    // replace function call with copy where the value is an equals operation
 
-    // get the block statements as a local mutable vec
-    let mut block_statements = block.statements();
-
-    // delete statement
-    block_statements.remove(idx);
-
-    let Statement::FunctionCall {
-        expression: Some(expression),
-        arguments,
-        ..
-    } = &*statement.borrow()
-    else {
-        panic!()
-    };
-
-    let Expression::Identifier(original_target) = expression else {
-        panic!()
-    };
-
-    // remove type declaration for result struct, store names of fields
-    let index = block_statements
-        .iter()
-        .position(|stmt| {
-            let Statement::TypeDeclaration { name, .. } = &*stmt.borrow() else {
-                return false;
-            };
-
-            name == original_target
-        })
-        .unwrap();
-
-    let statement = block_statements.remove(index);
-
-    // remove type declaration
-    let (flags_field, result_field) = {
-        let Statement::TypeDeclaration { typ, .. } = &*statement.borrow() else {
+    let (expression, args) = {
+        let Statement::FunctionCall {
+            expression: Some(expression),
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
             panic!();
         };
 
-        let Type::Struct { fields, .. } = &*typ.borrow() else {
-            panic!();
-        };
-
-        (fields[0].name, fields[1].name)
+        (expression.clone(), arguments.clone())
     };
 
-    block_statements.splice(
-        idx..idx,
-        [
-            // create local vars for flags and result of the same type as the removed struct
-            Rc::new(RefCell::new(Statement::TypeDeclaration {
-                name: "flags".into(),
-                typ: Rc::new(RefCell::new(Type::FixedBits(4, false))),
-            })),
-            Rc::new(RefCell::new(Statement::TypeDeclaration {
-                name: "result".into(),
-                typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
-            })),
-            // create two new statements,genc_adc64_flags and genc_adc64 assigned to local
-            // vars
-            Rc::new(RefCell::new(Statement::FunctionCall {
-                expression: Some(Expression::Identifier("flags".into())),
-                name: "__builtin_adc64_flags".into(),
-                arguments: arguments.clone(),
-            })),
-            Rc::new(RefCell::new(Statement::FunctionCall {
-                expression: Some(Expression::Identifier("result".into())),
-                name: "__builtin_adc64".into(),
-                arguments: arguments.clone(),
-            })),
-        ],
-    );
+    let operation = match operator {
+        OperationKind::Not => Operation::Not(Box::new(args[0].clone())),
+        OperationKind::Complement => Operation::Complement(Box::new(args[0].clone())),
+        OperationKind::Equal => {
+            Operation::Equal(Box::new(args[0].clone()), Box::new(args[1].clone()))
+        }
+        OperationKind::LessThan => {
+            Operation::LessThan(Box::new(args[0].clone()), Box::new(args[1].clone()))
+        }
+        OperationKind::GreaterThan => {
+            Operation::GreaterThan(Box::new(args[0].clone()), Box::new(args[1].clone()))
+        }
+        OperationKind::Subtract => {
+            Operation::Subtract(Box::new(args[0].clone()), Box::new(args[1].clone()))
+        }
+        OperationKind::Add => Operation::Add(Box::new(args[0].clone()), Box::new(args[1].clone())),
+        OperationKind::Or => Operation::Or(Box::new(args[0].clone()), Box::new(args[1].clone())),
+        OperationKind::And => Operation::And(Box::new(args[0].clone()), Box::new(args[1].clone())),
+        OperationKind::LeftShift => {
+            Operation::LeftShift(Box::new(args[0].clone()), Box::new(args[1].clone()))
+        }
+        OperationKind::RightShift => {
+            Operation::RightShift(Box::new(args[0].clone()), Box::new(args[1].clone()))
+        }
+    };
 
-    block.set_statements(block_statements);
-
-    // remove any Field value with the `original_target` identifier (iterating
-    // over the current block and its children) and replace with ident of local
-    // var
-    block
-        .iter()
-        .map(|b| b.statements())
-        .flatten()
-        .for_each(|stmt| {
-            let new_value = {
-                let Statement::Copy { value, .. } = &*stmt.borrow() else {
-                    return;
-                };
-
-                let Value::Field { value, field_name } = value else {
-                    return;
-                };
-
-                let Value::Identifier(ident) = **value else {
-                    return;
-                };
-
-                if ident != *original_target {
-                    return;
-                }
-
-                if *field_name == result_field {
-                    Value::Identifier("result".into())
-                } else if *field_name == flags_field {
-                    Value::Identifier("flags".into())
-                } else {
-                    return;
-                }
-            };
-
-            let Statement::Copy { value, .. } = &mut *stmt.borrow_mut() else {
-                panic!()
-            };
-
-            *value = new_value;
-        });
+    *statement.borrow_mut() = Statement::Copy {
+        expression,
+        value: Value::Operation(operation),
+    };
 }

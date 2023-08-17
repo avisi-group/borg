@@ -21,13 +21,58 @@ static BUILTIN_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
     HashSet::from_iter(names.into_iter().map(InternedString::from_static))
 });
 
+/// Pre-generated GenC functions in text form to be inserted
+static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::new(|| {
+    let fns = [
+        HelperFunction {
+            name: "aset_X".into(),
+            parameters: "uint8 n, uint64 value".into(),
+            return_type: "void".into(),
+            body: "if (n != 31) { write_register_bank(reg_RB, n, value); } return;".into(),
+        },
+        HelperFunction {
+            name: "aget_X".into(),
+            parameters: "uint8 width, uint8 n".into(),
+            return_type: "uint64".into(),
+            body: r#"
+            if (n == 31) {
+                return 0;
+            }
+
+            uint64 value = read_register_bank(reg_RB, n);
+
+            if (width == 32) {
+                return (uint32)value;
+            } else {
+                return value;
+            }
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "vector_subrange_A".into(),
+            parameters: "uint64 value, uint8 start, uint8 end".into(),
+            return_type: "uint64".into(),
+            body: r#"
+            return (value >> start) & ((1 << (end - start + 1)) - 1);
+            "#
+            .into(),
+        },
+    ];
+
+    HashMap::from_iter(
+        fns.into_iter()
+            .map(|f| (InternedString::from(f.name.clone()), f)),
+    )
+});
+
 /// Generates GenC helper functions from all functions in a BOOM AST
 pub fn generate_fns(
     ast: Rc<RefCell<Ast>>,
     initial_fns: Vec<InternedString>,
 ) -> Vec<HelperFunction> {
     let mut remaining_fns = initial_fns;
-    let mut generated_fns = HashMap::default();
+    let mut generated_fns = PREGENERATED_FNS.clone();
 
     while let Some(ident) = remaining_fns.pop() {
         // skip if already generated

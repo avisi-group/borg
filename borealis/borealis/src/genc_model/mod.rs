@@ -121,6 +121,7 @@ impl Description {
             predicated: self.predicated,
             fetchsize: self.fetchsize,
             formats,
+            structs: self.structs.clone(),
         };
 
         // semantics of each instruction
@@ -422,7 +423,7 @@ pub struct HelperFunction {
 }
 
 /// Struct definition
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Struct {
     /// Name of the struct
     pub name: String,

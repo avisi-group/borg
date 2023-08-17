@@ -12,6 +12,7 @@ use {
         rc::Rc,
     },
 };
+
 /// Used to emit BOOM to GenC strings
 pub trait Emit {
     /// Renders `self` as GenC
@@ -100,31 +101,44 @@ impl Emit for Rc<RefCell<Type>> {
     fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
         use Type::*;
 
-        let str = match &*self.borrow() {
-            Unit => "void",
+        let typ = &*self.borrow();
+
+        match typ {
+            Unit => write!(w, "void"),
 
             LargeBits(_) => {
                 log::debug!("Emitted unknown length bitvector as uint64!");
-                "uint64"
+                write!(w, "uint64")
             }
-            FixedInt(len) | FixedBits(len, _) => match *len {
-                0 => panic!("unexpected 0 length bitvector"),
-                1..=8 => "uint8",
-                9..=16 => "uint16",
-                17..=32 => "uint32",
-                33..=64 => "uint64",
-                65..=128 => "uint128",
-                _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
-            },
+            FixedInt(len) | FixedBits(len, _) => write!(
+                w,
+                "{}",
+                match *len {
+                    0 => panic!("unexpected 0 length bitvector"),
+                    1..=8 => "uint8",
+                    9..=16 => "uint16",
+                    17..=32 => "uint32",
+                    33..=64 => "uint64",
+                    65..=128 => "uint128",
+                    _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
+                }
+            ),
             Bool => panic!("bools should not exist in the AST after passes"),
-            LargeInt => "uint64",
-            Union { .. } => "union",
+            LargeInt => write!(w, "uint64"),
+            Union { .. } => write!(w, "union"),
+            Enum { .. } => write!(w, "uint32"), // <-- tom responsible for this
+            Struct { name, .. } => write!(w, "struct {name}"),
+
+            Real | Float => write!(w, "double"),
+
+            Reference(typ) => {
+                typ.emit(w)?;
+                write!(w, "&")
+            }
 
             // need to figure out what the rest mean
-            _ => "unknown",
-        };
-
-        write!(w, "{str}")
+            _ => write!(w, "unknown"),
+        }
     }
 }
 
@@ -215,6 +229,10 @@ impl Emit for Operation {
         match self {
             Operation::Not(value) => {
                 write!(w, "!")?;
+                value.emit(w)
+            }
+            Operation::Complement(value) => {
+                write!(w, "~")?;
                 value.emit(w)
             }
             Operation::Equal(lhs, rhs) => emit_op2(w, lhs, rhs, "=="),

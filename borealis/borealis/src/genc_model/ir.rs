@@ -8,9 +8,13 @@
 //! or external state
 
 use {
-    crate::genc_model::{
-        Bank, Endianness, RegisterSpace, Slot, Typ, View, BEHAVIOURS_FILENAME, EXECUTE_FILENAME,
-        ISA_FILENAME,
+    crate::{
+        boom::{NamedType, Type},
+        codegen::emit::Emit,
+        genc_model::{
+            Bank, Endianness, RegisterSpace, Slot, Struct, Typ, View, BEHAVIOURS_FILENAME,
+            EXECUTE_FILENAME, ISA_FILENAME,
+        },
     },
     std::fmt::{self, Display, Formatter},
 };
@@ -175,6 +179,9 @@ pub struct Isa {
 
     /// Instruction decode format strings
     pub formats: Vec<Format>,
+
+    /// Struct definitions
+    pub structs: Vec<Struct>,
 }
 
 impl Display for Isa {
@@ -192,6 +199,25 @@ impl Display for Isa {
                 false => "no",
             }
         )?;
+
+        writeln!(f)?;
+
+        for Struct { name, fields } in &self.structs {
+            writeln!(f, "\tstruct {name} {{")?;
+
+            for NamedType { name, typ } in fields {
+                if let Type::Struct { name: pname, .. } = &*typ.borrow() {
+                    writeln!(f, "\t\t{pname} {name};",)?;
+                } else {
+                    writeln!(f, "\t\t{} {name};", typ.emit_string())?;
+                }
+            }
+
+            writeln!(f, "\t}};")?;
+        }
+
+        writeln!(f)?;
+        writeln!(f)?;
 
         for format in &self.formats {
             write!(f, "{format}")?;

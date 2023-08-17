@@ -9,7 +9,7 @@ use {
             functions::generate_fns,
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
         },
-        genc_model::{Description, Instruction},
+        genc_model::{Bank, Description, Instruction, RegisterSpace, Slot, Struct, View},
         passes::execute_passes,
     },
     common::intern::INTERNER,
@@ -73,6 +73,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
             if ![
                 "integer_arithmetic_addsub_immediate_decode",
                 "integer_arithmetic_addsub_immediate",
+                "id",
+                "AddWithCarry",
             ]
             .contains(&k.as_ref())
             {
@@ -124,6 +126,81 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     description.helpers.append(&mut functions);
 
     description.instructions = instructions;
+
+    description.structs = ast
+        .borrow()
+        .definitions
+        .iter()
+        .filter_map(|def| {
+            let boom::Definition::Struct { name, fields } = def else {
+                return None;
+            };
+
+            Some(Struct {
+                name: name.to_string(),
+                fields: fields.clone(),
+            })
+        })
+        .collect();
+
+    description.registers = vec![
+        RegisterSpace {
+            size: 256,
+            views: vec![View::Bank(Bank {
+                name: "reg_RB".into(),
+                typ: genc_model::Typ::Uint64,
+                offset: 0,
+                count: 31,
+                stride: 8,
+                element_count: 1,
+                element_size: 8,
+                element_stride: 8,
+            })],
+        },
+        RegisterSpace {
+            size: 8,
+            views: vec![View::Slot(Slot {
+                name: "reg_PC".into(),
+                typ: genc_model::Typ::Uint64,
+                width: 8,
+                offset: 0,
+                tag: Some("PC".into()),
+            })],
+        },
+        RegisterSpace {
+            size: 4,
+            views: vec![
+                View::Slot(Slot {
+                    name: "reg_N".into(),
+                    typ: genc_model::Typ::Uint8,
+                    width: 1,
+                    offset: 0,
+                    tag: Some("N".into()),
+                }),
+                View::Slot(Slot {
+                    name: "reg_Z".into(),
+                    typ: genc_model::Typ::Uint8,
+                    width: 1,
+                    offset: 1,
+                    tag: Some("Z".into()),
+                }),
+                View::Slot(Slot {
+                    name: "reg_C".into(),
+                    typ: genc_model::Typ::Uint8,
+                    width: 1,
+                    offset: 2,
+                    tag: Some("C".into()),
+                }),
+                View::Slot(Slot {
+                    name: "reg_V".into(),
+                    typ: genc_model::Typ::Uint8,
+                    width: 1,
+                    offset: 3,
+                    tag: Some("V".into()),
+                }),
+            ],
+        },
+    ];
 
     description
 }
