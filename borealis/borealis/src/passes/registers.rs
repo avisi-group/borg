@@ -62,7 +62,9 @@ impl Visitor for RegisterHandler {
             expression: None,
             name: "write_register".into(),
             arguments: vec![
-                Value::Identifier(("reg_".to_owned() + field.as_ref()).into()),
+                Rc::new(RefCell::new(Value::Identifier(
+                    ("reg_".to_owned() + field.as_ref()).into(),
+                ))),
                 value,
             ],
         }

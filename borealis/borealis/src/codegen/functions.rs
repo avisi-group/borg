@@ -208,7 +208,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
 
                 if let Some(value) = value {
                     buf += " ";
-                    value.emit(&mut buf).unwrap();
+                    Rc::new(RefCell::new(value)).emit(&mut buf).unwrap();
                 }
 
                 buf += ";\n";
@@ -223,7 +223,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
             } => {
                 buf += indent.get();
                 buf += "if (";
-                condition.emit(&mut buf).unwrap();
+                Rc::new(RefCell::new(condition)).emit(&mut buf).unwrap();
                 buf += ") {\n";
                 indent.inc();
 

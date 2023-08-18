@@ -72,7 +72,7 @@ impl ControlFlowBlock {
             .collect()
     }
 
-    pub fn get_assignment(&self, ident: InternedString) -> Option<Value> {
+    pub fn get_assignment(&self, ident: InternedString) -> Option<Rc<RefCell<Value>>> {
         self.iter()
             .flat_map(|cfb| cfb.statements())
             .filter_map(|statement| {

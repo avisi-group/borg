@@ -72,9 +72,12 @@ impl Visitor for ReplaceBools {
     fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
         let mut node = node.borrow_mut();
 
-        if let Type::Bool = *node {
-            *node = Type::FixedBits(8, false);
-            self.did_change = true;
+        match *node {
+            Type::Bool | Type::Bit => {
+                *node = Type::FixedBits(8, false);
+                self.did_change = true;
+            }
+            _ => {}
         }
     }
 }

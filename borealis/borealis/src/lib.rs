@@ -9,7 +9,7 @@ use {
             functions::generate_fns,
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
         },
-        genc_model::{Bank, Description, Instruction, RegisterSpace, Slot, Struct, View},
+        genc_model::{Bank, Description, Instruction, RegisterSpace, Slot, View},
         passes::execute_passes,
     },
     common::intern::INTERNER,
@@ -126,22 +126,6 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     description.helpers.append(&mut functions);
 
     description.instructions = instructions;
-
-    description.structs = ast
-        .borrow()
-        .definitions
-        .iter()
-        .filter_map(|def| {
-            let boom::Definition::Struct { name, fields } = def else {
-                return None;
-            };
-
-            Some(Struct {
-                name: name.to_string(),
-                fields: fields.clone(),
-            })
-        })
-        .collect();
 
     description.registers = vec![
         RegisterSpace {

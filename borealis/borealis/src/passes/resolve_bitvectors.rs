@@ -90,7 +90,7 @@ impl ResolveBitvectors {
 
     /// Try to use the value being assigned to a bitvector to determine it's
     /// length
-    fn resolve_from_copy(&mut self, expression: &Expression, value: &Value) {
+    fn resolve_from_copy(&mut self, expression: &Expression, value: Rc<RefCell<Value>>) {
         let Expression::Identifier(dest) = expression else {
             return;
         };
@@ -98,7 +98,7 @@ impl ResolveBitvectors {
         // if the identifier being copied into is a variable bitvector, try and resolve
         // it's length
         if let Some(Length::Variable(_)) = self.lengths.get(dest) {
-            match value {
+            match &*value.borrow() {
                 // if the value is an identifier
                 Value::Identifier(source) => {
                     // and that identifier has a known length
@@ -136,10 +136,10 @@ impl ResolveBitvectors {
         statement: Rc<RefCell<Statement>>,
         expression: &Expression,
         name: InternedString,
-        arguments: &[Value],
+        arguments: &[Rc<RefCell<Value>>],
     ) {
         type HandlerFunction =
-            fn(&mut ResolveBitvectors, Rc<RefCell<Statement>>, &Expression, &[Value]);
+            fn(&mut ResolveBitvectors, Rc<RefCell<Statement>>, &Expression, &[Rc<RefCell<Value>>]);
 
         // function handlers
         static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
@@ -187,7 +187,7 @@ impl Pass for ResolveBitvectors {
                         |NamedType { name, typ }| match &*typ.borrow() {
                             Type::FixedBits(length, _) => Some((*name, Length::Fixed(*length))),
                             Type::LargeBits(_) => {
-                                log::warn!("unknown length bitvector in function signature");
+                                log::debug!("unknown length bitvector in function signature");
                                 None
                             }
                             _ => None,
@@ -214,7 +214,9 @@ impl Visitor for ResolveBitvectors {
             Statement::TypeDeclaration { name, typ } => {
                 self.add_type_declaration(name, typ.clone())
             }
-            Statement::Copy { expression, value } => self.resolve_from_copy(&expression, &value),
+            Statement::Copy { expression, value } => {
+                self.resolve_from_copy(&expression, value.clone())
+            }
             Statement::FunctionCall {
                 expression: Some(expression),
                 name,
@@ -232,12 +234,12 @@ fn zeros_handler(
     celf: &mut ResolveBitvectors,
     statement: Rc<RefCell<Statement>>,
     expression: &Expression,
-    arguments: &[Value],
+    arguments: &[Rc<RefCell<Value>>],
 ) {
     // get assignment to argument to Zeros
     assert_eq!(arguments.len(), 1);
 
-    let Value::Identifier(ident) = arguments[0] else {
+    let Value::Identifier(ident) = &*arguments[0].borrow() else {
         panic!();
     };
 
@@ -246,12 +248,12 @@ fn zeros_handler(
         .as_ref()
         .unwrap()
         .entry_block
-        .get_assignment(ident)
+        .get_assignment(*ident)
     else {
         panic!("{ident}");
     };
 
-    let Value::Literal(literal) = value else {
+    let Value::Literal(literal) = &*value.borrow() else {
         panic!();
     };
 
@@ -269,7 +271,9 @@ fn zeros_handler(
     // assign literal 0
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
-        value: Value::Literal(Rc::new(RefCell::new(Literal::Int(0.into())))),
+        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+            Literal::Int(0.into()),
+        ))))),
     }
 }
 
@@ -277,37 +281,37 @@ fn concat_handler(
     celf: &mut ResolveBitvectors,
     statement: Rc<RefCell<Statement>>,
     expression: &Expression,
-    arguments: &[Value],
+    arguments: &[Rc<RefCell<Value>>],
 ) {
     // get identifiers and lengths of input bitvectors
     assert_eq!(arguments.len(), 2);
 
-    let Value::Identifier(left_ident) = arguments[0] else {
+    let Value::Identifier(left_ident) = &*arguments[0].borrow() else {
         panic!();
     };
 
-    let Value::Identifier(right_ident) = arguments[1] else {
+    let Value::Identifier(right_ident) = &*arguments[1].borrow() else {
         panic!();
     };
 
-    let Some(Length::Fixed(left_length)) = celf.lengths.get(&left_ident) else {
+    let Some(Length::Fixed(left_length)) = celf.lengths.get(left_ident) else {
         panic!();
     };
-    let Some(Length::Fixed(right_length)) = celf.lengths.get(&right_ident) else {
+    let Some(Length::Fixed(right_length)) = celf.lengths.get(right_ident) else {
         panic!();
     };
 
     // generate shifting and & logic
     // (left << right_length) | right
-    let value = Value::Operation(Operation::Or(
-        Box::new(Value::Operation(Operation::LeftShift(
-            Box::new(Value::Identifier(left_ident)),
-            Box::new(Value::Literal(Rc::new(RefCell::new(Literal::Int(
-                BigInt::from(*right_length),
+    let value = Rc::new(RefCell::new(Value::Operation(Operation::Or(
+        Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+            Rc::new(RefCell::new(Value::Identifier(*left_ident))),
+            Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                Literal::Int(BigInt::from(*right_length)),
             ))))),
-        ))),
-        Box::new(Value::Identifier(right_ident)),
-    ));
+        )))),
+        Rc::new(RefCell::new(Value::Identifier(*right_ident))),
+    ))));
 
     let Expression::Identifier(dest) = expression else {
         panic!();
@@ -326,24 +330,24 @@ fn eq_handler(
     _: &mut ResolveBitvectors,
     statement: Rc<RefCell<Statement>>,
     expression: &Expression,
-    arguments: &[Value],
+    arguments: &[Rc<RefCell<Value>>],
 ) {
     // get identifiers and lengths of input bitvectors
     assert_eq!(arguments.len(), 2);
 
-    let Value::Identifier(left_ident) = arguments[0] else {
+    let Value::Identifier(left_ident) = &*arguments[0].borrow() else {
         panic!();
     };
 
-    let Value::Identifier(right_ident) = arguments[1] else {
+    let Value::Identifier(right_ident) = &*arguments[1].borrow() else {
         panic!();
     };
 
     // generate equality operation
-    let value = Value::Operation(Operation::Equal(
-        Box::new(Value::Identifier(left_ident)),
-        Box::new(Value::Identifier(right_ident)),
-    ));
+    let value = Rc::new(RefCell::new(Value::Operation(Operation::Equal(
+        Rc::new(RefCell::new(Value::Identifier(*left_ident))),
+        Rc::new(RefCell::new(Value::Identifier(*right_ident))),
+    ))));
 
     let Expression::Identifier(_) = expression else {
         panic!();
@@ -359,7 +363,7 @@ fn undefined_handler(
     _: &mut ResolveBitvectors,
     statement: Rc<RefCell<Statement>>,
     expression: &Expression,
-    _arguments: &[Value],
+    _arguments: &[Rc<RefCell<Value>>],
 ) {
     // TODO: assign dest bitvector length to supplied argument
     // either by detecting const or evaluating what the value would be at that point
@@ -367,6 +371,8 @@ fn undefined_handler(
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
-        value: Value::Literal(Rc::new(RefCell::new(Literal::Int(BigInt::from(0))))),
+        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+            Literal::Int(BigInt::from(0)),
+        ))))),
     }
 }

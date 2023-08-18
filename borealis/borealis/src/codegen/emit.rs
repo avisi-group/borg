@@ -106,10 +106,9 @@ impl Emit for Rc<RefCell<Type>> {
         match typ {
             Unit => write!(w, "void"),
 
-            LargeBits(_) => {
-                log::debug!("Emitted unknown length bitvector as uint64!");
-                write!(w, "uint64")
-            }
+            // probably bad to emit unknown length bitvector as uint64!
+            LargeBits(_) | LargeInt => write!(w, "uint64"),
+
             FixedInt(len) | FixedBits(len, _) => write!(
                 w,
                 "{}",
@@ -123,11 +122,8 @@ impl Emit for Rc<RefCell<Type>> {
                     _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
                 }
             ),
-            Bool => panic!("bools should not exist in the AST after passes"),
-            LargeInt => write!(w, "uint64"),
-            Union { .. } => write!(w, "union"),
+
             Enum { .. } => write!(w, "uint32"), // <-- tom responsible for this
-            Struct { name, .. } => write!(w, "struct {name}"),
 
             Real | Float => write!(w, "double"),
 
@@ -136,13 +132,15 @@ impl Emit for Rc<RefCell<Type>> {
                 write!(w, "&")
             }
 
+            Bool => panic!("bools should not exist in the AST after passes"),
+
             // need to figure out what the rest mean
             _ => write!(w, "unknown"),
         }
     }
 }
 
-impl Emit for Value {
+impl Emit for Rc<RefCell<Value>> {
     fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
         fn write_uid<W: Write>(
             w: &mut W,
@@ -169,7 +167,7 @@ impl Emit for Value {
             Ok(())
         }
 
-        match self {
+        match &*self.borrow() {
             Value::Identifier(ident) => write!(w, "{ident}"),
             Value::Literal(literal) => literal.emit(w),
             Value::Operation(op) => op.emit(w),
@@ -219,7 +217,7 @@ impl Emit for Rc<RefCell<Literal>> {
             Literal::Bool(bool) => write!(w, "{bool}"),
             Literal::String(s) => write!(w, "{s:?}"),
             Literal::Unit => write!(w, "()"),
-            Literal::Reference(s) => write!(w, "&{s}"),
+            Literal::Reference(s) => write!(w, "{s}&"),
         }
     }
 }
@@ -248,7 +246,12 @@ impl Emit for Operation {
     }
 }
 
-fn emit_op2<W: Write>(w: &mut W, lhs: &Value, rhs: &Value, op: &str) -> fmt::Result {
+fn emit_op2<W: Write>(
+    w: &mut W,
+    lhs: &Rc<RefCell<Value>>,
+    rhs: &Rc<RefCell<Value>>,
+    op: &str,
+) -> fmt::Result {
     write!(w, "(")?;
     lhs.emit(w)?;
     write!(w, " {op} ")?;

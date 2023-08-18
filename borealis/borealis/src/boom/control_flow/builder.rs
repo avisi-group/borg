@@ -65,7 +65,7 @@ impl ControlFlowGraphBuilder {
 
                     self.current_block.borrow_mut().set_terminator(
                         MaybeUnresolvedTerminator::Conditional {
-                            condition: condition.clone(),
+                            condition: condition.borrow().clone(),
                             target: MaybeUnresolvedJumpTarget::Resolved {
                                 target: if_block.clone(),
                             },
@@ -101,7 +101,7 @@ impl ControlFlowGraphBuilder {
                     let fallthrough_block = MaybeUnresolvedControlFlowBlock::new();
                     self.current_block.borrow_mut().set_terminator(
                         MaybeUnresolvedTerminator::Conditional {
-                            condition: condition.clone(),
+                            condition: condition.borrow().clone(),
                             target: MaybeUnresolvedJumpTarget::Unresolved { label: *target },
                             fallthrough: MaybeUnresolvedJumpTarget::Resolved {
                                 target: fallthrough_block.clone(),

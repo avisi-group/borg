@@ -58,8 +58,8 @@ pub trait Visitor: Sized {
     }
 
     #[allow(missing_docs)]
-    fn visit_value(&mut self, node: &Value) {
-        node.walk(self);
+    fn visit_value(&mut self, node: Rc<RefCell<Value>>) {
+        node.borrow().walk(self);
     }
 
     #[allow(missing_docs)]

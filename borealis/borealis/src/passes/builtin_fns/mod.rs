@@ -4,14 +4,14 @@
 use {
     crate::{
         boom::{Ast, FunctionDefinition, Statement},
-        passes::{builtin_fns::functions::HANDLERS, Pass},
+        passes::{builtin_fns::handlers::HANDLERS, Pass},
     },
     common::{intern::InternedString, HashMap, HashSet},
     once_cell::sync::Lazy,
     std::{cell::RefCell, hash::Hash, rc::Rc},
 };
 
-pub mod functions;
+pub mod handlers;
 
 type HandlerFunction = fn(Rc<RefCell<Ast>>, FunctionDefinition, Rc<RefCell<Statement>>);
 

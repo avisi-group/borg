@@ -11,6 +11,7 @@ use {
         visitor::{Visitor, Walkable},
     },
     common::{intern::InternedString, shared_key::SharedKey, HashMap, HashSet},
+    kinded::Kinded,
     num_bigint::BigInt,
     sail::jib_ast,
     std::{
@@ -219,12 +220,12 @@ impl Walkable for NamedType {
 #[derive(Debug, Clone)]
 pub struct NamedValue {
     pub name: InternedString,
-    pub value: Value,
+    pub value: Rc<RefCell<Value>>,
 }
 
 impl Walkable for NamedValue {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_value(&self.value);
+        visitor.visit_value(self.value.clone());
     }
 }
 
@@ -324,23 +325,23 @@ pub enum Statement {
     },
     Copy {
         expression: Expression,
-        value: Value,
+        value: Rc<RefCell<Value>>,
     },
     FunctionCall {
         expression: Option<Expression>,
         name: InternedString,
-        arguments: Vec<Value>,
+        arguments: Vec<Rc<RefCell<Value>>>,
     },
     Label(InternedString),
     Goto(InternedString),
     Jump {
-        condition: Value,
+        condition: Rc<RefCell<Value>>,
         target: InternedString,
     },
     End(InternedString),
     Undefined,
     If {
-        condition: Value,
+        condition: Rc<RefCell<Value>>,
         if_body: Vec<Rc<RefCell<Statement>>>,
         else_body: Vec<Rc<RefCell<Statement>>>,
     },
@@ -354,7 +355,7 @@ impl Walkable for Statement {
             Self::TypeDeclaration { typ, .. } => visitor.visit_type(typ.clone()),
             Self::Copy { expression, value } => {
                 visitor.visit_expression(expression);
-                visitor.visit_value(value);
+                visitor.visit_value(value.clone());
             }
 
             Self::FunctionCall {
@@ -367,11 +368,11 @@ impl Walkable for Statement {
                 }
                 arguments
                     .iter()
-                    .for_each(|argument| visitor.visit_value(argument));
+                    .for_each(|argument| visitor.visit_value(argument.clone()));
             }
             Self::Label(_) => (),
             Self::Goto(_) => (),
-            Self::Jump { condition, .. } => visitor.visit_value(condition),
+            Self::Jump { condition, .. } => visitor.visit_value(condition.clone()),
             Self::End(_) => (),
             Self::Undefined => (),
             Self::If {
@@ -379,7 +380,7 @@ impl Walkable for Statement {
                 if_body,
                 else_body,
             } => {
-                visitor.visit_value(condition);
+                visitor.visit_value(condition.clone());
                 if_body
                     .iter()
                     .for_each(|statement| visitor.visit_statement(statement.clone()));
@@ -425,16 +426,16 @@ pub enum Value {
         fields: Vec<NamedValue>,
     },
     Field {
-        value: Box<Self>,
+        value: Rc<RefCell<Self>>,
         field_name: InternedString,
     },
     CtorKind {
-        value: Box<Self>,
+        value: Rc<RefCell<Self>>,
         identifier: InternedString,
         types: Vec<Rc<RefCell<Type>>>,
     },
     CtorUnwrap {
-        value: Box<Self>,
+        value: Rc<RefCell<Self>>,
         identifier: InternedString,
         types: Vec<Rc<RefCell<Type>>>,
     },
@@ -472,7 +473,8 @@ impl Value {
                 // variable should be assigned to exactly once
                 assert!(defs.len() == 1);
 
-                defs[0].evaluate_bool(ctx)
+                let value = defs[0].borrow();
+                value.evaluate_bool(ctx)
             }
             Self::Literal(literal) => match &*literal.borrow() {
                 Literal::Bool(value) => Some(*value),
@@ -488,7 +490,7 @@ impl Value {
     pub fn get_ident(&self) -> Option<InternedString> {
         match self {
             Value::Identifier(ident) => Some(*ident),
-            Value::Operation(Operation::Not(value)) => value.get_ident(),
+            Value::Operation(Operation::Not(value)) => value.borrow().get_ident(),
             _ => None,
         }
     }
@@ -503,9 +505,9 @@ impl Walkable for Value {
             Value::Struct { fields, .. } => fields
                 .iter()
                 .for_each(|field| visitor.visit_named_value(field)),
-            Value::Field { value, .. } => visitor.visit_value(value),
+            Value::Field { value, .. } => visitor.visit_value(value.clone()),
             Value::CtorKind { value, types, .. } | Value::CtorUnwrap { value, types, .. } => {
-                visitor.visit_value(value);
+                visitor.visit_value(value.clone());
                 types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
         }
@@ -529,25 +531,27 @@ impl Walkable for Rc<RefCell<Literal>> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Kinded)]
 pub enum Operation {
-    Not(Box<Value>),
-    Complement(Box<Value>),
-    Equal(Box<Value>, Box<Value>),
-    LessThan(Box<Value>, Box<Value>),
-    GreaterThan(Box<Value>, Box<Value>),
-    Subtract(Box<Value>, Box<Value>),
-    Add(Box<Value>, Box<Value>),
-    Or(Box<Value>, Box<Value>),
-    And(Box<Value>, Box<Value>),
-    LeftShift(Box<Value>, Box<Value>),
-    RightShift(Box<Value>, Box<Value>),
+    Not(Rc<RefCell<Value>>),
+    Complement(Rc<RefCell<Value>>),
+    Equal(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    LessThan(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    GreaterThan(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Subtract(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Add(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Or(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    And(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    LeftShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    RightShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
 }
 
 impl Walkable for Operation {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Operation::Not(value) | Operation::Complement(value) => visitor.visit_value(value),
+            Operation::Not(value) | Operation::Complement(value) => {
+                visitor.visit_value(value.clone())
+            }
             Operation::Equal(lhs, rhs)
             | Operation::LessThan(lhs, rhs)
             | Operation::GreaterThan(lhs, rhs)
@@ -557,25 +561,11 @@ impl Walkable for Operation {
             | Operation::And(lhs, rhs)
             | Operation::LeftShift(lhs, rhs)
             | Operation::RightShift(lhs, rhs) => {
-                visitor.visit_value(lhs);
-                visitor.visit_value(rhs);
+                visitor.visit_value(lhs.clone());
+                visitor.visit_value(rhs.clone());
             }
         }
     }
-}
-
-pub enum OperationKind {
-    Not,
-    Complement,
-    Equal,
-    LessThan,
-    GreaterThan,
-    Subtract,
-    Add,
-    Or,
-    And,
-    LeftShift,
-    RightShift,
 }
 
 /// Bit

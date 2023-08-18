@@ -43,6 +43,7 @@ impl Pass for RemoveUnits {
                 if *def.signature.return_type.borrow() == Type::Unit {
                     self.deleted_unit_vars.insert("return_type".into());
                     self.deleted_unit_vars.insert("return".into());
+                    self.deleted_unit_vars.insert("return_value".into());
                 }
 
                 self.visit_function_definition(def);
@@ -130,8 +131,8 @@ impl RemoveUnits {
                 }
 
                 // if any of the arguments are unit values, remove them
-                if arguments.iter().any(is_unit_value) {
-                    arguments.retain(|value| !is_unit_value(value));
+                if arguments.iter().cloned().any(is_unit_value) {
+                    arguments.retain(|value| !is_unit_value(value.clone()));
                 }
 
                 Some(statement_cloned)
@@ -142,8 +143,8 @@ impl RemoveUnits {
     }
 }
 
-fn is_unit_value(value: &Value) -> bool {
-    let Value::Literal(literal) = value else {
+fn is_unit_value(value: Rc<RefCell<Value>>) -> bool {
+    let Value::Literal(literal) = &*value.borrow() else {
         return false;
     };
 

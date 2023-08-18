@@ -148,7 +148,7 @@ fn statement_filter(
 
             match ident.as_ref() {
                 "exception" => {
-                    if let Value::Identifier(ident) = value {
+                    if let Value::Identifier(ident) = &*value.borrow() {
                         if deleted_exception_vars.contains(ident) {
                             None
                         } else {

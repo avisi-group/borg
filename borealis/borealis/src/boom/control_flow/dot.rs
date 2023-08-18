@@ -5,7 +5,11 @@ use {
     },
     common::HashMap,
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
-    std::io::{self, Write},
+    std::{
+        cell::RefCell,
+        io::{self, Write},
+        rc::Rc,
+    },
 };
 
 pub fn render<W: Write>(w: &mut W, block: &ControlFlowBlock) -> io::Result<()> {
@@ -53,11 +57,15 @@ impl Graph {
                 Terminator::Return(value) => {
                     format!(
                         "return {:?}",
-                        value.as_ref().map_or("none".to_owned(), Emit::emit_string)
+                        value
+                            .map(RefCell::new)
+                            .map(Rc::new)
+                            .as_ref()
+                            .map_or("none".to_owned(), Emit::emit_string)
                     )
                 }
                 Terminator::Conditional { condition, .. } => {
-                    format!("if {}", condition.emit_string())
+                    format!("if {}", Rc::new(RefCell::new(condition)).emit_string())
                 }
                 Terminator::Unconditional { .. } => "goto".to_owned(),
             };

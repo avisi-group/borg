@@ -10,7 +10,7 @@ use {
         boom::Ast,
         passes::{
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-            fix_struct_return::FixStructReturn, fold_unconditionals::FoldUnconditionals,
+            destruct_structs::DestructStructs, fold_unconditionals::FoldUnconditionals,
             registers::RegisterHandler, remove_const_branch::RemoveConstBranch,
             remove_exception::RemoveExceptions, remove_unit::RemoveUnits,
             replace_bools::ReplaceBools, resolve_bitvectors::ResolveBitvectors,
@@ -29,8 +29,8 @@ use {
 mod any;
 mod builtin_fns;
 mod cycle_finder;
+mod destruct_structs;
 mod destructure;
-mod fix_struct_return;
 mod fold_unconditionals;
 mod registers;
 mod remove_const_branch;
@@ -47,17 +47,26 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         &mut [
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
-            CycleFinder::new_boxed(),
-            ReplaceBools::new_boxed(),
-            RemoveUnits::new_boxed(ast),
-            FixStructReturn::new_boxed(),
-            ResolveReturns::new_boxed(),
-            RemoveExceptions::new_boxed(),
-            AddBuiltinFns::new_boxed(),
-            ResolveBitvectors::new_boxed(),
-            RegisterHandler::new_boxed(),
         ],
     );
+
+    [
+        CycleFinder::new_boxed(),
+        ResolveReturns::new_boxed(),
+        DestructStructs::new_boxed(),
+        ReplaceBools::new_boxed(),
+        RemoveUnits::new_boxed(ast.clone()),
+        RemoveExceptions::new_boxed(),
+        AddBuiltinFns::new_boxed(),
+        ResolveBitvectors::new_boxed(),
+        RegisterHandler::new_boxed(),
+    ]
+    .into_iter()
+    .for_each(|mut pass| {
+        info!("{}", pass.name());
+        pass.reset();
+        pass.run(ast.clone());
+    });
 }
 
 /// Pass that performs an operation on an AST

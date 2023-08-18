@@ -4,6 +4,7 @@ use {
         passes::builtin_fns::HandlerFunction,
     },
     common::{intern::InternedString, HashMap},
+    itertools::Itertools,
     once_cell::sync::Lazy,
     std::{cell::RefCell, rc::Rc},
 };
@@ -212,6 +213,11 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
     ]
     .into_iter()
     .map(|(s, f)| (InternedString::from_static(s), f));
+
+    assert!(
+        mappings.clone().map(|(n, _)| n).all_unique(),
+        "non-unique function name found in mappings to handler!"
+    );
 
     HashMap::from_iter(mappings)
 });
@@ -430,33 +436,21 @@ pub fn replace_with_infix(
     };
 
     let operation = match operator {
-        OperationKind::Not => Operation::Not(Box::new(args[0].clone())),
-        OperationKind::Complement => Operation::Complement(Box::new(args[0].clone())),
-        OperationKind::Equal => {
-            Operation::Equal(Box::new(args[0].clone()), Box::new(args[1].clone()))
-        }
-        OperationKind::LessThan => {
-            Operation::LessThan(Box::new(args[0].clone()), Box::new(args[1].clone()))
-        }
-        OperationKind::GreaterThan => {
-            Operation::GreaterThan(Box::new(args[0].clone()), Box::new(args[1].clone()))
-        }
-        OperationKind::Subtract => {
-            Operation::Subtract(Box::new(args[0].clone()), Box::new(args[1].clone()))
-        }
-        OperationKind::Add => Operation::Add(Box::new(args[0].clone()), Box::new(args[1].clone())),
-        OperationKind::Or => Operation::Or(Box::new(args[0].clone()), Box::new(args[1].clone())),
-        OperationKind::And => Operation::And(Box::new(args[0].clone()), Box::new(args[1].clone())),
-        OperationKind::LeftShift => {
-            Operation::LeftShift(Box::new(args[0].clone()), Box::new(args[1].clone()))
-        }
-        OperationKind::RightShift => {
-            Operation::RightShift(Box::new(args[0].clone()), Box::new(args[1].clone()))
-        }
+        OperationKind::Not => Operation::Not(args[0].clone()),
+        OperationKind::Complement => Operation::Complement(args[0].clone()),
+        OperationKind::Equal => Operation::Equal(args[0].clone(), args[1].clone()),
+        OperationKind::LessThan => Operation::LessThan(args[0].clone(), args[1].clone()),
+        OperationKind::GreaterThan => Operation::GreaterThan(args[0].clone(), args[1].clone()),
+        OperationKind::Subtract => Operation::Subtract(args[0].clone(), args[1].clone()),
+        OperationKind::Add => Operation::Add(args[0].clone(), args[1].clone()),
+        OperationKind::Or => Operation::Or(args[0].clone(), args[1].clone()),
+        OperationKind::And => Operation::And(args[0].clone(), args[1].clone()),
+        OperationKind::LeftShift => Operation::LeftShift(args[0].clone(), args[1].clone()),
+        OperationKind::RightShift => Operation::RightShift(args[0].clone(), args[1].clone()),
     };
 
     *statement.borrow_mut() = Statement::Copy {
         expression,
-        value: Value::Operation(operation),
+        value: Rc::new(RefCell::new(Value::Operation(operation))),
     };
 }

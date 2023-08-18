@@ -49,15 +49,15 @@ impl Pass for ResolveReturns {
 
                 // get return type of function:
                 // if void, there should be no return assigments
-                //  and replace all assignments to return to that
-                // then return return_value;
                 self.return_type = if let Type::Unit = &*def.signature.return_type.borrow() {
                     None
                 } else {
                     Some(def.signature.return_type.clone())
                 };
 
-                // if not void, create a new local variable called "return_value",
+                // if not void, create a new local variable called "return_value", and replace
+                // all assignments to "return" to "return_value" then return
+                // "return_value";
                 if let Some(typ) = &self.return_type {
                     let mut statements = def.entry_block.statements();
 

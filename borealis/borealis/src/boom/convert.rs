@@ -261,8 +261,8 @@ fn convert_expression(expression: &jib_ast::Expression) -> boom::Expression {
     }
 }
 
-fn convert_value(value: &jib_ast::Value) -> boom::Value {
-    match value {
+fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
+    Rc::new(RefCell::new(match value {
         jib_ast::Value::Id(name, _) => boom::Value::Identifier(convert_name(name)),
         jib_ast::Value::Lit(vl, _) => boom::Value::Literal(convert_literal(vl)),
         jib_ast::Value::Tuple(_, _) => todo!(),
@@ -278,22 +278,18 @@ fn convert_value(value: &jib_ast::Value) -> boom::Value {
         },
         jib_ast::Value::Struct(_, _) => panic!("encountered struct with non-struct type"),
         jib_ast::Value::CtorKind(value, ctor, unifiers, _) => boom::Value::CtorKind {
-            value: Box::new(convert_value(value)),
+            value: (convert_value(value)),
             identifier: ctor.as_interned(),
             types: unifiers.iter().map(convert_type).collect(),
         },
         jib_ast::Value::CtorUnwrap(value, (ctor, unifiers), _) => boom::Value::CtorUnwrap {
-            value: Box::new(convert_value(value)),
+            value: (convert_value(value)),
             identifier: ctor.as_interned(),
             types: unifiers.iter().map(convert_type).collect(),
         },
         jib_ast::Value::TupleMember(_, _, _) => todo!(),
         jib_ast::Value::Call(op, values) => {
-            let values = values
-                .iter()
-                .map(convert_value)
-                .map(Box::new)
-                .collect::<Vec<_>>();
+            let values = values.iter().map(convert_value).collect::<Vec<_>>();
 
             let op = match op {
                 jib_ast::Op::Bnot => boom::Operation::Not(values[0].clone()),
@@ -302,9 +298,11 @@ fn convert_value(value: &jib_ast::Value) -> boom::Value {
                 jib_ast::Op::ListHead => todo!(),
                 jib_ast::Op::ListTail => todo!(),
                 jib_ast::Op::Eq => todo!(),
-                jib_ast::Op::Neq => boom::Operation::Not(Box::new(boom::Value::Operation(
-                    boom::Operation::Equal(values[0].clone(), values[1].clone()),
-                ))),
+                jib_ast::Op::Neq => {
+                    boom::Operation::Not(Rc::new(RefCell::new(boom::Value::Operation(
+                        boom::Operation::Equal(values[0].clone(), values[1].clone()),
+                    ))))
+                }
                 jib_ast::Op::Ilt => boom::Operation::LessThan(values[0].clone(), values[1].clone()),
 
                 jib_ast::Op::Ilteq => todo!(),
@@ -336,10 +334,10 @@ fn convert_value(value: &jib_ast::Value) -> boom::Value {
             boom::Value::Operation(op)
         }
         jib_ast::Value::Field(value, (ident, _)) => boom::Value::Field {
-            value: Box::new(convert_value(value)),
+            value: (convert_value(value)),
             field_name: ident.as_interned(),
         },
-    }
+    }))
 }
 
 fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
