@@ -75,6 +75,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "integer_arithmetic_addsub_immediate",
                 "id",
                 "AddWithCarry",
+                "IsZero",
+                "GetSlice_int",
             ]
             .contains(&k.as_ref())
             {

@@ -45,6 +45,7 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("SInt", replace_with_copy),
         ("bitvector_length", bv_length_handler),
         ("bitvector_access_B", bv_access_handler),
+        ("raw_GetSlice_int", noop),
         //
         ("slice", noop),
         ("Zeros", noop),
@@ -65,7 +66,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("negate_atom", noop),
         ("mult_atom", noop),
         ("neq_vec", noop),
-        ("raw_GetSlice_int", noop),
         ("DecStr", noop),
         ("asl_prerr_string", noop),
         ("replicate_bits", noop),
