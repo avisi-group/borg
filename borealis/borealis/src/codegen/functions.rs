@@ -58,6 +58,19 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             "#
             .into(),
         },
+        HelperFunction {
+            name: "update_fbits".into(),
+            parameters: "uint64 op, uint64 n, uint64 bit".into(),
+            return_type: "uint64".into(),
+            body: r#"
+            if ((bit & 1) == 1) {
+                return op | (bit << n);
+            } else {
+                return op & ~(bit << n);
+            }
+            "#
+            .into(),
+        },
     ];
 
     HashMap::from_iter(

@@ -1,6 +1,8 @@
 use {
     crate::{
-        boom::{Ast, FunctionDefinition, Operation, OperationKind, Statement, Value},
+        boom::{
+            Ast, FunctionDefinition, Literal, Operation, OperationKind, Statement, Type, Value,
+        },
         passes::builtin_fns::HandlerFunction,
     },
     common::{intern::InternedString, HashMap},
@@ -33,6 +35,16 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("not_bool", |ast, f, s| {
             replace_with_infix(ast, f, s, OperationKind::Not)
         }),
+        ("add_atom", |ast, f, s| {
+            replace_with_infix(ast, f, s, OperationKind::Add)
+        }),
+        ("sub_atom", |ast, f, s| {
+            replace_with_infix(ast, f, s, OperationKind::Subtract)
+        }),
+        // probably need to take another look at this
+        ("SInt", replace_with_copy),
+        ("bitvector_length", bv_length_handler),
+        ("bitvector_access_B", bv_access_handler),
         //
         ("slice", noop),
         ("Zeros", noop),
@@ -50,12 +62,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("gteq_int", noop),
         ("lteq_int", noop),
         ("eq_bool", noop),
-        ("add_atom", noop),
-        ("sub_atom", noop),
         ("negate_atom", noop),
         ("mult_atom", noop),
         ("neq_vec", noop),
-        ("bitvector_length", noop),
         ("raw_GetSlice_int", noop),
         ("DecStr", noop),
         ("asl_prerr_string", noop),
@@ -70,7 +79,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("Error_See", noop),
         ("update_fbits", noop),
         ("vector_access_A_B32_", noop),
-        ("bitvector_access_B", noop),
         ("SetSlice_bits", noop),
         ("Error_Undefined", noop),
         ("shl8", noop),
@@ -195,7 +203,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("Error_SError", noop),
         ("add_vec_int", noop),
         ("internal_pick_EMemOp_pcnt__", noop),
-        ("SInt", noop),
         ("vector_access_B_B64_", noop),
         ("vector_subrange_B", noop),
         ("SetSlice_int", noop),
@@ -453,4 +460,79 @@ pub fn replace_with_infix(
         expression,
         value: Rc::new(RefCell::new(Value::Operation(operation))),
     };
+}
+
+///
+pub fn bv_length_handler(
+    _: Rc<RefCell<Ast>>,
+    fn_def: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    // get ident of argument from statement, use that to lookup the type, which
+    // should have a size
+
+    let Statement::FunctionCall {
+        expression,
+        arguments,
+        ..
+    } = statement.borrow().clone()
+    else {
+        panic!();
+    };
+
+    assert_eq!(arguments.len(), 1);
+
+    let Value::Identifier(bv_ident) = &*arguments[0].borrow() else {
+        panic!();
+    };
+
+    let len = match fn_def.get_ident_type(*bv_ident).unwrap() {
+        Type::FixedInt(len) | Type::FixedBits(len, _) => len,
+        // TODO: this is a lie and wrong
+        Type::LargeBits(_) | Type::LargeInt => 64,
+        _ => panic!("not a bv"),
+    };
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.as_ref().unwrap().clone(),
+        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+            Literal::Int(len.into()),
+        ))))),
+    };
+
+    // replace statement with a copy of that size as a literal to the original
+    // destination
+}
+
+pub fn bv_access_handler(
+    _: Rc<RefCell<Ast>>,
+    _: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    // access a bit of a bitvector by generating the appropriate shifting logic
+    // dest = bitvector_access_B(input, index);
+    //
+    // dest = (input >> index) & 1
+
+    let Statement::FunctionCall {
+        expression,
+        arguments,
+        ..
+    } = statement.borrow().clone()
+    else {
+        panic!();
+    };
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.unwrap(),
+        value: Rc::new(RefCell::new(Value::Operation(Operation::And(
+            Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
+                arguments[0].clone(),
+                arguments[1].clone(),
+            )))),
+            Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                Literal::Int(1.into()),
+            ))))),
+        )))),
+    }
 }
