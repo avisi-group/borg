@@ -28,24 +28,30 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             name: "aset_X".into(),
             parameters: "uint8 n, uint64 value".into(),
             return_type: "void".into(),
-            body: "if (n != 31) { write_register_bank(reg_RB, n, value); } return;".into(),
+            body: r#"
+                if (n != 31) {
+                    write_register_bank(reg_RB, n, value);
+                }
+                return;
+            "#
+            .into(),
         },
         HelperFunction {
             name: "aget_X".into(),
             parameters: "uint8 width, uint8 n".into(),
             return_type: "uint64".into(),
             body: r#"
-            if (n == 31) {
-                return 0;
-            }
+                if (n == 31) {
+                    return 0;
+                }
 
-            uint64 value = read_register_bank(reg_RB, n);
+                uint64 value = read_register_bank(reg_RB, n);
 
-            if (width == 32) {
-                return (uint32)value;
-            } else {
-                return value;
-            }
+                if (width == 32) {
+                    return (uint32)value;
+                } else {
+                    return value;
+                }
             "#
             .into(),
         },
@@ -54,7 +60,7 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             parameters: "uint64 value, uint8 start, uint8 end".into(),
             return_type: "uint64".into(),
             body: r#"
-            return (value >> start) & ((1 << (end - start + 1)) - 1);
+                return (value >> start) & ((1 << (end - start + 1)) - 1);
             "#
             .into(),
         },
@@ -63,11 +69,11 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             parameters: "uint64 op, uint64 n, uint64 bit".into(),
             return_type: "uint64".into(),
             body: r#"
-            if ((bit & 1) == 1) {
-                return op | (bit << n);
-            } else {
-                return op & ~(bit << n);
-            }
+                if ((bit & 1) == 1) {
+                    return op | (bit << n);
+                } else {
+                    return op & ~(bit << n);
+                }
             "#
             .into(),
         },
@@ -76,7 +82,7 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             parameters: "uint64 len, uint64 n, uint64 start".into(),
             return_type: "uint64".into(),
             body: r#"
-            return (n >> start) & ((1 << len) - 1);
+                return (n >> start) & ((1 << len) - 1);
             "#
             .into(),
         },

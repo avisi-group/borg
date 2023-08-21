@@ -9,7 +9,7 @@ ocaml = { version = "1.0.0-beta.5", features = ["no-panic-hook"] }
 deepsize = "0.2.0"
 lasso = { version = "0.7.2", features = ["multi-threaded"] }
 once_cell = "1.18.0"
-serde = { version = "1.0.183", features = ["derive"] }
+serde = { version = "1.0.185", features = ["derive"] }
 twox-hash = "1.6.3"
 
 [dev-dependencies]
