@@ -12,13 +12,12 @@ use {
 };
 
 pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
-    // TODO: switch to hashmap literal
     let mappings = [
         // this is a GenC builtin function so can be left as a noop here (technically not needed
         // but just being explicit)
         ("trap", noop as HandlerFunction),
         // requires bitvector conversion logic
-        ("UInt", uint_handler),
+        ("UInt", replace_with_copy),
         // we represent integers as u64s so these can be removed
         ("pcnt_i___pcnt_i64", replace_with_copy),
         ("pcnt_i64___pcnt_i", replace_with_copy),
@@ -234,16 +233,6 @@ pub fn noop(
     _function: FunctionDefinition,
     _statement: Rc<RefCell<Statement>>,
 ) {
-}
-
-/// UInt converts a bitvector into an int
-pub fn uint_handler(
-    ast: Rc<RefCell<Ast>>,
-    function: FunctionDefinition,
-    statement: Rc<RefCell<Statement>>,
-) {
-    // TODO: this will break when I properly implement bitvectors
-    replace_with_copy(ast, function, statement)
 }
 
 /// Blindly replace function call with assignment

@@ -52,8 +52,9 @@ fn main() -> Result<()> {
     #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
     {
         println!("cargo:rustc-link-search=/opt/homebrew/lib");
-        println!("cargo:rustc-link-lib=gmp");
     }
+
+    println!("cargo:rustc-link-lib=gmp");
 
     // rebuild if OCaml package is modified
     println!("cargo:rerun-if-changed=wrapper");

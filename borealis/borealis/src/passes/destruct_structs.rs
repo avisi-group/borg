@@ -57,16 +57,16 @@ impl Pass for DestructStructs {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow().functions.iter().for_each(|(name, def)| {
-            log::warn!("processing {name}");
-            transform_fn(def)
-        });
+        ast.borrow()
+            .functions
+            .iter()
+            .for_each(|(_, def)| destruct_structs(def));
 
         false
     }
 }
 
-fn transform_fn(fn_def: &FunctionDefinition) {
+fn destruct_structs(fn_def: &FunctionDefinition) {
     fix_params(&fn_def.signature);
     let return_fields = fix_return(fn_def);
     destruct_locals(fn_def, return_fields);
@@ -149,8 +149,6 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                         let Type::Struct { fields, .. } = &*typ.borrow() else {
                             return vec![clone];
                         };
-
-                        log::warn!("declaring {variable_name} as struct");
 
                         structs.insert(*variable_name, fields.clone());
 

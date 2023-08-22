@@ -101,9 +101,7 @@ impl Emit for Rc<RefCell<Type>> {
     fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
         use Type::*;
 
-        let typ = &*self.borrow();
-
-        match typ {
+        match &*self.borrow() {
             Unit => write!(w, "void"),
 
             // probably bad to emit unknown length bitvector as uint64!
