@@ -144,14 +144,23 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
             })],
         },
         RegisterSpace {
-            size: 8,
-            views: vec![View::Slot(Slot {
-                name: "reg_PC".into(),
-                typ: genc_model::Typ::Uint64,
-                width: 8,
-                offset: 0,
-                tag: Some("PC".into()),
-            })],
+            size: 16,
+            views: vec![
+                View::Slot(Slot {
+                    name: "reg_PC".into(),
+                    typ: genc_model::Typ::Uint64,
+                    width: 8,
+                    offset: 0,
+                    tag: Some("PC".into()),
+                }),
+                View::Slot(Slot {
+                    name: "reg_SP".into(),
+                    typ: genc_model::Typ::Uint64,
+                    width: 8,
+                    offset: 8,
+                    tag: Some("SP".into()),
+                }),
+            ],
         },
         RegisterSpace {
             size: 4,
@@ -187,6 +196,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
             ],
         },
     ];
+
+    description.features.insert("EMULATE_LINUX_ARCHSIM".into());
 
     description
 }

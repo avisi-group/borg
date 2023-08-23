@@ -12,6 +12,7 @@ use {
         Bank, Endianness, RegisterSpace, Slot, Typ, View, BEHAVIOURS_FILENAME, EXECUTE_FILENAME,
         ISA_FILENAME,
     },
+    common::HashSet,
     std::fmt::{self, Display, Formatter},
 };
 
@@ -50,6 +51,8 @@ pub struct Main {
 
     /// Register definitions
     pub registers: Vec<RegisterSpace>,
+
+    pub features: HashSet<String>,
 }
 
 impl Display for Main {
@@ -74,7 +77,16 @@ impl Display for Main {
 
         for register in &self.registers {
             write!(f, "{register}")?;
+            writeln!(f)?;
         }
+
+        writeln!(f)?;
+
+        writeln!(f, "\tac_features {{")?;
+        for feature in &self.features {
+            write!(f, "\t\tfeature {feature};")?;
+        }
+        writeln!(f, "\t}}")?;
 
         writeln!(f)?;
 

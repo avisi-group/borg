@@ -71,6 +71,19 @@ build:
     # we save the workspace as a copy of all the code with no build artefacts as the e2e-test uses a different target none of that is reusable
     SAVE ARTIFACT . workspace
 
+borealis-docs:
+    FROM +build
+    RUN eval `opam env` && cargo doc --target $RUST_TARGET
+    RUN echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; URL=/borealis/borealis" /></head></html>' > target/$RUST_TARGET/doc/index.html
+    SAVE ARTIFACT target/$RUST_TARGET/doc docs
+
+docs:
+    FROM scratch
+    COPY (+borealis-docs/docs) docs
+#    COPY (+libarch-docs/docs) docs/libarch_sys
+    CMD [""]
+    SAVE IMAGE --push ghcr.io/avisi-group/borealis/docs
+
 docker:
     BUILD +build
     FROM alpine
@@ -83,7 +96,7 @@ docker:
 
 test:
     BUILD +unit-test
-    BUILD --platform=linux/amd64 +e2e-test
+    BUILD --platform=linux/amd64 +e2e-test-archsim
 
 unit-test:
     BUILD +build
@@ -93,7 +106,7 @@ unit-test:
     RUN eval `opam env` && cargo test --target $RUST_TARGET --no-fail-fast
 
 e2e-test-borealis-genc:
-    # must use alpine instead of +docker due to https://github.com/earthly/earthly/issues/2618
+    # must use alpine instead of +docker due to https://github.com/earthly/earthly/issues/2618. reading this comment on 2023-08-23 i do not understand it.
     FROM +docker
     COPY data/arm-v8.5-a.bincode.lz4 arm-v8.5-a.bincode.lz4
     RUN ./borealis sail2genc arm-v8.5-a.bincode.lz4 genc
@@ -102,53 +115,19 @@ e2e-test-borealis-genc:
 e2e-test-gensim:
     FROM ghcr.io/fmckeogh/gensim:latest
     COPY (+e2e-test-borealis-genc/genc) .
-    RUN gensim --verbose -a main.genc -t output -s captive_decoder,captive_cpu,captive_jitv2,captive_disasm -o captive_decoder.GenerateDotGraph=1,captive_decoder.OptimisationEnabled=1,captive_decoder.OptimisationMinPrefixLength=8,captive_decoder.OptimisationMinPrefixMembers=4,captive_decoder.InlineHints=1
-    SAVE ARTIFACT output output
+    RUN ./dist/bin/gensim --verbose -a main.genc -t output -s module,arch,decode,disasm,ee_interp,ee_blockjit,jumpinfo,function,makefile -o decode.GenerateDotGraph=1,makefile.libtrace_path=/build/support/libtrace/inc,makefile.archsim_path=/build/archsim/inc,makefile.Optimise=3,makefile.Debug=1
+    RUN cd output && make
+    SAVE ARTIFACT output/arm64.dll arm64.dll
 
-e2e-test:
-    FROM rust
-    WORKDIR /tmp/build
+e2e-test-archsim:
+    FROM ghcr.io/fmckeogh/gensim:latest
 
-    ARG USERARCH
+    RUN apt-get install -yy gcc-aarch64-linux-gnu
+    RUN echo "_start:\n.globl _start\nadd x0, x1, #20" > test.S
+    RUN aarch64-linux-gnu-gcc -o test -nostdlib -static test.S
 
-    IF [ "$USERARCH" = "amd64" ]
-        ENV HOSTPLATFORM=linux/amd64
-    ELSE IF [ "$USERARCH" = "arm64" ]
-        ENV HOSTPLATFORM=linux/arm64
-    ELSE
-        ENV HOSTPLATFORM=invalid
-    END
+    RUN mkdir modules
+    COPY (+e2e-test-gensim/arm64.dll) modules
 
-    RUN apt-get update && apt-get install -yy libclang-dev
-
-    # copy workspace
-    COPY --platform=$HOSTPLATFORM (+build/workspace) .
-
-    # copy libarch rust source
-    COPY libarch-sys libarch-sys
-
-    # copy gensim output
-    COPY --platform=$HOSTPLATFORM (+e2e-test-gensim/output/arm64-decode.cpp) libarch-sys/include
-    COPY --platform=$HOSTPLATFORM (+e2e-test-gensim/output/arm64-decode.h) libarch-sys/include
-    COPY --platform=$HOSTPLATFORM (+e2e-test-gensim/output/arm64-disasm.cpp) libarch-sys/include
-    COPY --platform=$HOSTPLATFORM (+e2e-test-gensim/output/arm64-disasm.h) libarch-sys/include
-
-    RUN cd libarch-sys && cargo test --no-fail-fast
-
-libarch-docs:
-    FROM --platform=linux/amd64 +e2e-test
-    RUN cd libarch-sys && cargo doc
-    SAVE ARTIFACT target/doc/libarch_sys docs
-
-borealis-docs:
-    FROM +build
-    RUN eval `opam env` && cargo doc --target $RUST_TARGET
-    RUN echo '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; URL=/borealis/borealis" /></head></html>' > target/$RUST_TARGET/doc/index.html
-    SAVE ARTIFACT target/$RUST_TARGET/doc docs
-
-docs:
-    FROM scratch
-    COPY (+borealis-docs/docs) docs
-    COPY (+libarch-docs/docs) docs/libarch_sys
-    CMD [""]
-    SAVE IMAGE --push ghcr.io/avisi-group/borealis/docs
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./test -t -U trace.out --mode Interpreter
+    RUN var="$(./dist/bin/TraceCat trace.out0)" && if [ $var != "test" ]; then exit -1; fi

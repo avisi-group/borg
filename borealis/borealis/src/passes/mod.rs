@@ -57,9 +57,10 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         ReplaceBools::new_boxed(),
         RemoveUnits::new_boxed(ast.clone()),
         RemoveExceptions::new_boxed(),
+        RegisterHandler::new_boxed(),
+        ResolveBitvectors::new_boxed(),
         AddBuiltinFns::new_boxed(),
         ResolveBitvectors::new_boxed(),
-        RegisterHandler::new_boxed(),
     ]
     .into_iter()
     .for_each(|mut pass| {

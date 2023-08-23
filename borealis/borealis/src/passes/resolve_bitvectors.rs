@@ -250,7 +250,7 @@ fn zeros_handler(
         .entry_block
         .get_assignment(*ident)
     else {
-        panic!("{ident}");
+        return;
     };
 
     let Value::Literal(literal) = &*value.borrow() else {

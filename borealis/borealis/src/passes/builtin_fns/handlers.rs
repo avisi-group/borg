@@ -45,13 +45,13 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("bitvector_length", bv_length_handler),
         ("bitvector_access_B", bv_access_handler),
         ("raw_GetSlice_int", noop),
+        ("ZeroExtend__0", zero_extend_handler),
         //
         ("slice", noop),
         ("Zeros", noop),
         ("undefined_bitvector", noop),
         ("bitvector_access_A", noop),
         ("bitvector_concat", noop),
-        ("ZeroExtend__0", noop),
         // non addsub_immediate functions below here
         ("undefined_bool", noop),
         ("undefined_int", noop),
@@ -524,4 +524,54 @@ pub fn bv_access_handler(
             ))))),
         )))),
     }
+}
+
+pub fn zero_extend_handler(
+    _ast: Rc<RefCell<Ast>>,
+    function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    let Statement::FunctionCall {
+        expression,
+        arguments,
+        ..
+    } = statement.borrow().clone()
+    else {
+        panic!();
+    };
+
+    // x1 = ZeroExtend__0(x, n)
+    //
+    //
+
+    let Value::Identifier(x_ident) = &*arguments[0].borrow() else {
+        panic!();
+    };
+
+    let Type::FixedBits(x_len, _) = function.get_ident_type(*x_ident).unwrap() else {
+        panic!();
+    };
+
+    // (x << (64 - x_len)) >> (64 - x_len)
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.unwrap(),
+        value: Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
+            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+                arguments[0].clone(),
+                Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
+                    arguments[1].clone(),
+                    Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                        Literal::Int(x_len.into()),
+                    ))))),
+                )))),
+            )))),
+            Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
+                arguments[1].clone(),
+                Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                    Literal::Int(x_len.into()),
+                ))))),
+            )))),
+        )))),
+    };
 }

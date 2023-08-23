@@ -8,7 +8,7 @@ use {
         },
         Error,
     },
-    common::HashMap,
+    common::{HashMap, HashSet},
     errctx::PathCtx,
     std::{
         fmt::Display,
@@ -84,6 +84,9 @@ pub struct Description {
 
     /// Helper functions
     pub helpers: Vec<HelperFunction>,
+
+    /// AC features
+    pub features: HashSet<String>,
 }
 
 impl Description {
@@ -95,6 +98,7 @@ impl Description {
             endianness: self.endianness,
             wordsize: self.wordsize,
             registers: self.registers.clone(),
+            features: self.features.clone(),
         };
 
         // construct Vec of Formats
@@ -217,43 +221,7 @@ impl Description {
             wordsize: 64,
             fetchsize: 32,
             predicated: false,
-            registers: vec![
-                RegisterSpace {
-                    size: 248,
-                    views: vec![
-                        View::Bank(Bank {
-                            name: "RBX".to_owned(),
-                            typ: Typ::Uint64,
-                            offset: 0,
-                            count: 31,
-                            stride: 8,
-                            element_count: 1,
-                            element_size: 8,
-                            element_stride: 8,
-                        }),
-                        View::Bank(Bank {
-                            name: "RBW".to_owned(),
-                            typ: Typ::Uint32,
-                            offset: 0,
-                            count: 31,
-                            stride: 8,
-                            element_count: 1,
-                            element_size: 4,
-                            element_stride: 4,
-                        }),
-                    ],
-                },
-                RegisterSpace {
-                    size: 16,
-                    views: vec![View::Slot(Slot {
-                        name: "PC".to_owned(),
-                        typ: Typ::Uint64,
-                        width: 8,
-                        offset: 0,
-                        tag: Some("PC".to_owned()),
-                    })],
-                },
-            ],
+            registers: vec![],
             instructions: HashMap::default(),
             behaviours: Behaviours {
                 handle_exception: "".to_owned(),
@@ -270,6 +238,7 @@ impl Description {
                 }],
             },
             helpers: vec![],
+            features: HashSet::default(),
         }
     }
 }
