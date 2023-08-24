@@ -32,7 +32,7 @@ use {
     crate::{
         boom::{
             control_flow::Terminator, visitor::Visitor, Ast, Expression, FunctionDefinition,
-            FunctionSignature, NamedType, NamedValue, Statement, Type, Value,
+            FunctionSignature, NamedType, NamedValue, Parameter, Statement, Type, Value,
         },
         passes::Pass,
     },
@@ -102,9 +102,10 @@ fn fix_return(fn_def: &FunctionDefinition) -> Option<Vec<NamedType>> {
         fields
             .iter()
             .cloned()
-            .map(|NamedType { name, typ }| NamedType {
+            .map(|NamedType { name, typ }| Parameter {
                 name: destructed_ident("return_value".into(), name),
                 typ,
+                is_ref: true,
             }),
     );
 

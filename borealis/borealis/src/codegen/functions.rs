@@ -82,7 +82,11 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             parameters: "uint64 len, uint64 n, uint64 start".into(),
             return_type: "uint64".into(),
             body: r#"
-                return (n >> start) & ((1 << len) - 1);
+                if (len == 64) {
+                    return n;
+                } else {
+                    return (n >> start) & ((1 << len) - 1);
+                }
             "#
             .into(),
         },

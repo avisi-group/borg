@@ -23,22 +23,22 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("pcnt_i64___pcnt_i", replace_with_copy),
         // replace with equality test
         ("eq_int", |ast, f, s| {
-            replace_with_infix(ast, f, s, OperationKind::Equal)
+            replace_with_op(ast, f, s, OperationKind::Equal)
         }),
         ("eq_vec", |ast, f, s| {
-            replace_with_infix(ast, f, s, OperationKind::Equal)
+            replace_with_op(ast, f, s, OperationKind::Equal)
         }),
         ("not_vec", |ast, f, s| {
-            replace_with_infix(ast, f, s, OperationKind::Complement)
+            replace_with_op(ast, f, s, OperationKind::Complement)
         }),
         ("not_bool", |ast, f, s| {
-            replace_with_infix(ast, f, s, OperationKind::Not)
+            replace_with_op(ast, f, s, OperationKind::Not)
         }),
         ("add_atom", |ast, f, s| {
-            replace_with_infix(ast, f, s, OperationKind::Add)
+            replace_with_op(ast, f, s, OperationKind::Add)
         }),
         ("sub_atom", |ast, f, s| {
-            replace_with_infix(ast, f, s, OperationKind::Subtract)
+            replace_with_op(ast, f, s, OperationKind::Subtract)
         }),
         // probably need to take another look at this
         ("SInt", replace_with_copy),
@@ -409,7 +409,7 @@ pub fn replace_with_copy(
 // }
 
 ///
-pub fn replace_with_infix(
+pub fn replace_with_op(
     _: Rc<RefCell<Ast>>,
     _: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
@@ -443,6 +443,7 @@ pub fn replace_with_infix(
         OperationKind::And => Operation::And(args[0].clone(), args[1].clone()),
         OperationKind::LeftShift => Operation::LeftShift(args[0].clone(), args[1].clone()),
         OperationKind::RightShift => Operation::RightShift(args[0].clone(), args[1].clone()),
+        _ => unimplemented!(),
     };
 
     *statement.borrow_mut() = Statement::Copy {
@@ -558,7 +559,10 @@ pub fn zero_extend_handler(
         expression: expression.unwrap(),
         value: Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
             Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                arguments[0].clone(),
+                Rc::new(RefCell::new(Value::Operation(Operation::Cast(
+                    arguments[0].clone(),
+                    Rc::new(RefCell::new(Type::FixedBits(64, false))),
+                )))),
                 Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
                     arguments[1].clone(),
                     Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(

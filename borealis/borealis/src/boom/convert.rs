@@ -1,5 +1,7 @@
 //! JIB to BOOM conversion
 
+use crate::boom::Parameter;
+
 use {
     crate::boom::{self, control_flow::build_graph, Bit, FunctionSignature, NamedType},
     common::{intern::InternedString, HashMap},
@@ -92,7 +94,11 @@ impl BoomEmitter {
                         .iter()
                         .map(sail_ast::Identifier::as_interned)
                         .zip(parameter_types)
-                        .map(|(name, typ)| NamedType { name, typ })
+                        .map(|(name, typ)| Parameter {
+                            name,
+                            typ,
+                            is_ref: false,
+                        })
                         .collect::<Vec<_>>(),
                 ));
 

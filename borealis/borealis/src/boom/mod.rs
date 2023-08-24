@@ -178,18 +178,25 @@ impl FunctionDefinition {
                     .parameters
                     .borrow()
                     .iter()
-                    .map(|NamedType { name, typ }| (*name, typ.clone())),
+                    .map(|Parameter { name, typ, .. }| (*name, typ.clone())),
             )
             .find(|(name, ..)| *name == ident)
             .map(|(.., typ)| typ.borrow().clone())
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Parameter {
+    pub name: InternedString,
+    pub typ: Rc<RefCell<Type>>,
+    pub is_ref: bool,
+}
+
 /// Function parameter and return types
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: InternedString,
-    pub parameters: Rc<RefCell<Vec<NamedType>>>,
+    pub parameters: Rc<RefCell<Vec<Parameter>>>,
     pub return_type: Rc<RefCell<Type>>,
 }
 
@@ -198,7 +205,7 @@ impl Walkable for FunctionSignature {
         self.parameters
             .borrow()
             .iter()
-            .for_each(|parameter| visitor.visit_named_type(parameter));
+            .for_each(|Parameter { typ, .. }| visitor.visit_type(typ.clone()));
         visitor.visit_type(self.return_type.clone());
     }
 }
@@ -544,6 +551,7 @@ pub enum Operation {
     And(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     LeftShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     RightShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Cast(Rc<RefCell<Value>>, Rc<RefCell<Type>>),
 }
 
 impl Walkable for Operation {
@@ -563,6 +571,10 @@ impl Walkable for Operation {
             | Operation::RightShift(lhs, rhs) => {
                 visitor.visit_value(lhs.clone());
                 visitor.visit_value(rhs.clone());
+            }
+            Operation::Cast(value, typ) => {
+                visitor.visit_value(value.clone());
+                visitor.visit_type(typ.clone());
             }
         }
     }

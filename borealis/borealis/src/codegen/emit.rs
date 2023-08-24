@@ -1,5 +1,7 @@
 //! GenC code generation from BOOM structures
 
+use crate::boom::Parameter;
+
 use {
     crate::boom::{
         bits_to_int, Expression, Literal, NamedType, NamedValue, Operation, Statement, Type, Value,
@@ -138,6 +140,16 @@ impl Emit for Rc<RefCell<Type>> {
     }
 }
 
+impl Emit for Parameter {
+    fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
+        self.typ.emit(w)?;
+        if self.is_ref {
+            write!(w, "&")?;
+        }
+        write!(w, " {}", self.name)
+    }
+}
+
 impl Emit for Rc<RefCell<Value>> {
     fn emit<W: Write>(&self, w: &mut W) -> fmt::Result {
         fn write_uid<W: Write>(
@@ -240,6 +252,14 @@ impl Emit for Operation {
             Operation::And(lhs, rhs) => emit_op2(w, lhs, rhs, "&"),
             Operation::LeftShift(lhs, rhs) => emit_op2(w, lhs, rhs, "<<"),
             Operation::RightShift(lhs, rhs) => emit_op2(w, lhs, rhs, ">>"),
+
+            Operation::Cast(value, typ) => {
+                write!(w, "(")?;
+                typ.emit(w)?;
+                write!(w, ")(")?;
+                value.emit(w)?;
+                write!(w, ")")
+            }
         }
     }
 }

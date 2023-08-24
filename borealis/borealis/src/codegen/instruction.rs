@@ -3,7 +3,7 @@
 
 use {
     crate::{
-        boom::{self, NamedType},
+        boom::{self, Parameter},
         codegen::format::{process_decode_function_clause, InstructionDecodeInformation},
         genc_model::format::{InstructionFormat, SegmentContent},
     },
@@ -86,7 +86,7 @@ pub fn generate_execute_entrypoint(
                 .parameters
                 .borrow()
                 .iter()
-                .map(|NamedType { name, .. }| name)
+                .map(|Parameter { name, .. }| name)
                 .map(|name| {
                     if variables.contains(name) {
                         // if the parameter name is a format variable, access it from the `inst`

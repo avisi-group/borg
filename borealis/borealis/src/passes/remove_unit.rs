@@ -6,7 +6,7 @@ use {
         boom::{
             control_flow::ControlFlowBlock,
             visitor::{Visitor, Walkable},
-            Ast, Expression, FunctionDefinition, Literal, NamedType, Statement, Type, Value,
+            Ast, Expression, FunctionDefinition, Literal, Parameter, Statement, Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },
@@ -59,7 +59,7 @@ impl Visitor for RemoveUnits {
         node.signature
             .parameters
             .borrow_mut()
-            .retain(|NamedType { typ, .. }| *typ.borrow() != Type::Unit);
+            .retain(|Parameter { typ, .. }| *typ.borrow() != Type::Unit);
         node.walk(self);
     }
 
