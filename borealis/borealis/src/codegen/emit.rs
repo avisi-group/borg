@@ -123,6 +123,20 @@ impl Emit for Rc<RefCell<Type>> {
                 }
             ),
 
+            FixedSignedBits(len) => write!(
+                w,
+                "{}",
+                match *len {
+                    0 => panic!("unexpected 0 length bitvector"),
+                    1..=8 => "sint8",
+                    9..=16 => "sint16",
+                    17..=32 => "sint32",
+                    33..=64 => "sint64",
+                    65..=128 => "sint128",
+                    _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
+                }
+            ),
+
             Enum { .. } => write!(w, "uint32"), // <-- tom responsible for this
 
             Real | Float => write!(w, "double"),
@@ -244,14 +258,21 @@ impl Emit for Operation {
                 value.emit(w)
             }
             Operation::Equal(lhs, rhs) => emit_op2(w, lhs, rhs, "=="),
+            Operation::NotEqual(lhs, rhs) => emit_op2(w, lhs, rhs, "!="),
             Operation::LessThan(lhs, rhs) => emit_op2(w, lhs, rhs, "<"),
             Operation::GreaterThan(lhs, rhs) => emit_op2(w, lhs, rhs, ">"),
+            Operation::LessThanOrEqual(lhs, rhs) => emit_op2(w, lhs, rhs, "<="),
+            Operation::GreaterThanOrEqual(lhs, rhs) => emit_op2(w, lhs, rhs, ">="),
             Operation::Subtract(lhs, rhs) => emit_op2(w, lhs, rhs, "-"),
             Operation::Add(lhs, rhs) => emit_op2(w, lhs, rhs, "+"),
             Operation::Or(lhs, rhs) => emit_op2(w, lhs, rhs, "|"),
+            Operation::Xor(lhs, rhs) => emit_op2(w, lhs, rhs, "^"),
             Operation::And(lhs, rhs) => emit_op2(w, lhs, rhs, "&"),
             Operation::LeftShift(lhs, rhs) => emit_op2(w, lhs, rhs, "<<"),
             Operation::RightShift(lhs, rhs) => emit_op2(w, lhs, rhs, ">>"),
+
+            Operation::RotateLeft(lhs, rhs) => emit_op2(w, lhs, rhs, "<<<"),
+            Operation::RotateRight(lhs, rhs) => emit_op2(w, lhs, rhs, ">>>"),
 
             Operation::Cast(value, typ) => {
                 write!(w, "(")?;

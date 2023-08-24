@@ -311,6 +311,10 @@ impl Visitor for FieldVisitor {
                 panic!("field access to non identifier")
             };
 
+            if ident.as_ref() == "PSTATE" {
+                return;
+            }
+
             (*ident, *field_name)
         };
 

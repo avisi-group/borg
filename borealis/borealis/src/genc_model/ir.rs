@@ -12,7 +12,7 @@ use {
         Bank, Endianness, RegisterSpace, Slot, Typ, View, BEHAVIOURS_FILENAME, EXECUTE_FILENAME,
         ISA_FILENAME,
     },
-    common::HashSet,
+    common::{intern::InternedString, HashMap, HashSet},
     std::fmt::{self, Display, Formatter},
 };
 
@@ -53,6 +53,8 @@ pub struct Main {
     pub registers: Vec<RegisterSpace>,
 
     pub features: HashSet<String>,
+
+    pub constants: HashMap<InternedString, (Typ, u64)>,
 }
 
 impl Display for Main {
@@ -93,6 +95,11 @@ impl Display for Main {
         writeln!(f, "\tARCH_CTOR(arm) {{")?;
         writeln!(f, "\t\tac_isa(\"{ISA_FILENAME}\");")?;
         writeln!(f, "\t\tset_endian(\"{}\");", self.endianness)?;
+
+        for (name, (typ, value)) in &self.constants {
+            writeln!(f, "\t\tset_constant({name}, {typ}, {value});")?;
+        }
+
         writeln!(f, "\t}};")?;
 
         writeln!(f, "}};")?;

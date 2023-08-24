@@ -1,11 +1,12 @@
 use {
     crate::{
         boom::{
-            Ast, FunctionDefinition, Literal, Operation, OperationKind, Statement, Type, Value,
+            Ast, Expression, FunctionDefinition, Literal, Operation, OperationKind, Statement,
+            Type, Value,
         },
         passes::builtin_fns::HandlerFunction,
     },
-    common::{intern::InternedString, HashMap},
+    common::{identifiable::unique_id, intern::InternedString, HashMap},
     itertools::Itertools,
     once_cell::sync::Lazy,
     std::{cell::RefCell, rc::Rc},
@@ -25,6 +26,15 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("eq_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
+        ("lt_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::LessThan)
+        }),
+        ("gteq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
+        }),
+        ("shl_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::LeftShift)
+        }),
         ("eq_vec", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
@@ -40,49 +50,74 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("sub_atom", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Subtract)
         }),
+        ("xor_vec", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Xor)
+        }),
+        ("or_vec", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Or)
+        }),
+        ("and_vec", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::And)
+        }),
+        ("add_vec", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Add)
+        }),
+        ("neq_vec", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::NotEqual)
+        }),
+        ("ROR", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::RotateRight)
+        }),
+        ("ASR", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::RightShift)
+        }),
+        ("LSR", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::RightShift)
+        }),
+        ("LSL", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::LeftShift)
+        }),
         // probably need to take another look at this
         ("SInt", replace_with_copy),
         ("bitvector_length", bv_length_handler),
         ("bitvector_access_B", bv_access_handler),
+        ("bitvector_access_A", bv_access_handler),
         ("raw_GetSlice_int", noop),
         ("ZeroExtend__0", zero_extend_handler),
-        //
+        ("ZeroExtend__1", zero_extend_handler),
+        ("SignExtend__0", sign_extend_handler),
         ("slice", noop),
         ("Zeros", noop),
         ("undefined_bitvector", noop),
-        ("bitvector_access_A", noop),
         ("bitvector_concat", noop),
-        // non addsub_immediate functions below here
-        ("undefined_bool", noop),
+        ("aget_PC", |ast, f, s| rename(ast, f, s, "read_pc".into())),
+        ("sail_assert", assert_handler),
+        ("undefined_bool", delete),
+        ("undefined_LogicalOp", delete),
+        ("replicate_bits", replicate_bits_handler),
         ("undefined_int", noop),
         ("undefined_real", noop),
         ("undefined_string", noop),
         ("undefined_unit", noop),
         ("ediv_int", noop),
-        ("gteq_int", noop),
         ("lteq_int", noop),
         ("eq_bool", noop),
         ("negate_atom", noop),
         ("mult_atom", noop),
-        ("neq_vec", noop),
         ("DecStr", noop),
         ("asl_prerr_string", noop),
-        ("replicate_bits", noop),
         ("Error_Implementation_Defined", noop),
         ("Error_ExceptionTaken", noop),
         ("append_str", noop),
         ("GetVerbosity", noop),
         ("WriteRAM_bool", noop),
         ("cons", noop),
-        ("sail_assert", noop),
         ("Error_See", noop),
         ("update_fbits", noop),
         ("vector_access_A_B32_", noop),
         ("SetSlice_bits", noop),
         ("Error_Undefined", noop),
         ("shl8", noop),
-        ("add_vec", noop),
-        ("xor_vec", noop),
         ("eq_anything_EFPRounding_pcnt__", noop),
         ("eq_real", noop),
         ("pcnt_string___pcnt_real", noop),
@@ -145,13 +180,10 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("ReadRAM", noop),
         ("gteq_real", noop),
         ("shr32", noop),
-        ("shl_int", noop),
-        ("or_vec", noop),
         ("vector_update_B_o_", noop),
         ("eq_anything_ESRType_pcnt__", noop),
         ("internal_pick_EMBReqTypes_pcnt__", noop),
         ("internal_pick_EImmediateOp_pcnt__", noop),
-        ("and_vec", noop),
         ("undefined_vector_B64_", noop),
         ("undefined_vector_B128_", noop),
         ("undefined_vector_i_", noop),
@@ -159,7 +191,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("check_cycle_count", noop),
         ("shr_int", noop),
         ("eq_string", noop),
-        ("lt_int", noop),
         ("shl32", noop),
         ("WakeupRequest", noop),
         ("vector_update_subrange", noop),
@@ -235,6 +266,17 @@ pub fn noop(
 ) {
 }
 
+pub fn delete(
+    _ast: Rc<RefCell<Ast>>,
+    function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    let (block, index) = function.entry_block.find_statement(statement).unwrap();
+    let mut statements = block.statements();
+    statements.remove(index);
+    block.set_statements(statements);
+}
+
 /// Blindly replace function call with assignment
 pub fn replace_with_copy(
     _ast: Rc<RefCell<Ast>>,
@@ -277,137 +319,6 @@ pub fn replace_with_copy(
     };
 }
 
-/// DEPRECATING TEMPORARILY, GENC INTRINSICS REQUIRED FOR MAX PERF BUT CURRENT
-/// BOREALIS HEURISTICS NOT POWERFUL ENOUGH
-// /// Add with carry handler
-// pub fn add_with_carry_handler(
-//     _ast: Rc<RefCell<Ast>>,
-//     function: FunctionDefinition,
-//     statement: Rc<RefCell<Statement>>,
-// ) { // find the block containing the addwithcarry function call, and it's position // within that
-//   block let (block, idx) = function .entry_block .find_statement(statement.clone()) .unwrap();
-
-//     // get the block statements as a local mutable vec
-//     let mut block_statements = block.statements();
-
-//     // delete statement
-//     block_statements.remove(idx);
-
-//     let Statement::FunctionCall {
-//         expression: Some(expression),
-//         arguments,
-//         ..
-//     } = &*statement.borrow()
-//     else {
-//         panic!()
-//     };
-
-//     let Expression::Identifier(original_target) = expression else {
-//         panic!()
-//     };
-
-//     // remove type declaration for result struct, store names of fields
-//     let index = block_statements
-//         .iter()
-//         .position(|stmt| {
-//             let Statement::TypeDeclaration { name, .. } = &*stmt.borrow() else {
-//                 return false;
-//             };
-
-//             name == original_target
-//         })
-//         .unwrap();
-
-//     let statement = block_statements.remove(index);
-
-//     // remove type declaration
-//     let (result_field, flags_field) = {
-//         let Statement::TypeDeclaration { typ, .. } = &*statement.borrow() else {
-//             panic!();
-//         };
-
-//         let Type::Struct { fields, .. } = &*typ.borrow() else {
-//             panic!();
-//         };
-
-//         (fields[0].name, fields[1].name)
-//     };
-
-//     let id = unique_id();
-//     let flags_ident = InternedString::from(format!("adc_flags{id}"));
-//     let result_ident = InternedString::from(format!("adc_result{id}"));
-
-//     block_statements.splice(
-//         idx..idx,
-//         [
-//             // create local vars for flags and result of the same type as the removed struct
-//             Rc::new(RefCell::new(Statement::TypeDeclaration {
-//                 name: flags_ident,
-//                 typ: Rc::new(RefCell::new(Type::FixedBits(4, false))),
-//             })),
-//             Rc::new(RefCell::new(Statement::TypeDeclaration {
-//                 name: result_ident,
-//                 typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
-//             })),
-//             // create two new statements,genc_adc64_flags and genc_adc64 assigned to local
-//             // vars
-//             Rc::new(RefCell::new(Statement::FunctionCall {
-//                 expression: Some(Expression::Identifier(flags_ident)),
-//                 name: "__builtin_adc64_flags".into(),
-//                 arguments: arguments.clone(),
-//             })),
-//             Rc::new(RefCell::new(Statement::FunctionCall {
-//                 expression: Some(Expression::Identifier(result_ident)),
-//                 name: "__builtin_adc64".into(),
-//                 arguments: arguments.clone(),
-//             })),
-//         ],
-//     );
-
-//     block.set_statements(block_statements);
-
-//     // remove any Field value with the `original_target` identifier (iterating
-//     // over the current block and its children) and replace with ident of local
-//     // var
-//     block
-//         .iter()
-//         .map(|b| b.statements())
-//         .flatten()
-//         .for_each(|stmt| {
-//             let new_value = {
-//                 let Statement::Copy { value, .. } = &*stmt.borrow() else {
-//                     return;
-//                 };
-
-//                 let Value::Field { value, field_name } = value else {
-//                     return;
-//                 };
-
-//                 let Value::Identifier(ident) = **value else {
-//                     return;
-//                 };
-
-//                 if ident != *original_target {
-//                     return;
-//                 }
-
-//                 if *field_name == result_field {
-//                     Value::Identifier(result_ident)
-//                 } else if *field_name == flags_field {
-//                     Value::Identifier(flags_ident)
-//                 } else {
-//                     return;
-//                 }
-//             };
-
-//             let Statement::Copy { value, .. } = &mut *stmt.borrow_mut() else {
-//                 panic!()
-//             };
-
-//             *value = new_value;
-//         });
-// }
-
 ///
 pub fn replace_with_op(
     _: Rc<RefCell<Ast>>,
@@ -435,15 +346,25 @@ pub fn replace_with_op(
         OperationKind::Not => Operation::Not(args[0].clone()),
         OperationKind::Complement => Operation::Complement(args[0].clone()),
         OperationKind::Equal => Operation::Equal(args[0].clone(), args[1].clone()),
+        OperationKind::NotEqual => Operation::NotEqual(args[0].clone(), args[1].clone()),
         OperationKind::LessThan => Operation::LessThan(args[0].clone(), args[1].clone()),
         OperationKind::GreaterThan => Operation::GreaterThan(args[0].clone(), args[1].clone()),
+        OperationKind::LessThanOrEqual => {
+            Operation::LessThanOrEqual(args[0].clone(), args[1].clone())
+        }
+        OperationKind::GreaterThanOrEqual => {
+            Operation::GreaterThanOrEqual(args[0].clone(), args[1].clone())
+        }
         OperationKind::Subtract => Operation::Subtract(args[0].clone(), args[1].clone()),
         OperationKind::Add => Operation::Add(args[0].clone(), args[1].clone()),
         OperationKind::Or => Operation::Or(args[0].clone(), args[1].clone()),
         OperationKind::And => Operation::And(args[0].clone(), args[1].clone()),
         OperationKind::LeftShift => Operation::LeftShift(args[0].clone(), args[1].clone()),
         OperationKind::RightShift => Operation::RightShift(args[0].clone(), args[1].clone()),
-        _ => unimplemented!(),
+        OperationKind::Xor => Operation::Xor(args[0].clone(), args[1].clone()),
+        OperationKind::RotateLeft => Operation::RotateLeft(args[0].clone(), args[1].clone()),
+        OperationKind::RotateRight => Operation::RotateRight(args[0].clone(), args[1].clone()),
+        OperationKind::Cast => panic!(),
     };
 
     *statement.borrow_mut() = Statement::Copy {
@@ -549,8 +470,9 @@ pub fn zero_extend_handler(
         panic!();
     };
 
-    let Type::FixedBits(x_len, _) = function.get_ident_type(*x_ident).unwrap() else {
-        panic!();
+    let x_len = match function.get_ident_type(*x_ident).unwrap() {
+        Type::FixedBits(len, _) | Type::FixedSignedBits(len) => len,
+        _ => return,
     };
 
     // (x << (64 - x_len)) >> (64 - x_len)
@@ -578,4 +500,188 @@ pub fn zero_extend_handler(
             )))),
         )))),
     };
+}
+
+pub fn sign_extend_handler(
+    _ast: Rc<RefCell<Ast>>,
+    function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    let Statement::FunctionCall {
+        expression,
+        arguments,
+        ..
+    } = statement.borrow().clone()
+    else {
+        panic!();
+    };
+
+    // x1 = ZeroExtend__0(x, n)
+    //
+    //
+
+    let Value::Identifier(x_ident) = &*arguments[0].borrow() else {
+        panic!();
+    };
+
+    let Type::FixedBits(x_len, _) = function.get_ident_type(*x_ident).unwrap() else {
+        panic!();
+    };
+
+    // ((sint64)x << (64 - x_len)) >> (64 - x_len)
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.unwrap(),
+        value: Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
+            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+                Rc::new(RefCell::new(Value::Operation(Operation::Cast(
+                    arguments[0].clone(),
+                    Rc::new(RefCell::new(Type::FixedSignedBits(64))),
+                )))),
+                Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
+                    arguments[1].clone(),
+                    Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                        Literal::Int(x_len.into()),
+                    ))))),
+                )))),
+            )))),
+            Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
+                arguments[1].clone(),
+                Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                    Literal::Int(x_len.into()),
+                ))))),
+            )))),
+        )))),
+    };
+}
+
+fn rename(
+    _ast: Rc<RefCell<Ast>>,
+    _function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+    new_name: InternedString,
+) {
+    let Statement::FunctionCall { name, .. } = &mut *statement.borrow_mut() else {
+        panic!();
+    };
+
+    *name = new_name;
+}
+
+pub fn assert_handler(
+    _ast: Rc<RefCell<Ast>>,
+    _function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    let Statement::FunctionCall {
+        expression,
+        arguments,
+        ..
+    } = &mut *statement.borrow_mut()
+    else {
+        panic!();
+    };
+
+    *expression = None;
+    arguments.pop();
+}
+
+pub fn replicate_bits_handler(
+    _ast: Rc<RefCell<Ast>>,
+    function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    let (expression, name, length, count) = {
+        let Statement::FunctionCall {
+            expression,
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
+            panic!();
+        };
+
+        let Value::Identifier(ident) = &*arguments[1].borrow() else {
+            panic!();
+        };
+
+        let Some(value) = function.entry_block.get_assignment(*ident) else {
+            return;
+        };
+
+        let Value::Literal(literal) = &*value.borrow() else {
+            panic!();
+        };
+
+        let Literal::Int(count) = &*literal.borrow() else {
+            panic!();
+        };
+
+        let Value::Identifier(ident) = &*arguments[0].borrow() else {
+            panic!();
+        };
+
+        let Some(Type::FixedBits(length, _)) = function.get_ident_type(*ident) else {
+            panic!();
+        };
+
+        (
+            expression.clone().unwrap(),
+            *ident,
+            length,
+            isize::try_from(count).unwrap(),
+        )
+    };
+
+    let (block, idx) = function
+        .entry_block
+        .find_statement(statement.clone())
+        .unwrap();
+
+    let mut statements = block.statements();
+
+    statements.remove(idx);
+
+    let mut rep_statements = vec![];
+
+    let id = unique_id();
+
+    let mut prev_ident = format!("rep_{id}_0").into();
+    rep_statements.push(Rc::new(RefCell::new(Statement::TypeDeclaration {
+        name: prev_ident,
+        typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
+    })));
+    rep_statements.push(Rc::new(RefCell::new(Statement::Copy {
+        expression: Expression::Identifier(prev_ident),
+        value: Rc::new(RefCell::new(Value::Identifier(name))),
+    })));
+
+    for i in 1..count {
+        let this_ident = format!("rep_{id}_{i}").into();
+        rep_statements.push(Rc::new(RefCell::new(Statement::TypeDeclaration {
+            name: this_ident,
+            typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
+        })));
+        rep_statements.push(Rc::new(RefCell::new(Statement::Copy {
+            expression: Expression::Identifier(this_ident),
+            value: Rc::new(RefCell::new(Value::Operation(Operation::Or(
+                Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+                    Rc::new(RefCell::new(Value::Identifier(name))),
+                    Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                        Literal::Int((length * i).into()),
+                    ))))),
+                )))),
+                Rc::new(RefCell::new(Value::Identifier(prev_ident))),
+            )))),
+        })));
+        prev_ident = this_ident;
+    }
+
+    rep_statements.push(Rc::new(RefCell::new(Statement::Copy {
+        expression,
+        value: Rc::new(RefCell::new(Value::Identifier(prev_ident))),
+    })));
+
+    statements.splice(idx..idx, rep_statements);
+    block.set_statements(statements);
 }

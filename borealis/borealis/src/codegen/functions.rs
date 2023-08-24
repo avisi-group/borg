@@ -1,5 +1,6 @@
 //! GenC function generation from BOOM
 
+use crate::{boom::Definition, genc_model};
 use {
     crate::{
         boom::{
@@ -90,6 +91,45 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             "#
             .into(),
         },
+        HelperFunction {
+            name: "slice".into(),
+            parameters: "uint64 n, uint64 start, uint64 len".into(),
+            return_type: "uint64".into(),
+            body: r#"
+                return raw_GetSlice_int(len, n, start);
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "sail_assert".into(),
+            parameters: "uint64 value".into(),
+            return_type: "void".into(),
+            body: r#"
+                if (!value) {
+                    trap();
+                }
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "UsingAArch32".into(),
+            parameters: "".into(),
+            return_type: "uint8".into(),
+            body: r#"
+                return 0;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "AArch64_BranchAddr".into(),
+            parameters: "uint64 vaddress".into(),
+            return_type: "uint64".into(),
+            body: r#"
+            return vaddress;
+            "#
+            .into(),
+        },
     ];
 
     HashMap::from_iter(
@@ -147,6 +187,30 @@ pub fn generate_fns(
     }
 
     generated_fns.into_values().collect()
+}
+
+/// Generates constants from all enum variants
+pub fn generate_enums(ast: Rc<RefCell<Ast>>) -> HashMap<InternedString, (genc_model::Typ, u64)> {
+    ast.borrow()
+        .definitions
+        .iter()
+        .filter_map(|def| {
+            if let Definition::Enum { name, variants } = def {
+                Some((name, variants))
+            } else {
+                None
+            }
+        })
+        .map(|(name, variants)| variants.iter().map(|variant| enum_mangle(*name, *variant)))
+        .flatten()
+        .zip(0..)
+        .map(|(k, v)| (k, (genc_model::Typ::Uint32, v)))
+        .collect()
+}
+
+/// Mangled enum variant constant name generator
+pub fn enum_mangle(_name: InternedString, variant: InternedString) -> InternedString {
+    format!("{variant}").into()
 }
 
 #[derive(Debug)]

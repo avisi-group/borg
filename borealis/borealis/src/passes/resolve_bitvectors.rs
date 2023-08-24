@@ -145,6 +145,7 @@ impl ResolveBitvectors {
         static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
             let mappings = [
                 ("Zeros", zeros_handler as HandlerFunction),
+                ("Ones", ones_handler),
                 ("bitvector_concat", concat_handler),
                 ("eq_vec", eq_handler),
                 ("undefined_bitvector", undefined_handler),
@@ -273,6 +274,53 @@ fn zeros_handler(
         expression: expression.clone(),
         value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
             Literal::Int(0.into()),
+        ))))),
+    }
+}
+
+fn ones_handler(
+    celf: &mut ResolveBitvectors,
+    statement: Rc<RefCell<Statement>>,
+    expression: &Expression,
+    arguments: &[Rc<RefCell<Value>>],
+) {
+    // get assignment to argument to Ones
+    assert_eq!(arguments.len(), 1);
+
+    let Value::Identifier(ident) = &*arguments[0].borrow() else {
+        panic!();
+    };
+
+    let Some(value) = celf
+        .current_func
+        .as_ref()
+        .unwrap()
+        .entry_block
+        .get_assignment(*ident)
+    else {
+        return;
+    };
+
+    let Value::Literal(literal) = &*value.borrow() else {
+        panic!();
+    };
+
+    let Literal::Int(length) = &*literal.borrow() else {
+        panic!();
+    };
+
+    // change type of destination to length
+    let Expression::Identifier(destination) = expression else {
+        panic!();
+    };
+
+    celf.resolve(*destination, isize::try_from(length).unwrap());
+
+    // assign all 1s
+    *statement.borrow_mut() = Statement::Copy {
+        expression: expression.clone(),
+        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+            Literal::Int(((1u128 << u64::try_from(length).unwrap()) - 1).into()),
         ))))),
     }
 }

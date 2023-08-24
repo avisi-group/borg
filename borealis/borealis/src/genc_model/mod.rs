@@ -8,7 +8,7 @@ use {
         },
         Error,
     },
-    common::{HashMap, HashSet},
+    common::{intern::InternedString, HashMap, HashSet},
     errctx::PathCtx,
     std::{
         fmt::Display,
@@ -87,6 +87,9 @@ pub struct Description {
 
     /// AC features
     pub features: HashSet<String>,
+
+    /// Constant values
+    pub constants: HashMap<InternedString, (Typ, u64)>,
 }
 
 impl Description {
@@ -99,6 +102,7 @@ impl Description {
             wordsize: self.wordsize,
             registers: self.registers.clone(),
             features: self.features.clone(),
+            constants: self.constants.clone(),
         };
 
         // construct Vec of Formats
@@ -239,6 +243,7 @@ impl Description {
             },
             helpers: vec![],
             features: HashSet::default(),
+            constants: HashMap::default(),
         }
     }
 }

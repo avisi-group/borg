@@ -254,6 +254,8 @@ pub enum Type {
     FixedBits(isize, bool), // uint64_t
     LargeBits(bool),
 
+    FixedSignedBits(isize),
+
     Enum {
         name: InternedString,
         variants: Vec<InternedString>,
@@ -300,6 +302,7 @@ impl Walkable for Rc<RefCell<Type>> {
             | FixedInt(_)
             | FixedBits(_, _)
             | LargeBits(_)
+            | FixedSignedBits(_)
             | Bit
             | Enum { .. } => (),
 
@@ -542,16 +545,27 @@ impl Walkable for Rc<RefCell<Literal>> {
 pub enum Operation {
     Not(Rc<RefCell<Value>>),
     Complement(Rc<RefCell<Value>>),
+
     Equal(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    NotEqual(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+
     LessThan(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    LessThanOrEqual(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     GreaterThan(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    GreaterThanOrEqual(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+
     Subtract(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     Add(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     Or(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     And(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Xor(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+
+    Cast(Rc<RefCell<Value>>, Rc<RefCell<Type>>),
+
     LeftShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     RightShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    Cast(Rc<RefCell<Value>>, Rc<RefCell<Type>>),
+    RotateRight(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    RotateLeft(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
 }
 
 impl Walkable for Operation {
@@ -561,14 +575,20 @@ impl Walkable for Operation {
                 visitor.visit_value(value.clone())
             }
             Operation::Equal(lhs, rhs)
+            | Operation::NotEqual(lhs, rhs)
             | Operation::LessThan(lhs, rhs)
             | Operation::GreaterThan(lhs, rhs)
+            | Operation::LessThanOrEqual(lhs, rhs)
+            | Operation::GreaterThanOrEqual(lhs, rhs)
             | Operation::Subtract(lhs, rhs)
             | Operation::Add(lhs, rhs)
             | Operation::Or(lhs, rhs)
+            | Operation::Xor(lhs, rhs)
             | Operation::And(lhs, rhs)
             | Operation::LeftShift(lhs, rhs)
-            | Operation::RightShift(lhs, rhs) => {
+            | Operation::RightShift(lhs, rhs)
+            | Operation::RotateLeft(lhs, rhs)
+            | Operation::RotateRight(lhs, rhs) => {
                 visitor.visit_value(lhs.clone());
                 visitor.visit_value(rhs.clone());
             }

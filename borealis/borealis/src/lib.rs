@@ -6,7 +6,7 @@ use {
     crate::{
         boom::control_flow::ControlFlowBlock,
         codegen::{
-            functions::generate_fns,
+            functions::{generate_enums, generate_fns},
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
         },
         genc_model::{Bank, Description, Instruction, RegisterSpace, Slot, View},
@@ -77,6 +77,20 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "AddWithCarry",
                 "IsZero",
                 "GetSlice_int",
+                "integer_logical_shiftedreg_decode",
+                "DecodeShift",
+                "integer_logical_shiftedreg",
+                "ShiftReg",
+                "branch_conditional_cond_decode",
+                "branch_conditional_cond",
+                "ConditionHolds",
+                "BranchTo",
+                // "AArch64_BranchAddr",
+                // "UsingAArch32",
+                "IsZeroBit",
+                "integer_logical_immediate_decode",
+                "DecodeBitMasks",
+                "integer_logical_immediate",
             ]
             .contains(&k.as_ref())
             {
@@ -119,6 +133,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     // generate all functions, using the names of the instructions as the entrypoint
     let mut functions = generate_fns(ast.clone(), instruction_names);
 
+    let constants = generate_enums(ast.clone());
+
     // generate register spaces
     let _registers = 0;
 
@@ -126,6 +142,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
     let mut description = Description::empty();
 
     description.helpers.append(&mut functions);
+
+    description.constants = constants;
 
     description.instructions = instructions;
 

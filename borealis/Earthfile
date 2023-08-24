@@ -123,11 +123,11 @@ e2e-test-archsim:
     FROM ghcr.io/fmckeogh/gensim:latest
 
     RUN apt-get install -yy gcc-aarch64-linux-gnu
-    COPY data/test.S .
-    RUN aarch64-linux-gnu-gcc -o test -nostdlib -static test.S
+    COPY data/fib.S .
+    RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
 
     RUN mkdir modules
     COPY (+e2e-test-gensim/arm64.dll) modules
 
-    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./test -t -U trace.out --mode Interpreter
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out --mode Interpreter
     RUN ./dist/bin/TraceCat trace.out0
