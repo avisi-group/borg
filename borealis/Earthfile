@@ -123,7 +123,7 @@ e2e-test-archsim:
     FROM ghcr.io/fmckeogh/gensim:latest
 
     RUN apt-get install -yy gcc-aarch64-linux-gnu
-    RUN echo "_start:\n.globl _start\nadd x0, x1, #0x20\nadd x0, x0, #0x30\nsubs x0, x0, #0x10\nsubs x0, x0, #0x40" > test.S
+    COPY data/test.S .
     RUN aarch64-linux-gnu-gcc -o test -nostdlib -static test.S
 
     RUN mkdir modules
