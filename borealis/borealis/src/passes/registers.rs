@@ -135,7 +135,7 @@ impl Visitor for PcHandler {
                             .borrow()
                             .functions
                             .get(&name)
-                            .unwrap()
+                            .unwrap_or_else(|| panic!("could not get function {name}"))
                             .signature
                             .return_type
                             .clone();

@@ -86,6 +86,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("ZeroExtend__0", zero_extend_handler),
         ("ZeroExtend__1", zero_extend_handler),
         ("SignExtend__0", sign_extend_handler),
+        ("eq_anything_EArchVersion_pcnt__", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Equal)
+        }),
         ("slice", noop),
         ("Zeros", noop),
         ("undefined_bitvector", noop),
@@ -126,7 +129,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("abs_real", noop),
         ("vector_update_B_B64_", noop),
         ("eq_anything_ECountOp_pcnt__", noop),
-        ("eq_anything_EArchVersion_pcnt__", noop),
         ("vector_access_B_B32_", noop),
         ("sub_vec", noop),
         ("real_power", noop),

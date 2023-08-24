@@ -1,14 +1,13 @@
 //! GenC function generation from BOOM
 
-use crate::{boom::Definition, genc_model};
 use {
     crate::{
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
-            Ast, Statement,
+            Ast, Definition, Statement,
         },
         codegen::emit::Emit,
-        genc_model::HelperFunction,
+        genc_model::{self, HelperFunction},
     },
     common::{intern::InternedString, HashMap, HashSet},
     itertools::Itertools,
@@ -126,7 +125,16 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             parameters: "uint64 vaddress".into(),
             return_type: "uint64".into(),
             body: r#"
-            return vaddress;
+                return vaddress;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "Hint_Branch".into(),
+            parameters: "uint32 typ".into(),
+            return_type: "void".into(),
+            body: r#"
+                return;
             "#
             .into(),
         },

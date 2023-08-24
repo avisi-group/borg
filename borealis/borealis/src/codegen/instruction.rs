@@ -101,8 +101,13 @@ pub fn generate_execute_entrypoint(
                 })
                 .join(", ")
         } else {
-            log::debug!("could not find function {:?}", execute_function_name);
-            "".to_owned()
+            return (
+                execute_function_name,
+                mangled_name,
+                format,
+                "trap();\nreturn;".into(),
+                "".into(),
+            );
         }
     };
 

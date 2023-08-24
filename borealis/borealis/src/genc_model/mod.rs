@@ -1,10 +1,13 @@
 //! GenC model filesystem representation
+//!
+//! `Description` is a GenC ISA description which can be used to generate it's
+//! constituent files, the
 
 use {
     crate::{
         genc_model::{
+            files::{Execute, Files, Format, Function, Isa, Main},
             format::InstructionFormat,
-            ir::{Execute, Files, Format, Function, Isa, Main},
         },
         Error,
     },
@@ -18,42 +21,13 @@ use {
     },
 };
 
+mod files;
 pub mod format;
-mod ir;
 
 const MAIN_FILENAME: &str = "main.genc";
 const ISA_FILENAME: &str = "isa.genc";
 const EXECUTE_FILENAME: &str = "execute.genc";
 const BEHAVIOURS_FILENAME: &str = "behaviours.genc";
-
-/// Export a GenC description to the supplied empty directory
-pub fn export<P: AsRef<Path>>(description: &Description, path: P) -> Result<(), Error> {
-    let path = path.as_ref();
-
-    create_dir_all(path).map_err(PathCtx::f(path))?;
-
-    let Files {
-        main,
-        isa,
-        execute,
-        behaviours,
-    } = description.files();
-
-    write_file(main, path.join(MAIN_FILENAME))?;
-    write_file(isa, path.join(ISA_FILENAME))?;
-    write_file(execute, path.join(EXECUTE_FILENAME))?;
-    write_file(behaviours, path.join(BEHAVIOURS_FILENAME))?;
-
-    Ok(())
-}
-
-/// Creates and writes an value implementing `Display` to a file at the supplied
-/// path.
-fn write_file<D: Display>(contents: D, path: PathBuf) -> Result<(), Error> {
-    let mut file = File::create(&path).map_err(PathCtx::f(&path))?;
-    writeln!(file, "{contents}").map_err(PathCtx::f(&path))?;
-    Ok(())
-}
 
 /// GenC description of an instruction set architecture
 #[derive(Debug)]
@@ -90,6 +64,35 @@ pub struct Description {
 
     /// Constant values
     pub constants: HashMap<InternedString, (Typ, u64)>,
+}
+
+/// Export a GenC description to the supplied empty directory
+pub fn export<P: AsRef<Path>>(description: &Description, path: P) -> Result<(), Error> {
+    let path = path.as_ref();
+
+    create_dir_all(path).map_err(PathCtx::f(path))?;
+
+    let Files {
+        main,
+        isa,
+        execute,
+        behaviours,
+    } = description.files();
+
+    write_file(main, path.join(MAIN_FILENAME))?;
+    write_file(isa, path.join(ISA_FILENAME))?;
+    write_file(execute, path.join(EXECUTE_FILENAME))?;
+    write_file(behaviours, path.join(BEHAVIOURS_FILENAME))?;
+
+    Ok(())
+}
+
+/// Creates and writes an value implementing `Display` to a file at the supplied
+/// path.
+fn write_file<D: Display>(contents: D, path: PathBuf) -> Result<(), Error> {
+    let mut file = File::create(&path).map_err(PathCtx::f(&path))?;
+    writeln!(file, "{contents}").map_err(PathCtx::f(&path))?;
+    Ok(())
 }
 
 impl Description {
@@ -196,7 +199,7 @@ impl Description {
             },
         ];
 
-        let behaviours = ir::Behaviours(
+        let behaviours = files::Behaviours(
             self.behaviours
                 .custom
                 .iter()
@@ -214,36 +217,6 @@ impl Description {
             isa,
             execute,
             behaviours,
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn empty() -> Self {
-        Description {
-            name: "arm64".to_owned(),
-            endianness: Endianness::LittleEndian,
-            wordsize: 64,
-            fetchsize: 32,
-            predicated: false,
-            registers: vec![],
-            instructions: HashMap::default(),
-            behaviours: Behaviours {
-                handle_exception: "".to_owned(),
-                reset: "".to_owned(),
-                irq: "".to_owned(),
-                mmu_fault: "".to_owned(),
-                page_fault: "".to_owned(),
-                undefined_instruction: "".to_owned(),
-                single_step: "".to_owned(),
-                undef: "".to_owned(),
-                custom: vec![CustomBehaviour {
-                    name: "custom".to_owned(),
-                    body: "return;".to_owned(),
-                }],
-            },
-            helpers: vec![],
-            features: HashSet::default(),
-            constants: HashMap::default(),
         }
     }
 }

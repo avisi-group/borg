@@ -115,7 +115,7 @@ e2e-test-borealis-genc:
 e2e-test-gensim:
     FROM ghcr.io/fmckeogh/gensim:latest
     COPY (+e2e-test-borealis-genc/genc) .
-    RUN ./dist/bin/gensim --verbose -a main.genc -t output -s module,arch,decode,disasm,ee_interp,ee_blockjit,jumpinfo,function,makefile -o decode.GenerateDotGraph=1,makefile.libtrace_path=/build/support/libtrace/inc,makefile.archsim_path=/build/archsim/inc,makefile.Optimise=3,makefile.Debug=1
+    RUN ./dist/bin/gensim --verbose -a main.genc -t output -s module,arch,decode,disasm,ee_interp,ee_blockjit,jumpinfo,function,makefile -o decode.GenerateDotGraph=1,makefile.libtrace_path=/gensim/support/libtrace/inc,makefile.archsim_path=/gensim/archsim/inc,makefile.Optimise=3,makefile.Debug=1
     RUN cd output && make -j8
     SAVE ARTIFACT output/arm64.dll arm64.dll
 

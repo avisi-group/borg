@@ -4,15 +4,17 @@
 
 use {
     crate::{
-        boom::control_flow::ControlFlowBlock,
+        boom::{control_flow::ControlFlowBlock, Statement},
         codegen::{
             functions::{generate_enums, generate_fns},
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
         },
-        genc_model::{Bank, Description, Instruction, RegisterSpace, Slot, View},
+        genc_model::{
+            Bank, Behaviours, Description, Endianness, Instruction, RegisterSpace, Slot, Typ, View,
+        },
         passes::execute_passes,
     },
-    common::intern::INTERNER,
+    common::{intern::INTERNER, HashMap},
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{info, trace},
@@ -22,11 +24,13 @@ use {
         sail_ast::Ast,
     },
     std::{
+        cell::RefCell,
         collections::LinkedList,
         ffi::OsStr,
         fs::File,
         io::{self, BufReader},
         path::{Path, PathBuf},
+        rc::Rc,
         thread,
     },
 };
@@ -83,18 +87,29 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "ShiftReg",
                 "branch_conditional_cond_decode",
                 "branch_conditional_cond",
-                "ConditionHolds",
-                "BranchTo",
-                // "AArch64_BranchAddr",
-                // "UsingAArch32",
-                "IsZeroBit",
-                "integer_logical_immediate_decode",
-                "DecodeBitMasks",
-                "integer_logical_immediate",
+                //"PostDecode",
+                //"HaveBTIExt",
+                //"HasArchVersion",
+                //"BranchTargetCheck",
+                //"ConditionHolds",
+                //"BranchTo",
+                //"AArch64_BranchAddr",
+                //"UsingAArch32",
+                //"IsZeroBit",
+                //"integer_logical_immediate_decode",
+                //"DecodeBitMasks",
+                //"integer_logical_immediate",
             ]
             .contains(&k.as_ref())
             {
                 def.entry_block = ControlFlowBlock::new();
+                def.entry_block.set_statements(vec![Rc::new(RefCell::new(
+                    Statement::FunctionCall {
+                        expression: None,
+                        name: "trap".into(),
+                        arguments: vec![],
+                    },
+                ))])
             }
 
             (k, def)
@@ -131,93 +146,112 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
         .unzip::<_, _, _, _>();
 
     // generate all functions, using the names of the instructions as the entrypoint
-    let mut functions = generate_fns(ast.clone(), instruction_names);
+    let functions = generate_fns(ast.clone(), instruction_names);
 
-    let constants = generate_enums(ast.clone());
+    let constants = {
+        let mut constants = HashMap::default();
+        let enum_constants = generate_enums(ast.clone());
 
-    // generate register spaces
-    let _registers = 0;
+        constants.extend(enum_constants);
 
-    // create empty GenC description
-    let mut description = Description::empty();
+        constants.insert("v85_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("v84_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("v83_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("v82_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("v81_implemented".into(), (Typ::Uint8, 1));
 
-    description.helpers.append(&mut functions);
+        constants
+    };
 
-    description.constants = constants;
-
-    description.instructions = instructions;
-
-    description.registers = vec![
-        RegisterSpace {
-            size: 256,
-            views: vec![View::Bank(Bank {
-                name: "reg_RB".into(),
-                typ: genc_model::Typ::Uint64,
-                offset: 0,
-                count: 31,
-                stride: 8,
-                element_count: 1,
-                element_size: 8,
-                element_stride: 8,
-            })],
-        },
-        RegisterSpace {
-            size: 16,
-            views: vec![
-                View::Slot(Slot {
-                    name: "reg_PC".into(),
+    Description {
+        name: "arm64".to_owned(),
+        endianness: Endianness::LittleEndian,
+        wordsize: 64,
+        fetchsize: 32,
+        predicated: false,
+        registers: vec![
+            RegisterSpace {
+                size: 256,
+                views: vec![View::Bank(Bank {
+                    name: "reg_RB".into(),
                     typ: genc_model::Typ::Uint64,
-                    width: 8,
                     offset: 0,
-                    tag: Some("PC".into()),
-                }),
-                View::Slot(Slot {
-                    name: "reg_SP".into(),
-                    typ: genc_model::Typ::Uint64,
-                    width: 8,
-                    offset: 8,
-                    tag: Some("SP".into()),
-                }),
-            ],
+                    count: 31,
+                    stride: 8,
+                    element_count: 1,
+                    element_size: 8,
+                    element_stride: 8,
+                })],
+            },
+            RegisterSpace {
+                size: 16,
+                views: vec![
+                    View::Slot(Slot {
+                        name: "reg_PC".into(),
+                        typ: genc_model::Typ::Uint64,
+                        width: 8,
+                        offset: 0,
+                        tag: Some("PC".into()),
+                    }),
+                    View::Slot(Slot {
+                        name: "reg_SP".into(),
+                        typ: genc_model::Typ::Uint64,
+                        width: 8,
+                        offset: 8,
+                        tag: Some("SP".into()),
+                    }),
+                ],
+            },
+            RegisterSpace {
+                size: 4,
+                views: vec![
+                    View::Slot(Slot {
+                        name: "reg_N".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 0,
+                        tag: Some("N".into()),
+                    }),
+                    View::Slot(Slot {
+                        name: "reg_Z".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 1,
+                        tag: Some("Z".into()),
+                    }),
+                    View::Slot(Slot {
+                        name: "reg_C".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 2,
+                        tag: Some("C".into()),
+                    }),
+                    View::Slot(Slot {
+                        name: "reg_V".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 3,
+                        tag: Some("V".into()),
+                    }),
+                ],
+            },
+        ],
+        instructions,
+        behaviours: Behaviours {
+            handle_exception: "".to_owned(),
+            reset: "".to_owned(),
+            irq: "".to_owned(),
+            mmu_fault: "".to_owned(),
+            page_fault: "".to_owned(),
+            undefined_instruction: "".to_owned(),
+            single_step: "".to_owned(),
+            undef: "".to_owned(),
+            custom: vec![],
         },
-        RegisterSpace {
-            size: 4,
-            views: vec![
-                View::Slot(Slot {
-                    name: "reg_N".into(),
-                    typ: genc_model::Typ::Uint8,
-                    width: 1,
-                    offset: 0,
-                    tag: Some("N".into()),
-                }),
-                View::Slot(Slot {
-                    name: "reg_Z".into(),
-                    typ: genc_model::Typ::Uint8,
-                    width: 1,
-                    offset: 1,
-                    tag: Some("Z".into()),
-                }),
-                View::Slot(Slot {
-                    name: "reg_C".into(),
-                    typ: genc_model::Typ::Uint8,
-                    width: 1,
-                    offset: 2,
-                    tag: Some("C".into()),
-                }),
-                View::Slot(Slot {
-                    name: "reg_V".into(),
-                    typ: genc_model::Typ::Uint8,
-                    width: 1,
-                    offset: 3,
-                    tag: Some("V".into()),
-                }),
-            ],
-        },
-    ];
-
-    description.features.insert("EMULATE_LINUX_ARCHSIM".into());
-
-    description
+        helpers: functions,
+        features: ["EMULATE_LINUX_ARCHSIM".into()].into_iter().collect(),
+        constants,
+    }
 }
 
 /// Load Sail model AST and JIB from either a `sail.json` or compressed

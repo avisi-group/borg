@@ -56,7 +56,6 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         RegisterHandler::new_boxed(),
         DestructStructs::new_boxed(),
         ReplaceBools::new_boxed(),
-        //    ReplaceEnums::new_boxed(),
         RemoveUnits::new_boxed(ast.clone()),
         RemoveExceptions::new_boxed(),
         ResolveBitvectors::new_boxed(),
