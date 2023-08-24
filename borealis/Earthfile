@@ -17,7 +17,7 @@ base-image:
     END
 
     RUN rustup component add rustfmt
-    RUN apk update && apk add opam alpine-sdk zlib-dev xz m4 z3 gmp-dev clang
+    RUN apk update && apk add opam alpine-sdk zlib-dev xz m4 z3 gmp-dev clang mold
 
     # setup OCaml
     RUN opam init --disable-sandboxing --bare -y
@@ -48,8 +48,7 @@ prebuild:
 
     RUN eval `opam env` && \
         cargo build --target $RUST_TARGET --release && \
-        cargo test --target $RUST_TARGET --no-run && \
-        cargo doc --target $RUST_TARGET
+        cargo test --target $RUST_TARGET --no-run
 
     SAVE IMAGE --cache-hint --push ghcr.io/avisi-group/borealis/prebuild
 
@@ -61,11 +60,8 @@ build:
     COPY --keep-ts --dir borealis common sail data .
     RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs
 
-    # check formatting
-    RUN cargo fmt --all -- --check
-
     # build borealis
-    RUN eval `opam env` && cargo build --target $RUST_TARGET --release
+    RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET --release
 
     SAVE ARTIFACT target/$RUST_TARGET/release/borealis borealis
     # we save the workspace as a copy of all the code with no build artefacts as the e2e-test uses a different target none of that is reusable
@@ -101,6 +97,9 @@ test:
 unit-test:
     BUILD +build
     FROM +build
+
+    # check formatting
+    RUN cargo fmt --all -- --check
 
     # build and run tests
     RUN eval `opam env` && cargo test --target $RUST_TARGET --no-fail-fast
