@@ -27,8 +27,8 @@ use {
         boom::{
             bits_to_int,
             visitor::{Visitor, Walkable},
-            Ast, Expression, FunctionDefinition, Literal, Operation, Parameter, Statement, Type,
-            Value,
+            Ast, Expression, FunctionDefinition, Literal, Operation, Parameter, Size, Statement,
+            Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },
@@ -70,7 +70,10 @@ impl ResolveBitvectors {
             panic!("called resolve on non-variable bitvector");
         };
 
-        *typ.borrow_mut() = Type::FixedBits(length, false);
+        *typ.borrow_mut() = Type::Int {
+            signed: false,
+            size: Size::Static(length.try_into().unwrap()),
+        };
         self.lengths.insert(ident, Length::Fixed(length));
     }
 
@@ -78,10 +81,14 @@ impl ResolveBitvectors {
     fn add_type_declaration(&mut self, name: InternedString, typ: Rc<RefCell<Type>>) {
         match &*typ.borrow() {
             // if we encounter a fixed variable,
-            Type::FixedBits(length, _) => {
-                self.lengths.insert(name, Length::Fixed(*length));
+            Type::Int {
+                size: Size::Static(length),
+                ..
+            } => {
+                self.lengths
+                    .insert(name, Length::Fixed((*length).try_into().unwrap()));
             }
-            Type::LargeBits(_) => {
+            Type::Int { .. } => {
                 self.lengths.insert(name, Length::Variable(typ.clone()));
             }
             _ => {}
@@ -186,8 +193,11 @@ impl Pass for ResolveBitvectors {
                 self.lengths
                     .extend(func.signature.parameters.borrow().iter().filter_map(
                         |Parameter { name, typ, .. }| match &*typ.borrow() {
-                            Type::FixedBits(length, _) => Some((*name, Length::Fixed(*length))),
-                            Type::LargeBits(_) => {
+                            Type::Int {
+                                size: Size::Static(length),
+                                ..
+                            } => Some((*name, Length::Fixed((*length).try_into().unwrap()))),
+                            Type::Int { .. } => {
                                 log::debug!("unknown length bitvector in function signature");
                                 None
                             }

@@ -1,9 +1,9 @@
 //! JIB to BOOM conversion
 
-use crate::boom::Parameter;
-
 use {
-    crate::boom::{self, control_flow::build_graph, Bit, FunctionSignature, NamedType},
+    crate::boom::{
+        self, control_flow::build_graph, Bit, FunctionSignature, NamedType, Parameter, Size,
+    },
     common::{intern::InternedString, HashMap},
     sail::{jib_ast, sail_ast},
     std::{borrow::Borrow, cell::RefCell, collections::LinkedList, rc::Rc},
@@ -133,20 +133,21 @@ impl BoomEmitter {
 
 fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
     Rc::new(RefCell::new(match typ.borrow() {
-        jib_ast::Type::Lint => boom::Type::LargeInt,
-        jib_ast::Type::Fint(i) => boom::Type::FixedInt(*i),
-        jib_ast::Type::Constant(_) => todo!(),
-        jib_ast::Type::Lbits(b) => boom::Type::LargeBits(*b),
-        jib_ast::Type::Sbits(_, _) => todo!(),
-        jib_ast::Type::Fbits(i, b) => boom::Type::FixedBits(*i, *b),
+        jib_ast::Type::Lint | jib_ast::Type::Lbits(_) => boom::Type::Int {
+            signed: false,
+            size: Size::Unknown,
+        },
+        jib_ast::Type::Fint(i) | jib_ast::Type::Fbits(i, _) => boom::Type::Int {
+            signed: false,
+            size: Size::Static(usize::try_from(*i).unwrap()),
+        },
+
         jib_ast::Type::Unit => boom::Type::Unit,
         jib_ast::Type::Bool => boom::Type::Bool,
         jib_ast::Type::Bit => boom::Type::Bit,
         jib_ast::Type::String => boom::Type::String,
         jib_ast::Type::Real => boom::Type::Real,
-        jib_ast::Type::Float(_) => todo!(),
-        jib_ast::Type::RoundingMode => todo!(),
-        jib_ast::Type::Tup(_) => todo!(),
+
         jib_ast::Type::Enum(name, variants) => boom::Type::Enum {
             name: name.as_interned(),
             variants: convert_variants(variants),
@@ -170,7 +171,12 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
             element_type: (convert_type(&**typ)),
         },
         jib_ast::Type::Ref(typ) => boom::Type::Reference(convert_type(&**typ)),
-        jib_ast::Type::Poly(_) => todo!(),
+        jib_ast::Type::Constant(_)
+        | jib_ast::Type::Sbits(_, _)
+        | jib_ast::Type::Float(_)
+        | jib_ast::Type::RoundingMode
+        | jib_ast::Type::Tup(_)
+        | jib_ast::Type::Poly(_) => todo!(),
     }))
 }
 

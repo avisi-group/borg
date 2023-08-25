@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        boom::{visitor::Visitor, Ast, Literal, Type},
+        boom::{visitor::Visitor, Ast, Literal, Size, Type},
         passes::{any::AnyExt, Pass},
     },
     std::{cell::RefCell, rc::Rc},
@@ -74,7 +74,10 @@ impl Visitor for ReplaceBools {
 
         match *node {
             Type::Bool | Type::Bit => {
-                *node = Type::FixedBits(8, false);
+                *node = Type::Int {
+                    signed: false,
+                    size: Size::Static(8),
+                };
                 self.did_change = true;
             }
             _ => {}

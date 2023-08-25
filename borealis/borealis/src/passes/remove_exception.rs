@@ -15,7 +15,7 @@ use {
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
             visitor::{Visitor, Walkable},
-            Ast, Expression, Literal, Statement, Type, Value,
+            Ast, Expression, Literal, Size, Statement, Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },
@@ -53,7 +53,10 @@ impl Pass for RemoveExceptions {
                         0,
                         Statement::TypeDeclaration {
                             name: "exception".into(),
-                            typ: Rc::new(RefCell::new(Type::FixedInt(8))),
+                            typ: Rc::new(RefCell::new(Type::Int {
+                                signed: false,
+                                size: Size::Static(8),
+                            })),
                         }
                         .into(),
                     );

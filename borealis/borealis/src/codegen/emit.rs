@@ -1,15 +1,15 @@
 //! GenC code generation from BOOM structures
 
-use crate::boom::Parameter;
-
 use {
     crate::boom::{
-        bits_to_int, Expression, Literal, NamedType, NamedValue, Operation, Statement, Type, Value,
+        bits_to_int, Expression, Literal, NamedType, NamedValue, Operation, Parameter, Size,
+        Statement, Type, Value,
     },
     common::intern::InternedString,
     itertools::Itertools,
     std::{
         cell::RefCell,
+        cmp::max,
         fmt::{self, Write},
         rc::Rc,
     },
@@ -106,45 +106,20 @@ impl Emit for Rc<RefCell<Type>> {
         match &*self.borrow() {
             Unit => write!(w, "void"),
 
-            // probably bad to emit unknown length bitvector as uint64!
-            LargeBits(_) | LargeInt => write!(w, "uint64"),
+            Int { signed, size } => match size {
+                Size::Static(size) => write!(
+                    w,
+                    "{}int{}",
+                    if *signed { 's' } else { 'u' },
+                    max(8, size.next_power_of_two())
+                ),
 
-            FixedInt(len) | FixedBits(len, _) => write!(
-                w,
-                "{}",
-                match *len {
-                    0 => panic!("unexpected 0 length bitvector"),
-                    1..=8 => "uint8",
-                    9..=16 => "uint16",
-                    17..=32 => "uint32",
-                    33..=64 => "uint64",
-                    65..=128 => "uint128",
-                    _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
-                }
-            ),
-
-            FixedSignedBits(len) => write!(
-                w,
-                "{}",
-                match *len {
-                    0 => panic!("unexpected 0 length bitvector"),
-                    1..=8 => "sint8",
-                    9..=16 => "sint16",
-                    17..=32 => "sint32",
-                    33..=64 => "sint64",
-                    65..=128 => "sint128",
-                    _ => panic!("bitvector length exceeds 128 bits, not representable in GenC"),
-                }
-            ),
+                Size::Unknown | Size::Runtime(_) => write!(w, "uint64"),
+            },
 
             Enum { .. } => write!(w, "uint32"), // <-- tom responsible for this
 
             Real | Float => write!(w, "double"),
-
-            Reference(typ) => {
-                typ.emit(w)?;
-                write!(w, "&")
-            }
 
             Bool => panic!("bools should not exist in the AST after passes"),
 

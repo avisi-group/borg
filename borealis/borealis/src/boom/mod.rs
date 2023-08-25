@@ -239,22 +239,23 @@ impl Walkable for NamedValue {
 /// Type
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    // removed before emitting
     Unit,
-    Bool,
-
     String,
+
+    // maybe useful to be distinct?
+    Bool,
+    Bit,
 
     Real,
     Float,
+
+    Int {
+        signed: bool,
+        size: Size,
+    },
+
     Constant(BigInt),
-    FixedInt(isize), // int64_t
-    LargeInt,
-
-    Bit,
-    FixedBits(isize, bool), // uint64_t
-    LargeBits(bool),
-
-    FixedSignedBits(isize),
 
     Enum {
         name: InternedString,
@@ -287,24 +288,25 @@ pub enum Type {
     Reference(Rc<RefCell<Self>>),
 }
 
+/// Size of a boom integer
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Size {
+    /// Size is known statically at borealis compile time
+    Static(usize),
+    /// Size is not static but in a local variable
+    Runtime(InternedString),
+    /// Size is unknown (emitted as uint64)
+    Unknown,
+}
+
 impl Walkable for Rc<RefCell<Type>> {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         use Type::*;
 
         match &*self.borrow() {
-            Unit
-            | Bool
-            | String
-            | Real
-            | Float
-            | Constant(_)
-            | LargeInt
-            | FixedInt(_)
-            | FixedBits(_, _)
-            | LargeBits(_)
-            | FixedSignedBits(_)
-            | Bit
-            | Enum { .. } => (),
+            Unit | Bool | String | Real | Float | Constant(_) | Int { .. } | Bit | Enum { .. } => {
+                ()
+            }
 
             Union { fields, .. } | Struct { fields, .. } => fields
                 .iter()

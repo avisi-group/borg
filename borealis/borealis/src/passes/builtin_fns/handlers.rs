@@ -1,8 +1,8 @@
 use {
     crate::{
         boom::{
-            Ast, Expression, FunctionDefinition, Literal, Operation, OperationKind, Statement,
-            Type, Value,
+            Ast, Expression, FunctionDefinition, Literal, Operation, OperationKind, Size,
+            Statement, Type, Value,
         },
         passes::builtin_fns::HandlerFunction,
     },
@@ -33,6 +33,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
             replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
         }),
         ("shl_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::LeftShift)
+        }),
+        ("shl8", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LeftShift)
         }),
         ("eq_vec", |ast, f, s| {
@@ -132,7 +135,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("update_fbits", noop),
         ("vector_access_A_B32_", noop),
         ("Error_Undefined", noop),
-        ("shl8", noop),
         ("eq_anything_EFPRounding_pcnt__", noop),
         ("eq_real", noop),
         ("pcnt_string___pcnt_real", noop),
@@ -407,16 +409,25 @@ pub fn bv_length_handler(
         panic!();
     };
 
-    let len = match fn_def.get_ident_type(*bv_ident).unwrap() {
-        Type::FixedInt(len) | Type::FixedBits(len, _) => len,
-        // TODO: this is a lie and wrong
-        Type::LargeBits(_) | Type::LargeInt => 64,
+    let size = match fn_def.get_ident_type(*bv_ident).unwrap() {
+        Type::Int {
+            size: Size::Static(size),
+            ..
+        } => Literal::Int(size.into()).into(),
+        Type::Int {
+            size: Size::Runtime(ident),
+            ..
+        } => Rc::new(RefCell::new(Value::Identifier(ident))),
+        Type::Int {
+            size: Size::Unknown,
+            ..
+        } => Literal::Int(64.into()).into(),
         _ => panic!("not a bv"),
     };
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.as_ref().unwrap().clone(),
-        value: Literal::Int(len.into()).into(),
+        value: size,
     };
 
     // replace statement with a copy of that size as a literal to the original
@@ -475,7 +486,10 @@ pub fn zero_extend_handler(
     };
 
     let x_len = match function.get_ident_type(*x_ident).unwrap() {
-        Type::FixedBits(len, _) | Type::FixedSignedBits(len) => len,
+        Type::Int {
+            size: Size::Static(len),
+            ..
+        } => len as isize,
         _ => return,
     };
 
@@ -487,7 +501,10 @@ pub fn zero_extend_handler(
             Operation::LeftShift(
                 Operation::Cast(
                     arguments[0].clone(),
-                    Rc::new(RefCell::new(Type::FixedBits(64, false))),
+                    Rc::new(RefCell::new(Type::Int {
+                        signed: false,
+                        size: Size::Static(64),
+                    })),
                 )
                 .into(),
                 Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into()).into(),
@@ -521,9 +538,24 @@ pub fn sign_extend_handler(
         panic!();
     };
 
-    let Type::FixedBits(x_len, _) = function.get_ident_type(*x_ident).unwrap() else {
-        panic!();
-    };
+    let len_value: Rc<RefCell<Value>> =
+        if let Type::Int { size, .. } = function.get_ident_type(*x_ident).unwrap() {
+            match size {
+                Size::Static(size) => Literal::Int(size.into()).into(),
+                Size::Runtime(ident) => Rc::new(RefCell::new(Value::Identifier(ident))),
+                Size::Unknown => panic!("unknown size"),
+            }
+        } else {
+            panic!(
+                "could not get type of {x_ident:?} in {}",
+                function.signature.name
+            );
+
+            // function.entry_block.get_assignment(ident)
+            // Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+            //     Literal::Int(x_len.into()),
+            // )))))
+        };
 
     // ((sint64)x << (64 - x_len)) >> (64 - x_len)
 
@@ -534,17 +566,22 @@ pub fn sign_extend_handler(
                 Operation::LeftShift(
                     Operation::Cast(
                         arguments[0].clone(),
-                        Rc::new(RefCell::new(Type::FixedSignedBits(64))),
+                        Rc::new(RefCell::new(Type::Int {
+                            signed: true,
+                            size: Size::Static(64),
+                        })),
                     )
                     .into(),
-                    Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into())
-                        .into(),
+                    Operation::Subtract(arguments[1].clone(), len_value.clone()).into(),
                 )
                 .into(),
-                Rc::new(RefCell::new(Type::FixedSignedBits(64))),
+                Rc::new(RefCell::new(Type::Int {
+                    signed: true,
+                    size: Size::Static(64),
+                })),
             )
             .into(),
-            Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into()).into(),
+            Operation::Subtract(arguments[1].clone(), len_value).into(),
         )
         .into(),
     };
@@ -616,7 +653,11 @@ pub fn replicate_bits_handler(
             panic!();
         };
 
-        let Some(Type::FixedBits(length, _)) = function.get_ident_type(*ident) else {
+        let Some(Type::Int {
+            size: Size::Static(length),
+            ..
+        }) = function.get_ident_type(*ident)
+        else {
             panic!();
         };
 
@@ -624,7 +665,7 @@ pub fn replicate_bits_handler(
             expression.clone().unwrap(),
             *ident,
             length,
-            isize::try_from(count).unwrap(),
+            usize::try_from(count).unwrap(),
         )
     };
 
@@ -647,7 +688,10 @@ pub fn replicate_bits_handler(
         buf.push(
             Statement::TypeDeclaration {
                 name: prev_ident,
-                typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
+                typ: Rc::new(RefCell::new(Type::Int {
+                    signed: false,
+                    size: Size::Static(64),
+                })),
             }
             .into(),
         );
@@ -665,7 +709,10 @@ pub fn replicate_bits_handler(
             buf.push(
                 Statement::TypeDeclaration {
                     name: this_ident,
-                    typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
+                    typ: Rc::new(RefCell::new(Type::Int {
+                        signed: false,
+                        size: Size::Static(64),
+                    })),
                 }
                 .into(),
             );
