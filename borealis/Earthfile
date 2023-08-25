@@ -45,7 +45,7 @@ build:
     FROM +chef-cook
 
     # copy full source
-    COPY . .
+    COPY --dir sail common borealis libarch-sys .
 
     # build borealis
     RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET
@@ -115,16 +115,12 @@ e2e-test-archsim:
     FROM ghcr.io/fmckeogh/gensim:latest
 
     RUN apt-get install -yy gcc-aarch64-linux-gnu
-    COPY data/test.S .
     COPY data/fib.S .
-    RUN aarch64-linux-gnu-gcc -o test -nostdlib -static test.S
+    COPY data/fib.trace .
     RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
 
     RUN mkdir modules
     COPY (+e2e-test-gensim/arm64.dll) modules
 
-    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./test -t -U trace.out.test --mode Interpreter
-    RUN ./dist/bin/TraceCat trace.out.test0
-
     RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out.fib --mode Interpreter
-    RUN ./dist/bin/TraceCat trace.out.fib0
+    RUN bash -c 'diff -u fib.trace <(./dist/bin/TraceCat trace.out.fib0)'

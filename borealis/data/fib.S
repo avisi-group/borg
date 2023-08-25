@@ -5,7 +5,7 @@ _start:
     mov x1, #1  // y
     mov x2, #0  // z
     mov x3, #0  // i
-    mov x4, #100  // num
+    mov x4, #10  // num
 
 loop:
     cmp x3, x4
