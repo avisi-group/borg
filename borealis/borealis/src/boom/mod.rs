@@ -527,6 +527,7 @@ impl Walkable for Value {
 #[derive(Debug, Clone)]
 pub enum Literal {
     Int(BigInt),
+    // Little-endian order
     Bits(Vec<Bit>),
     Bit(Bit),
     Bool(bool),

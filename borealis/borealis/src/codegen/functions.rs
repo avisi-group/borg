@@ -138,6 +138,15 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             "#
             .into(),
         },
+        HelperFunction {
+            name: "PostDecode".into(),
+            parameters: "".into(),
+            return_type: "void".into(),
+            body: r#"
+                return;
+            "#
+            .into(),
+        },
     ];
 
     HashMap::from_iter(

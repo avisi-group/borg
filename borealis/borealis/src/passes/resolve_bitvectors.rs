@@ -244,30 +244,22 @@ fn zeros_handler(
         panic!();
     };
 
-    let Some(value) = celf
+    // resolve destination length if possible
+    if let Some(value) = celf
         .current_func
         .as_ref()
         .unwrap()
         .entry_block
         .get_assignment(*ident)
-    else {
-        return;
-    };
-
-    let Value::Literal(literal) = &*value.borrow() else {
-        panic!();
-    };
-
-    let Literal::Int(length) = &*literal.borrow() else {
-        panic!();
-    };
-
-    // change type of destination to length
-    let Expression::Identifier(destination) = expression else {
-        panic!();
-    };
-
-    celf.resolve(*destination, isize::try_from(length).unwrap());
+    {
+        if let Value::Literal(literal) = &*value.borrow() {
+            if let Literal::Int(length) = &*literal.borrow() {
+                if let Expression::Identifier(destination) = expression {
+                    celf.resolve(*destination, isize::try_from(length).unwrap());
+                }
+            }
+        }
+    }
 
     // assign literal 0
     *statement.borrow_mut() = Statement::Copy {

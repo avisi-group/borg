@@ -348,7 +348,14 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
 
 fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
     Rc::new(RefCell::new(match literal {
-        jib_ast::Vl::Bits(bits, _) => boom::Literal::Bits(bits.iter().map(convert_bit).collect()),
+        jib_ast::Vl::Bits(bits, is_big_endian) => {
+            let bits = if *is_big_endian {
+                bits.iter().rev().map(convert_bit).collect()
+            } else {
+                bits.iter().map(convert_bit).collect()
+            };
+            boom::Literal::Bits(bits)
+        }
         jib_ast::Vl::Bit(bit) => boom::Literal::Bit(convert_bit(bit)),
         jib_ast::Vl::Bool(b) => boom::Literal::Bool(*b),
         jib_ast::Vl::Unit => boom::Literal::Unit,

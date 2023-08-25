@@ -6,18 +6,6 @@ _start:
     mov x2, #0  // z
     mov x3, #0  // i
     mov x4, #10  // num
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
-    add x9, x1, #0x20
 
 loop:
     cmp x3, x4

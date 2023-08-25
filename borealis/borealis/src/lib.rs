@@ -87,6 +87,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "ShiftReg",
                 "branch_conditional_cond_decode",
                 "branch_conditional_cond",
+                "integer_insext_insert_movewide_decode",
+                "integer_insext_insert_movewide",
                 //"PostDecode",
                 //"HaveBTIExt",
                 //"HasArchVersion",

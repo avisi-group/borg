@@ -77,8 +77,7 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("LSL", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LeftShift)
         }),
-        // probably need to take another look at this
-        ("SInt", replace_with_copy),
+        ("SInt", replace_with_copy), // probably need to take another look at this
         ("bitvector_length", bv_length_handler),
         ("bitvector_access_B", bv_access_handler),
         ("bitvector_access_A", bv_access_handler),
@@ -89,16 +88,24 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("eq_anything_EArchVersion_pcnt__", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
+        ("eq_anything_EMoveWideOp_pcnt__", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Equal)
+        }),
         ("slice", noop),
         ("Zeros", noop),
         ("undefined_bitvector", noop),
         ("bitvector_concat", noop),
         ("aget_PC", |ast, f, s| rename(ast, f, s, "read_pc".into())),
         ("sail_assert", assert_handler),
+        // delete undefined initializers
         ("undefined_bool", delete),
         ("undefined_LogicalOp", delete),
+        ("undefined_int", delete),
+        ("undefined_MoveWideOp", delete),
         ("replicate_bits", replicate_bits_handler),
-        ("undefined_int", noop),
+        ("SetSlice_int", noop),
+        ("SetSlice_bits", set_slice_handler),
+        //
         ("undefined_real", noop),
         ("undefined_string", noop),
         ("undefined_unit", noop),
@@ -118,7 +125,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("Error_See", noop),
         ("update_fbits", noop),
         ("vector_access_A_B32_", noop),
-        ("SetSlice_bits", noop),
         ("Error_Undefined", noop),
         ("shl8", noop),
         ("eq_anything_EFPRounding_pcnt__", noop),
@@ -237,8 +243,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("internal_pick_EMemOp_pcnt__", noop),
         ("vector_access_B_B64_", noop),
         ("vector_subrange_B", noop),
-        ("SetSlice_int", noop),
-        ("eq_anything_EMoveWideOp_pcnt__", noop),
         ("vector_access_A_B64_", noop),
         ("negate_real", noop),
         ("undefined_vector_B32_", noop),
@@ -686,4 +690,81 @@ pub fn replicate_bits_handler(
 
     statements.splice(idx..idx, rep_statements);
     block.set_statements(statements);
+}
+
+pub fn set_slice_handler(
+    _ast: Rc<RefCell<Ast>>,
+    _function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    // result = 0;
+    // // RefCell { value: LargeInt }
+    // uint64 gs_12779;
+    // // Identifier("gs_12779") RefCell { value: Literal(RefCell { value: Int(16)
+    // }) } gs_12779 = 16;
+    // // RefCell { value: LargeInt }
+    // uint64 gs_155056;
+    // // Identifier("gs_155056") RefCell { value: Identifier("datasize") }
+    // gs_155056 = datasize;
+    // // RefCell { value: FixedBits(16, false) }
+    // uint16 gs_155057;
+    // // Identifier("gs_155057") RefCell { value: Identifier("imm") }
+    // gs_155057 = imm;
+    // result = SetSlice_bits(gs_155056, gs_12779, result, pos, gs_155057);
+
+    // void set_slice(lbits *rop,
+    //     const sail_int len_mpz,
+    //     const sail_int slen_mpz,
+    //     const lbits op,
+    //     const sail_int start_mpz,
+    //     const lbits slice)
+
+    // result = (result & (~(((1 << slice_len) - 1) << pos))) | (slice << pos)
+    let (expression, slice_len, input, pos, slice) = {
+        let Statement::FunctionCall {
+            expression,
+
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
+            panic!();
+        };
+
+        (
+            expression.clone().unwrap(),
+            arguments[1].clone(),
+            arguments[2].clone(),
+            arguments[3].clone(),
+            arguments[4].clone(),
+        )
+    };
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression,
+        value: Rc::new(RefCell::new(Value::Operation(Operation::Or(
+            Rc::new(RefCell::new(Value::Operation(Operation::And(
+                input,
+                Rc::new(RefCell::new(Value::Operation(Operation::Complement(
+                    Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+                        Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
+                            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+                                Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                                    Literal::Int(1.into()),
+                                ))))),
+                                slice_len,
+                            )))),
+                            Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                                Literal::Int(1.into()),
+                            ))))),
+                        )))),
+                        pos.clone(),
+                    )))),
+                )))),
+            )))),
+            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+                slice, pos,
+            )))),
+        )))),
+    };
 }
