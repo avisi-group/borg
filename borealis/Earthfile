@@ -39,7 +39,7 @@ chef-prepare:
 chef-cook:
     FROM +base-image
     COPY (+chef-prepare/recipe.json) .
-    RUN eval `opam env` && cargo chef cook --recipe-path recipe.json --target $RUST_TARGET --release
+    RUN eval `opam env` && cargo chef cook --recipe-path recipe.json --target $RUST_TARGET
 
 build:
     FROM +chef-cook
@@ -48,9 +48,9 @@ build:
     COPY . .
 
     # build borealis
-    RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET --release
+    RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET
 
-    SAVE ARTIFACT target/$RUST_TARGET/release/borealis borealis
+    SAVE ARTIFACT target/$RUST_TARGET/debug/borealis borealis
 
 borealis-docs:
     FROM +build
@@ -79,14 +79,14 @@ test:
     BUILD +unit-test
     BUILD --platform=linux/amd64 +e2e-test-archsim
 
-chef-cook-test:
+test-chef-cook:
     FROM +base-image
     COPY (+chef-prepare/recipe.json) .
     RUN eval `opam env` && cargo chef cook --recipe-path recipe.json --target $RUST_TARGET --tests
 
 unit-test:
     BUILD +build
-    FROM +chef-cook-test
+    FROM +test-chef-cook
 
     # copy full source
     COPY . .
@@ -115,11 +115,16 @@ e2e-test-archsim:
     FROM ghcr.io/fmckeogh/gensim:latest
 
     RUN apt-get install -yy gcc-aarch64-linux-gnu
+    COPY data/test.S .
     COPY data/fib.S .
+    RUN aarch64-linux-gnu-gcc -o test -nostdlib -static test.S
     RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
 
     RUN mkdir modules
     COPY (+e2e-test-gensim/arm64.dll) modules
 
-    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out --mode Interpreter
-    RUN ./dist/bin/TraceCat trace.out0
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./test -t -U trace.out.test --mode Interpreter
+    RUN ./dist/bin/TraceCat trace.out.test0
+
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out.fib --mode Interpreter
+    RUN ./dist/bin/TraceCat trace.out.fib0
