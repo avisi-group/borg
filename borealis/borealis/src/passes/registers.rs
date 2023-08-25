@@ -114,8 +114,11 @@ impl Visitor for PcHandler {
                     if ident.as_ref() == "PC" {
                         *node.borrow_mut() = Statement::FunctionCall {
                             expression: None,
-                            name: "write_pc".into(),
-                            arguments: vec![value.clone()],
+                            name: "write_register".into(),
+                            arguments: vec![
+                                Rc::new(RefCell::new(Value::Identifier("reg_PC_target".into()))),
+                                value.clone(),
+                            ],
                         }
                     } else if ident.as_ref() == "PC_changed" {
                         *node.borrow_mut() = Statement::Comment("PC_changed remove here".into());
@@ -165,8 +168,13 @@ impl Visitor for PcHandler {
                             idx + 2,
                             Rc::new(RefCell::new(Statement::FunctionCall {
                                 expression: None,
-                                name: "write_pc".into(),
-                                arguments: vec![Rc::new(RefCell::new(Value::Identifier(var_name)))],
+                                name: "write_register".into(),
+                                arguments: vec![
+                                    Rc::new(RefCell::new(Value::Identifier(
+                                        "reg_PC_target".into(),
+                                    ))),
+                                    Rc::new(RefCell::new(Value::Identifier(var_name))),
+                                ],
                             })),
                         );
 

@@ -113,11 +113,20 @@ impl Description {
             .instructions
             .iter()
             .map(
-                |(instruction_ident, Instruction { format, disasm, .. })| Format {
+                |(
+                    instruction_ident,
+                    Instruction {
+                        format,
+                        disasm,
+                        is_branch,
+                        ..
+                    },
+                )| Format {
                     format_ident: format!("fmt_{instruction_ident}"),
                     instruction_ident: instruction_ident.clone(),
                     contents: format.to_string(),
                     disasm: disasm.clone(),
+                    is_branch: *is_branch,
                 },
             )
             .collect();
@@ -135,9 +144,20 @@ impl Description {
             self.instructions
                 .iter()
                 .map(
-                    |(instruction_ident, Instruction { execute, .. })| Function::Execute {
+                    |(
+                        instruction_ident,
+                        Instruction {
+                            execute, is_branch, ..
+                        },
+                    )| Function::Execute {
                         name: instruction_ident.clone(),
-                        body: execute.clone(),
+                        body: if *is_branch {
+                            "\twrite_register(reg_PC_target, read_pc() + 4);\n".to_owned()
+                                + execute
+                                + "\n\twrite_pc(read_register(reg_PC_target));\n"
+                        } else {
+                            execute.clone()
+                        },
                     },
                 )
                 .chain(self.helpers.iter().cloned().map(
@@ -316,6 +336,8 @@ pub struct Instruction {
     pub execute: String,
     /// GenC disassembly behaviour
     pub disasm: String,
+    /// Is branch instruction (modifies PC)
+    pub is_branch: bool,
 }
 
 /// Required and custom behaviours for architecture

@@ -62,6 +62,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("add_vec", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Add)
         }),
+        ("add_vec_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Add)
+        }),
         ("neq_vec", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::NotEqual)
         }),
@@ -89,6 +92,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
         ("eq_anything_EMoveWideOp_pcnt__", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Equal)
+        }),
+        ("eq_anything_EBranchType_pcnt__", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
         ("slice", noop),
@@ -211,7 +217,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("vector_update_B_RTLBLine_", noop),
         ("internal_pick_EFPUnaryOp_pcnt__", noop),
         ("Error_Unpredictable", noop),
-        ("eq_anything_EBranchType_pcnt__", noop),
         ("Error_ReservedEncoding", noop),
         ("gt_int", noop),
         ("SleepRequest", noop),
@@ -239,7 +244,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("vector_access_B_B16_", noop),
         ("internal_pick_EFault_pcnt__", noop),
         ("Error_SError", noop),
-        ("add_vec_int", noop),
         ("internal_pick_EMemOp_pcnt__", noop),
         ("vector_access_B_B64_", noop),
         ("vector_subrange_B", noop),
@@ -539,17 +543,20 @@ pub fn sign_extend_handler(
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.unwrap(),
         value: Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
-            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                Rc::new(RefCell::new(Value::Operation(Operation::Cast(
-                    arguments[0].clone(),
-                    Rc::new(RefCell::new(Type::FixedSignedBits(64))),
+            Rc::new(RefCell::new(Value::Operation(Operation::Cast(
+                Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+                    Rc::new(RefCell::new(Value::Operation(Operation::Cast(
+                        arguments[0].clone(),
+                        Rc::new(RefCell::new(Type::FixedSignedBits(64))),
+                    )))),
+                    Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
+                        arguments[1].clone(),
+                        Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                            Literal::Int(x_len.into()),
+                        ))))),
+                    )))),
                 )))),
-                Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
-                    arguments[1].clone(),
-                    Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                        Literal::Int(x_len.into()),
-                    ))))),
-                )))),
+                Rc::new(RefCell::new(Type::FixedSignedBits(64))),
             )))),
             Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
                 arguments[1].clone(),

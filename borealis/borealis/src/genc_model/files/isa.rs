@@ -45,6 +45,7 @@ impl Display for Isa {
         for Format {
             instruction_ident,
             disasm,
+            is_branch,
             ..
         } in &self.formats
         {
@@ -56,8 +57,14 @@ impl Display for Isa {
 
             writeln!(
                 f,
-                "\t\t{instruction_ident}.set_behaviour({instruction_ident});\n",
+                "\t\t{instruction_ident}.set_behaviour({instruction_ident});",
             )?;
+
+            if *is_branch {
+                writeln!(f, "\t\t{instruction_ident}.set_end_of_block();")?;
+                writeln!(f, "\t\t{instruction_ident}.set_variable_jump();")?;
+            }
+            writeln!(f)?;
         }
 
         writeln!(f, "\t\tac_behaviours(\"{BEHAVIOURS_FILENAME}\");")?;
@@ -81,6 +88,9 @@ pub struct Format {
     pub contents: String,
     /// Disassembly string
     pub disasm: String,
+    /// Is branch instruction, if true, adds `set_end_of_block` and
+    /// `set_variable_jump` attributes
+    pub is_branch: bool,
 }
 
 impl Display for Format {

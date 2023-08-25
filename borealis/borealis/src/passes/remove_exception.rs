@@ -56,6 +56,15 @@ impl Pass for RemoveExceptions {
                             typ: Rc::new(RefCell::new(Type::FixedInt(8))),
                         })),
                     );
+                    statements.insert(
+                        1,
+                        Rc::new(RefCell::new(Statement::Copy {
+                            expression: Expression::Identifier("exception".into()),
+                            value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
+                                crate::boom::Literal::Int(0.into()),
+                            ))))),
+                        })),
+                    );
                     def.entry_block.set_statements(statements);
                 }
 

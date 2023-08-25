@@ -6,7 +6,7 @@ use {
     crate::{
         boom::{control_flow::ControlFlowBlock, Statement},
         codegen::{
-            functions::{generate_enums, generate_fns},
+            functions::{contains_write_pc, generate_enums, generate_fns},
             instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
         },
         genc_model::{
@@ -89,18 +89,14 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "branch_conditional_cond",
                 "integer_insext_insert_movewide_decode",
                 "integer_insext_insert_movewide",
-                //"PostDecode",
-                //"HaveBTIExt",
-                //"HasArchVersion",
-                //"BranchTargetCheck",
-                //"ConditionHolds",
-                //"BranchTo",
-                //"AArch64_BranchAddr",
-                //"UsingAArch32",
-                //"IsZeroBit",
-                //"integer_logical_immediate_decode",
-                //"DecodeBitMasks",
-                //"integer_logical_immediate",
+                "integer_arithmetic_addsub_shiftedreg_decode",
+                "DecodeShift",
+                "integer_arithmetic_addsub_shiftedreg",
+                "IsZeroBit",
+                "ConditionHolds",
+                "BranchTo",
+                "branch_unconditional_immediate_decode",
+                "branch_unconditional_immediate",
             ]
             .contains(&k.as_ref())
             {
@@ -140,6 +136,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                             format,
                             execute,
                             disasm,
+                            is_branch: contains_write_pc(ast.clone(), instruction_name),
                         },
                     ),
                 )
@@ -186,7 +183,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 })],
             },
             RegisterSpace {
-                size: 16,
+                size: 24,
                 views: vec![
                     View::Slot(Slot {
                         name: "reg_PC".into(),
@@ -201,6 +198,13 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                         width: 8,
                         offset: 8,
                         tag: Some("SP".into()),
+                    }),
+                    View::Slot(Slot {
+                        name: "reg_PC_target".into(),
+                        typ: genc_model::Typ::Uint64,
+                        width: 8,
+                        offset: 16,
+                        tag: None,
                     }),
                 ],
             },

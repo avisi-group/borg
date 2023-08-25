@@ -4,6 +4,7 @@ use {
     crate::{
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
+            visitor::{Visitor, Walkable},
             Ast, Definition, Statement,
         },
         codegen::emit::Emit,
@@ -353,4 +354,47 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
     }
 
     buf
+}
+
+/// Determines whether the supplied function is a branch instruction
+pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -> bool {
+    let borrow = ast.borrow();
+    let Some(fn_def) = borrow.functions.get(&function_name) else {
+        return false;
+    };
+
+    struct PcWritefinder {
+        ast: Rc<RefCell<Ast>>,
+        writes_pc: bool,
+    }
+
+    impl Visitor for PcWritefinder {
+        fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
+            {
+                if let Statement::FunctionCall { name, .. } = &*node.borrow() {
+                    if contains_write_pc(self.ast.clone(), *name) {
+                        self.writes_pc = true;
+                    }
+                }
+            }
+            node.borrow().walk(self);
+        }
+
+        fn visit_value(&mut self, node: Rc<RefCell<crate::boom::Value>>) {
+            if let crate::boom::Value::Identifier(ident) = &*node.borrow() {
+                if ident.as_ref() == "reg_PC_target" {
+                    self.writes_pc = true;
+                }
+            }
+        }
+    }
+
+    let mut finder = PcWritefinder {
+        ast: ast.clone(),
+        writes_pc: false,
+    };
+
+    finder.visit_function_definition(fn_def);
+
+    finder.writes_pc
 }
