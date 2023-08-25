@@ -228,7 +228,7 @@ impl Description {
                     body: body.clone(),
                     global: false,
                 })
-                .chain(required_behaviours.into_iter())
+                .chain(required_behaviours)
                 .collect::<Vec<_>>(),
         );
 

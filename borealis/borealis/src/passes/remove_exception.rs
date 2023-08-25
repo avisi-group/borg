@@ -15,7 +15,7 @@ use {
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
             visitor::{Visitor, Walkable},
-            Ast, Expression, Statement, Type, Value,
+            Ast, Expression, Literal, Statement, Type, Value,
         },
         passes::{any::AnyExt, Pass},
     },
@@ -51,19 +51,19 @@ impl Pass for RemoveExceptions {
                     let mut statements = def.entry_block.statements();
                     statements.insert(
                         0,
-                        Rc::new(RefCell::new(Statement::TypeDeclaration {
+                        Statement::TypeDeclaration {
                             name: "exception".into(),
                             typ: Rc::new(RefCell::new(Type::FixedInt(8))),
-                        })),
+                        }
+                        .into(),
                     );
                     statements.insert(
                         1,
-                        Rc::new(RefCell::new(Statement::Copy {
+                        Statement::Copy {
                             expression: Expression::Identifier("exception".into()),
-                            value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                                crate::boom::Literal::Int(0.into()),
-                            ))))),
-                        })),
+                            value: Literal::Int(0.into()).into(),
+                        }
+                        .into(),
                     );
                     def.entry_block.set_statements(statements);
                 }
@@ -94,11 +94,12 @@ impl Visitor for RemoveExceptions {
         } = block.terminator()
         {
             if ident.as_ref() == "exception" {
-                target.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
+                target.set_statements(vec![Statement::FunctionCall {
                     expression: None,
                     name: "trap".into(),
                     arguments: vec![],
-                }))]);
+                }
+                .into()]);
                 target.set_terminator(Terminator::Return(None));
             }
         }

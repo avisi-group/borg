@@ -219,8 +219,7 @@ pub fn generate_enums(ast: Rc<RefCell<Ast>>) -> HashMap<InternedString, (genc_mo
                 None
             }
         })
-        .map(|(name, variants)| variants.iter().map(|variant| enum_mangle(*name, *variant)))
-        .flatten()
+        .flat_map(|(name, variants)| variants.iter().map(|variant| enum_mangle(*name, *variant)))
         .zip(0..)
         .map(|(k, v)| (k, (genc_model::Typ::Uint32, v)))
         .collect()

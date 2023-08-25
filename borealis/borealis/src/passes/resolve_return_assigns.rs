@@ -74,10 +74,11 @@ impl Pass for ResolveReturns {
                     if !return_value_exists {
                         statements.insert(
                             0,
-                            Rc::new(RefCell::new(Statement::TypeDeclaration {
+                            Statement::TypeDeclaration {
                                 name: "return_value".into(),
                                 typ: typ.clone(),
-                            })),
+                            }
+                            .into(),
                         );
                     }
 

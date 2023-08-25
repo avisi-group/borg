@@ -359,6 +359,12 @@ pub enum Statement {
     Comment(InternedString),
 }
 
+impl From<Statement> for Rc<RefCell<Statement>> {
+    fn from(value: Statement) -> Self {
+        Rc::new(RefCell::new(value))
+    }
+}
+
 impl Walkable for Statement {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
@@ -521,6 +527,18 @@ impl Walkable for Value {
                 types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
         }
+    }
+}
+
+impl From<Literal> for Rc<RefCell<Value>> {
+    fn from(value: Literal) -> Self {
+        Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(value)))))
+    }
+}
+
+impl From<Operation> for Rc<RefCell<Value>> {
+    fn from(value: Operation) -> Self {
+        Rc::new(RefCell::new(Value::Operation(value)))
     }
 }
 

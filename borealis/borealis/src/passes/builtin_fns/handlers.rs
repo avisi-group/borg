@@ -379,7 +379,7 @@ pub fn replace_with_op(
 
     *statement.borrow_mut() = Statement::Copy {
         expression,
-        value: Rc::new(RefCell::new(Value::Operation(operation))),
+        value: operation.into(),
     };
 }
 
@@ -416,9 +416,7 @@ pub fn bv_length_handler(
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.as_ref().unwrap().clone(),
-        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-            Literal::Int(len.into()),
-        ))))),
+        value: Literal::Int(len.into()).into(),
     };
 
     // replace statement with a copy of that size as a literal to the original
@@ -446,15 +444,11 @@ pub fn bv_access_handler(
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.unwrap(),
-        value: Rc::new(RefCell::new(Value::Operation(Operation::And(
-            Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
-                arguments[0].clone(),
-                arguments[1].clone(),
-            )))),
-            Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                Literal::Int(1.into()),
-            ))))),
-        )))),
+        value: Operation::And(
+            Operation::RightShift(arguments[0].clone(), arguments[1].clone()).into(),
+            Literal::Int(1.into()).into(),
+        )
+        .into(),
     }
 }
 
@@ -489,26 +483,19 @@ pub fn zero_extend_handler(
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.unwrap(),
-        value: Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
-            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                Rc::new(RefCell::new(Value::Operation(Operation::Cast(
+        value: Operation::RightShift(
+            Operation::LeftShift(
+                Operation::Cast(
                     arguments[0].clone(),
                     Rc::new(RefCell::new(Type::FixedBits(64, false))),
-                )))),
-                Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
-                    arguments[1].clone(),
-                    Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                        Literal::Int(x_len.into()),
-                    ))))),
-                )))),
-            )))),
-            Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
-                arguments[1].clone(),
-                Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                    Literal::Int(x_len.into()),
-                ))))),
-            )))),
-        )))),
+                )
+                .into(),
+                Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into()).into(),
+            )
+            .into(),
+            Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into()).into(),
+        )
+        .into(),
     };
 }
 
@@ -542,29 +529,24 @@ pub fn sign_extend_handler(
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.unwrap(),
-        value: Rc::new(RefCell::new(Value::Operation(Operation::RightShift(
-            Rc::new(RefCell::new(Value::Operation(Operation::Cast(
-                Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                    Rc::new(RefCell::new(Value::Operation(Operation::Cast(
+        value: Operation::RightShift(
+            Operation::Cast(
+                Operation::LeftShift(
+                    Operation::Cast(
                         arguments[0].clone(),
                         Rc::new(RefCell::new(Type::FixedSignedBits(64))),
-                    )))),
-                    Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
-                        arguments[1].clone(),
-                        Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                            Literal::Int(x_len.into()),
-                        ))))),
-                    )))),
-                )))),
+                    )
+                    .into(),
+                    Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into())
+                        .into(),
+                )
+                .into(),
                 Rc::new(RefCell::new(Type::FixedSignedBits(64))),
-            )))),
-            Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
-                arguments[1].clone(),
-                Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                    Literal::Int(x_len.into()),
-                ))))),
-            )))),
-        )))),
+            )
+            .into(),
+            Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into()).into(),
+        )
+        .into(),
     };
 }
 
@@ -655,45 +637,67 @@ pub fn replicate_bits_handler(
 
     statements.remove(idx);
 
-    let mut rep_statements = vec![];
+    let rep_statements = {
+        let mut buf = vec![];
 
-    let id = unique_id();
+        let id = unique_id();
 
-    let mut prev_ident = format!("rep_{id}_0").into();
-    rep_statements.push(Rc::new(RefCell::new(Statement::TypeDeclaration {
-        name: prev_ident,
-        typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
-    })));
-    rep_statements.push(Rc::new(RefCell::new(Statement::Copy {
-        expression: Expression::Identifier(prev_ident),
-        value: Rc::new(RefCell::new(Value::Identifier(name))),
-    })));
+        // start sequence by copying in input ident
+        let mut prev_ident = format!("rep_{id}_0").into();
+        buf.push(
+            Statement::TypeDeclaration {
+                name: prev_ident,
+                typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
+            }
+            .into(),
+        );
+        buf.push(
+            Statement::Copy {
+                expression: Expression::Identifier(prev_ident),
+                value: Rc::new(RefCell::new(Value::Identifier(name))),
+            }
+            .into(),
+        );
 
-    for i in 1..count {
-        let this_ident = format!("rep_{id}_{i}").into();
-        rep_statements.push(Rc::new(RefCell::new(Statement::TypeDeclaration {
-            name: this_ident,
-            typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
-        })));
-        rep_statements.push(Rc::new(RefCell::new(Statement::Copy {
-            expression: Expression::Identifier(this_ident),
-            value: Rc::new(RefCell::new(Value::Operation(Operation::Or(
-                Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                    Rc::new(RefCell::new(Value::Identifier(name))),
-                    Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                        Literal::Int((length * i).into()),
-                    ))))),
-                )))),
-                Rc::new(RefCell::new(Value::Identifier(prev_ident))),
-            )))),
-        })));
-        prev_ident = this_ident;
-    }
+        // for each intermediate shift and or create a new var
+        for i in 1..count {
+            let this_ident = format!("rep_{id}_{i}").into();
+            buf.push(
+                Statement::TypeDeclaration {
+                    name: this_ident,
+                    typ: Rc::new(RefCell::new(Type::FixedBits(64, false))),
+                }
+                .into(),
+            );
+            buf.push(
+                Statement::Copy {
+                    expression: Expression::Identifier(this_ident),
+                    value: Operation::Or(
+                        Operation::LeftShift(
+                            Rc::new(RefCell::new(Value::Identifier(name))),
+                            Literal::Int((length * i).into()).into(),
+                        )
+                        .into(),
+                        Rc::new(RefCell::new(Value::Identifier(prev_ident))),
+                    )
+                    .into(),
+                }
+                .into(),
+            );
+            prev_ident = this_ident;
+        }
 
-    rep_statements.push(Rc::new(RefCell::new(Statement::Copy {
-        expression,
-        value: Rc::new(RefCell::new(Value::Identifier(prev_ident))),
-    })));
+        // copy out result
+        buf.push(
+            Statement::Copy {
+                expression,
+                value: Rc::new(RefCell::new(Value::Identifier(prev_ident))),
+            }
+            .into(),
+        );
+
+        buf
+    };
 
     statements.splice(idx..idx, rep_statements);
     block.set_statements(statements);
@@ -749,29 +753,25 @@ pub fn set_slice_handler(
 
     *statement.borrow_mut() = Statement::Copy {
         expression,
-        value: Rc::new(RefCell::new(Value::Operation(Operation::Or(
-            Rc::new(RefCell::new(Value::Operation(Operation::And(
+        value: Operation::Or(
+            Operation::And(
                 input,
-                Rc::new(RefCell::new(Value::Operation(Operation::Complement(
-                    Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                        Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
-                            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                                Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                                    Literal::Int(1.into()),
-                                ))))),
-                                slice_len,
-                            )))),
-                            Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                                Literal::Int(1.into()),
-                            ))))),
-                        )))),
+                Operation::Complement(
+                    Operation::LeftShift(
+                        Operation::Subtract(
+                            Operation::LeftShift(Literal::Int(1.into()).into(), slice_len).into(),
+                            Literal::Int(1.into()).into(),
+                        )
+                        .into(),
                         pos.clone(),
-                    )))),
-                )))),
-            )))),
-            Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
-                slice, pos,
-            )))),
-        )))),
+                    )
+                    .into(),
+                )
+                .into(),
+            )
+            .into(),
+            Operation::LeftShift(slice, pos).into(),
+        )
+        .into(),
     };
 }

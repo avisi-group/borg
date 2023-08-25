@@ -160,10 +160,11 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                                      name: field_name,
                                      typ,
                                  }| {
-                                    Rc::new(RefCell::new(Statement::TypeDeclaration {
+                                    Statement::TypeDeclaration {
                                         name: destructed_ident(*variable_name, *field_name),
                                         typ: typ.clone(),
-                                    }))
+                                    }
+                                    .into()
                                 },
                             )
                             .collect()
@@ -241,16 +242,17 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                                     .iter()
                                     .map(|NamedType { name, .. }| destructed_ident(dest, *name))
                                     .map(|name| Rc::new(RefCell::new(Value::Identifier(name))))
-                                    .chain(arguments.into_iter())
+                                    .chain(arguments)
                                     .collect::<Vec<_>>()
                             }
                         }
 
-                        vec![Rc::new(RefCell::new(Statement::FunctionCall {
+                        vec![Statement::FunctionCall {
                             expression,
                             name: *name,
                             arguments,
-                        }))]
+                        }
+                        .into()]
 
                         // if any arguments are in `structs`, replace with
                         // mangled field names

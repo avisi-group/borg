@@ -264,9 +264,7 @@ fn zeros_handler(
     // assign literal 0
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
-        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-            Literal::Int(0.into()),
-        ))))),
+        value: Literal::Int(0.into()).into(),
     }
 }
 
@@ -311,9 +309,7 @@ fn ones_handler(
     // assign all 1s
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
-        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-            Literal::Int(((1u128 << u64::try_from(length).unwrap()) - 1).into()),
-        ))))),
+        value: Literal::Int(((1u128 << u64::try_from(length).unwrap()) - 1).into()).into(),
     }
 }
 
@@ -343,15 +339,15 @@ fn concat_handler(
 
     // generate shifting and & logic
     // (left << right_length) | right
-    let value = Rc::new(RefCell::new(Value::Operation(Operation::Or(
-        Rc::new(RefCell::new(Value::Operation(Operation::LeftShift(
+    let value = Operation::Or(
+        Operation::LeftShift(
             Rc::new(RefCell::new(Value::Identifier(*left_ident))),
-            Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-                Literal::Int(BigInt::from(*right_length)),
-            ))))),
-        )))),
+            Literal::Int((*right_length).into()).into(),
+        )
+        .into(),
         Rc::new(RefCell::new(Value::Identifier(*right_ident))),
-    ))));
+    )
+    .into();
 
     let Expression::Identifier(dest) = expression else {
         panic!();
@@ -384,10 +380,11 @@ fn eq_handler(
     };
 
     // generate equality operation
-    let value = Rc::new(RefCell::new(Value::Operation(Operation::Equal(
+    let value = Operation::Equal(
         Rc::new(RefCell::new(Value::Identifier(*left_ident))),
         Rc::new(RefCell::new(Value::Identifier(*right_ident))),
-    ))));
+    )
+    .into();
 
     let Expression::Identifier(_) = expression else {
         panic!();
@@ -411,8 +408,6 @@ fn undefined_handler(
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
-        value: Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(
-            Literal::Int(BigInt::from(0)),
-        ))))),
+        value: Literal::Int(0.into()).into(),
     }
 }

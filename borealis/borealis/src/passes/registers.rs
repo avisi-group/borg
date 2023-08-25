@@ -109,77 +109,77 @@ impl Visitor for PcHandler {
         let stmt = { node.borrow().clone() };
         match stmt {
             // if expression == "PC", replace copy with write_pc function call
-            Statement::Copy { expression, value } => {
-                if let Expression::Identifier(ident) = expression {
-                    if ident.as_ref() == "PC" {
-                        *node.borrow_mut() = Statement::FunctionCall {
+            Statement::Copy {
+                expression: Expression::Identifier(ident),
+                value,
+            } => {
+                if ident.as_ref() == "PC" {
+                    *node.borrow_mut() = Statement::FunctionCall {
+                        expression: None,
+                        name: "write_register".into(),
+                        arguments: vec![
+                            Rc::new(RefCell::new(Value::Identifier("reg_PC_target".into()))),
+                            value.clone(),
+                        ],
+                    }
+                } else if ident.as_ref() == "PC_changed" {
+                    *node.borrow_mut() = Statement::Comment("PC_changed remove here".into());
+                }
+            }
+            Statement::FunctionCall {
+                expression: Some(Expression::Identifier(ident)),
+                name,
+                arguments,
+            } => {
+                if ident.as_ref() == "PC" {
+                    // lookup return type
+                    let typ = self
+                        .ast
+                        .borrow()
+                        .functions
+                        .get(&name)
+                        .unwrap_or_else(|| panic!("could not get function {name}"))
+                        .signature
+                        .return_type
+                        .clone();
+
+                    // create local var with type
+                    let (block, idx) = self.entry_block.find_statement(node.clone()).unwrap();
+                    let mut statements = block.statements();
+                    let var_name = format!("pc_temp{}", unique_id()).into();
+
+                    statements.insert(
+                        idx,
+                        Statement::TypeDeclaration {
+                            name: var_name,
+                            typ,
+                        }
+                        .into(),
+                    );
+
+                    // assign function call to that local var
+                    statements[idx + 1] = Statement::FunctionCall {
+                        expression: Some(Expression::Identifier(var_name)),
+                        name,
+                        arguments,
+                    }
+                    .into();
+
+                    // pass local var as param to write_pc
+                    statements.insert(
+                        idx + 2,
+                        Statement::FunctionCall {
                             expression: None,
                             name: "write_register".into(),
                             arguments: vec![
                                 Rc::new(RefCell::new(Value::Identifier("reg_PC_target".into()))),
-                                value.clone(),
+                                Rc::new(RefCell::new(Value::Identifier(var_name))),
                             ],
                         }
-                    } else if ident.as_ref() == "PC_changed" {
-                        *node.borrow_mut() = Statement::Comment("PC_changed remove here".into());
-                    }
-                }
-            }
-            Statement::FunctionCall {
-                expression,
-                name,
-                arguments,
-            } => {
-                if let Some(Expression::Identifier(ident)) = expression {
-                    if ident.as_ref() == "PC" {
-                        // lookup return type
-                        let typ = self
-                            .ast
-                            .borrow()
-                            .functions
-                            .get(&name)
-                            .unwrap_or_else(|| panic!("could not get function {name}"))
-                            .signature
-                            .return_type
-                            .clone();
+                        .into(),
+                    );
 
-                        // create local var with type
-                        let (block, idx) = self.entry_block.find_statement(node.clone()).unwrap();
-                        let mut statements = block.statements();
-                        let var_name = format!("pc_temp{}", unique_id()).into();
-
-                        statements.insert(
-                            idx,
-                            Rc::new(RefCell::new(Statement::TypeDeclaration {
-                                name: var_name,
-                                typ,
-                            })),
-                        );
-
-                        // assign function call to that local var
-                        statements[idx + 1] = Rc::new(RefCell::new(Statement::FunctionCall {
-                            expression: Some(Expression::Identifier(var_name)),
-                            name,
-                            arguments,
-                        }));
-
-                        // pass local var as param to write_pc
-                        statements.insert(
-                            idx + 2,
-                            Rc::new(RefCell::new(Statement::FunctionCall {
-                                expression: None,
-                                name: "write_register".into(),
-                                arguments: vec![
-                                    Rc::new(RefCell::new(Value::Identifier(
-                                        "reg_PC_target".into(),
-                                    ))),
-                                    Rc::new(RefCell::new(Value::Identifier(var_name))),
-                                ],
-                            })),
-                        );
-
-                        block.set_statements(statements);
-                    }
+                    block.set_statements(statements);
                 }
             }
             _ => (),
