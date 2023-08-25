@@ -26,46 +26,31 @@ base-image:
     # install sail
     RUN eval `opam env` && opam install --assume-depexts -y sail=0.15 gmp
 
+    RUN cargo install cargo-chef --locked
+
     SAVE IMAGE --cache-hint --push ghcr.io/avisi-group/borealis/baseimage
 
-prebuild:
-    BUILD +base-image
+chef-prepare:
     FROM +base-image
-    WORKDIR /tmp/build
+    COPY . .
+    RUN cargo chef prepare --recipe-path recipe.json
+    SAVE ARTIFACT recipe.json recipe.json
 
-    # build and document rust dependencies by creating empty crates
-    RUN cargo init --lib borealis && \
-        cargo init --lib sail && \
-        cargo init --lib common && \
-        cargo init --lib libarch-sys
-
-    COPY Cargo.lock .
-    COPY Cargo.toml .
-    COPY borealis/Cargo.toml borealis/
-    COPY sail/Cargo.toml sail/
-    COPY common/Cargo.toml common/
-    COPY libarch-sys/Cargo.toml libarch-sys/
-
-    RUN eval `opam env` && \
-        cargo build --target $RUST_TARGET --release && \
-        cargo test --target $RUST_TARGET --no-run
-
-    SAVE IMAGE --cache-hint --push ghcr.io/avisi-group/borealis/prebuild
+chef-cook:
+    FROM +base-image
+    COPY (+chef-prepare/recipe.json) .
+    RUN eval `opam env` && cargo chef cook --recipe-path recipe.json --target $RUST_TARGET --release
 
 build:
-    BUILD +prebuild
-    FROM +prebuild
+    FROM +chef-cook
 
     # copy full source
-    COPY --keep-ts --dir borealis common sail data .
-    RUN touch borealis/src/lib.rs sail/src/lib.rs common/src/lib.rs
+    COPY . .
 
     # build borealis
     RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET --release
 
     SAVE ARTIFACT target/$RUST_TARGET/release/borealis borealis
-    # we save the workspace as a copy of all the code with no build artefacts as the e2e-test uses a different target none of that is reusable
-    SAVE ARTIFACT . workspace
 
 borealis-docs:
     FROM +build
@@ -94,9 +79,17 @@ test:
     BUILD +unit-test
     BUILD --platform=linux/amd64 +e2e-test-archsim
 
+chef-cook-test:
+    FROM +base-image
+    COPY (+chef-prepare/recipe.json) .
+    RUN eval `opam env` && cargo chef cook --recipe-path recipe.json --target $RUST_TARGET --tests
+
 unit-test:
     BUILD +build
-    FROM +build
+    FROM +chef-cook-test
+
+    # copy full source
+    COPY . .
 
     # check formatting
     RUN cargo fmt --all -- --check
