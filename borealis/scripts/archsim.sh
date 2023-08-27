@@ -10,7 +10,7 @@ cd target/genc
 
 cd output
 mkdir -p modules
-make -j12 && cp arm64.dll modules/
+make -j$(nproc) && cp arm64.dll modules/
 
 cd /t1/Sync/gensim/build/dist/bin/
 ./archsim -m aarch64-user -l contiguous -s arm64 --modules /t1/Sync/borealis/target/genc/output/modules -e ./fib -t -U trace.out --mode Interpreter
