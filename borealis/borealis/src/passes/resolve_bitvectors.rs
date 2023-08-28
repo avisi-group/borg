@@ -41,7 +41,8 @@ use {
 #[derive(Debug)]
 pub struct ResolveBitvectors {
     did_change: bool,
-    /// local variables and their types (containing bitvector length information)
+    /// local variables and their types (containing bitvector length
+    /// information)
     locals: HashMap<InternedString, Rc<RefCell<Type>>>,
     current_func: Option<FunctionDefinition>,
 }
@@ -120,7 +121,8 @@ impl ResolveBitvectors {
         })
     }
 
-    /// Gets the size of a local variable, None if not an int or a local variable
+    /// Gets the size of a local variable, None if not an int or a local
+    /// variable
     fn get_size(&self, name: InternedString) -> Option<Size> {
         self.locals
             .get(&name)
@@ -155,7 +157,8 @@ impl ResolveBitvectors {
                 // and that identifier has a known length
                 match (self.get_size(*dest), self.get_size(*source)) {
                     // do not override destination if already static
-                    // TODO: make sure this is always the best heuristic (shortest/longest length? oldest/newest assignment?)
+                    // TODO: make sure this is always the best heuristic (shortest/longest length?
+                    // oldest/newest assignment?)
                     (Some(Size::Static(_)), Some(_)) => (),
 
                     // if destination is unknown, replace with source

@@ -325,6 +325,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
             buf += "\n";
         });
 
+        // only process terminator if told to
         if recurse {
             match block.terminator() {
                 Terminator::Return(value) => {

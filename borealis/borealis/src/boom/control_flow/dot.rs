@@ -50,6 +50,8 @@ impl Graph {
                     label += "\n";
                 }
 
+                label = label.replace('<', r"\<").replace('>', r"\>");
+
                 label
             };
 

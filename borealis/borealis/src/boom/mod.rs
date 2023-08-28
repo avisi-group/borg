@@ -600,6 +600,7 @@ pub enum Operation {
     Or(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     And(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     Xor(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Divide(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
 
     Cast(Rc<RefCell<Value>>, Rc<RefCell<Type>>),
 
@@ -626,6 +627,7 @@ impl Walkable for Operation {
             | Operation::Or(lhs, rhs)
             | Operation::Xor(lhs, rhs)
             | Operation::And(lhs, rhs)
+            | Operation::Divide(lhs, rhs)
             | Operation::LeftShift(lhs, rhs)
             | Operation::RightShift(lhs, rhs)
             | Operation::RotateLeft(lhs, rhs)

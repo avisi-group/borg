@@ -243,6 +243,7 @@ impl Emit for Operation {
             Operation::Or(lhs, rhs) => emit_op2(w, lhs, rhs, "|"),
             Operation::Xor(lhs, rhs) => emit_op2(w, lhs, rhs, "^"),
             Operation::And(lhs, rhs) => emit_op2(w, lhs, rhs, "&"),
+            Operation::Divide(lhs, rhs) => emit_op2(w, lhs, rhs, "/"),
             Operation::LeftShift(lhs, rhs) => emit_op2(w, lhs, rhs, "<<"),
             Operation::RightShift(lhs, rhs) => emit_op2(w, lhs, rhs, ">>"),
 

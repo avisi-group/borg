@@ -68,6 +68,14 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         pass.reset();
         pass.run(ast.clone());
     });
+
+    run_fixed_point(
+        ast.clone(),
+        &mut [
+            FoldUnconditionals::new_boxed(),
+            RemoveConstBranch::new_boxed(),
+        ],
+    );
 }
 
 /// Pass that performs an operation on an AST
