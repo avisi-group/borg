@@ -543,7 +543,7 @@ pub fn sign_extend_handler(
             match size {
                 Size::Static(size) => Literal::Int(size.into()).into(),
                 Size::Runtime(ident) => Rc::new(RefCell::new(Value::Identifier(ident))),
-                Size::Unknown => panic!("unknown size"),
+                Size::Unknown => panic!("unknown size {x_ident:?} in {}", function.signature.name),
             }
         } else {
             panic!(

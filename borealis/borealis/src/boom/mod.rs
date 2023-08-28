@@ -288,6 +288,26 @@ pub enum Type {
     Reference(Rc<RefCell<Self>>),
 }
 
+impl Type {
+    // Gets the size of a type if it is an integer
+    pub fn get_size(&self) -> Option<Size> {
+        if let Type::Int { size, .. } = self {
+            Some(*size)
+        } else {
+            None
+        }
+    }
+
+    // Gets a reference to the size of a type if it is an integer
+    pub fn get_size_mut(&mut self) -> Option<&mut Size> {
+        if let Type::Int { size, .. } = self {
+            Some(size)
+        } else {
+            None
+        }
+    }
+}
+
 /// Size of a boom integer
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Size {

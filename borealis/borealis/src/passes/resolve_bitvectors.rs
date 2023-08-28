@@ -38,61 +38,105 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+#[derive(Debug)]
 pub struct ResolveBitvectors {
     did_change: bool,
-    /// bitvector lengths of local variables in a function
-    lengths: HashMap<InternedString, Length>,
+    /// local variables and their types (containing bitvector length information)
+    locals: HashMap<InternedString, Rc<RefCell<Type>>>,
     current_func: Option<FunctionDefinition>,
 }
 
-/// Length of a bitvector local variable
-#[derive(Debug)]
-enum Length {
-    /// Variable, and a reference to the type so we can modify it when the
-    /// length is known
-    Variable(Rc<RefCell<Type>>),
-    /// Fixed, and the length
-    Fixed(isize),
+impl Pass for ResolveBitvectors {
+    fn name(&self) -> &'static str {
+        "ReplaceBitvectors"
+    }
+
+    fn reset(&mut self) {
+        self.did_change = false;
+        self.locals.clear();
+        self.current_func = None;
+    }
+
+    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
+        ast.borrow()
+            .functions
+            .values()
+            .map(|func| {
+                self.reset();
+
+                self.locals
+                    .extend(func.signature.parameters.borrow().iter().filter_map(
+                        |Parameter { name, typ, .. }| {
+                            if let Type::Int { .. } = &*typ.borrow() {
+                                Some((*name, typ.clone()))
+                            } else {
+                                None
+                            }
+                        },
+                    ));
+
+                self.visit_function_definition(func);
+
+                self.did_change
+            })
+            .any()
+    }
+}
+
+impl Visitor for ResolveBitvectors {
+    fn visit_function_definition(&mut self, node: &FunctionDefinition) {
+        self.current_func = Some(node.clone());
+        node.walk(self);
+    }
+
+    fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
+        let statement = { node.borrow().clone() };
+        match statement {
+            Statement::TypeDeclaration { name, typ } => {
+                self.add_type_declaration(name, typ.clone())
+            }
+            Statement::Copy { expression, value } => {
+                self.resolve_from_copy(&expression, value.clone())
+            }
+            Statement::FunctionCall {
+                expression: Some(expression),
+                name,
+                arguments,
+            } => self.resolve_fn(node.clone(), &expression, name, &arguments),
+            _ => {}
+        }
+
+        // use assignments to determine length
+        // function calls are special:/ need to think about handling these
+    }
 }
 
 impl ResolveBitvectors {
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
-            lengths: HashMap::default(),
+            locals: HashMap::default(),
             current_func: None,
         })
     }
 
-    /// Resolves the length of a local variable
-    fn resolve(&mut self, ident: InternedString, length: isize) {
-        let Some(Length::Variable(typ)) = self.lengths.get(&ident) else {
-            panic!("called resolve on non-variable bitvector");
-        };
+    /// Gets the size of a local variable, None if not an int or a local variable
+    fn get_size(&self, name: InternedString) -> Option<Size> {
+        self.locals
+            .get(&name)
+            .map(|t| t.borrow().get_size())
+            .flatten()
+    }
 
-        *typ.borrow_mut() = Type::Int {
-            signed: false,
-            size: Size::Static(length.try_into().unwrap()),
-        };
-        self.lengths.insert(ident, Length::Fixed(length));
+    /// Sets the size of a local variable
+    fn set_size(&self, name: InternedString, size: Size) {
+        let typ = self.locals.get(&name).unwrap();
+        *typ.borrow_mut().get_size_mut().unwrap() = size;
     }
 
     /// Adds a bitvector type declaration to the mapping
     fn add_type_declaration(&mut self, name: InternedString, typ: Rc<RefCell<Type>>) {
-        match &*typ.borrow() {
-            // if we encounter a fixed variable,
-            Type::Int {
-                size: Size::Static(length),
-                ..
-            } => {
-                self.lengths
-                    .insert(name, Length::Fixed((*length).try_into().unwrap()));
-            }
-            Type::Int { .. } => {
-                self.lengths.insert(name, Length::Variable(typ.clone()));
-            }
-            _ => {}
-        }
+        self.locals.insert(name, typ);
     }
 
     /// Try to use the value being assigned to a bitvector to determine it's
@@ -104,29 +148,43 @@ impl ResolveBitvectors {
 
         // if the identifier being copied into is a variable bitvector, try and resolve
         // it's length
-        if let Some(Length::Variable(_)) = self.lengths.get(dest) {
-            match &*value.borrow() {
-                // if the value is an identifier
-                Value::Identifier(source) => {
-                    // and that identifier has a known length
-                    if let Some(Length::Fixed(length)) = self.lengths.get(source) {
-                        // the source variable must also have that length
-                        self.resolve(*dest, *length);
+
+        match &*value.borrow() {
+            Value::Identifier(source) => {
+                // set the dest size to be the source size
+                // and that identifier has a known length
+                match (self.get_size(*dest), self.get_size(*source)) {
+                    // do not override destination if already static
+                    // TODO: make sure this is always the best heuristic (shortest/longest length? oldest/newest assignment?)
+                    (Some(Size::Static(_)), Some(_)) => (),
+
+                    // if destination is unknown, replace with source
+                    (Some(Size::Unknown), Some(source_size)) => {
+                        self.set_size(*dest, source_size);
                     }
-                }
 
-                Value::Literal(literal) => {
-                    let literal = &mut *literal.borrow_mut();
-                    if let Literal::Bits(bits) = literal {
-                        self.resolve(*dest, bits.len() as isize);
-
-                        // replace bits with constant int
-                        *literal = Literal::Int(BigInt::from(bits_to_int(bits)));
+                    // if destination is runtime and source is static, assign source size
+                    (Some(Size::Runtime(_)), Some(Size::Static(size))) => {
+                        self.set_size(*dest, Size::Static(size));
                     }
-                }
 
-                _ => (),
+                    // otherwise do nothing
+                    _ => (),
+                }
             }
+
+            Value::Literal(literal) => {
+                let literal = &mut *literal.borrow_mut();
+                if let Literal::Bits(bits) = literal {
+                    // set size as static
+                    self.set_size(*dest, Size::Static(bits.len()));
+
+                    // replace bits with constant int
+                    *literal = Literal::Int(BigInt::from(bits_to_int(bits)));
+                }
+            }
+
+            _ => (),
         }
     }
 
@@ -171,76 +229,6 @@ impl ResolveBitvectors {
     }
 }
 
-impl Pass for ResolveBitvectors {
-    fn name(&self) -> &'static str {
-        "ReplaceBitvectors"
-    }
-
-    fn reset(&mut self) {
-        self.did_change = false;
-        self.lengths.clear();
-        self.current_func = None;
-    }
-
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow()
-            .functions
-            .values()
-            .map(|func| {
-                self.reset();
-
-                // insert any bitvector function parameters
-                self.lengths
-                    .extend(func.signature.parameters.borrow().iter().filter_map(
-                        |Parameter { name, typ, .. }| match &*typ.borrow() {
-                            Type::Int {
-                                size: Size::Static(length),
-                                ..
-                            } => Some((*name, Length::Fixed((*length).try_into().unwrap()))),
-                            Type::Int { .. } => {
-                                log::debug!("unknown length bitvector in function signature");
-                                None
-                            }
-                            _ => None,
-                        },
-                    ));
-
-                self.visit_function_definition(func);
-
-                self.did_change
-            })
-            .any()
-    }
-}
-
-impl Visitor for ResolveBitvectors {
-    fn visit_function_definition(&mut self, node: &FunctionDefinition) {
-        self.current_func = Some(node.clone());
-        node.walk(self);
-    }
-
-    fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        let statement = { node.borrow().clone() };
-        match statement {
-            Statement::TypeDeclaration { name, typ } => {
-                self.add_type_declaration(name, typ.clone())
-            }
-            Statement::Copy { expression, value } => {
-                self.resolve_from_copy(&expression, value.clone())
-            }
-            Statement::FunctionCall {
-                expression: Some(expression),
-                name,
-                arguments,
-            } => self.resolve_fn(node.clone(), &expression, name, &arguments),
-            _ => {}
-        }
-
-        // use assignments to determine length
-        // function calls are special:/ need to think about handling these
-    }
-}
-
 fn zeros_handler(
     celf: &mut ResolveBitvectors,
     statement: Rc<RefCell<Statement>>,
@@ -265,7 +253,7 @@ fn zeros_handler(
         if let Value::Literal(literal) = &*value.borrow() {
             if let Literal::Int(length) = &*literal.borrow() {
                 if let Expression::Identifier(destination) = expression {
-                    celf.resolve(*destination, isize::try_from(length).unwrap());
+                    celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
                 }
             }
         }
@@ -314,7 +302,7 @@ fn ones_handler(
         panic!();
     };
 
-    celf.resolve(*destination, isize::try_from(length).unwrap());
+    celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
 
     // assign all 1s
     *statement.borrow_mut() = Statement::Copy {
@@ -340,11 +328,20 @@ fn concat_handler(
         panic!();
     };
 
-    let Some(Length::Fixed(left_length)) = celf.lengths.get(left_ident) else {
-        panic!();
+    let Some(Size::Static(left_length)) = celf.get_size(*left_ident) else {
+        panic!(
+            "{left_ident} not static, got {:?}\n {:#?}",
+            celf.get_size(*left_ident),
+            celf
+        );
     };
-    let Some(Length::Fixed(right_length)) = celf.lengths.get(right_ident) else {
-        panic!();
+
+    let Some(Size::Static(right_length)) = celf.get_size(*right_ident) else {
+        panic!(
+            "{right_ident} not static, got {:?}\n {:#?}",
+            celf.get_size(*right_ident),
+            celf
+        );
     };
 
     // generate shifting and & logic
@@ -352,7 +349,7 @@ fn concat_handler(
     let value = Operation::Or(
         Operation::LeftShift(
             Rc::new(RefCell::new(Value::Identifier(*left_ident))),
-            Literal::Int((*right_length).into()).into(),
+            Literal::Int(right_length.into()).into(),
         )
         .into(),
         Rc::new(RefCell::new(Value::Identifier(*right_ident))),
@@ -364,7 +361,7 @@ fn concat_handler(
     };
 
     // calculate length of output
-    celf.resolve(*dest, left_length + right_length);
+    celf.set_size(*dest, Size::Static(left_length + right_length));
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
@@ -407,14 +404,30 @@ fn eq_handler(
 }
 
 fn undefined_handler(
-    _: &mut ResolveBitvectors,
+    celf: &mut ResolveBitvectors,
     statement: Rc<RefCell<Statement>>,
     expression: &Expression,
-    _arguments: &[Rc<RefCell<Value>>],
+    arguments: &[Rc<RefCell<Value>>],
 ) {
     // TODO: assign dest bitvector length to supplied argument
     // either by detecting const or evaluating what the value would be at that point
     // in execution (symbolic execution?)
+
+    assert!(arguments.len() == 1);
+
+    let Expression::Identifier(dest) = expression else {
+        panic!();
+    };
+
+    let dest_size = celf.get_size(*dest).unwrap();
+
+    if let Size::Unknown = dest_size {
+        let Value::Identifier(size_ident) = &*arguments[0].borrow() else {
+            panic!();
+        };
+
+        celf.set_size(*dest, Size::Runtime(*size_ident));
+    }
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),

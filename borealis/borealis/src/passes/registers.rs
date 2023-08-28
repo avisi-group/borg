@@ -45,11 +45,11 @@ impl Pass for RegisterHandler {
 
 impl Visitor for RegisterHandler {
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        // if statement is a copy into PSTATE, repalce with call to write_register
         let Statement::Copy { expression, value } = node.borrow().clone() else {
             return;
         };
 
+        // if we are copying *from* PSTATE
         if let Value::Field { value, field_name } = value.borrow().clone() {
             if let Value::Identifier(ident) = value.borrow().clone() {
                 if ident.as_ref() == "PSTATE" {
@@ -58,6 +58,7 @@ impl Visitor for RegisterHandler {
             }
         }
 
+        // if we are copying *into* PSTATE
         if let Expression::Field { expression, field } = expression {
             if let Expression::Identifier(ident) = *expression {
                 if ident.as_ref() == "PSTATE" {

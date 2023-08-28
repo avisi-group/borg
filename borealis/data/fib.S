@@ -1,7 +1,6 @@
 .globl _start
 
 _start:
-//    ldr x0, [x1]
     mov x0, #0  // x
     mov x1, #1  // y
     mov x2, #0  // z
@@ -21,4 +20,5 @@ loop:
 
 done:
     mov x0, x2
+//    ldr x0, [x1]
     udf #0
