@@ -111,6 +111,7 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("undefined_LogicalOp", delete),
         ("undefined_int", delete),
         ("undefined_MoveWideOp", delete),
+        ("undefined_MemOp", delete),
         ("replicate_bits", replicate_bits_handler),
         ("SetSlice_int", noop),
         ("SetSlice_bits", set_slice_handler),

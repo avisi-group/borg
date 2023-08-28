@@ -266,13 +266,21 @@ impl Indent {
 
 fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
     enum StackItem {
-        Block(ControlFlowBlock),
+        Block {
+            // the control flow block
+            block: ControlFlowBlock,
+            // whether the child blocks should be emitted or not
+            recurse: bool,
+        },
         Else,
         EndElse,
     }
 
     let mut buf = String::new();
-    let mut stack = vec![StackItem::Block(entry_block)];
+    let mut stack = vec![StackItem::Block {
+        block: entry_block,
+        recurse: true,
+    }];
     let mut indent = Indent::new("    ");
 
     // if a block is unconditional, emit the statements and go to the next block
@@ -280,8 +288,11 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
     // blocks are indented one more
 
     while let Some(item) = stack.pop() {
-        let block = match item {
-            StackItem::Block(block) => block,
+        let (block, recurse) = match item {
+            StackItem::Block {
+                block,
+                recurse: _recurse,
+            } => (block, _recurse),
             StackItem::Else => {
                 indent.dec();
                 buf += indent.get();
@@ -289,7 +300,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 indent.inc();
                 continue;
             }
-            StackItem::EndElse => {
+            StackItem::EndElse { .. } => {
                 indent.dec();
                 buf += indent.get();
                 buf += "}\n";
@@ -314,40 +325,73 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
             buf += "\n";
         });
 
-        match block.terminator() {
-            Terminator::Return(value) => {
-                buf += indent.get();
-                buf += "return";
+        if recurse {
+            match block.terminator() {
+                Terminator::Return(value) => {
+                    buf += indent.get();
+                    buf += "return";
 
-                if let Some(value) = value {
-                    buf += " ";
-                    Rc::new(RefCell::new(value)).emit(&mut buf).unwrap();
+                    if let Some(value) = value {
+                        buf += " ";
+                        Rc::new(RefCell::new(value)).emit(&mut buf).unwrap();
+                    }
+
+                    buf += ";\n";
                 }
+                Terminator::Unconditional { target } => {
+                    stack.push(StackItem::Block {
+                        block: target,
+                        recurse: true,
+                    });
+                }
+                Terminator::Conditional {
+                    condition,
+                    target,
+                    fallthrough,
+                } => {
+                    buf += indent.get();
+                    buf += "if (";
+                    Rc::new(RefCell::new(condition)).emit(&mut buf).unwrap();
+                    buf += ") {\n";
+                    indent.inc();
 
-                buf += ";\n";
-            }
-            Terminator::Unconditional { target } => {
-                stack.push(StackItem::Block(target));
-            }
-            Terminator::Conditional {
-                condition,
-                target,
-                fallthrough,
-            } => {
-                buf += indent.get();
-                buf += "if (";
-                Rc::new(RefCell::new(condition)).emit(&mut buf).unwrap();
-                buf += ") {\n";
-                indent.inc();
+                    // set up stack for processing the rest of the if statement
 
-                // set up stack for processing the rest of the if statement
-
-                stack.extend([
-                    StackItem::EndElse,
-                    StackItem::Block(fallthrough),
-                    StackItem::Else,
-                    StackItem::Block(target),
-                ]);
+                    if target.terminator().targets().len() == 1
+                        && target.terminator().targets() == fallthrough.terminator().targets()
+                    {
+                        // both target and fallthrough have common child
+                        stack.extend([
+                            StackItem::Block {
+                                block: target.terminator().targets()[0].clone(),
+                                recurse: true,
+                            },
+                            StackItem::EndElse,
+                            StackItem::Block {
+                                block: fallthrough,
+                                recurse: false,
+                            },
+                            StackItem::Else,
+                            StackItem::Block {
+                                block: target,
+                                recurse: false,
+                            },
+                        ]);
+                    } else {
+                        stack.extend([
+                            StackItem::EndElse,
+                            StackItem::Block {
+                                block: fallthrough,
+                                recurse: true,
+                            },
+                            StackItem::Else,
+                            StackItem::Block {
+                                block: target,
+                                recurse: true,
+                            },
+                        ]);
+                    }
+                }
             }
         }
     }
