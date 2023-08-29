@@ -184,17 +184,28 @@ fn statement_filter(
 }
 
 fn raise_exceptions(fn_def: &FunctionDefinition) {
-    // first, find exception blocks (likely candidates are the target of "if exception"s and contain a single `trap()` instruction)
+    // first, find exception blocks (likely candidates are the target of "if
+    // exception"s and contain a single `trap()` instruction)
     let exception_blocks = fn_def
         .entry_block
         .iter()
         .filter(|block| {
             block.statements().len() == 1
-                && if let Statement::FunctionCall { name, .. } = &*block.statements()[0].borrow() {
+                && (if let Statement::FunctionCall { name, .. } = &*block.statements()[0].borrow() {
                     name.as_ref() == "trap"
                 } else {
                     false
-                }
+                } || if let Statement::Copy { expression, .. } =
+                    &*block.statements()[0].borrow()
+                {
+                    if let Expression::Identifier(ident) = expression {
+                        ident.as_ref() == "exception"
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                })
         })
         .collect::<HashSet<_>>();
 

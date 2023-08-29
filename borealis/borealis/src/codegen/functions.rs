@@ -268,33 +268,24 @@ impl Indent {
 
 fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
     enum StackItem {
-        Block {
-            // the control flow block
-            block: ControlFlowBlock,
-            // whether the child blocks should be emitted or not
-            recurse: bool,
-        },
+        Block(ControlFlowBlock),
         Else,
         EndElse,
     }
 
     let mut buf = String::new();
-    let mut stack = vec![StackItem::Block {
-        block: entry_block,
-        recurse: true,
-    }];
+    let mut stack = vec![StackItem::Block(entry_block)];
     let mut indent = Indent::new("    ");
+
+    let mut rejoining_blocks = vec![];
 
     // if a block is unconditional, emit the statements and go to the next block
     // if a block is conditional, emit an if, else branch, where the if and else
     // blocks are indented one more
 
     while let Some(item) = stack.pop() {
-        let (block, recurse) = match item {
-            StackItem::Block {
-                block,
-                recurse: _recurse,
-            } => (block, _recurse),
+        let block = match item {
+            StackItem::Block(block) => block,
             StackItem::Else => {
                 indent.dec();
                 buf += indent.get();
@@ -309,6 +300,28 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 continue;
             }
         };
+
+        log::trace!("at block {block}");
+
+        if let Some((rejoin_block, count)) = rejoining_blocks.pop() {
+            if block == rejoin_block {
+                match count {
+                    2 => {
+                        rejoining_blocks.push((rejoin_block, 1));
+                        stack.push(StackItem::Else);
+                        continue;
+                    }
+                    1 => {
+                        stack.push(StackItem::Block(rejoin_block));
+                        stack.push(StackItem::EndElse);
+                        continue;
+                    }
+                    _ => panic!(),
+                }
+            } else {
+                rejoining_blocks.push((rejoin_block, count));
+            }
+        }
 
         // write current block statements to buf here
         block.statements().iter().for_each(|stmt| {
@@ -327,93 +340,56 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
             buf += "\n";
         });
 
-        // only process terminator if told to
-        if recurse {
-            match block.terminator() {
-                Terminator::Return(value) => {
-                    buf += indent.get();
-                    buf += "return";
+        match block.terminator() {
+            Terminator::Return(value) => {
+                buf += indent.get();
+                buf += "return";
 
-                    if let Some(value) = value {
-                        buf += " ";
-                        Rc::new(RefCell::new(value)).emit(&mut buf).unwrap();
-                    }
-
-                    buf += ";\n";
+                if let Some(value) = value {
+                    buf += " ";
+                    Rc::new(RefCell::new(value)).emit(&mut buf).unwrap();
                 }
-                Terminator::Unconditional { target } => {
-                    stack.push(StackItem::Block {
-                        block: target,
-                        recurse: true,
-                    });
-                }
-                Terminator::Conditional {
-                    condition,
-                    target,
-                    fallthrough,
-                } => {
-                    buf += indent.get();
-                    buf += "if (";
-                    Rc::new(RefCell::new(condition)).emit(&mut buf).unwrap();
-                    buf += ") {\n";
-                    indent.inc();
 
-                    // set up stack for processing the rest of the if statement
+                buf += ";\n";
+            }
+            Terminator::Unconditional { target } => {
+                stack.push(StackItem::Block(target));
+            }
+            Terminator::Conditional {
+                condition,
+                target,
+                fallthrough,
+            } => {
+                buf += indent.get();
+                buf += "if (";
+                Rc::new(RefCell::new(condition)).emit(&mut buf).unwrap();
+                buf += ") {\n";
+                indent.inc();
 
-                    // find all children of target and fallthrough
-                    // find closest child of both target and fallthrough (that all paths converge
-                    // to?) set child as checkpoint, emit both up to that point
-                    // emit child (and its children) as normal
+                // set up stack for processing the rest of the if statement
 
-                    let paths = {
-                        let mut paths = target.get_paths();
-                        paths.extend(fallthrough.get_paths());
-                        paths
-                    };
+                // find all children of target and fallthrough
+                // find closest child of both target and fallthrough (that all paths converge
+                // to?) set child as checkpoint, emit both up to that point
+                // emit child (and its children) as normal
 
-                    let common = find_common_block(paths);
+                let paths = {
+                    let mut paths = target.get_paths();
+                    paths.extend(fallthrough.get_paths());
+                    paths
+                };
 
-                    if let Some(block) = common {
-                        log::trace!("found common block {block}");
-                    }
+                let block = find_common_block(paths).unwrap();
+                log::trace!("found common block {block}");
 
-                    // if target and fallthrough have a common child, emit all blocks up to that
-                    // common child then stop recursing
-
-                    if target.terminator().targets().len() == 1
-                        && target.terminator().targets() == fallthrough.terminator().targets()
-                    {
-                        // both target and fallthrough have common child
-                        stack.extend([
-                            StackItem::Block {
-                                block: target.terminator().targets()[0].clone(),
-                                recurse: true,
-                            },
-                            StackItem::EndElse,
-                            StackItem::Block {
-                                block: fallthrough,
-                                recurse: false,
-                            },
-                            StackItem::Else,
-                            StackItem::Block {
-                                block: target,
-                                recurse: false,
-                            },
-                        ]);
-                    } else {
-                        stack.extend([
-                            StackItem::EndElse,
-                            StackItem::Block {
-                                block: fallthrough,
-                                recurse: true,
-                            },
-                            StackItem::Else,
-                            StackItem::Block {
-                                block: target,
-                                recurse: true,
-                            },
-                        ]);
-                    }
+                if target == block {
+                    todo!()
+                } else if fallthrough == block {
+                    rejoining_blocks.push((block.clone(), 1u8));
+                    stack.extend([StackItem::Block(target)]);
+                } else {
+                    rejoining_blocks.push((block.clone(), 2u8));
+                    stack.extend([StackItem::Block(fallthrough), StackItem::Block(target)]);
                 }
             }
         }
@@ -473,7 +449,7 @@ fn find_common_block(paths: Vec<Vec<ControlFlowBlock>>) -> Option<ControlFlowBlo
     let first = &paths[0];
 
     for block in first {
-        if paths.iter().all(|path| path.contains(&block)) {
+        if paths.iter().all(|path| path.contains(block)) {
             return Some(block.clone());
         }
     }

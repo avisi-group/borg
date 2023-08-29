@@ -324,9 +324,7 @@ impl Walkable for Rc<RefCell<Type>> {
         use Type::*;
 
         match &*self.borrow() {
-            Unit | Bool | String | Real | Float | Constant(_) | Int { .. } | Bit | Enum { .. } => {
-                ()
-            }
+            Unit | Bool | String | Real | Float | Constant(_) | Int { .. } | Bit | Enum { .. } => {}
 
             Union { fields, .. } | Struct { fields, .. } => fields
                 .iter()

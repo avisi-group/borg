@@ -77,8 +77,10 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         ],
     );
 
-    // _dump_func_dot(&ast, "memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode", None);
-    // _dump_func_dot(&ast, "memory_single_general_immediate_signed_postidx", None);
+    //_dump_func_dot(&ast, "memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode", None);
+    //_dump_func_dot(&ast, "integer_logical_shiftedreg", None);
+    // _dump_func_dot(&ast, "memory_single_general_immediate_signed_postidx",
+    // None);
 }
 
 /// Pass that performs an operation on an AST

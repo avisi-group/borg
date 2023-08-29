@@ -124,10 +124,7 @@ impl ResolveBitvectors {
     /// Gets the size of a local variable, None if not an int or a local
     /// variable
     fn get_size(&self, name: InternedString) -> Option<Size> {
-        self.locals
-            .get(&name)
-            .map(|t| t.borrow().get_size())
-            .flatten()
+        self.locals.get(&name).and_then(|t| t.borrow().get_size())
     }
 
     /// Sets the size of a local variable
