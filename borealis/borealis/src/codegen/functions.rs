@@ -270,14 +270,15 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
     enum StackItem {
         Block(ControlFlowBlock),
         Else,
-        EndElse,
+        End,
     }
 
-    let mut buf = String::new();
     let mut stack = vec![StackItem::Block(entry_block)];
+
+    let mut buf = String::new();
     let mut indent = Indent::new("    ");
 
-    let mut rejoining_blocks = vec![];
+    let mut sink_block_stack = vec![];
 
     // if a block is unconditional, emit the statements and go to the next block
     // if a block is conditional, emit an if, else branch, where the if and else
@@ -293,7 +294,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 indent.inc();
                 continue;
             }
-            StackItem::EndElse { .. } => {
+            StackItem::End { .. } => {
                 indent.dec();
                 buf += indent.get();
                 buf += "}\n";
@@ -303,23 +304,20 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
 
         log::trace!("at block {block}");
 
-        if let Some((rejoin_block, count)) = rejoining_blocks.pop() {
-            if block == rejoin_block {
-                match count {
-                    2 => {
-                        rejoining_blocks.push((rejoin_block, 1));
-                        stack.push(StackItem::Else);
-                        continue;
-                    }
-                    1 => {
-                        stack.push(StackItem::Block(rejoin_block));
-                        stack.push(StackItem::EndElse);
-                        continue;
-                    }
-                    _ => panic!(),
+        if let Some((sink, has_else)) = sink_block_stack.last().cloned() {
+            if block == sink {
+                log::trace!("is sink block, has_else: {has_else}");
+                sink_block_stack.pop();
+
+                if has_else {
+                    sink_block_stack.push((sink, false));
+                    stack.push(StackItem::Else);
+                    continue;
+                } else {
+                    stack.push(StackItem::Block(sink));
+                    stack.push(StackItem::End);
+                    continue;
                 }
-            } else {
-                rejoining_blocks.push((rejoin_block, count));
             }
         }
 
@@ -373,22 +371,17 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 // to?) set child as checkpoint, emit both up to that point
                 // emit child (and its children) as normal
 
-                let paths = {
-                    let mut paths = target.get_paths();
-                    paths.extend(fallthrough.get_paths());
-                    paths
-                };
-
-                let block = find_common_block(paths).unwrap();
+                let block = find_common_block(target.clone(), fallthrough.clone()).unwrap();
                 log::trace!("found common block {block}");
 
                 if target == block {
                     todo!()
+                    // emit nothing in if-branch, and then emit fallthrough in else-branch, then continue
                 } else if fallthrough == block {
-                    rejoining_blocks.push((block.clone(), 1u8));
+                    sink_block_stack.push((block, false));
                     stack.extend([StackItem::Block(target)]);
                 } else {
-                    rejoining_blocks.push((block.clone(), 2u8));
+                    sink_block_stack.push((block, true));
                     stack.extend([StackItem::Block(fallthrough), StackItem::Block(target)]);
                 }
             }
@@ -441,16 +434,39 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
     finder.writes_pc
 }
 
-fn find_common_block(paths: Vec<Vec<ControlFlowBlock>>) -> Option<ControlFlowBlock> {
-    if paths.is_empty() || paths[0].is_empty() {
-        return None;
-    }
+/// Finds and returns the first common child block of blocks `left` and `right`, if it exists.
+///
+/// Left and right don't actually mean anything, just used to distinguish between blocks
+fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> Option<ControlFlowBlock> {
+    let mut paths = vec![vec![left], vec![right]];
 
-    let first = &paths[0];
+    for _ in 0..1_000_000 {
+        paths = paths
+            .into_iter()
+            .map(|path| {
+                let node = path.last().unwrap();
+                let children = node.terminator().targets();
 
-    for block in first {
-        if paths.iter().all(|path| path.contains(block)) {
-            return Some(block.clone());
+                if children.is_empty() {
+                    return vec![path];
+                }
+
+                children
+                    .iter()
+                    .map(|child| {
+                        let mut new_path = path.clone();
+                        new_path.push(child.clone());
+                        new_path
+                    })
+                    .collect()
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        for vertex in &paths[0] {
+            if paths.iter().all(|path| path.contains(&vertex)) {
+                return Some(vertex.clone());
+            }
         }
     }
 

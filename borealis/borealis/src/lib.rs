@@ -98,7 +98,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "branch_unconditional_immediate_decode",
                 "branch_unconditional_immediate",
                 "memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode",
-               // "memory_single_general_immediate_signed_postidx",
+                "memory_single_general_immediate_signed_postidx",
             ]
             .contains(&k.as_ref())
             {

@@ -185,26 +185,6 @@ impl ControlFlowBlock {
     pub fn iter(&self) -> ControlFlowBlockIterator {
         ControlFlowBlockIterator::new(self.clone())
     }
-
-    /// Gets all paths starting from the current block
-    pub fn get_paths(&self) -> Vec<Vec<ControlFlowBlock>> {
-        let mut paths = vec![];
-        let mut stack = vec![(self.clone(), Vec::new())];
-
-        while let Some((node, mut current_path)) = stack.pop() {
-            current_path.push(node.clone());
-
-            if node.terminator().targets().is_empty() {
-                paths.push(current_path);
-            } else {
-                for child in node.terminator().targets() {
-                    stack.push((child, current_path.clone()));
-                }
-            }
-        }
-
-        paths
-    }
 }
 
 /// Non-owning reference to a `ControlFlowBlock`
