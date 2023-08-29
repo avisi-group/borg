@@ -66,7 +66,25 @@ impl Emit for Rc<RefCell<Statement>> {
 
             Statement::Comment(str) => write!(w, "// {str}"),
 
-            Statement::If { .. } | Statement::Jump { .. } | Statement::Goto(_) => {
+            Statement::If {
+                condition,
+                if_body,
+                else_body,
+            } => {
+                write!(w, "if (")?;
+                condition.emit(w)?;
+                write!(w, ") {{")?;
+                for statement in if_body {
+                    statement.emit(w)?;
+                }
+                write!(w, "}} else {{")?;
+                for statement in else_body {
+                    statement.emit(w)?;
+                }
+                write!(w, "}}")
+            }
+
+            Statement::Jump { .. } | Statement::Goto(_) => {
                 panic!("control flow statements should have been removed by this point")
             }
 

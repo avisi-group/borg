@@ -47,10 +47,14 @@ impl Graph {
 
                 for statement in node.statements() {
                     statement.emit(&mut label).unwrap();
-                    label += "\n";
+                    label += r"\l";
                 }
 
-                label = label.replace('<', r"\<").replace('>', r"\>");
+                label = label
+                    .replace('<', r"\<")
+                    .replace('>', r"\>")
+                    .replace('{', r"\{")
+                    .replace('}', r"\}");
 
                 label
             };

@@ -15,9 +15,9 @@ use {
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
             visitor::{Visitor, Walkable},
-            Ast, Expression, Literal, Size, Statement, Type, Value,
+            Ast, Expression, FunctionDefinition, Literal, Size, Statement, Type, Value,
         },
-        passes::{any::AnyExt, Pass},
+        passes::Pass,
     },
     common::{intern::InternedString, HashSet},
     std::{cell::RefCell, rc::Rc},
@@ -43,38 +43,40 @@ impl Pass for RemoveExceptions {
     }
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow()
-            .functions
-            .values()
-            .map(|def| {
-                {
-                    let mut statements = def.entry_block.statements();
-                    statements.insert(
-                        0,
-                        Statement::TypeDeclaration {
-                            name: "exception".into(),
-                            typ: Rc::new(RefCell::new(Type::Int {
-                                signed: false,
-                                size: Size::Static(8),
-                            })),
-                        }
-                        .into(),
-                    );
-                    statements.insert(
-                        1,
-                        Statement::Copy {
-                            expression: Expression::Identifier("exception".into()),
-                            value: Literal::Int(0.into()).into(),
-                        }
-                        .into(),
-                    );
-                    def.entry_block.set_statements(statements);
-                }
+        // first pass to remove exceptions
+        ast.borrow().functions.values().for_each(|def| {
+            {
+                let mut statements = def.entry_block.statements();
+                statements.insert(
+                    0,
+                    Statement::TypeDeclaration {
+                        name: "exception".into(),
+                        typ: Rc::new(RefCell::new(Type::Int {
+                            signed: false,
+                            size: Size::Static(8),
+                        })),
+                    }
+                    .into(),
+                );
+                statements.insert(
+                    1,
+                    Statement::Copy {
+                        expression: Expression::Identifier("exception".into()),
+                        value: Literal::Int(0.into()).into(),
+                    }
+                    .into(),
+                );
+                def.entry_block.set_statements(statements);
+            }
 
-                self.visit_function_definition(def);
-                self.did_change
-            })
-            .any()
+            self.visit_function_definition(def);
+        });
+
+        // second pass identifying exception blocks and raising back into if statements
+        // to simplify control flow graph
+        ast.borrow().functions.values().for_each(raise_exceptions);
+
+        false
     }
 }
 
@@ -179,4 +181,67 @@ fn statement_filter(
 
         _ => Some(statement_cloned),
     }
+}
+
+fn raise_exceptions(fn_def: &FunctionDefinition) {
+    // first, find exception blocks (likely candidates are the target of "if exception"s and contain a single `trap()` instruction)
+    let exception_blocks = fn_def
+        .entry_block
+        .iter()
+        .filter(|block| {
+            block.statements().len() == 1
+                && if let Statement::FunctionCall { name, .. } = &*block.statements()[0].borrow() {
+                    name.as_ref() == "trap"
+                } else {
+                    false
+                }
+        })
+        .collect::<HashSet<_>>();
+
+    fn_def.entry_block.iter().for_each(|block| {
+        if let Terminator::Conditional {
+            condition,
+            target,
+            fallthrough,
+        } = block.terminator()
+        {
+            if exception_blocks.contains(&target) {
+                let mut statements = block.statements();
+                statements.push(
+                    Statement::If {
+                        condition: Rc::new(RefCell::new(condition)),
+                        if_body: vec![Statement::FunctionCall {
+                            expression: None,
+                            name: "trap".into(),
+                            arguments: vec![],
+                        }
+                        .into()],
+                        else_body: vec![],
+                    }
+                    .into(),
+                );
+                block.set_statements(statements);
+                block.set_terminator(Terminator::Unconditional {
+                    target: fallthrough,
+                });
+            } else if exception_blocks.contains(&fallthrough) {
+                let mut statements = block.statements();
+                statements.push(
+                    Statement::If {
+                        condition: Rc::new(RefCell::new(condition)),
+                        if_body: vec![],
+                        else_body: vec![Statement::FunctionCall {
+                            expression: None,
+                            name: "trap".into(),
+                            arguments: vec![],
+                        }
+                        .into()],
+                    }
+                    .into(),
+                );
+                block.set_statements(statements);
+                block.set_terminator(Terminator::Unconditional { target });
+            }
+        }
+    });
 }

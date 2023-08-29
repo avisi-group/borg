@@ -176,6 +176,8 @@ pub fn generate_fns(
             continue;
         };
 
+        log::trace!("generating {ident}");
+
         #[allow(unstable_name_collisions)]
         let generated = HelperFunction {
             name: ident.to_string(),
@@ -358,6 +360,26 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
 
                     // set up stack for processing the rest of the if statement
 
+                    // find all children of target and fallthrough
+                    // find closest child of both target and fallthrough (that all paths converge
+                    // to?) set child as checkpoint, emit both up to that point
+                    // emit child (and its children) as normal
+
+                    let paths = {
+                        let mut paths = target.get_paths();
+                        paths.extend(fallthrough.get_paths());
+                        paths
+                    };
+
+                    let common = find_common_block(paths);
+
+                    if let Some(block) = common {
+                        log::trace!("found common block {block}");
+                    }
+
+                    // if target and fallthrough have a common child, emit all blocks up to that
+                    // common child then stop recursing
+
                     if target.terminator().targets().len() == 1
                         && target.terminator().targets() == fallthrough.terminator().targets()
                     {
@@ -441,4 +463,20 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
     finder.visit_function_definition(fn_def);
 
     finder.writes_pc
+}
+
+fn find_common_block(paths: Vec<Vec<ControlFlowBlock>>) -> Option<ControlFlowBlock> {
+    if paths.is_empty() || paths[0].is_empty() {
+        return None;
+    }
+
+    let first = &paths[0];
+
+    for block in first {
+        if paths.iter().all(|path| path.contains(&block)) {
+            return Some(block.clone());
+        }
+    }
+
+    None
 }
