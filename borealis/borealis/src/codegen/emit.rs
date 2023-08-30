@@ -73,15 +73,15 @@ impl Emit for Rc<RefCell<Statement>> {
             } => {
                 write!(w, "if (")?;
                 condition.emit(w)?;
-                write!(w, ") {{")?;
+                write!(w, ") {{ ")?;
                 for statement in if_body {
                     statement.emit(w)?;
                 }
-                write!(w, "}} else {{")?;
+                write!(w, " }} else {{ ")?;
                 for statement in else_body {
                     statement.emit(w)?;
                 }
-                write!(w, "}}")
+                write!(w, " }}")
             }
 
             Statement::Jump { .. } | Statement::Goto(_) => {

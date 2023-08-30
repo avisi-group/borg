@@ -195,14 +195,12 @@ fn raise_exceptions(fn_def: &FunctionDefinition) {
                     name.as_ref() == "trap"
                 } else {
                     false
-                } || if let Statement::Copy { expression, .. } =
-                    &*block.statements()[0].borrow()
+                } || if let Statement::Copy {
+                    expression: Expression::Identifier(ident),
+                    ..
+                } = &*block.statements()[0].borrow()
                 {
-                    if let Expression::Identifier(ident) = expression {
-                        ident.as_ref() == "exception"
-                    } else {
-                        false
-                    }
+                    ident.as_ref() == "exception"
                 } else {
                     false
                 })

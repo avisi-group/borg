@@ -99,6 +99,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "branch_unconditional_immediate",
                 "memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode",
                 "memory_single_general_immediate_signed_postidx",
+                "ConstrainUnpredictable"
             ]
             .contains(&k.as_ref())
             {
@@ -160,6 +161,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
         constants.insert("v83_implemented".into(), (Typ::Uint8, 1));
         constants.insert("v82_implemented".into(), (Typ::Uint8, 1));
         constants.insert("v81_implemented".into(), (Typ::Uint8, 1));
+
+        constants.insert("unpred_tsize_aborts".into(), (Typ::Uint8, 0));
 
         constants
     };

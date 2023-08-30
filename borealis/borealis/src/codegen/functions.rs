@@ -57,6 +57,27 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             .into(),
         },
         HelperFunction {
+            name: "aset_Mem".into(),
+            parameters: "uint64 address, uint64 size, uint32 acctype, uint64 value_name__arg"
+                .into(),
+            return_type: "void".into(),
+            body: r#"
+                trap();
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "aget_Mem".into(),
+            parameters: "uint64 address, uint64 size, uint32 acctype".into(),
+            return_type: "uint64".into(),
+            body: r#"
+                trap();
+                return 0;
+            "#
+            .into(),
+        },
+        HelperFunction {
             name: "vector_subrange_A".into(),
             parameters: "uint64 value, uint8 start, uint8 end".into(),
             return_type: "uint64".into(),
@@ -142,6 +163,53 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
         HelperFunction {
             name: "PostDecode".into(),
             parameters: "".into(),
+            return_type: "void".into(),
+            body: r#"
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "HaveMTEExt".into(),
+            parameters: "".into(),
+            return_type: "uint8".into(),
+            body: r#"
+                return 0;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "Prefetch".into(),
+            parameters: "uint64 address, uint8 prfop".into(),
+            return_type: "void".into(),
+            body: r#"
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "EndOfInstruction".into(),
+            parameters: "".into(),
+            return_type: "void".into(),
+            body: r#"
+                trap();
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "CheckSPAlignment".into(),
+            parameters: "".into(),
+            return_type: "void".into(),
+            body: r#"
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "AArch64_SetLSInstructionSyndrome".into(),
+            parameters:
+                "uint64 size, uint8 sign_extend, uint64 Rt, uint8 sixty_four, uint8 acq_rel".into(),
             return_type: "void".into(),
             body: r#"
                 return;
@@ -443,7 +511,7 @@ fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> Option<
     for _ in 0..1_000_000 {
         paths = paths
             .into_iter()
-            .map(|path| {
+            .flat_map(|path| {
                 let node = path.last().unwrap();
                 let children = node.terminator().targets();
 
@@ -460,11 +528,10 @@ fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> Option<
                     })
                     .collect()
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         for vertex in &paths[0] {
-            if paths.iter().all(|path| path.contains(&vertex)) {
+            if paths.iter().all(|path| path.contains(vertex)) {
                 return Some(vertex.clone());
             }
         }

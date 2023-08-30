@@ -32,6 +32,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("gteq_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
         }),
+        ("neq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::NotEqual)
+        }),
         ("shl_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LeftShift)
         }),
@@ -109,6 +112,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("eq_anything_EConstraint_pcnt__", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
+        ("neq_anything_EMemOp_pcnt__", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::NotEqual)
+        }),
         ("slice", noop),
         ("Zeros", noop),
         ("undefined_bitvector", noop),
@@ -121,6 +127,7 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("undefined_int", delete),
         ("undefined_MoveWideOp", delete),
         ("undefined_MemOp", delete),
+        ("undefined_Constraint", delete),
         ("replicate_bits", replicate_bits_handler),
         ("SetSlice_int", noop),
         ("SetSlice_bits", set_slice_handler),
@@ -355,7 +362,11 @@ pub fn zero_extend_handler(
         Type::Int {
             size: Size::Static(len),
             ..
-        } => len as isize,
+        } => Literal::Int(len.into()).into(),
+        Type::Int {
+            size: Size::Runtime(ident),
+            ..
+        } => Rc::new(RefCell::new(Value::Identifier(ident))),
         _ => return,
     };
 
@@ -373,10 +384,10 @@ pub fn zero_extend_handler(
                     })),
                 )
                 .into(),
-                Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into()).into(),
+                Operation::Subtract(arguments[1].clone(), x_len.clone()).into(),
             )
             .into(),
-            Operation::Subtract(arguments[1].clone(), Literal::Int(x_len.into()).into()).into(),
+            Operation::Subtract(arguments[1].clone(), x_len).into(),
         )
         .into(),
     };
