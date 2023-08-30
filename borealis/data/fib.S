@@ -21,4 +21,6 @@ loop:
 done:
     mov x0, x2
 //    ldr x0, [x1]
-    udf #0
+    mov x0, #0
+    mov w8, #93
+    svc 0

@@ -109,6 +109,7 @@ e2e-test-gensim:
     COPY (+e2e-test-borealis-genc/genc) .
     RUN ./dist/bin/gensim --verbose -a main.genc -t output -s module,arch,decode,disasm,ee_interp,ee_blockjit,jumpinfo,function,makefile -o decode.GenerateDotGraph=1,makefile.libtrace_path=/gensim/support/libtrace/inc,makefile.archsim_path=/gensim/archsim/inc,makefile.Optimise=3,makefile.Debug=1
     RUN cd output && make -j$(nproc)
+    SAVE ARTIFACT /gensim/build/dist dist
     SAVE ARTIFACT output/arm64.dll arm64.dll
 
 e2e-test-archsim:
@@ -124,3 +125,71 @@ e2e-test-archsim:
 
     RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out.fib --mode Interpreter
     RUN bash -c 'diff -u fib.trace <(./dist/bin/TraceCat trace.out.fib0)'
+
+bench:
+    FROM ubuntu:latest
+
+    COPY (+bench-fib-qemu/qemu.time) .
+    COPY (+bench-fib-sail/sail.time) .
+    COPY (+bench-fib-archsim/archsim.time) .
+
+    ENV cachebust
+
+    RUN cat qemu.time
+    RUN cat sail.time
+    RUN cat archsim.time
+
+bench-fib-program:
+    FROM ubuntu:latest
+
+    RUN apt-get update
+    RUN apt-get install -yy gcc-aarch64-linux-gnu
+
+    COPY data/fib.S .
+    RUN sed -i 's/#10/0x00800000/g' fib.S
+    RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
+
+    RUN aarch64-linux-gnu-objdump -D fib
+
+    SAVE ARTIFACT fib fib
+
+bench-fib-qemu:
+    FROM ubuntu:latest
+
+    RUN apt-get update
+    RUN apt-get install -yy qemu-user time
+
+    COPY (+bench-fib-program/fib) fib
+
+    RUN { time qemu-aarch64 fib ; } 2> qemu.time
+
+    SAVE ARTIFACT qemu.time qemu.time
+
+bench-fib-sail:
+    FROM +base-image
+
+    RUN apk add git
+
+    RUN git clone https://github.com/rems-project/sail-arm.git
+    RUN cd sail-arm/arm-v8.5-a && eval `opam env` && make
+    RUN cd sail-arm/arm-v8.5-a && eval `opam env` && make aarch64
+
+    COPY (+bench-fib-program/fib) fib
+
+    RUN { time sail-arm/arm-v8.5-a/aarch64 -C cpu.cpu0.RVBAR=0x4000d4 -e fib || true ; } 2> sail.time
+
+    SAVE ARTIFACT sail.time sail.time
+
+bench-fib-archsim:
+    FROM ghcr.io/fmckeogh/gensim:latest
+
+    RUN apt-get update
+    RUN apt-get install -yy time
+
+    COPY (+bench-fib-program/fib) fib
+
+    RUN mkdir modules
+    COPY (+e2e-test-gensim/arm64.dll) modules
+    RUN { time ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out.fib --mode Interpreter ; } 2> archsim.time
+
+    SAVE ARTIFACT archsim.time archsim.time
