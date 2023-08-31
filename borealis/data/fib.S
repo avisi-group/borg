@@ -23,9 +23,11 @@ done:
 
     mov x1, 0x0
     add x1, x1, 0x401000
-    ldr x0, [x1]
+    mov x0, 0x0
     add x0, x0, #3141
     str x0, [x1]
+    ldr x0, [x1]
+
 
     mov x0, #0
     mov w8, #93

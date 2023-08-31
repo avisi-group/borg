@@ -68,28 +68,18 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
                     break;
                 }
 
-                case 8: {
-                    mem_write_8(Data, address, (uint8)value_name__arg);
-                    break;
-                }
-
-                case 16: {
+                case 2: {
                     mem_write_16(Data, address, (uint16)value_name__arg);
                     break;
                 }
 
-                case 32: {
+                case 4: {
                     mem_write_32(Data, address, (uint32)value_name__arg);
                     break;
                 }
 
-                case 64: {
+                case 8: {
                     mem_write_64(Data, address, value_name__arg);
-                    break;
-                }
-
-                case 128: {
-                    trap();
                     break;
                 }
 
@@ -114,53 +104,26 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
                 case 1: {
                     uint8 data8;
                     mem_read_8(Data, address, data8);
-                    read_data = data8 & ((1 << 1) - 1);
-                    break;
-                }
-
-                case 2: {
-                    uint8 data8;
-                    mem_read_8(Data, address, data8);
-                    read_data = data8 & ((1 << 2) - 1);
-                    break;
-                }
-
-                case 4: {
-                    uint8 data8;
-                    mem_read_8(Data, address, data8);
-                    read_data = data8 & ((1 << 4) - 1);
-                    break;
-                }
-
-
-                case 8: {
-                    uint8 data8;
-                    mem_read_8(Data, address, data8);
                     read_data = data8;
                     break;
                 }
 
-                case 16: {
+                case 2: {
                     uint16 data16;
                     mem_read_16(Data, address, data16);
                     read_data = data16;
                     break;
                 }
 
-                case 32: {
+                case 4: {
                     uint32 data32;
                     mem_read_32(Data, address, data32);
                     read_data = data32;
                     break;
                 }
 
-                case 64: {
+                case 8: {
                     mem_read_64(Data, address, read_data);
-                    break;
-                }
-
-                case 128: {
-                    trap();
                     break;
                 }
 
