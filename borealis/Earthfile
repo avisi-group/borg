@@ -124,7 +124,7 @@ e2e-test-archsim:
     COPY (+e2e-test-gensim/arm64.dll) modules
 
     RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out.fib --mode Interpreter
-    RUN bash -c 'diff --strip-trailing-cr -w fib.trace <(./dist/bin/TraceCat trace.out.fib0)'
+    RUN bash -c 'diff --strip-trailing-cr -u -w fib.trace <(./dist/bin/TraceCat trace.out.fib0)'
 
 bench:
     FROM ubuntu:latest

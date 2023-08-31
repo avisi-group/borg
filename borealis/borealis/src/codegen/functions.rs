@@ -62,7 +62,43 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
                 .into(),
             return_type: "void".into(),
             body: r#"
-                trap();
+                switch (size) {
+                case 1: {
+                    mem_write_8(Data, address, (uint8)value_name__arg);
+                    break;
+                }
+
+                case 8: {
+                    mem_write_8(Data, address, (uint8)value_name__arg);
+                    break;
+                }
+
+                case 16: {
+                    mem_write_16(Data, address, (uint16)value_name__arg);
+                    break;
+                }
+
+                case 32: {
+                    mem_write_32(Data, address, (uint32)value_name__arg);
+                    break;
+                }
+
+                case 64: {
+                    mem_write_64(Data, address, value_name__arg);
+                    break;
+                }
+
+                case 128: {
+                    trap();
+                    break;
+                }
+
+                default: {
+                    trap();
+                    break;
+                }
+                }
+
                 return;
             "#
             .into(),
@@ -72,8 +108,69 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             parameters: "uint64 address, uint64 size, uint32 acctype".into(),
             return_type: "uint64".into(),
             body: r#"
-                trap();
-                return 0;
+                uint64 read_data;
+
+                switch (size) {
+                case 1: {
+                    uint8 data8;
+                    mem_read_8(Data, address, data8);
+                    read_data = data8 & ((1 << 1) - 1);
+                    break;
+                }
+
+                case 2: {
+                    uint8 data8;
+                    mem_read_8(Data, address, data8);
+                    read_data = data8 & ((1 << 2) - 1);
+                    break;
+                }
+
+                case 4: {
+                    uint8 data8;
+                    mem_read_8(Data, address, data8);
+                    read_data = data8 & ((1 << 4) - 1);
+                    break;
+                }
+
+
+                case 8: {
+                    uint8 data8;
+                    mem_read_8(Data, address, data8);
+                    read_data = data8;
+                    break;
+                }
+
+                case 16: {
+                    uint16 data16;
+                    mem_read_16(Data, address, data16);
+                    read_data = data16;
+                    break;
+                }
+
+                case 32: {
+                    uint32 data32;
+                    mem_read_32(Data, address, data32);
+                    read_data = data32;
+                    break;
+                }
+
+                case 64: {
+                    mem_read_64(Data, address, read_data);
+                    break;
+                }
+
+                case 128: {
+                    trap();
+                    break;
+                }
+
+                default: {
+                    trap();
+                    break;
+                }
+                }
+
+                return read_data;
             "#
             .into(),
         },
