@@ -117,15 +117,20 @@ e2e-test-archsim:
 
     RUN apt-get install -yy gcc-aarch64-linux-gnu
     COPY data/fib.S .
-    COPY data/fib.trace .
     RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
 
     RUN mkdir modules
     COPY (+e2e-test-gensim/arm64.dll) modules
 
-    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out.fib --mode Interpreter
-    RUN ./dist/bin/TraceCat trace.out.fib0
-    RUN bash -c 'diff --strip-trailing-cr -u -w fib.trace <(./dist/bin/TraceCat trace.out.fib0)'
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.interp.fib --mode Interpreter
+    RUN ./dist/bin/TraceCat trace.interp.fib0
+    COPY data/fib.interp.trace .
+    RUN bash -c 'diff --strip-trailing-cr -u -w fib.interp.trace <(./dist/bin/TraceCat trace.interp.fib0)'
+
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.jit.fib
+    RUN ./dist/bin/TraceCat trace.jit.fib0
+    COPY data/fib.jit.trace .
+    RUN bash -c 'diff --strip-trailing-cr -u -w fib.jit.trace <(./dist/bin/TraceCat trace.jit.fib0)'
 
 bench:
     FROM ubuntu:latest
@@ -147,7 +152,7 @@ bench-fib-program:
     RUN apt-get install -yy gcc-aarch64-linux-gnu
 
     COPY data/fib.S .
-    RUN sed -i 's/#10/0x00800000/g' fib.S
+    RUN sed -i 's/#10/0x08000000/g' fib.S
     RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
 
     RUN aarch64-linux-gnu-objdump -D fib
@@ -191,6 +196,6 @@ bench-fib-archsim:
 
     RUN mkdir modules
     COPY (+e2e-test-gensim/arm64.dll) modules
-    RUN { time ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib -t -U trace.out.fib --mode Interpreter ; } 2> archsim.time
+    RUN { time ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib ; } 2> archsim.time
 
     SAVE ARTIFACT archsim.time archsim.time

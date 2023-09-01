@@ -269,11 +269,11 @@ impl Emit for Operation {
             Operation::RotateRight(lhs, rhs) => emit_op2(w, lhs, rhs, ">>>"),
 
             Operation::Cast(value, typ) => {
-                write!(w, "(")?;
+                write!(w, "((")?;
                 typ.emit(w)?;
                 write!(w, ")(")?;
                 value.emit(w)?;
-                write!(w, ")")
+                write!(w, "))")
             }
         }
     }

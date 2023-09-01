@@ -13,5 +13,8 @@ mkdir -p modules
 make -j$(nproc) && cp arm64.dll modules/
 
 cd /home/fm208/Sync/gensim/build/dist/bin/
-./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./fib -t -U trace.out --mode Interpreter
-./TraceCat trace.out0
+
+cp /home/fm208/Sync/borealis/data/fib.S .
+aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
+
+./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./fib -d

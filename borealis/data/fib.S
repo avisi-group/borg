@@ -20,15 +20,6 @@ loop:
 
 done:
     mov x0, x2
-
-    mov x1, 0x0
-    add x1, x1, 0x401000
-    mov x0, 0x0
-    add x0, x0, #3141
-    str x0, [x1]
-    ldr x0, [x1]
-
-
     mov x0, #0
     mov w8, #93
     svc 0
