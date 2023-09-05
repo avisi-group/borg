@@ -504,7 +504,8 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
 
                 if target == block {
                     todo!()
-                    // emit nothing in if-branch, and then emit fallthrough in else-branch, then continue
+                    // emit nothing in if-branch, and then emit fallthrough in
+                    // else-branch, then continue
                 } else if fallthrough == block {
                     sink_block_stack.push((block, false));
                     stack.extend([StackItem::Block(target)]);
@@ -562,9 +563,11 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
     finder.writes_pc
 }
 
-/// Finds and returns the first common child block of blocks `left` and `right`, if it exists.
+/// Finds and returns the first common child block of blocks `left` and `right`,
+/// if it exists.
 ///
-/// Left and right don't actually mean anything, just used to distinguish between blocks
+/// Left and right don't actually mean anything, just used to distinguish
+/// between blocks
 fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> Option<ControlFlowBlock> {
     let mut paths = vec![vec![left], vec![right]];
 

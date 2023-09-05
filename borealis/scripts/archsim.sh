@@ -2,7 +2,7 @@
 set -e
 
 # export genc from bincode
-cargo r -- --log info sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
+#cargo r -- --log info sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
 
 # run gensim
 cd target/genc
@@ -14,7 +14,7 @@ make -j$(nproc) && cp arm64.dll modules/
 
 cd /home/fm208/Sync/gensim/build/dist/bin/
 
-cp /home/fm208/Sync/borealis/data/fib.S .
-aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
+cp /home/fm208/Sync/borealis/data/mem.S .
+aarch64-linux-gnu-gcc -o mem -nostdlib -static mem.S
 
-./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./fib -d
+./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./mem -d --mode Interpreter

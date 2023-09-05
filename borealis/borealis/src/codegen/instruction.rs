@@ -252,8 +252,8 @@ fn reconstruct_split_vars(
             })
             // shift into position
             .map(|(start_pos, segment_str)| format!("({segment_str} << {start_pos})"))
-            // and all together
-            .join(" & ");
+            // OR together
+            .join(" | ");
 
         buf.push_str(&format!("\tuint64 {name} = {value};\n"));
     }

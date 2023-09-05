@@ -118,6 +118,8 @@ e2e-test-archsim:
     RUN apt-get install -yy gcc-aarch64-linux-gnu
     COPY data/fib.S .
     RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
+    COPY data/mem.S .
+    RUN aarch64-linux-gnu-gcc -o mem -nostdlib -static mem.S
 
     RUN mkdir modules
     COPY (+e2e-test-gensim/arm64.dll) modules
@@ -131,6 +133,11 @@ e2e-test-archsim:
     RUN ./dist/bin/TraceCat trace.jit.fib0
     COPY data/fib.jit.trace .
     RUN bash -c 'diff --strip-trailing-cr -u -w fib.jit.trace <(./dist/bin/TraceCat trace.jit.fib0)'
+
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./mem -t -U trace.interp.mem --mode Interpreter
+    RUN ./dist/bin/TraceCat trace.interp.mem0
+    COPY data/mem.trace .
+    RUN bash -c 'diff --strip-trailing-cr -u -w mem.trace <(./dist/bin/TraceCat trace.interp.mem0)'
 
 bench:
     FROM ubuntu:latest
