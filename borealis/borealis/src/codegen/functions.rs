@@ -48,10 +48,43 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
 
                 uint64 value = read_register_bank(reg_RB, n);
 
-                if (width == 32) {
-                    return (uint32)value;
-                } else {
-                    return value;
+                switch (width) {
+                    case 64: {
+                        return value;
+                    }
+
+                    case 32: {
+                        return (uint32)value;
+                    }
+
+                    default: {
+                        trap();
+                        return 0;
+                    }
+                }
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "aget_SP".into(),
+            parameters: "uint8 width".into(),
+            return_type: "uint64".into(),
+            body: r#"
+                uint64 value = read_register(reg_SP);
+
+                switch (width) {
+                    case 64: {
+                        return value;
+                    }
+
+                    case 32: {
+                        return (uint32)value;
+                    }
+
+                    default: {
+                        trap();
+                        return 0;
+                    }
                 }
             "#
             .into(),
@@ -270,6 +303,15 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             name: "AArch64_SetLSInstructionSyndrome".into(),
             parameters:
                 "uint64 size, uint8 sign_extend, uint64 Rt, uint8 sixty_four, uint8 acq_rel".into(),
+            return_type: "void".into(),
+            body: r#"
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "system_hints".into(),
+            parameters: "uint32 op".into(),
             return_type: "void".into(),
             body: r#"
                 return;

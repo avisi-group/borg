@@ -99,7 +99,11 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "branch_unconditional_immediate",
                 "memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode",
                 "memory_single_general_immediate_signed_postidx",
-                "ConstrainUnpredictable"
+                "ConstrainUnpredictable",
+                "system_hints_decode",
+                "integer_arithmetic_address_pcrel_decode",
+                "integer_arithmetic_address_pcrel",
+                "memory_pair_general_preidx_memory_pair_general_postidx__decode",
             ]
             .contains(&k.as_ref())
             {
@@ -245,6 +249,16 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                         tag: Some("V".into()),
                     }),
                 ],
+            },
+            RegisterSpace {
+                size: 1,
+                views: vec![View::Slot(Slot {
+                    name: "BTypeCompatible".into(),
+                    typ: genc_model::Typ::Uint8,
+                    width: 1,
+                    offset: 0,
+                    tag: None,
+                })],
             },
         ],
         instructions,

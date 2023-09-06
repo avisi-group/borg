@@ -229,6 +229,7 @@ fn reconstruct_split_vars(
 
         let value = segments
             .into_iter()
+            .rev()
             .scan(0, |state, seg| {
                 let initial = *state;
                 *state += seg.len();

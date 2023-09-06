@@ -4,7 +4,7 @@ set -e
 GENSIM_PATH="/home/fm208/Sync/gensim"
 
 # export genc from bincode
-cargo r -- --log info sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
+#cargo r -- --log info sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
 
 # run gensim
 cd target/genc
@@ -13,12 +13,10 @@ $GENSIM_PATH/build/dist/bin/gensim --verbose -a main.genc -t output -s module,ar
 cd output
 mkdir -p modules
 make -j$(nproc) && cp arm64.dll modules/
-cp ../../../data/mem.S $GENSIM_PATH/build/dist/bin/
+cp ../../../data/mcf/mcf_r_base.aarch64-static-64 $GENSIM_PATH/build/dist/bin/
 
 cd $GENSIM_PATH/build/dist/bin/
 
-aarch64-linux-gnu-gcc -o mem -nostdlib -static mem.S
-
 rm trace0 || true
-./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./mem -d -t -U trace --mode Interpreter
+./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./mcf_r_base.aarch64-static-64 -d -t -U trace --mode Interpreter
 ./TraceCat trace0
