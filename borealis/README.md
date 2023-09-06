@@ -6,9 +6,13 @@
 [![borealis docs](https://img.shields.io/badge/docs-borealis-blue)](https://avisi.org.uk/borealis/borealis/)
 [![sail docs](https://img.shields.io/badge/docs-sail-blue)](https://avisi.org.uk/borealis/sail/)
 [![libarch-sys docs](https://img.shields.io/badge/docs-libarch_sys-blue)](https://avisi.org.uk/borealis/libarch_sys/)
-[![Lines of code](https://tokei.rs/b1/github/avisi-group/borealis)](https://github.com/avisi-group/borealis)
 
 ## Build Requirements
+
+* [Docker](https://www.docker.com)
+* [Earthly](https://earthly.dev)
+
+**OR**
 
 * [Rust toolchain](https://rustup.rs)
 * [OCaml toolchain](https://ocaml.org)
@@ -20,7 +24,7 @@
 
 ## Testing
 
-`cargo test --release` to run all tests.
+`earthly +test` to run all tests.
 
 ## Docker/Earthly
 
