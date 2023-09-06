@@ -2,6 +2,7 @@ target
 **/.DS_Store
 **/_build
 .vscode
+.tmp-earthly-out
 
 libarch-sys/include/arm64-decode.h
 libarch-sys/include/arm64-decode.cpp
