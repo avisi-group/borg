@@ -66,6 +66,16 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             .into(),
         },
         HelperFunction {
+            name: "aset_SP".into(),
+            parameters: "uint64 value".into(),
+            return_type: "void".into(),
+            body: r#"
+                write_register(reg_SP, value);
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
             name: "aget_SP".into(),
             parameters: "uint8 width".into(),
             return_type: "uint64".into(),

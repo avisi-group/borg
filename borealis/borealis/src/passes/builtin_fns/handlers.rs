@@ -1,8 +1,10 @@
+use crate::boom::control_flow::ControlFlowBlock;
+
 use {
     crate::{
         boom::{
-            Ast, Expression, FunctionDefinition, Literal, Operation, OperationKind, Size,
-            Statement, Type, Value,
+            control_flow::Terminator, Ast, Expression, FunctionDefinition, Literal, Operation,
+            OperationKind, Size, Statement, Type, Value,
         },
         passes::builtin_fns::HandlerFunction,
     },
@@ -26,14 +28,20 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("eq_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
+        ("neq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::NotEqual)
+        }),
         ("lt_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LessThan)
         }),
+        ("gt_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::GreaterThan)
+        }),
+        ("lteq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::LessThanOrEqual)
+        }),
         ("gteq_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
-        }),
-        ("neq_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::NotEqual)
         }),
         ("shl_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LeftShift)
@@ -132,6 +140,8 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("replicate_bits", replicate_bits_handler),
         ("SetSlice_int", noop),
         ("SetSlice_bits", set_slice_handler),
+        ("min_int", min_int_handler),
+        ("Extend__0", extend_handler),
     ]
     .into_iter()
     .map(|(s, f)| (InternedString::from_static(s), f));
@@ -289,9 +299,9 @@ pub fn bv_length_handler(
             ..
         } => Literal::Int(size.into()).into(),
         Type::Int {
-            size: Size::Runtime(ident),
+            size: Size::Runtime(value),
             ..
-        } => Rc::new(RefCell::new(Value::Identifier(ident))),
+        } => value,
         Type::Int {
             size: Size::Unknown,
             ..
@@ -365,9 +375,9 @@ pub fn zero_extend_handler(
             ..
         } => Literal::Int(len.into()).into(),
         Type::Int {
-            size: Size::Runtime(ident),
+            size: Size::Runtime(value),
             ..
-        } => Rc::new(RefCell::new(Value::Identifier(ident))),
+        } => value,
         _ => return,
     };
 
@@ -420,7 +430,7 @@ pub fn sign_extend_handler(
         if let Type::Int { size, .. } = function.get_ident_type(*x_ident).unwrap() {
             match size {
                 Size::Static(size) => Literal::Int(size.into()).into(),
-                Size::Runtime(ident) => Rc::new(RefCell::new(Value::Identifier(ident))),
+                Size::Runtime(value) => value,
                 Size::Unknown => panic!("unknown size {x_ident:?} in {}", function.signature.name),
             }
         } else {
@@ -493,7 +503,10 @@ pub fn assert_handler(
     };
 
     *expression = None;
-    arguments.pop();
+
+    if arguments.len() == 2 {
+        arguments.pop();
+    }
 }
 
 pub fn replicate_bits_handler(
@@ -699,4 +712,120 @@ pub fn set_slice_handler(
         )
         .into(),
     };
+}
+
+pub fn min_int_handler(
+    _ast: Rc<RefCell<Ast>>,
+    _function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    let (destination, a, b) = {
+        let Statement::FunctionCall {
+            expression,
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
+            panic!();
+        };
+
+        (
+            expression.clone().unwrap(),
+            arguments[0].clone(),
+            arguments[1].clone(),
+        )
+    };
+
+    *statement.borrow_mut() = Statement::If {
+        condition: Operation::GreaterThan(a.clone(), b.clone()).into(),
+        if_body: vec![Rc::new(RefCell::new(Statement::Copy {
+            expression: destination.clone(),
+            value: b,
+        }))],
+        else_body: vec![Rc::new(RefCell::new(Statement::Copy {
+            expression: destination,
+            value: a,
+        }))],
+    };
+}
+
+pub fn extend_handler(
+    _: Rc<RefCell<Ast>>,
+    fn_def: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) {
+    // val Extend__0 : (%bv, %i, %bool) -> %bv
+    // fn Extend__0(x, N, unsigned) {
+    //     if (unsigned) {
+    //       return = ZeroExtend__0(x, N)
+    //     } else {
+    //       return = SignExtend__0(x, N)
+    //     }
+    //     label "end_function_4997"
+    //     end(return)
+    //     label "end_block_exception_4998"
+    //     undefined
+    //   }
+
+    // set terminator to be conditional on `unsigned`
+
+    // create two new blocks with calls to extend fns
+
+    // set terminators to the second half of the original split block
+
+    let (destination, x, n, unsigned) = {
+        let Statement::FunctionCall {
+            expression,
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
+            panic!();
+        };
+
+        (
+            expression.clone(),
+            arguments[0].clone(),
+            arguments[1].clone(),
+            arguments[2].clone(),
+        )
+    };
+
+    let (block, pos) = fn_def.entry_block.find_statement(statement).unwrap();
+
+    // split block statements at pos
+    let mut statements = block.statements();
+    statements.remove(pos);
+    let (pre_statements, post_statements) = statements.split_at(pos);
+
+    let final_block = ControlFlowBlock::new();
+    final_block.set_statements(post_statements.to_owned());
+    final_block.set_terminator(block.terminator());
+
+    let target = ControlFlowBlock::new();
+    target.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
+        expression: destination.clone(),
+        name: "ZeroExtend__0".into(),
+        arguments: vec![x.clone(), n.clone()],
+    }))]);
+    target.set_terminator(Terminator::Unconditional {
+        target: final_block.clone(),
+    });
+
+    let fallthrough = ControlFlowBlock::new();
+    fallthrough.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
+        expression: destination.clone(),
+        name: "SignExtend__0".into(),
+        arguments: vec![x, n],
+    }))]);
+    fallthrough.set_terminator(Terminator::Unconditional {
+        target: final_block,
+    });
+
+    block.set_statements(pre_statements.to_owned());
+    block.set_terminator(Terminator::Conditional {
+        condition: unsigned.borrow().clone(),
+        target,
+        fallthrough,
+    });
 }

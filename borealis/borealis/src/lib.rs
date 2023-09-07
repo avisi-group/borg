@@ -104,6 +104,12 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "integer_arithmetic_address_pcrel_decode",
                 "integer_arithmetic_address_pcrel",
                 "memory_pair_general_preidx_memory_pair_general_postidx__decode",
+                "memory_pair_general_postidx",
+                "memory_pair_general_offset_memory_pair_general_postidx__decode",
+                "integer_arithmetic_addsub_extendedreg_decode",
+                "DecodeRegExtend",
+                "integer_arithmetic_addsub_extendedreg",
+                "ExtendReg"
             ]
             .contains(&k.as_ref())
             {

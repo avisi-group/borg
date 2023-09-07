@@ -40,7 +40,7 @@ impl Pass for RemoveUnits {
             .map(|def| {
                 self.reset();
 
-                if *def.signature.return_type.borrow() == Type::Unit {
+                if let Type::Unit = *def.signature.return_type.borrow() {
                     self.deleted_unit_vars.insert("return_type".into());
                     self.deleted_unit_vars.insert("return".into());
                     self.deleted_unit_vars.insert("return_value".into());
@@ -59,7 +59,14 @@ impl Visitor for RemoveUnits {
         node.signature
             .parameters
             .borrow_mut()
-            .retain(|Parameter { typ, .. }| *typ.borrow() != Type::Unit);
+            .retain(|Parameter { typ, .. }| {
+                // retain if not unit
+                if let Type::Unit = *typ.borrow() {
+                    false
+                } else {
+                    true
+                }
+            });
         node.walk(self);
     }
 

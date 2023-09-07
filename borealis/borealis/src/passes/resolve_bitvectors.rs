@@ -214,6 +214,7 @@ impl ResolveBitvectors {
                 ("bitvector_concat", concat_handler),
                 ("eq_vec", eq_handler),
                 ("undefined_bitvector", undefined_handler),
+                ("slice", slice_handler),
             ]
             .into_iter()
             .map(|(s, f)| (InternedString::from_static(s), f));
@@ -242,7 +243,11 @@ fn zeros_handler(
         panic!();
     };
 
-    // resolve destination length if possible
+    let Expression::Identifier(destination) = expression else {
+        panic!();
+    };
+
+    // resolve static destination length if possible
     if let Some(value) = celf
         .current_func
         .as_ref()
@@ -252,11 +257,12 @@ fn zeros_handler(
     {
         if let Value::Literal(literal) = &*value.borrow() {
             if let Literal::Int(length) = &*literal.borrow() {
-                if let Expression::Identifier(destination) = expression {
-                    celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
-                }
+                celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
             }
         }
+        // otherwise store value
+    } else {
+        celf.set_size(*destination, Size::Runtime(arguments[0].clone()));
     }
 
     // assign literal 0
@@ -328,19 +334,27 @@ fn concat_handler(
         panic!();
     };
 
-    let Some(Size::Static(left_length)) = celf.get_size(*left_ident) else {
+    let Some(left_size) = celf.get_size(*left_ident) else {
         panic!(
-            "{left_ident} not static, got {:?}\n {:#?}",
+            "{left_ident} not static, got {:?}\nfunc: {:#?}\nlocals: {:#?}",
             celf.get_size(*left_ident),
-            celf
+            celf.current_func
+                .as_ref()
+                .map(|f| f.signature.name)
+                .unwrap_or("?".into()),
+            celf.locals
         );
     };
 
-    let Some(Size::Static(right_length)) = celf.get_size(*right_ident) else {
+    let Some(right_size) = celf.get_size(*right_ident) else {
         panic!(
-            "{right_ident} not static, got {:?}\n {:#?}",
-            celf.get_size(*right_ident),
-            celf
+            "{right_ident} not static, got {:?}\nfunc: {:#?}\nlocals: {:#?}",
+            celf.get_size(*left_ident),
+            celf.current_func
+                .as_ref()
+                .map(|f| f.signature.name)
+                .unwrap_or("?".into()),
+            celf.locals
         );
     };
 
@@ -349,7 +363,7 @@ fn concat_handler(
     let value = Operation::Or(
         Operation::LeftShift(
             Rc::new(RefCell::new(Value::Identifier(*left_ident))),
-            Literal::Int(right_length.into()).into(),
+            (&right_size).try_into().unwrap(),
         )
         .into(),
         Rc::new(RefCell::new(Value::Identifier(*right_ident))),
@@ -361,7 +375,7 @@ fn concat_handler(
     };
 
     // calculate length of output
-    celf.set_size(*dest, Size::Static(left_length + right_length));
+    celf.set_size(*dest, left_size + right_size);
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
@@ -422,15 +436,29 @@ fn undefined_handler(
     let dest_size = celf.get_size(*dest).unwrap();
 
     if let Size::Unknown = dest_size {
-        let Value::Identifier(size_ident) = &*arguments[0].borrow() else {
-            panic!();
-        };
-
-        celf.set_size(*dest, Size::Runtime(*size_ident));
+        celf.set_size(*dest, Size::Runtime(arguments[0].clone()));
     }
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value: Literal::Int(0.into()).into(),
+    }
+}
+
+fn slice_handler(
+    celf: &mut ResolveBitvectors,
+    _statement: Rc<RefCell<Statement>>,
+    expression: &Expression,
+    arguments: &[Rc<RefCell<Value>>],
+) {
+    assert!(arguments.len() == 3);
+
+    let Expression::Identifier(dest) = expression else {
+        panic!();
+    };
+
+    if let Some(Size::Static(_)) = celf.get_size(*dest) {
+    } else {
+        celf.set_size(*dest, Size::Runtime(arguments[2].clone()));
     }
 }

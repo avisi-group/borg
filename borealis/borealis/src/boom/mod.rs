@@ -17,6 +17,7 @@ use {
     std::{
         cell::RefCell,
         fmt::{self, Debug, Display, Formatter},
+        ops::Add,
         rc::Rc,
     },
 };
@@ -211,7 +212,7 @@ impl Walkable for FunctionSignature {
 }
 
 /// Name and type of a union field, struct field, or function parameter
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct NamedType {
     pub name: InternedString,
     pub typ: Rc<RefCell<Type>>,
@@ -237,7 +238,7 @@ impl Walkable for NamedValue {
 }
 
 /// Type
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Type {
     // removed before emitting
     Unit,
@@ -292,7 +293,7 @@ impl Type {
     // Gets the size of a type if it is an integer
     pub fn get_size(&self) -> Option<Size> {
         if let Type::Int { size, .. } = self {
-            Some(*size)
+            Some(size.clone())
         } else {
             None
         }
@@ -309,12 +310,12 @@ impl Type {
 }
 
 /// Size of a boom integer
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Size {
     /// Size is known statically at borealis compile time
     Static(usize),
-    /// Size is not static but in a local variable
-    Runtime(InternedString),
+    /// Size is not static but a runtime value
+    Runtime(Rc<RefCell<Value>>),
     /// Size is unknown (emitted as uint64)
     Unknown,
 }
@@ -344,6 +345,36 @@ impl Display for Type {
         //TODO: this is probably bad and slow
         visitor.visit_type(Rc::new(RefCell::new(self.clone())));
         Ok(())
+    }
+}
+
+impl TryFrom<&Size> for Rc<RefCell<Value>> {
+    type Error = ();
+
+    fn try_from(value: &Size) -> Result<Self, Self::Error> {
+        match value {
+            Size::Static(size) => Ok(Literal::Int((*size).into()).into()),
+            Size::Runtime(value) => Ok(value.clone()),
+            Size::Unknown => Err(()),
+        }
+    }
+}
+
+impl Add for Size {
+    type Output = Size;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Size::Static(l), Size::Static(r)) => Size::Static(l + r),
+
+            (Size::Static(s), Size::Runtime(d)) | (Size::Runtime(d), Size::Static(s)) => {
+                Size::Runtime(Operation::Add(d, Literal::Int(s.into()).into()).into())
+            }
+
+            (Size::Runtime(l), Size::Runtime(r)) => Size::Runtime(Operation::Add(l, r).into()),
+
+            _ => panic!("cannot add unknown"),
+        }
     }
 }
 

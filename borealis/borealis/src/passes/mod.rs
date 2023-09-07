@@ -61,6 +61,8 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         ResolveBitvectors::new_boxed(),
         AddBuiltinFns::new_boxed(),
         ResolveBitvectors::new_boxed(),
+        AddBuiltinFns::new_boxed(),
+        ResolveBitvectors::new_boxed(),
     ]
     .into_iter()
     .for_each(|mut pass| {

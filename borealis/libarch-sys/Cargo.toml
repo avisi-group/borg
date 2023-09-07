@@ -12,5 +12,5 @@ memmap2 = "0.7.1"
 insta = "1.31.0"
 
 [build-dependencies]
-bindgen = "0.66.1"
+bindgen = "0.68.1"
 cc = "1.0.83"
