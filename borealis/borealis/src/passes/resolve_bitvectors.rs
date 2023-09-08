@@ -49,7 +49,7 @@ pub struct ResolveBitvectors {
 
 impl Pass for ResolveBitvectors {
     fn name(&self) -> &'static str {
-        "ReplaceBitvectors"
+        "ResolveBitvectors"
     }
 
     fn reset(&mut self) {
@@ -161,11 +161,14 @@ impl ResolveBitvectors {
                     // if destination is unknown, replace with source
                     (Some(Size::Unknown), Some(source_size)) => {
                         self.set_size(*dest, source_size);
+                        // TODO: find out why this loops infinitely
+                        // self.did_change = true;
                     }
 
                     // if destination is runtime and source is static, assign source size
                     (Some(Size::Runtime(_)), Some(Size::Static(size))) => {
                         self.set_size(*dest, Size::Static(size));
+                        self.did_change = true;
                     }
 
                     // otherwise do nothing
@@ -181,6 +184,8 @@ impl ResolveBitvectors {
 
                     // replace bits with constant int
                     *literal = Literal::Int(BigInt::from(bits_to_int(bits)));
+
+                    self.did_change = true;
                 }
             }
 
@@ -269,7 +274,9 @@ fn zeros_handler(
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value: Literal::Int(0.into()).into(),
-    }
+    };
+
+    celf.did_change = true;
 }
 
 fn ones_handler(
@@ -402,11 +409,13 @@ fn concat_handler(
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value,
-    }
+    };
+
+    celf.did_change = true;
 }
 
 fn eq_handler(
-    _: &mut ResolveBitvectors,
+    celf: &mut ResolveBitvectors,
     statement: Rc<RefCell<Statement>>,
     expression: &Expression,
     arguments: &[Rc<RefCell<Value>>],
@@ -436,7 +445,9 @@ fn eq_handler(
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value,
-    }
+    };
+
+    celf.did_change = true;
 }
 
 fn undefined_handler(
@@ -464,7 +475,9 @@ fn undefined_handler(
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.clone(),
         value: Literal::Int(0.into()).into(),
-    }
+    };
+
+    celf.did_change = true;
 }
 
 fn slice_handler(
@@ -482,5 +495,6 @@ fn slice_handler(
     if let Some(Size::Static(_)) = celf.get_size(*dest) {
     } else {
         celf.set_size(*dest, Size::Runtime(arguments[2].clone()));
+        //  celf.did_change = true;
     }
 }

@@ -47,35 +47,15 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
         &mut [
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
-        ],
-    );
-
-    [
-        CycleFinder::new_boxed(),
-        ResolveReturns::new_boxed(),
-        RegisterHandler::new_boxed(),
-        DestructStructs::new_boxed(),
-        ReplaceBools::new_boxed(),
-        RemoveUnits::new_boxed(ast.clone()),
-        RemoveExceptions::new_boxed(),
-        ResolveBitvectors::new_boxed(),
-        AddBuiltinFns::new_boxed(),
-        ResolveBitvectors::new_boxed(),
-        AddBuiltinFns::new_boxed(),
-        ResolveBitvectors::new_boxed(),
-    ]
-    .into_iter()
-    .for_each(|mut pass| {
-        info!("{}", pass.name());
-        pass.reset();
-        pass.run(ast.clone());
-    });
-
-    run_fixed_point(
-        ast.clone(),
-        &mut [
-            FoldUnconditionals::new_boxed(),
-            RemoveConstBranch::new_boxed(),
+            CycleFinder::new_boxed(),
+            ResolveReturns::new_boxed(),
+            RegisterHandler::new_boxed(),
+            DestructStructs::new_boxed(),
+            ReplaceBools::new_boxed(),
+            RemoveUnits::new_boxed(ast.clone()),
+            RemoveExceptions::new_boxed(),
+            ResolveBitvectors::new_boxed(),
+            AddBuiltinFns::new_boxed(),
         ],
     );
 }

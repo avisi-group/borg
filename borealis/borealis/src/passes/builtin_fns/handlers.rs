@@ -160,18 +160,20 @@ pub fn noop(
     _ast: Rc<RefCell<Ast>>,
     _function: FunctionDefinition,
     _statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
+    false
 }
 
 pub fn delete(
     _ast: Rc<RefCell<Ast>>,
     function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     let (block, index) = function.entry_block.find_statement(statement).unwrap();
     let mut statements = block.statements();
     statements.remove(index);
     block.set_statements(statements);
+    false
 }
 
 /// Blindly replace function call with assignment
@@ -179,7 +181,7 @@ pub fn replace_with_copy(
     _ast: Rc<RefCell<Ast>>,
     _function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     // get function arguments, and expression the function output is being assigned
     // to
     let (expression, arguments) = {
@@ -214,6 +216,8 @@ pub fn replace_with_copy(
         expression: expression.clone(),
         value: arguments[0].clone(),
     };
+
+    true
 }
 
 ///
@@ -222,7 +226,7 @@ pub fn replace_with_op(
     _: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
     operator: OperationKind,
-) {
+) -> bool {
     // assert there are two arguments, lhs and rhs
     // replace function call with copy where the value is an equals operation
 
@@ -269,6 +273,8 @@ pub fn replace_with_op(
         expression,
         value: operation.into(),
     };
+
+    true
 }
 
 ///
@@ -276,7 +282,7 @@ pub fn bv_length_handler(
     _: Rc<RefCell<Ast>>,
     fn_def: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     // get ident of argument from statement, use that to lookup the type, which
     // should have a size
 
@@ -311,20 +317,21 @@ pub fn bv_length_handler(
         _ => panic!("not a bv"),
     };
 
+    // replace statement with a copy of that size as a literal to the original
+    // destination
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.as_ref().unwrap().clone(),
         value: size,
     };
 
-    // replace statement with a copy of that size as a literal to the original
-    // destination
+    true
 }
 
 pub fn bv_access_handler(
     _: Rc<RefCell<Ast>>,
     _: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     // access a bit of a bitvector by generating the appropriate shifting logic
     // dest = bitvector_access_B(input, index);
     //
@@ -346,14 +353,16 @@ pub fn bv_access_handler(
             Literal::Int(1.into()).into(),
         )
         .into(),
-    }
+    };
+
+    true
 }
 
 pub fn zero_extend_handler(
     _ast: Rc<RefCell<Ast>>,
     function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     let Statement::FunctionCall {
         expression,
         arguments,
@@ -380,7 +389,8 @@ pub fn zero_extend_handler(
             size: Size::Runtime(value),
             ..
         } => value,
-        _ => return,
+        // TODO: write comment proving why this is false not true
+        _ => return false,
     };
 
     // (x << (64 - x_len)) >> (64 - x_len)
@@ -404,13 +414,15 @@ pub fn zero_extend_handler(
         )
         .into(),
     };
+
+    true
 }
 
 pub fn sign_extend_handler(
     _ast: Rc<RefCell<Ast>>,
     function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     let Statement::FunctionCall {
         expression,
         arguments,
@@ -475,6 +487,8 @@ pub fn sign_extend_handler(
         )
         .into(),
     };
+
+    true
 }
 
 fn rename(
@@ -482,19 +496,21 @@ fn rename(
     _function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
     new_name: InternedString,
-) {
+) -> bool {
     let Statement::FunctionCall { name, .. } = &mut *statement.borrow_mut() else {
         panic!();
     };
 
     *name = new_name;
+
+    true
 }
 
 pub fn assert_handler(
     _ast: Rc<RefCell<Ast>>,
     _function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     let (value, str) = {
         let Statement::FunctionCall { arguments, .. } = &*statement.borrow() else {
             panic!();
@@ -515,7 +531,9 @@ pub fn assert_handler(
             .into(),
         ],
         else_body: vec![],
-    }
+    };
+
+    true
 }
 
 /// Inserts size field
@@ -523,7 +541,7 @@ pub fn replicate_bits_handler(
     _ast: Rc<RefCell<Ast>>,
     function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     let Statement::FunctionCall { arguments, .. } = &mut *statement.borrow_mut() else {
         panic!();
     };
@@ -542,6 +560,9 @@ pub fn replicate_bits_handler(
 
     if arguments.len() == 2 {
         arguments.insert(1, size.try_into().unwrap());
+        true
+    } else {
+        false
     }
 }
 
@@ -549,7 +570,7 @@ pub fn set_slice_handler(
     _ast: Rc<RefCell<Ast>>,
     _function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     // result = 0;
     // // RefCell { value: LargeInt }
     // uint64 gs_12779;
@@ -616,13 +637,15 @@ pub fn set_slice_handler(
         )
         .into(),
     };
+
+    true
 }
 
 pub fn min_int_handler(
     _ast: Rc<RefCell<Ast>>,
     _function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     let (destination, a, b) = {
         let Statement::FunctionCall {
             expression,
@@ -651,13 +674,15 @@ pub fn min_int_handler(
             value: a,
         }))],
     };
+
+    true
 }
 
 pub fn extend_handler(
     _: Rc<RefCell<Ast>>,
     fn_def: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
-) {
+) -> bool {
     // val Extend__0 : (%bv, %i, %bool) -> %bv
     // fn Extend__0(x, N, unsigned) {
     //     if (unsigned) {
@@ -732,4 +757,6 @@ pub fn extend_handler(
         target,
         fallthrough,
     });
+
+    true
 }

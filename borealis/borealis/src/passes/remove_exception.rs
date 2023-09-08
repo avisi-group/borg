@@ -23,13 +23,11 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
-pub struct RemoveExceptions {
-    did_change: bool,
-}
+pub struct RemoveExceptions;
 
 impl RemoveExceptions {
     pub fn new_boxed() -> Box<dyn Pass> {
-        Box::new(Self { did_change: false })
+        Box::new(Self)
     }
 }
 
@@ -38,15 +36,22 @@ impl Pass for RemoveExceptions {
         "RemoveExceptions"
     }
 
-    fn reset(&mut self) {
-        self.did_change = false;
-    }
+    fn reset(&mut self) {}
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
         // first pass to remove exceptions
         ast.borrow().functions.values().for_each(|def| {
             {
                 let mut statements = def.entry_block.statements();
+
+                if let Some(stmt) = statements.first() {
+                    if let Statement::TypeDeclaration { name, .. } = &*stmt.borrow() {
+                        if name.as_ref() == "exception" {
+                            return;
+                        }
+                    }
+                }
+
                 statements.insert(
                     0,
                     Statement::TypeDeclaration {
@@ -76,6 +81,7 @@ impl Pass for RemoveExceptions {
         // to simplify control flow graph
         ast.borrow().functions.values().for_each(raise_exceptions);
 
+        // TODO: write comment proving this only ever needs one pass
         false
     }
 }

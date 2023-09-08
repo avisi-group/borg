@@ -4,7 +4,7 @@
 use {
     crate::{
         boom::{Ast, FunctionDefinition, Statement},
-        passes::{builtin_fns::handlers::HANDLERS, Pass},
+        passes::{any::AnyExt, builtin_fns::handlers::HANDLERS, Pass},
     },
     common::{intern::InternedString, HashMap, HashSet},
     once_cell::sync::Lazy,
@@ -13,7 +13,7 @@ use {
 
 pub mod handlers;
 
-type HandlerFunction = fn(Rc<RefCell<Ast>>, FunctionDefinition, Rc<RefCell<Statement>>);
+type HandlerFunction = fn(Rc<RefCell<Ast>>, FunctionDefinition, Rc<RefCell<Statement>>) -> bool;
 
 /// Functions to handle in an initial pass, before processing others
 static INITIAL_PASS_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
@@ -47,16 +47,19 @@ impl Pass for AddBuiltinFns {
 
         // perform initial pass on limited set of functions
         ast.borrow().functions.values().for_each(|def| {
-            process_function_definition(ast.clone(), def, &difference(&HANDLERS, &INITIAL_PASS_FNS))
+            process_function_definition(
+                ast.clone(),
+                def,
+                &difference(&HANDLERS, &INITIAL_PASS_FNS),
+            );
         });
 
         // perform full pass on all functions
         ast.borrow()
             .functions
             .values()
-            .for_each(|def| process_function_definition(ast.clone(), def, &HANDLERS));
-
-        false
+            .map(|def| process_function_definition(ast.clone(), def, &HANDLERS))
+            .any()
     }
 }
 
@@ -64,20 +67,30 @@ fn process_function_definition(
     ast: Rc<RefCell<Ast>>,
     fn_def: &FunctionDefinition,
     handlers: &HashMap<InternedString, HandlerFunction>,
-) {
-    fn_def.entry_block.iter().for_each(|block| {
-        block.statements().into_iter().for_each(|statement| {
-            // ignore statements that are not function calls
-            let Statement::FunctionCall { name, .. } = *statement.borrow() else {
-                return;
-            };
+) -> bool {
+    fn_def
+        .entry_block
+        .iter()
+        .map(|block| {
+            block
+                .statements()
+                .into_iter()
+                .map(|statement| {
+                    // ignore statements that are not function calls
+                    let Statement::FunctionCall { name, .. } = *statement.borrow() else {
+                        return false;
+                    };
 
-            // if the function has a handler, call it
-            if let Some(handler) = handlers.get(&name) {
-                handler(ast.clone(), fn_def.clone(), statement);
-            }
-        });
-    });
+                    // if the function has a handler, call it
+                    if let Some(handler) = handlers.get(&name) {
+                        handler(ast.clone(), fn_def.clone(), statement)
+                    } else {
+                        false
+                    }
+                })
+                .any()
+        })
+        .any()
 }
 
 /// Returns the key-value pairs in `map` where the keys exist in `set`
