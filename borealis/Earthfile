@@ -102,7 +102,7 @@ e2e-test-borealis-genc:
     FROM +docker
     COPY data/arm-v8.5-a.bincode.lz4 arm-v8.5-a.bincode.lz4
     RUN ./borealis sail2genc arm-v8.5-a.bincode.lz4 genc
-    SAVE ARTIFACT genc AS LOCAL target/genc
+    SAVE ARTIFACT --force genc AS LOCAL target/genc
 
 e2e-test-gensim:
     BUILD +e2e-test-borealis-genc
@@ -110,7 +110,7 @@ e2e-test-gensim:
     FROM ghcr.io/fmckeogh/gensim:latest
     COPY (+e2e-test-borealis-genc/genc) .
     RUN ./dist/bin/gensim --verbose -a main.genc -t output -s module,arch,decode,disasm,ee_interp,ee_blockjit,jumpinfo,function,makefile -o decode.GenerateDotGraph=1,makefile.libtrace_path=/gensim/support/libtrace/inc,makefile.archsim_path=/gensim/archsim/inc,makefile.Optimise=3,makefile.Debug=1
-    SAVE ARTIFACT output AS LOCAL target/genc/output
+    SAVE ARTIFACT --force output AS LOCAL target/genc/output
     RUN cd output && make -j$(nproc)
     SAVE ARTIFACT /gensim/build/dist dist
     SAVE ARTIFACT output/arm64.dll arm64.dll
@@ -156,8 +156,8 @@ mcf:
 
     RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./mcf_r_base.aarch64-static-64 -d -t -U trace --mode Interpreter 2>&1 | tee archsim.mcf.log
     RUN ./dist/bin/TraceCat trace0 2>&1 | tee archsim.mcf.trace
-    SAVE ARTIFACT archsim.mcf.log AS LOCAL target/archsim.mcf.log
-    SAVE ARTIFACT archsim.mcf.trace AS LOCAL target/archsim.mcf.trace
+    SAVE ARTIFACT --force archsim.mcf.log AS LOCAL target/archsim.mcf.log
+    SAVE ARTIFACT --force archsim.mcf.trace AS LOCAL target/archsim.mcf.trace
 
 bench:
     FROM ubuntu:latest

@@ -109,7 +109,15 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "integer_arithmetic_addsub_extendedreg_decode",
                 "DecodeRegExtend",
                 "integer_arithmetic_addsub_extendedreg",
-                "ExtendReg"
+                "ExtendReg",
+                "memory_single_general_immediate_signed_postidx_memory_single_general_immediate_signed_postidx__decode",
+                "branch_conditional_compare_decode",
+                "branch_conditional_compare",
+                "memory_single_general_immediate_signed_preidx_memory_single_general_immediate_signed_postidx__decode",
+                "integer_conditional_select_decode",
+                "integer_conditional_select",
+                "integer_logical_immediate_decode",
+               // "DecodeBitMasks"
             ]
             .contains(&k.as_ref())
             {
