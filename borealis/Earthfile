@@ -145,7 +145,7 @@ e2e-test-archsim:
     RUN bash -c 'diff --strip-trailing-cr -u -w mem.trace <(./dist/bin/TraceCat trace.interp.mem0)'
 
 mcf:
-    BUILD +e2e-test-gensim
+    BUILD +test
 
     FROM ghcr.io/fmckeogh/gensim:latest
 

@@ -225,18 +225,6 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             .into(),
         },
         HelperFunction {
-            name: "sail_assert".into(),
-            parameters: "uint64 value".into(),
-            return_type: "void".into(),
-            body: r#"
-                if (!value) {
-                    trap();
-                }
-                return;
-            "#
-            .into(),
-        },
-        HelperFunction {
             name: "UsingAArch32".into(),
             parameters: "".into(),
             return_type: "uint8".into(),
@@ -325,6 +313,51 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             return_type: "void".into(),
             body: r#"
                 return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "replicate_bits".into(),
+            parameters: "uint64 value, uint64 size, uint64 count".into(),
+            return_type: "uint64".into(),
+            body: r#"
+                uint64 result = 0;
+                for (uint64 i = 0; i < count; i++) {
+                    result = (result << size) | count;
+                }
+                return result;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "HighestSetBit".into(),
+            parameters: "uint64 value".into(),
+            return_type: "sint64".into(),
+            body: r#"
+                for (sint64 i = 63; i >= 0; i--) {
+                    uint64 bit = (value >> i) & 1;
+                    if (bit == 1)
+                    {
+                        return i;
+                    }
+                }
+
+                return -1;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "Ones".into(),
+            parameters: "uint64 n".into(),
+            return_type: "uint64".into(),
+            body: r#"
+                uint64 result = 0;
+
+                for (uint8 i = 0; i < n; i++) {
+                    result = result << 1 | 1;
+                }
+
+                return result;
             "#
             .into(),
         },

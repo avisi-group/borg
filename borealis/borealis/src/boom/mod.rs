@@ -360,6 +360,14 @@ impl TryFrom<&Size> for Rc<RefCell<Value>> {
     }
 }
 
+impl TryFrom<Size> for Rc<RefCell<Value>> {
+    type Error = ();
+
+    fn try_from(value: Size) -> Result<Self, Self::Error> {
+        (&value).try_into()
+    }
+}
+
 impl Add for Size {
     type Output = Size;
 

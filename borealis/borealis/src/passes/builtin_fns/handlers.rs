@@ -1,14 +1,13 @@
-use crate::boom::control_flow::ControlFlowBlock;
-
 use {
     crate::{
         boom::{
-            control_flow::Terminator, Ast, Expression, FunctionDefinition, Literal, Operation,
-            OperationKind, Size, Statement, Type, Value,
+            control_flow::{ControlFlowBlock, Terminator},
+            Ast, FunctionDefinition, Literal, Operation, OperationKind, Size, Statement, Type,
+            Value,
         },
         passes::builtin_fns::HandlerFunction,
     },
-    common::{identifiable::unique_id, intern::InternedString, HashMap},
+    common::{intern::InternedString, HashMap},
     itertools::Itertools,
     once_cell::sync::Lazy,
     std::{cell::RefCell, rc::Rc},
@@ -496,152 +495,54 @@ pub fn assert_handler(
     _function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
 ) {
-    let Statement::FunctionCall {
-        expression,
-        arguments,
-        ..
-    } = &mut *statement.borrow_mut()
-    else {
-        panic!();
+    let (value, str) = {
+        let Statement::FunctionCall { arguments, .. } = &*statement.borrow() else {
+            panic!();
+        };
+
+        (arguments[0].clone(), arguments[1].clone())
     };
 
-    *expression = None;
-
-    if arguments.len() == 2 {
-        arguments.pop();
+    *statement.borrow_mut() = Statement::If {
+        condition: Operation::Not(value).into(),
+        if_body: vec![
+            Statement::Comment(format!("{:?}", str).into()).into(),
+            Statement::FunctionCall {
+                expression: None,
+                name: "trap".into(),
+                arguments: vec![],
+            }
+            .into(),
+        ],
+        else_body: vec![],
     }
 }
 
+/// Inserts size field
 pub fn replicate_bits_handler(
     _ast: Rc<RefCell<Ast>>,
     function: FunctionDefinition,
     statement: Rc<RefCell<Statement>>,
 ) {
-    let (expression, name, length, count) = {
-        let Statement::FunctionCall {
-            expression,
-            arguments,
-            ..
-        } = &*statement.borrow()
-        else {
-            panic!();
-        };
+    let Statement::FunctionCall { arguments, .. } = &mut *statement.borrow_mut() else {
+        panic!();
+    };
 
-        let Value::Identifier(ident) = &*arguments[1].borrow() else {
-            panic!();
-        };
-
-        let Some(value) = function.entry_block.get_assignment(*ident) else {
-            return;
-        };
-
-        let Value::Literal(literal) = &*value.borrow() else {
-            panic!();
-        };
-
-        let Literal::Int(count) = &*literal.borrow() else {
-            panic!();
-        };
-
+    let size = {
         let Value::Identifier(ident) = &*arguments[0].borrow() else {
             panic!();
         };
 
-        let Some(Type::Int {
-            size: Size::Static(length),
-            ..
-        }) = function.get_ident_type(*ident)
-        else {
+        let Some(Type::Int { size, .. }) = function.get_ident_type(*ident) else {
             panic!();
         };
 
-        (
-            expression.clone().unwrap(),
-            *ident,
-            length,
-            usize::try_from(count).unwrap(),
-        )
+        size
     };
 
-    let (block, idx) = function
-        .entry_block
-        .find_statement(statement.clone())
-        .unwrap();
-
-    let mut statements = block.statements();
-
-    statements.remove(idx);
-
-    let rep_statements = {
-        let mut buf = vec![];
-
-        let id = unique_id();
-
-        // start sequence by copying in input ident
-        let mut prev_ident = format!("rep_{id}_0").into();
-        buf.push(
-            Statement::TypeDeclaration {
-                name: prev_ident,
-                typ: Rc::new(RefCell::new(Type::Int {
-                    signed: false,
-                    size: Size::Static(64),
-                })),
-            }
-            .into(),
-        );
-        buf.push(
-            Statement::Copy {
-                expression: Expression::Identifier(prev_ident),
-                value: Rc::new(RefCell::new(Value::Identifier(name))),
-            }
-            .into(),
-        );
-
-        // for each intermediate shift and or create a new var
-        for i in 1..count {
-            let this_ident = format!("rep_{id}_{i}").into();
-            buf.push(
-                Statement::TypeDeclaration {
-                    name: this_ident,
-                    typ: Rc::new(RefCell::new(Type::Int {
-                        signed: false,
-                        size: Size::Static(64),
-                    })),
-                }
-                .into(),
-            );
-            buf.push(
-                Statement::Copy {
-                    expression: Expression::Identifier(this_ident),
-                    value: Operation::Or(
-                        Operation::LeftShift(
-                            Rc::new(RefCell::new(Value::Identifier(name))),
-                            Literal::Int((length * i).into()).into(),
-                        )
-                        .into(),
-                        Rc::new(RefCell::new(Value::Identifier(prev_ident))),
-                    )
-                    .into(),
-                }
-                .into(),
-            );
-            prev_ident = this_ident;
-        }
-
-        // copy out result
-        buf.push(
-            Statement::Copy {
-                expression,
-                value: Rc::new(RefCell::new(Value::Identifier(prev_ident))),
-            }
-            .into(),
-        );
-
-        buf
-    };
-
-    statements.splice(idx..idx, rep_statements);
-    block.set_statements(statements);
+    if arguments.len() == 2 {
+        arguments.insert(1, size.try_into().unwrap());
+    }
 }
 
 pub fn set_slice_handler(

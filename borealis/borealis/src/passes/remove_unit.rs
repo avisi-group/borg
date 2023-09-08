@@ -59,14 +59,8 @@ impl Visitor for RemoveUnits {
         node.signature
             .parameters
             .borrow_mut()
-            .retain(|Parameter { typ, .. }| {
-                // retain if not unit
-                if let Type::Unit = *typ.borrow() {
-                    false
-                } else {
-                    true
-                }
-            });
+            // retain if not unit
+            .retain(|Parameter { typ, .. }| !matches!(*typ.borrow(), Type::Unit));
         node.walk(self);
     }
 

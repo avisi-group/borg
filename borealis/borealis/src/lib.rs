@@ -117,7 +117,9 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "integer_conditional_select_decode",
                 "integer_conditional_select",
                 "integer_logical_immediate_decode",
-               // "DecodeBitMasks"
+                "DecodeBitMasks",
+                "HighestSetBit",
+                "integer_logical_immediate"
             ]
             .contains(&k.as_ref())
             {

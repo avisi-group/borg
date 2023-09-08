@@ -274,7 +274,7 @@ fn zeros_handler(
 
 fn ones_handler(
     celf: &mut ResolveBitvectors,
-    statement: Rc<RefCell<Statement>>,
+    _statement: Rc<RefCell<Statement>>,
     expression: &Expression,
     arguments: &[Rc<RefCell<Value>>],
 ) {
@@ -285,36 +285,33 @@ fn ones_handler(
         panic!();
     };
 
-    let Some(value) = celf
+    let Expression::Identifier(destination) = expression else {
+        panic!();
+    };
+
+    // resolve destination size
+    if let Some(value) = celf
         .current_func
         .as_ref()
         .unwrap()
         .entry_block
         .get_assignment(*ident)
-    else {
-        return;
+    {
+        let Value::Literal(literal) = &*value.borrow() else {
+            panic!();
+        };
+
+        let Literal::Int(length) = &*literal.borrow() else {
+            panic!();
+        };
+
+        celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
+    } else {
+        celf.set_size(
+            *destination,
+            Size::Runtime(Rc::new(RefCell::new(Value::Identifier(*ident)))),
+        );
     };
-
-    let Value::Literal(literal) = &*value.borrow() else {
-        panic!();
-    };
-
-    let Literal::Int(length) = &*literal.borrow() else {
-        panic!();
-    };
-
-    // change type of destination to length
-    let Expression::Identifier(destination) = expression else {
-        panic!();
-    };
-
-    celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
-
-    // assign all 1s
-    *statement.borrow_mut() = Statement::Copy {
-        expression: expression.clone(),
-        value: Literal::Int(((1u128 << u64::try_from(length).unwrap()) - 1).into()).into(),
-    }
 }
 
 fn concat_handler(
@@ -359,14 +356,39 @@ fn concat_handler(
     };
 
     // generate shifting and & logic
-    // (left << right_length) | right
+    // ((left & ((1 << left_length) - 1)) << right_length) | (right & ((1 <<
+    // right_length) - 1))
     let value = Operation::Or(
         Operation::LeftShift(
-            Rc::new(RefCell::new(Value::Identifier(*left_ident))),
+            Operation::And(
+                Rc::new(RefCell::new(Value::Identifier(*left_ident))),
+                Operation::Subtract(
+                    Operation::LeftShift(
+                        Literal::Int(1.into()).into(),
+                        (&left_size).try_into().unwrap(),
+                    )
+                    .into(),
+                    Literal::Int(1.into()).into(),
+                )
+                .into(),
+            )
+            .into(),
             (&right_size).try_into().unwrap(),
         )
         .into(),
-        Rc::new(RefCell::new(Value::Identifier(*right_ident))),
+        Operation::And(
+            Rc::new(RefCell::new(Value::Identifier(*right_ident))),
+            Operation::Subtract(
+                Operation::LeftShift(
+                    Literal::Int(1.into()).into(),
+                    (&right_size).try_into().unwrap(),
+                )
+                .into(),
+                Literal::Int(1.into()).into(),
+            )
+            .into(),
+        )
+        .into(),
     )
     .into();
 
