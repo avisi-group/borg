@@ -119,7 +119,13 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "integer_logical_immediate_decode",
                 "DecodeBitMasks",
                 "HighestSetBit",
-                "integer_logical_immediate"
+                "integer_logical_immediate",
+                "memory_pair_general_postidx_memory_pair_general_postidx__decode",
+                "branch_unconditional_register_decode",
+                "branch_unconditional_register",
+                "system_exceptions_runtime_svc_decode",
+                "system_exceptions_runtime_svc",
+               // "AArch64_CallSupervisor"
             ]
             .contains(&k.as_ref())
             {
@@ -267,14 +273,30 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 ],
             },
             RegisterSpace {
-                size: 1,
-                views: vec![View::Slot(Slot {
-                    name: "BTypeCompatible".into(),
-                    typ: genc_model::Typ::Uint8,
-                    width: 1,
-                    offset: 0,
-                    tag: None,
-                })],
+                size: 3,
+                views: vec![
+                    View::Slot(Slot {
+                        name: "BTypeCompatible".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 0,
+                        tag: None,
+                    }),
+                    View::Slot(Slot {
+                        name: "BTypeNext".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 1,
+                        tag: None,
+                    }),
+                    View::Slot(Slot {
+                        name: "InGuardedPage".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 2,
+                        tag: None,
+                    }),
+                ],
             },
         ],
         instructions,

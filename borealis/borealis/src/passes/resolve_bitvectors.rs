@@ -179,8 +179,11 @@ impl ResolveBitvectors {
             Value::Literal(literal) => {
                 let literal = &mut *literal.borrow_mut();
                 if let Literal::Bits(bits) = literal {
-                    // set size as static
-                    self.set_size(*dest, Size::Static(bits.len()));
+                    // only set size if it is declared in the local scope
+                    if self.get_size(*dest).is_some() {
+                        // set size as static
+                        self.set_size(*dest, Size::Static(bits.len()));
+                    }
 
                     // replace bits with constant int
                     *literal = Literal::Int(BigInt::from(bits_to_int(bits)));
