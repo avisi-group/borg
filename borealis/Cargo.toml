@@ -1,6 +1,5 @@
 [workspace]
-members = ["sail", "borealis", "common", "libarch-sys"]
-default-members = ["sail", "borealis", "common"]
+members = ["sail", "borealis", "common"]
 resolver = "2"
 
 # deserializing/converting the AST takes forever and overflows the stack without optimisations

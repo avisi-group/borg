@@ -45,7 +45,7 @@ build:
     FROM +chef-cook
 
     # copy full source
-    COPY --dir sail common borealis libarch-sys .
+    COPY --dir sail common borealis .
 
     # build borealis
     RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET
@@ -61,7 +61,6 @@ borealis-docs:
 docs:
     FROM scratch
     COPY (+borealis-docs/docs) docs
-#    COPY (+libarch-docs/docs) docs/libarch_sys
     CMD [""]
     SAVE IMAGE --push ghcr.io/avisi-group/borealis/docs
 
