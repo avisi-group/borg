@@ -227,13 +227,15 @@ impl Identifier {
             }
         }
 
-        let trimmed = buf.trim_start_matches('_');
-
-        if !VALIDATOR.is_match(trimmed) {
-            panic!("identifier {trimmed:?} not normalized");
+        if buf.starts_with('_') {
+            buf = "u".to_owned() + &buf;
         }
 
-        let normalized = InternedString::from(trimmed);
+        if !VALIDATOR.is_match(&buf) {
+            panic!("identifier {buf:?} not normalized");
+        }
+
+        let normalized = InternedString::from(buf);
 
         NORMALIZED.lock().insert(raw, normalized);
 

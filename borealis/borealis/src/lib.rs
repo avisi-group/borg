@@ -77,10 +77,10 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
             if ![
                 "integer_arithmetic_addsub_immediate_decode",
                 "integer_arithmetic_addsub_immediate",
-                "id",
+                "u__id",
                 "AddWithCarry",
                 "IsZero",
-                "GetSlice_int",
+                "u__GetSlice_int",
                 "integer_logical_shiftedreg_decode",
                 "DecodeShift",
                 "integer_logical_shiftedreg",
@@ -137,11 +137,11 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "integer_bitfield",
                 "branch_conditional_test_decode",
                 "branch_conditional_test",
-                // "system_register_system_decode",
-                // "AArch64_CheckSystemAccess",
-                // "system_register_system",
-                // "IMPDEF_boolean",
-                // "IMPDEF_boolean_map"
+                "system_register_system_decode",
+                "AArch64_CheckSystemAccess",
+                "system_register_system",
+                "u__IMPDEF_boolean",
+                "u__IMPDEF_boolean_map"
             ]
             .contains(&k.as_ref())
             {
@@ -204,17 +204,23 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
         constants.insert("v82_implemented".into(), (Typ::Uint8, 1));
         constants.insert("v81_implemented".into(), (Typ::Uint8, 1));
 
-        constants.insert("unpred_tsize_aborts".into(), (Typ::Uint8, 0));
+        constants.insert("u__unpred_tsize_aborts".into(), (Typ::Uint8, 0));
 
-        constants.insert("mte_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("mpam_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("crypto_sm4_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("crypto_sm3_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("crypto_sha3_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("crypto_sha256_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("crypto_sha512_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("crypto_aes_implemented".into(), (Typ::Uint8, 0));
-        constants.insert("crypto_sha1_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("u__crypto_aes_implemented".into(), (Typ::Uint8, 0));
+
+        constants.insert("reg_u__mte_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("reg_u__mpam_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("reg_u__crypto_sm4_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("reg_u__crypto_sm3_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("reg_u__crypto_sha3_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("reg_u__crypto_sha256_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("reg_u__crypto_sha512_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("reg_u__crypto_sha1_implemented".into(), (Typ::Uint8, 0));
+
+        constants.insert("EL0".into(), (Typ::Uint8, 0));
+        constants.insert("EL1".into(), (Typ::Uint8, 1));
+        constants.insert("EL2".into(), (Typ::Uint8, 2));
+        constants.insert("EL3".into(), (Typ::Uint8, 3));
 
         constants
     };
@@ -269,28 +275,28 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 4,
                 views: vec![
                     View::Slot(Slot {
-                        name: "reg_N".into(),
+                        name: "reg_PSTATE_N".into(),
                         typ: genc_model::Typ::Uint8,
                         width: 1,
                         offset: 0,
                         tag: Some("N".into()),
                     }),
                     View::Slot(Slot {
-                        name: "reg_Z".into(),
+                        name: "reg_PSTATE_Z".into(),
                         typ: genc_model::Typ::Uint8,
                         width: 1,
                         offset: 1,
                         tag: Some("Z".into()),
                     }),
                     View::Slot(Slot {
-                        name: "reg_C".into(),
+                        name: "reg_PSTATE_C".into(),
                         typ: genc_model::Typ::Uint8,
                         width: 1,
                         offset: 2,
                         tag: Some("C".into()),
                     }),
                     View::Slot(Slot {
-                        name: "reg_V".into(),
+                        name: "reg_PSTATE_V".into(),
                         typ: genc_model::Typ::Uint8,
                         width: 1,
                         offset: 3,
@@ -299,7 +305,17 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 ],
             },
             RegisterSpace {
-                size: 3,
+                size: 8,
+                views: vec![View::Slot(Slot {
+                    name: "reg_HCR_EL2".into(),
+                    typ: genc_model::Typ::Uint64,
+                    width: 8,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
+            RegisterSpace {
+                size: 4,
                 views: vec![
                     View::Slot(Slot {
                         name: "BTypeCompatible".into(),
@@ -309,7 +325,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                         tag: None,
                     }),
                     View::Slot(Slot {
-                        name: "BTypeNext".into(),
+                        name: "reg_BTypeNext".into(),
                         typ: genc_model::Typ::Uint8,
                         width: 1,
                         offset: 1,
@@ -320,6 +336,13 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                         typ: genc_model::Typ::Uint8,
                         width: 1,
                         offset: 2,
+                        tag: None,
+                    }),
+                    View::Slot(Slot {
+                        name: "reg_PSTATE_EL".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 3,
                         tag: None,
                     }),
                 ],

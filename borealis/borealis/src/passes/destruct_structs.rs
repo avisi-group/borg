@@ -60,6 +60,8 @@ impl Pass for DestructStructs {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
+        handle_registers(&mut ast.borrow_mut().registers);
+
         ast.borrow()
             .functions
             .iter()
@@ -207,6 +209,25 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                             }))];
                         }
 
+                        // if we are copying *from* a field
+                        {
+                            let value_mut = &mut *value.borrow_mut();
+
+                            if let Value::Field {
+                                value: struc_val,
+                                field_name,
+                            } = value_mut
+                            {
+                                let Value::Identifier(struc) = *(struc_val.clone().borrow()) else {
+                                    panic!();
+                                };
+
+                                *value_mut =
+                                    Value::Identifier(destructed_ident(struc, *field_name));
+                            }
+                        }
+
+                        // otherwise assigning to whole struct
                         let Expression::Identifier(dest) = expression else {
                             return vec![clone];
                         };
@@ -356,4 +377,26 @@ fn destructed_ident(
     field_name: InternedString,
 ) -> InternedString {
     format!("{local_variable_name}_{field_name}").into()
+}
+
+fn handle_registers(registers: &mut HashMap<InternedString, Rc<RefCell<Type>>>) {
+    let mut to_remove = vec![];
+    let mut to_add = vec![];
+
+    registers.iter().for_each(|(name, typ)| {
+        if let Type::Struct { fields, .. } = &*typ.borrow() {
+            to_remove.push(*name);
+            to_add.extend(fields.iter().map(
+                |NamedType {
+                     name: field_name,
+                     typ,
+                 }| (destructed_ident(*name, *field_name), typ.clone()),
+            ));
+        }
+    });
+
+    for name in to_remove {
+        registers.remove(&name).unwrap();
+    }
+    registers.extend(to_add);
 }

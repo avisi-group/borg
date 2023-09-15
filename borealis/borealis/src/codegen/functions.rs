@@ -203,7 +203,7 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             .into(),
         },
         HelperFunction {
-            name: "raw_GetSlice_int".into(),
+            name: "u__raw_GetSlice_int".into(),
             parameters: "uint64 len, uint64 n, uint64 start".into(),
             return_type: "uint64".into(),
             body: r#"
@@ -220,7 +220,7 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             parameters: "uint64 n, uint64 start, uint64 len".into(),
             return_type: "uint64".into(),
             body: r#"
-                return raw_GetSlice_int(len, n, start);
+                return u__raw_GetSlice_int(len, n, start);
             "#
             .into(),
         },
@@ -252,7 +252,7 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             .into(),
         },
         HelperFunction {
-            name: "PostDecode".into(),
+            name: "u__PostDecode".into(),
             parameters: "".into(),
             return_type: "void".into(),
             body: r#"

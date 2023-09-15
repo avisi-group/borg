@@ -21,8 +21,8 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         // requires bitvector conversion logic
         ("UInt", replace_with_copy),
         // we represent integers as u64s so these can be removed
-        ("pcnt_i___pcnt_i64", replace_with_copy),
-        ("pcnt_i64___pcnt_i", replace_with_copy),
+        ("u_pcnt_i___pcnt_i64", replace_with_copy),
+        ("u_pcnt_i64___pcnt_i", replace_with_copy),
         // replace with equality test
         ("eq_bool", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
@@ -48,10 +48,10 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("gteq_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
         }),
-        ("shl_int", |ast, f, s| {
+        ("u_shl_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LeftShift)
         }),
-        ("shl8", |ast, f, s| {
+        ("u_shl8", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LeftShift)
         }),
         ("eq_vec", |ast, f, s| {
@@ -145,7 +145,7 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("undefined_BranchType", delete),
         ("replicate_bits", replicate_bits_handler),
         ("SetSlice_int", noop),
-        ("SetSlice_bits", set_slice_handler),
+        ("u__SetSlice_bits", set_slice_handler),
         ("min_int", min_int_handler),
         ("Extend__0", extend_handler),
     ]

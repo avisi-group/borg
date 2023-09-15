@@ -12,8 +12,8 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
-/// Replace any access or assignment to PSTATE with a call to write/read
-/// register
+/// Replace any access or assignment to a register with a call to
+/// `read_register` or `write_register`, respectively.
 #[derive(Debug, Default)]
 pub struct RegisterHandler {
     ast: Option<Rc<RefCell<Ast>>>,
@@ -34,32 +34,16 @@ impl Pass for RegisterHandler {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        // {
-        //     let mut ast = ast.borrow_mut();
-
-        //     ast.registers = ast
-        //         .registers
-        //         .iter()
-        //         .map(|(name, typ)| {
-        //             if !name.as_ref().starts_with("reg_") {
-        //                 (mangle_reg(*name), typ.clone())
-        //             } else {
-        //                 (*name, typ.clone())
-        //             }
-        //         })
-        //         .collect();
-        // }
-
         self.ast = Some(ast.clone());
 
         ast.borrow().functions.iter().for_each(|(_, def)| {
-            self.visit_function_definition(def);
-
             PcHandler {
                 ast: ast.clone(),
                 entry_block: def.entry_block.clone(),
             }
             .visit_function_definition(def);
+
+            self.visit_function_definition(def);
         });
 
         false
@@ -72,22 +56,32 @@ impl Visitor for RegisterHandler {
             return;
         };
 
-        // if we are copying *from* PSTATE
-        if let Value::Field { value, field_name } = value.borrow().clone() {
-            if let Value::Identifier(ident) = value.borrow().clone() {
-                if ident.as_ref() == "PSTATE" {
-                    handle_register_read(node.clone(), expression.clone(), field_name);
-                }
+        // if we are copying *from* a register
+        if let Value::Identifier(ident) = *value.borrow() {
+            if self
+                .ast
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .registers
+                .contains_key(&ident)
+            {
+                handle_register_read(node.clone(), expression.clone(), ident);
             }
         }
 
-        // if we are copying *into* PSTATE
-        if let Expression::Field { expression, field } = expression {
-            if let Expression::Identifier(ident) = *expression {
-                if ident.as_ref() == "PSTATE" {
-                    handle_register_write(node.clone(), value.clone(), field);
-                }
-            };
+        // if we are copying *into* a register
+        if let Expression::Identifier(ident) = expression {
+            if self
+                .ast
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .registers
+                .contains_key(&ident)
+            {
+                handle_register_write(node.clone(), value.clone(), ident);
+            }
         }
     }
 }
@@ -132,12 +126,12 @@ impl Visitor for PcHandler {
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
         let stmt = { node.borrow().clone() };
         match stmt {
-            // if expression == "PC", replace copy with write_pc function call
+            // if expression == "u_PC", replace copy with write_pc function call
             Statement::Copy {
                 expression: Expression::Identifier(ident),
                 value,
             } => {
-                if ident.as_ref() == "PC" {
+                if ident.as_ref() == "u_PC" {
                     *node.borrow_mut() = Statement::FunctionCall {
                         expression: None,
                         name: "write_register".into(),
@@ -146,7 +140,7 @@ impl Visitor for PcHandler {
                             value.clone(),
                         ],
                     }
-                } else if ident.as_ref() == "PC_changed" {
+                } else if ident.as_ref() == "u__PC_changed" {
                     *node.borrow_mut() = Statement::Comment("PC_changed remove here".into());
                 }
             }
@@ -155,7 +149,7 @@ impl Visitor for PcHandler {
                 name,
                 arguments,
             } => {
-                if ident.as_ref() == "PC" {
+                if ident.as_ref() == "u_PC" {
                     // lookup return type
                     let typ = self
                         .ast

@@ -43,6 +43,10 @@ impl BoomEmitter {
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
         match definition {
             jib_ast::Definition::RegDec(ident, typ, _) => {
+                if ident.as_interned().as_ref() == "R" {
+                    panic!("{:#?}", ident);
+                }
+
                 self.ast
                     .registers
                     .insert(ident.as_interned(), convert_type(typ));

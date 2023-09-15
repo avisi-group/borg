@@ -3,9 +3,6 @@ set -e
 
 GENSIM_PATH="/home/fm208/Sync/gensim"
 
-# export genc from bincode
-#cargo r -- --log info sail2genc data/arm-v8.5-a.bincode.lz4 target/genc/
-
 # run gensim
 cd target/genc
 $GENSIM_PATH/build/dist/bin/gensim --verbose -a main.genc -t output -s module,arch,decode,disasm,ee_interp,ee_blockjit,jumpinfo,function,makefile -o decode.GenerateDotGraph=1,makefile.libtrace_path=$GENSIM_PATH/support/libtrace/inc,makefile.archsim_path=$GENSIM_PATH/archsim/inc,makefile.Optimise=3,makefile.Debug=1
