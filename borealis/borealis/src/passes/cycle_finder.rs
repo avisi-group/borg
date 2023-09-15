@@ -1,13 +1,16 @@
+//! Finds cycles in the control flow graph
+
 use {
     crate::{boom::Ast, passes::Pass},
     log::warn,
     std::{cell::RefCell, rc::Rc},
 };
-
+/// Finds cycles in the control flow graph
 #[derive(Debug, Default)]
 pub struct CycleFinder {}
 
 impl CycleFinder {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::<Self>::default()
     }

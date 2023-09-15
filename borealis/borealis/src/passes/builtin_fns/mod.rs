@@ -11,7 +11,7 @@ use {
     std::{cell::RefCell, hash::Hash, rc::Rc},
 };
 
-pub mod handlers;
+mod handlers;
 
 type HandlerFunction = fn(Rc<RefCell<Ast>>, FunctionDefinition, Rc<RefCell<Statement>>) -> bool;
 
@@ -24,9 +24,12 @@ static INITIAL_PASS_FNS: Lazy<HashSet<InternedString>> = Lazy::new(|| {
     )
 });
 
+/// Pass for implementing builtin (as in, provided by the Sail compiler)
+/// functions in BOOM
 pub struct AddBuiltinFns;
 
 impl AddBuiltinFns {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self)
     }

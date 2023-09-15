@@ -1,3 +1,5 @@
+//! Unconditional folding logic
+
 use {
     crate::{
         boom::{
@@ -18,6 +20,7 @@ use {
 pub struct FoldUnconditionals;
 
 impl FoldUnconditionals {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::<Self>::default()
     }

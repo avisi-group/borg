@@ -1,3 +1,5 @@
+//! Extension trait for `any` method on iterators of bools.
+
 /// Extension trait for `any` method on iterators of bools.
 pub trait AnyExt: Iterator<Item = bool> {
     /// Non-short circuiting, boolean-only version of `Iterator::any`.

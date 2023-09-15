@@ -16,12 +16,14 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+/// Resolves assignments to `return` variables.
 pub struct ResolveReturns {
     did_change: bool,
     return_type: Option<Rc<RefCell<Type>>>,
 }
 
 impl ResolveReturns {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,

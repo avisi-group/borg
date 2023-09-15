@@ -11,10 +11,10 @@ use {
         passes::{
             builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             destruct_structs::DestructStructs, fold_unconditionals::FoldUnconditionals,
-            registers::RegisterHandler, remove_const_branch::RemoveConstBranch,
-            remove_exception::RemoveExceptions, remove_unit::RemoveUnits,
-            replace_bools::ReplaceBools, resolve_bitvectors::ResolveBitvectors,
-            resolve_return_assigns::ResolveReturns,
+            lower_enums::LowerEnums, registers::RegisterHandler,
+            remove_const_branch::RemoveConstBranch, remove_exception::RemoveExceptions,
+            remove_unit::RemoveUnits, replace_bools::ReplaceBools, replace_strings::ReplaceStrings,
+            resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
     },
     log::info,
@@ -26,19 +26,21 @@ use {
     },
 };
 
-mod any;
-mod builtin_fns;
-mod cycle_finder;
-mod destruct_structs;
-mod destructure;
-mod fold_unconditionals;
-mod registers;
-mod remove_const_branch;
-mod remove_exception;
-mod remove_unit;
-mod replace_bools;
-mod resolve_bitvectors;
-mod resolve_return_assigns;
+pub mod any;
+pub mod builtin_fns;
+pub mod cycle_finder;
+pub mod destruct_structs;
+pub mod destructure;
+pub mod fold_unconditionals;
+pub mod lower_enums;
+pub mod registers;
+pub mod remove_const_branch;
+pub mod remove_exception;
+pub mod remove_unit;
+pub mod replace_bools;
+pub mod replace_strings;
+pub mod resolve_bitvectors;
+pub mod resolve_return_assigns;
 
 /// Executes the optimisation and raising passes on an AST
 pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
@@ -52,6 +54,8 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             RegisterHandler::new_boxed(),
             DestructStructs::new_boxed(),
             ReplaceBools::new_boxed(),
+            ReplaceStrings::new_boxed(),
+            LowerEnums::new_boxed(),
             RemoveUnits::new_boxed(ast.clone()),
             RemoveExceptions::new_boxed(),
             ResolveBitvectors::new_boxed(),

@@ -23,9 +23,11 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+/// Remove all exception handling logic
 pub struct RemoveExceptions;
 
 impl RemoveExceptions {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self)
     }

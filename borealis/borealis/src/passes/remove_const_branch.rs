@@ -19,6 +19,7 @@ use {
 pub struct RemoveConstBranch;
 
 impl RemoveConstBranch {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::<Self>::default()
     }

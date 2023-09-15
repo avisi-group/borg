@@ -125,7 +125,23 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "branch_unconditional_register",
                 "system_exceptions_runtime_svc_decode",
                 "system_exceptions_runtime_svc",
-               // "AArch64_CallSupervisor"
+                "integer_conditional_compare_immediate_decode",
+                "integer_conditional_compare_immediate",
+                "memory_single_general_register_memory_single_general_register__decode",
+                "memory_single_general_register",
+                "integer_conditional_compare_register_decode",
+                "integer_conditional_compare_register",
+                "memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode",
+                "memory_single_general_immediate_signed_offset_normal",
+                "integer_bitfield_decode",
+                "integer_bitfield",
+                "branch_conditional_test_decode",
+                "branch_conditional_test",
+                // "system_register_system_decode",
+                // "AArch64_CheckSystemAccess",
+                // "system_register_system",
+                // "IMPDEF_boolean",
+                // "IMPDEF_boolean_map"
             ]
             .contains(&k.as_ref())
             {
@@ -189,6 +205,16 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
         constants.insert("v81_implemented".into(), (Typ::Uint8, 1));
 
         constants.insert("unpred_tsize_aborts".into(), (Typ::Uint8, 0));
+
+        constants.insert("mte_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("mpam_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("crypto_sm4_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("crypto_sm3_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("crypto_sha3_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("crypto_sha256_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("crypto_sha512_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("crypto_aes_implemented".into(), (Typ::Uint8, 0));
+        constants.insert("crypto_sha1_implemented".into(), (Typ::Uint8, 0));
 
         constants
     };

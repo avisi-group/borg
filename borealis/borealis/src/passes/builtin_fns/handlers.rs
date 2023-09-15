@@ -27,6 +27,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("eq_bool", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),
+        ("eq_string", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Equal)
+        }),
         ("eq_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Equal)
         }),

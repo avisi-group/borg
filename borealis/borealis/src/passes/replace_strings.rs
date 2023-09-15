@@ -1,6 +1,4 @@
-//! Replace booleans in statements with integers
-//!
-//! GenC doesn't have bools, so we need to replace all bools with uint8
+//! Replace strings with integers
 
 use {
     crate::{
@@ -10,21 +8,21 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
-/// Replace booleans in statements with integers
-pub struct ReplaceBools {
+/// Replace strings with integers
+pub struct ReplaceStrings {
     did_change: bool,
 }
 
-impl ReplaceBools {
+impl ReplaceStrings {
     /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self { did_change: false })
     }
 }
 
-impl Pass for ReplaceBools {
+impl Pass for ReplaceStrings {
     fn name(&self) -> &'static str {
-        "ReplaceBools"
+        "ReplaceStrings"
     }
 
     fn reset(&mut self) {
@@ -32,17 +30,6 @@ impl Pass for ReplaceBools {
     }
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        let regs_did_change = ast
-            .borrow()
-            .registers
-            .values()
-            .map(|typ| {
-                self.reset();
-                self.visit_type(typ.clone());
-                self.did_change
-            })
-            .any();
-
         let defs_did_change = ast
             .borrow()
             .definitions
@@ -65,19 +52,16 @@ impl Pass for ReplaceBools {
             })
             .any();
 
-        regs_did_change || defs_did_change || fns_did_change
+        defs_did_change || fns_did_change
     }
 }
 
-impl Visitor for ReplaceBools {
+impl Visitor for ReplaceStrings {
     fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
         let mut node = node.borrow_mut();
 
-        if let Literal::Bool(bool) = *node {
-            *node = match bool {
-                false => Literal::Int(num_bigint::BigInt::from(0)),
-                true => Literal::Int(num_bigint::BigInt::from(1)),
-            };
+        if let Literal::String(s) = *node {
+            *node = Literal::Int(num_bigint::BigInt::from(s.key()));
             self.did_change = true;
         }
     }
@@ -85,15 +69,12 @@ impl Visitor for ReplaceBools {
     fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
         let mut node = node.borrow_mut();
 
-        match *node {
-            Type::Bool | Type::Bit => {
-                *node = Type::Int {
-                    signed: false,
-                    size: Size::Static(8),
-                };
-                self.did_change = true;
-            }
-            _ => {}
+        if let Type::String = *node {
+            *node = Type::Int {
+                signed: false,
+                size: Size::Static(32),
+            };
+            self.did_change = true;
         }
     }
 }

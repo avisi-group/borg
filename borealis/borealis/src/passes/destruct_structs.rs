@@ -40,10 +40,13 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+/// Destructures structs into their fields as local variables to work around the
+/// lack of struct support in GenSim
 #[derive(Debug, Default)]
 pub struct DestructStructs;
 
 impl DestructStructs {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::<Self>::default()
     }
@@ -72,16 +75,35 @@ fn destruct_structs(fn_def: &FunctionDefinition) {
     destruct_locals(fn_def, return_fields);
 }
 
-fn fix_params(_fn_signature: &FunctionSignature) {
-    // fn_signature
-    //     .parameters
-    //     .borrow()
-    //     .iter()
-    //     .for_each(|NamedType { name, typ }| {
-    //         if let Type::Struct { name, fields } = &*typ.borrow() {
-    //             panic!();
-    //         }
-    //     });
+fn fix_params(fn_signature: &FunctionSignature) {
+    let mut parameters = fn_signature.parameters.borrow_mut();
+    *parameters = parameters
+        .iter()
+        .map(|parameter| {
+            if let Type::Struct {
+                name: struct_name,
+                fields,
+            } = &*parameter.typ.borrow()
+            {
+                fields
+                    .iter()
+                    .map(
+                        |NamedType {
+                             name: field_name,
+                             typ,
+                         }| Parameter {
+                            name: destructed_ident(*struct_name, *field_name),
+                            typ: typ.clone(),
+                            is_ref: false,
+                        },
+                    )
+                    .collect()
+            } else {
+                vec![parameter.clone()]
+            }
+        })
+        .flatten()
+        .collect();
 }
 
 fn fix_return(fn_def: &FunctionDefinition) -> Option<Vec<NamedType>> {
@@ -172,6 +194,19 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                     // if a struct is copied into a local variable, replace with several copies into
                     // each field
                     Statement::Copy { expression, value } => {
+                        // if we are assigning to a field, replace with a copy where expression is
+                        // destructed
+                        if let Expression::Field { expression, field } = expression {
+                            let Expression::Identifier(struc) = **expression else {
+                                panic!();
+                            };
+
+                            return vec![Rc::new(RefCell::new(Statement::Copy {
+                                expression: Expression::Identifier(destructed_ident(struc, *field)),
+                                value: value.clone(),
+                            }))];
+                        }
+
                         let Expression::Identifier(dest) = expression else {
                             return vec![clone];
                         };
@@ -247,43 +282,34 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                             }
                         }
 
+                        // if any arguments are in `structs`, replace with
+                        // mangled field names
+                        arguments = arguments
+                            .iter()
+                            .map(|arg| {
+                                let Value::Identifier(ident) = &*arg.borrow() else {
+                                    return vec![arg.clone()];
+                                };
+
+                                let Some(fields) = structs.get(ident) else {
+                                    return vec![arg.clone()];
+                                };
+
+                                fields
+                                    .iter()
+                                    .map(|NamedType { name, .. }| destructed_ident(*ident, *name))
+                                    .map(|name| Rc::new(RefCell::new(Value::Identifier(name))))
+                                    .collect()
+                            })
+                            .flatten()
+                            .collect();
+
                         vec![Statement::FunctionCall {
                             expression,
                             name: *name,
                             arguments,
                         }
                         .into()]
-
-                        // if any arguments are in `structs`, replace with
-                        // mangled field names
-
-                        // THIS IS FOR FIXING PARAMETER STRUCTS
-                        // *arguments = arguments
-                        //     .iter()
-                        //     .map(|arg| {
-                        //         let Value::Identifier(ident) = &*arg.borrow()
-                        // else {             return
-                        // vec![arg.clone()];         };
-
-                        //         let Some(fields) = structs.get(ident) else {
-                        //             return vec![arg.clone()];
-                        //         };
-
-                        //         fields
-                        //             .iter()
-                        //             .map(|NamedType { name, .. }|
-                        // destructed_ident(*ident, *name))
-                        //             .map(|name| {
-                        //
-                        // Rc::new(RefCell::new(Value::Literal(Rc::new(
-                        //
-                        // RefCell::new(crate::boom::Literal::Reference(name)),
-                        //                 ))))
-                        //             })
-                        //             .collect()
-                        //     })
-                        //     .flatten()
-                        //     .collect();
                     }
 
                     _ => vec![clone],

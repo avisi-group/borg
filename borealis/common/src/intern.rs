@@ -27,6 +27,11 @@ impl InternedString {
     pub fn from_static(key: &'static str) -> Self {
         Self(INTERNER.get_or_intern_static(key))
     }
+
+    /// Gets the inner key of the interned string
+    pub fn key(&self) -> u32 {
+        self.0.into_inner().into()
+    }
 }
 
 impl AsRef<str> for InternedString {

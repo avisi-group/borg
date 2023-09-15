@@ -361,6 +361,17 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             "#
             .into(),
         },
+        HelperFunction {
+            name: "AArch64_CallSupervisor".into(),
+            parameters: "uint16 imm".into(),
+            return_type: "void".into(),
+            body: r#"
+                take_exception(3, imm);
+		        //write_register(PC_target, read_pc() + 4);
+                return;
+            "#
+            .into(),
+        },
     ];
 
     HashMap::from_iter(
@@ -621,11 +632,14 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
         fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
             {
                 if let Statement::FunctionCall { name, .. } = &*node.borrow() {
-                    if contains_write_pc(self.ast.clone(), *name) {
+                    if name.as_ref() == "AArch64_CallSupervisor" {
+                        self.writes_pc = true;
+                    } else if contains_write_pc(self.ast.clone(), *name) {
                         self.writes_pc = true;
                     }
                 }
             }
+
             node.borrow().walk(self);
         }
 

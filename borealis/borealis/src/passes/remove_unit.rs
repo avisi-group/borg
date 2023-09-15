@@ -15,6 +15,8 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+/// Removes unit local variables and assignments, void parameters from function
+/// definitions, and void arguments from function calls
 pub struct RemoveUnits {
     ast: Rc<RefCell<Ast>>,
     did_change: bool,
@@ -79,6 +81,7 @@ impl Visitor for RemoveUnits {
 }
 
 impl RemoveUnits {
+    /// Create a new Pass object
     pub fn new_boxed(ast: Rc<RefCell<Ast>>) -> Box<dyn Pass> {
         Box::new(Self {
             ast,

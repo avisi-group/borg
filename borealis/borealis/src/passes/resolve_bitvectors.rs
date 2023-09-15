@@ -38,6 +38,7 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
+/// Bitvector length resolution
 #[derive(Debug)]
 pub struct ResolveBitvectors {
     did_change: bool,
@@ -113,6 +114,7 @@ impl Visitor for ResolveBitvectors {
 }
 
 impl ResolveBitvectors {
+    /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self {
             did_change: false,
