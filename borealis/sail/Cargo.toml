@@ -19,7 +19,7 @@ log = "0.4.20"
 serde = { version = "1.0.188", features = ["derive"] }
 deepsize = "0.2.0"
 num-bigint = { version = "0.4.4", features = ["serde"] }
-serde_json = "1.0.106"
+serde_json = "1.0.107"
 strum = { version = "0.25.0", features = ["derive"] }
 phf = { version = "0.11.2", features = ["macros"] }
 regex = "1.9.5"
@@ -32,4 +32,4 @@ color-eyre = "0.6.2"
 color-eyre = { version = "0.6.2", default-features = false }
 insta = { version = "1.31.0", features = ["json", "filters"] }
 proptest = "1.2.0"
-serde_json = "1.0.106"
+serde_json = "1.0.107"

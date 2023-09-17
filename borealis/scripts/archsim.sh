@@ -16,4 +16,4 @@ cd $GENSIM_PATH/build/dist/bin/
 
 rm trace0 || true
 ./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./mcf_r_base.aarch64-static-64 -d -t -U trace --mode Interpreter
-./TraceCat trace0
+#./TraceCat trace0

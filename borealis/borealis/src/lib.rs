@@ -141,7 +141,16 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "AArch64_CheckSystemAccess",
                 "system_register_system",
                 "u__IMPDEF_boolean",
-                "u__IMPDEF_boolean_map"
+                "u__IMPDEF_boolean_map",
+                "AArch64_SysRegRead",
+                // "AArch64_SysRegWrite",
+                // "HaveBTIExt",
+                // "HasArchVersion",
+                // "BranchTargetCheck",
+                // "AArch64_ExecutingBROrBLROrRetInstr",
+                // "AArch64_ExecutingBTIInstr",
+                // "ThisInstr",
+                // "HaveNVExt"
             ]
             .contains(&k.as_ref())
             {
@@ -198,11 +207,11 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
 
         constants.extend(enum_constants);
 
-        constants.insert("v85_implemented".into(), (Typ::Uint8, 1));
-        constants.insert("v84_implemented".into(), (Typ::Uint8, 1));
-        constants.insert("v83_implemented".into(), (Typ::Uint8, 1));
-        constants.insert("v82_implemented".into(), (Typ::Uint8, 1));
-        constants.insert("v81_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("reg_u__v85_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("reg_u__v84_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("reg_u__v83_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("reg_u__v82_implemented".into(), (Typ::Uint8, 1));
+        constants.insert("reg_u__v81_implemented".into(), (Typ::Uint8, 1));
 
         constants.insert("u__unpred_tsize_aborts".into(), (Typ::Uint8, 0));
 
@@ -316,6 +325,16 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
             },
             RegisterSpace {
                 size: 4,
+                views: vec![View::Slot(Slot {
+                    name: "reg_u__currentInstr".into(),
+                    typ: genc_model::Typ::Uint32,
+                    width: 4,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
+            RegisterSpace {
+                size: 5,
                 views: vec![
                     View::Slot(Slot {
                         name: "BTypeCompatible".into(),
@@ -343,6 +362,13 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                         typ: genc_model::Typ::Uint8,
                         width: 1,
                         offset: 3,
+                        tag: None,
+                    }),
+                    View::Slot(Slot {
+                        name: "reg_PSTATE_BTYPE".into(),
+                        typ: genc_model::Typ::Uint8,
+                        width: 1,
+                        offset: 4,
                         tag: None,
                     }),
                 ],

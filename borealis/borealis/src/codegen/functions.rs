@@ -1,5 +1,6 @@
 //! GenC function generation from BOOM
 
+use bitvec::bitvec;
 use {
     crate::{
         boom::{
@@ -10,6 +11,7 @@ use {
         codegen::emit::Emit,
         genc_model::{self, HelperFunction},
     },
+    bitvec::{prelude::Lsb0, vec::BitVec},
     common::{intern::InternedString, HashMap, HashSet},
     itertools::Itertools,
     once_cell::sync::Lazy,
@@ -595,7 +597,7 @@ fn generate_fn_body(entry_block: ControlFlowBlock) -> String {
                 // to?) set child as checkpoint, emit both up to that point
                 // emit child (and its children) as normal
 
-                let block = find_common_block(target.clone(), fallthrough.clone()).unwrap();
+                let block = find_common_block(target.clone(), fallthrough.clone());
                 log::trace!("found common block {block}");
 
                 if target == block {
@@ -666,38 +668,134 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
 /// if it exists.
 ///
 /// Left and right don't actually mean anything, just used to distinguish
-/// between blocks
-fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> Option<ControlFlowBlock> {
-    let mut paths = vec![vec![left], vec![right]];
+/// between blocks, and a common child is a block in which all paths from `left`
+/// and `right` go through.
+///
+/// When emitting BOOM, we could recurse into each sub-tree when emitting
+/// if-statements. This is *correct* but results in an explosion, all blocks in
+/// each left and right body after the if-statements original scope are
+/// duplicated, and this occurs for every if-statement.
+///
+/// Instead, if we can find the point at which the branches re-join, we can emit
+/// only the minimum number of statements in the left and right bodies of the
+/// if-statement, and return one indendation level. This avoids the duplication
+/// explosion.
+///
+/// However, finding the block where branches re-join is non-trivial. We need to
+/// find all paths from the left and right blocks, then find the first (closest)
+/// block which appears in all such paths. Finding all paths first quickly
+/// exhausts available memory, so the current implementation iteratively grows
+/// all paths in lock-step, searching for common blocks each time.
+///
+/// The problem is that it still consumes too much memory on larger graphs. At
+/// the time of writing, this was solved by culling paths which re-join. I
+/// thought about it for a while and I think it's correct, but who knows?
+fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> ControlFlowBlock {
+    log::trace!("finding common block of {left} and {right}");
 
-    for _ in 0..1_000_000 {
-        paths = paths
-            .into_iter()
-            .flat_map(|path| {
-                let node = path.last().unwrap();
-                let children = node.terminator().targets();
+    // limit depth to 1000
+    for i in 1..1000 {
+        log::trace!("max depth {i}");
 
-                if children.is_empty() {
-                    return vec![path];
-                }
+        let mut current_path = bitvec!(usize, Lsb0; 0; i);
 
-                children
-                    .iter()
-                    .map(|child| {
-                        let mut new_path = path.clone();
-                        new_path.push(child.clone());
-                        new_path
-                    })
-                    .collect()
-            })
-            .collect::<Vec<_>>();
+        let mut common_blocks = visit_path(left.clone(), &mut current_path);
 
-        for vertex in &paths[0] {
-            if paths.iter().all(|path| path.contains(vertex)) {
-                return Some(vertex.clone());
+        // iterate over every path
+        loop {
+            common_blocks = intersect(common_blocks, visit_path(left.clone(), &current_path));
+            common_blocks = intersect(common_blocks, visit_path(right.clone(), &current_path));
+
+            // if increment path overflows
+            if increment_path(&mut current_path) {
+                break;
             }
+        }
+
+        // if we found a common block, return it
+        if !common_blocks.is_empty() {
+            log::trace!(
+                "found common blocks {}",
+                common_blocks
+                    .iter()
+                    .map(|(block, value)| format!("{block}: {value}"))
+                    .join(", ")
+            );
+            return common_blocks
+                .into_iter()
+                .min_by_key(|(_, depth)| *depth)
+                .unwrap()
+                .0;
         }
     }
 
-    None
+    // hashmap of visited blocks to their depths
+
+    // intersect with hashmap of last path, summing depths(?)
+
+    // after all paths, entries in map will be blocks common to all paths
+
+    panic!();
+}
+
+fn visit_path(
+    start: ControlFlowBlock,
+    path: &BitVec<usize, Lsb0>,
+) -> HashMap<ControlFlowBlock, usize> {
+    let mut visited_blocks = HashMap::default();
+
+    let mut depth = 0;
+    let mut current_block = start;
+
+    loop {
+        visited_blocks.insert(current_block.clone(), depth);
+
+        match &current_block.terminator().targets()[..] {
+            // reached leaf node
+            [] => break,
+            [child] => current_block = child.clone(),
+            [left, right] => {
+                let Some(condition) = path.get(depth).as_deref().copied() else {
+                    // reached end of path
+                    break;
+                };
+
+                current_block = if condition {
+                    right.clone()
+                } else {
+                    left.clone()
+                };
+
+                depth += 1;
+            }
+
+            _ => panic!(),
+        }
+    }
+
+    visited_blocks
+}
+
+fn increment_path(path: &mut BitVec<usize, Lsb0>) -> bool {
+    for mut bit in path.iter_mut().rev() {
+        if *bit {
+            *bit = false;
+            continue;
+        } else {
+            *bit = true;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/// Returns the sum of the values of keys present in both `a` and `b`, discarding all others
+fn intersect(
+    a: HashMap<ControlFlowBlock, usize>,
+    b: HashMap<ControlFlowBlock, usize>,
+) -> HashMap<ControlFlowBlock, usize> {
+    a.into_iter()
+        .filter_map(|(k, v1)| b.get(&k).map(|v2| (k, v1 + v2)))
+        .collect()
 }
