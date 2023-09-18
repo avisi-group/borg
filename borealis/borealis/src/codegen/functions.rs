@@ -1,6 +1,5 @@
 //! GenC function generation from BOOM
 
-use bitvec::bitvec;
 use {
     crate::{
         boom::{
@@ -11,7 +10,6 @@ use {
         codegen::emit::Emit,
         genc_model::{self, HelperFunction},
     },
-    bitvec::{prelude::Lsb0, vec::BitVec},
     common::{intern::InternedString, HashMap, HashSet},
     itertools::Itertools,
     once_cell::sync::Lazy,
@@ -634,6 +632,7 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
         fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
             {
                 if let Statement::FunctionCall { name, .. } = &*node.borrow() {
+                    // TODO remove this special casing
                     if name.as_ref() == "AArch64_CallSupervisor" {
                         self.writes_pc = true;
                     } else if contains_write_pc(self.ast.clone(), *name) {
@@ -690,112 +689,41 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
 /// The problem is that it still consumes too much memory on larger graphs. At
 /// the time of writing, this was solved by culling paths which re-join. I
 /// thought about it for a while and I think it's correct, but who knows?
+///
+/// Update 2023-09-18: Spoke with Al, only need to walk left and right paths
+/// once to find rejoining block
+///
+/// :(
 fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> ControlFlowBlock {
     log::trace!("finding common block of {left} and {right}");
 
-    // limit depth to 1000
-    for i in 1..1000 {
-        log::trace!("max depth {i}");
+    let left_path = walk(left);
+    let right_path = walk(right);
 
-        let mut current_path = bitvec!(usize, Lsb0; 0; i);
+    let common = left_path
+        .into_iter()
+        .find(|left_block| {
+            right_path
+                .iter()
+                .any(|right_block| *left_block == *right_block)
+        })
+        .unwrap();
 
-        let mut common_blocks = visit_path(left.clone(), &mut current_path);
+    log::trace!("found common block {}", common);
 
-        // iterate over every path
-        loop {
-            common_blocks = intersect(common_blocks, visit_path(left.clone(), &current_path));
-            common_blocks = intersect(common_blocks, visit_path(right.clone(), &current_path));
-
-            // if increment path overflows
-            if increment_path(&mut current_path) {
-                break;
-            }
-        }
-
-        // if we found a common block, return it
-        if !common_blocks.is_empty() {
-            log::trace!(
-                "found common blocks {}",
-                common_blocks
-                    .iter()
-                    .map(|(block, value)| format!("{block}: {value}"))
-                    .join(", ")
-            );
-            return common_blocks
-                .into_iter()
-                .min_by_key(|(_, depth)| *depth)
-                .unwrap()
-                .0;
-        }
-    }
-
-    // hashmap of visited blocks to their depths
-
-    // intersect with hashmap of last path, summing depths(?)
-
-    // after all paths, entries in map will be blocks common to all paths
-
-    panic!();
+    return common;
 }
 
-fn visit_path(
-    start: ControlFlowBlock,
-    path: &BitVec<usize, Lsb0>,
-) -> HashMap<ControlFlowBlock, usize> {
-    let mut visited_blocks = HashMap::default();
-
-    let mut depth = 0;
-    let mut current_block = start;
+/// Walks the graph, always taking the left child
+fn walk(start: ControlFlowBlock) -> Vec<ControlFlowBlock> {
+    let mut path = vec![start];
 
     loop {
-        visited_blocks.insert(current_block.clone(), depth);
+        let current = path.last().unwrap();
 
-        match &current_block.terminator().targets()[..] {
-            // reached leaf node
-            [] => break,
-            [child] => current_block = child.clone(),
-            [left, right] => {
-                let Some(condition) = path.get(depth).as_deref().copied() else {
-                    // reached end of path
-                    break;
-                };
-
-                current_block = if condition {
-                    right.clone()
-                } else {
-                    left.clone()
-                };
-
-                depth += 1;
-            }
-
-            _ => panic!(),
+        match &current.terminator().targets()[..] {
+            [] => return path,
+            [next] | [next, ..] => path.push(next.clone()),
         }
     }
-
-    visited_blocks
-}
-
-fn increment_path(path: &mut BitVec<usize, Lsb0>) -> bool {
-    for mut bit in path.iter_mut().rev() {
-        if *bit {
-            *bit = false;
-            continue;
-        } else {
-            *bit = true;
-            return false;
-        }
-    }
-
-    return true;
-}
-
-/// Returns the sum of the values of keys present in both `a` and `b`, discarding all others
-fn intersect(
-    a: HashMap<ControlFlowBlock, usize>,
-    b: HashMap<ControlFlowBlock, usize>,
-) -> HashMap<ControlFlowBlock, usize> {
-    a.into_iter()
-        .filter_map(|(k, v1)| b.get(&k).map(|v2| (k, v1 + v2)))
-        .collect()
 }

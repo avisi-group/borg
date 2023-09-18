@@ -62,8 +62,6 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             RegisterHandler::new_boxed(),
         ],
     );
-
-    _dump_func_dot(&ast, "ConstrainUnpredictable", None);
 }
 
 /// Pass that performs an operation on an AST

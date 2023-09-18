@@ -142,8 +142,8 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "system_register_system",
                 "u__IMPDEF_boolean",
                 "u__IMPDEF_boolean_map",
-                "AArch64_SysRegRead",
-                // "AArch64_SysRegWrite",
+                // "AArch64_SysRegRead",
+                // "AArch64_SysRegWrite"
                 // "HaveBTIExt",
                 // "HasArchVersion",
                 // "BranchTargetCheck",
