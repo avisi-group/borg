@@ -1,4 +1,6 @@
 //! Remove redundant assignments to intermediate local variables
+//!
+//! TODO: remove never used variables
 
 use {
     crate::{
@@ -31,8 +33,7 @@ impl Pass for RemoveRedundantAssigns {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow().functions.values().map(process_fn).any();
-        false
+        ast.borrow().functions.values().map(process_fn).any()
     }
 }
 
@@ -61,12 +62,17 @@ fn process_fn(fn_def: &FunctionDefinition) -> bool {
                             }
                         }
 
-                        // TODO: maybe make this work with all values not just idents?
-                        if let Value::Identifier(source) = *value.borrow() {
-                            // only perform one level/step of folding per execution
-                            if !assignments_value.contains_key(&source) {
-                                assignments_value.insert(*dest, source);
+                        match &*value.borrow() {
+                            Value::Identifier(source) => {
+                                // only perform one level/step of folding per execution
+                                if !assignments_value.contains_key(source) {
+                                    assignments_value.insert(*dest, value.clone());
+                                }
                             }
+                            Value::Literal(_) => {
+                                assignments_value.insert(*dest, value.clone());
+                            }
+                            _ => (),
                         }
                     }
                 }
@@ -94,17 +100,14 @@ fn process_fn(fn_def: &FunctionDefinition) -> bool {
         assignments_value
     );
 
-    // number of times each ident was used
-    let uses_count = UseCounter::run(fn_def);
-
     let redundant = assignments_count
         .into_iter()
         // only remove variables that are assigned to once
         .filter(|(_, count)| *count == 1)
-        // only remove variables that are used once or less
-        .filter(|(dest, _)| uses_count.get(dest).copied().unwrap_or(0) < 2)
         // never remove return values (would break tuple returns)
         .filter(|(dest, _)| !dest.as_ref().starts_with("return_value"))
+        // never remove exception values (TODO probably can do this)
+        .filter(|(dest, _)| dest.as_ref() != "exception")
         .filter_map(|(dest, _)| {
             assignments_value
                 .get(&dest)
@@ -113,7 +116,11 @@ fn process_fn(fn_def: &FunctionDefinition) -> bool {
         })
         .collect::<HashMap<_, _>>();
 
-    log::trace!("{}: {:?}", fn_def.signature.name, redundant);
+    if redundant.is_empty() {
+        return false;
+    }
+
+    log::trace!("{}: beepboop {:?}", fn_def.signature.name, redundant);
 
     fn_def.entry_block.iter().for_each(|block| {
         // remove declarations and copies into redundant variables
@@ -168,11 +175,11 @@ fn process_fn(fn_def: &FunctionDefinition) -> bool {
     // replace all redundant identifiers
     IdentReplacer { mapping: redundant }.visit_function_definition(fn_def);
 
-    false
+    true
 }
 
 struct IdentReplacer {
-    mapping: HashMap<InternedString, InternedString>,
+    mapping: HashMap<InternedString, Rc<RefCell<Value>>>,
 }
 
 impl Visitor for IdentReplacer {
@@ -184,77 +191,10 @@ impl Visitor for IdentReplacer {
         };
 
         if let Some(replacement) = replacement {
-            log::trace!("replacing {node:?} with {replacement}");
-            *node.borrow_mut() = Value::Identifier(replacement);
+            log::trace!("replacing {node:?} with {replacement:?}");
+            *node.borrow_mut() = replacement.borrow().clone();
         }
 
         node.borrow().walk(self);
     }
-
-    // fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-    //     if let Statement::FunctionCall { expression, .. } = &mut
-    // *node.borrow_mut() {         let replacement = if let
-    // Some(Expression::Identifier(ident)) = expression {
-    // self.mapping.get(ident).cloned()         } else {
-    //             None
-    //         };
-
-    //         if let Some(replacement) = replacement {
-    //             log::trace!("replacing {expression:?} with {replacement}");
-    //             *expression = Some(Expression::Identifier(replacement));
-    //         }
-    //     }
-
-    //     node.borrow().walk(self);
-    // }
-}
-
-struct UseCounter {
-    mapping: HashMap<InternedString, usize>,
-}
-
-impl UseCounter {
-    fn run(fn_def: &FunctionDefinition) -> HashMap<InternedString, usize> {
-        let mut celf = Self {
-            mapping: HashMap::default(),
-        };
-
-        celf.visit_function_definition(fn_def);
-
-        celf.mapping
-    }
-}
-
-impl Visitor for UseCounter {
-    fn visit_value(&mut self, node: Rc<RefCell<Value>>) {
-        if let Value::Identifier(ident) = &*node.borrow() {
-            match self.mapping.get_mut(ident) {
-                Some(count) => {
-                    *count += 1;
-                }
-                None => {
-                    self.mapping.insert(*ident, 1);
-                }
-            }
-        }
-
-        node.borrow().walk(self);
-    }
-
-    // fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-    //     if let Statement::FunctionCall { expression, .. } = &mut
-    // *node.borrow_mut() {         let replacement = if let
-    // Some(Expression::Identifier(ident)) = expression {
-    // self.mapping.get(ident).cloned()         } else {
-    //             None
-    //         };
-
-    //         if let Some(replacement) = replacement {
-    //             log::trace!("replacing {expression:?} with {replacement}");
-    //             *expression = Some(Expression::Identifier(replacement));
-    //         }
-    //     }
-
-    //     node.borrow().walk(self);
-    // }
 }

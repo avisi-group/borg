@@ -370,21 +370,26 @@ pub fn zero_extend_handler(
     let Statement::FunctionCall {
         expression,
         arguments,
-        ..
+        name,
     } = statement.borrow().clone()
     else {
         panic!();
     };
 
-    // x1 = ZeroExtend__0(x, n)
-    //
-    //
-
-    let Value::Identifier(x_ident) = &*arguments[0].borrow() else {
+    // zero-extend value to length bits
+    let (value, length) = if name.as_ref() == "ZeroExtend__0" {
+        (arguments[0].clone(), arguments[1].clone())
+    } else if name.as_ref() == "ZeroExtend__1" {
+        (arguments[1].clone(), arguments[0].clone())
+    } else {
         panic!();
     };
 
-    let x_len = match function.get_ident_type(*x_ident).unwrap() {
+    let Value::Identifier(value_ident) = &*value.borrow() else {
+        return false;
+    };
+
+    let value_len = match function.get_ident_type(*value_ident).unwrap() {
         Type::Int {
             size: Size::Static(len),
             ..
@@ -397,7 +402,16 @@ pub fn zero_extend_handler(
         _ => return false,
     };
 
-    // (x << (64 - x_len)) >> (64 - x_len)
+    let size = match &*length.borrow() {
+        Value::Literal(lit) => {
+            if let Literal::Int(size) = &*lit.borrow() {
+                Size::Static(size.try_into().unwrap())
+            } else {
+                Size::Runtime(length.clone())
+            }
+        }
+        _ => Size::Runtime(length.clone()),
+    };
 
     *statement.borrow_mut() = Statement::Copy {
         expression: expression.unwrap(),
@@ -407,14 +421,14 @@ pub fn zero_extend_handler(
                     arguments[0].clone(),
                     Rc::new(RefCell::new(Type::Int {
                         signed: false,
-                        size: Size::Static(64),
+                        size,
                     })),
                 )
                 .into(),
-                Operation::Subtract(arguments[1].clone(), x_len.clone()).into(),
+                Operation::Subtract(length.clone(), value_len.clone()).into(),
             )
             .into(),
-            Operation::Subtract(arguments[1].clone(), x_len).into(),
+            Operation::Subtract(length, value_len).into(),
         )
         .into(),
     };
@@ -552,7 +566,7 @@ pub fn replicate_bits_handler(
 
     let size = {
         let Value::Identifier(ident) = &*arguments[0].borrow() else {
-            panic!();
+            panic!("{:?}", arguments[0]);
         };
 
         let Some(Type::Int { size, .. }) = function.get_ident_type(*ident) else {

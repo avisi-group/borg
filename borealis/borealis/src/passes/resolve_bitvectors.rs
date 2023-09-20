@@ -293,37 +293,21 @@ fn ones_handler(
     // get assignment to argument to Ones
     assert_eq!(arguments.len(), 1);
 
-    let Value::Identifier(ident) = &*arguments[0].borrow() else {
-        panic!();
-    };
+    let length_value = arguments[0].clone();
 
     let Expression::Identifier(destination) = expression else {
         panic!();
     };
 
     // resolve destination size
-    if let Some(value) = celf
-        .current_func
-        .as_ref()
-        .unwrap()
-        .entry_block
-        .get_assignment(*ident)
-    {
-        let Value::Literal(literal) = &*value.borrow() else {
-            panic!();
-        };
+    if let Value::Literal(literal) = &*length_value.borrow() {
+        if let Literal::Int(length) = &*literal.borrow() {
+            celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
+            return;
+        }
+    }
 
-        let Literal::Int(length) = &*literal.borrow() else {
-            panic!();
-        };
-
-        celf.set_size(*destination, Size::Static(length.try_into().unwrap()));
-    } else {
-        celf.set_size(
-            *destination,
-            Size::Runtime(Rc::new(RefCell::new(Value::Identifier(*ident)))),
-        );
-    };
+    celf.set_size(*destination, Size::Runtime(length_value.clone()));
 }
 
 fn concat_handler(
