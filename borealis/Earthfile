@@ -76,7 +76,7 @@ docker:
 
 test:
     BUILD +unit-test
-    BUILD --platform=linux/amd64 +e2e-test-archsim
+    BUILD +e2e-test-archsim
 
 test-chef-cook:
     FROM +base-image

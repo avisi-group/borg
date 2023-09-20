@@ -11,9 +11,12 @@ cd output
 mkdir -p modules
 make -j$(nproc) && cp arm64.dll modules/
 cp ../../../data/mcf/mcf_r_base.aarch64-static-64 $GENSIM_PATH/build/dist/bin/
+cp ../../../data/fib.S $GENSIM_PATH/build/dist/bin/
 
 cd $GENSIM_PATH/build/dist/bin/
 
+aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
+
 rm trace0 || true
-./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./mcf_r_base.aarch64-static-64 -d -t -U trace --mode Interpreter
-#./TraceCat trace0
+./archsim -m aarch64-user -l contiguous -s arm64 --modules /home/fm208/Sync/borealis/target/genc/output/modules -e ./fib -d -t -U trace --mode Interpreter
+./TraceCat trace0

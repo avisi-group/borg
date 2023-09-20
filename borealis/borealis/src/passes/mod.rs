@@ -13,7 +13,8 @@ use {
             destruct_structs::DestructStructs, fold_unconditionals::FoldUnconditionals,
             lower_enums::LowerEnums, registers::RegisterHandler,
             remove_const_branch::RemoveConstBranch, remove_exception::RemoveExceptions,
-            remove_unit::RemoveUnits, replace_bools::ReplaceBools, replace_strings::ReplaceStrings,
+            remove_redundant_assigns::RemoveRedundantAssigns, remove_unit::RemoveUnits,
+            replace_bools::ReplaceBools, replace_strings::ReplaceStrings,
             resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
     },
@@ -36,6 +37,7 @@ pub mod lower_enums;
 pub mod registers;
 pub mod remove_const_branch;
 pub mod remove_exception;
+pub mod remove_redundant_assigns;
 pub mod remove_unit;
 pub mod replace_bools;
 pub mod replace_strings;
@@ -60,6 +62,7 @@ pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
             ResolveBitvectors::new_boxed(),
             AddBuiltinFns::new_boxed(),
             RegisterHandler::new_boxed(),
+            RemoveRedundantAssigns::new_boxed(),
         ],
     );
 }
