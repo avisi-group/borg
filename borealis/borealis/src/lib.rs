@@ -142,10 +142,11 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "system_register_system",
                 "u__IMPDEF_boolean",
                 "u__IMPDEF_boolean_map",
+                "vector_arithmetic_binary_uniform_mul_int_doubling_sisd_decode"
 
                 // // CHECKPOINT
 
-                // "AArch64_SysRegRead",
+                //"AArch64_SysRegRead",
                 // "AArch64_SysRegWrite",
                 // "HaveBTIExt",
                 // "HasArchVersion",
@@ -326,66 +327,66 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                     tag: None,
                 })],
             },
-            // RegisterSpace {
-            //     size: 8,
-            //     views: vec![View::Slot(Slot {
-            //         name: "reg_VMPIDR_EL2".into(),
-            //         typ: genc_model::Typ::Uint64,
-            //         width: 8,
-            //         offset: 0,
-            //         tag: None,
-            //     })],
-            // },
-            // RegisterSpace {
-            //     size: 4,
-            //     views: vec![View::Slot(Slot {
-            //         name: "reg_VPIDR_EL2".into(),
-            //         typ: genc_model::Typ::Uint32,
-            //         width: 4,
-            //         offset: 0,
-            //         tag: None,
-            //     })],
-            // },
-            // RegisterSpace {
-            //     size: 4,
-            //     views: vec![View::Slot(Slot {
-            //         name: "reg_ESR_EL1".into(),
-            //         typ: genc_model::Typ::Uint32,
-            //         width: 4,
-            //         offset: 0,
-            //         tag: None,
-            //     })],
-            // },
-            // RegisterSpace {
-            //     size: 8,
-            //     views: vec![View::Slot(Slot {
-            //         name: "reg_FAR_EL1".into(),
-            //         typ: genc_model::Typ::Uint64,
-            //         width: 8,
-            //         offset: 0,
-            //         tag: None,
-            //     })],
-            // },
-            // RegisterSpace {
-            //     size: 8,
-            //     views: vec![View::Slot(Slot {
-            //         name: "reg_SCTLR_EL1".into(),
-            //         typ: genc_model::Typ::Uint64,
-            //         width: 8,
-            //         offset: 0,
-            //         tag: None,
-            //     })],
-            // },
-            // RegisterSpace {
-            //     size: 4,
-            //     views: vec![View::Slot(Slot {
-            //         name: "reg_DCZID_EL0".into(),
-            //         typ: genc_model::Typ::Uint32,
-            //         width: 4,
-            //         offset: 0,
-            //         tag: None,
-            //     })],
-            // },
+            RegisterSpace {
+                size: 8,
+                views: vec![View::Slot(Slot {
+                    name: "reg_VMPIDR_EL2".into(),
+                    typ: genc_model::Typ::Uint64,
+                    width: 8,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
+            RegisterSpace {
+                size: 4,
+                views: vec![View::Slot(Slot {
+                    name: "reg_VPIDR_EL2".into(),
+                    typ: genc_model::Typ::Uint32,
+                    width: 4,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
+            RegisterSpace {
+                size: 4,
+                views: vec![View::Slot(Slot {
+                    name: "reg_ESR_EL1".into(),
+                    typ: genc_model::Typ::Uint32,
+                    width: 4,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
+            RegisterSpace {
+                size: 8,
+                views: vec![View::Slot(Slot {
+                    name: "reg_FAR_EL1".into(),
+                    typ: genc_model::Typ::Uint64,
+                    width: 8,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
+            RegisterSpace {
+                size: 8,
+                views: vec![View::Slot(Slot {
+                    name: "reg_SCTLR_EL1".into(),
+                    typ: genc_model::Typ::Uint64,
+                    width: 8,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
+            RegisterSpace {
+                size: 4,
+                views: vec![View::Slot(Slot {
+                    name: "reg_DCZID_EL0".into(),
+                    typ: genc_model::Typ::Uint32,
+                    width: 4,
+                    offset: 0,
+                    tag: None,
+                })],
+            },
             RegisterSpace {
                 size: 4,
                 views: vec![View::Slot(Slot {

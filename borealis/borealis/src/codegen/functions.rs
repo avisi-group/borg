@@ -320,6 +320,12 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             name: "replicate_bits".into(),
             parameters: "uint64 value, uint64 size, uint64 count".into(),
             return_type: "uint64".into(),
+            body: generate_replicate_bits_body(),
+        },
+        HelperFunction {
+            name: "replicate_bits_fallback".into(),
+            parameters: "uint64 value, uint64 size, uint64 count".into(),
+            return_type: "uint64".into(),
             body: r#"
                 uint64 result = 0;
                 for (uint64 i = 0; i < count; i++) {
@@ -369,6 +375,24 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
                 take_exception(3, imm);
 		        //write_register(PC_target, read_pc() + 4);
                 return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "BranchTargetCheck".into(),
+            parameters: "".into(),
+            return_type: "void".into(),
+            body: r#"
+                return;
+            "#
+            .into(),
+        },
+        HelperFunction {
+            name: "EL2Enabled".into(),
+            parameters: "".into(),
+            return_type: "uint8".into(),
+            body: r#"
+                return 0;
             "#
             .into(),
         },
@@ -726,4 +750,64 @@ fn walk(start: ControlFlowBlock) -> Vec<ControlFlowBlock> {
             [next] | [next, ..] => path.push(next.clone()),
         }
     }
+}
+
+fn generate_replicate_bits_body() -> String {
+    let values = [1u64, 2, 4, 8, 16, 32, 64];
+
+    let mut body = String::new();
+
+    let count_groups = values
+        .into_iter()
+        .cartesian_product(values)
+        .filter(|(count, size)| *count * *size <= 64)
+        // generating 65536 cases would be too many, so cap at 255
+        .filter(|(_, size)| *size <= 8)
+        .map(|(count, size)| {
+            (0u64..(1 << size))
+                .into_iter()
+                .map(move |value| (count, size, value))
+        })
+        .flatten()
+        .map(|(count, size, value)| {
+            let mut result = 0;
+
+            for _ in 0..count {
+                result = (result << size) | value;
+            }
+
+            (count, size, value, result)
+        })
+        .group_by(|(count, _, _, _)| *count);
+
+    body += "switch (count) {\n";
+
+    count_groups.into_iter().for_each(|(count, group)| {
+        body += &format!("\tcase {count}: {{\n");
+        body += "\t\tswitch (size) {\n";
+        group
+            .group_by(|(_, size, _, _)| *size)
+            .into_iter()
+            .for_each(|(size, group)| {
+                body += &format!("\t\t\tcase {size}: {{\n");
+                body += "\t\t\t\tswitch (value) {\n";
+                group.for_each(|(_, _, value, result)| {
+                    body += &format!("\t\t\t\t\tcase {value}: {{\n");
+                    body += &format!("\t\t\t\t\t\treturn 0x{result:X};\n");
+                    body += &format!("\t\t\t\t\t}}\n");
+                });
+                body +=
+                    "\t\t\t\t\tdefault: { return replicate_bits_fallback(value, size, count); }\n";
+                body += "\t\t\t\t}\n";
+                body += &format!("\t\t\t}}\n");
+            });
+        body += "\t\tdefault: { return replicate_bits_fallback(value, size, count); }\n";
+        body += "\t\t}\n";
+        body += "\t}\n";
+    });
+
+    body += "\tdefault: { return replicate_bits_fallback(value, size, count); }\n";
+    body += "}\n";
+
+    body
 }
