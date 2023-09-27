@@ -148,6 +148,7 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("u__SetSlice_bits", set_slice_handler),
         ("min_int", min_int_handler),
         ("Extend__0", extend_handler),
+        ("update_fbits", update_fbits_handler),
     ]
     .into_iter()
     .map(|(s, f)| (InternedString::from_static(s), f));
@@ -777,4 +778,68 @@ pub fn extend_handler(
     });
 
     true
+}
+
+pub fn update_fbits_handler(
+    _: Rc<RefCell<Ast>>,
+    fn_def: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) -> bool {
+    let (destination, op, n, bit) = {
+        let Statement::FunctionCall {
+            expression,
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
+            panic!();
+        };
+
+        (
+            expression.clone(),
+            arguments[0].clone(),
+            arguments[1].clone(),
+            arguments[2].clone(),
+        )
+    };
+
+    // assert op variable assigned to 0
+    {
+        let Value::Identifier(ident) = &*op.borrow() else {
+            panic!();
+        };
+
+        let assignment = fn_def.entry_block.get_assignment(*ident).unwrap();
+
+        let Value::Literal(literal) = &*assignment.borrow() else {
+            panic!();
+        };
+
+        let Literal::Int(n) = &*literal.borrow() else {
+            panic!();
+        };
+
+        assert_eq!(u64::try_from(n).unwrap(), 0);
+    }
+
+    // assert n is literal 0
+    {
+        let Value::Literal(literal) = &*n.borrow() else {
+            panic!();
+        };
+
+        let Literal::Int(n) = &*literal.borrow() else {
+            panic!();
+        };
+
+        assert_eq!(u64::try_from(n).unwrap(), 0);
+    }
+
+    // assign bit to destination
+    *statement.borrow_mut() = Statement::Copy {
+        expression: destination.unwrap(),
+        value: bit,
+    };
+
+    false
 }
