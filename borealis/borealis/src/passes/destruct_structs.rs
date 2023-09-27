@@ -81,7 +81,7 @@ fn fix_params(fn_signature: &FunctionSignature) {
     let mut parameters = fn_signature.parameters.borrow_mut();
     *parameters = parameters
         .iter()
-        .map(|parameter| {
+        .flat_map(|parameter| {
             if let Type::Struct {
                 name: struct_name,
                 fields,
@@ -104,7 +104,6 @@ fn fix_params(fn_signature: &FunctionSignature) {
                 vec![parameter.clone()]
             }
         })
-        .flatten()
         .collect();
 }
 
@@ -307,7 +306,7 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                         // mangled field names
                         arguments = arguments
                             .iter()
-                            .map(|arg| {
+                            .flat_map(|arg| {
                                 let Value::Identifier(ident) = &*arg.borrow() else {
                                     return vec![arg.clone()];
                                 };
@@ -322,7 +321,6 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                                     .map(|name| Rc::new(RefCell::new(Value::Identifier(name))))
                                     .collect()
                             })
-                            .flatten()
                             .collect();
 
                         vec![Statement::FunctionCall {

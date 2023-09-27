@@ -631,9 +631,9 @@ pub fn contains_write_pc(ast: Rc<RefCell<Ast>>, function_name: InternedString) -
             {
                 if let Statement::FunctionCall { name, .. } = &*node.borrow() {
                     // TODO remove this special casing
-                    if name.as_ref() == "AArch64_CallSupervisor" {
-                        self.writes_pc = true;
-                    } else if contains_write_pc(self.ast.clone(), *name) {
+                    if name.as_ref() == "AArch64_CallSupervisor"
+                        || contains_write_pc(self.ast.clone(), *name)
+                    {
                         self.writes_pc = true;
                     }
                 }
@@ -709,7 +709,7 @@ fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> Control
 
     log::trace!("found common block {}", common);
 
-    return common;
+    common
 }
 
 /// Walks the graph, always taking the left child

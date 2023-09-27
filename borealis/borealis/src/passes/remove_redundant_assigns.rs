@@ -46,46 +46,47 @@ fn process_fn(fn_def: &FunctionDefinition) -> bool {
     fn_def
         .entry_block
         .iter()
-        .map(|b| b.statements())
-        .flatten()
+        .flat_map(|b| b.statements())
         .for_each(|statement| {
             match &*statement.borrow() {
-                Statement::Copy { expression, value } => {
-                    if let Expression::Identifier(dest) = expression {
-                        // increment assignment counter
-                        match assignments_count.get_mut(dest) {
-                            Some(count) => {
-                                *count += 1;
-                            }
-                            None => {
-                                assignments_count.insert(*dest, 1usize);
-                            }
+                Statement::Copy {
+                    expression: Expression::Identifier(dest),
+                    value,
+                } => {
+                    // increment assignment counter
+                    match assignments_count.get_mut(dest) {
+                        Some(count) => {
+                            *count += 1;
                         }
-
-                        match &*value.borrow() {
-                            Value::Identifier(source) => {
-                                // only perform one level/step of folding per execution
-                                if !assignments_value.contains_key(source) {
-                                    assignments_value.insert(*dest, value.clone());
-                                }
-                            }
-                            Value::Literal(_) => {
-                                assignments_value.insert(*dest, value.clone());
-                            }
-                            _ => (),
+                        None => {
+                            assignments_count.insert(*dest, 1usize);
                         }
                     }
+
+                    match &*value.borrow() {
+                        Value::Identifier(source) => {
+                            // only perform one level/step of folding per execution
+                            if !assignments_value.contains_key(source) {
+                                assignments_value.insert(*dest, value.clone());
+                            }
+                        }
+                        Value::Literal(_) => {
+                            assignments_value.insert(*dest, value.clone());
+                        }
+                        _ => (),
+                    }
                 }
-                Statement::FunctionCall { expression, .. } => {
-                    if let Some(Expression::Identifier(dest)) = expression {
-                        // increment assignment counter
-                        match assignments_count.get_mut(dest) {
-                            Some(count) => {
-                                *count += 1;
-                            }
-                            None => {
-                                assignments_count.insert(*dest, 1);
-                            }
+                Statement::FunctionCall {
+                    expression: Some(Expression::Identifier(dest)),
+                    ..
+                } => {
+                    // increment assignment counter
+                    match assignments_count.get_mut(dest) {
+                        Some(count) => {
+                            *count += 1;
+                        }
+                        None => {
+                            assignments_count.insert(*dest, 1);
                         }
                     }
                 }
@@ -112,7 +113,7 @@ fn process_fn(fn_def: &FunctionDefinition) -> bool {
             assignments_value
                 .get(&dest)
                 .cloned()
-                .and_then(|source| Some((dest, source)))
+                .map(|source| (dest, source))
         })
         .collect::<HashMap<_, _>>();
 
