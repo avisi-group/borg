@@ -635,6 +635,7 @@ pub enum Operation {
     Subtract(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     Add(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     Or(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Multiply(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     And(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     Xor(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
     Divide(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
@@ -661,6 +662,7 @@ impl Walkable for Operation {
             | Operation::GreaterThanOrEqual(lhs, rhs)
             | Operation::Subtract(lhs, rhs)
             | Operation::Add(lhs, rhs)
+            | Operation::Multiply(lhs, rhs)
             | Operation::Or(lhs, rhs)
             | Operation::Xor(lhs, rhs)
             | Operation::And(lhs, rhs)

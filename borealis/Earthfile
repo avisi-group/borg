@@ -124,6 +124,8 @@ e2e-test-archsim:
     RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
     COPY data/mem.S .
     RUN aarch64-linux-gnu-gcc -o mem -nostdlib -static mem.S
+    COPY data/hello.S .
+    RUN aarch64-linux-gnu-gcc -o hello -nostdlib -static hello.S
 
     RUN mkdir modules
     COPY (+e2e-test-gensim/arm64.dll) modules
@@ -143,20 +145,14 @@ e2e-test-archsim:
     COPY data/mem.trace .
     RUN bash -c 'diff --strip-trailing-cr -u -w mem.trace <(./dist/bin/TraceCat trace.interp.mem0)'
 
-mcf:
-    BUILD +test
+hello:
+    BUILD +e2e-test-archsim
+    FROM +e2e-test-archsim
 
-    FROM ghcr.io/fmckeogh/gensim:latest
-
-    RUN mkdir modules
-    COPY (+e2e-test-gensim/arm64.dll) modules
-
-    COPY data/mcf/mcf_r_base.aarch64-static-64 .
-
-    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./mcf_r_base.aarch64-static-64 -d -t -U trace --mode Interpreter 2>&1 | tee archsim.mcf.log
-    RUN ./dist/bin/TraceCat trace0 2>&1 | tee archsim.mcf.trace
-    SAVE ARTIFACT --force archsim.mcf.log AS LOCAL target/archsim.mcf.log
-    SAVE ARTIFACT --force archsim.mcf.trace AS LOCAL target/archsim.mcf.trace
+    RUN ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./hello -d -t -U trace --mode Interpreter 2>&1 | tee archsim.hello.log
+    RUN ./dist/bin/TraceCat trace0 2>&1 | tee archsim.hello.trace
+    SAVE ARTIFACT --force archsim.hello.log AS LOCAL target/archsim.hello.log
+    SAVE ARTIFACT --force archsim.hello.trace AS LOCAL target/archsim.hello.trace
 
 bench:
     FROM ubuntu:latest

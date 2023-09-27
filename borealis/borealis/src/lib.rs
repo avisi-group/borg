@@ -142,7 +142,9 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 "system_register_system",
                 "u__IMPDEF_boolean",
                 "u__IMPDEF_boolean_map",
-                "vector_arithmetic_binary_uniform_mul_int_doubling_sisd_decode"
+                "vector_arithmetic_binary_uniform_mul_int_doubling_sisd_decode",
+                "memory_literal_general_decode",
+                "memory_literal_general"
 
                 // // CHECKPOINT
 

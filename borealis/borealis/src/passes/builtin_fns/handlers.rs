@@ -69,6 +69,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("sub_atom", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Subtract)
         }),
+        ("mult_atom", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Multiply)
+        }),
         ("xor_vec", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::Xor)
         }),
@@ -263,6 +266,7 @@ pub fn replace_with_op(
         }
         OperationKind::Subtract => Operation::Subtract(args[0].clone(), args[1].clone()),
         OperationKind::Add => Operation::Add(args[0].clone(), args[1].clone()),
+        OperationKind::Multiply => Operation::Multiply(args[0].clone(), args[1].clone()),
         OperationKind::Divide => Operation::Divide(args[0].clone(), args[1].clone()),
         OperationKind::Or => Operation::Or(args[0].clone(), args[1].clone()),
         OperationKind::And => Operation::And(args[0].clone(), args[1].clone()),

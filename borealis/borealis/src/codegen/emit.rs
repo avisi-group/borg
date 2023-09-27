@@ -263,6 +263,7 @@ impl Emit for Operation {
             Operation::GreaterThanOrEqual(lhs, rhs) => emit_op2(w, lhs, rhs, ">="),
             Operation::Subtract(lhs, rhs) => emit_op2(w, lhs, rhs, "-"),
             Operation::Add(lhs, rhs) => emit_op2(w, lhs, rhs, "+"),
+            Operation::Multiply(lhs, rhs) => emit_op2(w, lhs, rhs, "*"),
             Operation::Or(lhs, rhs) => emit_op2(w, lhs, rhs, "|"),
             Operation::Xor(lhs, rhs) => emit_op2(w, lhs, rhs, "^"),
             Operation::And(lhs, rhs) => emit_op2(w, lhs, rhs, "&"),
