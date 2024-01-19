@@ -15,7 +15,7 @@ macro_rules! dbg {
     ($val:expr $(,)?) => {
         match $val {
             tmp => {
-                $crate::println!("[{}:{}] {} = {:#?}",
+                $crate::println!("[{}:{}] {} = {:#x?}",
                 core::file!(), core::line!(), core::stringify!($val), &tmp);
                 tmp
             }

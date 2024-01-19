@@ -1,20 +1,18 @@
 use {
     crate::{gdt, println},
     lazy_static::lazy_static,
-    pic8259::ChainedPics,
-    spin::Mutex,
-    x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame},
+    x2apic::lapic::{xapic_base, LocalApic, LocalApicBuilder},
+    x86_64::{
+        registers::control::Cr2,
+        structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
+    },
 };
-
-pub const PIC_1_OFFSET: u8 = 0x20;
-
-pub static PICS: Mutex<ChainedPics> =
-    Mutex::new(unsafe { ChainedPics::new_contiguous(PIC_1_OFFSET) });
 
 lazy_static! {
     static ref IDT: InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
         idt.breakpoint.set_handler_fn(breakpoint_handler);
+        idt.page_fault.set_handler_fn(page_fault_handler);
         unsafe {
             idt.double_fault
                 .set_handler_fn(double_fault_handler)
@@ -22,12 +20,27 @@ lazy_static! {
         }
         idt
     };
+    static ref LAPIC: LocalApic = {
+        let physical = unsafe { xapic_base() } + 0x8000000000;
+
+        let mut lapic = LocalApicBuilder::new()
+            .timer_vector(0x20)
+            .error_vector(0x21)
+            .spurious_vector(0x22)
+            .set_xapic_base(physical)
+            .build()
+            .unwrap_or_else(|err| panic!("{}", err));
+        unsafe {
+            lapic.enable();
+        }
+        lapic
+    };
 }
 
 pub fn init() {
     IDT.load();
-    unsafe { PICS.lock().initialize() };
-    x86_64::instructions::interrupts::enable();
+    // lazy_static::initialize(&LAPIC);
+    // x86_64::instructions::interrupts::enable();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
@@ -41,5 +54,15 @@ extern "x86-interrupt" fn double_fault_handler(
     panic!(
         "EXCEPTION: DOUBLE FAULT code {error_code}\n{:#?}",
         stack_frame
+    );
+}
+
+extern "x86-interrupt" fn page_fault_handler(
+    stack_frame: InterruptStackFrame,
+    error_code: PageFaultErrorCode,
+) {
+    println!(
+        "PAGE FAULT code {error_code:?} @ {:?}\n{stack_frame:#?}",
+        Cr2::read()
     );
 }

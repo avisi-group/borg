@@ -9,4 +9,5 @@ uart_16550 = "0.3.0"
 spin = "0.9.8"
 x86_64 = "0.14.11"
 lazy_static = { version = "1.4.0", default-features = false, features = ["spin_no_std"] }
-pic8259 = "0.10.4"
+x2apic = "0.4.3"
+buddy_system_allocator = "0.9.0"

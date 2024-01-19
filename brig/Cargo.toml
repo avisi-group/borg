@@ -14,5 +14,5 @@ panic = "abort"
 ovmf-prebuilt = "0.1.0-alpha.1" # used for UEFI booting in QEMU
 
 [build-dependencies]
-bootloader = "0.11.5"
+bootloader = { version = "0.11.5", default-features = false, features = ["uefi"] }
 kernel = { path = "kernel", artifact = "bin", target = "x86_64-unknown-none" }

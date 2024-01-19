@@ -8,6 +8,8 @@ fn main() {
     cmd.arg("-drive")
         .arg(format!("format=raw,file={uefi_path}"));
     cmd.arg("-nographic");
+    cmd.arg("-m");
+    cmd.arg("1g");
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();

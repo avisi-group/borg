@@ -2,22 +2,33 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use core::panic::PanicInfo;
+extern crate alloc;
+
+use {
+    bootloader_api::{config::Mapping, BootloaderConfig},
+    core::panic::PanicInfo,
+};
 
 mod console;
 mod gdt;
 mod interrupts;
+mod memory;
 mod serial;
 
-bootloader_api::entry_point!(kernel_main);
+pub static BOOTLOADER_CONFIG: BootloaderConfig = {
+    let mut config = BootloaderConfig::new_default();
+    config.mappings.physical_memory = Some(Mapping::Dynamic);
+    config
+};
+
+bootloader_api::entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 
 fn kernel_main(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     gdt::init();
     interrupts::init();
+    memory::init(boot_info);
 
-    println!("Hello, world!");
-
-    dbg!(boot_info);
+    dbg!(&boot_info);
 
     loop {
         x86_64::instructions::hlt();
