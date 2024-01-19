@@ -1,0 +1,12 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bootloader_api = "0.11.5"
+uart_16550 = "0.3.0"
+spin = "0.9.8"
+x86_64 = "0.14.11"
+lazy_static = { version = "1.4.0", default-features = false, features = ["spin_no_std"] }
+pic8259 = "0.10.4"

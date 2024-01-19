@@ -1,0 +1,18 @@
+[package]
+name = "brig"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["kernel"]
+resolver = "2"
+
+[profile.release]
+panic = "abort"
+
+[dependencies]
+ovmf-prebuilt = "0.1.0-alpha.1" # used for UEFI booting in QEMU
+
+[build-dependencies]
+bootloader = "0.11.5"
+kernel = { path = "kernel", artifact = "bin", target = "x86_64-unknown-none" }
