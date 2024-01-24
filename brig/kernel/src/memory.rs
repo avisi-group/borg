@@ -7,8 +7,8 @@ use {
     core::ops::Deref,
     x86_64::{
         structures::paging::{
-            FrameAllocator, Mapper, OffsetPageTable, Page, PageTable, PageTableFlags, PhysFrame,
-            Size4KiB,
+            FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTable, PageTableFlags,
+            PhysFrame, Size1GiB, Size2MiB, Size4KiB,
         },
         PhysAddr, VirtAddr,
     },
@@ -17,8 +17,8 @@ use {
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
 
-pub const HEAP_START: u64 = 0x_4444_4444_0000;
-pub const HEAP_SIZE: usize = 100 * 1024; // 100 KiB
+pub const HEAP_START: u64 = 0x_ffff_a000_0000_0000; // +160TiB
+pub const HEAP_SIZE: usize = 1 * 1024 * 1024;
 
 pub fn init(boot_info: &'static BootInfo) {
     // virtual address of the start of mapped physical memory
@@ -29,12 +29,17 @@ pub fn init(boot_info: &'static BootInfo) {
             .expect("No physical memory offset in boot info"),
     );
 
+    // let pml4 = unsafe { (phys_mem_start.as_ptr::<u8>().add(0x2000)) as *mut [u64;
+    // 512] }; pml4[]
+
+    //OffsetPageTable::new(level_4_table, physical_memory_offset);
+
     let mut mapper = unsafe { offset_page_table(phys_mem_start) };
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
 
     let heap_start = VirtAddr::new(HEAP_START);
     let heap_end = heap_start + HEAP_SIZE - 1u64;
-    let heap_start_page = Page::containing_address(heap_start);
+    let heap_start_page = Page::<Size2MiB>::containing_address(heap_start);
     let heap_end_page = Page::containing_address(heap_end);
     let page_range = Page::range_inclusive(heap_start_page, heap_end_page);
 
@@ -107,7 +112,7 @@ impl BootInfoFrameAllocator {
     }
 
     /// Returns an iterator over the usable frames specified in the memory
-    fn usable_frames(&self) -> impl Iterator<Item = PhysFrame> {
+    fn usable_frames<S: PageSize>(&self) -> impl Iterator<Item = PhysFrame<S>> {
         // get usable regions from memory map
         let regions = self.memory_map.deref().iter();
         let usable_regions = regions.filter(|r| r.kind == MemoryRegionKind::Usable); // map each region to its address range
@@ -121,6 +126,22 @@ impl BootInfoFrameAllocator {
 
 unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame> {
+        let frame = self.usable_frames().nth(self.next);
+        self.next += 1;
+        frame
+    }
+}
+
+unsafe impl FrameAllocator<Size2MiB> for BootInfoFrameAllocator {
+    fn allocate_frame(&mut self) -> Option<PhysFrame<Size2MiB>> {
+        let frame = self.usable_frames().nth(self.next);
+        self.next += 1;
+        frame
+    }
+}
+
+unsafe impl FrameAllocator<Size1GiB> for BootInfoFrameAllocator {
+    fn allocate_frame(&mut self) -> Option<PhysFrame<Size1GiB>> {
         let frame = self.usable_frames().nth(self.next);
         self.next += 1;
         frame

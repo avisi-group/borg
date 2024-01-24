@@ -9,7 +9,7 @@ fn main() {
         .arg(format!("format=raw,file={uefi_path}"));
     cmd.arg("-nographic");
     cmd.arg("-m");
-    cmd.arg("1g");
+    cmd.arg("4g");
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
