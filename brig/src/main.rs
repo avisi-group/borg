@@ -8,8 +8,15 @@ fn main() {
     cmd.arg("-drive")
         .arg(format!("format=raw,file={uefi_path}"));
     cmd.arg("-nographic");
+    cmd.arg("-enable-kvm");
     cmd.arg("-m");
-    cmd.arg("4g");
+    cmd.arg("1g");
+    cmd.arg("-device");
+    cmd.arg("virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4");
+    cmd.arg("-drive");
+    cmd.arg("file=../rootfs.ext2,if=none,id=drive0");
+    cmd.arg("-M");
+    cmd.arg("q35");
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();

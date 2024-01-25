@@ -5,9 +5,17 @@ edition = "2021"
 
 [dependencies]
 bootloader_api = "0.11.5"
-uart_16550 = "0.3.0"
-spin = "0.9.8"
+
 x86_64 = "0.14.11"
-lazy_static = { version = "1.4.0", default-features = false, features = ["spin_no_std"] }
+x86 = "0.52.0"
 x2apic = "0.4.3"
+uart_16550 = "0.3.0"
+acpi = "5.0.0"
+virtio-drivers = "0.7.1"
+
+spin = "0.9.8"
 buddy_system_allocator = "0.9.0"
+byte-unit = { version = "5.1.4", default-features = false, features = ["byte"] }
+log = { version = "0.4.20", default-features = false, features = ["release_max_level_warn"] }
+elf = { version = "0.7.4", default-features = false }
+rustc-demangle = { version = "0.1.23", default-features = false }
