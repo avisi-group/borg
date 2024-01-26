@@ -4,4 +4,5 @@
 bindeps = true
 
 [build]
-rustflags = ["-C", "force-frame-pointers=yes"]
+rustflags = ["-C", "force-frame-pointers=yes"] # ideally only enabled for debug builds
+target-dir = "./target" # required to fix deadlock in release builds of `bootloader(build)` UEFI

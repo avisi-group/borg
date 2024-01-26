@@ -1,16 +1,20 @@
 use {
-    crate::{devices::pcie, memory::PhysAddrExt},
+    super::{pcie::PCIEBus, Bus},
+    crate::{arch::x86::memory::PhysAddrExt, devices::pcie},
     acpi::{AcpiHandler, AcpiTables, PciConfigRegions, PhysicalMapping},
     core::ptr::NonNull,
     x86_64::PhysAddr,
 };
 
-pub fn init(rsdp: usize) {
-    let tables = unsafe { AcpiTables::from_rsdp(Handler, rsdp) }.unwrap();
-    PciConfigRegions::new(&tables)
-        .unwrap()
-        .iter()
-        .for_each(|entry| pcie::enumerate(entry));
+pub struct ACPIBus;
+
+impl Bus<PhysAddr> for ACPIBus {
+    fn probe(&self, probe_data: PhysAddr) {
+        let tables =
+            unsafe { AcpiTables::from_rsdp(Handler, probe_data.as_u64() as usize) }.unwrap();
+
+        PCIEBus.probe(PciConfigRegions::new(&tables).unwrap())
+    }
 }
 
 #[derive(Clone)]

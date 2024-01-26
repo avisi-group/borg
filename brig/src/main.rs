@@ -10,11 +10,15 @@ fn main() {
     cmd.arg("-nographic");
     cmd.arg("-enable-kvm");
     cmd.arg("-m");
-    cmd.arg("1g");
+    cmd.arg("8g");
     cmd.arg("-device");
     cmd.arg("virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4");
     cmd.arg("-drive");
-    cmd.arg("file=../rootfs.ext2,if=none,id=drive0");
+    cmd.arg("file=../brig-linux/brig-arm64-virt.tar,if=none,format=raw,id=drive0");
+    cmd.arg("-device");
+    cmd.arg("virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4");
+    cmd.arg("-drive");
+    cmd.arg("file=../brig-linux/rootfs.ext2,if=none,format=raw,id=drive1");
     cmd.arg("-M");
     cmd.arg("q35");
 

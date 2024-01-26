@@ -3,22 +3,26 @@ pub mod lapic;
 pub mod pcie;
 pub mod pit;
 pub mod serial;
+pub mod virtio;
 
-pub fn init(rsdp_phys: usize) {
-    acpi::init(rsdp_phys);
-    lapic::init();
-}
+pub fn init() {}
 
 struct DeviceManager {}
 
-trait Device {
-    fn name(&self) -> &'static str;
+impl DeviceManager {
+    pub fn register_device<D: Device>(&self, device: D) -> &D {
+        todo!()
+    }
 }
 
-trait BlockDevice {
-    fn read();
-    fn write();
+pub trait Device {
+    fn configure(&mut self);
 }
+
+pub trait Bus<P> {
+    fn probe(&self, probe_data: P);
+}
+
 
 // Box<dyn Device> -> name, id, etc, kind/downcast
 

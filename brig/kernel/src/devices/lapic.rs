@@ -1,7 +1,7 @@
 use {
     crate::{
+        arch::x86::memory::PhysAddrExt,
         devices::pit::{self, PIT_FREQUENCY},
-        memory::PhysAddrExt,
     },
     spin::{Mutex, Once},
     x2apic::lapic::{xapic_base, LocalApicBuilder, TimerDivide, TimerMode},

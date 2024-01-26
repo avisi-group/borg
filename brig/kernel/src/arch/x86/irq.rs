@@ -1,5 +1,4 @@
 use {
-    crate::gdt,
     spin::Once,
     x86_64::{
         registers::control::Cr2,
@@ -17,13 +16,12 @@ pub fn init() {
         idt.general_protection_fault
             .set_handler_fn(general_protection_handler);
         idt[32].set_handler_fn(timer_handler);
-        unsafe {
-            idt.double_fault
-                .set_handler_fn(double_fault_handler)
-                .set_stack_index(gdt::DOUBLE_FAULT_IST_INDEX);
-        }
+        idt.double_fault.set_handler_fn(double_fault_handler);
         idt
     });
+}
+
+pub fn enable_irqs() {
     x86_64::instructions::interrupts::enable();
 }
 

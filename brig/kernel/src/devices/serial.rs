@@ -1,22 +1,26 @@
-use core::fmt;
+use {crate::devices::Device, core::fmt};
 
-const SERIAL_IO_PORT: u16 = 0x3F8;
+pub trait SerialPort {
+    fn write_byte(b: u8);
+    fn write_bytes(b: &[u8]);
+}
 
-pub struct SerialPort(uart_16550::SerialPort);
+pub struct UART16550Device(uart_16550::SerialPort);
 
-impl SerialPort {
-    pub fn init() -> Self {
-        let mut serial_port = unsafe { uart_16550::SerialPort::new(SERIAL_IO_PORT) };
-        serial_port.init();
-        Self(serial_port)
+impl UART16550Device {
+    pub fn new(io_port: u16) -> Self {
+        Self(unsafe { uart_16550::SerialPort::new(io_port) })
     }
 }
 
-impl fmt::Write for SerialPort {
+impl Device for UART16550Device {
+    fn configure(&mut self) {
+        self.0.init();
+    }
+}
+
+impl fmt::Write for UART16550Device {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for byte in s.as_bytes() {
-            self.0.send(*byte)
-        }
-        Ok(())
+        self.0.write_str(s)
     }
 }

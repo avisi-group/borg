@@ -1,35 +1,58 @@
 //! Logger implementation
 
 use {
-    crate::devices::serial::SerialPort,
+    crate::devices::{serial::UART16550Device, Device},
     core::fmt::{self, Write},
     log::{Level, LevelFilter, Log, Metadata, Record},
     spin::Once,
 };
 
+/*struct QemuWriter;
+
+impl fmt::Write for QemuWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for byte in s.as_bytes() {
+            unsafe { x86::io::outb(0xe9, *byte) };
+        }
+        Ok(())
+    }
+}*/
+
 /// Global console writer
-static mut WRITER: Once<SerialPort> = Once::INIT;
+static mut WRITER: Once<UART16550Device> = Once::INIT;
 
 static LOGGER: Logger = Logger;
 
+// This is sort of a hack -- because we need the serial port REALLY early.
+// Possible solution - use QEMU's debugcon support, until devices have been
+// loaded Then switch the WRITER
+const SERIAL_IO_PORT: u16 = 0x3F8;
+
 /// Initialise logger using the xen::console backend
 pub fn init() {
-    unsafe { WRITER.call_once(|| SerialPort::init()) };
-    log::set_logger(&LOGGER)
-        .map(|()| log::set_max_level(LevelFilter::Trace))
-        .expect("Failed to set logger");
+    unsafe {
+        WRITER.call_once(|| {
+            let mut sp = UART16550Device::new(SERIAL_IO_PORT);
+            sp.configure();
+            sp
+        })
+    };
+
+    log::set_logger(&LOGGER).expect("Failed to set logger");
+    log::set_max_level(LevelFilter::Trace);
+
     log::info!(
         r#"
-        starting...
-    _
-   /\ \             __
-   \ \ \____  _ __ /\_\     __
-    \ \ '__`\/\`'__\/\ \  /'_ `\
-     \ \ \L\ \ \ \/ \ \ \/\ \L\ \
-      \ \_,__/\ \_\  \ \_\ \____ \
-       \/___/  \/_/   \/_/\/___L\ \
-                            /\____/
-                            \_/__/
+    starting...
+ __
+/\ \             __
+\ \ \____  _ __ /\_\     __             __4___
+ \ \  __ \/\  __\/\ \  / _  \        _  \ \ \ \
+  \ \ \L\ \ \ \/ \ \ \/\ \L\ \      <'\ /_/_/_/
+   \ \____/\ \_\  \ \_\ \____ \      ((____!___/)
+    \/___/  \/_/   \/_/\/___L\ \      \0\0\0\0\/
+                         /\____/   ~~~~~~~~~~~~~~~~
+                         \_/__/
 "#
     )
 }
@@ -98,4 +121,6 @@ pub fn _print(args: fmt::Arguments) {
         .unwrap()
         .write_fmt(format_args!("{}\0", args))
         .unwrap();
+
+    //unsafe { WRITER.write_fmt(format_args!("{}\0", args)).unwrap() };
 }

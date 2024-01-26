@@ -3,13 +3,12 @@ use {
     buddy_system_allocator::LockedHeap,
     byte_unit::{Byte, UnitType},
     core::{alloc::Layout, ops::Deref},
-    spin::Once,
     x86_64::{
         self,
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
-            FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTable, PageTableFlags,
-            PhysFrame, Size1GiB, Size4KiB,
+            FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame,
+            Size1GiB, Size4KiB, Translate,
         },
         PhysAddr, VirtAddr,
     },
@@ -20,9 +19,7 @@ pub const HIGH_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0x_ffff_fff
 pub const PHYSICAL_MEMORY_MAP_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8180_0000_0000);
 
 #[global_allocator]
-pub static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
-
-pub static OFFSET_PAGE_TABLE: Once<OffsetPageTable<'static>> = Once::INIT;
+static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
 
 pub fn init(boot_info: &'static BootInfo) {
     // virtual address of the start of mapped physical memory
@@ -62,6 +59,16 @@ pub fn init(boot_info: &'static BootInfo) {
     VMA::current().invalidate();
 }
 
+/// Returns the number of bytes used by and number of bytes available to the
+/// heap allocator
+pub fn stats() -> (usize, usize) {
+    let allocator = HEAP_ALLOCATOR.lock();
+    (
+        allocator.stats_alloc_actual(),
+        allocator.stats_total_bytes(),
+    )
+}
+
 /// Frame allocator that uses the global heap allocator, then translates virtual
 /// addresses back to physical
 struct HeapStealingFrameAllocator;
@@ -79,8 +86,9 @@ unsafe impl FrameAllocator<Size4KiB> for HeapStealingFrameAllocator {
     }
 }
 
-struct VMA {
+pub struct VMA {
     pml4_base: PhysAddr,
+    opt: OffsetPageTable<'static>,
 }
 
 impl VMA {
@@ -89,8 +97,13 @@ impl VMA {
     }
 
     pub fn current() -> Self {
+        let pml4_base = Self::get_current_cr3();
+        let pml4_virt = pml4_base.to_virt();
+        let pml4_table = unsafe { &mut *(pml4_virt.as_mut_ptr()) };
+
         Self {
-            pml4_base: Self::get_current_cr3(),
+            pml4_base,
+            opt: unsafe { OffsetPageTable::new(pml4_table, PHYSICAL_MEMORY_MAP_OFFSET) },
         }
     }
 
@@ -108,52 +121,46 @@ impl VMA {
         }
     }
 
-    fn get_pml4(&self) -> (PhysAddr, VirtAddr) {
-        (self.pml4_base, self.pml4_base.to_virt())
-    }
-
-    fn get_pml4_ptr(&self) -> &mut PageTable {
-        unsafe { &mut *(self.get_pml4().1.as_mut_ptr()) }
-    }
-
-    pub fn map_page<'a, S: PageSize + core::fmt::Debug>(
-        &'a mut self,
+    pub fn map_page<S: PageSize + core::fmt::Debug>(
+        &mut self,
         page: Page<S>,
         frame: PhysFrame<S>,
         flags: PageTableFlags,
     ) where
-        OffsetPageTable<'a>: Mapper<S>,
-    {
-        let pml4 = self.get_pml4_ptr();
-
-        let _ = unsafe {
-            OffsetPageTable::new(pml4, PHYSICAL_MEMORY_MAP_OFFSET).map_to(
-                page,
-                frame,
-                flags,
-                &mut HeapStealingFrameAllocator,
-            )
-        }
-        .unwrap();
-    }
-
-    pub fn translate_page<S: PageSize + core::fmt::Debug>(&self, page: Page<S>) -> PhysFrame<S>
-    where
         OffsetPageTable<'static>: Mapper<S>,
     {
-        let (level_4_table_frame, _) = Cr3::read();
-
-        let phys = level_4_table_frame.start_address();
-        let page_table_ptr = unsafe { &mut *(phys.to_virt().as_mut_ptr()) };
-
         unsafe {
+            let _ = self
+                .opt
+                .map_to(page, frame, flags, &mut HeapStealingFrameAllocator)
+                .unwrap();
+        }
+    }
+
+    /*pub fn translate_page<'a, S: PageSize + core::fmt::Debug>(
+        &'a self,
+        page: Page<S>,
+    ) -> Option<PhysFrame<S>>
+    where
+        OffsetPageTable<'a>: Mapper<S>,
+    {
+        let page_table_ref = self.get_pml4_ptr();
+        let page_table = unsafe {
             OffsetPageTable::new(
-                page_table_ptr,
+                page_table_ref,
                 VirtAddr::new(PHYSICAL_MEMORY_MAP_OFFSET.as_u64()),
             )
-            .translate_page(page)
-        }
-        .unwrap()
+        };
+
+        page_table.translate_page(page).ok()
+    }*/
+
+    pub fn translate_address(&self, addr: VirtAddr) -> Option<PhysAddr> {
+        let r = self.opt.translate_addr(addr);
+
+        log::trace!("translating {:x} to {:?}", addr, r);
+
+        r
     }
 }
 

@@ -2,30 +2,27 @@
 #![feature(abi_x86_interrupt)]
 #![feature(non_null_convenience)]
 #![feature(slice_ptr_get)]
+#![feature(allocator_api)]
 
 extern crate alloc;
 
 use {
-    crate::{
+    crate::arch::x86::{
         backtrace::backtrace,
-        memory::{
-            HEAP_ALLOCATOR, HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START,
-            PHYSICAL_MEMORY_MAP_OFFSET,
-        },
+        memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_MAP_OFFSET},
     },
     bootloader_api::{config::Mapping, BootloaderConfig},
-    byte_unit::Byte,
+    byte_unit::{Byte, UnitType::Binary},
     core::panic::PanicInfo,
     x86::io::outw,
     x86_64::{PhysAddr, VirtAddr},
 };
 
-mod backtrace;
+mod arch;
 mod devices;
-mod gdt;
-mod interrupts;
+mod guest;
 mod logger;
-mod memory;
+mod sched;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -43,34 +40,38 @@ pub fn start(boot_info: &'static mut bootloader_api::BootInfo) -> ! {
     );
 
     logger::init();
-    backtrace::init(
+
+    // Host machine initialisation
+    arch::x86::backtrace::init(
         VirtAddr::new(boot_info.kernel_image_offset),
         PhysAddr::new(boot_info.kernel_addr),
         usize::try_from(boot_info.kernel_len).unwrap(),
     );
+    arch::x86::init_system();
+    arch::x86::memory::init(boot_info);
+    devices::init();
+    arch::x86::init_platform(PhysAddr::new(boot_info.rsdp_addr.into_option().unwrap()));
+    sched::init();
 
-    gdt::init();
-    interrupts::init();
-    memory::init(boot_info);
-    devices::init(boot_info.rsdp_addr.into_option().unwrap() as usize);
+    // Guest machine initialisation
 
     // let a = Box::new(14u64);
     // let b = vec![0xFF00_FF00_FF00u64; 1_000];
     // println!("{a:?} {a:p} {} {:p}", b.len(), b.as_ptr());
 
-    unimplemented!();
+    panic!("reached end of start");
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    let allocator = HEAP_ALLOCATOR.lock();
-    let used = Byte::from(allocator.stats_alloc_actual())
-        .get_appropriate_unit(byte_unit::UnitType::Binary);
-    let total =
-        Byte::from(allocator.stats_total_bytes()).get_appropriate_unit(byte_unit::UnitType::Binary);
+    let (used, total) = arch::x86::memory::stats();
 
     log::error!("{info}");
-    log::error!("heap {:.2}/{:.2} used", used, total);
+    log::error!(
+        "heap {:.2}/{:.2} used",
+        Byte::from(used).get_appropriate_unit(Binary),
+        Byte::from(total).get_appropriate_unit(Binary),
+    );
 
     backtrace();
     qemu_exit();
