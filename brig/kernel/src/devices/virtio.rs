@@ -36,21 +36,24 @@ unsafe impl virtio_drivers::Hal for VirtioHal {
                 .unwrap(),
             )
         };
-        (
-            VirtAddr::from_ptr(ptr)
-                .to_phys()
-                .as_u64()
-                .try_into()
-                .unwrap(),
-            NonNull::new(ptr).unwrap(),
-        )
+
+        let paddr = VirtAddr::from_ptr(ptr)
+            .to_phys()
+            .as_u64()
+            .try_into()
+            .unwrap();
+
+        let vaddr = NonNull::new(ptr).unwrap();
+
+        (paddr, vaddr)
     }
 
     unsafe fn dma_dealloc(
-        _paddr: virtio_drivers::PhysAddr,
+        paddr: virtio_drivers::PhysAddr,
         vaddr: NonNull<u8>,
         pages: usize,
     ) -> i32 {
+        log::trace!("dma_dealloc: {paddr:x} {vaddr:p} {pages:x}");
         dealloc(
             vaddr.as_ptr(),
             Layout::from_size_align(pages * virtio_drivers::PAGE_SIZE, virtio_drivers::PAGE_SIZE)
@@ -104,14 +107,11 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
     );
 
     let (config, kernel, _dt) = {
+        // todo: maybeuninit
         let mut buf = vec![0u8; len];
-
-        log::trace!("{:p}", buf.as_ptr());
-
         disk.read_blocks(0, &mut buf).unwrap();
-        guest::config::load_guest_config(&buf)
+        guest::config::load_guest_config(&buf).unwrap()
     };
 
-    log::trace!("kernel len: {:x}, got config: {:#?}", kernel.len(), config);
-    panic!();
+    log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
 }

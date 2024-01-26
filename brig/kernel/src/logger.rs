@@ -118,9 +118,7 @@ macro_rules! print {
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     unsafe { WRITER.get_mut() }
-        .unwrap()
+        .expect("WRITER not initialized")
         .write_fmt(format_args!("{}\0", args))
-        .unwrap();
-
-    //unsafe { WRITER.write_fmt(format_args!("{}\0", args)).unwrap() };
+        .expect("failed to write format args to WRITER");
 }

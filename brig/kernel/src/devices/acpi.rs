@@ -1,6 +1,8 @@
 use {
-    super::{pcie::PCIEBus, Bus},
-    crate::{arch::x86::memory::PhysAddrExt, devices::pcie},
+    crate::{
+        arch::x86::memory::PhysAddrExt,
+        devices::{pcie::PCIEBus, Bus},
+    },
     acpi::{AcpiHandler, AcpiTables, PciConfigRegions, PhysicalMapping},
     core::ptr::NonNull,
     x86_64::PhysAddr,

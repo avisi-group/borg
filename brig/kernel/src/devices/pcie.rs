@@ -44,7 +44,7 @@ pub fn enumerate(
     }: PciConfigEntry,
 ) {
     let physical_address = PhysAddr::new(u64::try_from(physical_address).unwrap());
-    log::debug!("pcie {:?} {:x}", bus_range, physical_address);
+    log::debug!("enumerating pcie {:?} {:x}", bus_range, physical_address);
 
     let mut root = unsafe { PciRoot::new(physical_address.to_virt().as_mut_ptr(), Cam::Ecam) };
 

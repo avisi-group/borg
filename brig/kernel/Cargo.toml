@@ -14,7 +14,7 @@ acpi = "5.0.0"
 virtio-drivers = { version = "0.7.1", features = ["alloc"] }
 
 spin = "0.9.8"
-buddy_system_allocator = "0.9.0"
+buddy_system_allocator = {git = "https://github.com/fmckeogh/buddy_system_allocator"} # use crates.io when PR#31 is merged
 byte-unit = { version = "5.1.4", default-features = false, features = ["byte"] }
 log = { version = "0.4.20", default-features = false }
 elf = { version = "0.7.4", default-features = false }
@@ -28,3 +28,5 @@ serde_json = { version = "1.0.111", default-features = false, features = [
 ] }
 phf = { version = "0.11.2", default-features = false, features = ["macros"] }
 tar-no-std = "0.2.0"
+thiserror-core = { version = "1.0.50", default-features = false }
+displaydoc = { version = "0.2.4", default-features = false }

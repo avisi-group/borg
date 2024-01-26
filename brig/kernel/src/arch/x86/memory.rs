@@ -1,4 +1,5 @@
 use {
+    crate::error::Error,
     bootloader_api::{info::MemoryRegionKind, BootInfo},
     buddy_system_allocator::LockedHeap,
     byte_unit::{Byte, UnitType},
@@ -21,28 +22,20 @@ pub const PHYSICAL_MEMORY_MAP_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
 
-pub fn init(boot_info: &'static BootInfo) {
-    // virtual address of the start of mapped physical memory
-    let phys_mem_start = VirtAddr::new(
-        boot_info
-            .physical_memory_offset
-            .into_option()
-            .expect("No physical memory offset in boot info"),
-    );
-
+pub fn init(boot_info: &'static BootInfo) -> Result<(), Error> {
     // get usable regions from memory map and add to heap allocator
-    (boot_info.memory_regions)
+    for region in (boot_info.memory_regions)
         .deref()
         .iter()
         .filter(|r| matches!(r.kind, MemoryRegionKind::Usable))
-        .for_each(|region| {
-            unsafe {
-                HEAP_ALLOCATOR.lock().add_to_heap(
-                    (phys_mem_start.as_u64() + region.start) as usize,
-                    (phys_mem_start.as_u64() + region.end) as usize,
-                )
-            };
-        });
+    {
+        unsafe {
+            HEAP_ALLOCATOR.lock().add_to_heap(
+                usize::try_from(PhysAddr::new(region.start).to_virt().as_u64())?,
+                usize::try_from(PhysAddr::new(region.end).to_virt().as_u64())?,
+            )
+        };
+    }
 
     log::info!(
         "heap allocator initialized, {:.2} available",
@@ -51,17 +44,19 @@ pub fn init(boot_info: &'static BootInfo) {
     );
 
     VMA::current().map_page(
-        Page::<Size1GiB>::from_start_address(VirtAddr::new(0xffff818800000000)).unwrap(),
-        PhysFrame::<Size1GiB>::from_start_address(PhysAddr::new(0x800000000)).unwrap(),
+        Page::<Size1GiB>::from_start_address(VirtAddr::new(0xffff818800000000))?,
+        PhysFrame::<Size1GiB>::from_start_address(PhysAddr::new(0x800000000))?,
         PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
     );
-
     VMA::current().invalidate();
+
+    Ok(())
 }
 
 /// Returns the number of bytes used by and number of bytes available to the
 /// heap allocator
 pub fn stats() -> (usize, usize) {
+    unsafe { HEAP_ALLOCATOR.force_unlock() };
     let allocator = HEAP_ALLOCATOR.lock();
     (
         allocator.stats_alloc_actual(),

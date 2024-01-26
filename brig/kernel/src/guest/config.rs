@@ -1,40 +1,35 @@
 use {
-    alloc::{collections::BTreeMap, string::String, vec::Vec},
+    crate::error::Error,
+    alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec::Vec},
     serde::Deserialize,
-    tar_no_std::TarArchiveRef,
+    tar_no_std::{ArchiveEntry, TarArchiveRef},
 };
 
 /// Load guest configuration, kernel image, and platform dtb from the config tar
 /// image
-pub fn load_guest_config(config_tar: &[u8]) -> (Config, Vec<u8>, Vec<u8>) {
+pub fn load_guest_config(config_tar: &[u8]) -> Result<(Config, Vec<u8>, Vec<u8>), Error> {
     let tar = TarArchiveRef::new(config_tar);
 
-    let config_entry = tar
-        .entries()
-        .find(|e| *e.filename() == *"config.json")
-        .unwrap();
+    let config: Config = serde_json::from_slice(find_file(&tar, "config.json")?.data())?;
 
-    let config: Config = serde_json::from_slice(config_entry.data()).unwrap();
-
-    let (kernel_path, dt_path) = match config.boot {
+    let (kernel_path, dtb_path) = match config.boot {
         BootProtocol::Arm64Linux(Arm64LinuxBootProtocol { ref kernel, ref dt }) => (kernel, dt),
     };
 
-    let kernel_entry = tar
-        .entries()
-        .find(|e| *e.filename() == *(kernel_path.trim_start_matches("./")))
-        .unwrap();
+    let kernel_entry = find_file(&tar, kernel_path)?;
+    let dtb_entry = find_file(&tar, dtb_path)?;
 
-    let dtb_entry = tar
-        .entries()
-        .find(|e| *e.filename() == *(dt_path.trim_start_matches("./")))
-        .unwrap();
-
-    (
+    Ok((
         config,
         kernel_entry.data().to_vec(),
         dtb_entry.data().to_vec(),
-    )
+    ))
+}
+
+fn find_file<'a>(tar: &'a TarArchiveRef<'a>, path: &str) -> Result<ArchiveEntry<'a>, Error> {
+    tar.entries()
+        .find(|e| *e.filename() == *(path.trim_start_matches("./")))
+        .ok_or(Error::FileNotFoundInTar(path.to_owned()))
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,5 +61,6 @@ pub struct Memory {
 #[derive(Debug, Deserialize)]
 pub struct Device {
     pub kind: String,
-    //extra: HashMap<String, String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, String>,
 }

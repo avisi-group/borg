@@ -21,8 +21,12 @@ pub fn init() {
     });
 }
 
-pub fn enable_irqs() {
+pub fn local_enable_irqs() {
     x86_64::instructions::interrupts::enable();
+}
+
+pub fn local_disable_irqs() {
+    x86_64::instructions::interrupts::disable();
 }
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {

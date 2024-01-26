@@ -246,8 +246,7 @@ dependencies = [
 [[package]]
 name = "buddy_system_allocator"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43f9365b6b0c9e1663ca4ca9440c00eda46bc85a3407070be8b5e0d8d1f29629"
+source = "git+https://github.com/fmckeogh/buddy_system_allocator#b437bd367a5026ce19623f36e854273a70b599ae"
 dependencies = [
  "spin",
 ]
@@ -303,6 +302,17 @@ name = "crossbeam-utils"
 version = "0.8.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "248e3bacc7dc6baa3b21e405ee045c3047101a49145e7e9eca583ab4c2ca5345"
+
+[[package]]
+name = "displaydoc"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
 
 [[package]]
 name = "elf"
@@ -580,6 +590,7 @@ dependencies = [
  "bootloader_api",
  "buddy_system_allocator",
  "byte-unit",
+ "displaydoc",
  "elf",
  "log",
  "phf",
@@ -588,6 +599,7 @@ dependencies = [
  "serde_json",
  "spin",
  "tar-no-std",
+ "thiserror-core",
  "uart_16550",
  "virtio-drivers",
  "x2apic",
@@ -1020,6 +1032,26 @@ dependencies = [
  "redox_syscall",
  "rustix 0.38.30",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "thiserror-core"
+version = "1.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c001ee18b7e5e3f62cbf58c7fe220119e68d902bb7443179c0c8aef30090e999"
+dependencies = [
+ "thiserror-core-impl",
+]
+
+[[package]]
+name = "thiserror-core-impl"
+version = "1.0.50"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4c60d69f36615a077cc7663b9cb8e42275722d23e58a7fa3d2c7f2915d09d04"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
