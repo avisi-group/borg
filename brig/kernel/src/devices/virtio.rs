@@ -1,16 +1,15 @@
 use {
-    super::BlockDevice,
     crate::{
         arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
-        devices::Device,
+        devices::{self, pcie::allocate_bars, BlockDevice, Device},
         guest,
     },
     alloc::{
         alloc::{alloc_zeroed, dealloc},
-        vec,
+        format, vec,
     },
     byte_unit::Byte,
-    core::{alloc::Layout, ptr::NonNull},
+    core::{alloc::Layout, fmt::Debug, ptr::NonNull},
     log::trace,
     virtio_drivers::{
         device::blk::{VirtIOBlk, SECTOR_SIZE},
@@ -98,40 +97,70 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
         Command::IO_SPACE | Command::MEMORY_SPACE | Command::BUS_MASTER,
     );
 
+    allocate_bars(root, device_function);
+
     let transport = PciTransport::new::<VirtioHal>(root, device_function).unwrap();
 
-    let mut disk = VirtIOBlk::<VirtioHal, _>::new(transport).unwrap();
-    let len = usize::try_from(disk.capacity()).unwrap() * SECTOR_SIZE;
-
-    log::trace!(
-        "VirtIO block device: {}",
-        Byte::from(len).get_appropriate_unit(byte_unit::UnitType::Binary)
-    );
+    let blk = VirtIOBlk::<VirtioHal, _>::new(transport).unwrap();
+    let mut device = VirtioBlockDevice {
+        blk,
+        device_function,
+    };
 
     let (config, kernel, _dt) = {
         // todo: maybeuninit
-        let mut buf = vec![0u8; len];
-        disk.read_blocks(0, &mut buf).unwrap();
+        let mut buf = vec![0u8; device.size()];
+        device.read(&mut buf, 0).unwrap();
         guest::config::load_guest_config(&buf).unwrap()
     };
 
     log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
+
+    devices::manager::SharedDeviceManager::get()
+        .register_block_device(format!("disk{}", 0), device);
 }
 
-// struct VirtIOBlockDevice;
+struct VirtioBlockDevice {
+    blk: VirtIOBlk<VirtioHal, PciTransport>,
+    device_function: DeviceFunction,
+}
 
-// impl Device for VirtIOBlockDevice {
-//     fn configure(&mut self) {
-//         todo!()
-//     }
-// }
+impl Debug for VirtioBlockDevice {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "virtio block device @ {}, capacity: {:.2}, block size: {:.2}",
+            self.device_function,
+            Byte::from(self.blk.capacity()).get_appropriate_unit(byte_unit::UnitType::Binary),
+            Byte::from(self.block_size()).get_appropriate_unit(byte_unit::UnitType::Binary),
+        )
+    }
+}
 
-// impl BlockDevice for VirtIOBlockDevice {
-//     fn read(&self, buf: &[u8]) {
-//         todo!()
-//     }
+impl Device for VirtioBlockDevice {
+    fn configure(&mut self) {
+        // no config needed?
+    }
+}
 
-//     fn write(&self, buf: &[u8]) {
-//         todo!()
-//     }
-// }
+impl BlockDevice for VirtioBlockDevice {
+    fn block_size(&self) -> usize {
+        SECTOR_SIZE
+    }
+
+    fn size(&self) -> usize {
+        usize::try_from(self.blk.capacity()).unwrap() * self.block_size()
+    }
+
+    fn read(&mut self, buf: &mut [u8], start_block_index: usize) -> Result<(), super::IoError> {
+        self.blk
+            .read_blocks(start_block_index, buf)
+            .map_err(|e| panic!("{e:?}"))
+    }
+
+    fn write(&mut self, buf: &[u8], start_block_index: usize) -> Result<(), super::IoError> {
+        self.blk
+            .write_blocks(start_block_index, buf)
+            .map_err(|e| panic!("{e:?}"))
+    }
+}

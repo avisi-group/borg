@@ -1,14 +1,11 @@
 use {
     crate::{
-        arch::x86::memory::{PhysAddrExt, VirtualMemoryArea},
+        arch::x86::memory::PhysAddrExt,
         devices::{pcie::PCIEBus, Bus},
     },
     acpi::{AcpiHandler, AcpiTables, PciConfigRegions, PhysicalMapping},
     core::ptr::NonNull,
-    x86_64::{
-        structures::paging::{Page, PageTableFlags, PhysFrame, Size1GiB},
-        PhysAddr, VirtAddr,
-    },
+    x86_64::PhysAddr,
 };
 
 pub struct ACPIBus;
@@ -17,14 +14,6 @@ impl Bus<PhysAddr> for ACPIBus {
     fn probe(&self, probe_data: PhysAddr) {
         let tables =
             unsafe { AcpiTables::from_rsdp(Handler, probe_data.as_u64() as usize) }.unwrap();
-
-        // todo: do this dynamically
-        VirtualMemoryArea::current().map_page(
-            Page::<Size1GiB>::from_start_address(VirtAddr::new(0xffff818800000000)).unwrap(),
-            PhysFrame::<Size1GiB>::from_start_address(PhysAddr::new(0x800000000)).unwrap(),
-            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-        );
-        VirtualMemoryArea::current().invalidate();
 
         PCIEBus.probe(PciConfigRegions::new(&tables).unwrap())
     }

@@ -21,7 +21,7 @@ pub fn init() {
     });
 }
 
-pub fn enable() {
+pub fn _enable() {
     x86_64::instructions::interrupts::enable();
 }
 

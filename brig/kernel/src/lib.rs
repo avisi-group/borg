@@ -2,6 +2,9 @@
 #![feature(abi_x86_interrupt)] // needed for interrupts
 #![feature(allocator_api)] // needed for pci config regions
 
+// not sure we need this?
+//#![feature(trait_upcasting)] // in the device manager
+
 extern crate alloc;
 
 use {
@@ -13,15 +16,14 @@ use {
     byte_unit::{Byte, UnitType::Binary},
     core::panic::PanicInfo,
     x86::io::outw,
-    x86_64::{PhysAddr, VirtAddr},
 };
 
 mod arch;
 mod devices;
+mod fs;
 mod guest;
 mod logger;
 mod sched;
-mod fs;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();

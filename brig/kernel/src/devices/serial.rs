@@ -1,4 +1,4 @@
-use {crate::devices::Device, core::fmt};
+use core::fmt;
 
 pub trait SerialPort {
     fn write_byte(b: u8);

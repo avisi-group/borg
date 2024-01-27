@@ -1,7 +1,7 @@
 use {
     crate::{
         arch::x86::memory::PHYSICAL_MEMORY_OFFSET,
-        devices::{acpi, lapic, Bus},
+        devices::{self, acpi, lapic, Bus},
     },
     bootloader_api::BootInfo,
     x86_64::{PhysAddr, VirtAddr},
@@ -45,11 +45,12 @@ pub fn init(
     // crate works
     memory::heap_init(memory_regions);
 
-
-
     // initialize global descriptor table and interrupts
     gdt::init();
     irq::init();
+
+    // initialize device manager ready to register detected devices
+    devices::manager::init();
 
     // probe system bus, this bootstraps device enumeration and initialization
     SYSTEM_BUS.probe(X86SystemBusProbeData {

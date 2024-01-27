@@ -19,7 +19,7 @@ pub const HIGH_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0x_ffff_fff
 pub const PHYSICAL_MEMORY_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8180_0000_0000);
 
 #[global_allocator]
-static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
+static HEAP_ALLOCATOR: LockedHeap<64> = LockedHeap::empty();
 
 /// Initialize the global heap allocator backed by the usable memory regions
 /// supplied by the bootloader
