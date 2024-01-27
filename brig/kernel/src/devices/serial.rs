@@ -9,13 +9,9 @@ pub struct UART16550Device(uart_16550::SerialPort);
 
 impl UART16550Device {
     pub fn new(io_port: u16) -> Self {
-        Self(unsafe { uart_16550::SerialPort::new(io_port) })
-    }
-}
-
-impl Device for UART16550Device {
-    fn configure(&mut self) {
-        self.0.init();
+        let mut serial_port = unsafe { uart_16550::SerialPort::new(io_port) };
+        serial_port.init();
+        Self(serial_port)
     }
 }
 

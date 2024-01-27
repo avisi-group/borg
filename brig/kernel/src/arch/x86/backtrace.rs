@@ -20,19 +20,20 @@ struct Backtracer {
 impl Backtracer {
     // TODO: explain why the kernel image addresses are different
     fn new(
-        kernel_image_virt_addr: VirtAddr,
-        kernel_image_phys_addr: PhysAddr,
-        kernel_image_len: usize,
+        // Virtual address of the loaded kernel image
+        kernel_image_offset: VirtAddr,
+        // Physical address of the kernel ELF in memory
+        elf_phys_addr: PhysAddr,
+        // Size of the kernel ELF in memory
+        elf_len: usize,
     ) -> Self {
-        let elf_slice = unsafe {
-            slice::from_raw_parts(kernel_image_phys_addr.to_virt().as_ptr(), kernel_image_len)
-        };
+        let elf_slice = unsafe { slice::from_raw_parts(elf_phys_addr.to_virt().as_ptr(), elf_len) };
         let elf = ElfBytes::<AnyEndian>::minimal_parse(elf_slice).unwrap();
         let (symbol_table, string_table) = elf.symbol_table().unwrap().unwrap();
 
         Self {
-            kernel_image_virt_addr,
-            kernel_image_len,
+            kernel_image_virt_addr: kernel_image_offset,
+            kernel_image_len: elf_len,
             symbol_table,
             string_table,
         }
@@ -52,12 +53,11 @@ impl Backtracer {
         self.symbol_table
             .iter()
             .find(|sym| pc >= sym.st_value && pc < (sym.st_value + sym.st_size))
-            .map(|sym| {
+            .and_then(|sym| {
                 self.string_table
                     .get(usize::try_from(sym.st_name).unwrap())
                     .ok()
             })
-            .flatten()
             .unwrap_or("???")
     }
 }

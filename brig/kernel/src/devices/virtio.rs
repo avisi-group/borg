@@ -1,6 +1,8 @@
 use {
+    super::BlockDevice,
     crate::{
-        arch::x86::memory::{PhysAddrExt, VirtAddrExt, VMA},
+        arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
+        devices::Device,
         guest,
     },
     alloc::{
@@ -72,7 +74,7 @@ unsafe impl virtio_drivers::Hal for VirtioHal {
         buffer: NonNull<[u8]>,
         _direction: virtio_drivers::BufferDirection,
     ) -> virtio_drivers::PhysAddr {
-        VMA::current()
+        VirtualMemoryArea::current()
             .translate_address(VirtAddr::from_ptr(buffer.as_ptr() as *const u8))
             .unwrap()
             .as_u64()
@@ -115,3 +117,21 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
 
     log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
 }
+
+// struct VirtIOBlockDevice;
+
+// impl Device for VirtIOBlockDevice {
+//     fn configure(&mut self) {
+//         todo!()
+//     }
+// }
+
+// impl BlockDevice for VirtIOBlockDevice {
+//     fn read(&self, buf: &[u8]) {
+//         todo!()
+//     }
+
+//     fn write(&self, buf: &[u8]) {
+//         todo!()
+//     }
+// }

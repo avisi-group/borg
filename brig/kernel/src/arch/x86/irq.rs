@@ -21,11 +21,11 @@ pub fn init() {
     });
 }
 
-pub fn local_enable_irqs() {
+pub fn enable() {
     x86_64::instructions::interrupts::enable();
 }
 
-pub fn local_disable_irqs() {
+pub fn disable() {
     x86_64::instructions::interrupts::disable();
 }
 

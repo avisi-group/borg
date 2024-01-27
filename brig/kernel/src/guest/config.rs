@@ -1,13 +1,27 @@
 use {
-    crate::error::Error,
     alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec::Vec},
     serde::Deserialize,
     tar_no_std::{ArchiveEntry, TarArchiveRef},
+    thiserror_core as thiserror,
 };
+
+#[derive(Debug, thiserror::Error, displaydoc::Display)]
+pub enum ConfigLoadError {
+    /// File {0:?} was not found in TAR archive
+    FileNotFoundInTar(String),
+    /// Failed to parse JSON config: {0:#?}
+    JsonParse(serde_json::Error),
+}
+
+impl From<serde_json::Error> for ConfigLoadError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::JsonParse(value)
+    }
+}
 
 /// Load guest configuration, kernel image, and platform dtb from the config tar
 /// image
-pub fn load_guest_config(config_tar: &[u8]) -> Result<(Config, Vec<u8>, Vec<u8>), Error> {
+pub fn load_guest_config(config_tar: &[u8]) -> Result<(Config, Vec<u8>, Vec<u8>), ConfigLoadError> {
     let tar = TarArchiveRef::new(config_tar);
 
     let config: Config = serde_json::from_slice(find_file(&tar, "config.json")?.data())?;
@@ -26,10 +40,13 @@ pub fn load_guest_config(config_tar: &[u8]) -> Result<(Config, Vec<u8>, Vec<u8>)
     ))
 }
 
-fn find_file<'a>(tar: &'a TarArchiveRef<'a>, path: &str) -> Result<ArchiveEntry<'a>, Error> {
+fn find_file<'a>(
+    tar: &'a TarArchiveRef<'a>,
+    path: &str,
+) -> Result<ArchiveEntry<'a>, ConfigLoadError> {
     tar.entries()
         .find(|e| *e.filename() == *(path.trim_start_matches("./")))
-        .ok_or(Error::FileNotFoundInTar(path.to_owned()))
+        .ok_or(ConfigLoadError::FileNotFoundInTar(path.to_owned()))
 }
 
 #[derive(Debug, Deserialize)]

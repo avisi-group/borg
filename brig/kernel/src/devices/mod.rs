@@ -1,4 +1,7 @@
-use alloc::{collections::BTreeMap, string::String, sync::Arc};
+use {
+    alloc::{collections::BTreeMap, format, string::String, sync::Arc},
+    core::borrow::BorrowMut,
+};
 
 pub mod acpi;
 pub mod lapic;
@@ -11,19 +14,30 @@ pub fn init() {}
 
 struct DeviceManager {
     devices: BTreeMap<String, Arc<dyn Device>>,
+    next_block_device_id: u32,
 }
 
 impl DeviceManager {
-    pub fn register_device<D: Device>(&self, device: D) -> &D {
+    fn register_device<D: Device>(&mut self, name: String, device: D) -> Arc<D> {
+        // let mut dev = Arc::new(device);
+        // dev.borrow_mut().configure();
+
+        // self.devices.insert(name, dev);
+
+        // dev
         todo!()
     }
 
-    pub fn get_device(&self, name: String) -> Arc<dyn Device> {
-        todo!();
+    fn register_block_device<D: BlockDevice>(&mut self, device: D) -> Arc<dyn BlockDevice> {
+        // let name = format!("disk{}", self.next_block_device_id);
+        // self.next_block_device_id += 1;
+
+        // self.register_device(name, device)
+        todo!()
     }
 
-    pub fn get_block_device(&self, name: String) -> Arc<dyn BlockDevice> {
-        todo!();
+    pub fn get_device(&self, name: String) -> Option<Arc<dyn Device>> {
+        self.devices.get(&name).cloned()
     }
 }
 
@@ -35,16 +49,16 @@ pub trait Bus<P> {
     fn probe(&self, probe_data: P);
 }
 
-pub struct NetDeviceManager(BTreeMap<String, Arc<dyn BlockDevice>>);
+// pub struct NetDeviceManager(BTreeMap<String, Arc<dyn BlockDevice>>);
 
-trait NetDevice {
-    fn read(&self, mac: u64, buf: &[u8]);
-    fn write(&self, mac: u64, buf: &[u8]);
-}
+// trait NetDevice {
+//     fn read(&self, mac: u64, buf: &[u8]);
+//     fn write(&self, mac: u64, buf: &[u8]);
+// }
 
-pub struct BlockDeviceManager(BTreeMap<String, Arc<dyn BlockDevice>>);
+// pub struct BlockDeviceManager(BTreeMap<String, Arc<dyn BlockDevice>>);
 
-trait BlockDevice {
+pub trait BlockDevice: Device {
     fn read(&self, buf: &[u8]);
     fn write(&self, buf: &[u8]);
 }

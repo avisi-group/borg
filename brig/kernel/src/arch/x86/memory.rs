@@ -1,6 +1,5 @@
 use {
-    crate::error::Error,
-    bootloader_api::{info::MemoryRegionKind, BootInfo},
+    bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
     byte_unit::{Byte, UnitType},
     core::{alloc::Layout, ops::Deref},
@@ -9,7 +8,7 @@ use {
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
             FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame,
-            Size1GiB, Size4KiB, Translate,
+            Size4KiB, Translate,
         },
         PhysAddr, VirtAddr,
     },
@@ -17,22 +16,24 @@ use {
 
 pub const HIGH_HALF_CANONICAL_START: VirtAddr = VirtAddr::new_truncate(0x_ffff_8000_0000_0000);
 pub const HIGH_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0x_ffff_ffff_ffff_ffff);
-pub const PHYSICAL_MEMORY_MAP_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8180_0000_0000);
+pub const PHYSICAL_MEMORY_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8180_0000_0000);
 
 #[global_allocator]
 static HEAP_ALLOCATOR: LockedHeap<32> = LockedHeap::empty();
 
-pub fn init(boot_info: &'static BootInfo) -> Result<(), Error> {
+/// Initialize the global heap allocator backed by the usable memory regions
+/// supplied by the bootloader
+pub fn heap_init(memory_regions: &MemoryRegions) {
     // get usable regions from memory map and add to heap allocator
-    for region in (boot_info.memory_regions)
+    for region in memory_regions
         .deref()
         .iter()
         .filter(|r| matches!(r.kind, MemoryRegionKind::Usable))
     {
         unsafe {
             HEAP_ALLOCATOR.lock().add_to_heap(
-                usize::try_from(PhysAddr::new(region.start).to_virt().as_u64())?,
-                usize::try_from(PhysAddr::new(region.end).to_virt().as_u64())?,
+                usize::try_from(PhysAddr::new(region.start).to_virt().as_u64()).unwrap(),
+                usize::try_from(PhysAddr::new(region.end).to_virt().as_u64()).unwrap(),
             )
         };
     }
@@ -42,15 +43,6 @@ pub fn init(boot_info: &'static BootInfo) -> Result<(), Error> {
         Byte::from(HEAP_ALLOCATOR.lock().stats_total_bytes())
             .get_appropriate_unit(UnitType::Binary)
     );
-
-    VMA::current().map_page(
-        Page::<Size1GiB>::from_start_address(VirtAddr::new(0xffff818800000000))?,
-        PhysFrame::<Size1GiB>::from_start_address(PhysAddr::new(0x800000000))?,
-        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-    );
-    VMA::current().invalidate();
-
-    Ok(())
 }
 
 /// Returns the number of bytes used by and number of bytes available to the
@@ -81,12 +73,12 @@ unsafe impl FrameAllocator<Size4KiB> for HeapStealingFrameAllocator {
     }
 }
 
-pub struct VMA {
+pub struct VirtualMemoryArea {
     pml4_base: PhysAddr,
     opt: OffsetPageTable<'static>,
 }
 
-impl VMA {
+impl VirtualMemoryArea {
     fn get_current_cr3() -> PhysAddr {
         Cr3::read().0.start_address()
     }
@@ -98,7 +90,7 @@ impl VMA {
 
         Self {
             pml4_base,
-            opt: unsafe { OffsetPageTable::new(pml4_table, PHYSICAL_MEMORY_MAP_OFFSET) },
+            opt: unsafe { OffsetPageTable::new(pml4_table, PHYSICAL_MEMORY_OFFSET) },
         }
     }
 
@@ -166,7 +158,7 @@ pub trait PhysAddrExt {
 
 impl PhysAddrExt for PhysAddr {
     fn to_virt(&self) -> VirtAddr {
-        VirtAddr::new(self.as_u64() + PHYSICAL_MEMORY_MAP_OFFSET.as_u64())
+        VirtAddr::new(self.as_u64() + PHYSICAL_MEMORY_OFFSET.as_u64())
     }
 }
 
@@ -177,6 +169,6 @@ pub trait VirtAddrExt {
 
 impl VirtAddrExt for VirtAddr {
     fn to_phys(&self) -> PhysAddr {
-        PhysAddr::new(self.as_u64() - PHYSICAL_MEMORY_MAP_OFFSET.as_u64())
+        PhysAddr::new(self.as_u64() - PHYSICAL_MEMORY_OFFSET.as_u64())
     }
 }

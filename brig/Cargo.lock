@@ -245,8 +245,9 @@ dependencies = [
 
 [[package]]
 name = "buddy_system_allocator"
-version = "0.9.0"
-source = "git+https://github.com/fmckeogh/buddy_system_allocator#b437bd367a5026ce19623f36e854273a70b599ae"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d44d578cadd17312c75e7d0ef489361f160ace58f7139aa32001fee1a51b89b5"
 dependencies = [
  "spin",
 ]

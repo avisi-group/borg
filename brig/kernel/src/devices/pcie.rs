@@ -12,20 +12,7 @@ pub struct PCIEBus;
 
 impl Bus<PciConfigRegions<'_, alloc::alloc::Global>> for PCIEBus {
     fn probe(&self, probe_data: PciConfigRegions<'_, alloc::alloc::Global>) {
-        probe_data.iter().for_each(|entry| enumerate(entry));
-    }
-}
-
-impl PCIEBus {
-    fn enumarate(
-        &self,
-        PciConfigEntry {
-            bus_range,
-            physical_address,
-            ..
-        }: PciConfigEntry,
-    ) {
-        todo!()
+        probe_data.iter().for_each(enumerate);
     }
 }
 

@@ -1,7 +1,7 @@
 //! Logger implementation
 
 use {
-    crate::devices::{serial::UART16550Device, Device},
+    crate::devices::serial::UART16550Device,
     core::fmt::{self, Write},
     log::{Level, LevelFilter, Log, Metadata, Record},
     spin::Once,
@@ -28,15 +28,9 @@ static LOGGER: Logger = Logger;
 // loaded Then switch the WRITER
 const SERIAL_IO_PORT: u16 = 0x3F8;
 
-/// Initialise logger using the xen::console backend
+/// Initialise logger
 pub fn init() {
-    unsafe {
-        WRITER.call_once(|| {
-            let mut sp = UART16550Device::new(SERIAL_IO_PORT);
-            sp.configure();
-            sp
-        })
-    };
+    unsafe { WRITER.call_once(|| UART16550Device::new(SERIAL_IO_PORT)) };
 
     log::set_logger(&LOGGER).expect("Failed to set logger");
     log::set_max_level(LevelFilter::Trace);
