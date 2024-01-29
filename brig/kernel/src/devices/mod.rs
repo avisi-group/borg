@@ -12,7 +12,7 @@ pub trait Bus<P> {
     fn probe(&self, probe_data: P);
 }
 
-pub trait Device: Debug {
+pub trait Device: Debug + Send {
     fn configure(&mut self);
 }
 

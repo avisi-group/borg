@@ -2,12 +2,8 @@ use {
     crate::{
         arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
         devices::{self, pcie::allocate_bars, BlockDevice, Device},
-        guest,
     },
-    alloc::{
-        alloc::{alloc_zeroed, dealloc},
-        format, vec,
-    },
+    alloc::alloc::{alloc_zeroed, dealloc},
     byte_unit::Byte,
     core::{alloc::Layout, fmt::Debug, ptr::NonNull},
     log::trace,
@@ -103,15 +99,6 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
 
     let blk = VirtIOBlk::<VirtioHal, _>::new(transport).unwrap();
 
-    /* let (config, kernel, _dt) = {
-        // todo: maybeuninit
-        let mut buf = vec![0u8; device.size()];
-        device.read(&mut buf, 0).unwrap();
-        guest::config::load_guest_config(&buf).unwrap()
-    };
-
-    log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);*/
-
     devices::manager::SharedDeviceManager::get().register_block_device(VirtioBlockDevice {
         blk,
         device_function,
@@ -134,6 +121,9 @@ impl Debug for VirtioBlockDevice {
         )
     }
 }
+
+// safe because device is held behind mutex in device manager
+unsafe impl Send for VirtioBlockDevice {}
 
 impl Device for VirtioBlockDevice {
     fn configure(&mut self) {

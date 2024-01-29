@@ -9,13 +9,11 @@ use {
     x86_64::PhysAddr,
 };
 
-pub fn init() {
-    unsafe {
-        LAPIC.call_once(|| Mutex::new(LocalApic::new()));
-    }
-}
+pub static LAPIC: Once<Mutex<LocalApic>> = Once::INIT;
 
-pub static mut LAPIC: Once<Mutex<LocalApic>> = Once::INIT;
+pub fn init() {
+    LAPIC.call_once(|| Mutex::new(LocalApic::new()));
+}
 
 pub struct LocalApic {
     pub inner: x2apic::lapic::LocalApic,
@@ -28,7 +26,7 @@ impl LocalApic {
 
         let mut lapic = LocalApicBuilder::new()
             .timer_vector(0x20)
-            .error_vector(0x21)
+            .error_vector(0xff)
             .spurious_vector(0xff)
             .set_xapic_base(base.as_u64())
             .build()
