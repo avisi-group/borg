@@ -9,7 +9,12 @@ use {
     crate::arch::x86::{
         backtrace::backtrace,
         memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
-    }, bootloader_api::{config::Mapping, BootInfo, BootloaderConfig}, byte_unit::{Byte, UnitType::Binary}, core::panic::PanicInfo, log::trace, x86::io::outw
+    },
+    bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
+    byte_unit::{Byte, UnitType::Binary},
+    core::panic::PanicInfo,
+    log::trace,
+    x86::io::outw,
 };
 
 mod arch;
@@ -17,7 +22,8 @@ mod devices;
 mod fs;
 mod guest;
 mod logger;
-mod sched;
+mod rand;
+mod scheduler;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -32,20 +38,48 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     // note: logging device initialized internally before platform
     logger::init();
 
+    // required for generating UUIDs
+    rand::init();
+
     // Host machine initialisation
     arch::platform_init(boot_info);
-    sched::init();
+    scheduler::init();
 
-    sched::spawn(continue_start);
+    // search all drives for guest tar
+    /* let (config, kernel, _dt) = {
+        // todo: maybeuninit
+        let mut buf = vec![0u8; device.size()];
+        device.read(&mut buf, 0).unwrap();
+        guest::config::load_guest_config(&buf).unwrap()
+    };
+    log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);*/
 
-    sched::run();
+    scheduler::spawn(continue_start1);
+    scheduler::spawn(continue_start2);
 
-    unreachable!()
+    scheduler::start();
+
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
-pub fn continue_start() {
-    trace!("hello from a thread");
-    loop {}
+pub fn continue_start1() {
+    loop {
+        trace!("hello from thread 1");
+        for _ in 0..100000000 {
+            //
+        }
+    }
+}
+
+pub fn continue_start2() {
+    loop {
+        trace!("hello from thread 2");
+        for _ in 0..10000000 {
+            //
+        }
+    }
 }
 
 #[panic_handler]

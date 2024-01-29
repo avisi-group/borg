@@ -69,12 +69,12 @@ impl SharedDeviceManager {
 
     /// This could be more efficient by returning an iterator, but would require
     /// holding the lock and possibly risking deadlock.
-    pub fn get_aliases<S: AsRef<str>>(&self, device: Uuid) -> Vec<String> {
+    pub fn get_aliases(&self, device: Uuid) -> Vec<String> {
         self.inner
             .lock()
             .aliases
             .iter()
-            .filter(|(k, v)| **v == device)
+            .filter(|(_, v)| **v == device)
             .map(|(k, _)| k)
             .cloned()
             .collect()

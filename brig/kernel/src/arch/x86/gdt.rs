@@ -6,7 +6,7 @@ use {
             segmentation::{Segment, CS},
             tables::load_tss,
         },
-        registers::segmentation::{DS, ES, SS},
+        registers::segmentation::{DS, ES, FS, GS, SS},
         structures::{
             gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector},
             tss::TaskStateSegment,
@@ -67,6 +67,8 @@ pub fn init() {
         CS::set_reg(GDT.get().unwrap().1.kernel_code_selector);
         DS::set_reg(GDT.get().unwrap().1.kernel_data_selector);
         ES::set_reg(GDT.get().unwrap().1.kernel_data_selector);
+        FS::set_reg(GDT.get().unwrap().1.kernel_data_selector);
+        GS::set_reg(GDT.get().unwrap().1.kernel_data_selector);
         SS::set_reg(GDT.get().unwrap().1.kernel_data_selector);
         load_tss(GDT.get().unwrap().1.tss_selector);
     }

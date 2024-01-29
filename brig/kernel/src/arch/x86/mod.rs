@@ -2,9 +2,9 @@ use {
     crate::{
         arch::x86::memory::PHYSICAL_MEMORY_OFFSET,
         devices::{self, acpi, lapic, Bus},
-        qemu_exit,
     },
     bootloader_api::BootInfo,
+    core::fmt::Display,
     log::trace,
     x86::controlregs::{cr0, cr0_write, cr4, cr4_write, Cr0, Cr4},
     x86_64::{
@@ -112,26 +112,29 @@ impl Bus<X86SystemBusProbeData> for X86SystemBus {
     }
 }
 
-#[repr(C)]
+#[repr(C, packed)]
 pub struct MachineContext {
-    pub rax: u64,
-    pub rcx: u64,
-    pub rdx: u64,
-    pub rbx: u64,
-    pub rsi: u64,
-    pub rdi: u64,
-    pub rbp: u64,
-    pub rsp: u64,
-    pub r8: u64,
-    pub r9: u64,
-    pub r10: u64,
-    pub r11: u64,
-    pub r12: u64,
-    pub r13: u64,
-    pub r14: u64,
     pub r15: u64,
-    pub rflags: u64,
+    pub r14: u64,
+    pub r13: u64,
+    pub r12: u64,
+    pub r11: u64,
+    pub r10: u64,
+    pub r9: u64,
+    pub r8: u64,
+    pub rdi: u64,
+    pub rsi: u64,
+    pub rbp: u64,
+    pub rbx: u64,
+    pub rdx: u64,
+    pub rcx: u64,
+    pub rax: u64,
+
     pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
+    pub rsp: u64,
+    pub ss: u64,
 }
 
 impl MachineContext {
@@ -155,6 +158,24 @@ impl MachineContext {
             r15: 0,
             rflags: 0,
             rip: 0,
+            cs: 0,
+            ss: 0,
         }
+    }
+}
+
+impl Display for MachineContext {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        /*writeln!(f, "RIP={:016x}  RFLAGS={:08x}", self.rip, self.rflags).unwrap();
+        writeln!(f, " CS={:04x}   SS={:04x}", self.cs, self.ss).unwrap();
+        writeln!(f, "RAX={:016x}  RCX={:016x}", self.rax, self.rcx).unwrap();
+        writeln!(f, "RDX={:016x}  RBX={:016x}", self.rdx, self.rbx).unwrap();
+        writeln!(f, "RDI={:016x}  RSI={:016x}", self.rdi, self.rsi).unwrap();
+        writeln!(f, "RBP={:016x}  RSP={:016x}", self.rbp, self.rsp).unwrap();
+        writeln!(f, " R8={:016x}   R9={:016x}", self.r8, self.r9).unwrap();
+        writeln!(f, "R10={:016x}  R11={:016x}", self.r10, self.r11).unwrap();
+        writeln!(f, "R12={:016x}  R13={:016x}", self.r12, self.r13).unwrap();
+        writeln!(f, "R14={:016x}  R15={:016x}", self.r14, self.r15)*/
+        writeln!(f, "x")
     }
 }
