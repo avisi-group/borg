@@ -3,10 +3,16 @@ use {
     x86_64::{
         registers::control::Cr2,
         structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
+        VirtAddr,
     },
 };
 
 static IDT: Once<InterruptDescriptorTable> = Once::INIT;
+
+#[naked]
+unsafe fn foo() -> ! {
+    core::arch::asm!("1: jmp 1b", options(att_syntax, noreturn));
+}
 
 pub fn init() {
     IDT.call_once(|| {
@@ -15,17 +21,17 @@ pub fn init() {
         idt.page_fault.set_handler_fn(page_fault_handler);
         idt.general_protection_fault
             .set_handler_fn(general_protection_handler);
-        idt[32].set_handler_fn(timer_handler);
+        unsafe { idt[32].set_handler_addr(VirtAddr::from_ptr(foo as *const u8)) };
         idt.double_fault.set_handler_fn(double_fault_handler);
         idt
     });
 }
 
-pub fn _enable() {
+pub fn local_enable() {
     x86_64::instructions::interrupts::enable();
 }
 
-pub fn disable() {
+pub fn local_disable() {
     x86_64::instructions::interrupts::disable();
 }
 
@@ -55,6 +61,8 @@ extern "x86-interrupt" fn page_fault_handler(
 
 extern "x86-interrupt" fn timer_handler(_stack_frame: InterruptStackFrame) {
     log::warn!("timer interrupt");
+    loop {}
+
     unsafe {
         crate::devices::lapic::LAPIC
             .get()

@@ -21,6 +21,8 @@ fn main() {
     cmd.arg("file=../brig-linux/rootfs.ext2,if=none,format=raw,id=drive1");
     cmd.arg("-M");
     cmd.arg("q35");
+    cmd.arg("-cpu");
+    cmd.arg("host");
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();

@@ -3,16 +3,19 @@ use {
         arch::x86::memory::PhysAddrExt,
         devices::pit::{self, PIT_FREQUENCY},
     },
+    log::trace,
     spin::{Mutex, Once},
     x2apic::lapic::{xapic_base, LocalApicBuilder, TimerDivide, TimerMode},
     x86_64::PhysAddr,
 };
 
 pub fn init() {
-    LAPIC.call_once(|| Mutex::new(LocalApic::new()));
+    unsafe {
+        LAPIC.call_once(|| Mutex::new(LocalApic::new()));
+    }
 }
 
-pub static LAPIC: Once<Mutex<LocalApic>> = Once::INIT;
+pub static mut LAPIC: Once<Mutex<LocalApic>> = Once::INIT;
 
 pub struct LocalApic {
     pub inner: x2apic::lapic::LocalApic,
@@ -37,10 +40,21 @@ impl LocalApic {
         }
 
         let frequency = calibrate_timer_frequency(&mut lapic);
+        trace!("lapic frequency={}", frequency);
 
         Self {
             inner: lapic,
             frequency,
+        }
+    }
+
+    pub fn start_periodic(&mut self, frequency: u32) {
+        unsafe {
+            self.inner.set_timer_mode(TimerMode::Periodic);
+            self.inner.set_timer_divide(TimerDivide::Div16);
+            self.inner
+                .set_timer_initial((self.frequency >> 4) / frequency);
+            self.inner.enable_timer();
         }
     }
 }
@@ -59,12 +73,21 @@ fn calibrate_timer_frequency(lapic: &mut x2apic::lapic::LocalApic) -> u32 {
     pit::start();
     unsafe { lapic.set_timer_initial(u32::MAX) };
 
-    while !pit::is_expired() {}
+    while !pit::is_expired() {
+        unsafe {
+            core::arch::asm!("nop");
+        }
+    }
 
     unsafe { lapic.disable_timer() };
 
     // Calculate the number of ticks per period (accounting for the LAPIC division)
     let ticks_per_period = (u32::MAX - unsafe { lapic.timer_current() }) << 4;
+
     // Determine the LAPIC base frequency
-    ticks_per_period * (factor / calibration_period)
+    let freq = ticks_per_period * (factor / calibration_period);
+
+    trace!("ticks-per-period={ticks_per_period}, freq={freq}");
+
+    freq
 }

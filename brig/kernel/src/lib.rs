@@ -1,9 +1,7 @@
 #![no_std]
 #![feature(abi_x86_interrupt)] // needed for interrupts
 #![feature(allocator_api)] // needed for pci config regions
-
-// not sure we need this?
-//#![feature(trait_upcasting)] // in the device manager
+#![feature(naked_functions)] // for interrupts with glorious purpose
 
 extern crate alloc;
 
@@ -11,11 +9,7 @@ use {
     crate::arch::x86::{
         backtrace::backtrace,
         memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
-    },
-    bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
-    byte_unit::{Byte, UnitType::Binary},
-    core::panic::PanicInfo,
-    x86::io::outw,
+    }, bootloader_api::{config::Mapping, BootInfo, BootloaderConfig}, byte_unit::{Byte, UnitType::Binary}, core::panic::PanicInfo, log::trace, x86::io::outw
 };
 
 mod arch;
@@ -42,12 +36,21 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     arch::platform_init(boot_info);
     sched::init();
 
+    sched::spawn(continue_start);
+
+    sched::run();
+
     unreachable!()
+}
+
+pub fn continue_start() {
+    trace!("hello from a thread");
+    loop {}
 }
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    arch::x86::irq::disable();
+    arch::x86::irq::local_disable();
     let (used, total) = arch::x86::memory::stats();
 
     log::error!("{info}");
