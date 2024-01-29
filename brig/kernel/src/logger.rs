@@ -21,7 +21,10 @@ impl fmt::Write for QemuWriter {
 /// Global console writer
 static mut WRITER: Once<UART16550Device> = Once::INIT;
 
-static LOGGER: Logger = Logger;
+static LOGGER: Logger<1> = Logger {
+    default_level: LevelFilter::Trace,
+    module_levels: [("virtio_drivers", LevelFilter::Warn)],
+};
 
 // This is sort of a hack -- because we need the serial port REALLY early.
 // Possible solution - use QEMU's debugcon support, until devices have been
@@ -51,15 +54,42 @@ pub fn init() {
     )
 }
 
-struct Logger;
+struct Logger<const N: usize> {
+    default_level: LevelFilter,
+    module_levels: [(&'static str, LevelFilter); N],
+}
 
-impl Log for Logger {
-    fn enabled(&self, _: &Metadata) -> bool {
-        true
+impl<const N: usize> Log for Logger<N> {
+    fn enabled(&self, metadata: &Metadata) -> bool {
+        &metadata.level().to_level_filter()
+            <= self
+                .module_levels
+                .iter()
+                /* At this point the Vec is already sorted so that we can simply take
+                 * the first match
+                 */
+                .find(|(name, _level)| metadata.target().starts_with(name))
+                .map(|(_name, level)| level)
+                .unwrap_or(&self.default_level)
     }
 
     fn log(&self, record: &Record) {
-        crate::println!("{} {}", format_level(record.level()), record.args());
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+
+        let target = if !record.target().is_empty() {
+            record.target()
+        } else {
+            record.module_path().unwrap_or_default()
+        };
+
+        crate::println!(
+            "{} \x1b[0;30m[{}]\x1b[0m {}",
+            format_level(record.level()),
+            target,
+            record.args()
+        );
     }
 
     fn flush(&self) {}
