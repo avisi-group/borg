@@ -135,7 +135,7 @@ pub fn allocate_bars(root: &mut PciRoot, device_function: DeviceFunction) {
                         PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
                     );
                 });
-
-            VirtualMemoryArea::current().invalidate();
         });
+
+    VirtualMemoryArea::current().invalidate();
 }

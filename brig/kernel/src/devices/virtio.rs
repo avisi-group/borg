@@ -102,22 +102,20 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
     let transport = PciTransport::new::<VirtioHal>(root, device_function).unwrap();
 
     let blk = VirtIOBlk::<VirtioHal, _>::new(transport).unwrap();
-    let mut device = VirtioBlockDevice {
-        blk,
-        device_function,
-    };
 
-    let (config, kernel, _dt) = {
+    /* let (config, kernel, _dt) = {
         // todo: maybeuninit
         let mut buf = vec![0u8; device.size()];
         device.read(&mut buf, 0).unwrap();
         guest::config::load_guest_config(&buf).unwrap()
     };
 
-    log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
+    log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);*/
 
-    devices::manager::SharedDeviceManager::get()
-        .register_block_device(format!("disk{}", 0), device);
+    devices::manager::SharedDeviceManager::get().register_block_device(VirtioBlockDevice {
+        blk,
+        device_function,
+    });
 }
 
 struct VirtioBlockDevice {
@@ -131,7 +129,7 @@ impl Debug for VirtioBlockDevice {
             f,
             "virtio block device @ {}, capacity: {:.2}, block size: {:.2}",
             self.device_function,
-            Byte::from(self.blk.capacity()).get_appropriate_unit(byte_unit::UnitType::Binary),
+            Byte::from(self.size()).get_appropriate_unit(byte_unit::UnitType::Binary),
             Byte::from(self.block_size()).get_appropriate_unit(byte_unit::UnitType::Binary),
         )
     }
