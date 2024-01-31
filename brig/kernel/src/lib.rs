@@ -6,15 +6,19 @@
 extern crate alloc;
 
 use {
-    crate::arch::x86::{
-        backtrace::backtrace,
-        memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
+    crate::{
+        arch::x86::{
+            backtrace::backtrace,
+            memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
+        },
+        scheduler::Scheduler,
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
     core::panic::PanicInfo,
     log::trace,
     x86::io::outw,
+    x86_64::instructions::nop,
 };
 
 mod arch;
@@ -24,6 +28,7 @@ mod guest;
 mod logger;
 mod rand;
 mod scheduler;
+mod tasks;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -38,48 +43,28 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     // note: logging device initialized internally before platform
     logger::init();
 
+    arch::Core::init_self();
+
     // required for generating UUIDs
     rand::init();
 
     // Host machine initialisation
     arch::platform_init(boot_info);
-    scheduler::init();
+    tasks::init();
 
-    // search all drives for guest tar
-    /* let (config, kernel, _dt) = {
-        // todo: maybeuninit
-        let mut buf = vec![0u8; device.size()];
-        device.read(&mut buf, 0).unwrap();
-        guest::config::load_guest_config(&buf).unwrap()
-    };
-    log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);*/
+    // occurs per core
+    tasks::register_scheduler();
 
-    scheduler::spawn(continue_start1);
-    scheduler::spawn(continue_start2);
-
-    scheduler::start();
-
-    loop {
-        x86_64::instructions::hlt();
+    {
+        let continue_start_task = tasks::create_task(continue_start);
+        continue_start_task.start();
     }
+
+    scheduler::local_run();
 }
 
-pub fn continue_start1() {
-    loop {
-        trace!("hello from thread 1");
-        for _ in 0..100000000 {
-            //
-        }
-    }
-}
-
-pub fn continue_start2() {
-    loop {
-        trace!("hello from thread 2");
-        for _ in 0..10000000 {
-            //
-        }
-    }
+pub fn continue_start() {
+    guest::start();
 }
 
 #[panic_handler]

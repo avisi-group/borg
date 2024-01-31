@@ -1,6 +1,6 @@
 use {
     crate::{
-        devices::{BlockDevice, Device},
+        devices::{BlockDevice, Device, SharedDevice},
         rand::new_uuid_v4,
     },
     alloc::{borrow::ToOwned, collections::BTreeMap, format, string::String, sync::Arc, vec::Vec},
@@ -11,7 +11,7 @@ use {
 static DEVICE_MANAGER: Once<SharedDeviceManager> = Once::INIT;
 
 pub fn init() {
-    DEVICE_MANAGER.call_once(|| SharedDeviceManager::default());
+    DEVICE_MANAGER.call_once(SharedDeviceManager::default);
 }
 
 #[derive(Debug, Default)]
@@ -21,7 +21,7 @@ pub struct SharedDeviceManager {
 
 #[derive(Debug, Default)]
 pub struct InnerDeviceManager {
-    devices: BTreeMap<Uuid, Arc<Mutex<dyn Device>>>,
+    devices: BTreeMap<Uuid, SharedDevice>,
     aliases: BTreeMap<String, Uuid>,
 }
 
@@ -30,28 +30,14 @@ impl SharedDeviceManager {
         DEVICE_MANAGER.get().unwrap()
     }
 
-    fn register_device<D: Device + 'static>(&self, device: D) -> Uuid {
+    pub fn register_device(&self, device: SharedDevice) -> Uuid {
         let id = new_uuid_v4();
         log::debug!("registering device {id:?}: {device:?}");
-        let shared_device = Arc::new(Mutex::new(device));
-        let res = self.inner.lock().devices.insert(id, shared_device);
+        let res = self.inner.lock().devices.insert(id, device);
 
         if res.is_some() {
-            panic!("device {id:?} already registered");
+            unreachable!("uuids should be unique")
         }
-
-        id
-    }
-
-    fn count_block_devices(&self) -> usize {
-        self.inner.lock().devices.values().filter(|d| true).count()
-    }
-
-    pub fn register_block_device<B: BlockDevice + 'static>(&self, device: B) -> Uuid {
-        let id = self.register_device(device);
-
-        let name = format!("disk{}", self.count_block_devices());
-        self.add_alias(id, name);
 
         id
     }
@@ -61,6 +47,8 @@ impl SharedDeviceManager {
             .lock()
             .aliases
             .insert(alias.as_ref().to_owned(), device);
+
+        log::trace!("added alias {:?} for {device}", alias.as_ref());
     }
 
     pub fn remove_alias<S: AsRef<str>>(&self, alias: S) {
@@ -84,8 +72,16 @@ impl SharedDeviceManager {
         self.inner.lock().aliases.get(alias.as_ref()).copied()
     }
 
-    pub fn _get_device(&self, name: String) -> Option<Arc<Mutex<dyn Device>>> {
-        // self.inner.lock().devices.get(&name).cloned()
-        todo!()
+    pub fn get_device_by_id(&self, id: Uuid) -> Option<SharedDevice> {
+        self.inner.lock().devices.get(&id).cloned()
+    }
+
+    pub fn get_device_by_alias<S: AsRef<str>>(&self, alias: S) -> Option<SharedDevice> {
+        let id = &self.lookup_alias(alias)?;
+        self.inner.lock().devices.get(&id).cloned()
+    }
+
+    pub fn devices(&self) -> Vec<Uuid> {
+        self.inner.lock().devices.keys().copied().collect()
     }
 }

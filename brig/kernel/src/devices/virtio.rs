@@ -1,12 +1,20 @@
 use {
     crate::{
         arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
-        devices::{self, pcie::allocate_bars, BlockDevice, Device},
+        devices::{
+            manager::SharedDeviceManager, pcie::allocate_bars, BlockDevice, Device, SharedDevice,
+        },
     },
-    alloc::alloc::{alloc_zeroed, dealloc},
+    alloc::{
+        alloc::{alloc_zeroed, dealloc},
+        boxed::Box,
+        format,
+        sync::Arc,
+    },
     byte_unit::Byte,
     core::{alloc::Layout, fmt::Debug, ptr::NonNull},
     log::trace,
+    spin::Mutex,
     virtio_drivers::{
         device::blk::{VirtIOBlk, SECTOR_SIZE},
         transport::pci::{
@@ -97,18 +105,28 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
 
     let transport = PciTransport::new::<VirtioHal>(root, device_function).unwrap();
 
-    let blk = VirtIOBlk::<VirtioHal, _>::new(transport).unwrap();
+    let blk = Mutex::new(VirtIOBlk::<VirtioHal, _>::new(transport).unwrap());
 
-    devices::manager::SharedDeviceManager::get().register_block_device(VirtioBlockDevice {
-        blk,
-        device_function,
+    let dev_mgr = SharedDeviceManager::get();
+
+    let id = dev_mgr.register_device(SharedDevice {
+        inner: Arc::new(Mutex::new(Device::Block(Box::new(VirtioBlockDevice {
+            blk,
+            device_function,
+        })))),
     });
+
+    dev_mgr.add_alias(id, format!("disk{}", device_function));
 }
 
 struct VirtioBlockDevice {
-    blk: VirtIOBlk<VirtioHal, PciTransport>,
+    blk: Mutex<VirtIOBlk<VirtioHal, PciTransport>>,
     device_function: DeviceFunction,
 }
+
+// safe as blk is accessed through mutex
+unsafe impl Sync for VirtioBlockDevice {}
+unsafe impl Send for VirtioBlockDevice {}
 
 impl Debug for VirtioBlockDevice {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -122,32 +140,25 @@ impl Debug for VirtioBlockDevice {
     }
 }
 
-// safe because device is held behind mutex in device manager
-unsafe impl Send for VirtioBlockDevice {}
-
-impl Device for VirtioBlockDevice {
-    fn configure(&mut self) {
-        // no config needed?
-    }
-}
-
 impl BlockDevice for VirtioBlockDevice {
     fn block_size(&self) -> usize {
         SECTOR_SIZE
     }
 
     fn size(&self) -> usize {
-        usize::try_from(self.blk.capacity()).unwrap() * self.block_size()
+        usize::try_from(self.blk.lock().capacity()).unwrap() * self.block_size()
     }
 
     fn read(&mut self, buf: &mut [u8], start_block_index: usize) -> Result<(), super::IoError> {
         self.blk
+            .lock()
             .read_blocks(start_block_index, buf)
             .map_err(|e| panic!("{e:?}"))
     }
 
     fn write(&mut self, buf: &[u8], start_block_index: usize) -> Result<(), super::IoError> {
         self.blk
+            .lock()
             .write_blocks(start_block_index, buf)
             .map_err(|e| panic!("{e:?}"))
     }

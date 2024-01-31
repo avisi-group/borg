@@ -21,9 +21,12 @@ impl fmt::Write for QemuWriter {
 /// Global console writer
 static mut WRITER: Once<UART16550Device> = Once::INIT;
 
-static LOGGER: Logger<1> = Logger {
+static LOGGER: Logger<2> = Logger {
     default_level: LevelFilter::Trace,
-    module_levels: [("virtio_drivers", LevelFilter::Warn)],
+    module_levels: [
+        ("virtio_drivers", LevelFilter::Warn),
+        ("tar_no_std", LevelFilter::Warn),
+    ],
 };
 
 // This is sort of a hack -- because we need the serial port REALLY early.

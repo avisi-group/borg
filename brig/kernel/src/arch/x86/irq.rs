@@ -29,9 +29,9 @@ unsafe extern "C" fn timer_irq() -> ! {
 	push %r13
 	push %r14
 	push %r15
-    mov %rsp, %gs:8
+    mov %rsp, %gs:0
     call timer_handler
-    mov %gs:8, %rsp
+    mov %gs:0, %rsp
     pop %r15
 	pop %r14
 	pop %r13

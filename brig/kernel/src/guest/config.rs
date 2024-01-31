@@ -1,7 +1,7 @@
 use {
-    alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec::Vec},
+    crate::{devices::SharedDevice, fs::tar::TarFilesystem},
+    alloc::{collections::BTreeMap, string::String, vec::Vec},
     serde::Deserialize,
-    tar_no_std::{ArchiveEntry, TarArchiveRef},
     thiserror_core as thiserror,
 };
 
@@ -11,6 +11,8 @@ pub enum ConfigLoadError {
     FileNotFoundInTar(String),
     /// Failed to parse JSON config: {0:#?}
     JsonParse(serde_json::Error),
+    /// Supplied device was not a block device
+    NotBlockDevice,
 }
 
 impl From<serde_json::Error> for ConfigLoadError {
@@ -21,32 +23,24 @@ impl From<serde_json::Error> for ConfigLoadError {
 
 /// Load guest configuration, kernel image, and platform dtb from the config tar
 /// image
-pub fn load_guest_config(config_tar: &[u8]) -> Result<(Config, Vec<u8>, Vec<u8>), ConfigLoadError> {
-    let tar = TarArchiveRef::new(config_tar);
+pub fn load_from_device(
+    device: &SharedDevice,
+) -> Result<(Config, Vec<u8>, Vec<u8>), ConfigLoadError> {
+    let crate::devices::Device::Block(ref mut dyn_block) = *device.inner.lock() else {
+        return Err(ConfigLoadError::NotBlockDevice);
+    };
+    let mut fs = TarFilesystem::mount(dyn_block);
 
-    let config: Config = serde_json::from_slice(find_file(&tar, "config.json")?.data())?;
+    let config: Config = { serde_json::from_slice(&fs.open("/config.json").read_to_vec())? };
 
     let (kernel_path, dtb_path) = match config.boot {
         BootProtocol::Arm64Linux(Arm64LinuxBootProtocol { ref kernel, ref dt }) => (kernel, dt),
     };
 
-    let kernel_entry = find_file(&tar, kernel_path)?;
-    let dtb_entry = find_file(&tar, dtb_path)?;
+    let kernel_entry = fs.open(kernel_path).read_to_vec();
+    let dtb_entry = fs.open(dtb_path).read_to_vec();
 
-    Ok((
-        config,
-        kernel_entry.data().to_vec(),
-        dtb_entry.data().to_vec(),
-    ))
-}
-
-fn find_file<'a>(
-    tar: &'a TarArchiveRef<'a>,
-    path: &str,
-) -> Result<ArchiveEntry<'a>, ConfigLoadError> {
-    tar.entries()
-        .find(|e| *e.filename() == *(path.trim_start_matches("./")))
-        .ok_or(ConfigLoadError::FileNotFoundInTar(path.to_owned()))
+    Ok((config, kernel_entry, dtb_entry))
 }
 
 #[derive(Debug, Deserialize)]
