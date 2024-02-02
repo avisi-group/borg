@@ -48,7 +48,7 @@ build:
     COPY --dir sail common borealis .
 
     # build borealis
-    RUN eval `opam env` && mold -run cargo build --target $RUST_TARGET
+    RUN eval `opam env` && cargo build --target $RUST_TARGET
 
     SAVE ARTIFACT target/$RUST_TARGET/debug/borealis borealis
 
@@ -119,6 +119,7 @@ e2e-test-archsim:
 
     FROM ghcr.io/fmckeogh/gensim:latest
 
+    RUN apt-get update
     RUN apt-get install -yy gcc-aarch64-linux-gnu
     COPY data/fib.S .
     RUN aarch64-linux-gnu-gcc -o fib -nostdlib -static fib.S
