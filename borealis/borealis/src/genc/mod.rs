@@ -5,7 +5,7 @@
 
 use {
     crate::{
-        genc_model::{
+        genc::{
             files::{Execute, Files, Format, Function, Isa, Main},
             format::InstructionFormat,
         },
@@ -21,6 +21,7 @@ use {
     },
 };
 
+pub mod codegen;
 mod files;
 pub mod format;
 

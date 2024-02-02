@@ -7,8 +7,7 @@ use {
             visitor::{Visitor, Walkable},
             Ast, Definition, Statement,
         },
-        codegen::emit::Emit,
-        genc_model::{self, HelperFunction},
+        genc::{self, codegen::emit::Emit, HelperFunction},
     },
     common::{intern::InternedString, HashMap, HashSet},
     itertools::Itertools,
@@ -432,7 +431,7 @@ pub fn generate_fns(
 }
 
 /// Generates constants from all enum variants
-pub fn generate_enums(ast: Rc<RefCell<Ast>>) -> HashMap<InternedString, (genc_model::Typ, u64)> {
+pub fn generate_enums(ast: Rc<RefCell<Ast>>) -> HashMap<InternedString, (genc::Typ, u64)> {
     ast.borrow()
         .definitions
         .iter()
@@ -445,7 +444,7 @@ pub fn generate_enums(ast: Rc<RefCell<Ast>>) -> HashMap<InternedString, (genc_mo
         })
         .flat_map(|(name, variants)| variants.iter().map(|variant| enum_mangle(*name, *variant)))
         .zip(0..)
-        .map(|(k, v)| (k, (genc_model::Typ::Uint32, v)))
+        .map(|(k, v)| (k, (genc::Typ::Uint32, v)))
         .collect()
 }
 

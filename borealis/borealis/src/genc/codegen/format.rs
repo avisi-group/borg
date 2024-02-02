@@ -3,7 +3,7 @@
 use {
     crate::{
         boom::{bits_to_int, Bit},
-        genc_model::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
+        genc::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
     },
     common::{identifiable::unique_id, intern::InternedString, HashMap},
     log::{debug, trace, warn},

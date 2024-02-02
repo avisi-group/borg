@@ -1,5 +1,5 @@
 use {
-    borealis::{genc_model, load_sail, sail_to_genc},
+    borealis::{genc, load_sail, sail_to_genc},
     clap::{Parser, Subcommand},
     color_eyre::eyre::{Result, WrapErr},
     errctx::PathCtx,
@@ -40,6 +40,14 @@ enum Command {
         /// Path to Bincode file.
         output: PathBuf,
     },
+
+    /// Compile a Sail ISA specification to a Rust module for use with brig
+    Sail2brig {
+        /// Path to Sail JSON config or bincode AST
+        input: PathBuf,
+        /// Path to Rust file.
+        output: PathBuf,
+    },
 }
 
 fn main() -> Result<()> {
@@ -59,8 +67,7 @@ fn main() -> Result<()> {
             let description = sail_to_genc(&ast, &jib);
 
             info!("Exporting GenC description");
-            genc_model::export(&description, output)
-                .wrap_err("Error while exporting GenC description")?
+            genc::export(&description, output).wrap_err("Error while exporting GenC description")?
         }
         Command::Sail2bincode { input, output } => {
             let (ast, jib) = load_sail(input)?;
@@ -73,6 +80,17 @@ fn main() -> Result<()> {
             bincode::serialize_into(&mut encoder, &(ast, jib))?;
             encoder.finish()?;
             info!("done");
+        }
+        Command::Sail2brig { input, output } => {
+            let (ast, jib) = load_sail(input)?;
+
+            // info!("Converting Sail model to brig module");
+            // let description = sail_to_brig(&ast, &jib);
+
+            // info!("Exporting module");
+            // brig_module::export(&description, output)
+            //     .wrap_err("Error while exporting brig module")?
+            todo!()
         }
     }
 

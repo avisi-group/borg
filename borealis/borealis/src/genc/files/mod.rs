@@ -14,7 +14,7 @@ mod execute;
 mod isa;
 mod main;
 
-pub use crate::genc_model::files::{
+pub use crate::genc::files::{
     behaviours::Behaviours,
     execute::Execute,
     isa::{Format, Isa},

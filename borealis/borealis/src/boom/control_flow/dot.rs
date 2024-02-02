@@ -1,7 +1,7 @@
 use {
     crate::{
         boom::control_flow::{ControlFlowBlock, Terminator},
-        codegen::emit::Emit,
+        genc::codegen::emit::Emit,
     },
     common::HashMap,
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},

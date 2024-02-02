@@ -6,7 +6,7 @@ use {
             visitor::Visitor, Ast, Definition, FunctionDefinition, FunctionSignature, NamedType,
             Statement,
         },
-        codegen::emit::Emit,
+        genc::codegen::emit::Emit,
     },
     std::{
         cell::RefCell,

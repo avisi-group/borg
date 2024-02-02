@@ -1,5 +1,5 @@
 use {
-    crate::genc_model::{
+    crate::genc::{
         files::write_header, Bank, Endianness, RegisterSpace, Slot, Typ, View, ISA_FILENAME,
     },
     common::{intern::InternedString, HashMap, HashSet},

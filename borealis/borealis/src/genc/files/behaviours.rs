@@ -1,13 +1,13 @@
 use {
-    crate::genc_model::{files::write_header, Function},
+    crate::genc::files::{write_header, Function},
     std::fmt::{self, Display, Formatter},
 };
 
-/// Execution GenC file containing instruction implementations
+/// Behaviours GenC file
 #[derive(Debug, Clone)]
-pub struct Execute(pub Vec<Function>);
+pub struct Behaviours(pub Vec<Function>);
 
-impl Display for Execute {
+impl Display for Behaviours {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write_header(f)?;
 

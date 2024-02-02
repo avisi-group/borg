@@ -5,11 +5,11 @@
 use {
     crate::{
         boom::{control_flow::ControlFlowBlock, Statement},
-        codegen::{
-            functions::{contains_write_pc, generate_enums, generate_fns},
-            instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
-        },
-        genc_model::{
+        genc::{
+            codegen::{
+                functions::{contains_write_pc, generate_enums, generate_fns},
+                instruction::{generate_execute_entrypoint, get_instruction_entrypoint_fns},
+            },
             Bank, Behaviours, Description, Endianness, Instruction, RegisterSpace, Slot, Typ, View,
         },
         passes::execute_passes,
@@ -36,8 +36,7 @@ use {
 };
 
 pub mod boom;
-pub mod codegen;
-pub mod genc_model;
+pub mod genc;
 pub mod passes;
 
 /// Borealis error
@@ -251,7 +250,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 256,
                 views: vec![View::Bank(Bank {
                     name: "reg_RB".into(),
-                    typ: genc_model::Typ::Uint64,
+                    typ: genc::Typ::Uint64,
                     offset: 0,
                     count: 31,
                     stride: 8,
@@ -265,21 +264,21 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 views: vec![
                     View::Slot(Slot {
                         name: "reg_PC".into(),
-                        typ: genc_model::Typ::Uint64,
+                        typ: genc::Typ::Uint64,
                         width: 8,
                         offset: 0,
                         tag: Some("PC".into()),
                     }),
                     View::Slot(Slot {
                         name: "reg_SP".into(),
-                        typ: genc_model::Typ::Uint64,
+                        typ: genc::Typ::Uint64,
                         width: 8,
                         offset: 8,
                         tag: Some("SP".into()),
                     }),
                     View::Slot(Slot {
                         name: "reg_PC_target".into(),
-                        typ: genc_model::Typ::Uint64,
+                        typ: genc::Typ::Uint64,
                         width: 8,
                         offset: 16,
                         tag: None,
@@ -291,28 +290,28 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 views: vec![
                     View::Slot(Slot {
                         name: "reg_PSTATE_N".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 0,
                         tag: Some("N".into()),
                     }),
                     View::Slot(Slot {
                         name: "reg_PSTATE_Z".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 1,
                         tag: Some("Z".into()),
                     }),
                     View::Slot(Slot {
                         name: "reg_PSTATE_C".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 2,
                         tag: Some("C".into()),
                     }),
                     View::Slot(Slot {
                         name: "reg_PSTATE_V".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 3,
                         tag: Some("V".into()),
@@ -323,7 +322,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 8,
                 views: vec![View::Slot(Slot {
                     name: "reg_HCR_EL2".into(),
-                    typ: genc_model::Typ::Uint64,
+                    typ: genc::Typ::Uint64,
                     width: 8,
                     offset: 0,
                     tag: None,
@@ -333,7 +332,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 8,
                 views: vec![View::Slot(Slot {
                     name: "reg_VMPIDR_EL2".into(),
-                    typ: genc_model::Typ::Uint64,
+                    typ: genc::Typ::Uint64,
                     width: 8,
                     offset: 0,
                     tag: None,
@@ -343,7 +342,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 4,
                 views: vec![View::Slot(Slot {
                     name: "reg_VPIDR_EL2".into(),
-                    typ: genc_model::Typ::Uint32,
+                    typ: genc::Typ::Uint32,
                     width: 4,
                     offset: 0,
                     tag: None,
@@ -353,7 +352,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 4,
                 views: vec![View::Slot(Slot {
                     name: "reg_ESR_EL1".into(),
-                    typ: genc_model::Typ::Uint32,
+                    typ: genc::Typ::Uint32,
                     width: 4,
                     offset: 0,
                     tag: None,
@@ -363,7 +362,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 8,
                 views: vec![View::Slot(Slot {
                     name: "reg_FAR_EL1".into(),
-                    typ: genc_model::Typ::Uint64,
+                    typ: genc::Typ::Uint64,
                     width: 8,
                     offset: 0,
                     tag: None,
@@ -373,7 +372,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 8,
                 views: vec![View::Slot(Slot {
                     name: "reg_SCTLR_EL1".into(),
-                    typ: genc_model::Typ::Uint64,
+                    typ: genc::Typ::Uint64,
                     width: 8,
                     offset: 0,
                     tag: None,
@@ -383,7 +382,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 4,
                 views: vec![View::Slot(Slot {
                     name: "reg_DCZID_EL0".into(),
-                    typ: genc_model::Typ::Uint32,
+                    typ: genc::Typ::Uint32,
                     width: 4,
                     offset: 0,
                     tag: None,
@@ -393,7 +392,7 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 size: 4,
                 views: vec![View::Slot(Slot {
                     name: "reg_u__currentInstr".into(),
-                    typ: genc_model::Typ::Uint32,
+                    typ: genc::Typ::Uint32,
                     width: 4,
                     offset: 0,
                     tag: None,
@@ -404,35 +403,35 @@ pub fn sail_to_genc(sail_ast: &Ast, jib_ast: &LinkedList<Definition>) -> Descrip
                 views: vec![
                     View::Slot(Slot {
                         name: "BTypeCompatible".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 0,
                         tag: None,
                     }),
                     View::Slot(Slot {
                         name: "reg_BTypeNext".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 1,
                         tag: None,
                     }),
                     View::Slot(Slot {
                         name: "InGuardedPage".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 2,
                         tag: None,
                     }),
                     View::Slot(Slot {
                         name: "reg_PSTATE_EL".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 3,
                         tag: None,
                     }),
                     View::Slot(Slot {
                         name: "reg_PSTATE_BTYPE".into(),
-                        typ: genc_model::Typ::Uint8,
+                        typ: genc::Typ::Uint8,
                         width: 1,
                         offset: 4,
                         tag: None,

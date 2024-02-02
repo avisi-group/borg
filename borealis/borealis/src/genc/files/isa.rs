@@ -1,5 +1,5 @@
 use {
-    crate::genc_model::{files::write_header, BEHAVIOURS_FILENAME, EXECUTE_FILENAME},
+    crate::genc::{files::write_header, BEHAVIOURS_FILENAME, EXECUTE_FILENAME},
     std::fmt::{self, Display, Formatter},
 };
 

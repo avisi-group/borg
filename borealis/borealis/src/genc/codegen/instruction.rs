@@ -4,8 +4,10 @@
 use {
     crate::{
         boom::{self, Parameter},
-        codegen::format::{process_decode_function_clause, InstructionDecodeInformation},
-        genc_model::format::{InstructionFormat, SegmentContent},
+        genc::{
+            codegen::format::{process_decode_function_clause, InstructionDecodeInformation},
+            format::{InstructionFormat, SegmentContent},
+        },
     },
     common::{intern::InternedString, HashMap, HashSet},
     itertools::Itertools,
@@ -300,9 +302,9 @@ fn get_segments_in_range(format: &InstructionFormat, range: Range<usize>) -> Vec
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
+        crate::genc::{
             codegen::instruction::{get_segments_in_range, VariableSegment::*},
-            genc_model::format::{InstructionFormat, Segment, SegmentContent},
+            format::{InstructionFormat, Segment, SegmentContent},
         },
         once_cell::sync::Lazy,
         pretty_assertions::assert_eq,
