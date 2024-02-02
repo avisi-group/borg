@@ -27,8 +27,7 @@ impl AddressSpace {
         let candidate = self
             .regions
             .upper_bound(core::ops::Bound::Included(&address))
-            .next()
-            .unwrap();
+            .prev()?;
 
         if address >= candidate.1.base && address < (candidate.1.base + candidate.1.size) {
             Some(candidate.1)

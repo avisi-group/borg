@@ -9,13 +9,9 @@ impl PL011 {
 }
 
 impl GuestDevice for PL011 {
-    fn start(&self) {
-        todo!()
-    }
+    fn start(&self) {}
 
-    fn stop(&self) {
-        todo!()
-    }
+    fn stop(&self) {}
 
     fn as_io_handler(self: alloc::rc::Rc<Self>) -> Option<alloc::rc::Rc<dyn IOMemoryHandler>> {
         Some(self.clone())

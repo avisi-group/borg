@@ -3,13 +3,9 @@ use crate::guest::{devices::GuestDevice, memory::IOMemoryHandler};
 pub struct VirtIOBlock;
 
 impl GuestDevice for VirtIOBlock {
-    fn start(&self) {
-        todo!()
-    }
+    fn start(&self) {}
 
-    fn stop(&self) {
-        todo!()
-    }
+    fn stop(&self) {}
 
     fn as_io_handler(
         self: alloc::rc::Rc<Self>,

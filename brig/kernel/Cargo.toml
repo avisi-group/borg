@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bootloader_api = "0.11.5"
+proc_macro_lib = { path = "../proc_macro_lib" }
+
+bootloader_api = "0.11.6"
 
 x86_64 = "0.14.11"
 x86 = "0.52.0"
@@ -19,11 +21,11 @@ byte-unit = { version = "5.1.4", default-features = false, features = ["byte"] }
 log = { version = "0.4.20", default-features = false }
 elf = { version = "0.7.4", default-features = false }
 rustc-demangle = { version = "0.1.23", default-features = false }
-serde = { version = "1.0.195", default-features = false, features = [
+serde = { version = "1.0.196", default-features = false, features = [
     "derive",
     "alloc",
 ] }
-serde_json = { version = "1.0.111", default-features = false, features = [
+serde_json = { version = "1.0.113", default-features = false, features = [
     "alloc",
 ] }
 phf = { version = "0.11.2", default-features = false, features = ["macros"] }

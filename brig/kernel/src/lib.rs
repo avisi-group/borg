@@ -2,7 +2,6 @@
 #![feature(abi_x86_interrupt)] // needed for interrupts
 #![feature(allocator_api)] // needed for pci config regions
 #![feature(naked_functions)] // for interrupts with glorious purpose
-#![feature(concat_idents)]
 #![feature(btree_cursors)]
 
 extern crate alloc;
