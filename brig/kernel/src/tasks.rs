@@ -1,29 +1,16 @@
 use {
     crate::{
-        arch::{self, x86::MachineContext, PAGE_SIZE},
-        dbg,
-        devices::lapic::LAPIC,
-        scheduler::{self, Scheduler},
+        arch::{x86::MachineContext, PAGE_SIZE},
+        scheduler::Scheduler,
     },
     alloc::{
         alloc::{alloc_zeroed, dealloc},
         collections::LinkedList,
         rc::{Rc, Weak},
-        sync::Arc,
     },
-    core::{
-        alloc::Layout,
-        borrow::BorrowMut,
-        mem::size_of,
-        panic,
-        ptr::{null, null_mut},
-    },
-    log::trace,
+    core::{alloc::Layout, mem::size_of},
     spin::{Mutex, Once},
-    x86::{
-        current::segmentation::{rdgsbase, wrgsbase},
-        segmentation::gs,
-    },
+    x86::current::segmentation::rdgsbase,
 };
 
 /// Task stack size in bytes
@@ -105,12 +92,12 @@ impl TaskManager {
             .collect();
     }
 
-    pub fn suspend_task(&mut self, task: &Task) {
-        todo!();
+    pub fn _suspend_task(&mut self, _task: &Task) {
+        todo!("remove from runqueue but dont delete?");
     }
 
-    pub fn resume_task(&mut self, task: &Task) {
-        todo!();
+    pub fn _resume_task(&mut self, _task: &Task) {
+        todo!("palce in runqueue");
     }
 }
 

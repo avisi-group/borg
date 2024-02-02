@@ -77,6 +77,7 @@ pub fn local_run() -> ! {
 	pop %rdx
 	pop %rcx
 	pop %rax
+    add $8, %rsp
     iretq",
             options(att_syntax, noreturn)
         );

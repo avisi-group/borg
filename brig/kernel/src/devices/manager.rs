@@ -1,9 +1,6 @@
 use {
-    crate::{
-        devices::{BlockDevice, Device, SharedDevice},
-        rand::new_uuid_v4,
-    },
-    alloc::{borrow::ToOwned, collections::BTreeMap, format, string::String, sync::Arc, vec::Vec},
+    crate::{devices::SharedDevice, rand::new_uuid_v4},
+    alloc::{borrow::ToOwned, collections::BTreeMap, string::String, vec::Vec},
     spin::{Mutex, Once},
     uuid::Uuid,
 };
@@ -51,13 +48,13 @@ impl SharedDeviceManager {
         log::trace!("added alias {:?} for {device}", alias.as_ref());
     }
 
-    pub fn remove_alias<S: AsRef<str>>(&self, alias: S) {
+    pub fn _remove_alias<S: AsRef<str>>(&self, alias: S) {
         self.inner.lock().aliases.remove(alias.as_ref());
     }
 
     /// This could be more efficient by returning an iterator, but would require
     /// holding the lock and possibly risking deadlock.
-    pub fn get_aliases(&self, device: Uuid) -> Vec<String> {
+    pub fn _get_aliases_by_device(&self, device: Uuid) -> Vec<String> {
         self.inner
             .lock()
             .aliases
@@ -72,16 +69,12 @@ impl SharedDeviceManager {
         self.inner.lock().aliases.get(alias.as_ref()).copied()
     }
 
-    pub fn get_device_by_id(&self, id: Uuid) -> Option<SharedDevice> {
+    pub fn _get_device_by_id(&self, id: Uuid) -> Option<SharedDevice> {
         self.inner.lock().devices.get(&id).cloned()
     }
 
     pub fn get_device_by_alias<S: AsRef<str>>(&self, alias: S) -> Option<SharedDevice> {
         let id = &self.lookup_alias(alias)?;
         self.inner.lock().devices.get(&id).cloned()
-    }
-
-    pub fn devices(&self) -> Vec<Uuid> {
-        self.inner.lock().devices.keys().copied().collect()
     }
 }

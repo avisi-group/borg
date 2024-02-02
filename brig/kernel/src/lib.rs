@@ -2,23 +2,20 @@
 #![feature(abi_x86_interrupt)] // needed for interrupts
 #![feature(allocator_api)] // needed for pci config regions
 #![feature(naked_functions)] // for interrupts with glorious purpose
+#![feature(concat_idents)]
+#![feature(btree_cursors)]
 
 extern crate alloc;
 
 use {
-    crate::{
-        arch::x86::{
-            backtrace::backtrace,
-            memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
-        },
-        scheduler::Scheduler,
+    crate::arch::x86::{
+        backtrace::backtrace,
+        memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
     core::panic::PanicInfo,
-    log::trace,
     x86::io::outw,
-    x86_64::instructions::nop,
 };
 
 mod arch;

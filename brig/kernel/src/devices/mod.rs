@@ -1,10 +1,10 @@
 use {
-    alloc::{boxed::Box, rc::Rc, sync::Arc},
+    alloc::{boxed::Box, sync::Arc},
     core::{
         fmt::Debug,
         ops::{Deref, DerefMut},
     },
-    spin::Mutex,
+    spin::{Mutex, MutexGuard},
     thiserror_core as thiserror,
 };
 
@@ -22,20 +22,59 @@ pub trait Bus<P> {
 
 #[derive(Debug, Clone)]
 pub struct SharedDevice {
-    pub inner: Arc<Mutex<Device>>,
+    inner: Arc<Mutex<Device>>,
+}
+
+impl SharedDevice {
+    pub fn from_device(device: Device) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(device)),
+        }
+    }
+
+    pub fn lock(&self) -> MutexGuard<Device> {
+        self.inner.lock()
+    }
 }
 
 // no clone for now
 #[derive(Debug)]
 pub enum Device {
     Block(Box<dyn BlockDevice>),
+    #[allow(unused)]
     Net(Box<dyn NetDevice>),
+    #[allow(unused)]
     Timer(Box<dyn Timer>),
 }
 
-// pub trait Device: Debug + Send {
-//     fn configure(&mut self);
-// }
+impl Device {
+    /// Panics if underlying device is not a block device
+    pub fn as_block(&mut self) -> &mut Box<dyn BlockDevice> {
+        let Device::Block(ref mut blk) = self else {
+            panic!("not a block device");
+        };
+
+        blk
+    }
+}
+
+impl From<Box<dyn BlockDevice>> for Device {
+    fn from(value: Box<dyn BlockDevice>) -> Self {
+        Self::Block(value)
+    }
+}
+
+impl From<Box<dyn NetDevice>> for Device {
+    fn from(value: Box<dyn NetDevice>) -> Self {
+        Self::Net(value)
+    }
+}
+
+impl From<Box<dyn Timer>> for Device {
+    fn from(value: Box<dyn Timer>) -> Self {
+        Self::Timer(value)
+    }
+}
 
 /// Error type shared between block and network devices
 #[derive(Debug, thiserror::Error, displaydoc::Display)]

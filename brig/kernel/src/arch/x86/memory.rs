@@ -1,4 +1,5 @@
 use {
+    alloc::alloc::alloc_zeroed,
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
     byte_unit::{Byte, UnitType},
@@ -14,8 +15,10 @@ use {
     },
 };
 
-pub const HIGH_HALF_CANONICAL_START: VirtAddr = VirtAddr::new_truncate(0x_ffff_8000_0000_0000);
-pub const HIGH_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0x_ffff_ffff_ffff_ffff);
+pub const _LOW_HALF_CANONICAL_START: VirtAddr = VirtAddr::new_truncate(0x0000_0000_0000_0000);
+pub const LOW_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0x0000_7fff_ffff_ffff);
+pub const HIGH_HALF_CANONICAL_START: VirtAddr = VirtAddr::new_truncate(0xffff_8000_0000_0000);
+pub const HIGH_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0xffff_ffff_ffff_ffff);
 pub const PHYSICAL_MEMORY_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8180_0000_0000);
 
 #[global_allocator]
@@ -62,14 +65,9 @@ struct HeapStealingFrameAllocator;
 
 unsafe impl FrameAllocator<Size4KiB> for HeapStealingFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
-        let virt_ptr = HEAP_ALLOCATOR
-            .lock()
-            .alloc(Layout::from_size_align(4096, 4096).unwrap())
-            .unwrap();
+        let new_frame = unsafe { alloc_zeroed(Layout::from_size_align(4096, 4096).unwrap()) };
 
-        Some(
-            PhysFrame::from_start_address(VirtAddr::from_ptr(virt_ptr.as_ptr()).to_phys()).unwrap(),
-        )
+        Some(PhysFrame::from_start_address(VirtAddr::from_ptr(new_frame).to_phys()).unwrap())
     }
 }
 

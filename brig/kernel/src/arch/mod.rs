@@ -1,5 +1,5 @@
 use {
-    ::x86::{rdpid, time::rdtscp},
+    ::x86::time::rdtscp,
     alloc::{boxed::Box, collections::BTreeMap},
     bootloader_api::BootInfo,
     core::any::{Any, TypeId},
@@ -37,10 +37,6 @@ impl Core {
                 .unwrap()
                 .call_once(|| Core::default())
         };
-    }
-
-    pub fn this() -> &'static Self {
-        unsafe { CORES.get(get_local_pid() as usize).unwrap().get().unwrap() }
     }
 
     pub fn this_mut() -> &'static mut Self {

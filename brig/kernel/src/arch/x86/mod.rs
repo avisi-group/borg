@@ -129,7 +129,7 @@ pub struct MachineContext {
     pub rdx: u64,
     pub rcx: u64,
     pub rax: u64,
-
+    pub error_code: u64,
     pub rip: u64,
     pub cs: u64,
     pub rflags: u64,
@@ -160,6 +160,7 @@ impl MachineContext {
             rip: 0,
             cs: 0,
             ss: 0,
+            error_code: 0,
         }
     }
 }

@@ -9,7 +9,6 @@ use {
         alloc::{alloc_zeroed, dealloc},
         boxed::Box,
         format,
-        sync::Arc,
     },
     byte_unit::Byte,
     core::{alloc::Layout, fmt::Debug, ptr::NonNull},
@@ -109,12 +108,12 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
 
     let dev_mgr = SharedDeviceManager::get();
 
-    let id = dev_mgr.register_device(SharedDevice {
-        inner: Arc::new(Mutex::new(Device::Block(Box::new(VirtioBlockDevice {
+    let id = dev_mgr.register_device(SharedDevice::from_device(Device::Block(Box::new(
+        VirtioBlockDevice {
             blk,
             device_function,
-        })))),
-    });
+        },
+    ))));
 
     dev_mgr.add_alias(id, format!("disk{}", device_function));
 }
