@@ -11,6 +11,8 @@ lasso = { version = "0.7.2", features = ["multi-threaded"] }
 once_cell = "1.19.0"
 serde = { version = "1.0.196", features = ["derive"] }
 twox-hash = "1.6.3"
+quote = "1.0.35"
+proc-macro2 = "1.0.78"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

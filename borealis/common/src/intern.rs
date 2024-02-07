@@ -5,6 +5,8 @@ use {
     lasso::{Spur, ThreadedRodeo},
     ocaml::{FromValue, ToValue, Value},
     once_cell::sync::Lazy,
+    proc_macro2::{Ident, Span, TokenStream},
+    quote::{ToTokens, TokenStreamExt},
     std::hash::BuildHasherDefault,
     twox_hash::XxHash64,
 };
@@ -107,5 +109,11 @@ impl DeepSizeOf for InternedString {
 
     fn deep_size_of(&self) -> usize {
         std::mem::size_of_val(self)
+    }
+}
+
+impl ToTokens for InternedString {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.append(Ident::new(self.as_ref(), Span::call_site()));
     }
 }

@@ -6,18 +6,7 @@
 //! * Builtin function handling
 
 use {
-    crate::{
-        boom::Ast,
-        passes::{
-            builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-            destruct_structs::DestructStructs, fold_unconditionals::FoldUnconditionals,
-            lower_enums::LowerEnums, registers::RegisterHandler,
-            remove_const_branch::RemoveConstBranch, remove_exception::RemoveExceptions,
-            remove_redundant_assigns::RemoveRedundantAssigns, remove_unit::RemoveUnits,
-            replace_bools::ReplaceBools, replace_strings::ReplaceStrings,
-            resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
-        },
-    },
+    crate::boom::Ast,
     log::info,
     std::{
         cell::RefCell,
@@ -44,29 +33,6 @@ pub mod replace_strings;
 pub mod resolve_bitvectors;
 pub mod resolve_return_assigns;
 
-/// Executes the optimisation and raising passes on an AST
-pub fn execute_passes(ast: Rc<RefCell<Ast>>) {
-    run_fixed_point(
-        ast.clone(),
-        &mut [
-            FoldUnconditionals::new_boxed(),
-            RemoveConstBranch::new_boxed(),
-            CycleFinder::new_boxed(),
-            ResolveReturns::new_boxed(),
-            DestructStructs::new_boxed(),
-            ReplaceBools::new_boxed(),
-            ReplaceStrings::new_boxed(),
-            LowerEnums::new_boxed(),
-            RemoveUnits::new_boxed(ast.clone()),
-            RemoveExceptions::new_boxed(),
-            ResolveBitvectors::new_boxed(),
-            AddBuiltinFns::new_boxed(),
-            RegisterHandler::new_boxed(),
-            RemoveRedundantAssigns::new_boxed(),
-        ],
-    );
-}
-
 /// Pass that performs an operation on an AST
 pub trait Pass {
     /// Gets the name of the pass
@@ -81,7 +47,7 @@ pub trait Pass {
 
 /// Run each pass until it does not mutate the AST, and run the whole sequence
 /// of passes until no pass mutates the AST
-fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
+pub fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
     // ironically, we *do* want to short-circuit here
     // behaviour is "keep running the passes in order until none change"
     loop {

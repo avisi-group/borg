@@ -1,5 +1,9 @@
 use {
-    borealis::{genc, load_sail, sail_to_genc},
+    borealis::{
+        genc::{self, sail_to_genc},
+        load_sail,
+        rust::sail_to_brig,
+    },
     clap::{Parser, Subcommand},
     color_eyre::eyre::{Result, WrapErr},
     errctx::PathCtx,
@@ -84,13 +88,10 @@ fn main() -> Result<()> {
         Command::Sail2brig { input, output } => {
             let (ast, jib) = load_sail(input)?;
 
-            // info!("Converting Sail model to brig module");
-            // let description = sail_to_brig(&ast, &jib);
-
-            // info!("Exporting module");
-            // brig_module::export(&description, output)
-            //     .wrap_err("Error while exporting brig module")?
-            todo!()
+            info!("Converting Sail model to brig module");
+            let mut writer = File::create(output)?;
+            sail_to_brig(&mut writer, &ast, &jib)?;
+            info!("done");
         }
     }
 
