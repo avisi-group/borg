@@ -165,6 +165,7 @@ dependencies = [
  "pretty_assertions",
  "pretty_env_logger",
  "prettyplease",
+ "proc-macro2",
  "quote",
  "regex",
  "sail",

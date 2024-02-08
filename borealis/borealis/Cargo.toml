@@ -36,3 +36,4 @@ kinded = "0.3.0"
 quote = "1.0.35"
 syn = { version = "2.0.48",  features = ["full", "parsing"] }
 prettyplease = "0.2.16"
+proc-macro2 = "1.0.78"
