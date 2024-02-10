@@ -172,6 +172,7 @@ impl DecodeTree {
     }
 
     /// Emits a decode tree as a DOT graph to `stdout`
+    #[allow(unused)] // (might need for debugging)
     pub fn to_dot(&self) {
         fn to_dot_node(node: Node, graph: &mut graph::Graph) -> u32 {
             let id = unique_id();
@@ -238,26 +239,31 @@ impl Node {
         match prefix {
             Prefix::Constrained { value, len } => {
                 // find existing transition
-                let constraineds = self.constrained();
-                let existing = constraineds
-                    .iter()
+                let existing = self
+                    .constrained()
+                    .into_iter()
                     .find(|t| t.len == len && t.value == value);
 
-                if let Some(existing) = existing {
-                    existing.target.insert(name, bits);
-                } else {
-                    let new_node = Node::new(name, self.offset() + len);
-                    new_node.insert(name, bits);
-                    self.insert_constrained(ConstrainedTransition {
-                        value,
-                        len,
-                        target: new_node,
-                    });
+                match existing {
+                    // if transition already exists, continue insertion on its target
+                    Some(existing) => {
+                        existing.target.insert(name, bits);
+                    }
+                    // otherwise, create a new one
+                    None => {
+                        let new_node = Node::new(name, self.offset() + len);
+                        new_node.insert(name, bits);
+                        self.insert_constrained(ConstrainedTransition {
+                            value,
+                            len,
+                            target: new_node,
+                        });
+                    }
                 }
             }
             Prefix::Unconstrained { len } => {
-                let unconstrained = self.unconstrained();
-                match unconstrained {
+                match self.unconstrained() {
+                    // current node does not have an unconstrained transition, insert one
                     None => {
                         let new_node = Node::new(name, self.offset() + len);
                         new_node.insert(name, bits);
@@ -267,42 +273,56 @@ impl Node {
                             target: new_node,
                         });
                     }
+                    // current node does have an unconstrained transition
                     Some(transition) => {
+                        // existing unconstrained transition already covers the prefix length
                         if len >= transition.len {
-                            // first `len` bits are already handled, so just proceed
+                            // first `len` bits are already handled so simply continue
                             transition.target.insert(name, bits);
-                        } else {
-                            // transition is shorter so need to break transition in twain, and pass new node to first part
+                        }
+                        // existing unconstrained transition only covers part of the prefix
+                        else {
+                            // transition is shorter so need to break transition in twain, and pass
+                            // new node to first part
 
                             // length of first transition is the prefix length
-                            let t_len_a = len;
+                            let first_transition_length = len;
 
-                            // length of second transition is the remaining length of the original transition
-                            let t_len_b = transition.len - len;
+                            // length of second transition is the remaining length of the original
+                            // transition
+                            let second_transition_length = transition.len - len;
 
-                            if transition.len <= t_len_a {
-                                panic!("who knows???")
+                            if transition.len <= first_transition_length {
+                                // this was a condition in the original gensim implementation
+                                // todo: figure out what it was for
+                                panic!("???")
                             }
 
                             // create new intermediate node
-                            let intermediate =
-                                Node::new("intermediate".into(), self.offset() + t_len_a);
+                            let intermediate = Node::new(
+                                "intermediate".into(),
+                                self.offset() + first_transition_length,
+                            );
 
                             // transition from current node to intermediate
-                            let t_a = UnconstrainedTransition {
-                                len: t_len_a,
+                            let first_transition = UnconstrainedTransition {
+                                len: first_transition_length,
                                 target: intermediate.clone(),
                             };
 
+                            // transition from current node
+                            self.set_unconstrained(first_transition);
+
                             // transition from intermediate to original target
-                            let t_b = UnconstrainedTransition {
-                                len: t_len_b,
+                            let second_transition = UnconstrainedTransition {
+                                len: second_transition_length,
                                 target: transition.target,
                             };
 
-                            self.set_unconstrained(t_a);
-                            intermediate.set_unconstrained(t_b);
+                            // transition from intermediate
+                            intermediate.set_unconstrained(second_transition);
 
+                            // now recurse and insert on intermediate2
                             intermediate.insert(name, bits);
                         }
                     }
@@ -367,6 +387,7 @@ fn get_prefix(bits: &[Bit], offset: usize) -> Prefix {
 
     let biterator = bits[offset..]
         .iter()
+        // get first homogenous segment
         .take_while(|bit| bit.is_unknown() == first_bit.is_unknown());
 
     match first_bit {
@@ -385,8 +406,10 @@ fn get_prefix(bits: &[Bit], offset: usize) -> Prefix {
 }
 
 mod graph {
-    use common::HashMap;
-    use dot::{Edges, GraphWalk, LabelText, Labeller, Nodes};
+    use {
+        common::HashMap,
+        dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
+    };
 
     type NodeId = u32;
     type EdgeId = (NodeId, NodeId);

@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! Sail frontend for GenSim
 
 use {
@@ -25,8 +23,8 @@ use {
 pub mod boom;
 pub mod genc;
 pub mod passes;
-pub mod rust;
 pub mod rudder;
+pub mod rust;
 
 /// Borealis error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]

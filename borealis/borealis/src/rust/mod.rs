@@ -1,7 +1,6 @@
 //! Rust module generation
 
 use {
-    crate::rust::decode::generate_decode_fns,
     crate::{
         boom::{control_flow::ControlFlowBlock, Ast, Statement},
         passes::{
@@ -10,6 +9,7 @@ use {
             remove_exception::RemoveExceptions, remove_redundant_assigns::RemoveRedundantAssigns,
             resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
+        rust::decode::generate_decode_fns,
     },
     color_eyre::eyre::Context,
     common::{intern::InternedString, HashMap},
@@ -51,7 +51,8 @@ pub fn sail_to_brig<W: Write>(
 
     info!("Generating Rust");
 
-    // let reg_fields = TokenStream::from_iter(ast.borrow().registers.iter().map(|(name, typ)| {
+    // let reg_fields =
+    // TokenStream::from_iter(ast.borrow().registers.iter().map(|(name, typ)| {
     //     let typ_str = Ident::new(&typ.emit_string(), Span::call_site());
     //     quote! {
     //         #name: #typ_str,
@@ -272,7 +273,8 @@ pub fn generate_fns(
 
         generated_fns.insert(ident, formatted);
 
-        // find all functions called by the current one, and put them in the remaining list (duplicates caught by check if ident is in `generated_fns`)
+        // find all functions called by the current one, and put them in the remaining
+        // list (duplicates caught by check if ident is in `generated_fns`)
         remaining_fns.extend(definition.entry_block.get_functions());
     }
 

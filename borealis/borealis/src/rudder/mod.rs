@@ -1,6 +1,9 @@
-use std::{borrow::Borrow, cell::RefCell, collections::LinkedList, rc::Rc};
+#![allow(unused)]
 
-use crate::boom::{self, control_flow::ControlFlowBlock, FunctionDefinition};
+use {
+    crate::boom::{self, control_flow::ControlFlowBlock, FunctionDefinition},
+    std::{cell::RefCell, collections::LinkedList, rc::Rc},
+};
 
 pub enum ConstantValue {
     UnsignedInteger(usize),
