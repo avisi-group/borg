@@ -26,6 +26,7 @@ pub mod boom;
 pub mod genc;
 pub mod passes;
 pub mod rust;
+pub mod rudder;
 
 /// Borealis error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
