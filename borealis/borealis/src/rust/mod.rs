@@ -11,9 +11,9 @@ use {
         },
         rust::decode::generate_decode_fns,
     },
-    color_eyre::eyre::Context,
-    common::{intern::InternedString, HashMap},
+    color_eyre::eyre::{Context, Result},
     log::info,
+    proc_macro2::TokenStream,
     quote::quote,
     sail::{jib_ast::Definition, sail_ast},
     std::{cell::RefCell, collections::LinkedList, io::Write, rc::Rc},
@@ -51,6 +51,8 @@ pub fn sail_to_brig<W: Write>(
 
     info!("Generating Rust");
 
+    let mut token_writer = TokenStreamWriter::new(writer);
+
     // let reg_fields =
     // TokenStream::from_iter(ast.borrow().registers.iter().map(|(name, typ)| {
     //     let typ_str = Ident::new(&typ.emit_string(), Span::call_site());
@@ -64,7 +66,7 @@ pub fn sail_to_brig<W: Write>(
         x: [u64; 31],
     };
 
-    let boilerplate = quote! {
+    let prelude = quote! {
         //! BOREALIS GENERATED FILE DO NOT MODIFY
 
         use super::{CoreState, ExecutionEngine};
@@ -117,12 +119,9 @@ pub fn sail_to_brig<W: Write>(
         }
     };
 
-    let syntax_tree = syn::parse_file(&boilerplate.to_string())
-        .wrap_err(format!("failed to parse {:?}", boilerplate.to_string()))?;
-    let formatted = prettyplease::unparse(&syntax_tree);
-    writeln!(writer, "{formatted}")?;
+    generate_decode_fns(&mut token_writer, sail_ast, ast)?;
 
-    generate_decode_fns(writer, sail_ast, ast);
+    token_writer.emit(prelude)?;
 
     Ok(())
 }
@@ -238,45 +237,20 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
     ast.borrow_mut().functions = funcs;
 }
 
-/// Generates Rust functions from all functions in a BOOM AST
-pub fn generate_fns(
-    ast: Rc<RefCell<Ast>>,
-    initial_fns: Vec<InternedString>,
-) -> color_eyre::Result<Vec<String>> {
-    let mut remaining_fns = initial_fns;
-    let mut generated_fns = HashMap::default();
+struct TokenStreamWriter<'w, W> {
+    writer: &'w mut W,
+}
 
-    while let Some(ident) = remaining_fns.pop() {
-        // skip if already generated
-        if generated_fns.contains_key(&ident) {
-            continue;
-        }
-
-        let ast = ast.borrow();
-        let Some(definition) = ast.functions.get(&ident) else {
-            log::trace!("cannot generate GenC for unknown function {ident:?}");
-            continue;
-        };
-        log::trace!("generating {ident}");
-
-        let generated = quote! {
-            fn #ident() {
-                todo!();
-            }
-        }
-        .to_string();
-
-        // count format the whole file at the end but it might be slow?
-        let syntax_tree =
-            syn::parse_file(&generated).wrap_err(format!("failed to parse {generated:?}"))?;
-        let formatted = prettyplease::unparse(&syntax_tree);
-
-        generated_fns.insert(ident, formatted);
-
-        // find all functions called by the current one, and put them in the remaining
-        // list (duplicates caught by check if ident is in `generated_fns`)
-        remaining_fns.extend(definition.entry_block.get_functions());
+impl<'w, W: Write> TokenStreamWriter<'w, W> {
+    pub fn new(writer: &'w mut W) -> Self {
+        Self { writer }
     }
 
-    Ok(generated_fns.into_values().collect())
+    pub fn emit(&mut self, tokens: TokenStream) -> Result<()> {
+        // could format the whole file at the end idk
+        let syntax_tree =
+            syn::parse_file(&tokens.to_string()).wrap_err(format!("failed to parse tokens"))?;
+        let formatted = prettyplease::unparse(&syntax_tree);
+        Ok(self.writer.write_all(formatted.as_bytes())?)
+    }
 }

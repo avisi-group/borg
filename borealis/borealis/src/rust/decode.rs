@@ -8,8 +8,12 @@ use {
             format::{Segment, SegmentContent},
         },
         rudder,
+        rust::TokenStreamWriter,
     },
+    color_eyre::Result,
     common::{identifiable::unique_id, intern::InternedString, HashMap},
+    proc_macro2::{Ident, Literal, TokenStream},
+    quote::{format_ident, quote, TokenStreamExt},
     sail::sail_ast,
     std::{
         cell::RefCell,
@@ -19,11 +23,11 @@ use {
     },
 };
 
-pub fn generate_decode_fns<W: Write>(
-    writer: &mut W,
+pub fn generate_decode_fns<'w, W: Write>(
+    writer: &mut TokenStreamWriter<'w, W>,
     sail: &sail_ast::Ast,
     boom: Rc<RefCell<boom::Ast>>,
-) {
+) -> Result<()> {
     // retrieve all `decode64` function clauses
     let epfns = get_instruction_entrypoint_fns(sail);
 
@@ -69,7 +73,7 @@ pub fn generate_decode_fns<W: Write>(
         tree.insert(name.0.clone(), bits);
     }
 
-    tree.codegen(writer);
+    tree.codegen(writer)?;
 
     let boom_functions = &boom.borrow().functions;
     let mut seen = HashSet::new();
@@ -81,23 +85,27 @@ pub fn generate_decode_fns<W: Write>(
         seen.insert(name.0);
         let boomfn = boom_functions.get(&name.0);
 
-        generate_decode_fn(writer, name.0, boomfn.unwrap());
+        generate_decode_fn(writer, name.0, boomfn.unwrap())?;
     }
+
+    Ok(())
 }
 
-fn generate_decode_fn<W: Write>(
-    writer: &mut W,
+fn generate_decode_fn<'w, W: Write>(
+    writer: &mut TokenStreamWriter<'w, W>,
     name: InternedString,
     boom_function: &boom::FunctionDefinition,
-) {
+) -> Result<()> {
     let _rudderfn = rudder::Function::from_boom(boom_function);
 
-    writeln!(
-        writer,
-        "fn execute_{}(state: &mut AArch64CoreState) -> ExecuteResult {{ log::trace!({:?}); ExecuteResult::Ok }}",
-        name, name
-    )
-    .unwrap();
+    let fn_name = execute_fn_name_to_ident(name);
+
+    writer.emit(quote! {
+        fn #fn_name(state: &mut AArch64CoreState) -> ExecuteResult {
+            log::trace!(#name);
+            ExecuteResult::Ok
+        }
+    })
 }
 
 pub struct DecodeTree {
@@ -115,60 +123,81 @@ impl DecodeTree {
         self.root.insert(name, bits)
     }
 
-    pub fn codegen<W: Write>(&self, writer: &mut W) {
-        writeln!(
-            writer,
-            "fn execute_instruction(value: u32, state: &mut AArch64CoreState) -> ExecuteResult {{"
-        )
-        .unwrap();
-        Self::to_rs_rec(writer, self.root.clone());
-        writeln!(writer, "ExecuteResult::UndefinedInstruction").unwrap();
-        writeln!(writer, "}}").unwrap();
+    pub fn codegen<'w, W: Write>(&self, writer: &mut TokenStreamWriter<'w, W>) -> Result<()> {
+        let body = Self::to_rs_rec(writer, self.root.clone());
+        writer.emit(quote! {
+            fn execute_instruction(value: u32, state: &mut AArch64CoreState) -> ExecuteResult {
+                #body
+                ExecuteResult::UndefinedInstruction
+            }
+        })
     }
 
-    fn to_rs_rec<W: Write>(w: &mut W, node: Node) {
-        if node.offset() == 32 {
-            if !node.constrained().is_empty() || node.unconstrained().is_some() {
-                panic!("leaf should not have children");
+    fn to_rs_rec<'w, W: Write>(w: &mut TokenStreamWriter<'w, W>, node: Node) -> TokenStream {
+        // check if it is a leaf node
+        if node.constrained().is_empty() && node.unconstrained().is_none() {
+            if node.offset() != 32 {
+                panic!("leaf should have length 32");
             }
 
-            writeln!(w, "return execute_{}(state);", node.name()).unwrap();
+            let fn_name = execute_fn_name_to_ident(node.name());
+
+            return quote!(return #fn_name(state););
         }
 
+        let mut constrained_handlers = quote!();
         let mut first = true;
         for constrained in node.constrained() {
             let start_idx = node.offset();
-            let len = constrained.len;
 
-            let mask = ((1u64 << len) - 1) << start_idx;
-            let pattern = constrained.value << start_idx;
+            let mask = u32::try_from(((1u64 << constrained.len) - 1) << start_idx).unwrap();
+            let pattern = u32::try_from(constrained.value << start_idx).unwrap();
 
-            if start_idx + len > 32 {
+            if start_idx + constrained.len > 32 {
                 panic!("bit extract overflow")
-            } else if len == 32 {
-                writeln!(w, "if value == 0x{pattern:08x} {{").unwrap();
-            } else {
-                if !first {
-                    write!(w, "else ").unwrap();
-                }
-
-                writeln!(w, "if (value & 0x{mask:08x}) == 0x{pattern:08x} {{").unwrap();
             }
 
-            Self::to_rs_rec(w, constrained.target);
+            let mask = format!("0x{mask:08x}").parse::<Literal>().unwrap();
+            let pattern = format!("0x{pattern:08x}").parse::<Literal>().unwrap();
 
-            writeln!(w, "}}").unwrap();
+            if constrained.len == 32 {
+                let inner = Self::to_rs_rec(w, constrained.target);
+
+                constrained_handlers.append_all(quote! {
+                    if value == #pattern {
+                        #inner
+                    }
+                });
+            } else {
+                if !first {
+                    constrained_handlers.append_all(quote! {else});
+                }
+
+                let inner = Self::to_rs_rec(w, constrained.target);
+
+                constrained_handlers.append_all(quote! {
+                    if (value & #mask) == #pattern {
+                        #inner
+                    }
+                });
+            }
 
             if first {
                 first = false;
             }
         }
 
-        if let Some(unconstrained) = node.unconstrained() {
-            Self::to_rs_rec(w, unconstrained.target);
-        }
-
         // fallthrough to unconstrained if exists
+        let unconstrained_handler = if let Some(unconstrained) = node.unconstrained() {
+            Self::to_rs_rec(w, unconstrained.target)
+        } else {
+            quote!()
+        };
+
+        quote! {
+            #constrained_handlers
+            #unconstrained_handler
+        }
     }
 
     /// Emits a decode tree as a DOT graph to `stdout`
@@ -474,4 +503,8 @@ mod graph {
             edge.1.clone()
         }
     }
+}
+
+fn execute_fn_name_to_ident<S: AsRef<str>>(name: S) -> Ident {
+    format_ident!("execute_{}", name.as_ref())
 }

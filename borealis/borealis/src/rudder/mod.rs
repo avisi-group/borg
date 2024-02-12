@@ -65,6 +65,7 @@ impl Statement {
     }
 
     fn from_boom(boom_stmt: Rc<RefCell<crate::boom::Statement>>) -> Self {
+        // what in the name of greyskull?
         match &*((*boom_stmt).borrow()) {
             boom::Statement::TypeDeclaration { name, typ } => todo!(),
             boom::Statement::Copy { expression, value } => todo!(),
