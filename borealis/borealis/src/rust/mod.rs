@@ -43,7 +43,6 @@ pub fn sail_to_brig(sail_ast: &sail_ast::Ast, jib_ast: &LinkedList<Definition>) 
             RemoveConstBranch::new_boxed(),
             CycleFinder::new_boxed(),
             ResolveReturns::new_boxed(),
-            DestructStructs::new_boxed(),
             ResolveBitvectors::new_boxed(),
             AddBuiltinFns::new_boxed(),
             RemoveRedundantAssigns::new_boxed(),

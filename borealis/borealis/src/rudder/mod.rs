@@ -1,5 +1,4 @@
 use {
-    crate::boom,
     common::intern::InternedString,
     proc_macro2::TokenStream,
     quote::ToTokens,
@@ -32,7 +31,7 @@ pub struct PrimitiveType {
 #[derive(Clone)]
 pub enum Type {
     Primitive(PrimitiveType),
-    Composite(Vec<PrimitiveType>),
+    Composite(Vec<Rc<Type>>),
 }
 
 macro_rules! type_def_helper {
@@ -52,7 +51,7 @@ impl Type {
         })
     }
 
-    pub fn new_composite(fields: Vec<PrimitiveType>) -> Self {
+    pub fn new_composite(fields: Vec<Rc<Type>>) -> Self {
         Self::Composite(fields)
     }
 
@@ -139,7 +138,7 @@ impl Display for Type {
                         write!(f, "v{}", p.element_count)?;
                     }
 
-                    let prefix = match p.tc {
+                    let prefix = match tc {
                         PrimitiveTypeClass::Void => unreachable!(),
                         PrimitiveTypeClass::UnsignedInteger => "u",
                         PrimitiveTypeClass::SignedInteger => "s",
@@ -149,7 +148,7 @@ impl Display for Type {
                     write!(f, "{}{}", prefix, p.element_width_in_bits)
                 }
             },
-            Type::Composite(_) => todo!(),
+            Type::Composite(_) => write!(f, "struct"),
         }
     }
 }
@@ -181,7 +180,7 @@ pub struct SymbolInner {
 }
 
 impl Symbol {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> InternedString {
         "xxx".into()
     }
 }
@@ -267,7 +266,9 @@ pub enum StatementKind {
     PhiNode {
         members: Vec<(Block, Value)>,
     },
-    Return,
+    Return {
+        value: Option<Value>,
+    },
     Select {
         condition: Value,
         true_value: Value,
@@ -324,13 +325,19 @@ impl Display for StatementKind {
 
                 write!(f, "cast {} {}:{}", op, value, typ)
             }
-            StatementKind::Jump { target } => write!(f, "jump BLOCKNAME"),
+            StatementKind::Jump { target } => write!(f, "jump {}", target.name()),
             StatementKind::Branch {
                 condition,
                 true_target,
                 false_target,
             } => {
-                write!(f, "branch {} TT FT", condition)
+                write!(
+                    f,
+                    "branch {} {} {}",
+                    condition,
+                    true_target.name(),
+                    false_target.name()
+                )
             }
             StatementKind::PhiNode { members } => {
                 write!(f, "phi ")?;
@@ -341,7 +348,12 @@ impl Display for StatementKind {
 
                 Ok(())
             }
-            StatementKind::Return => write!(f, "return"),
+            StatementKind::Return { value: None } => {
+                write!(f, "return")
+            }
+            StatementKind::Return { value: Some(value) } => {
+                write!(f, "return {value}")
+            }
             StatementKind::Select {
                 condition,
                 true_value,
@@ -364,9 +376,9 @@ pub struct Value {
 }
 
 impl Value {
-    pub fn name(&self) -> String {
-        match self.kind {
-            ValueKind::Statement(_) => "STMT".into(),
+    pub fn name(&self) -> InternedString {
+        match &self.kind {
+            ValueKind::Statement(s) => s.name(),
         }
     }
 }
@@ -402,7 +414,7 @@ pub struct Statement {
 }
 
 pub struct StatementInner {
-    name: String,
+    name: InternedString,
     kind: StatementKind,
 }
 
@@ -411,11 +423,11 @@ impl Statement {
         (*self.inner).borrow().kind.clone()
     }
 
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> InternedString {
         (*self.inner).borrow().name.clone()
     }
 
-    pub fn update_names(&self, name: String) {
+    pub fn update_names(&self, name: InternedString) {
         (*self.inner).borrow_mut().update_names(name);
     }
 
@@ -439,30 +451,6 @@ impl Statement {
             StatementKind::Select { condition, true_value, false_value } => todo!(),
         }
     }*/
-
-    fn from_boom(boom_stmt: Rc<RefCell<crate::boom::Statement>>) -> Self {
-        // what in the name of greyskull?
-        match &*((*boom_stmt).borrow()) {
-            boom::Statement::TypeDeclaration { name, typ } => todo!(),
-            boom::Statement::Copy { expression, value } => todo!(),
-            boom::Statement::FunctionCall {
-                expression,
-                name,
-                arguments,
-            } => todo!(),
-
-            boom::Statement::End(_)
-            | boom::Statement::Undefined
-            | boom::Statement::If { .. }
-            | boom::Statement::Label(_)
-            | boom::Statement::Goto(_)
-            | boom::Statement::Jump { .. }
-            | boom::Statement::Exit(_)
-            | boom::Statement::Comment(_) => unreachable!(),
-        }
-
-        todo!()
-    }
 }
 
 impl Display for Statement {
@@ -472,7 +460,7 @@ impl Display for Statement {
 }
 
 impl StatementInner {
-    pub fn update_names(&mut self, name: String) {
+    pub fn update_names(&mut self, name: InternedString) {
         self.name = name;
     }
 }
@@ -483,30 +471,47 @@ pub struct Block {
 }
 
 impl Block {
-    pub fn name(&self) -> String {
+    pub fn new() -> Self {
+        Self {
+            inner: Rc::new(RefCell::new(BlockInner {
+                name: "???".into(),
+                statements: LinkedList::new(),
+            })),
+        }
+    }
+
+    pub fn name(&self) -> InternedString {
         (*self.inner).borrow().name.clone()
     }
 
-    pub fn update_names(&self, name: String) {
+    pub fn update_names(&self, name: InternedString) {
         (*self.inner).borrow_mut().update_names(name);
+    }
+
+    pub fn statements(&self) -> LinkedList<Statement> {
+        self.inner.borrow().statements.clone()
+    }
+
+    pub fn set_statements<I: Iterator<Item = Statement>>(&self, statements: I) {
+        self.inner.borrow_mut().statements = statements.collect();
+    }
+
+    pub fn add_statement(&self, kind: StatementKind) -> Statement {
+        let statement = Statement {
+            inner: Rc::new(RefCell::new(StatementInner {
+                name: "???".into(),
+                kind,
+            })),
+        };
+        self.inner
+            .borrow_mut()
+            .statements
+            .push_back(statement.clone());
+        statement
     }
 
     pub fn iter(&self) -> BlockIterator {
         BlockIterator::new(self.clone())
-    }
-
-    fn from_boom(boom_block: &boom::control_flow::ControlFlowBlock) -> Self {
-        let mut statements = LinkedList::new();
-        for stmt in boom_block.statements() {
-            statements.push_back(Statement::from_boom(stmt));
-        }
-
-        Self {
-            inner: Rc::new(RefCell::new(BlockInner {
-                name: "x".into(),
-                statements,
-            })),
-        }
     }
 }
 
@@ -535,6 +540,23 @@ impl PartialEq for Block {
 }
 
 impl Eq for Block {}
+
+pub struct BlockInner {
+    name: InternedString,
+    statements: LinkedList<Statement>,
+}
+
+impl BlockInner {
+    pub fn update_names(&mut self, name: InternedString) {
+        self.name = name.clone();
+
+        let mut idx = 0;
+        for stmt in &self.statements {
+            stmt.update_names(format!("s_{}_{}", name.clone(), idx).into());
+            idx += 1;
+        }
+    }
+}
 
 pub struct BlockIterator {
     visited: HashSet<Block>,
@@ -572,27 +594,21 @@ impl Iterator for BlockIterator {
         // mark current node as processed
         self.visited.insert(current.clone());
 
-        // TODO: push children to visit
-        //self.remaining.extend(current.terminator().targets());
+        // push children to visit
+        if let Some(last) = current.statements().back() {
+            self.remaining.extend(match &last.inner.borrow().kind {
+                StatementKind::Jump { target } => vec![target.clone()],
+                StatementKind::Branch {
+                    true_target,
+                    false_target,
+                    ..
+                } => vec![true_target.clone(), false_target.clone()],
+                StatementKind::Return { .. } => vec![],
+                _ => panic!("block missing terminator"),
+            })
+        }
 
         Some(current)
-    }
-}
-
-pub struct BlockInner {
-    name: String,
-    statements: LinkedList<Statement>,
-}
-
-impl BlockInner {
-    pub fn update_names(&mut self, name: String) {
-        self.name = name.clone();
-
-        let mut idx = 0;
-        for stmt in &self.statements {
-            stmt.update_names(format!("s_{}_{}", name.clone(), idx));
-            idx += 1;
-        }
     }
 }
 
@@ -609,44 +625,43 @@ impl ToTokens for Function {
 
 #[derive(Clone)]
 pub struct FunctionInner {
-    return_type: Type,
-    parameters: Vec<Type>,
-    entry_block: Option<Block>,
+    return_type: Rc<Type>,
+    parameters: Vec<Rc<Type>>,
+    entry_block: Block,
 }
 
 impl Function {
-    pub fn new(return_type: Type, parameters: Vec<Type>) -> Self {
+    pub fn new(return_type: Rc<Type>, parameters: Vec<Rc<Type>>) -> Self {
         Self {
             inner: Rc::new(RefCell::new(FunctionInner {
                 return_type,
                 parameters,
-                entry_block: None,
+                entry_block: Block::new(),
             })),
         }
     }
 
     pub fn update_names(&self) {
-        if let Some(block) = &(*self.inner).borrow().entry_block {
-            let mut idx = 0;
-            for b in block.iter() {
-                b.update_names(format!("b_{}", idx).to_string());
-                idx += 1;
-            }
+        let mut idx = 0;
+        for b in self.inner.borrow().entry_block.iter() {
+            b.update_names(format!("b_{}", idx).into());
+            idx += 1;
         }
     }
 }
 
 impl Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(block) = &(*self.inner).borrow().entry_block {
-            write!(f, "{}", block)
-        } else {
-            write!(f, "(empty)")
-        }
+        self.inner
+            .borrow()
+            .entry_block
+            .iter()
+            .map(|block| write!(f, "{}", block))
+            .collect()
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub enum FunctionKind {
     Execute,
     Other,
