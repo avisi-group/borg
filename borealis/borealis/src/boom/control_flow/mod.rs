@@ -27,7 +27,7 @@ use {
 
 mod builder;
 mod dot;
-mod util;
+pub mod util;
 
 /// Creates a control flow graph from a slice of statements.
 ///

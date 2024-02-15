@@ -15,9 +15,11 @@ use {
     std::{cell::RefCell, io::stdout, rc::Rc},
 };
 
-/// Generates the instruction decode function from the Sail `decode64` clauses using a decode tree
+/// Generates the instruction decode function from the Sail `decode64` clauses
+/// using a decode tree
 pub fn generate_fn(sail: &sail_ast::Ast) -> TokenStream {
-    // retrieve all `decode64` function clauses and process clauses to extract bits from segments
+    // retrieve all `decode64` function clauses and process clauses to extract bits
+    // from segments
     let insn_formats = get_instruction_entrypoint_fns(sail)
         .iter()
         .map(process_decode_function_clause)

@@ -7,19 +7,13 @@ use {
     crate::boom::{
         control_flow::ControlFlowBlock,
         convert::BoomEmitter,
-        pretty_print::BoomPrettyPrinter,
         visitor::{Visitor, Walkable},
     },
     common::{intern::InternedString, shared_key::SharedKey, HashMap, HashSet},
     kinded::Kinded,
     num_bigint::BigInt,
     sail::jib_ast,
-    std::{
-        cell::RefCell,
-        fmt::{self, Debug, Display, Formatter},
-        ops::Add,
-        rc::Rc,
-    },
+    std::{cell::RefCell, fmt::Debug, ops::Add, rc::Rc},
 };
 
 pub mod control_flow;
@@ -193,6 +187,12 @@ pub struct Parameter {
     pub is_ref: bool,
 }
 
+impl Walkable for Parameter {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_type(self.typ.clone());
+    }
+}
+
 /// Function parameter and return types
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
@@ -336,15 +336,6 @@ impl Walkable for Rc<RefCell<Type>> {
             | FixedVector { element_type, .. }
             | Reference(element_type) => visitor.visit_type(element_type.clone()),
         }
-    }
-}
-
-impl Display for Type {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let mut visitor = BoomPrettyPrinter::new(f);
-        //TODO: this is probably bad and slow
-        visitor.visit_type(Rc::new(RefCell::new(self.clone())));
-        Ok(())
     }
 }
 

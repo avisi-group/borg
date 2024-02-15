@@ -5,69 +5,63 @@
 use {
     crate::boom::{
         control_flow::ControlFlowBlock, Definition, Expression, FunctionDefinition,
-        FunctionSignature, Literal, NamedType, NamedValue, Operation, Statement, Type, Value,
+        FunctionSignature, Literal, NamedType, NamedValue, Operation, Parameter, Statement, Type,
+        Value,
     },
     std::{cell::RefCell, rc::Rc},
 };
 
 /// Visitor trait for interacting with the BOOM AST
+#[allow(missing_docs)]
 pub trait Visitor: Sized {
-    #[allow(missing_docs)]
     fn visit_definition(&mut self, node: &Definition) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_function_definition(&mut self, node: &FunctionDefinition) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_function_signature(&mut self, node: &FunctionSignature) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
         block.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_named_type(&mut self, node: &NamedType) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_named_value(&mut self, node: &NamedValue) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
+    fn visit_parameter(&mut self, node: &Parameter) {
+        node.walk(self);
+    }
+
     fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
         node.borrow().walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_expression(&mut self, node: &Expression) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_value(&mut self, node: Rc<RefCell<Value>>) {
         node.borrow().walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
         node.walk(self);
     }
 
-    #[allow(missing_docs)]
     fn visit_operation(&mut self, node: &Operation) {
         node.walk(self);
     }

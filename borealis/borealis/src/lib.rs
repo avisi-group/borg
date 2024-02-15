@@ -95,3 +95,37 @@ pub fn deserialize_compressed_ast<P: AsRef<Path>>(
 
     Ok(out)
 }
+
+#[derive(Debug)]
+struct Indent {
+    buf: String,
+    num: usize,
+    whitespace: &'static str,
+}
+
+impl Indent {
+    pub fn new(whitespace: &'static str) -> Self {
+        Self {
+            buf: whitespace.to_owned(),
+            num: 1,
+            whitespace,
+        }
+    }
+
+    pub fn inc(&mut self) {
+        self.num += 1;
+
+        while self.buf.len() < self.num * self.whitespace.len() {
+            self.buf += self.whitespace;
+            assert!(self.buf.len() == self.num * self.whitespace.len());
+        }
+    }
+
+    pub fn dec(&mut self) {
+        self.num -= 1;
+    }
+
+    pub fn get(&self) -> &str {
+        &self.buf[..self.num * self.whitespace.len()]
+    }
+}
