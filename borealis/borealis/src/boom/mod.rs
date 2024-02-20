@@ -5,6 +5,7 @@
 
 use {
     crate::boom::{
+        builtins::builtin_fns,
         control_flow::ControlFlowBlock,
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
@@ -16,6 +17,7 @@ use {
     std::{cell::RefCell, fmt::Debug, ops::Add, rc::Rc},
 };
 
+pub mod builtins;
 pub mod control_flow;
 pub mod convert;
 pub mod pretty_print;
@@ -39,7 +41,16 @@ impl Ast {
     ) -> Rc<RefCell<Self>> {
         let mut emitter = BoomEmitter::new();
         emitter.process(iter);
-        Rc::new(RefCell::new(emitter.finish()))
+
+        let mut ast = emitter.finish();
+
+        ast.functions.extend(
+            builtin_fns()
+                .into_iter()
+                .map(|(name, def)| (name.into(), def)),
+        );
+
+        Rc::new(RefCell::new(ast))
     }
 
     /// Collects all statements in the AST into a HashSet

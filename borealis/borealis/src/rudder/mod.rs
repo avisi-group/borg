@@ -1,37 +1,52 @@
 use {
     common::intern::InternedString,
+    log::warn,
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
         cell::RefCell,
         collections::{HashMap, HashSet, LinkedList},
-        fmt::Display,
         hash::{Hash, Hasher},
         rc::Rc,
     },
 };
 
 pub mod build;
+mod pretty_print;
 
-#[derive(Clone)]
+#[derive(Hash, Clone, Copy)]
 pub enum PrimitiveTypeClass {
     Void,
+    Unit,
     UnsignedInteger,
     SignedInteger,
     FloatingPoint,
 }
 
-#[derive(Clone)]
+#[derive(Hash, Clone)]
 pub struct PrimitiveType {
     tc: PrimitiveTypeClass,
     element_width_in_bits: usize,
-    element_count: usize,
 }
 
-#[derive(Clone)]
+impl PrimitiveType {
+    pub fn type_class(&self) -> PrimitiveTypeClass {
+        self.tc
+    }
+
+    pub fn width(&self) -> usize {
+        self.element_width_in_bits
+    }
+}
+
+#[derive(Hash, Clone)]
 pub enum Type {
     Primitive(PrimitiveType),
     Composite(Vec<Rc<Type>>),
+    Vector {
+        element_count: usize,
+        element_type: Rc<Type>,
+    },
 }
 
 macro_rules! type_def_helper {
@@ -47,7 +62,6 @@ impl Type {
         Self::Primitive(PrimitiveType {
             tc,
             element_width_in_bits: element_width,
-            element_count: 1,
         })
     }
 
@@ -59,8 +73,25 @@ impl Type {
         Self::Primitive(PrimitiveType {
             tc: PrimitiveTypeClass::Void,
             element_width_in_bits: 0,
-            element_count: 0,
         })
+    }
+
+    pub fn unit() -> Self {
+        Self::Primitive(PrimitiveType {
+            tc: PrimitiveTypeClass::Unit,
+            element_width_in_bits: 0,
+        })
+    }
+
+    pub fn width(&self) -> usize {
+        match self {
+            Self::Composite(xs) => xs.iter().map(|x| x.width()).sum(),
+            Self::Primitive(p) => p.element_width_in_bits,
+            Type::Vector {
+                element_count,
+                element_type,
+            } => element_type.width() * element_count,
+        }
     }
 
     type_def_helper!(u1, UnsignedInteger, 1);
@@ -75,28 +106,32 @@ impl Type {
     type_def_helper!(f32, FloatingPoint, 32);
     type_def_helper!(f64, FloatingPoint, 64);
 
-    pub fn vectorize(self, element_count: usize) -> Result<Self, ()> {
-        match self {
-            Type::Primitive(p) => {
-                if p.element_count > 1 {
-                    Ok(Self::Primitive(PrimitiveType {
-                        tc: p.tc,
-                        element_width_in_bits: p.element_width_in_bits,
-                        element_count,
-                    }))
-                } else {
-                    Err(())
-                }
-            }
-            Type::Composite(_) => Err(()),
+    pub fn vectorize(self, element_count: usize) -> Self {
+        Self::Vector {
+            element_count,
+            element_type: Rc::new(self),
         }
     }
 
-    /*pub fn is_void(&self) -> bool {
-        matches!(self.tc, TypeClass::Void)
+    pub fn is_void(&self) -> bool {
+        match self {
+            Self::Primitive(PrimitiveType { tc, .. }) => {
+                matches!(tc, PrimitiveTypeClass::Void)
+            }
+            _ => false,
+        }
     }
 
-    pub fn is_integer(&self) -> bool {
+    pub fn is_unit(&self) -> bool {
+        match self {
+            Self::Primitive(PrimitiveType { tc, .. }) => {
+                matches!(tc, PrimitiveTypeClass::Unit)
+            }
+            _ => false,
+        }
+    }
+
+    /*pub fn is_integer(&self) -> bool {
         matches!(
             self.tc,
             TypeClass::UnsignedInteger | TypeClass::SignedInteger
@@ -128,60 +163,38 @@ impl Type {
     }*/
 }
 
-impl Display for Type {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            Type::Primitive(p) => match &p.tc {
-                PrimitiveTypeClass::Void => write!(f, "void"),
-                tc => {
-                    if p.element_count > 1 {
-                        write!(f, "v{}", p.element_count)?;
-                    }
-
-                    let prefix = match tc {
-                        PrimitiveTypeClass::Void => unreachable!(),
-                        PrimitiveTypeClass::UnsignedInteger => "u",
-                        PrimitiveTypeClass::SignedInteger => "s",
-                        PrimitiveTypeClass::FloatingPoint => "f",
-                    };
-
-                    write!(f, "{}{}", prefix, p.element_width_in_bits)
-                }
-            },
-            Type::Composite(_) => write!(f, "struct"),
-        }
-    }
-}
-
 #[derive(Clone)]
 pub enum ConstantValue {
     UnsignedInteger(usize),
     SignedInteger(isize),
     FloatingPoint(f64),
+    Unit,
 }
 
-impl Display for ConstantValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConstantValue::UnsignedInteger(v) => write!(f, "{}", v),
-            ConstantValue::SignedInteger(v) => write!(f, "{}", v),
-            ConstantValue::FloatingPoint(v) => write!(f, "{}", v),
-        }
-    }
+#[derive(Clone, Copy)]
+pub enum SymbolKind {
+    Parameter,
+    LocalVariable,
 }
 
 #[derive(Clone)]
 pub struct Symbol {
-    inner: Rc<RefCell<SymbolInner>>,
-}
-
-pub struct SymbolInner {
-    tag: usize,
+    name: InternedString,
+    kind: SymbolKind,
+    typ: Rc<Type>,
 }
 
 impl Symbol {
     pub fn name(&self) -> InternedString {
-        "xxx".into()
+        self.name
+    }
+
+    pub fn kind(&self) -> SymbolKind {
+        self.kind
+    }
+
+    pub fn typ(&self) -> Rc<Type> {
+        self.typ.clone()
     }
 }
 
@@ -192,10 +205,21 @@ pub enum BinaryOperationKind {
     Multiply,
     Divide,
     Modulo,
+    And,
+    Or,
+    Xor,
+    CmpEq,
+    CmpNe,
+    CmpLt,
+    CmpLe,
+    CmpGt,
+    CmpGe,
 }
 
 #[derive(Clone)]
 pub enum UnaryOperationKind {
+    Not,
+    Negate,
     Complement,
 }
 
@@ -210,8 +234,18 @@ pub enum CastOperationKind {
 }
 
 #[derive(Clone)]
+pub enum ShiftOperationKind {
+    LogicalShiftLeft,
+    LogicalShiftRight,
+    ArithmeticShiftRight,
+    RotateRight,
+    RotateLeft,
+}
+
+#[derive(Clone)]
 pub enum StatementKind {
     Constant {
+        typ: Rc<Type>,
         value: ConstantValue,
     },
     ReadVariable {
@@ -219,193 +253,87 @@ pub enum StatementKind {
     },
     WriteVariable {
         symbol: Symbol,
-        value: Value,
+        value: Statement,
     },
     ReadRegister {
-        typ: Type,
-        offset: Value,
+        typ: Rc<Type>,
+        offset: Statement,
     },
     WriteRegister {
-        offset: Value,
-        value: Value,
+        offset: Statement,
+        value: Statement,
     },
     ReadMemory {
-        typ: Type,
-        offset: Value,
+        typ: Rc<Type>,
+        offset: Statement,
     },
     WriteMemory {
-        offset: Value,
-        value: Value,
+        offset: Statement,
+        value: Statement,
+    },
+    ReadPc,
+    WritePc {
+        value: Statement,
     },
     BinaryOperation {
         kind: BinaryOperationKind,
-        lhs: Value,
-        rhs: Value,
+        lhs: Statement,
+        rhs: Statement,
     },
     UnaryOperation {
         kind: UnaryOperationKind,
-        value: Value,
+        value: Statement,
+    },
+    ShiftOperation {
+        kind: ShiftOperationKind,
+        value: Statement,
+        amount: Statement,
     },
     Call {
         target: Function,
-        args: Vec<Value>,
+        args: Vec<Statement>,
     },
     Cast {
         kind: CastOperationKind,
-        typ: Type,
-        value: Value,
+        typ: Rc<Type>,
+        value: Statement,
     },
     Jump {
         target: Block,
     },
     Branch {
-        condition: Value,
+        condition: Statement,
         true_target: Block,
         false_target: Block,
     },
     PhiNode {
-        members: Vec<(Block, Value)>,
+        members: Vec<(Block, Statement)>,
     },
     Return {
-        value: Option<Value>,
+        value: Option<Statement>,
     },
     Select {
-        condition: Value,
-        true_value: Value,
-        false_value: Value,
+        condition: Statement,
+        true_value: Statement,
+        false_value: Statement,
     },
+    BitExtract {
+        value: Statement,
+        start: Statement,
+        length: Statement,
+    },
+    BitInsert {
+        original_value: Statement,
+        insert_value: Statement,
+        start: Statement,
+        length: Statement,
+    },
+    Trap,
 }
 
-impl Display for StatementKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self {
-            StatementKind::Constant { value } => write!(f, "const #{}", value),
-            StatementKind::ReadVariable { symbol } => write!(f, "read-var {}", symbol.name()),
-            StatementKind::WriteVariable { symbol, value } => {
-                write!(f, "write-var {} {}", symbol.name(), value)
-            }
-            StatementKind::ReadRegister { typ, offset } => {
-                write!(f, "read-reg {}:{}", offset, typ)
-            }
-            StatementKind::WriteRegister { offset, value } => {
-                write!(f, "write-reg {} {}", offset, value)
-            }
-            StatementKind::ReadMemory { typ, offset } => write!(f, "read-mem {}:{}", offset, typ),
-            StatementKind::WriteMemory { offset, value } => {
-                write!(f, "write-mem {} {}", offset, value)
-            }
-            StatementKind::BinaryOperation { kind, lhs, rhs } => {
-                let op = match kind {
-                    BinaryOperationKind::Add => "add",
-                    BinaryOperationKind::Sub => "sub",
-                    BinaryOperationKind::Multiply => "mul",
-                    BinaryOperationKind::Divide => "div",
-                    BinaryOperationKind::Modulo => "mod",
-                };
-
-                write!(f, "{} {} {}", op, lhs, rhs)
-            }
-            StatementKind::UnaryOperation { kind, value } => {
-                let op = match kind {
-                    UnaryOperationKind::Complement => "cmpl",
-                };
-
-                write!(f, "{} {}", op, value)
-            }
-            StatementKind::Call { target, args } => write!(f, "call FUNCNAME"),
-            StatementKind::Cast { kind, typ, value } => {
-                let op = match kind {
-                    CastOperationKind::ZeroExtend => "zx",
-                    CastOperationKind::SignExtend => "sx",
-                    CastOperationKind::Truncate => "trunc",
-                    CastOperationKind::Reinterpret => "reint",
-                    CastOperationKind::Convert => "cvt",
-                    CastOperationKind::Broadcast => "bcast",
-                };
-
-                write!(f, "cast {} {}:{}", op, value, typ)
-            }
-            StatementKind::Jump { target } => write!(f, "jump {}", target.name()),
-            StatementKind::Branch {
-                condition,
-                true_target,
-                false_target,
-            } => {
-                write!(
-                    f,
-                    "branch {} {} {}",
-                    condition,
-                    true_target.name(),
-                    false_target.name()
-                )
-            }
-            StatementKind::PhiNode { members } => {
-                write!(f, "phi ")?;
-
-                for member in members {
-                    write!(f, "(BLOCK, {}) ", member.1)?;
-                }
-
-                Ok(())
-            }
-            StatementKind::Return { value: None } => {
-                write!(f, "return")
-            }
-            StatementKind::Return { value: Some(value) } => {
-                write!(f, "return {value}")
-            }
-            StatementKind::Select {
-                condition,
-                true_value,
-                false_value,
-            } => {
-                write!(f, "select {} {} {}", condition, true_value, false_value)
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum ValueKind {
-    Statement(Statement),
-}
-
-#[derive(Clone)]
-pub struct Value {
-    kind: ValueKind,
-}
-
-impl Value {
-    pub fn name(&self) -> InternedString {
-        match &self.kind {
-            ValueKind::Statement(s) => s.name(),
-        }
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.name())
-    }
-}
-
-pub enum ValueClassification {
+pub enum ValueClass {
     Fixed,
     Dynamic,
-}
-
-impl Value {
-    pub fn classify(&self) -> ValueClassification {
-        match &self.kind {
-            ValueKind::Statement(stmt) => {
-                todo!()
-            }
-        }
-    }
-
-    pub fn typ(&self) -> Type {
-        todo!()
-    }
 }
 
 #[derive(Clone)]
@@ -419,6 +347,15 @@ pub struct StatementInner {
 }
 
 impl Statement {
+    pub fn from_kind(kind: StatementKind) -> Self {
+        Self {
+            inner: Rc::new(RefCell::new(StatementInner {
+                name: "".into(),
+                kind,
+            })),
+        }
+    }
+
     pub fn kind(&self) -> StatementKind {
         (*self.inner).borrow().kind.clone()
     }
@@ -431,9 +368,9 @@ impl Statement {
         (*self.inner).borrow_mut().update_names(name);
     }
 
-    /*pub fn has_value(&self) -> bool {
+    pub fn classify(&self) -> ValueClass {
         match self.kind() {
-            StatementKind::Constant { value } => todo!(),
+            StatementKind::Constant { typ, value } => ValueClass::Fixed,
             StatementKind::ReadVariable { symbol } => todo!(),
             StatementKind::WriteVariable { symbol, value } => todo!(),
             StatementKind::ReadRegister { typ, offset } => todo!(),
@@ -442,20 +379,96 @@ impl Statement {
             StatementKind::WriteMemory { offset, value } => todo!(),
             StatementKind::BinaryOperation { kind, lhs, rhs } => todo!(),
             StatementKind::UnaryOperation { kind, value } => todo!(),
+            StatementKind::ShiftOperation {
+                kind,
+                value,
+                amount,
+            } => todo!(),
             StatementKind::Call { target, args } => todo!(),
             StatementKind::Cast { kind, typ, value } => todo!(),
             StatementKind::Jump { target } => todo!(),
-            StatementKind::Branch { condition, true_target, false_target } => todo!(),
+            StatementKind::Branch {
+                condition,
+                true_target,
+                false_target,
+            } => todo!(),
             StatementKind::PhiNode { members } => todo!(),
-            StatementKind::Return => todo!(),
-            StatementKind::Select { condition, true_value, false_value } => todo!(),
+            StatementKind::Return { value } => todo!(),
+            StatementKind::Select {
+                condition,
+                true_value,
+                false_value,
+            } => todo!(),
+            StatementKind::Trap => todo!(),
+            StatementKind::ReadPc => ValueClass::Dynamic,
+            StatementKind::WritePc { value } => todo!(),
+            StatementKind::BitExtract {
+                value,
+                start,
+                length,
+            } => todo!(),
+            StatementKind::BitInsert {
+                original_value,
+                insert_value,
+                start,
+                length,
+            } => todo!(),
         }
-    }*/
-}
+    }
 
-impl Display for Statement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{}: {}", self.name(), self.kind())
+    pub fn get_type(&self) -> Rc<Type> {
+        match self.kind() {
+            StatementKind::Constant { typ, value } => typ,
+            StatementKind::ReadVariable { symbol } => symbol.typ,
+            StatementKind::WriteVariable { symbol, value } => Rc::new(Type::void()),
+            StatementKind::ReadRegister { typ, offset } => typ,
+            StatementKind::WriteRegister { offset, value } => Rc::new(Type::void()),
+            StatementKind::ReadMemory { typ, offset } => typ,
+            StatementKind::WriteMemory { offset, value } => Rc::new(Type::void()),
+            StatementKind::BinaryOperation { kind, lhs, rhs } => lhs.get_type(),
+            StatementKind::UnaryOperation { kind, value } => value.get_type(),
+            StatementKind::ShiftOperation {
+                kind,
+                value,
+                amount,
+            } => value.get_type(),
+            StatementKind::Call { target, args } => target.return_type(),
+            StatementKind::Cast { kind, typ, value } => typ,
+            StatementKind::Jump { target } => Rc::new(Type::void()),
+            StatementKind::Branch {
+                condition,
+                true_target,
+                false_target,
+            } => Rc::new(Type::void()),
+            StatementKind::PhiNode { members } => members
+                .first()
+                .map(|(_, stmt)| stmt.get_type())
+                .unwrap_or_else(|| Rc::new(Type::void())),
+            StatementKind::Return { value } => Rc::new(Type::void()),
+            StatementKind::Select {
+                condition,
+                true_value,
+                false_value,
+            } => true_value.get_type(),
+            StatementKind::Trap => Rc::new(Type::void()),
+            StatementKind::ReadPc => Rc::new(Type::u64()),
+            StatementKind::WritePc { value } => Rc::new(Type::void()),
+            StatementKind::BitExtract {
+                value,
+                start,
+                length,
+            } => value.get_type(),
+            StatementKind::BitInsert {
+                original_value,
+                insert_value,
+                start,
+                length,
+            } => original_value.get_type(),
+        }
+    }
+
+    pub fn has_value(&self) -> bool {
+        !self.get_type().is_void()
     }
 }
 
@@ -496,34 +509,12 @@ impl Block {
         self.inner.borrow_mut().statements = statements.collect();
     }
 
-    pub fn add_statement(&self, kind: StatementKind) -> Statement {
-        let statement = Statement {
-            inner: Rc::new(RefCell::new(StatementInner {
-                name: "???".into(),
-                kind,
-            })),
-        };
-        self.inner
-            .borrow_mut()
-            .statements
-            .push_back(statement.clone());
-        statement
+    pub fn extend_statements<I: Iterator<Item = Statement>>(&self, stmts: I) {
+        self.inner.borrow_mut().statements.extend(stmts)
     }
 
     pub fn iter(&self) -> BlockIterator {
         BlockIterator::new(self.clone())
-    }
-}
-
-impl Display for Block {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "block {}:", self.name())?;
-
-        for stmt in &(*self.inner).borrow().statements {
-            writeln!(f, "{}", stmt)?;
-        }
-
-        Ok(())
     }
 }
 
@@ -604,7 +595,10 @@ impl Iterator for BlockIterator {
                     ..
                 } => vec![true_target.clone(), false_target.clone()],
                 StatementKind::Return { .. } => vec![],
-                _ => panic!("block missing terminator"),
+                _ => {
+                    warn!("block missing terminator");
+                    vec![]
+                }
             })
         }
 
@@ -625,20 +619,51 @@ impl ToTokens for Function {
 
 #[derive(Clone)]
 pub struct FunctionInner {
+    name: InternedString,
     return_type: Rc<Type>,
-    parameters: Vec<Rc<Type>>,
+    parameters: Vec<Symbol>,
+    local_variables: HashMap<InternedString, Symbol>,
     entry_block: Block,
 }
 
 impl Function {
-    pub fn new(return_type: Rc<Type>, parameters: Vec<Rc<Type>>) -> Self {
-        Self {
+    pub fn new<I: Iterator<Item = (InternedString, Rc<Type>)>>(
+        name: InternedString,
+        return_type: Rc<Type>,
+        parameters: I,
+    ) -> Self {
+        let mut celf = Self {
             inner: Rc::new(RefCell::new(FunctionInner {
-                return_type,
-                parameters,
+                name,
+                return_type: return_type.clone(),
+                parameters: parameters
+                    .map(|(name, typ)| Symbol {
+                        name,
+                        kind: SymbolKind::Parameter,
+                        typ,
+                    })
+                    .collect(),
+                local_variables: HashMap::new(),
                 entry_block: Block::new(),
             })),
-        }
+        };
+
+        celf.add_local_variable("exception".into(), Rc::new(Type::u32()));
+        celf.add_local_variable("return_value".into(), return_type);
+        celf.add_local_variable("throw".into(), Rc::new(Type::u32()));
+
+        celf
+    }
+
+    pub fn name(&self) -> InternedString {
+        self.inner.borrow().name
+    }
+
+    pub fn signature(&self) -> (Rc<Type>, Vec<Symbol>) {
+        (
+            self.inner.borrow().return_type.clone(),
+            self.inner.borrow().parameters.clone(),
+        )
     }
 
     pub fn update_names(&self) {
@@ -648,16 +673,46 @@ impl Function {
             idx += 1;
         }
     }
-}
 
-impl Display for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    pub fn add_local_variable(&mut self, name: InternedString, typ: Rc<Type>) {
+        self.inner.borrow_mut().local_variables.insert(
+            name,
+            Symbol {
+                name,
+                kind: SymbolKind::LocalVariable,
+                typ,
+            },
+        );
+    }
+
+    pub fn get_local_variable(&self, name: InternedString) -> Option<Symbol> {
+        self.inner.borrow().local_variables.get(&name).cloned()
+    }
+
+    pub fn local_variables(&self) -> Vec<Symbol> {
         self.inner
             .borrow()
-            .entry_block
-            .iter()
-            .map(|block| write!(f, "{}", block))
+            .local_variables
+            .values()
+            .cloned()
             .collect()
+    }
+
+    pub fn get_parameter(&self, name: InternedString) -> Option<Symbol> {
+        self.inner
+            .borrow()
+            .parameters
+            .iter()
+            .find(|sym| sym.name() == name)
+            .cloned()
+    }
+
+    pub fn return_type(&self) -> Rc<Type> {
+        self.inner.borrow().return_type.clone()
+    }
+
+    pub fn entry_block(&self) -> Block {
+        self.inner.borrow().entry_block.clone()
     }
 }
 
@@ -692,42 +747,10 @@ impl Context {
         todo!()
     }
 
-    pub fn get_execute_functions(&self) -> Vec<Function> {
+    pub fn get_functions(&self) -> Vec<(InternedString, Function)> {
         self.fns
             .iter()
-            .filter_map(|(name, (kind, func))| {
-                if kind == &FunctionKind::Execute {
-                    Some(func.clone())
-                } else {
-                    None
-                }
-            })
+            .map(|(name, (_, function))| (*name, function.clone()))
             .collect()
-    }
-}
-
-impl Display for Context {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.update_names();
-
-        writeln!(f, "rudder context:")?;
-
-        for (name, (kind, func)) in self.fns.iter() {
-            writeln!(
-                f,
-                "function {} ({}):",
-                name,
-                if matches!(kind, FunctionKind::Execute) {
-                    "execute"
-                } else {
-                    "other"
-                }
-            )?;
-
-            write!(f, "{}", func);
-            writeln!(f, "");
-        }
-
-        Ok(())
     }
 }

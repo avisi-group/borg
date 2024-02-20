@@ -14,6 +14,7 @@ use {
             resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
         rudder,
+        rust::codegen::codegen,
     },
     common::intern::InternedString,
     itertools::Itertools,
@@ -24,8 +25,8 @@ use {
     std::{cell::RefCell, collections::LinkedList, io::stdout, rc::Rc},
 };
 
+mod codegen;
 mod decode;
-mod emit;
 
 /// Compiles a Sail model to a Brig module
 pub fn sail_to_brig(sail_ast: &sail_ast::Ast, jib_ast: &LinkedList<Definition>) -> TokenStream {
@@ -41,11 +42,11 @@ pub fn sail_to_brig(sail_ast: &sail_ast::Ast, jib_ast: &LinkedList<Definition>) 
         &mut [
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
-            CycleFinder::new_boxed(),
             ResolveReturns::new_boxed(),
             ResolveBitvectors::new_boxed(),
             AddBuiltinFns::new_boxed(),
             RemoveRedundantAssigns::new_boxed(),
+            CycleFinder::new_boxed(),
         ],
     );
 
@@ -137,75 +138,75 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
             // if it's not an allowlisted function, delete the body
             if ![
                 "integer_arithmetic_addsub_immediate_decode",
-                "integer_arithmetic_addsub_immediate",
-                "u__id",
-                "AddWithCarry",
-                "IsZero",
-                "u__GetSlice_int",
-                "integer_logical_shiftedreg_decode",
-                "DecodeShift",
-                "integer_logical_shiftedreg",
-                "ShiftReg",
-                "branch_conditional_cond_decode",
-                "branch_conditional_cond",
-                "integer_insext_insert_movewide_decode",
-                "integer_insext_insert_movewide",
-                "integer_arithmetic_addsub_shiftedreg_decode",
-                "DecodeShift",
-                "integer_arithmetic_addsub_shiftedreg",
-                "IsZeroBit",
-                "ConditionHolds",
-                "BranchTo",
-                "branch_unconditional_immediate_decode",
-                "branch_unconditional_immediate",
-                "memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode",
-                "memory_single_general_immediate_signed_postidx",
-                "ConstrainUnpredictable",
-                "system_hints_decode",
-                "integer_arithmetic_address_pcrel_decode",
-                "integer_arithmetic_address_pcrel",
-                "memory_pair_general_preidx_memory_pair_general_postidx__decode",
-                "memory_pair_general_postidx",
-                "memory_pair_general_offset_memory_pair_general_postidx__decode",
-                "integer_arithmetic_addsub_extendedreg_decode",
-                "DecodeRegExtend",
-                "integer_arithmetic_addsub_extendedreg",
-                "ExtendReg",
-                "memory_single_general_immediate_signed_postidx_memory_single_general_immediate_signed_postidx__decode",
-                "branch_conditional_compare_decode",
-                "branch_conditional_compare",
-                "memory_single_general_immediate_signed_preidx_memory_single_general_immediate_signed_postidx__decode",
-                "integer_conditional_select_decode",
-                "integer_conditional_select",
-                "integer_logical_immediate_decode",
-                "DecodeBitMasks",
-                "HighestSetBit",
-                "integer_logical_immediate",
-                "memory_pair_general_postidx_memory_pair_general_postidx__decode",
-                "branch_unconditional_register_decode",
-                "branch_unconditional_register",
-                "system_exceptions_runtime_svc_decode",
-                "system_exceptions_runtime_svc",
-                "integer_conditional_compare_immediate_decode",
-                "integer_conditional_compare_immediate",
-                "memory_single_general_register_memory_single_general_register__decode",
-                "memory_single_general_register",
-                "integer_conditional_compare_register_decode",
-                "integer_conditional_compare_register",
-                "memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode",
-                "memory_single_general_immediate_signed_offset_normal",
-                "integer_bitfield_decode",
-                "integer_bitfield",
-                "branch_conditional_test_decode",
-                "branch_conditional_test",
-                "system_register_system_decode",
-                "AArch64_CheckSystemAccess",
-                "system_register_system",
-                "u__IMPDEF_boolean",
-                "u__IMPDEF_boolean_map",
-                "vector_arithmetic_binary_uniform_mul_int_doubling_sisd_decode",
-                "memory_literal_general_decode",
-                "memory_literal_general"
+                // "integer_arithmetic_addsub_immediate",
+                // "u__id",
+                // "AddWithCarry",
+                // "IsZero",
+                // "u__GetSlice_int",
+                // "integer_logical_shiftedreg_decode",
+                // "DecodeShift",
+                // "integer_logical_shiftedreg",
+                // "ShiftReg",
+                // "branch_conditional_cond_decode",
+                // "branch_conditional_cond",
+                // "integer_insext_insert_movewide_decode",
+                // "integer_insext_insert_movewide",
+                // "integer_arithmetic_addsub_shiftedreg_decode",
+                // "DecodeShift",
+                // "integer_arithmetic_addsub_shiftedreg",
+                // "IsZeroBit",
+                // "ConditionHolds",
+                // "BranchTo",
+                // "branch_unconditional_immediate_decode",
+                // "branch_unconditional_immediate",
+                // "memory_single_general_immediate_unsigned_memory_single_general_immediate_signed_postidx__decode",
+                // "memory_single_general_immediate_signed_postidx",
+                // "ConstrainUnpredictable",
+                // "system_hints_decode",
+                // "integer_arithmetic_address_pcrel_decode",
+                // "integer_arithmetic_address_pcrel",
+                // "memory_pair_general_preidx_memory_pair_general_postidx__decode",
+                // "memory_pair_general_postidx",
+                // "memory_pair_general_offset_memory_pair_general_postidx__decode",
+                // "integer_arithmetic_addsub_extendedreg_decode",
+                // "DecodeRegExtend",
+                // "integer_arithmetic_addsub_extendedreg",
+                // "ExtendReg",
+                // "memory_single_general_immediate_signed_postidx_memory_single_general_immediate_signed_postidx__decode",
+                // "branch_conditional_compare_decode",
+                // "branch_conditional_compare",
+                // "memory_single_general_immediate_signed_preidx_memory_single_general_immediate_signed_postidx__decode",
+                // "integer_conditional_select_decode",
+                // "integer_conditional_select",
+                // "integer_logical_immediate_decode",
+                // "DecodeBitMasks",
+                // "HighestSetBit",
+                // "integer_logical_immediate",
+                // "memory_pair_general_postidx_memory_pair_general_postidx__decode",
+                // "branch_unconditional_register_decode",
+                // "branch_unconditional_register",
+                // "system_exceptions_runtime_svc_decode",
+                // "system_exceptions_runtime_svc",
+                // "integer_conditional_compare_immediate_decode",
+                // "integer_conditional_compare_immediate",
+                // "memory_single_general_register_memory_single_general_register__decode",
+                // "memory_single_general_register",
+                // "integer_conditional_compare_register_decode",
+                // "integer_conditional_compare_register",
+                // "memory_single_general_immediate_signed_offset_normal_memory_single_general_immediate_signed_offset_normal__decode",
+                // "memory_single_general_immediate_signed_offset_normal",
+                // "integer_bitfield_decode",
+                // "integer_bitfield",
+                // "branch_conditional_test_decode",
+                // "branch_conditional_test",
+                // "system_register_system_decode",
+                // "AArch64_CheckSystemAccess",
+                // "system_register_system",
+                // "u__IMPDEF_boolean",
+                // "u__IMPDEF_boolean_map",
+                // "vector_arithmetic_binary_uniform_mul_int_doubling_sisd_decode",
+                // "memory_literal_general_decode",
+                // "memory_literal_general"
 
                 // // CHECKPOINT
 
@@ -242,27 +243,5 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
 /// TODO: make this work on all functions? or work recursively like in genc
 pub fn generate_fns(boom: Rc<RefCell<boom::Ast>>, sail: &sail_ast::Ast) -> TokenStream {
     let rudder_ctx = rudder::build::from_boom(&*(*boom).borrow());
-
-    /*let boom_functions = &boom.borrow().functions;
-
-    // get all `decode64` clauses
-    get_instruction_entrypoint_fns(sail)
-        .iter()
-        // process to extract decode information
-        .map(process_decode_function_clause)
-        .map(|instr| instr.execute_function_name)
-        // many decode clauses may execute the same function (with different constant arguments
-        // typically) so need to filter for uniqueness
-        .unique()
-        // get the corresponding boom function definition
-        .map(|name| (name, boom_functions.get(&name).unwrap()))
-        // emit each function as a Rust function
-        .map(|(name, boom_fn)| generate_fn(name, boom_fn))
-        .collect()*/
-    // rudder_ctx.set_entrypoint();
-
-    println!("{}", rudder_ctx);
-
-    todo!();
-    // rudder_ctx.codegen();
+    codegen(rudder_ctx)
 }
