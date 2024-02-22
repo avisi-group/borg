@@ -1,5 +1,6 @@
 open Libsail
 open Sail_plugin_isla
+open Ast_util
 
 type error = Err_exception of string * string | Err_sail of Reporting.error
 
@@ -28,19 +29,92 @@ let get_lexbuf_string s filename =
     };
   lexbuf
 
-let parse_file ?loc:(l = Parse_ast.Unknown) (s : string) (filename : string) :
-    Lexer.comment list * Parse_ast.def list =
+let parse_file ?loc:(l = Parse_ast.Unknown) (source : string) (filename : string)
+    : Lexer.comment list * Parse_ast.def list =
   try
-    let lexbuf = get_lexbuf_string s filename in
+    let lexbuf = get_lexbuf_string source filename in
     try
       Lexer.comments := [];
       let defs = Parser.file Lexer.token lexbuf in
+
       (!Lexer.comments, defs)
     with Parser.Error ->
       let pos = Lexing.lexeme_start_p lexbuf in
       let tok = Lexing.lexeme lexbuf in
       raise (Reporting.err_syntax pos ("current token: " ^ tok))
   with Sys_error err -> raise (Reporting.err_general l err)
+
+let load_files ?target defs comments type_envs =
+  let t = Profile.start () in
+
+  let ast = Initial_check.process_ast ~generate:true defs in
+  let ast = { ast with comments } in
+
+  (* The separate loop measures declarations would be awkward to type check, so
+     move them into the definitions beforehand. *)
+  let ast = Rewrites.move_loop_measures ast in
+  Profile.finish "parsing" t;
+
+  let t = Profile.start () in
+  let asserts_termination =
+    Option.fold ~none:false ~some:Target.asserts_termination target
+  in
+  let ast, type_envs, side_effects =
+    Frontend.check_ast asserts_termination type_envs ast
+  in
+  Profile.finish "type checking" t;
+
+  (ast, type_envs, side_effects)
+
+let run_sail definitions comments =
+  let tgt =
+    Target.register ~name:"isla" ~options:isla_options
+      ~pre_parse_hook:isla_initialize ~rewrites:isla_rewrites isla_target
+  in
+  let () = Target.run_pre_parse_hook tgt () in
+
+  let env = Type_check.initial_env in
+  let manifest_dir = "" in
+  let opt_splice = [] in
+  let opt_file_out = None in
+
+
+  let ast, env, effect_info = load_files ~target:tgt definitions comments env in
+
+  let ast, env = Frontend.initial_rewrite effect_info env ast in
+  let ast, env =
+    List.fold_right
+      (fun file (ast, _) -> Splice.splice ast file)
+      opt_splice (ast, env)
+  in
+  let effect_info =
+    Effects.infer_side_effects (Target.asserts_termination tgt) ast
+  in
+  Reporting.opt_warnings := false;
+
+  (* Don't show warnings during re-writing for now *)
+  Target.run_pre_rewrites_hook tgt ast effect_info env;
+  let ast, effect_info, env =
+    Rewrites.rewrite effect_info env (Target.rewrites tgt) ast
+  in
+
+  let () =
+    Target.action tgt None manifest_dir opt_file_out ast effect_info env
+  in
+
+  (ast, env, effect_info)
+
+let generate_jib ast env effect_info =
+  let props = Property.find_properties ast in
+  Bindings.bindings props |> List.map fst |> IdSet.of_list
+  |> Specialize.add_initial_calls;
+
+  (* let ast, env = Specialize.(specialize typ_ord_specialization env ast) in *)
+  let cdefs, ctx = jib_of_ast env ast effect_info in
+  let cdefs, _ = Jib_optimize.remove_tuples cdefs ctx in
+  let cdefs = remove_casts cdefs |> remove_extern_impls |> fix_cons in
+
+  cdefs
 
 let () =
   (* Primary functions *)
@@ -51,73 +125,11 @@ let () =
       exception_to_result (fun () ->
           Preprocess.preprocess sail_dir target options file_ast));
 
-  Callback.register "process" (fun defs comments type_env ->
-      exception_to_result (fun () ->
-          let ast = Parse_ast.Defs defs in
-          let ast = Initial_check.process_ast ~generate:true ast in
-          let ast = { ast with comments } in
+  Callback.register "run_sail" (fun definitions comments ->
+      exception_to_result (fun () -> run_sail (Parse_ast.Defs definitions) comments));
 
-          (* The separate loop measures declarations would be awkward to type check, so
-             move them into the definitions beforehand. *)
-          let ast = Rewrites.move_loop_measures ast in
-
-          let asserts_termination =
-            Option.fold ~none:false ~some:Target.asserts_termination None
-          in
-
-          Frontend.check_ast asserts_termination type_env ast));
-
-  Callback.register "descatter" (fun effect_info env ast ->
-      exception_to_result (fun () -> Frontend.descatter effect_info env ast));
-
-  Callback.register "type_check_initial_env" (fun () ->
-      exception_to_result (fun () -> Type_check.initial_env));
-
-  Callback.register "register_isla_target" (fun () ->
-      exception_to_result (fun () ->
-          Target.register ~name:"isla" ~options:isla_options
-            ~pre_parse_hook:isla_initialize ~rewrites:isla_rewrites isla_target));
-
-  Callback.register "move_loop_measures" (fun ast ->
-      exception_to_result (fun () -> Rewrites.move_loop_measures ast));
-
-  Callback.register "target_run_pre_parse_hook" (fun target ->
-      exception_to_result (fun () -> Target.run_pre_parse_hook target ()));
-
-  Callback.register "target_asserts_termination" (fun target ->
-      exception_to_result (fun () -> Target.asserts_termination target));
-
-  Callback.register "effects_infer_side_effects" (fun asserts_termination ast ->
-      exception_to_result (fun () ->
-          Effects.infer_side_effects asserts_termination ast));
-
-  Callback.register "target_rewrites" (fun target ->
-      exception_to_result (fun () -> Target.rewrites target));
-
-  Callback.register "rewrites_rewrite"
-    (fun effect_info env rewrite_sequence ast ->
-      exception_to_result (fun () ->
-          Rewrites.rewrite effect_info env rewrite_sequence ast));
-
-  Callback.register "generate_jib" (fun ast effect_info env ->
-      exception_to_result (fun () ->
-          let props = Property.find_properties ast in
-          Ast_util.Bindings.bindings props
-          |> List.map fst |> Ast_util.IdSet.of_list
-          |> Specialize.add_initial_calls;
-
-          (* let ast, env = Specialize.(specialize typ_ord_specialization env ast) in *)
-          let cdefs, ctx = jib_of_ast env ast effect_info in
-          let cdefs, _ = Jib_optimize.remove_tuples cdefs ctx in
-          let cdefs = remove_casts cdefs |> remove_extern_impls |> fix_cons in
-
-          cdefs));
-
-  (* CLI options *)
-  Callback.register "set_non_lexical_flow" (fun b ->
-      exception_to_result (fun () -> Nl_flow.opt_nl_flow := b));
-  Callback.register "set_no_lexp_bounds_check" (fun b ->
-      exception_to_result (fun () -> Type_check.opt_no_lexp_bounds_check := b));
+  Callback.register "generate_jib" (fun ast env effect_info ->
+      exception_to_result (fun () -> generate_jib ast env effect_info));
 
   (* Utility *)
   Callback.register "util_dedup" (fun a ->
@@ -139,4 +151,4 @@ let () =
       exception_to_result (fun () -> Nat_big_num.of_string i));
 
   Callback.register "add_num" (fun a b ->
-      exception_to_result (fun () -> Nat_big_num.add a b))
+      exception_to_result (fun () -> Nat_big_num.add a b));

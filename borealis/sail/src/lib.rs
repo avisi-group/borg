@@ -5,12 +5,7 @@
 use {
     crate::{
         error::Error,
-        ffi::{
-            descatter, effects_infer_side_effects, generate_jib, move_loop_measures, parse_file,
-            preprocess, process, register_isla_target, rewrites_rewrite, set_no_lexp_bounds_check,
-            set_non_lexical_flow, target_asserts_termination, target_rewrites,
-            target_run_pre_parse_hook, type_check_initial_env,
-        },
+        ffi::{generate_jib, parse_file, preprocess, run_sail},
         json::ModelConfig,
         parse_ast::Definition,
         runtime::RT,
@@ -18,9 +13,9 @@ use {
     },
     common::intern::InternedString,
     errctx::PathCtx,
+    include_dir::{include_dir, Dir},
     log::trace,
     ocaml::{FromValue, Runtime, Value},
-    phf::{phf_map, Map},
     std::{collections::LinkedList, fs::read_to_string, path::Path},
 };
 
@@ -36,32 +31,7 @@ pub mod type_check;
 pub mod types;
 
 /// Sail standard library files
-const SAIL_LIB: Map<&'static str, &'static str> = phf_map! {
-    "arith.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/arith.sail")),
-    "exception_basic.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/exception_basic.sail")),
-    "generic_equality.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/generic_equality.sail")),
-    "mono_rewrites.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/mono_rewrites.sail")),
-    "regfp.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/regfp.sail")),
-    "string.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/string.sail")),
-    "concurrency_interface.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/concurrency_interface.sail")),
-    "exception_result.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/exception_result.sail")),
-    "instr_kinds.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/instr_kinds.sail")),
-    "option.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/option.sail")),
-    "result.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/result.sail")),
-    "trace.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/trace.sail")),
-    "elf.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/elf.sail")),
-    "float.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/float.sail")),
-    "isla.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/isla.sail")),
-    "prelude.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/prelude.sail")),
-    "reverse_endianness.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/reverse_endianness.sail")),
-    "vector_dec.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/vector_dec.sail")),
-    "exception.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/exception.sail")),
-    "flow.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/flow.sail")),
-    "mapping.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/mapping.sail")),
-    "real.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/real.sail")),
-    "smt.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/smt.sail")),
-    "vector_inc.sail" => include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/lib/vector_inc.sail")),
-};
+static SAIL_LIB: Dir = include_dir!("$CARGO_MANIFEST_DIR/lib");
 
 /// Loads Sail files from `sail.json` model configuration.
 ///
@@ -94,20 +64,10 @@ const SAIL_LIB: Map<&'static str, &'static str> = phf_map! {
 pub fn load_from_config<P: AsRef<Path>>(
     config_path: P,
 ) -> Result<(Ast, LinkedList<jib_ast::Definition>), Error> {
-    let ModelConfig { options, files } = ModelConfig::load(config_path.as_ref())?;
+    let ModelConfig { files, .. } = ModelConfig::load(config_path.as_ref())?;
 
     RT.lock().execute(move |rt| {
-        trace!("Registering isla target");
-        let target = unsafe { register_isla_target(rt) }??;
-
-        trace!("Running pre-parse hook");
-        unsafe { target_run_pre_parse_hook(rt, target.clone()) }??;
-
-        let env = unsafe { type_check_initial_env(rt)?? };
-
-        unsafe { set_non_lexical_flow(rt, options.non_lexical_flow) }??;
-        unsafe { set_no_lexp_bounds_check(rt, options.no_lexp_bounds_check) }??;
-
+        trace!("Preprocessing");
         let mut defs = LinkedList::new();
         let mut comments = LinkedList::new();
 
@@ -124,40 +84,16 @@ pub fn load_from_config<P: AsRef<Path>>(
             comments.push_back((path.clone(), file_comments));
         }
 
-        trace!("Processing");
-        let (ast, type_envs, side_effects) = unsafe { process(rt, defs, comments, env) }??;
-
-        trace!("Moving loop measures");
-        let ast = unsafe { move_loop_measures(rt, ast) }??;
-
-        trace!("Descattering");
-        let (descattered_ast, env) = unsafe { descatter(rt, side_effects, type_envs, ast) }??;
-
-        trace!("Inferring side effects");
-        let asserts_termination = unsafe { target_asserts_termination(rt, target.clone()) }??;
-        let effect_info = unsafe {
-            effects_infer_side_effects(rt, asserts_termination, descattered_ast.clone())
-        }??;
-
-        trace!("Rewriting");
-        let rewrite_sequence = unsafe { target_rewrites(rt, target) }??;
-        let (ast, effect_info, env) = unsafe {
-            rewrites_rewrite(
-                rt,
-                effect_info,
-                env,
-                rewrite_sequence,
-                descattered_ast.clone(),
-            )
-        }??;
+        trace!("Compiling Sail");
+        let (ast, env, effect_info) = unsafe { run_sail(rt, defs, comments) }??;
 
         trace!("Generating JIB IR");
-        let jib = unsafe { generate_jib(rt, ast, effect_info, env) }??;
+        let jib = unsafe { generate_jib(rt, ast.clone(), env, effect_info) }??;
 
-        Ok((
-            Ast::from_value(descattered_ast),
-            LinkedList::<jib_ast::Definition>::from_value(jib),
-        ))
+        let ast = Ast::from_value(ast);
+        let jib = LinkedList::<jib_ast::Definition>::from_value(jib);
+
+        Ok((ast, jib))
     })?
 }
 
@@ -213,13 +149,14 @@ fn resolve_includes(
             .strip_suffix('>')
             .unwrap();
 
-        let Some(included_contents) = SAIL_LIB.get(filename) else {
+        let Some(file) = SAIL_LIB.get_file(filename) else {
             return Err(Error::MissingIncludeFile(filename.to_owned(), l.clone()));
         };
 
+        let contents = file.contents_utf8().unwrap();
+
         trace!("Found {:?} in SAIL_LIB, recursing", filename);
-        let (_, mut defs) =
-            preprocess_file(rt, (*included_contents).to_owned(), filename.to_owned())?;
+        let (_, mut defs) = preprocess_file(rt, contents.to_owned(), filename.to_owned())?;
 
         if !defs.is_empty() {
             out_defs.push_back(Definition::Pragma(

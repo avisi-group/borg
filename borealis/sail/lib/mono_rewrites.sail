@@ -90,6 +90,9 @@ function extsv(m, v) = {
 val bitvector_cast_in = "zeroExtend" : forall 'n. bits('n) -> bits('n) effect pure
 val bitvector_cast_out = "zeroExtend" : forall 'n. bits('n) -> bits('n) effect pure
 
+/* Builtins for the rewrites */
+val string_of_bits_subrange = pure "string_of_bits_subrange" : forall 'n. (bits('n), int, int) -> string
+
 /* Definitions for the rewrites */
 
 val is_zero_subrange : forall 'n, 'n >= 0.
@@ -110,7 +113,7 @@ val is_ones_subrange : forall 'n, 'n >= 0.
   (bits('n), int, int) -> bool effect pure
 
 function is_ones_subrange (xs, i, j) = {
-  let m : bits('n) = slice_mask(j,j-i+1) in
+  let m : bits('n) = slice_mask(j,i-j+1) in
   (xs & m) == m
 }
 

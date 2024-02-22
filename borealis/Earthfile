@@ -22,7 +22,7 @@ base-image:
     RUN opam switch create 4.14.1+options --packages ocaml-variants.4.14.1+options,ocaml-option-static,ocaml-option-musl,ocaml-option-flambda
 
     # install sail
-    RUN eval `opam env` && opam install --assume-depexts -y sail=0.15 gmp
+    RUN eval `opam env` && opam install --assume-depexts -y sail=0.17.1 gmp
 
     RUN cargo install cargo-chef --locked
 

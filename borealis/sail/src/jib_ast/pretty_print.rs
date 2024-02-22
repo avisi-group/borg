@@ -88,7 +88,7 @@ impl Drop for IndentHandle {
 impl Visitor for JibPrettyPrinter {
     fn visit_definition(&mut self, node: &Definition) {
         match node {
-            Definition::RegDec(id, typ, _) => {
+            Definition::Register(id, typ, _) => {
                 self.prindent(format!("register {} : ", id.as_interned()));
                 self.visit_type(typ);
             }
@@ -103,13 +103,13 @@ impl Visitor for JibPrettyPrinter {
 
                 self.prindentln("}");
             }
-            Definition::Type(TypeDefinition::Struct(id, ids)) => {
+            Definition::Type(TypeDefinition::Struct(id, fields)) => {
                 self.prindentln(format!("struct {} {{", id.as_interned()));
 
                 {
                     let _h = self.indent();
-                    ids.iter().for_each(|((id, _), typ)| {
-                        self.prindent(format!("{}: ", id.as_interned()));
+                    fields.iter().for_each(|(name, typ)| {
+                        self.prindent(format!("{name}: "));
                         self.visit_type(typ);
                         println!(",");
                     });
@@ -117,13 +117,13 @@ impl Visitor for JibPrettyPrinter {
 
                 self.prindentln("}");
             }
-            Definition::Type(TypeDefinition::Variant(id, ids)) => {
+            Definition::Type(TypeDefinition::Variant(id, fields)) => {
                 self.prindentln(format!("union {} {{", id.as_interned()));
 
                 {
                     let _h = self.indent();
-                    ids.iter().for_each(|((id, _), typ)| {
-                        self.prindent(format!("{}: ", id.as_interned()));
+                    fields.iter().for_each(|(name, typ)| {
+                        self.prindent(format!("{name}: "));
                         self.visit_type(typ);
                         println!(",");
                     });
@@ -152,7 +152,7 @@ impl Visitor for JibPrettyPrinter {
 
                 println!("}}");
             }
-            Definition::Spec(id, ext, typs, typ) => {
+            Definition::Val(id, ext, typs, typ) => {
                 let keyword =
                     if let Some(true) = ext.map(|ext| self.abstract_functions.contains(&ext)) {
                         "abstract"
@@ -389,9 +389,9 @@ impl Visitor for JibPrettyPrinter {
             Type::Lint => print!("%i"),
             Type::Fint(n) => print!("%i{n}"),
             Type::Constant(bi) => print!("{}", bi.0),
-            Type::Lbits(_) => print!("%bv"),
-            Type::Sbits(n, _) => print!("%sbv{n}"),
-            Type::Fbits(n, _) => print!("%bv{n}"),
+            Type::Lbits => print!("%bv"),
+            Type::Sbits(n) => print!("%sbv{n}"),
+            Type::Fbits(n) => print!("%bv{n}"),
             Type::Unit => print!("%unit"),
             Type::Bool => print!("%bool"),
             Type::Bit => print!("%bit"),

@@ -68,8 +68,6 @@ impl Walkable for Name {
     }
 }
 
-type FieldType = ((Identifier, LinkedList<Type>), Box<Type>);
-
 /// C type
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
@@ -77,9 +75,9 @@ pub enum Type {
     Lint,
     Fint(Int),
     Constant(BigInt),
-    Lbits(bool),
-    Sbits(Int, bool),
-    Fbits(Int, bool),
+    Lbits,
+    Sbits(Int),
+    Fbits(Int),
     Unit,
     Bool,
     Bit,
@@ -89,8 +87,8 @@ pub enum Type {
     RoundingMode,
     Tup(LinkedList<Self>),
     Enum(Identifier, LinkedList<Identifier>),
-    Struct(Identifier, LinkedList<FieldType>),
-    Variant(Identifier, LinkedList<FieldType>),
+    Struct(Identifier, LinkedList<(Identifier, Type)>),
+    Variant(Identifier, LinkedList<(Identifier, Type)>),
     Fvector(Int, bool, Box<Self>),
     Vector(bool, Box<Self>),
     List(Box<Self>),
@@ -104,9 +102,9 @@ impl Walkable for Type {
             Self::Lint => (),
             Self::Fint(_) => (),
             Self::Constant(_) => (),
-            Self::Lbits(_) => (),
-            Self::Sbits(_, _) => (),
-            Self::Fbits(_, _) => (),
+            Self::Lbits => (),
+            Self::Sbits(_) => (),
+            Self::Fbits(_) => (),
             Self::Unit => (),
             Self::Bool => (),
             Self::Bit => (),
@@ -117,10 +115,9 @@ impl Walkable for Type {
             Self::Tup(types) => types.iter().for_each(|t| visitor.visit_type(t)),
             Self::Enum(_, _) => (),
             Self::Struct(_, fields) | Self::Variant(_, fields) => {
-                fields.iter().for_each(|((_, types), typ)| {
-                    types.iter().for_each(|t| visitor.visit_type(t));
+                fields.iter().for_each(|(_, typ)| {
                     visitor.visit_type(typ);
-                })
+                });
             }
             Self::Fvector(_, _, typ) | Self::Vector(_, typ) | Self::List(typ) | Self::Ref(typ) => {
                 visitor.visit_type(typ)
@@ -279,14 +276,8 @@ pub struct InstructionAnnotation {
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum TypeDefinition {
     Enum(Identifier, LinkedList<Identifier>),
-    Struct(
-        Identifier,
-        LinkedList<((Identifier, LinkedList<Type>), Type)>,
-    ),
-    Variant(
-        Identifier,
-        LinkedList<((Identifier, LinkedList<Type>), Type)>,
-    ),
+    Struct(Identifier, LinkedList<(Identifier, Type)>),
+    Variant(Identifier, LinkedList<(Identifier, Type)>),
 }
 
 impl Walkable for TypeDefinition {
@@ -294,8 +285,7 @@ impl Walkable for TypeDefinition {
         match self {
             Self::Enum(_, _) => (),
             Self::Struct(_, fields) | Self::Variant(_, fields) => {
-                fields.iter().for_each(|((_, types), typ)| {
-                    types.iter().for_each(|typ| visitor.visit_type(typ));
+                fields.iter().for_each(|(_, typ)| {
                     visitor.visit_type(typ);
                 });
             }
@@ -412,10 +402,10 @@ impl Walkable for Instruction {
 #[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum Definition {
-    RegDec(Identifier, Type, LinkedList<Instruction>),
+    Register(Identifier, Type, LinkedList<Instruction>),
     Type(TypeDefinition),
     Let(Int, LinkedList<(Identifier, Type)>, LinkedList<Instruction>),
-    Spec(Identifier, Option<InternedString>, LinkedList<Type>, Type),
+    Val(Identifier, Option<InternedString>, LinkedList<Type>, Type),
     Fundef(
         Identifier,
         Option<Identifier>,
@@ -430,7 +420,7 @@ pub enum Definition {
 impl Walkable for Definition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Self::RegDec(_, typ, instructions) => {
+            Self::Register(_, typ, instructions) => {
                 visitor.visit_type(typ);
                 instructions
                     .iter()
@@ -443,7 +433,7 @@ impl Walkable for Definition {
                     .iter()
                     .for_each(|i| visitor.visit_instruction(i));
             }
-            Self::Spec(_, _, types, typ) => {
+            Self::Val(_, _, types, typ) => {
                 types.iter().for_each(|typ| visitor.visit_type(typ));
                 visitor.visit_type(typ)
             }

@@ -42,7 +42,7 @@ impl BoomEmitter {
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
         match definition {
-            jib_ast::Definition::RegDec(ident, typ, _) => {
+            jib_ast::Definition::Register(ident, typ, _) => {
                 if ident.as_interned().as_ref() == "R" {
                     panic!("{:#?}", ident);
                 }
@@ -80,7 +80,7 @@ impl BoomEmitter {
                     body: convert_body(body),
                 });
             }
-            jib_ast::Definition::Spec(id, _, parameters, out) => {
+            jib_ast::Definition::Val(id, _, parameters, out) => {
                 self.function_types.insert(
                     id.as_interned(),
                     (
@@ -137,11 +137,11 @@ impl BoomEmitter {
 
 fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
     Rc::new(RefCell::new(match typ.borrow() {
-        jib_ast::Type::Lint | jib_ast::Type::Lbits(_) => boom::Type::Int {
+        jib_ast::Type::Lint | jib_ast::Type::Lbits => boom::Type::Int {
             signed: false,
             size: Size::Unknown,
         },
-        jib_ast::Type::Fint(i) | jib_ast::Type::Fbits(i, _) => boom::Type::Int {
+        jib_ast::Type::Fint(i) | jib_ast::Type::Fbits(i) => boom::Type::Int {
             signed: false,
             size: Size::Static(usize::try_from(*i).unwrap()),
         },
@@ -176,7 +176,7 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
         },
         jib_ast::Type::Ref(typ) => boom::Type::Reference(convert_type(&**typ)),
         jib_ast::Type::Constant(_)
-        | jib_ast::Type::Sbits(_, _)
+        | jib_ast::Type::Sbits(_)
         | jib_ast::Type::Float(_)
         | jib_ast::Type::RoundingMode
         | jib_ast::Type::Tup(_)
@@ -403,13 +403,13 @@ fn convert_variants(variants: &LinkedList<sail_ast::Identifier>) -> Vec<Interned
 fn convert_fields<
     'a,
     TYPE: Borrow<jib_ast::Type> + 'a,
-    ITER: IntoIterator<Item = &'a ((sail_ast::Identifier, LinkedList<jib_ast::Type>), TYPE)>,
+    ITER: IntoIterator<Item = &'a (sail_ast::Identifier, TYPE)>,
 >(
     fields: ITER,
 ) -> Vec<NamedType> {
     fields
         .into_iter()
-        .map(|((name, _), typ)| NamedType {
+        .map(|(name, typ)| NamedType {
             name: name.as_interned(),
             typ: convert_type(typ.borrow()),
         })

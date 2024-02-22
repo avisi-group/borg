@@ -37,8 +37,6 @@ pub enum Location {
     Hint(InternedString, Box<Location>, Box<Location>),
     /// Range between two positions
     Range(Position, Position),
-    /// Documented location
-    Documented(InternedString, Box<Location>),
 }
 
 impl Display for Location {

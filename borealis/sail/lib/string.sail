@@ -80,6 +80,8 @@ val dec_str = pure "dec_str" : int -> string
 
 val hex_str = pure "hex_str" : int -> string
 
+val hex_str_upper = pure "hex_str_upper" : int -> string
+
 val bits_str = pure "string_of_bits" : forall 'n. bitvector('n, dec) -> string
 
 val concat_str_bits : forall 'n. (string, bitvector('n, dec)) -> string
@@ -93,5 +95,9 @@ function concat_str_dec(str, x) = concat_str(str, dec_str(x))
 val print_endline = pure "print_endline" : string -> unit
 
 val prerr_endline = pure "prerr_endline" : string -> unit
+
+val print = pure "print" : string -> unit
+
+val prerr = pure "prerr" : string -> unit
 
 $endif
