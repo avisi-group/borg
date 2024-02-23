@@ -370,6 +370,19 @@ static PREGENERATED_FNS: Lazy<HashMap<InternedString, HelperFunction>> = Lazy::n
             "#
             .into(),
         },
+        HelperFunction {
+            name: "min_int".into(),
+            parameters: "uint64 a, uint64 b".into(),
+            return_type: "uint64".into(),
+            body: r#"
+                if (a > b) {
+                    return b;
+                } else {
+                    return a;
+                }
+            "#
+            .into(),
+        },
     ];
 
     HashMap::from_iter(

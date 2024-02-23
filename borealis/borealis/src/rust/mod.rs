@@ -8,18 +8,20 @@ use {
         },
         passes::{
             self, builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-            fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
-            remove_exception::RemoveExceptions, remove_redundant_assigns::RemoveRedundantAssigns,
+            destruct_structs::DestructStructs, fold_unconditionals::FoldUnconditionals,
+            remove_const_branch::RemoveConstBranch, remove_exception::RemoveExceptions,
+            remove_redundant_assigns::RemoveRedundantAssigns,
             resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
         rudder,
     },
-    common::{intern::InternedString, HashSet},
+    common::intern::InternedString,
+    itertools::Itertools,
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
     sail::{jib_ast::Definition, sail_ast},
-    std::{cell::RefCell, collections::LinkedList, rc::Rc},
+    std::{cell::RefCell, collections::LinkedList, io::stdout, rc::Rc},
 };
 
 mod decode;
@@ -41,7 +43,7 @@ pub fn sail_to_brig(sail_ast: &sail_ast::Ast, jib_ast: &LinkedList<Definition>) 
             RemoveConstBranch::new_boxed(),
             CycleFinder::new_boxed(),
             ResolveReturns::new_boxed(),
-            RemoveExceptions::new_boxed(),
+            DestructStructs::new_boxed(),
             ResolveBitvectors::new_boxed(),
             AddBuiltinFns::new_boxed(),
             RemoveRedundantAssigns::new_boxed(),
@@ -240,27 +242,28 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
 ///
 /// TODO: make this work on all functions? or work recursively like in genc
 pub fn generate_fns(boom: Rc<RefCell<boom::Ast>>, sail: &sail_ast::Ast) -> TokenStream {
-    let boom_functions = &boom.borrow().functions;
+    let rudder_ctx = rudder::build::from_boom(&*(*boom).borrow());
 
-    for name in get_instruction_entrypoint_fns(sail)
+    /*let boom_functions = &boom.borrow().functions;
+
+    // get all `decode64` clauses
+    get_instruction_entrypoint_fns(sail)
         .iter()
+        // process to extract decode information
         .map(process_decode_function_clause)
         .map(|instr| instr.execute_function_name)
-    {
-        let boom_fn = boom_functions.get(&name).unwrap();
+        // many decode clauses may execute the same function (with different constant arguments
+        // typically) so need to filter for uniqueness
+        .unique()
+        // get the corresponding boom function definition
+        .map(|name| (name, boom_functions.get(&name).unwrap()))
+        // emit each function as a Rust function
+        .map(|(name, boom_fn)| generate_fn(name, boom_fn))
+        .collect()*/
+    // rudder_ctx.set_entrypoint();
 
-        generate_fn(name, boom_fn);
-    }
-    todo!()
-}
+    println!("{}", rudder_ctx);
 
-fn generate_fn(fn_name: InternedString, _boom_function: &boom::FunctionDefinition) -> TokenStream {
-    //   let _rudderfn = rudder::Function::from_boom(boom_function);
-
-    quote! {
-        fn #fn_name(state: &mut AArch64CoreState) -> ExecuteResult {
-            log::trace!("#fn_name");
-            ExecuteResult::Ok
-        }
-    }
+    todo!();
+    // rudder_ctx.codegen();
 }

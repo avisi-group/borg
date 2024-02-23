@@ -136,7 +136,10 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("undefined_bitvector", noop),
         ("bitvector_concat", noop),
         ("aget_PC", |ast, f, s| rename(ast, f, s, "read_pc".into())),
+        // these two handlers originally replaced the call with an "inline" if statement, rather than splitting the control flow blocks, etc
         ("sail_assert", assert_handler),
+        ("min_int", noop),
+        //
         // delete undefined initializers
         ("undefined_bool", delete),
         ("undefined_LogicalOp", delete),
@@ -149,7 +152,6 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("replicate_bits", replicate_bits_handler),
         ("SetSlice_int", noop),
         ("u__SetSlice_bits", set_slice_handler),
-        ("min_int", min_int_handler),
         ("Extend__0", extend_handler),
         ("update_fbits", update_fbits_handler),
     ]
@@ -529,36 +531,6 @@ fn rename(
     true
 }
 
-pub fn assert_handler(
-    _ast: Rc<RefCell<Ast>>,
-    _function: FunctionDefinition,
-    statement: Rc<RefCell<Statement>>,
-) -> bool {
-    let (value, str) = {
-        let Statement::FunctionCall { arguments, .. } = &*statement.borrow() else {
-            panic!();
-        };
-
-        (arguments[0].clone(), arguments[1].clone())
-    };
-
-    *statement.borrow_mut() = Statement::If {
-        condition: Operation::Not(value).into(),
-        if_body: vec![
-            Statement::Comment(format!("{:?}", str).into()).into(),
-            Statement::FunctionCall {
-                expression: None,
-                name: "trap".into(),
-                arguments: vec![],
-            }
-            .into(),
-        ],
-        else_body: vec![],
-    };
-
-    true
-}
-
 /// Inserts size field
 pub fn replicate_bits_handler(
     _ast: Rc<RefCell<Ast>>,
@@ -659,43 +631,6 @@ pub fn set_slice_handler(
             Operation::LeftShift(slice, pos).into(),
         )
         .into(),
-    };
-
-    true
-}
-
-pub fn min_int_handler(
-    _ast: Rc<RefCell<Ast>>,
-    _function: FunctionDefinition,
-    statement: Rc<RefCell<Statement>>,
-) -> bool {
-    let (destination, a, b) = {
-        let Statement::FunctionCall {
-            expression,
-            arguments,
-            ..
-        } = &*statement.borrow()
-        else {
-            panic!();
-        };
-
-        (
-            expression.clone().unwrap(),
-            arguments[0].clone(),
-            arguments[1].clone(),
-        )
-    };
-
-    *statement.borrow_mut() = Statement::If {
-        condition: Operation::GreaterThan(a.clone(), b.clone()).into(),
-        if_body: vec![Rc::new(RefCell::new(Statement::Copy {
-            expression: destination.clone(),
-            value: b,
-        }))],
-        else_body: vec![Rc::new(RefCell::new(Statement::Copy {
-            expression: destination,
-            value: a,
-        }))],
     };
 
     true
@@ -846,4 +781,63 @@ pub fn update_fbits_handler(
     };
 
     false
+}
+
+pub fn assert_handler(
+    _ast: Rc<RefCell<Ast>>,
+    function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) -> bool {
+    // get block containing statement
+    // split block into first and second
+    // make first conditional on arguments[0].clone(), trapping on arguments[1].clone()
+
+    let (block, idx) = function
+        .entry_block
+        .find_statement(statement.clone())
+        .unwrap();
+
+    let statements = block.statements();
+    let terminator = block.terminator();
+
+    let first_statements = statements[..idx].to_owned();
+    let second_statements = statements[idx + 1..].to_owned();
+
+    let (value, str) = {
+        let Statement::FunctionCall { arguments, .. } = &*statement.borrow() else {
+            panic!();
+        };
+
+        (arguments[0].clone(), arguments[1].clone())
+    };
+
+    // second block has the rest of the statements, and the original terminator
+    let second = ControlFlowBlock::new();
+    second.set_statements(second_statements);
+    second.set_terminator(terminator);
+
+    let trap_block = ControlFlowBlock::new();
+    trap_block.set_statements(vec![
+        Statement::Comment(format!("{:?}", str).into()).into(),
+        Statement::FunctionCall {
+            expression: None,
+            name: "trap".into(),
+            arguments: vec![],
+        }
+        .into(),
+    ]);
+    // never reached but required to maintain common block (should maybe jump to end block?)
+    trap_block.set_terminator(Terminator::Unconditional {
+        target: second.clone(),
+    });
+
+    block.set_statements(first_statements);
+    // done in this order to avoid borealis/src/genc/codegen/functions.rs:580
+    block.set_terminator(Terminator::Conditional {
+        condition: Value::Operation(Operation::Not(value)),
+        target: trap_block,
+        fallthrough: second,
+    });
+
+    true
 }
