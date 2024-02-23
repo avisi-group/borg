@@ -1,10 +1,8 @@
-VERSION 0.7
+VERSION 0.8
 
 base-image:
     FROM rust:alpine
     WORKDIR /workdir
-
-    ENV RUSTFLAGS="-D warnings"
 
     ARG TARGETARCH
 
@@ -99,7 +97,7 @@ unit-test:
 e2e-test-borealis-genc:
     # must use alpine instead of +docker due to https://github.com/earthly/earthly/issues/2618. reading this comment on 2023-08-23 i do not understand it.
     FROM +docker
-    COPY data/arm-v8.5-a.bincode.lz4 arm-v8.5-a.bincode.lz4
+    COPY data/arm-v8.5-a_d43f3f4.bincode.lz4 arm-v8.5-a.bincode.lz4
     RUN ./borealis sail2genc arm-v8.5-a.bincode.lz4 genc
     SAVE ARTIFACT --force genc AS LOCAL target/genc
 

@@ -2,32 +2,31 @@
 
 use {
     crate::{
-        boom::{control_flow::ControlFlowBlock, Ast, Statement},
+        boom::{self, control_flow::ControlFlowBlock, Ast, Statement},
+        genc::codegen::{
+            format::process_decode_function_clause, instruction::get_instruction_entrypoint_fns,
+        },
         passes::{
             self, builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
             remove_exception::RemoveExceptions, remove_redundant_assigns::RemoveRedundantAssigns,
             resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
-        rust::decode::generate_decode_fns,
+        rudder,
     },
-    color_eyre::eyre::{Context, Result},
+    common::{intern::InternedString, HashSet},
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
     sail::{jib_ast::Definition, sail_ast},
-    std::{cell::RefCell, collections::LinkedList, io::Write, rc::Rc},
+    std::{cell::RefCell, collections::LinkedList, rc::Rc},
 };
 
 mod decode;
 mod emit;
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig<W: Write>(
-    writer: &mut W,
-    sail_ast: &sail_ast::Ast,
-    jib_ast: &LinkedList<Definition>,
-) -> color_eyre::Result<()> {
+pub fn sail_to_brig(sail_ast: &sail_ast::Ast, jib_ast: &LinkedList<Definition>) -> TokenStream {
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(jib_ast);
 
@@ -51,8 +50,6 @@ pub fn sail_to_brig<W: Write>(
 
     info!("Generating Rust");
 
-    let mut token_writer = TokenStreamWriter::new(writer);
-
     // let reg_fields =
     // TokenStream::from_iter(ast.borrow().registers.iter().map(|(name, typ)| {
     //     let typ_str = Ident::new(&typ.emit_string(), Span::call_site());
@@ -66,7 +63,11 @@ pub fn sail_to_brig<W: Write>(
         x: [u64; 31],
     };
 
-    let prelude = quote! {
+    let decode_fn = decode::generate_fn(sail_ast);
+
+    let execute_fns = generate_fns(ast, sail_ast);
+
+    quote! {
         //! BOREALIS GENERATED FILE DO NOT MODIFY
 
         use super::{CoreState, ExecutionEngine};
@@ -92,7 +93,7 @@ pub fn sail_to_brig<W: Write>(
                 let insn_data = fetch(state.pc());
                 log::trace!("fetch @ {} = {:08x}", state.pc(), insn_data);
 
-                match execute_instruction(insn_data, state) {
+                match decode_execute(insn_data, state) {
                     ExecuteResult::Ok => {
                         state.pc += 4;
                         super::StepResult::Ok
@@ -117,13 +118,11 @@ pub fn sail_to_brig<W: Write>(
             EndOfBlock,
             UndefinedInstruction
         }
-    };
 
-    generate_decode_fns(&mut token_writer, sail_ast, ast)?;
+        #decode_fn
 
-    token_writer.emit(prelude)?;
-
-    Ok(())
+        #execute_fns
+    }
 }
 
 fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
@@ -237,20 +236,31 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
     ast.borrow_mut().functions = funcs;
 }
 
-struct TokenStreamWriter<'w, W> {
-    writer: &'w mut W,
+/// Generates all BOOM functions, passing state struct to each
+///
+/// TODO: make this work on all functions? or work recursively like in genc
+pub fn generate_fns(boom: Rc<RefCell<boom::Ast>>, sail: &sail_ast::Ast) -> TokenStream {
+    let boom_functions = &boom.borrow().functions;
+
+    for name in get_instruction_entrypoint_fns(sail)
+        .iter()
+        .map(process_decode_function_clause)
+        .map(|instr| instr.execute_function_name)
+    {
+        let boom_fn = boom_functions.get(&name).unwrap();
+
+        generate_fn(name, boom_fn);
+    }
+    todo!()
 }
 
-impl<'w, W: Write> TokenStreamWriter<'w, W> {
-    pub fn new(writer: &'w mut W) -> Self {
-        Self { writer }
-    }
+fn generate_fn(fn_name: InternedString, _boom_function: &boom::FunctionDefinition) -> TokenStream {
+    //   let _rudderfn = rudder::Function::from_boom(boom_function);
 
-    pub fn emit(&mut self, tokens: TokenStream) -> Result<()> {
-        // could format the whole file at the end idk
-        let syntax_tree =
-            syn::parse_file(&tokens.to_string()).wrap_err(format!("failed to parse tokens"))?;
-        let formatted = prettyplease::unparse(&syntax_tree);
-        Ok(self.writer.write_all(formatted.as_bytes())?)
+    quote! {
+        fn #fn_name(state: &mut AArch64CoreState) -> ExecuteResult {
+            log::trace!("#fn_name");
+            ExecuteResult::Ok
+        }
     }
 }

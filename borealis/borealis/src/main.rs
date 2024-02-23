@@ -11,6 +11,7 @@ use {
     lz4_flex::frame::{BlockMode, FrameEncoder as Lz4Encoder, FrameInfo},
     std::{
         fs::File,
+        io::Write,
         path::{Path, PathBuf},
     },
 };
@@ -90,7 +91,13 @@ fn main() -> Result<()> {
 
             info!("Converting Sail model to brig module");
             let mut writer = File::create(output)?;
-            sail_to_brig(&mut writer, &ast, &jib)?;
+            let tokens = sail_to_brig(&ast, &jib);
+
+            let syntax_tree =
+                syn::parse_file(&tokens.to_string()).wrap_err(format!("failed to parse tokens"))?;
+            let formatted = prettyplease::unparse(&syntax_tree);
+            writer.write_all(formatted.as_bytes())?;
+
             info!("done");
         }
     }
