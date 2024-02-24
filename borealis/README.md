@@ -3,9 +3,6 @@
 > ISA simulation and development toolchain
 
 [![CI](https://github.com/avisi-group/borealis/actions/workflows/ci.yml/badge.svg)](https://github.com/avisi-group/borealis/actions/workflows/ci.yml)
-[![borealis docs](https://img.shields.io/badge/docs-borealis-blue)](https://avisi.org.uk/borealis/borealis/)
-[![sail docs](https://img.shields.io/badge/docs-sail-blue)](https://avisi.org.uk/borealis/sail/)
-[![libarch-sys docs](https://img.shields.io/badge/docs-libarch_sys-blue)](https://avisi.org.uk/borealis/libarch_sys/)
 
 ## Build Requirements
 
@@ -57,10 +54,6 @@ Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes
 ### `common`
 
 Rust does not support cyclic dependencies among crates so this crate contains types and logic shared by multiple other crates in the workspace.
-
-### `libarch-sys`
-
-Rust wrapper around the GenSim-emitted C++ source. Currently used for debugging instruction decoder and disassembler.
 
 ## Common Issues
 
