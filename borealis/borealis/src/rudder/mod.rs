@@ -1,11 +1,11 @@
 use {
-    common::intern::InternedString,
+    common::{intern::InternedString, HashMap, HashSet},
     log::warn,
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
         cell::RefCell,
-        collections::{HashMap, HashSet, LinkedList},
+        collections::LinkedList,
         hash::{Hash, Hasher},
         rc::Rc,
     },
@@ -14,7 +14,7 @@ use {
 pub mod build;
 mod pretty_print;
 
-#[derive(Hash, Clone, Copy)]
+#[derive(Hash, Clone, Copy, Eq, PartialEq)]
 pub enum PrimitiveTypeClass {
     Void,
     Unit,
@@ -23,7 +23,7 @@ pub enum PrimitiveTypeClass {
     FloatingPoint,
 }
 
-#[derive(Hash, Clone)]
+#[derive(Hash, Clone, Eq, PartialEq)]
 pub struct PrimitiveType {
     tc: PrimitiveTypeClass,
     element_width_in_bits: usize,
@@ -39,7 +39,7 @@ impl PrimitiveType {
     }
 }
 
-#[derive(Hash, Clone)]
+#[derive(Hash, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(PrimitiveType),
     Composite(Vec<Rc<Type>>),
@@ -643,10 +643,14 @@ impl Function {
                         typ,
                     })
                     .collect(),
-                local_variables: HashMap::new(),
+                local_variables: HashMap::default(),
                 entry_block: Block::new(),
             })),
         };
+
+        if return_type.is_void() {
+            panic!("functions must have a return type (unit not void)");
+        }
 
         celf.add_local_variable("exception".into(), Rc::new(Type::u32()));
         celf.add_local_variable("return_value".into(), return_type);
@@ -722,15 +726,16 @@ pub enum FunctionKind {
     Other,
 }
 
+#[derive(Default)]
 pub struct Context {
     fns: HashMap<InternedString, (FunctionKind, Function)>,
+    structs: HashSet<Rc<Type>>,
+    unions: HashSet<Rc<Type>>,
 }
 
 impl Context {
     pub fn new() -> Self {
-        Self {
-            fns: HashMap::default(),
-        }
+        Self::default()
     }
 
     pub fn add_function(&mut self, name: InternedString, kind: FunctionKind, func: Function) {
@@ -752,5 +757,13 @@ impl Context {
             .iter()
             .map(|(name, (_, function))| (*name, function.clone()))
             .collect()
+    }
+
+    pub fn get_structs(&self) -> HashSet<Rc<Type>> {
+        self.structs.clone()
+    }
+
+    pub fn get_unions(&self) -> HashSet<Rc<Type>> {
+        self.unions.clone()
     }
 }

@@ -2,9 +2,9 @@ use {
     crate::{
         boom::{self, control_flow::ControlFlowBlock, FunctionSignature, NamedType},
         rudder::{
-            self, BinaryOperationKind, CastOperationKind, Context, Function, FunctionKind,
-            PrimitiveType, ShiftOperationKind, Statement, StatementInner, StatementKind, Symbol,
-            Type,
+            self, BinaryOperationKind, Block, CastOperationKind, Context, Function, FunctionInner,
+            FunctionKind, PrimitiveType, ShiftOperationKind, Statement, StatementInner,
+            StatementKind, Symbol, Type,
         },
     },
     common::{intern::InternedString, HashMap},
@@ -227,6 +227,8 @@ impl BuildContext {
                 .into_iter()
                 .map(|(name, (kind, f, _))| (name, (kind, f)))
                 .collect(),
+            structs: self.structs.into_iter().map(|(_, (typ, _))| typ).collect(),
+            unions: self.unions.into_iter().map(|(_, (typ, _))| typ).collect(),
         }
     }
 }
@@ -679,8 +681,20 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .collect();
                 }
 
-                let Some((_, target, _)) = self.ctx().functions.get(name).cloned() else {
-                    panic!("unknown function {name}");
+                let target = match self.ctx().functions.get(name).cloned() {
+                    Some((_, target, _)) => target,
+                    None => {
+                        warn!("unknown function {name}");
+                        Function {
+                            inner: Rc::new(RefCell::new(FunctionInner {
+                                name: "unimplemented".into(),
+                                return_type: Rc::new(Type::unit()),
+                                parameters: vec![],
+                                local_variables: HashMap::default(),
+                                entry_block: Block::new(),
+                            })),
+                        }
+                    }
                 };
 
                 // call statement

@@ -82,7 +82,7 @@ impl DecodeTree {
     pub fn codegen(&self) -> TokenStream {
         let body = self.root.codegen();
         quote! {
-            fn decode_execute(value: u32, state: &mut AArch64CoreState) -> ExecuteResult {
+            fn decode_execute(value: u32, state: &mut State) -> ExecuteResult {
                 #body
                 ExecuteResult::UndefinedInstruction
             }
@@ -280,9 +280,11 @@ impl Node {
                 panic!("leaf should have length 32");
             }
 
-            let fn_name = self.name();
-
-            return quote!(return #fn_name(state););
+            let msg = format!(
+                "calculate correct parameters from instruction: {}",
+                self.name()
+            );
+            return quote!(todo!(#msg));
         }
 
         let mut constrained_handlers = quote!();

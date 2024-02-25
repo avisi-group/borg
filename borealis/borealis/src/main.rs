@@ -48,6 +48,10 @@ enum Command {
 
     /// Compile a Sail ISA specification to a Rust module for use with brig
     Sail2brig {
+        /// Produce a standalone (no brig traits) Rust source file for testing
+        /// purposes
+        #[arg(long)]
+        standalone: bool,
         /// Path to Sail JSON config or bincode AST
         input: PathBuf,
         /// Path to Rust file.
@@ -86,12 +90,16 @@ fn main() -> Result<()> {
             encoder.finish()?;
             info!("done");
         }
-        Command::Sail2brig { input, output } => {
+        Command::Sail2brig {
+            input,
+            output,
+            standalone,
+        } => {
             let (ast, jib) = load_sail(input)?;
 
             info!("Converting Sail model to brig module");
             let mut writer = File::create(output)?;
-            let tokens = sail_to_brig(&ast, &jib);
+            let tokens = sail_to_brig(&ast, &jib, standalone);
 
             let syntax_tree =
                 syn::parse_file(&tokens.to_string()).wrap_err(format!("failed to parse tokens"))?;

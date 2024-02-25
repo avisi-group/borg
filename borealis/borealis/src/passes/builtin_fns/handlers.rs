@@ -136,7 +136,8 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         ("undefined_bitvector", noop),
         ("bitvector_concat", noop),
         ("aget_PC", |ast, f, s| rename(ast, f, s, "read_pc".into())),
-        // these two handlers originally replaced the call with an "inline" if statement, rather than splitting the control flow blocks, etc
+        // these two handlers originally replaced the call with an "inline" if statement, rather
+        // than splitting the control flow blocks, etc
         ("sail_assert", assert_handler),
         ("min_int", noop),
         //
@@ -790,7 +791,8 @@ pub fn assert_handler(
 ) -> bool {
     // get block containing statement
     // split block into first and second
-    // make first conditional on arguments[0].clone(), trapping on arguments[1].clone()
+    // make first conditional on arguments[0].clone(), trapping on
+    // arguments[1].clone()
 
     let (block, idx) = function
         .entry_block
@@ -826,7 +828,8 @@ pub fn assert_handler(
         }
         .into(),
     ]);
-    // never reached but required to maintain common block (should maybe jump to end block?)
+    // never reached but required to maintain common block (should maybe jump to end
+    // block?)
     trap_block.set_terminator(Terminator::Unconditional {
         target: second.clone(),
     });

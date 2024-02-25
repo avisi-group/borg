@@ -1,8 +1,11 @@
-use crate::boom::{
-    control_flow::ControlFlowBlock, FunctionDefinition, FunctionSignature, Parameter, Size, Type,
+use {
+    crate::boom::{
+        control_flow::ControlFlowBlock, FunctionDefinition, FunctionSignature, Parameter, Size,
+        Type,
+    },
+    common::intern::InternedString,
+    std::{cell::RefCell, rc::Rc},
 };
-use common::intern::InternedString;
-use std::{cell::RefCell, rc::Rc};
 
 pub fn builtin_fns() -> Vec<(InternedString, FunctionDefinition)> {
     vec![]
