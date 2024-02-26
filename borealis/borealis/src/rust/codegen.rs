@@ -59,39 +59,8 @@ pub fn codegen(rudder: Context) -> TokenStream {
         })
         .collect();
 
-    let unions: TokenStream = rudder
-        .get_unions()
-        .into_iter()
-        .map(|typ| {
-            let ident = codegen_type(typ.clone());
-
-            let Type::Composite(fields) = typ.borrow() else {
-                panic!("struct must be composite type");
-            };
-
-            let fields: TokenStream = fields
-                .iter()
-                .enumerate()
-                .map(|(i, typ)| {
-                    let name = Ident::new(&format!("_{i}"), Span::call_site());
-                    let typ = codegen_type(typ.clone());
-                    quote!(#name: #typ,)
-                })
-                .collect();
-
-            quote! {
-                #[derive(Default)]
-                struct #ident {
-                    #fields
-                }
-            }
-        })
-        .collect();
-
     quote! {
         #structs
-
-        #unions
 
         #fns
     }
@@ -122,7 +91,7 @@ fn promote_width(width: usize) -> usize {
     }
 }
 
-fn codegen_type(typ: Rc<Type>) -> TokenStream {
+pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
     match &*typ {
         Type::Primitive(typ) => {
             let width = promote_width(typ.width());
@@ -265,9 +234,10 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {#var}
         }
         crate::rudder::StatementKind::WriteVariable { symbol, value } => {
+            let typ = codegen_type(symbol.typ());
             let var = format_ident!("{}", symbol.name().to_string());
             let value = get_ident(value);
-            quote! {#var = #value}
+            quote! {#var = #value as #typ}
         }
         crate::rudder::StatementKind::ReadRegister { typ, offset } => quote!(todo!("read-reg")),
         crate::rudder::StatementKind::WriteRegister { offset, value } => quote!(todo!("write-reg")),
@@ -347,8 +317,9 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! {#arg}
             });
 
-            if target.name() == "unimplemented".into() {
-                quote! { unimplemented!() }
+            if target.name().as_ref().starts_with("unimplemented_") {
+                let msg = target.name().to_string();
+                quote! { unimplemented!(#msg) }
             } else {
                 quote! {
                     #ident(state, #(#args),*)
@@ -385,8 +356,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         crate::rudder::StatementKind::PhiNode { members } => quote!(todo!("phi")),
         crate::rudder::StatementKind::Return { value } => match value {
             Some(value) => {
-                todo!();
-                // todo: need to discuss this, pretty sure it's always ok to just return the `return_value`
+                let name = value.name();
+                quote! {return #name;}
             }
             None => {
                 quote! {return return_value;}
@@ -413,18 +384,10 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
 
     let msg = stmt.to_string();
     if stmt.has_value() {
-        // hack to make rustc do the type inference
-        if value.to_string() == "unimplemented ! ()" {
-            quote! {
-                let _ = #msg;
-                let #stmt_name = #value;
-            }
-        } else {
-            let typ = codegen_type(stmt.get_type());
-            quote! {
-                let _ = #msg;
-                let #stmt_name: #typ = #value;
-            }
+        let typ = codegen_type(stmt.get_type());
+        quote! {
+            let _ = #msg;
+            let #stmt_name: #typ = #value;
         }
     } else {
         quote! {

@@ -673,7 +673,7 @@ impl Function {
     pub fn update_names(&self) {
         let mut idx = 0;
         for b in self.inner.borrow().entry_block.iter() {
-            b.update_names(format!("b_{}", idx).into());
+            b.update_names(format!("{idx}").into());
             idx += 1;
         }
     }
@@ -752,7 +752,7 @@ impl Context {
         todo!()
     }
 
-    pub fn get_functions(&self) -> Vec<(InternedString, Function)> {
+    pub fn get_functions(&self) -> HashMap<InternedString, Function> {
         self.fns
             .iter()
             .map(|(name, (_, function))| (*name, function.clone()))

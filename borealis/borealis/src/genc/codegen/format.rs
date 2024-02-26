@@ -6,6 +6,7 @@ use {
         genc::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
     },
     common::{identifiable::unique_id, intern::InternedString, HashMap},
+    itertools::Itertools,
     log::{debug, trace, warn},
     num_bigint::Sign,
     once_cell::sync::Lazy,
@@ -118,6 +119,8 @@ pub struct InstructionDecodeInformation {
     /// ranges and a `GenCFormat` is sufficient to reconstruct the original
     /// values
     pub split_variable_ranges: HashMap<InternedString, Range<usize>>,
+    /// Arguments and their range of the instruction value
+    pub arguments: HashMap<InternedString, Range<usize>>,
 }
 
 /// Main function clause processing
@@ -147,7 +150,7 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
 
     let expressions = flatten_expression(expressions.back().unwrap());
 
-    let mut named_ranges = expressions
+    let named_ranges_noncontig = expressions
         .iter()
         .take(expressions.len() - 1) // skip last expression
         .filter_map(expression_to_named_range)
@@ -169,10 +172,10 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
     // so fill any "gaps" with padding ranges
     //
     // these should only contain fixed bits
-    {
+    let named_ranges_contig = {
         let mut padding_ranges = vec![];
         let mut last_end = 0;
-        for (_, range) in &named_ranges {
+        for (_, range) in &named_ranges_noncontig {
             if range.start != last_end {
                 // insert new range from last_end to range.start
                 let padding = (
@@ -194,15 +197,17 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
             padding_ranges.push(padding);
         }
 
-        named_ranges.append(&mut padding_ranges);
-        named_ranges.sort_by(|(_, a), (_, b)| a.start.cmp(&b.start));
-    }
+        let mut named_ranges_contig = named_ranges_noncontig.clone();
+        named_ranges_contig.append(&mut padding_ranges);
+        named_ranges_contig.sort_by(|(_, a), (_, b)| a.start.cmp(&b.start));
+        named_ranges_contig
+    };
 
-    trace!("named_ranges: {:?}", named_ranges);
+    trace!("named_ranges: {:?}", named_ranges_contig);
 
     let mut split_variable_ranges = HashMap::default();
 
-    let homogenised_ranges = named_ranges
+    let homogenised_ranges = named_ranges_contig
         .clone()
         .into_iter()
         .flat_map(|(n, r)| {
@@ -309,6 +314,7 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
         format,
         constants,
         split_variable_ranges,
+        arguments: named_ranges_noncontig.into_iter().collect(),
     }
 }
 

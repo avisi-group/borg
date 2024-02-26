@@ -108,34 +108,34 @@ impl BuildContext {
             panic!("union with name {name} already added");
         }
 
-        for field in fields {
-            let field_type = self.resolve_type(field.typ.clone());
-            if self
-                .functions
-                .insert(
-                    field.name,
-                    (
-                        FunctionKind::Other,
-                        Function::new(
-                            field.name,
-                            typ.clone(),
-                            [(field.name, field_type)].into_iter(),
-                        ),
-                        boom::FunctionDefinition {
-                            signature: FunctionSignature {
-                                name: "IDONOTEXIST".into(),
-                                parameters: Rc::new(RefCell::new(vec![])),
-                                return_type: Rc::new(RefCell::new(boom::Type::Unit)),
-                            },
-                            entry_block: boom::control_flow::ControlFlowBlock::new(),
-                        },
-                    ),
-                )
-                .is_some()
-            {
-                panic!("union constructor with name {} already exists", field.name)
-            }
-        }
+        // for field in fields {
+        //     let field_type = self.resolve_type(field.typ.clone());
+        //     if self
+        //         .functions
+        //         .insert(
+        //             field.name,
+        //             (
+        //                 FunctionKind::Other,
+        //                 Function::new(
+        //                     field.name,
+        //                     typ.clone(),
+        //                     [(field.name, field_type)].into_iter(),
+        //                 ),
+        //                 boom::FunctionDefinition {
+        //                     signature: FunctionSignature {
+        //                         name: "IDONOTEXIST".into(),
+        //                         parameters: Rc::new(RefCell::new(vec![])),
+        //                         return_type: Rc::new(RefCell::new(boom::Type::Unit)),
+        //                     },
+        //                     entry_block: boom::control_flow::ControlFlowBlock::new(),
+        //                 },
+        //             ),
+        //         )
+        //         .is_some()
+        //     {
+        //         panic!("union constructor with name {} already exists", field.name)
+        //     }
+        // }
     }
 
     fn add_enum(&mut self, name: InternedString, variants: &[InternedString]) {
@@ -426,7 +426,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     stmts.push(op);
                     stmts
                 }
-                boom::Operation::Complement(_) => {
+                boom::Operation::Complement(value) => {
                     let mut stmts = self.transform_value(value.clone());
                     let op = Statement::from_kind(StatementKind::UnaryOperation {
                         kind: rudder::UnaryOperationKind::Complement,
@@ -684,11 +684,24 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let target = match self.ctx().functions.get(name).cloned() {
                     Some((_, target, _)) => target,
                     None => {
+                        // do this so that unimplemented has the correct type
+                        let crate::boom::Expression::Identifier(ident) =
+                            expression.as_ref().unwrap()
+                        else {
+                            panic!();
+                        };
+                        let typ = self
+                            .fn_ctx()
+                            .rudder_fn
+                            .get_local_variable(*ident)
+                            .unwrap()
+                            .typ();
+
                         warn!("unknown function {name}");
                         Function {
                             inner: Rc::new(RefCell::new(FunctionInner {
-                                name: "unimplemented".into(),
-                                return_type: Rc::new(Type::unit()),
+                                name: format!("unimplemented_{name}").into(),
+                                return_type: typ,
                                 parameters: vec![],
                                 local_variables: HashMap::default(),
                                 entry_block: Block::new(),
@@ -745,16 +758,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .chain(copy.into_iter())
                     .collect()
             }
-            boom::Statement::Label(_) => todo!(),
-            boom::Statement::Goto(_) => todo!(),
-            boom::Statement::Jump { condition, target } => todo!(),
-            boom::Statement::End(_) => todo!(),
-            boom::Statement::Undefined => todo!(),
-            boom::Statement::If {
-                condition,
-                if_body,
-                else_body,
-            } => todo!(),
+            boom::Statement::Label(_)
+            | boom::Statement::Goto(_)
+            | boom::Statement::Jump { .. }
+            | boom::Statement::End(_)
+            | boom::Statement::Undefined
+            | boom::Statement::If { .. } => {
+                unreachable!("no control flow should exist at this point in compilation!")
+            }
             boom::Statement::Exit(_) => vec![],
             boom::Statement::Comment(_) => todo!(),
         }

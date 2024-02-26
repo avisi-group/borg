@@ -23,6 +23,7 @@ pub mod destruct_structs;
 pub mod destructure;
 pub mod fold_unconditionals;
 pub mod lower_enums;
+pub mod make_exception_bool;
 pub mod registers;
 pub mod remove_const_branch;
 pub mod remove_exception;

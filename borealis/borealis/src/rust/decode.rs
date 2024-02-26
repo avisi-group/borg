@@ -1,67 +1,96 @@
 use {
     crate::{
-        boom::Bit,
+        boom::{self, Bit, FunctionDefinition},
         genc::{
             codegen::{
                 format::process_decode_function_clause, instruction::get_instruction_entrypoint_fns,
             },
             format::{Segment, SegmentContent},
         },
+        rudder::{Context, Function, Symbol, Type},
+        rust::codegen::codegen_type,
     },
     common::{identifiable::unique_id, intern::InternedString, HashMap},
     proc_macro2::{Literal, TokenStream},
     quote::{quote, TokenStreamExt},
     sail::sail_ast,
-    std::{cell::RefCell, io::stdout, rc::Rc},
+    std::{cell::RefCell, io::stdout, ops::Range, rc::Rc},
 };
 
 /// Generates the instruction decode function from the Sail `decode64` clauses
 /// using a decode tree
-pub fn generate_fn(sail: &sail_ast::Ast) -> TokenStream {
+pub fn generate_fn(sail: &sail_ast::Ast, rudder: &Context) -> TokenStream {
     // retrieve all `decode64` function clauses and process clauses to extract bits
     // from segments
     let insn_formats = get_instruction_entrypoint_fns(sail)
         .iter()
         .map(process_decode_function_clause)
         .map(|instr| {
+            let bits = instr
+                .format
+                .0
+                .iter()
+                .map(|Segment { content, length }| match content {
+                    SegmentContent::Variable(_) => vec![Bit::Unknown; *length],
+                    SegmentContent::Constant(val) => {
+                        let mut bits = vec![Bit::Unknown; *length];
+
+                        for i in 0..*length {
+                            match (val >> i) & 1 {
+                                0 => bits[i] = Bit::Zero,
+                                1 => bits[i] = Bit::One,
+                                _ => unreachable!(),
+                            }
+                        }
+
+                        bits.reverse();
+                        bits
+                    }
+                })
+                .flatten()
+                .collect::<Vec<_>>();
+
             (
                 (instr.execute_function_name, instr.mangled_name),
-                instr
-                    .format
-                    .0
-                    .iter()
-                    .map(|Segment { content, length }| match content {
-                        SegmentContent::Variable(_) => vec![Bit::Unknown; *length],
-                        SegmentContent::Constant(val) => {
-                            let mut bits = vec![Bit::Unknown; *length];
-
-                            for i in 0..*length {
-                                match (val >> i) & 1 {
-                                    0 => bits[i] = Bit::Zero,
-                                    1 => bits[i] = Bit::One,
-                                    _ => unreachable!(),
-                                }
-                            }
-
-                            bits.reverse();
-                            bits
-                        }
-                    })
-                    .flatten()
-                    .collect(),
+                (bits, instr.arguments),
             )
         })
-        .collect::<HashMap<(InternedString, InternedString), Vec<Bit>>>();
+        .collect::<HashMap<_, _>>();
 
     let tree = DecodeTree::new();
 
-    for (name, bits) in insn_formats.iter() {
+    for ((fn_name, _), (bits, _)) in insn_formats.iter() {
         let mut bits = bits.clone();
         bits.reverse();
-        tree.insert(name.0.clone(), bits);
+        tree.insert(*fn_name, bits);
     }
 
-    tree.codegen()
+    let args = insn_formats
+        .iter()
+        .map(|((name, _), (_, args))| (name, args))
+        .collect::<HashMap<_, _>>();
+
+    let function_args = rudder
+        .get_functions()
+        .into_iter()
+        .filter_map(|(fn_name, def)| {
+            args.get(&fn_name).map(|arg_ranges| {
+                let sig = def.signature();
+                let args = sig
+                    .1
+                    .iter()
+                    .map(|sym| (sym.name(), sym.typ()))
+                    .map(|(arg_name, typ)| {
+                        (arg_name, (typ, arg_ranges.get(&arg_name).unwrap().clone()))
+                    })
+                    .collect::<Vec<_>>();
+
+                (fn_name, args)
+            })
+        })
+        .collect::<HashMap<_, _>>();
+
+    tree.codegen(&function_args)
 }
 
 pub struct DecodeTree {
@@ -79,8 +108,11 @@ impl DecodeTree {
         self.root.insert(name, bits)
     }
 
-    pub fn codegen(&self) -> TokenStream {
-        let body = self.root.codegen();
+    pub fn codegen(
+        &self,
+        functions: &HashMap<InternedString, Vec<(InternedString, (Rc<Type>, Range<usize>))>>,
+    ) -> TokenStream {
+        let body = self.root.codegen(functions);
         quote! {
             fn decode_execute(value: u32, state: &mut State) -> ExecuteResult {
                 #body
@@ -273,18 +305,26 @@ impl Node {
         self.inner.borrow_mut().constrained.push(t);
     }
 
-    fn codegen(&self) -> TokenStream {
+    fn codegen(
+        &self,
+        functions: &HashMap<InternedString, Vec<(InternedString, (Rc<Type>, Range<usize>))>>,
+    ) -> TokenStream {
         // check if it is a leaf node
         if self.constrained().is_empty() && self.unconstrained().is_none() {
             if self.offset() != 32 {
                 panic!("leaf should have length 32");
             }
 
-            let msg = format!(
-                "calculate correct parameters from instruction: {}",
-                self.name()
-            );
-            return quote!(todo!(#msg));
+            return match functions.get(&self.name()) {
+                Some(args) => generate_decode_arguments(self.name(), args),
+                None => {
+                    let msg = format!(
+                        "calculate correct parameters from instruction: {}",
+                        self.name()
+                    );
+                    quote!(todo!(#msg))
+                }
+            };
         }
 
         let mut constrained_handlers = quote!();
@@ -303,7 +343,7 @@ impl Node {
             let pattern = format!("0x{pattern:08x}").parse::<Literal>().unwrap();
 
             if constrained.len == 32 {
-                let inner = constrained.target.codegen();
+                let inner = constrained.target.codegen(functions);
 
                 constrained_handlers.append_all(quote! {
                     if value == #pattern {
@@ -315,7 +355,7 @@ impl Node {
                     constrained_handlers.append_all(quote! {else});
                 }
 
-                let inner = constrained.target.codegen();
+                let inner = constrained.target.codegen(functions);
 
                 constrained_handlers.append_all(quote! {
                     if (value & #mask) == #pattern {
@@ -331,7 +371,7 @@ impl Node {
 
         // fallthrough to unconstrained if exists
         let unconstrained_handler = if let Some(unconstrained) = self.unconstrained() {
-            unconstrained.target.codegen()
+            unconstrained.target.codegen(functions)
         } else {
             quote!()
         };
@@ -461,4 +501,33 @@ mod graph {
             edge.1.clone()
         }
     }
+}
+
+/// Calculates arguments and generates the decode function call
+fn generate_decode_arguments(
+    name: InternedString,
+    arguments: &[(InternedString, (Rc<Type>, Range<usize>))],
+) -> TokenStream {
+    // let name = self.name();
+    // let sig = def.signature();
+    // let arguments = sig.1.iter().map(|sym| sym.name());
+    // quote!(#name(#(#arguments),*))
+    let args = arguments
+        .iter()
+        .map(|(name, (typ, Range { start, end }))| {
+            let typ = codegen_type(typ.clone());
+            quote!(let #name =((value >> #start) & ((1 << (#end - #start)) - 1)) as #typ;)
+        })
+        .collect::<TokenStream>();
+
+    let arg_idents = [InternedString::from_static("state")]
+        .into_iter()
+        .chain(arguments.iter().map(|(name, _)| *name));
+    quote! {
+        #args
+
+        #name(#(#arg_idents),*)
+    }
+
+    //
 }

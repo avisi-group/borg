@@ -63,6 +63,7 @@ pub fn generate_execute_entrypoint(
         format,
         constants,
         split_variable_ranges,
+        ..
     } = process_decode_function_clause(instruction);
 
     // generates the *arguments* to the instruction's execute function from the

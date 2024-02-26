@@ -5,7 +5,8 @@ use {
         boom::Ast,
         passes::{
             self, builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-            fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
+            fold_unconditionals::FoldUnconditionals, make_exception_bool::MakeExceptionBool,
+            remove_const_branch::RemoveConstBranch, remove_exception::RemoveExceptions,
             remove_redundant_assigns::RemoveRedundantAssigns,
             resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
@@ -45,6 +46,7 @@ pub fn sail_to_brig(
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
             ResolveReturns::new_boxed(),
+            MakeExceptionBool::new_boxed(),
             ResolveBitvectors::new_boxed(),
             AddBuiltinFns::new_boxed(),
             RemoveRedundantAssigns::new_boxed(),
@@ -68,9 +70,11 @@ pub fn sail_to_brig(
         x: [u64; 31],
     };
 
-    let decode_fn = decode::generate_fn(sail_ast);
+    let rudder = rudder::build::from_boom(&*ast.borrow());
 
-    let execute_fns = crate::rust::codegen(rudder::build::from_boom(&*ast.borrow()));
+    let decode_fn = decode::generate_fn(sail_ast, &rudder);
+
+    let execute_fns = crate::rust::codegen(rudder);
 
     let prelude = if standalone {
         quote! {
@@ -153,7 +157,16 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
         .functions
         .clone()
         .into_iter()
-        .filter(|(k, _)| ["integer_arithmetic_addsub_immediate_decode"].contains(&k.as_ref()))
+        .filter(|(k, _)| {
+            [
+                "integer_arithmetic_addsub_immediate_decode",
+                "u__id",
+                "ReservedValue",
+                "u__PostDecode",
+                //   "integer_arithmetic_addsub_immediate", WIP
+            ]
+            .contains(&k.as_ref())
+        })
         .collect();
     ast.borrow_mut().functions = funcs;
 }
