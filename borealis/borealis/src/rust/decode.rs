@@ -1,13 +1,13 @@
 use {
     crate::{
-        boom::{self, Bit, FunctionDefinition},
+        boom::Bit,
         genc::{
             codegen::{
                 format::process_decode_function_clause, instruction::get_instruction_entrypoint_fns,
             },
             format::{Segment, SegmentContent},
         },
-        rudder::{Context, Function, Symbol, Type},
+        rudder::{Context, Type},
         rust::codegen::codegen_type,
     },
     common::{identifiable::unique_id, intern::InternedString, HashMap},

@@ -48,9 +48,24 @@ impl Display for StatementKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self {
             StatementKind::Constant { typ, value } => write!(f, "const #{} : {}", value, typ),
-            StatementKind::ReadVariable { symbol } => write!(f, "read-var {}", symbol.name()),
-            StatementKind::WriteVariable { symbol, value } => {
-                write!(f, "write-var {} {}", symbol.name(), value.name())
+            StatementKind::ReadVariable { symbol, member } => {
+                write!(f, "read-var {}", symbol.name())?;
+                if let Some(idx) = member {
+                    write!(f, ".{idx}")
+                } else {
+                    Ok(())
+                }
+            }
+            StatementKind::WriteVariable {
+                symbol,
+                value,
+                member,
+            } => {
+                write!(f, "write-var {}", symbol.name())?;
+                if let Some(idx) = member {
+                    write!(f, ".{idx}")?;
+                }
+                write!(f, " {}", value.name())
             }
             StatementKind::ReadRegister { typ, offset } => {
                 write!(f, "read-reg {}:{}", offset.name(), typ)

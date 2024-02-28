@@ -250,9 +250,11 @@ pub enum StatementKind {
     },
     ReadVariable {
         symbol: Symbol,
+        member: Option<usize>,
     },
     WriteVariable {
         symbol: Symbol,
+        member: Option<usize>,
         value: Statement,
     },
     ReadRegister {
@@ -275,6 +277,7 @@ pub enum StatementKind {
     WritePc {
         value: Statement,
     },
+
     BinaryOperation {
         kind: BinaryOperationKind,
         lhs: Statement,
@@ -370,100 +373,61 @@ impl Statement {
 
     pub fn classify(&self) -> ValueClass {
         match self.kind() {
-            StatementKind::Constant { typ, value } => ValueClass::Fixed,
-            StatementKind::ReadVariable { symbol } => todo!(),
-            StatementKind::WriteVariable { symbol, value } => todo!(),
-            StatementKind::ReadRegister { typ, offset } => todo!(),
-            StatementKind::WriteRegister { offset, value } => todo!(),
-            StatementKind::ReadMemory { typ, offset } => todo!(),
-            StatementKind::WriteMemory { offset, value } => todo!(),
-            StatementKind::BinaryOperation { kind, lhs, rhs } => todo!(),
-            StatementKind::UnaryOperation { kind, value } => todo!(),
-            StatementKind::ShiftOperation {
-                kind,
-                value,
-                amount,
-            } => todo!(),
-            StatementKind::Call { target, args } => todo!(),
-            StatementKind::Cast { kind, typ, value } => todo!(),
-            StatementKind::Jump { target } => todo!(),
-            StatementKind::Branch {
-                condition,
-                true_target,
-                false_target,
-            } => todo!(),
-            StatementKind::PhiNode { members } => todo!(),
-            StatementKind::Return { value } => todo!(),
-            StatementKind::Select {
-                condition,
-                true_value,
-                false_value,
-            } => todo!(),
+            StatementKind::Constant { .. } => ValueClass::Fixed,
+            StatementKind::ReadRegister { .. } => todo!(),
+            StatementKind::WriteRegister { .. } => todo!(),
+            StatementKind::ReadMemory { .. } => todo!(),
+            StatementKind::WriteMemory { .. } => todo!(),
+            StatementKind::BinaryOperation { .. } => todo!(),
+            StatementKind::UnaryOperation { .. } => todo!(),
+            StatementKind::ShiftOperation { .. } => todo!(),
+            StatementKind::Call { .. } => todo!(),
+            StatementKind::Cast { .. } => todo!(),
+            StatementKind::Jump { .. } => todo!(),
+            StatementKind::Branch { .. } => todo!(),
+            StatementKind::PhiNode { .. } => todo!(),
+            StatementKind::Return { .. } => todo!(),
+            StatementKind::Select { .. } => todo!(),
             StatementKind::Trap => todo!(),
             StatementKind::ReadPc => ValueClass::Dynamic,
-            StatementKind::WritePc { value } => todo!(),
-            StatementKind::BitExtract {
-                value,
-                start,
-                length,
-            } => todo!(),
-            StatementKind::BitInsert {
-                original_value,
-                insert_value,
-                start,
-                length,
-            } => todo!(),
+            StatementKind::WritePc { .. } => todo!(),
+            StatementKind::BitExtract { .. } => todo!(),
+            StatementKind::BitInsert { .. } => todo!(),
+            StatementKind::ReadVariable { .. } => todo!(),
+            StatementKind::WriteVariable { .. } => todo!(),
         }
     }
 
     pub fn get_type(&self) -> Rc<Type> {
         match self.kind() {
-            StatementKind::Constant { typ, value } => typ,
-            StatementKind::ReadVariable { symbol } => symbol.typ,
-            StatementKind::WriteVariable { symbol, value } => Rc::new(Type::void()),
-            StatementKind::ReadRegister { typ, offset } => typ,
-            StatementKind::WriteRegister { offset, value } => Rc::new(Type::void()),
-            StatementKind::ReadMemory { typ, offset } => typ,
-            StatementKind::WriteMemory { offset, value } => Rc::new(Type::void()),
-            StatementKind::BinaryOperation { kind, lhs, rhs } => lhs.get_type(),
-            StatementKind::UnaryOperation { kind, value } => value.get_type(),
-            StatementKind::ShiftOperation {
-                kind,
-                value,
-                amount,
-            } => value.get_type(),
-            StatementKind::Call { target, args } => target.return_type(),
-            StatementKind::Cast { kind, typ, value } => typ,
-            StatementKind::Jump { target } => Rc::new(Type::void()),
-            StatementKind::Branch {
-                condition,
-                true_target,
-                false_target,
-            } => Rc::new(Type::void()),
+            StatementKind::Constant { typ, .. } => typ,
+            StatementKind::ReadVariable { symbol, member } => match member {
+                Some(idx) => todo!(),
+                None => symbol.typ,
+            },
+            StatementKind::WriteVariable { .. } => Rc::new(Type::void()),
+            StatementKind::ReadRegister { typ, .. } => typ,
+            StatementKind::WriteRegister { .. } => Rc::new(Type::void()),
+            StatementKind::ReadMemory { typ, .. } => typ,
+            StatementKind::WriteMemory { .. } => Rc::new(Type::void()),
+            StatementKind::BinaryOperation { lhs, .. } => lhs.get_type(),
+            StatementKind::UnaryOperation { value, .. } => value.get_type(),
+            StatementKind::ShiftOperation { value, .. } => value.get_type(),
+            StatementKind::Call { target, .. } => target.return_type(),
+            StatementKind::Cast { typ, .. } => typ,
+            StatementKind::Jump { .. } => Rc::new(Type::void()),
+            StatementKind::Branch { .. } => Rc::new(Type::void()),
             StatementKind::PhiNode { members } => members
                 .first()
                 .map(|(_, stmt)| stmt.get_type())
                 .unwrap_or_else(|| Rc::new(Type::void())),
-            StatementKind::Return { value } => Rc::new(Type::void()),
-            StatementKind::Select {
-                condition,
-                true_value,
-                false_value,
-            } => true_value.get_type(),
+            StatementKind::Return { .. } => Rc::new(Type::void()),
+            StatementKind::Select { true_value, .. } => true_value.get_type(),
             StatementKind::Trap => Rc::new(Type::void()),
             StatementKind::ReadPc => Rc::new(Type::u64()),
-            StatementKind::WritePc { value } => Rc::new(Type::void()),
-            StatementKind::BitExtract {
-                value,
-                start,
-                length,
-            } => value.get_type(),
-            StatementKind::BitInsert {
-                original_value,
-                insert_value,
-                start,
-                length,
-            } => original_value.get_type(),
+            StatementKind::WritePc { .. } => Rc::new(Type::void()),
+            StatementKind::BitExtract { value, .. } => value.get_type(),
+            StatementKind::BitInsert { original_value, .. } => original_value.get_type(),
         }
     }
 
@@ -612,7 +576,7 @@ pub struct Function {
 }
 
 impl ToTokens for Function {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
+    fn to_tokens(&self, _: &mut TokenStream) {
         todo!()
     }
 }

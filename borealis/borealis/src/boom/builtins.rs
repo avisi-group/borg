@@ -1,7 +1,6 @@
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, FunctionDefinition, FunctionSignature, Parameter, Size,
-        Type,
+        control_flow::ControlFlowBlock, FunctionDefinition, FunctionSignature, Parameter, Type,
     },
     common::intern::InternedString,
     std::{cell::RefCell, rc::Rc},

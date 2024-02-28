@@ -1,15 +1,14 @@
 use {
     crate::{
-        boom::{self, control_flow::ControlFlowBlock, FunctionSignature, NamedType},
+        boom,
         rudder::{
             self, BinaryOperationKind, Block, CastOperationKind, Context, Function, FunctionInner,
-            FunctionKind, PrimitiveType, ShiftOperationKind, Statement, StatementInner,
-            StatementKind, Symbol, Type,
+            FunctionKind, ShiftOperationKind, Statement, StatementKind, Type,
         },
     },
     common::{intern::InternedString, HashMap},
     log::warn,
-    std::{cell::RefCell, cmp::Ordering, process::Termination, rc::Rc},
+    std::{cell::RefCell, cmp::Ordering, rc::Rc},
 };
 
 pub fn from_boom(ast: &boom::Ast) -> Context {
@@ -20,8 +19,8 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
         boom::Definition::Enum { name, variants } => build_ctx.add_enum(*name, variants),
         boom::Definition::Union { name, fields } => build_ctx.add_union(*name, fields),
         boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
-        boom::Definition::Pragma { key, value } => (),
-        boom::Definition::Let { bindings, body } => (),
+        boom::Definition::Pragma { .. } => (),
+        boom::Definition::Let { .. } => (),
     });
 
     ast.registers
@@ -344,15 +343,21 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     /// Last statement returned is the value
-    fn transform_value(&mut self, value: Rc<RefCell<boom::Value>>) -> Vec<Statement> {
-        match &*value.borrow() {
+    fn transform_value(&mut self, boom_value: Rc<RefCell<boom::Value>>) -> Vec<Statement> {
+        match &*boom_value.borrow() {
             boom::Value::Identifier(ident) => {
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                    return vec![Statement::from_kind(StatementKind::ReadVariable { symbol })];
+                    return vec![Statement::from_kind(StatementKind::ReadVariable {
+                        symbol,
+                        member: None,
+                    })];
                 }
 
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
-                    return vec![Statement::from_kind(StatementKind::ReadVariable { symbol })];
+                    return vec![Statement::from_kind(StatementKind::ReadVariable {
+                        symbol,
+                        member: None,
+                    })];
                 }
 
                 if let Some((typ, offset)) = self.ctx().registers.get(ident) {
@@ -547,8 +552,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .collect()
                 }
             },
-            boom::Value::Struct { name, fields } => todo!(),
-            boom::Value::Field { value, field_name } => todo!(),
+            boom::Value::Struct { .. } => todo!(),
+            boom::Value::Field { value, field_name } => {
+                // self.build_field_access_from_value(value.clone(), *field_name)
+                todo!()
+            }
             boom::Value::CtorKind {
                 value,
                 identifier,
@@ -572,6 +580,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Statement::Copy { expression, value } => {
                 let mut stmts = self.transform_value(value.clone());
 
+                // write_register
+                // write_variable
+
                 match expression {
                     boom::Expression::Identifier(ident) => {
                         match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
@@ -580,6 +591,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                     Statement::from_kind(StatementKind::WriteVariable {
                                         symbol,
                                         value: stmts.last().unwrap().clone(),
+                                        member: None,
                                     });
                                 stmts.push(statement);
                             }
@@ -602,7 +614,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             }
                         }
                     }
-                    boom::Expression::Field { expression, field } => todo!(),
+                    boom::Expression::Field { expression, field } => {
+                        //stmts.extend(self.build_field_access_from_expression(expression, *field));
+                        todo!()
+                    }
                     boom::Expression::Address(_) => todo!(),
                 }
 
@@ -723,6 +738,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                         Statement::from_kind(StatementKind::WriteVariable {
                                             symbol,
                                             value: call.clone(),
+                                            member: None,
                                         });
                                     vec![statement]
                                 }
@@ -770,4 +786,92 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Statement::Comment(_) => todo!(),
         }
     }
+
+    // fn build_field_access_from_expression(
+    //     &mut self,
+    //     expression: &boom::Expression,
+    //     field_name: InternedString,
+    // ) -> Vec<Statement> {
+    //     let struct_name = match expression {
+    //         boom::Expression::Identifier(ident) => ident,
+    //         boom::Expression::Field { .. } => todo!("support nesting"),
+    //         boom::Expression::Address(_) => todo!("probably dont need this"),
+    //     };
+
+    //     let symbol = self
+    //         .fn_ctx()
+    //         .rudder_fn
+    //         .get_local_variable(*struct_name)
+    //         .expect(&format!("could not find {struct_name}"));
+
+    //     let value = Statement::from_kind(StatementKind::ReadVariable { symbol: symbol });
+
+    //     let idx = self
+    //         .ctx()
+    //         .structs
+    //         .get(&struct_name)
+    //         .unwrap()
+    //         .1
+    //         .get(&field_name)
+    //         .unwrap();
+
+    //     let statement = Statement::from_kind(StatementKind::ReadCompositeTypeMember {
+    //         value: value.clone(),
+    //         member: *idx,
+    //     });
+
+    //     vec![value, statement]
+    // }
+
+    // fn build_field_access_from_value(
+    //     &mut self,
+    //     value: Rc<RefCell<boom::Value>>,
+    //     field_name: InternedString,
+    // ) -> Vec<Statement> {
+    //     let struct_name = match &*value.borrow() {
+    //         boom::Value::Struct { name, .. } => *name,
+    //         boom::Value::Identifier(ident) => {
+    //             let symbol = self
+    //                 .fn_ctx()
+    //                 .rudder_fn
+    //                 .local_variables()
+    //                 .into_iter()
+    //                 .find(|sym| sym.name() == *ident)
+    //                 .unwrap();
+
+    //             let target_typ = symbol.typ();
+
+    //             let (struct_name, _) = self
+    //                 .ctx()
+    //                 .structs
+    //                 .iter()
+    //                 .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+    //                 .expect("failed to find struct :(");
+
+    //             *struct_name
+    //         }
+    //         // todo: also need to handle nested fields
+    //         _ => todo!(),
+    //     };
+
+    //     let mut stmts = self.transform_value(value.clone());
+    //     let value = stmts.last().unwrap().clone();
+
+    //     let idx = self
+    //         .ctx()
+    //         .structs
+    //         .get(&struct_name)
+    //         .unwrap()
+    //         .1
+    //         .get(&field_name)
+    //         .unwrap();
+
+    //     let statement = Statement::from_kind(StatementKind::ReadCompositeTypeMember {
+    //         value,
+    //         member: *idx,
+    //     });
+
+    //     stmts.push(statement);
+    //     stmts
+    // }
 }

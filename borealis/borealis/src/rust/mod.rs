@@ -6,7 +6,7 @@ use {
         passes::{
             self, builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
             fold_unconditionals::FoldUnconditionals, make_exception_bool::MakeExceptionBool,
-            remove_const_branch::RemoveConstBranch, remove_exception::RemoveExceptions,
+            remove_const_branch::RemoveConstBranch,
             remove_redundant_assigns::RemoveRedundantAssigns,
             resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
         },
@@ -163,7 +163,7 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
                 "u__id",
                 "ReservedValue",
                 "u__PostDecode",
-                //   "integer_arithmetic_addsub_immediate", WIP
+                //    "integer_arithmetic_addsub_immediate",
             ]
             .contains(&k.as_ref())
         })

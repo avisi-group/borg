@@ -9,7 +9,7 @@ use {
         boom::{
             control_flow::{ControlFlowBlock, Terminator},
             visitor::{Visitor, Walkable},
-            Ast, Expression, FunctionDefinition, Literal, Size, Statement, Type, Value,
+            Ast, Expression, Literal, Size, Statement, Type, Value,
         },
         passes::Pass,
     },

@@ -1,13 +1,12 @@
 use {
-    crate::rudder::{Block, Context, Function, PrimitiveType, Statement, Symbol, Type},
-    proc_macro2::{Ident, Literal, Span, TokenStream, TokenTree},
+    crate::rudder::{Block, Context, Function, Statement, Symbol, Type},
+    proc_macro2::{Ident, Literal, Span, TokenStream},
     quote::{format_ident, quote, ToTokens},
     std::{
         borrow::Borrow,
         hash::{DefaultHasher, Hash, Hasher},
         rc::Rc,
     },
-    syn::token::Token,
 };
 
 pub fn codegen(rudder: Context) -> TokenStream {
@@ -44,7 +43,7 @@ pub fn codegen(rudder: Context) -> TokenStream {
                 .iter()
                 .enumerate()
                 .map(|(i, typ)| {
-                    let name = Ident::new(&format!("_{i}"), Span::call_site());
+                    let name = codegen_member(i);
                     let typ = codegen_type(typ.clone());
                     quote!(#name: #typ,)
                 })
@@ -229,22 +228,28 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 crate::rudder::ConstantValue::Unit => quote!(()),
             }
         }
-        crate::rudder::StatementKind::ReadVariable { symbol } => {
+        crate::rudder::StatementKind::ReadVariable { symbol, member } => {
             let var = format_ident!("{}", symbol.name().to_string());
-            quote! {#var}
+            let member = member.map(codegen_member).map(|ident| quote!(.#ident));
+            quote! {#var #member}
         }
-        crate::rudder::StatementKind::WriteVariable { symbol, value } => {
+        crate::rudder::StatementKind::WriteVariable {
+            symbol,
+            member,
+            value,
+        } => {
             let typ = codegen_type(symbol.typ());
             let var = format_ident!("{}", symbol.name().to_string());
+            let member = member.map(codegen_member).map(|ident| quote!(.#ident));
             let value = get_ident(value);
-            quote! {#var = #value as #typ}
+            quote! {#var #member = #value as #typ}
         }
-        crate::rudder::StatementKind::ReadRegister { typ, offset } => quote!(todo!("read-reg")),
-        crate::rudder::StatementKind::WriteRegister { offset, value } => quote!(todo!("write-reg")),
-        crate::rudder::StatementKind::ReadMemory { typ, offset } => quote!(todo!("read-mem")),
-        crate::rudder::StatementKind::WriteMemory { offset, value } => quote!(todo!("write-mem")),
+        crate::rudder::StatementKind::ReadRegister { .. } => quote!(todo!("read-reg")),
+        crate::rudder::StatementKind::WriteRegister { .. } => quote!(todo!("write-reg")),
+        crate::rudder::StatementKind::ReadMemory { .. } => quote!(todo!("read-mem")),
+        crate::rudder::StatementKind::WriteMemory { .. } => quote!(todo!("write-mem")),
         crate::rudder::StatementKind::ReadPc => quote!(todo!("read-pc")),
-        crate::rudder::StatementKind::WritePc { value } => quote!(todo!("write-pc")),
+        crate::rudder::StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         crate::rudder::StatementKind::BinaryOperation { kind, lhs, rhs } => {
             let left = get_ident(lhs.clone());
             let right = get_ident(rhs.clone());
@@ -326,7 +331,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        crate::rudder::StatementKind::Cast { kind, typ, value } => {
+        crate::rudder::StatementKind::Cast { typ, value, .. } => {
             let value = get_ident(value);
             let typ = codegen_type(typ);
 
@@ -353,7 +358,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 current_block = if #condition != 0 { #true_target } else { #false_target };
             }
         }
-        crate::rudder::StatementKind::PhiNode { members } => quote!(todo!("phi")),
+        crate::rudder::StatementKind::PhiNode { .. } => quote!(todo!("phi")),
         crate::rudder::StatementKind::Return { value } => match value {
             Some(value) => {
                 let name = value.name();
@@ -363,22 +368,9 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! {return return_value;}
             }
         },
-        crate::rudder::StatementKind::Select {
-            condition,
-            true_value,
-            false_value,
-        } => quote!(todo!("select")),
-        crate::rudder::StatementKind::BitExtract {
-            value,
-            start,
-            length,
-        } => quote!(todo!("bitex")),
-        crate::rudder::StatementKind::BitInsert {
-            original_value,
-            insert_value,
-            start,
-            length,
-        } => quote!(todo!("bitins")),
+        crate::rudder::StatementKind::Select { .. } => quote!(todo!("select")),
+        crate::rudder::StatementKind::BitExtract { .. } => quote!(todo!("bitex")),
+        crate::rudder::StatementKind::BitInsert { .. } => quote!(todo!("bitins")),
         crate::rudder::StatementKind::Trap => quote!(panic!("it's a trap")),
     };
 
@@ -395,4 +387,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             #value;
         }
     }
+}
+
+fn codegen_member(idx: usize) -> Ident {
+    Ident::new(&format!("_{idx}"), Span::call_site())
 }

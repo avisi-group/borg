@@ -1,15 +1,12 @@
 //! BOOM AST pretty printing
 
 use {
-    crate::{
-        boom::{
-            bits_to_int,
-            control_flow::{util::find_common_block, ControlFlowBlock, Terminator},
-            visitor::Visitor,
-            Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
-            NamedValue, Operation, Parameter, Size, Statement, Type, Value,
-        },
-        Indent,
+    crate::boom::{
+        bits_to_int,
+        control_flow::{ControlFlowBlock, Terminator},
+        visitor::Visitor,
+        Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
+        NamedValue, Operation, Parameter, Size, Statement, Type, Value,
     },
     common::intern::InternedString,
     std::{

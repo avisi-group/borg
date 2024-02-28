@@ -6,7 +6,6 @@ use {
         genc::format::{InstructionFormat as GenCFormat, Segment, SegmentContent},
     },
     common::{identifiable::unique_id, intern::InternedString, HashMap},
-    itertools::Itertools,
     log::{debug, trace, warn},
     num_bigint::Sign,
     once_cell::sync::Lazy,
