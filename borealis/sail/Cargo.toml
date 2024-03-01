@@ -15,7 +15,7 @@ parking_lot = "0.12.1"
 displaydoc = "0.2.4"
 thiserror = "1.0.57"
 errctx = "1.0.0"
-log = "0.4.20"
+log = "0.4.21"
 serde = { version = "1.0.197", features = ["derive"] }
 deepsize = "0.2.0"
 num-bigint = { version = "0.4.4", features = ["serde"] }
@@ -25,7 +25,7 @@ phf = { version = "0.11.2", features = ["macros"] }
 regex = "1.10.3"
 
 [build-dependencies]
-cc = "1.0.83"
+cc = "1.0.88"
 color-eyre = "0.6.2"
 
 [dev-dependencies]

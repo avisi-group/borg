@@ -15,7 +15,7 @@ errctx = "1.0.0"
 color-eyre = { version = "0.6.2", default-features = false }
 pretty_assertions = "1.4.0"
 pretty_env_logger = "0.5.0"
-log = "0.4.20"
+log = "0.4.21"
 
 clap = { version = "4.5.1", features = ["derive"] }
 
@@ -34,7 +34,7 @@ itertools = "0.12.1"
 kinded = "0.3.0"
 
 quote = "1.0.35"
-syn = { version = "2.0.50",  features = ["full", "parsing"] }
+syn = { version = "2.0.52",  features = ["full", "parsing"] }
 prettyplease = "0.2.16"
 proc-macro2 = "1.0.78"
 ansi_term = "0.12.1"
