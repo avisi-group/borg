@@ -254,7 +254,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let left = get_ident(lhs.clone());
             let right = get_ident(rhs.clone());
 
-            let cmp_type = if lhs.get_type().width() > rhs.get_type().width() {
+            let cmp_type = if lhs.get_type().width_bits() > rhs.get_type().width_bits() {
                 lhs.get_type()
             } else {
                 rhs.get_type()
@@ -314,14 +314,13 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         crate::rudder::StatementKind::Call { target, args } => {
-            // // todo: remove me
-
             let ident = format_ident!("{}", target.name().to_string());
             let args = args.iter().map(|arg| {
                 let arg = get_ident(arg.clone());
                 quote! {#arg}
             });
 
+            // todo: remove this
             if target.name().as_ref().starts_with("unimplemented_") {
                 let msg = target.name().to_string();
                 quote! { unimplemented!(#msg) }

@@ -83,15 +83,18 @@ impl Type {
         })
     }
 
-    pub fn width(&self) -> usize {
+    pub fn width_bits(&self) -> usize {
         match self {
-            Self::Composite(xs) => xs.iter().map(|x| x.width()).sum(),
+            Self::Composite(xs) => xs.iter().map(|x| x.width_bits()).sum(),
             Self::Primitive(p) => p.element_width_in_bits,
             Type::Vector {
                 element_count,
                 element_type,
-            } => element_type.width() * element_count,
+            } => element_type.width_bits() * element_count,
         }
+    }
+    pub fn width_bytes(&self) -> usize {
+        self.width_bits().div_ceil(8)
     }
 
     type_def_helper!(u1, UnsignedInteger, 1);
@@ -402,8 +405,11 @@ impl Statement {
         match self.kind() {
             StatementKind::Constant { typ, .. } => typ,
             StatementKind::ReadVariable { symbol, member } => match member {
-                Some(idx) => todo!(),
-                None => symbol.typ,
+                Some(idx) => match &*symbol.typ() {
+                    Type::Composite(fields) => fields[idx].clone(),
+                    _ => unreachable!(),
+                },
+                None => symbol.typ(),
             },
             StatementKind::WriteVariable { .. } => Rc::new(Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
@@ -693,6 +699,8 @@ pub enum FunctionKind {
 #[derive(Default)]
 pub struct Context {
     fns: HashMap<InternedString, (FunctionKind, Function)>,
+    // offset-type pairs, offsets may not be unique? todo: ask tom
+    registers: Vec<(Rc<Type>, usize)>,
     structs: HashSet<Rc<Type>>,
     unions: HashSet<Rc<Type>>,
 }
@@ -721,6 +729,10 @@ impl Context {
             .iter()
             .map(|(name, (_, function))| (*name, function.clone()))
             .collect()
+    }
+
+    pub fn get_registers(&self) -> Vec<(Rc<Type>, usize)> {
+        self.registers.clone()
     }
 
     pub fn get_structs(&self) -> HashSet<Rc<Type>> {

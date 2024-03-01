@@ -56,21 +56,35 @@ pub fn sail_to_brig(
 
     info!("Generating Rust");
 
-    // TODO: properly handle registers
-    // let reg_fields =
-    // TokenStream::from_iter(ast.borrow().registers.iter().map(|(name, typ)| {
-    //     let typ_str = Ident::new(&typ.emit_string(), Span::call_site());
-    //     quote! {
-    //         #name: #typ_str,
-    //     }
-    // }));
-    let reg_fields = quote! {
-        pc: u64,
-        sp: u64,
-        x: [u64; 31],
-    };
-
     let rudder = rudder::build::from_boom(&*ast.borrow());
+
+    let max = rudder
+        .get_registers()
+        .into_iter()
+        .max_by_key(|(typ, offset)| offset + typ.width_bytes())
+        .unwrap();
+
+    let len = max.0.width_bytes() + max.1;
+
+    let state = quote! {
+        pub struct State {
+            pc: u64,
+            sp: u64,
+            x: [u64; 31],
+            data: [u8; #len],
+        }
+
+        impl Default for State {
+            fn default() -> Self {
+                Self {
+                    pc: 0,
+                    sp: 0,
+                    x: [0u64; 31],
+                    data: [0; #len],
+                }
+            }
+        }
+    };
 
     let decode_fn = decode::generate_fn(sail_ast, &rudder);
 
@@ -130,10 +144,7 @@ pub fn sail_to_brig(
     quote! {
         //! BOREALIS GENERATED FILE DO NOT MODIFY
 
-        #[derive(Default)]
-        pub struct State {
-            #reg_fields
-        }
+        #state
 
         #[derive(Debug)]
         enum ExecuteResult {
@@ -163,7 +174,7 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
                 "u__id",
                 "ReservedValue",
                 "u__PostDecode",
-                //    "integer_arithmetic_addsub_immediate",
+                "integer_arithmetic_addsub_immediate",
             ]
             .contains(&k.as_ref())
         })

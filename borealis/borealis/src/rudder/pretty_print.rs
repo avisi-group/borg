@@ -14,9 +14,9 @@ impl Display for Type {
             Type::Primitive(p) => match &p.tc {
                 PrimitiveTypeClass::Void => write!(f, "void"),
                 PrimitiveTypeClass::Unit => write!(f, "()"),
-                PrimitiveTypeClass::UnsignedInteger => write!(f, "u{}", self.width()),
-                PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width()),
-                PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width()),
+                PrimitiveTypeClass::UnsignedInteger => write!(f, "u{}", self.width_bits()),
+                PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width_bits()),
+                PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
             },
             Type::Composite(_) => write!(f, "struct"),
             Type::Vector {
