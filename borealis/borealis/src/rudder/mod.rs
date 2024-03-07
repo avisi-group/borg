@@ -416,6 +416,30 @@ impl Statement {
             StatementKind::WriteRegister { .. } => Rc::new(Type::void()),
             StatementKind::ReadMemory { typ, .. } => typ,
             StatementKind::WriteMemory { .. } => Rc::new(Type::void()),
+            StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::CmpEq,
+                ..
+            }
+            | StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::CmpNe,
+                ..
+            }
+            | StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::CmpGe,
+                ..
+            }
+            | StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::CmpGt,
+                ..
+            }
+            | StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::CmpLe,
+                ..
+            }
+            | StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::CmpLt,
+                ..
+            } => Rc::new(Type::u1()),
             StatementKind::BinaryOperation { lhs, .. } => lhs.get_type(),
             StatementKind::UnaryOperation { value, .. } => value.get_type(),
             StatementKind::ShiftOperation { value, .. } => value.get_type(),

@@ -508,26 +508,34 @@ fn generate_decode_arguments(
     name: InternedString,
     arguments: &[(InternedString, (Rc<Type>, Range<usize>))],
 ) -> TokenStream {
-    // let name = self.name();
-    // let sig = def.signature();
-    // let arguments = sig.1.iter().map(|sym| sym.name());
-    // quote!(#name(#(#arguments),*))
     let args = arguments
         .iter()
         .map(|(name, (typ, Range { start, end }))| {
-            let typ = codegen_type(typ.clone());
-            quote!(let #name =((value >> #start) & ((1 << (#end - #start)) - 1)) as #typ;)
+            let value = quote!(((value >> #start) & ((1 << (#end - #start)) - 1)));
+
+            // todo: this logic is duplicated in codegen
+            let cast = if **typ == Type::u1() {
+                quote! {
+                    ((#value) != 0)
+                }
+            } else {
+                let typ = codegen_type(typ.clone());
+                quote! {
+                    ((#value) as #typ)
+                }
+            };
+
+            quote!(let #name = #cast;)
         })
         .collect::<TokenStream>();
 
     let arg_idents = [InternedString::from_static("state")]
         .into_iter()
         .chain(arguments.iter().map(|(name, _)| *name));
+
     quote! {
         #args
 
         #name(#(#arg_idents),*)
     }
-
-    //
 }

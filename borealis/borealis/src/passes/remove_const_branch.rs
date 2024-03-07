@@ -6,7 +6,7 @@ use {
             control_flow::{ControlFlowBlock, Terminator},
             Ast,
         },
-        passes::{any::AnyExt as _, Pass},
+        passes::{any::AnyExt, Pass},
     },
     common::HashSet,
     log::{debug, trace},

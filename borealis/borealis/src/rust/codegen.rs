@@ -1,5 +1,10 @@
+//! Rust code generation
+//!
+//! Watch out for `return quote!(...)` in these functions when they build up
+//! quotes
+
 use {
-    crate::rudder::{Block, Context, Function, Statement, Symbol, Type},
+    crate::rudder::{Block, Context, Function, PrimitiveTypeClass, Statement, Symbol, Type},
     proc_macro2::{Ident, Literal, Span, TokenStream},
     quote::{format_ident, quote, ToTokens},
     std::{
@@ -93,18 +98,22 @@ fn promote_width(width: usize) -> usize {
 pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
     match &*typ {
         Type::Primitive(typ) => {
+            if typ.type_class() == PrimitiveTypeClass::UnsignedInteger && typ.width() == 1 {
+                return quote!(bool);
+            }
+
             let width = promote_width(typ.width());
 
             let rust_type = match typ.type_class() {
-                crate::rudder::PrimitiveTypeClass::Void => return quote!(()),
-                crate::rudder::PrimitiveTypeClass::Unit => return quote!(()),
-                crate::rudder::PrimitiveTypeClass::UnsignedInteger => {
+                PrimitiveTypeClass::Void => return quote!(()),
+                PrimitiveTypeClass::Unit => return quote!(()),
+                PrimitiveTypeClass::UnsignedInteger => {
                     format_ident!("u{}", width)
                 }
-                crate::rudder::PrimitiveTypeClass::SignedInteger => {
+                PrimitiveTypeClass::SignedInteger => {
                     format_ident!("i{}", width)
                 }
-                crate::rudder::PrimitiveTypeClass::FloatingPoint => {
+                PrimitiveTypeClass::FloatingPoint => {
                     format_ident!("f{}", width)
                 }
             };
@@ -138,7 +147,7 @@ fn codegen_body(function: Function) -> TokenStream {
         .enumerate()
         .map(|(idx, block)| {
             let block_name = format_ident!("BLOCK_{}", block.name().to_string());
-            let idx = idx as u32;
+            let idx = u32::try_from(idx).unwrap();
 
             quote! {
                 const #block_name: u32 = #idx;
@@ -209,12 +218,17 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
     let value = match stmt.kind() {
-        crate::rudder::StatementKind::Constant { value, .. } => {
+        crate::rudder::StatementKind::Constant { value, typ } => {
             match value {
                 // todo: do not emit type info here
                 crate::rudder::ConstantValue::UnsignedInteger(v) => {
-                    let v = Literal::usize_unsuffixed(v);
-                    quote!(#v)
+                    if *typ == Type::u1() {
+                        let b = if v == 0 { false } else { true };
+                        quote!(#b)
+                    } else {
+                        let v = Literal::usize_unsuffixed(v);
+                        quote!(#v)
+                    }
                 }
                 crate::rudder::ConstantValue::SignedInteger(v) => {
                     let v = Literal::isize_unsuffixed(v);
@@ -238,11 +252,10 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             member,
             value,
         } => {
-            let typ = codegen_type(symbol.typ());
             let var = format_ident!("{}", symbol.name().to_string());
             let member = member.map(codegen_member).map(|ident| quote!(.#ident));
             let value = get_ident(value);
-            quote! {#var #member = #value as #typ}
+            quote! {#var #member = #value}
         }
         crate::rudder::StatementKind::ReadRegister { .. } => quote!(todo!("read-reg")),
         crate::rudder::StatementKind::WriteRegister { .. } => quote!(todo!("write-reg")),
@@ -254,37 +267,24 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let left = get_ident(lhs.clone());
             let right = get_ident(rhs.clone());
 
-            let cmp_type = if lhs.get_type().width_bits() > rhs.get_type().width_bits() {
-                lhs.get_type()
-            } else {
-                rhs.get_type()
-            };
-
-            let rs_type = codegen_type(cmp_type);
-            let target_type = codegen_type(stmt.get_type());
-
-            let left = quote! { #rs_type::from(#left) };
-            let right = quote! { #rs_type::from(#right) };
-
             let op = match kind {
-                crate::rudder::BinaryOperationKind::CmpEq => quote! { #left == #right },
-                crate::rudder::BinaryOperationKind::Add => quote! {#left + #right},
-                crate::rudder::BinaryOperationKind::Sub => quote! {#left - #right},
-                crate::rudder::BinaryOperationKind::Multiply => quote! {#left * #right},
-                crate::rudder::BinaryOperationKind::Divide => quote! {#left / #right},
-                crate::rudder::BinaryOperationKind::Modulo => quote! {#left % #right},
-                crate::rudder::BinaryOperationKind::And => quote! {#left & #right},
-                crate::rudder::BinaryOperationKind::Or => quote! {#left | #right},
-                crate::rudder::BinaryOperationKind::Xor => quote! {#left ^ #right},
-                crate::rudder::BinaryOperationKind::CmpNe => quote! {#left != #right},
-                crate::rudder::BinaryOperationKind::CmpLt => quote! {#left < #right},
-                crate::rudder::BinaryOperationKind::CmpLe => quote! {#left <= #right},
-                crate::rudder::BinaryOperationKind::CmpGt => quote! {#left > #right},
-                crate::rudder::BinaryOperationKind::CmpGe => quote! {#left >= #right},
+                crate::rudder::BinaryOperationKind::CmpEq => quote! { (#left) == (#right) },
+                crate::rudder::BinaryOperationKind::Add => quote! { (#left) + (#right) },
+                crate::rudder::BinaryOperationKind::Sub => quote! { (#left) - (#right) },
+                crate::rudder::BinaryOperationKind::Multiply => quote! { (#left) * (#right) },
+                crate::rudder::BinaryOperationKind::Divide => quote! { (#left) / (#right) },
+                crate::rudder::BinaryOperationKind::Modulo => quote! { (#left) % (#right) },
+                crate::rudder::BinaryOperationKind::And => quote! { (#left) & (#right) },
+                crate::rudder::BinaryOperationKind::Or => quote! { (#left) | (#right) },
+                crate::rudder::BinaryOperationKind::Xor => quote! { (#left) ^ (#right) },
+                crate::rudder::BinaryOperationKind::CmpNe => quote! { (#left) != (#right) },
+                crate::rudder::BinaryOperationKind::CmpLt => quote! { (#left) < (#right) },
+                crate::rudder::BinaryOperationKind::CmpLe => quote! { (#left) <= (#right) },
+                crate::rudder::BinaryOperationKind::CmpGt => quote! { (#left) > (#right) },
+                crate::rudder::BinaryOperationKind::CmpGe => quote! { (#left) >= (#right) },
             };
 
-            // todo: don't blindly cast
-            quote! { (#op) as #target_type }
+            quote! { (#op) }
         }
         crate::rudder::StatementKind::UnaryOperation { kind, value } => {
             let value = get_ident(value);
@@ -331,11 +331,26 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         crate::rudder::StatementKind::Cast { typ, value, .. } => {
-            let value = get_ident(value);
-            let typ = codegen_type(typ);
+            let source = value.get_type();
+            let target = typ;
+            let ident = get_ident(value);
 
-            quote! {
-                #value as #typ
+            if source == target {
+                quote! {
+                    ((#ident))
+                }
+            } else if target == Rc::new(Type::u1()) {
+                // todo: is special casing booleans like this necessary?
+                // todo: this is duplicated in decode
+                quote! {
+                    ((#ident) != 0)
+                }
+            } else {
+                let target = codegen_type(target);
+
+                quote! {
+                    ((#ident) as #target)
+                }
             }
         }
         crate::rudder::StatementKind::Jump { target } => {
@@ -354,7 +369,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let false_target = format_ident!("BLOCK_{}", false_target.name().to_string());
 
             quote! {
-                current_block = if #condition != 0 { #true_target } else { #false_target };
+                current_block = if #condition { #true_target } else { #false_target };
             }
         }
         crate::rudder::StatementKind::PhiNode { .. } => quote!(todo!("phi")),
