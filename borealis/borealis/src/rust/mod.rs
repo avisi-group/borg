@@ -32,10 +32,6 @@ pub fn sail_to_brig(
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(jib_ast);
 
-    // // useful for debugging
-    // crate::boom::pretty_print::print_ast(&mut std::io::stdout(), ast.clone());
-    // panic!();
-
     // only run on a subset of the model, for now
     apply_function_denylist(ast.clone());
 
@@ -53,6 +49,10 @@ pub fn sail_to_brig(
             CycleFinder::new_boxed(),
         ],
     );
+
+    // // useful for debugging
+    // crate::boom::pretty_print::print_ast(&mut std::io::stdout(), ast.clone());
+    // panic!();
 
     info!("Generating Rust");
 
@@ -175,7 +175,7 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
                 "ReservedValue",
                 "u__PostDecode",
                 "integer_arithmetic_addsub_immediate",
-                //    "aget_SP",
+                "aget_X",
             ]
             .contains(&k.as_ref())
         })

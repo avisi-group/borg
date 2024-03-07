@@ -75,7 +75,16 @@ impl BuildContext {
                     self.add_register(format!("{name}_{i}").into(), typ.clone())
                 })
             }
-            Type::Vector { .. } => (), // todo: support vectors,
+            Type::Vector {
+                element_count,
+                element_type,
+            } => {
+                self.composite_registers.insert(name, typ.clone());
+
+                for i in 0..*element_count {
+                    self.add_register(format!("{name}_{i}").into(), element_type.clone());
+                }
+            }
         }
     }
 
@@ -407,11 +416,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     })];
                 }
 
-                panic!(
-                    "unknown ident: {:?}\n{:?}",
-                    ident,
-                    self.ctx().registers.keys().collect::<Vec<_>>()
-                );
+                panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
             }
             boom::Value::Literal(literal) => {
                 let kind = match &*literal.borrow() {
@@ -877,6 +882,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         })])
                         .collect();
                 }
+
+                if *name == InternedString::from_static("vector_subrange_A") {}
 
                 let target = match self.ctx().functions.get(name).cloned() {
                     Some((_, target, _)) => target,
