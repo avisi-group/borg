@@ -102,7 +102,7 @@ fn main() -> Result<()> {
             let tokens = sail_to_brig(&ast, &jib, standalone);
 
             let syntax_tree =
-                syn::parse_file(&tokens.to_string()).wrap_err(format!("failed to parse tokens"))?;
+                syn::parse_file(&tokens.to_string()).wrap_err("failed to parse tokens")?;
             let formatted = prettyplease::unparse(&syntax_tree);
             writer.write_all(formatted.as_bytes())?;
 

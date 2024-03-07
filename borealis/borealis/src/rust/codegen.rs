@@ -223,7 +223,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 // todo: do not emit type info here
                 crate::rudder::ConstantValue::UnsignedInteger(v) => {
                     if *typ == Type::u1() {
-                        let b = if v == 0 { false } else { true };
+                        let b = v != 0;
                         quote!(#b)
                     } else {
                         let v = Literal::usize_unsuffixed(v);

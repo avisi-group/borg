@@ -44,11 +44,7 @@ impl Ast {
 
         let mut ast = emitter.finish();
 
-        ast.functions.extend(
-            builtin_fns()
-                .into_iter()
-                .map(|(name, def)| (name.into(), def)),
-        );
+        ast.functions.extend(builtin_fns());
 
         Rc::new(RefCell::new(ast))
     }
@@ -713,6 +709,16 @@ impl Bit {
             Bit::Zero => 0,
             Bit::One => 1,
             Bit::Unknown => panic!("unknown bit has no value"),
+        }
+    }
+}
+
+impl From<u64> for Bit {
+    fn from(value: u64) -> Self {
+        match value {
+            0 => Bit::Zero,
+            1 => Bit::One,
+            _ => panic!("value must be 0 or 1 to be interpreted as a bit"),
         }
     }
 }

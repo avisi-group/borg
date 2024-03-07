@@ -17,6 +17,8 @@ use {
     std::{cell::RefCell, io::stdout, ops::Range, rc::Rc},
 };
 
+type DecodeParameter = (InternedString, (Rc<Type>, Range<usize>));
+
 /// Generates the instruction decode function from the Sail `decode64` clauses
 /// using a decode tree
 pub fn generate_fn(sail: &sail_ast::Ast, rudder: &Context) -> TokenStream {
@@ -30,24 +32,14 @@ pub fn generate_fn(sail: &sail_ast::Ast, rudder: &Context) -> TokenStream {
                 .format
                 .0
                 .iter()
-                .map(|Segment { content, length }| match content {
+                .flat_map(|Segment { content, length }| match content {
                     SegmentContent::Variable(_) => vec![Bit::Unknown; *length],
-                    SegmentContent::Constant(val) => {
-                        let mut bits = vec![Bit::Unknown; *length];
-
-                        for i in 0..*length {
-                            match (val >> i) & 1 {
-                                0 => bits[i] = Bit::Zero,
-                                1 => bits[i] = Bit::One,
-                                _ => unreachable!(),
-                            }
-                        }
-
-                        bits.reverse();
-                        bits
-                    }
+                    SegmentContent::Constant(val) => (0..*length)
+                        .rev()
+                        .map(|i| (val >> i) & 1)
+                        .map(Bit::from)
+                        .collect(),
                 })
-                .flatten()
                 .collect::<Vec<_>>();
 
             (
@@ -110,7 +102,7 @@ impl DecodeTree {
 
     pub fn codegen(
         &self,
-        functions: &HashMap<InternedString, Vec<(InternedString, (Rc<Type>, Range<usize>))>>,
+        functions: &HashMap<InternedString, Vec<DecodeParameter>>,
     ) -> TokenStream {
         let body = self.root.codegen(functions);
         quote! {
@@ -305,10 +297,7 @@ impl Node {
         self.inner.borrow_mut().constrained.push(t);
     }
 
-    fn codegen(
-        &self,
-        functions: &HashMap<InternedString, Vec<(InternedString, (Rc<Type>, Range<usize>))>>,
-    ) -> TokenStream {
+    fn codegen(&self, functions: &HashMap<InternedString, Vec<DecodeParameter>>) -> TokenStream {
         // check if it is a leaf node
         if self.constrained().is_empty() && self.unconstrained().is_none() {
             if self.offset() != 32 {
@@ -466,7 +455,6 @@ mod graph {
                     .unwrap_or(String::from("?"))
                     .into(),
             )
-            .into()
         }
 
         fn node_shape(&'ast self, _: &NodeId) -> Option<LabelText<'ast>> {
@@ -494,20 +482,17 @@ mod graph {
         }
 
         fn source(&'ast self, edge: &EdgeId) -> NodeId {
-            edge.0.clone()
+            edge.0
         }
 
         fn target(&'ast self, edge: &EdgeId) -> NodeId {
-            edge.1.clone()
+            edge.1
         }
     }
 }
 
 /// Calculates arguments and generates the decode function call
-fn generate_decode_arguments(
-    name: InternedString,
-    arguments: &[(InternedString, (Rc<Type>, Range<usize>))],
-) -> TokenStream {
+fn generate_decode_arguments(name: InternedString, arguments: &[DecodeParameter]) -> TokenStream {
     let args = arguments
         .iter()
         .map(|(name, (typ, Range { start, end }))| {

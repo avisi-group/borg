@@ -167,7 +167,7 @@ impl Emit for Rc<RefCell<Value>> {
         fn write_uid<W: Write>(
             w: &mut W,
             id: InternedString,
-            typs: &Vec<Rc<RefCell<Type>>>,
+            typs: &[Rc<RefCell<Type>>],
         ) -> fmt::Result {
             write!(w, "{id}")?;
 

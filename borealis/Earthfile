@@ -75,6 +75,7 @@ docker:
 test:
     BUILD +unit-test
     BUILD +e2e-test-archsim
+    BUILD +e2e-test-brig
 
 test-chef-cook:
     FROM +base-image
@@ -220,3 +221,15 @@ bench-fib-archsim:
     RUN { time ./dist/bin/archsim -m aarch64-user -l contiguous -s arm64 --modules ./modules -e ./fib ; } 2> archsim.time
 
     SAVE ARTIFACT archsim.time archsim.time
+
+
+### BRIG ###
+e2e-test-brig:
+    FROM rust:alpine
+
+    COPY data/arm-v8.5-a_d43f3f4.bincode.lz4 arm-v8.5-a.bincode.lz4
+    COPY (+build/borealis) borealis
+
+    RUN ./borealis sail2brig --standalone arm-v8.5-a.bincode.lz4 aarch64.rs
+    RUN rustc --edition 2021 aarch64.rs
+ #   RUN ./aarch64 91500421

@@ -56,7 +56,7 @@ pub fn sail_to_brig(
 
     info!("Generating Rust");
 
-    let rudder = rudder::build::from_boom(&*ast.borrow());
+    let rudder = rudder::build::from_boom(&ast.borrow());
 
     let max = rudder
         .get_registers()
@@ -175,6 +175,7 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
                 "ReservedValue",
                 "u__PostDecode",
                 "integer_arithmetic_addsub_immediate",
+                //    "aget_SP",
             ]
             .contains(&k.as_ref())
         })

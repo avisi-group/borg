@@ -367,7 +367,7 @@ impl Statement {
     }
 
     pub fn name(&self) -> InternedString {
-        (*self.inner).borrow().name.clone()
+        (*self.inner).borrow().name
     }
 
     pub fn update_names(&self, name: InternedString) {
@@ -479,16 +479,11 @@ pub struct Block {
 
 impl Block {
     pub fn new() -> Self {
-        Self {
-            inner: Rc::new(RefCell::new(BlockInner {
-                name: "???".into(),
-                statements: LinkedList::new(),
-            })),
-        }
+        Self::default()
     }
 
     pub fn name(&self) -> InternedString {
-        (*self.inner).borrow().name.clone()
+        (*self.inner).borrow().name
     }
 
     pub fn update_names(&self, name: InternedString) {
@@ -509,6 +504,17 @@ impl Block {
 
     pub fn iter(&self) -> BlockIterator {
         BlockIterator::new(self.clone())
+    }
+}
+
+impl Default for Block {
+    fn default() -> Self {
+        Self {
+            inner: Rc::new(RefCell::new(BlockInner {
+                name: "???".into(),
+                statements: LinkedList::new(),
+            })),
+        }
     }
 }
 
@@ -533,13 +539,11 @@ pub struct BlockInner {
 
 impl BlockInner {
     pub fn update_names(&mut self, name: InternedString) {
-        self.name = name.clone();
+        self.name = name;
 
-        let mut idx = 0;
-        for stmt in &self.statements {
+        self.statements.iter().enumerate().for_each(|(idx, stmt)| {
             stmt.update_names(format!("s_{}_{}", name.clone(), idx).into());
-            idx += 1;
-        }
+        });
     }
 }
 
@@ -665,11 +669,14 @@ impl Function {
     }
 
     pub fn update_names(&self) {
-        let mut idx = 0;
-        for b in self.inner.borrow().entry_block.iter() {
-            b.update_names(format!("{idx}").into());
-            idx += 1;
-        }
+        self.inner
+            .borrow()
+            .entry_block
+            .iter()
+            .enumerate()
+            .for_each(|(idx, b)| {
+                b.update_names(format!("{idx}").into());
+            });
     }
 
     pub fn add_local_variable(&mut self, name: InternedString, typ: Rc<Type>) {

@@ -369,7 +369,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         fn write_uid<W: Write>(
             printer: &mut PrettyPrinter<'_, W>,
             id: InternedString,
-            typs: &Vec<Rc<RefCell<Type>>>,
+            typs: &[Rc<RefCell<Type>>],
         ) {
             write!(printer.writer, "{id}").unwrap();
 
@@ -449,12 +449,12 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         match node {
             Expression::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
             Expression::Field { expression, field } => {
-                self.visit_expression(&expression);
+                self.visit_expression(expression);
                 write!(self.writer, ".{field}").unwrap();
             }
             Expression::Address(expression) => {
                 write!(self.writer, "&").unwrap();
-                self.visit_expression(&expression);
+                self.visit_expression(expression);
             }
         }
     }

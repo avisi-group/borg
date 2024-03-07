@@ -174,7 +174,7 @@ impl BuildContext {
                     self.resolve_type(definition.signature.return_type.clone()),
                     definition.signature.parameters.borrow().iter().map(
                         |boom::Parameter { typ, name, is_ref }| {
-                            assert!(*is_ref == false, "no reference parameters allowed");
+                            assert!(!is_ref, "no reference parameters allowed");
                             (*name, self.resolve_type(typ.clone()))
                         },
                     ),
@@ -407,7 +407,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     })];
                 }
 
-                panic!("unknown ident: {:?}", ident);
+                panic!(
+                    "unknown ident: {:?}\n{:?}",
+                    ident,
+                    self.ctx().registers.keys().collect::<Vec<_>>()
+                );
             }
             boom::Value::Literal(literal) => {
                 let kind = match &*literal.borrow() {
@@ -522,7 +526,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     value_statements
                         .into_iter()
-                        .chain(amount_statements.into_iter())
+                        .chain(amount_statements)
                         .chain([statement])
                         .collect()
                 }
@@ -596,7 +600,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     left_statements
                         .into_iter()
-                        .chain(right_statements.into_iter())
+                        .chain(right_statements)
                         .chain([statement])
                         .collect()
                 }
@@ -848,19 +852,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     return stmts
                         .into_iter()
-                        .chain(
-                            [
-                                one,
-                                diff,
-                                len.clone(),
-                                Statement::from_kind(StatementKind::BitExtract {
-                                    value: args[0].clone(),
-                                    start: args[1].clone(),
-                                    length: len,
-                                }),
-                            ]
-                            .into_iter(),
-                        )
+                        .chain([
+                            one,
+                            diff,
+                            len.clone(),
+                            Statement::from_kind(StatementKind::BitExtract {
+                                value: args[0].clone(),
+                                start: args[1].clone(),
+                                length: len,
+                            }),
+                        ])
                         .collect();
                 }
 
@@ -869,14 +870,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     return stmts
                         .into_iter()
-                        .chain(
-                            [Statement::from_kind(StatementKind::BitExtract {
-                                value: args[0].clone(),
-                                start: args[1].clone(),
-                                length: args[2].clone(),
-                            })]
-                            .into_iter(),
-                        )
+                        .chain([Statement::from_kind(StatementKind::BitExtract {
+                            value: args[0].clone(),
+                            start: args[1].clone(),
+                            length: args[2].clone(),
+                        })])
                         .collect();
                 }
 
@@ -978,8 +976,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 stmts
                     .into_iter()
                     .chain(casts)
-                    .chain([call].into_iter())
-                    .chain(copy.into_iter())
+                    .chain([call])
+                    .chain(copy)
                     .collect()
             }
             boom::Statement::Label(_)
@@ -990,8 +988,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | boom::Statement::If { .. } => {
                 unreachable!("no control flow should exist at this point in compilation!")
             }
-            boom::Statement::Exit(_) => vec![],
-            boom::Statement::Comment(_) => todo!(),
+            boom::Statement::Exit(_) | boom::Statement::Comment(_) => vec![],
         }
     }
 }

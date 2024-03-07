@@ -240,8 +240,7 @@ impl Display for Function {
             .borrow()
             .entry_block
             .iter()
-            .map(|block| write!(f, "{}", block))
-            .collect()
+            .try_for_each(|block| write!(f, "{}", block))
     }
 }
 
@@ -264,7 +263,7 @@ impl Display for Context {
             )?;
 
             write!(f, "{}", func)?;
-            writeln!(f, "")?;
+            writeln!(f)?;
         }
 
         Ok(())
