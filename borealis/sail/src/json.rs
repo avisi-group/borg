@@ -9,6 +9,7 @@
 
 use {
     errctx::PathCtx,
+    log::warn,
     serde::Deserialize,
     std::{
         fs, io,
@@ -80,6 +81,8 @@ pub struct Options {
     pub non_lexical_flow: bool,
     /// When set, disables lexp bounds check
     pub no_lexp_bounds_check: bool,
+    /// Memoize Z3
+    pub memo_z3: bool,
 }
 
 impl TryFrom<&str> for Options {
@@ -89,13 +92,15 @@ impl TryFrom<&str> for Options {
         let mut options = Options {
             non_lexical_flow: false,
             no_lexp_bounds_check: false,
+            memo_z3: false,
         };
 
         for flag in s.split_ascii_whitespace() {
             match flag {
                 "-non_lexical_flow" => options.non_lexical_flow = true,
                 "-no_lexp_bounds_check" => options.no_lexp_bounds_check = true,
-                s => return Err(Error::UnknownFlag(s.to_owned())),
+                "-memo_z3" => options.memo_z3 = true,
+                s => warn!("unknown flag {s:?}"),
             }
         }
 
