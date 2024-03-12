@@ -48,36 +48,23 @@ impl Display for StatementKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self {
             StatementKind::Constant { typ, value } => write!(f, "const #{} : {}", value, typ),
-            StatementKind::ReadVariable { symbol, member } => {
-                write!(f, "read-var {}", symbol.name())?;
-                if let Some(idx) = member {
-                    write!(f, ".{idx}")
-                } else {
-                    Ok(())
-                }
+            StatementKind::ReadVariable { symbol } => {
+                write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
             }
-            StatementKind::WriteVariable {
-                symbol,
-                value,
-                member,
-            } => {
-                write!(f, "write-var {}", symbol.name())?;
-                if let Some(idx) = member {
-                    write!(f, ".{idx}")?;
-                }
-                write!(f, " {}", value.name())
+            StatementKind::WriteVariable { symbol, value } => {
+                write!(f, "write-var {} = {}", symbol.name(), value)
             }
             StatementKind::ReadRegister { typ, offset } => {
                 write!(f, "read-reg {}:{}", offset.name(), typ)
             }
             StatementKind::WriteRegister { offset, value } => {
-                write!(f, "write-reg {} {}", offset.name(), value)
+                write!(f, "write-reg {} = {}", offset.name(), value)
             }
             StatementKind::ReadMemory { typ, offset } => {
                 write!(f, "read-mem {}:{}", offset.name(), typ)
             }
             StatementKind::WriteMemory { offset, value } => {
-                write!(f, "write-mem {} {}", offset.name(), value)
+                write!(f, "write-mem {} = {}", offset.name(), value)
             }
             StatementKind::BinaryOperation { kind, lhs, rhs } => {
                 let op = match kind {
@@ -211,6 +198,34 @@ impl Display for StatementKind {
                 insert_value.name(),
                 start.name(),
                 length.name()
+            ),
+            StatementKind::ReadField { value, field } => {
+                write!(f, "read-field {}.{}", value.name(), field)
+            }
+            StatementKind::MutateField {
+                composite,
+                field,
+                value,
+            } => write!(
+                f,
+                "mutate-field {}.{} = {}",
+                composite.name(),
+                field,
+                value.name()
+            ),
+            StatementKind::ReadElement { value, index } => {
+                write!(f, "read-element {}[{}]", value.name(), index.name())
+            }
+            StatementKind::MutateElement {
+                vector,
+                value,
+                index,
+            } => write!(
+                f,
+                "mutate-element {}[{}] = {}",
+                vector.name(),
+                index.name(),
+                value.name()
             ),
         }
     }

@@ -54,9 +54,11 @@ pub fn sail_to_brig(
     // crate::boom::pretty_print::print_ast(&mut std::io::stdout(), ast.clone());
     // panic!();
 
-    info!("Generating Rust");
+    info!("Building rudder");
 
     let rudder = rudder::build::from_boom(&ast.borrow());
+
+    info!("Generating Rust");
 
     let max = rudder
         .get_registers()

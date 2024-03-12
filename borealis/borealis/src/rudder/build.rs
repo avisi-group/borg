@@ -51,7 +51,6 @@ struct BuildContext {
     enums: HashMap<InternedString, (Rc<rudder::Type>, HashMap<InternedString, u32>)>,
 
     /// Register name to type and offset mapping
-    composite_registers: HashMap<InternedString, Rc<rudder::Type>>,
     registers: HashMap<InternedString, (Rc<rudder::Type>, usize)>,
     next_register_offset: usize,
 
@@ -61,31 +60,10 @@ struct BuildContext {
 
 impl BuildContext {
     fn add_register(&mut self, name: InternedString, typ: Rc<Type>) {
-        match &*typ {
-            Type::Primitive(_) => {
-                self.registers
-                    .insert(name, (typ.clone(), self.next_register_offset));
+        self.registers
+            .insert(name, (typ.clone(), self.next_register_offset));
 
-                self.next_register_offset += typ.width_bytes();
-            }
-            Type::Composite(types) => {
-                self.composite_registers.insert(name, typ.clone());
-
-                types.iter().enumerate().for_each(|(i, typ)| {
-                    self.add_register(format!("{name}_{i}").into(), typ.clone())
-                })
-            }
-            Type::Vector {
-                element_count,
-                element_type,
-            } => {
-                self.composite_registers.insert(name, typ.clone());
-
-                for i in 0..*element_count {
-                    self.add_register(format!("{name}_{i}").into(), element_type.clone());
-                }
-            }
-        }
+        self.next_register_offset += typ.width_bytes();
     }
 
     fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
@@ -339,11 +317,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             } => {
                 let stmts = self.transform_value(Rc::new(RefCell::new(condition)));
                 let condition = stmts.last().unwrap().clone();
-                let typ = condition.get_type();
+                let typ = condition.typ();
 
                 if *typ != Type::u1() {
                     // so far this todo is never hit, but if you do hit it implement it pls
-                    todo!("insert cast from {} to u1", condition.get_type());
+                    todo!("insert cast from {} to u1", condition.typ());
                 }
 
                 rudder_block.extend_statements(stmts.into_iter());
@@ -377,17 +355,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         match &*boom_value.borrow() {
             boom::Value::Identifier(ident) => {
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                    return vec![Statement::from_kind(StatementKind::ReadVariable {
-                        symbol,
-                        member: None,
-                    })];
+                    return vec![Statement::from_kind(StatementKind::ReadVariable { symbol })];
                 }
 
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
-                    return vec![Statement::from_kind(StatementKind::ReadVariable {
-                        symbol,
-                        member: None,
-                    })];
+                    return vec![Statement::from_kind(StatementKind::ReadVariable { symbol })];
                 }
 
                 if let Some((typ, offset)) = self.ctx().registers.get(ident) {
@@ -476,7 +448,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let mut stmts = self.transform_value(value.clone());
                     let value = stmts.last().unwrap().clone();
 
-                    let source_type = value.get_type();
+                    let source_type = value.typ();
 
                     let kind = match *source_type {
                         Type::Composite(_) | Type::Vector { .. } => {
@@ -555,27 +527,23 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let mut lhs = left_statements.last().unwrap().clone();
                     let mut rhs = right_statements.last().unwrap().clone();
 
-                    if lhs.get_type() != rhs.get_type() {
+                    if lhs.typ() != rhs.typ() {
                         // need to insert casts
-                        let destination_type =
-                            if lhs.get_type().width_bits() > rhs.get_type().width_bits() {
-                                lhs.get_type()
-                            } else {
-                                rhs.get_type()
-                            };
+                        let destination_type = if lhs.typ().width_bits() > rhs.typ().width_bits() {
+                            lhs.typ()
+                        } else {
+                            rhs.typ()
+                        };
 
                         lhs = {
-                            let cast = generate_cast(
-                                lhs.clone(),
-                                lhs.get_type(),
-                                destination_type.clone(),
-                            );
+                            let cast =
+                                generate_cast(lhs.clone(), lhs.typ(), destination_type.clone());
                             left_statements.push(cast.clone());
                             cast
                         };
 
                         rhs = {
-                            let cast = generate_cast(rhs.clone(), rhs.get_type(), destination_type);
+                            let cast = generate_cast(rhs.clone(), rhs.typ(), destination_type);
                             right_statements.push(cast.clone());
                             cast
                         };
@@ -632,16 +600,31 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .expect("failed to find struct :(");
 
                     let idx = fields.get(field_name).unwrap();
-                    let statement = Statement::from_kind(StatementKind::ReadVariable {
-                        symbol,
-                        member: Some(*idx),
-                    });
-                    stmts.push(statement);
-                } else if let Some(typ) = self.ctx().composite_registers.get(&ident) {
-                    // writing into composite register
-                    let target_typ = typ.clone();
 
-                    let (struct_name, (_, fields)) = self
+                    let read_var = Statement::from_kind(StatementKind::ReadVariable { symbol });
+                    let read_field = Statement::from_kind(StatementKind::ReadField {
+                        value: read_var.clone(),
+                        field: *idx,
+                    });
+                    stmts.push(read_var);
+                    stmts.push(read_field);
+                } else if let Some((typ, reg_offset)) = self.ctx().registers.get(&ident) {
+                    // writing into composite register
+
+                    let offset_statement = Statement::from_kind(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(*reg_offset),
+                    });
+                    stmts.push(offset_statement.clone());
+
+                    let read_reg = Statement::from_kind(StatementKind::ReadRegister {
+                        typ: typ.clone(),
+                        offset: offset_statement,
+                    });
+                    stmts.push(read_reg.clone());
+
+                    let target_typ = typ.clone();
+                    let (_, (_, fields)) = self
                         .ctx()
                         .structs
                         .iter()
@@ -650,19 +633,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let idx = fields.get(field_name).unwrap();
 
-                    let register_name = InternedString::from(format!("{struct_name}_{idx}"));
-                    let (register_type, offset) = self.ctx().registers.get(&register_name).unwrap();
-
-                    let offset_statement = Statement::from_kind(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
-                        value: rudder::ConstantValue::UnsignedInteger(*offset),
+                    let read_field = Statement::from_kind(StatementKind::ReadField {
+                        value: read_reg,
+                        field: *idx,
                     });
-                    stmts.push(offset_statement.clone());
-
-                    stmts.push(Statement::from_kind(StatementKind::ReadRegister {
-                        typ: register_type.clone(),
-                        offset: offset_statement,
-                    }));
+                    stmts.push(read_field);
                 } else {
                     panic!("{ident} not local var or register");
                 };
@@ -688,7 +663,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let mut stmts = self.transform_value(value.clone());
 
                 let source = stmts.last().unwrap().clone();
-                let source_type = source.get_type();
+                let source_type = source.typ();
 
                 match expression {
                     boom::Expression::Identifier(ident) => {
@@ -706,7 +681,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                     Statement::from_kind(StatementKind::WriteVariable {
                                         symbol,
                                         value,
-                                        member: None,
                                     });
                                 stmts.push(statement);
                             }
@@ -759,49 +733,81 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                         .expect("failed to find struct :(");
 
                                     let idx = fields.get(field).unwrap();
-                                    let statement =
+
+                                    // read variable
+                                    let read_var =
+                                        Statement::from_kind(StatementKind::ReadVariable {
+                                            symbol: symbol.clone(),
+                                        });
+
+                                    // modify field
+                                    let mutate_field =
+                                        Statement::from_kind(StatementKind::MutateField {
+                                            composite: read_var.clone(),
+                                            field: *idx,
+                                            value: stmts.last().unwrap().clone(),
+                                        });
+
+                                    // write variable
+                                    let write_var =
                                         Statement::from_kind(StatementKind::WriteVariable {
                                             symbol,
-                                            value: stmts.last().unwrap().clone(),
-                                            member: Some(*idx),
+                                            value: mutate_field.clone(),
                                         });
-                                    stmts.push(statement);
-                                } else if let Some(typ) = self.ctx().composite_registers.get(ident)
+
+                                    // nesting, what's that?
+
+                                    stmts.push(read_var);
+                                    stmts.push(mutate_field);
+                                    stmts.push(write_var);
+                                } else if let Some((typ, offset)) =
+                                    self.ctx().registers.get(ident).cloned()
                                 {
                                     // writing into composite register
-                                    let target_typ = typ.clone();
 
-                                    let (_, (_, fields)) = self
-                                        .ctx()
-                                        .structs
-                                        .iter()
-                                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                                        .expect("failed to find struct :(");
+                                    let idx = {
+                                        let target_typ = typ.clone();
 
-                                    let idx = fields.get(field).unwrap();
+                                        let (_, (_, fields)) = self
+                                            .ctx()
+                                            .structs
+                                            .iter()
+                                            .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+                                            .expect("failed to find struct :(");
 
-                                    let register_name =
-                                        InternedString::from(format!("{ident}_{idx}"));
-                                    let Some((_, offset)) =
-                                        self.ctx().registers.get(&register_name)
-                                    else {
-                                        for (name, (typ, offset)) in &self.ctx().registers {
-                                            println!("    {name}: {typ} @ {offset:x}");
-                                        }
-                                        panic!("register {register_name} not found",);
+                                        fields.get(field).unwrap()
                                     };
 
+                                    // push offset to statemetns
                                     let offset_statement =
                                         Statement::from_kind(StatementKind::Constant {
                                             typ: Rc::new(Type::u64()),
-                                            value: rudder::ConstantValue::UnsignedInteger(*offset),
+                                            value: rudder::ConstantValue::UnsignedInteger(offset),
                                         });
                                     stmts.push(offset_statement.clone());
 
+                                    // read whole register
+                                    let read_reg =
+                                        Statement::from_kind(StatementKind::ReadRegister {
+                                            typ: typ.clone(),
+                                            offset: offset_statement.clone(),
+                                        });
+                                    stmts.push(read_reg.clone());
+
+                                    // mutate field
+                                    let mutate_field =
+                                        Statement::from_kind(StatementKind::MutateField {
+                                            composite: read_reg,
+                                            field: *idx,
+                                            value: stmts.last().unwrap().clone(),
+                                        });
+                                    stmts.push(mutate_field.clone());
+
+                                    // write whole register
                                     stmts.push(Statement::from_kind(
                                         StatementKind::WriteRegister {
                                             offset: offset_statement,
-                                            value: stmts.last().unwrap().clone(),
+                                            value: mutate_field,
                                         },
                                     ));
                                 } else {
@@ -841,7 +847,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 if *name == InternedString::from_static("vector_subrange_A") {
                     // end - start + 1
                     let one = Statement::from_kind(StatementKind::Constant {
-                        typ: args[1].get_type(),
+                        typ: args[1].typ(),
                         value: rudder::ConstantValue::SignedInteger(1),
                     });
                     let diff = Statement::from_kind(StatementKind::BinaryOperation {
@@ -951,7 +957,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                         Statement::from_kind(StatementKind::WriteVariable {
                                             symbol,
                                             value: call.clone(),
-                                            member: None,
                                         });
                                     vec![statement]
                                 }

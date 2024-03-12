@@ -10,7 +10,7 @@ common = { path = "../common" }
 sail = { path = "../sail" }
 
 displaydoc = "0.2.4"
-thiserror = "1.0.57"
+thiserror = "1.0.58"
 errctx = "1.0.0"
 color-eyre = { version = "0.6.2", default-features = false }
 pretty_assertions = "1.4.0"
@@ -36,5 +36,5 @@ kinded = "0.3.0"
 quote = "1.0.35"
 syn = { version = "2.0.52",  features = ["full", "parsing"] }
 prettyplease = "0.2.16"
-proc-macro2 = "1.0.78"
+proc-macro2 = "1.0.79"
 ansi_term = "0.12.1"

@@ -251,23 +251,32 @@ pub enum StatementKind {
         typ: Rc<Type>,
         value: ConstantValue,
     },
+
     ReadVariable {
         symbol: Symbol,
-        member: Option<usize>,
     },
+
     WriteVariable {
         symbol: Symbol,
-        member: Option<usize>,
         value: Statement,
     },
+
     ReadRegister {
         typ: Rc<Type>,
+        /// offset into register state
+        ///
+        /// During building, this should just be the `next_register_offset` value, not accessing any elements or fields
         offset: Statement,
     },
+
     WriteRegister {
+        /// offset into register state
+        ///
+        /// During building, this should just be the `next_register_offset` value, not accessing any elements or fields
         offset: Statement,
         value: Statement,
     },
+
     ReadMemory {
         typ: Rc<Type>,
         offset: Statement,
@@ -276,7 +285,9 @@ pub enum StatementKind {
         offset: Statement,
         value: Statement,
     },
+
     ReadPc,
+
     WritePc {
         value: Statement,
     },
@@ -333,6 +344,26 @@ pub enum StatementKind {
         insert_value: Statement,
         start: Statement,
         length: Statement,
+    },
+    ReadField {
+        value: Statement,
+        field: usize,
+    },
+    /// Returns the composite with the mutated field
+    MutateField {
+        composite: Statement,
+        field: usize,
+        value: Statement,
+    },
+    ReadElement {
+        value: Statement,
+        index: Statement,
+    },
+    /// Returns the vector with the mutated element
+    MutateElement {
+        vector: Statement,
+        value: Statement,
+        index: Statement,
     },
     Trap,
 }
@@ -398,19 +429,17 @@ impl Statement {
             StatementKind::BitInsert { .. } => todo!(),
             StatementKind::ReadVariable { .. } => todo!(),
             StatementKind::WriteVariable { .. } => todo!(),
+            StatementKind::ReadField { .. } => todo!(),
+            StatementKind::MutateField { .. } => todo!(),
+            StatementKind::ReadElement { .. } => todo!(),
+            StatementKind::MutateElement { .. } => todo!(),
         }
     }
 
-    pub fn get_type(&self) -> Rc<Type> {
+    pub fn typ(&self) -> Rc<Type> {
         match self.kind() {
             StatementKind::Constant { typ, .. } => typ,
-            StatementKind::ReadVariable { symbol, member } => match member {
-                Some(idx) => match &*symbol.typ() {
-                    Type::Composite(fields) => fields[idx].clone(),
-                    _ => unreachable!(),
-                },
-                None => symbol.typ(),
-            },
+            StatementKind::ReadVariable { symbol } => symbol.typ(),
             StatementKind::WriteVariable { .. } => Rc::new(Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
             StatementKind::WriteRegister { .. } => Rc::new(Type::void()),
@@ -440,29 +469,51 @@ impl Statement {
                 kind: BinaryOperationKind::CmpLt,
                 ..
             } => Rc::new(Type::u1()),
-            StatementKind::BinaryOperation { lhs, .. } => lhs.get_type(),
-            StatementKind::UnaryOperation { value, .. } => value.get_type(),
-            StatementKind::ShiftOperation { value, .. } => value.get_type(),
+            StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
+            StatementKind::UnaryOperation { value, .. } => value.typ(),
+            StatementKind::ShiftOperation { value, .. } => value.typ(),
             StatementKind::Call { target, .. } => target.return_type(),
             StatementKind::Cast { typ, .. } => typ,
             StatementKind::Jump { .. } => Rc::new(Type::void()),
             StatementKind::Branch { .. } => Rc::new(Type::void()),
             StatementKind::PhiNode { members } => members
                 .first()
-                .map(|(_, stmt)| stmt.get_type())
+                .map(|(_, stmt)| stmt.typ())
                 .unwrap_or_else(|| Rc::new(Type::void())),
             StatementKind::Return { .. } => Rc::new(Type::void()),
-            StatementKind::Select { true_value, .. } => true_value.get_type(),
+            StatementKind::Select { true_value, .. } => true_value.typ(),
             StatementKind::Trap => Rc::new(Type::void()),
             StatementKind::ReadPc => Rc::new(Type::u64()),
             StatementKind::WritePc { .. } => Rc::new(Type::void()),
-            StatementKind::BitExtract { value, .. } => value.get_type(),
-            StatementKind::BitInsert { original_value, .. } => original_value.get_type(),
+            StatementKind::BitExtract { value, .. } => value.typ(),
+            StatementKind::BitInsert { original_value, .. } => original_value.typ(),
+            StatementKind::ReadField { value, field } => {
+                let Type::Composite(field_types) = &*value.typ() else {
+                    panic!("cannot read field of non-composite type")
+                };
+
+                field_types[field].clone()
+            }
+            StatementKind::MutateField { composite, .. } => {
+                // get type of composite and return it
+                composite.typ()
+            }
+            StatementKind::ReadElement { value, .. } => {
+                let Type::Vector { element_type, .. } = &*value.typ() else {
+                    panic!("cannot read field of non-composite type")
+                };
+
+                element_type.clone()
+            }
+            StatementKind::MutateElement { vector, .. } => {
+                // get type of the vector and return it
+                vector.typ()
+            }
         }
     }
 
     pub fn has_value(&self) -> bool {
-        !self.get_type().is_void()
+        !self.typ().is_void()
     }
 }
 

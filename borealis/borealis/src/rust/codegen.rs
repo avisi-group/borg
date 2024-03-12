@@ -242,20 +242,14 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 crate::rudder::ConstantValue::Unit => quote!(()),
             }
         }
-        crate::rudder::StatementKind::ReadVariable { symbol, member } => {
+        crate::rudder::StatementKind::ReadVariable { symbol } => {
             let var = format_ident!("{}", symbol.name().to_string());
-            let member = member.map(codegen_member).map(|ident| quote!(.#ident));
-            quote! {#var #member}
+            quote! {#var}
         }
-        crate::rudder::StatementKind::WriteVariable {
-            symbol,
-            member,
-            value,
-        } => {
+        crate::rudder::StatementKind::WriteVariable { symbol, value } => {
             let var = format_ident!("{}", symbol.name().to_string());
-            let member = member.map(codegen_member).map(|ident| quote!(.#ident));
             let value = get_ident(value);
-            quote! {#var #member = #value}
+            quote! {#var = #value}
         }
         crate::rudder::StatementKind::ReadRegister { .. } => quote!(todo!("read-reg")),
         crate::rudder::StatementKind::WriteRegister { .. } => quote!(todo!("write-reg")),
@@ -331,7 +325,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         crate::rudder::StatementKind::Cast { typ, value, .. } => {
-            let source = value.get_type();
+            let source = value.typ();
             let target = typ;
             let ident = get_ident(value);
 
@@ -386,11 +380,51 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         crate::rudder::StatementKind::BitExtract { .. } => quote!(todo!("bitex")),
         crate::rudder::StatementKind::BitInsert { .. } => quote!(todo!("bitins")),
         crate::rudder::StatementKind::Trap => quote!(panic!("it's a trap")),
+        crate::rudder::StatementKind::ReadField { value, field } => {
+            let value = get_ident(value);
+            let field = format_ident!("_{field}");
+            quote!(#value.#field)
+        }
+        crate::rudder::StatementKind::MutateField {
+            composite,
+            field,
+            value,
+        } => {
+            let composite = get_ident(composite);
+            let field = format_ident!("_{field}");
+            let value = get_ident(value);
+            quote! {
+                {
+                    #composite.#field = #value;
+                    composite
+                }
+            }
+        }
+        crate::rudder::StatementKind::ReadElement { value, index } => {
+            let value = get_ident(value);
+            let index = get_ident(index);
+            quote!(#value[#index])
+        }
+        crate::rudder::StatementKind::MutateElement {
+            vector,
+            value,
+            index,
+        } => {
+            let vector = get_ident(vector);
+            let index = get_ident(index);
+            let value = get_ident(value);
+            quote! {
+                {
+                    #vector[#index] = #value;
+                    vector
+                }
+            }
+        }
     };
 
     let msg = stmt.to_string();
     if stmt.has_value() {
-        let typ = codegen_type(stmt.get_type());
+        let typ = codegen_type(stmt.typ());
         quote! {
             let _ = #msg;
             let #stmt_name: #typ = #value;
