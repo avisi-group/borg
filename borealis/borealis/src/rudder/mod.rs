@@ -265,14 +265,16 @@ pub enum StatementKind {
         typ: Rc<Type>,
         /// offset into register state
         ///
-        /// During building, this should just be the `next_register_offset` value, not accessing any elements or fields
+        /// During building, this should just be the `next_register_offset`
+        /// value, not accessing any elements or fields
         offset: Statement,
     },
 
     WriteRegister {
         /// offset into register state
         ///
-        /// During building, this should just be the `next_register_offset` value, not accessing any elements or fields
+        /// During building, this should just be the `next_register_offset`
+        /// value, not accessing any elements or fields
         offset: Statement,
         value: Statement,
     },
@@ -366,6 +368,12 @@ pub enum StatementKind {
         index: Statement,
     },
     Trap,
+
+    CreateComposite {
+        typ: Rc<Type>,
+        /// Index of fields should match type
+        fields: Vec<Statement>,
+    },
 }
 
 pub enum ValueClass {
@@ -433,6 +441,7 @@ impl Statement {
             StatementKind::MutateField { .. } => todo!(),
             StatementKind::ReadElement { .. } => todo!(),
             StatementKind::MutateElement { .. } => todo!(),
+            StatementKind::CreateComposite { .. } => todo!(),
         }
     }
 
@@ -509,6 +518,7 @@ impl Statement {
                 // get type of the vector and return it
                 vector.typ()
             }
+            StatementKind::CreateComposite { typ, .. } => typ,
         }
     }
 

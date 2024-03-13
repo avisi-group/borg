@@ -69,19 +69,16 @@ pub fn sail_to_brig(
     let len = max.0.width_bytes() + max.1;
 
     let state = quote! {
+        // todo check this is necessary
+        #[repr(align(8))]
         pub struct State {
-            pc: u64,
-            sp: u64,
-            x: [u64; 31],
+            // todo PC here
             data: [u8; #len],
         }
 
         impl Default for State {
             fn default() -> Self {
                 Self {
-                    pc: 0,
-                    sp: 0,
-                    x: [0u64; 31],
                     data: [0; #len],
                 }
             }
@@ -144,6 +141,12 @@ pub fn sail_to_brig(
     };
 
     quote! {
+        #![allow(non_snake_case)]
+        #![allow(unused_assignments)]
+        #![allow(unused_mut)]
+        #![allow(unused_parens)]
+        #![allow(unused_variables)]
+
         //! BOREALIS GENERATED FILE DO NOT MODIFY
 
         #state
@@ -178,6 +181,7 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
                 "u__PostDecode",
                 "integer_arithmetic_addsub_immediate",
                 "aget_X",
+                "AddWithCarry",
             ]
             .contains(&k.as_ref())
         })

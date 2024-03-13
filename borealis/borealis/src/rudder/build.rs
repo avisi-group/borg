@@ -1,6 +1,6 @@
 use {
     crate::{
-        boom,
+        boom::{self, NamedValue},
         rudder::{
             self, BinaryOperationKind, Block, CastOperationKind, Context, Function, FunctionInner,
             FunctionKind, ShiftOperationKind, Statement, StatementKind, Symbol, Type,
@@ -63,7 +63,8 @@ impl BuildContext {
         self.registers
             .insert(name, (typ.clone(), self.next_register_offset));
 
-        self.next_register_offset += typ.width_bytes();
+        // 8 byte aligned
+        self.next_register_offset += typ.width_bytes().next_multiple_of(8)
     }
 
     fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
@@ -578,7 +579,27 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .collect()
                 }
             },
-            boom::Value::Struct { .. } => todo!(),
+            boom::Value::Struct { name, fields } => {
+                let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
+
+                let mut stmts = vec![];
+                let mut field_statements = vec![None; fields.len()];
+
+                for NamedValue { name, value } in fields {
+                    let statements = self.transform_value(value.clone());
+                    let last = statements.last().unwrap().clone();
+                    stmts.extend(statements);
+                    let idx = field_name_index_map.get(name).unwrap();
+                    field_statements[*idx] = Some(last);
+                }
+
+                stmts.push(Statement::from_kind(StatementKind::CreateComposite {
+                    typ: typ.clone(),
+                    fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
+                }));
+
+                stmts
+            }
             boom::Value::Field { value, field_name } => {
                 let ident = match &*value.borrow() {
                     boom::Value::Identifier(ident) => *ident,
@@ -725,7 +746,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                     // copying into local variable
                                     let target_typ = symbol.typ();
 
-                                    let (_, (_, fields)) = self
+                                    let (_, (struct_typ, fields)) = self
                                         .ctx()
                                         .structs
                                         .iter()
@@ -740,12 +761,27 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                             symbol: symbol.clone(),
                                         });
 
+                                    // cast to field type
+                                    let field_type = {
+                                        let Type::Composite(field_types) = &**struct_typ else {
+                                            unreachable!();
+                                        };
+
+                                        field_types[*idx].clone()
+                                    };
+
+                                    let cast = Statement::from_kind(StatementKind::Cast {
+                                        kind: CastOperationKind::Reinterpret,
+                                        typ: field_type,
+                                        value: source,
+                                    });
+
                                     // modify field
                                     let mutate_field =
                                         Statement::from_kind(StatementKind::MutateField {
                                             composite: read_var.clone(),
                                             field: *idx,
-                                            value: stmts.last().unwrap().clone(),
+                                            value: cast.clone(),
                                         });
 
                                     // write variable
@@ -758,6 +794,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                     // nesting, what's that?
 
                                     stmts.push(read_var);
+                                    stmts.push(cast);
                                     stmts.push(mutate_field);
                                     stmts.push(write_var);
                                 } else if let Some((typ, offset)) =
@@ -765,17 +802,23 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                 {
                                     // writing into composite register
 
-                                    let idx = {
+                                    let (idx, field_type) = {
                                         let target_typ = typ.clone();
 
-                                        let (_, (_, fields)) = self
+                                        let (_, (struct_type, fields)) = self
                                             .ctx()
                                             .structs
                                             .iter()
                                             .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
                                             .expect("failed to find struct :(");
 
-                                        fields.get(field).unwrap()
+                                        let Type::Composite(field_types) = &**struct_type else {
+                                            unreachable!();
+                                        };
+
+                                        let idx = *fields.get(field).unwrap();
+
+                                        (idx, field_types[idx].clone())
                                     };
 
                                     // push offset to statemetns
@@ -794,12 +837,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                         });
                                     stmts.push(read_reg.clone());
 
+                                    let cast = Statement::from_kind(StatementKind::Cast {
+                                        kind: CastOperationKind::Reinterpret,
+                                        typ: field_type,
+                                        value: source,
+                                    });
+                                    stmts.push(cast.clone());
+
                                     // mutate field
                                     let mutate_field =
                                         Statement::from_kind(StatementKind::MutateField {
                                             composite: read_reg,
-                                            field: *idx,
-                                            value: stmts.last().unwrap().clone(),
+                                            field: idx,
+                                            value: cast,
                                         });
                                     stmts.push(mutate_field.clone());
 
@@ -889,7 +939,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .collect();
                 }
 
-                if *name == InternedString::from_static("vector_subrange_A") {}
+                if name.as_ref().starts_with("vector_access_A") {
+                    return stmts
+                        .into_iter()
+                        .chain([Statement::from_kind(StatementKind::ReadElement {
+                            value: args[0].clone(),
+                            index: args[1].clone(),
+                        })])
+                        .collect();
+                }
 
                 let target = match self.ctx().functions.get(name).cloned() {
                     Some((_, target, _)) => target,

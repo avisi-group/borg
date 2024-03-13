@@ -52,19 +52,19 @@ impl Display for StatementKind {
                 write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
             }
             StatementKind::WriteVariable { symbol, value } => {
-                write!(f, "write-var {} = {}", symbol.name(), value)
+                write!(f, "write-var {} = {}", symbol.name(), value.name())
             }
             StatementKind::ReadRegister { typ, offset } => {
                 write!(f, "read-reg {}:{}", offset.name(), typ)
             }
             StatementKind::WriteRegister { offset, value } => {
-                write!(f, "write-reg {} = {}", offset.name(), value)
+                write!(f, "write-reg {} = {}", offset.name(), value.name())
             }
             StatementKind::ReadMemory { typ, offset } => {
                 write!(f, "read-mem {}:{}", offset.name(), typ)
             }
             StatementKind::WriteMemory { offset, value } => {
-                write!(f, "write-mem {} = {}", offset.name(), value)
+                write!(f, "write-mem {} = {}", offset.name(), value.name())
             }
             StatementKind::BinaryOperation { kind, lhs, rhs } => {
                 let op = match kind {
@@ -227,6 +227,14 @@ impl Display for StatementKind {
                 index.name(),
                 value.name()
             ),
+            StatementKind::CreateComposite { typ, fields } => {
+                write!(
+                    f,
+                    "create-composite {} = {:?}",
+                    typ,
+                    fields.iter().map(Statement::name).collect::<Vec<_>>()
+                )
+            }
         }
     }
 }
