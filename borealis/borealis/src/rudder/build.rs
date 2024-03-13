@@ -207,7 +207,11 @@ impl BuildContext {
             boom::Type::Union { name, .. } => self.unions.get(name).unwrap().0.clone(),
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
             boom::Type::List { .. } => todo!(),
-            boom::Type::Vector { .. } => todo!(),
+            boom::Type::Vector { .. } => {
+                //  let element_type = (*self.resolve_type(element_type.clone())).clone();
+                // todo: this is broken on purpose, Brian Campbell said the Sail C backend had functionality to staticize all bitvector lengths
+                Rc::new(rudder::Type::unit())
+            }
             boom::Type::FixedVector {
                 length,
                 element_type,
@@ -624,7 +628,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let read_var = Statement::from_kind(StatementKind::ReadVariable { symbol });
                     let read_field = Statement::from_kind(StatementKind::ReadField {
-                        value: read_var.clone(),
+                        composite: read_var.clone(),
                         field: *idx,
                     });
                     stmts.push(read_var);
@@ -655,7 +659,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let idx = fields.get(field_name).unwrap();
 
                     let read_field = Statement::from_kind(StatementKind::ReadField {
-                        value: read_reg,
+                        composite: read_reg,
                         field: *idx,
                     });
                     stmts.push(read_field);
@@ -886,15 +890,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let stmts = stmts.into_iter().flatten().collect::<Vec<_>>();
 
-                if *name == InternedString::from_static("trap") {
+                if name.as_ref() == "trap" {
                     return vec![Statement::from_kind(StatementKind::Trap)];
                 }
 
-                if *name == InternedString::from_static("read_pc") {
+                if name.as_ref() == "read_pc" {
                     return vec![Statement::from_kind(StatementKind::ReadPc)];
                 }
 
-                if *name == InternedString::from_static("vector_subrange_A") {
+                if name.as_ref() == "vector_subrange_A" {
                     // end - start + 1
                     let one = Statement::from_kind(StatementKind::Constant {
                         typ: args[1].typ(),
@@ -926,7 +930,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .collect();
                 }
 
-                if *name == InternedString::from_static("slice") {
+                if name.as_ref() == "slice" {
                     // uint64 n, uint64 start, uint64 len
 
                     return stmts
@@ -943,8 +947,31 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     return stmts
                         .into_iter()
                         .chain([Statement::from_kind(StatementKind::ReadElement {
-                            value: args[0].clone(),
+                            vector: args[0].clone(),
                             index: args[1].clone(),
+                        })])
+                        .collect();
+                }
+
+                if name.as_ref().starts_with("vector_update_B") {
+                    return stmts
+                        .into_iter()
+                        .chain([Statement::from_kind(StatementKind::MutateElement {
+                            vector: args[0].clone(),
+                            value: args[2].clone(),
+                            index: args[1].clone(),
+                        })])
+                        .collect();
+                }
+
+                if name.as_ref() == "u__raw_GetSlice_int" {
+                    // u__raw_GetSlice_int(len, n, start)
+                    return stmts
+                        .into_iter()
+                        .chain([Statement::from_kind(StatementKind::BitExtract {
+                            value: args[1].clone(),
+                            start: args[2].clone(),
+                            length: args[0].clone(),
                         })])
                         .collect();
                 }

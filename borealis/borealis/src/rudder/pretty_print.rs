@@ -199,8 +199,8 @@ impl Display for StatementKind {
                 start.name(),
                 length.name()
             ),
-            StatementKind::ReadField { value, field } => {
-                write!(f, "read-field {}.{}", value.name(), field)
+            StatementKind::ReadField { composite, field } => {
+                write!(f, "read-field {}.{}", composite.name(), field)
             }
             StatementKind::MutateField {
                 composite,
@@ -213,8 +213,8 @@ impl Display for StatementKind {
                 field,
                 value.name()
             ),
-            StatementKind::ReadElement { value, index } => {
-                write!(f, "read-element {}[{}]", value.name(), index.name())
+            StatementKind::ReadElement { vector, index } => {
+                write!(f, "read-element {}[{}]", vector.name(), index.name())
             }
             StatementKind::MutateElement {
                 vector,

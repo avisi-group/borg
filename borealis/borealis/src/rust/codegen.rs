@@ -406,10 +406,10 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::BitInsert { .. } => quote!(todo!("bitins")),
         StatementKind::Trap => quote!(panic!("it's a trap")),
-        StatementKind::ReadField { value, field } => {
-            let value = get_ident(value);
-            let field = format_ident!("_{field}");
-            quote!(#value.#field)
+        StatementKind::ReadField { composite, field } => {
+            let composite = get_ident(composite);
+            let field = codegen_member(field);
+            quote!(#composite.#field)
         }
         StatementKind::MutateField {
             composite,
@@ -427,11 +427,11 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::ReadElement { value, index } => {
-            let value = get_ident(value);
+        StatementKind::ReadElement { vector, index } => {
+            let vector = get_ident(vector);
             let index = get_ident(index);
             // todo remove this cast, need "machine word" size in rudder?
-            quote!(#value[(#index) as usize])
+            quote!(#vector[(#index) as usize])
         }
         StatementKind::MutateElement {
             vector,
@@ -445,7 +445,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     #vector[(#index) as usize] = #value;
-                    vector
+                    #vector
                 }
             }
         }

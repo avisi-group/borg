@@ -44,6 +44,7 @@ pub enum Type {
     Primitive(PrimitiveType),
     Composite(Vec<Rc<Type>>),
     Vector {
+        // 0 = unknown
         element_count: usize,
         element_type: Rc<Type>,
     },
@@ -348,7 +349,7 @@ pub enum StatementKind {
         length: Statement,
     },
     ReadField {
-        value: Statement,
+        composite: Statement,
         field: usize,
     },
     /// Returns the composite with the mutated field
@@ -358,7 +359,7 @@ pub enum StatementKind {
         value: Statement,
     },
     ReadElement {
-        value: Statement,
+        vector: Statement,
         index: Statement,
     },
     /// Returns the vector with the mutated element
@@ -496,8 +497,8 @@ impl Statement {
             StatementKind::WritePc { .. } => Rc::new(Type::void()),
             StatementKind::BitExtract { value, .. } => value.typ(),
             StatementKind::BitInsert { original_value, .. } => original_value.typ(),
-            StatementKind::ReadField { value, field } => {
-                let Type::Composite(field_types) = &*value.typ() else {
+            StatementKind::ReadField { composite, field } => {
+                let Type::Composite(field_types) = &*composite.typ() else {
                     panic!("cannot read field of non-composite type")
                 };
 
@@ -507,8 +508,8 @@ impl Statement {
                 // get type of composite and return it
                 composite.typ()
             }
-            StatementKind::ReadElement { value, .. } => {
-                let Type::Vector { element_type, .. } = &*value.typ() else {
+            StatementKind::ReadElement { vector, .. } => {
+                let Type::Vector { element_type, .. } = &*vector.typ() else {
                     panic!("cannot read field of non-composite type")
                 };
 

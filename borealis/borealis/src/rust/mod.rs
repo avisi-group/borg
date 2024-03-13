@@ -182,6 +182,9 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
                 "integer_arithmetic_addsub_immediate",
                 "aget_X",
                 "AddWithCarry",
+                "u__GetSlice_int",
+                "IsZero",
+                "aset_X",
             ]
             .contains(&k.as_ref())
         })
