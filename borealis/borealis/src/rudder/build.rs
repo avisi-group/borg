@@ -602,9 +602,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             return;
         }
 
-        // if name.as_ref() == "ZeroExtend__0" {
-        //     return;
-        // }
+        if name.as_ref() == "ZeroExtend__0" {
+            let value = args[0].clone();
+            let _length = args[1].clone();
+            self.statement_builder.build(StatementKind::Cast {
+                kind: CastOperationKind::ZeroExtend,
+                typ: Rc::new(Type::u64()),
+                value,
+            });
+            return;
+        }
 
         let target = match self.ctx().functions.get(name).cloned() {
             Some((_, target, _)) => target,
