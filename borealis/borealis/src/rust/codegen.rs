@@ -421,7 +421,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let value = get_ident(value);
             quote! {
                 {
-                    let mut local = #composite;
+                    let mut local = #composite.clone();
                     local.#field = #value;
                     local
                 }
@@ -444,8 +444,9 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             // todo remove this cast, need "machine word" size in rudder?
             quote! {
                 {
-                    #vector[(#index) as usize] = #value;
-                    #vector
+                    let mut local = #vector.clone();
+                    local[(#index) as usize] = #value;
+                    local
                 }
             }
         }

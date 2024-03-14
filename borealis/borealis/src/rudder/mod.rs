@@ -393,15 +393,6 @@ pub struct StatementInner {
 }
 
 impl Statement {
-    pub fn from_kind(kind: StatementKind) -> Self {
-        Self {
-            inner: Rc::new(RefCell::new(StatementInner {
-                name: "".into(),
-                kind,
-            })),
-        }
-    }
-
     pub fn kind(&self) -> StatementKind {
         (*self.inner).borrow().kind.clone()
     }
@@ -531,6 +522,36 @@ impl Statement {
 impl StatementInner {
     pub fn update_names(&mut self, name: InternedString) {
         self.name = name;
+    }
+}
+
+struct StatementBuilder {
+    statements: Vec<Statement>,
+}
+
+impl StatementBuilder {
+    /// Creates a new `StatementBuilder`
+    pub fn new() -> Self {
+        Self { statements: vec![] }
+    }
+
+    /// Builds a new `Statement` from a `StatementKind`, adds it to the builder, and returns it
+    pub fn build(&mut self, kind: StatementKind) -> Statement {
+        let statement = Statement {
+            inner: Rc::new(RefCell::new(StatementInner {
+                name: "".into(),
+                kind,
+            })),
+        };
+
+        self.statements.push(statement.clone());
+
+        statement
+    }
+
+    /// Consumes a `StatementBuilder` and returns it's statements
+    pub fn finish(self) -> Vec<Statement> {
+        self.statements
     }
 }
 

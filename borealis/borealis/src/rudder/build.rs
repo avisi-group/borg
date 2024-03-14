@@ -3,7 +3,8 @@ use {
         boom::{self, NamedValue},
         rudder::{
             self, BinaryOperationKind, Block, CastOperationKind, Context, Function, FunctionInner,
-            FunctionKind, ShiftOperationKind, Statement, StatementKind, Symbol, Type,
+            FunctionKind, ShiftOperationKind, Statement, StatementBuilder, StatementKind, Symbol,
+            Type,
         },
     },
     common::{intern::InternedString, HashMap},
@@ -107,35 +108,6 @@ impl BuildContext {
         {
             panic!("union with name {name} already added");
         }
-
-        // for field in fields {
-        //     let field_type = self.resolve_type(field.typ.clone());
-        //     if self
-        //         .functions
-        //         .insert(
-        //             field.name,
-        //             (
-        //                 FunctionKind::Other,
-        //                 Function::new(
-        //                     field.name,
-        //                     typ.clone(),
-        //                     [(field.name, field_type)].into_iter(),
-        //                 ),
-        //                 boom::FunctionDefinition {
-        //                     signature: FunctionSignature {
-        //                         name: "IDONOTEXIST".into(),
-        //                         parameters: Rc::new(RefCell::new(vec![])),
-        //                         return_type:
-        // Rc::new(RefCell::new(boom::Type::Unit)),
-        // },                     entry_block:
-        // boom::control_flow::ControlFlowBlock::new(),
-        // },             ),
-        //         )
-        //         .is_some()
-        //     {
-        //         panic!("union constructor with name {} already exists",
-        // field.name)     }
-        // }
     }
 
     fn add_enum(&mut self, name: InternedString, variants: &[InternedString]) {
@@ -273,12 +245,14 @@ impl<'ctx> FunctionBuildContext<'ctx> {
 
 struct BlockBuildContext<'ctx, 'fn_ctx> {
     function_build_context: &'fn_ctx mut FunctionBuildContext<'ctx>,
+    statement_builder: StatementBuilder,
 }
 
 impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     pub fn new(function_build_context: &'fn_ctx mut FunctionBuildContext<'ctx>) -> Self {
         Self {
             function_build_context,
+            statement_builder: StatementBuilder::new(),
         }
     }
 
@@ -290,27 +264,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         self.function_build_context
     }
 
-    fn build_block(&mut self, boom_block: boom::control_flow::ControlFlowBlock) -> rudder::Block {
+    fn build_block(mut self, boom_block: boom::control_flow::ControlFlowBlock) -> rudder::Block {
         log::trace!("building block: {}", boom_block);
-        let rudder_block = rudder::Block::new();
 
         // convert statements
-        rudder_block.set_statements(
-            boom_block
-                .statements()
-                .into_iter()
-                .flat_map(|stmt| self.build_statement(stmt)),
-        );
+        boom_block
+            .statements()
+            .iter()
+            .for_each(|stmt| self.build_statement(stmt.clone()));
 
         // check terminator, insert final rudder statement
         let kind = match boom_block.terminator() {
             boom::control_flow::Terminator::Return(value) => {
-                let value = value.map(|v| {
-                    let stmts = self.transform_value(Rc::new(RefCell::new(v)));
-                    let value = stmts.last().unwrap().clone();
-                    rudder_block.extend_statements(stmts.into_iter());
-                    value
-                });
+                let value = value.map(|v| self.build_value(Rc::new(RefCell::new(v))));
 
                 rudder::StatementKind::Return { value }
             }
@@ -320,16 +286,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 target: boom_target,
                 fallthrough: boom_fallthrough,
             } => {
-                let stmts = self.transform_value(Rc::new(RefCell::new(condition)));
-                let condition = stmts.last().unwrap().clone();
+                let condition = self.build_value(Rc::new(RefCell::new(condition)));
                 let typ = condition.typ();
 
                 if *typ != Type::u1() {
                     // so far this todo is never hit, but if you do hit it implement it pls
                     todo!("insert cast from {} to u1", condition.typ());
                 }
-
-                rudder_block.extend_statements(stmts.into_iter());
 
                 let rudder_true_target = self.fn_ctx().resolve_block(boom_target);
                 let rudder_false_target = self.fn_ctx().resolve_block(boom_fallthrough);
@@ -350,35 +313,413 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
         };
 
-        rudder_block.extend_statements([Statement::from_kind(kind)].into_iter());
+        self.statement_builder.build(kind);
 
+        let rudder_block = rudder::Block::new();
+        rudder_block.set_statements(self.statement_builder.finish().into_iter());
         rudder_block
     }
 
+    fn build_statement(&mut self, statement: Rc<RefCell<boom::Statement>>) {
+        match &*statement.borrow() {
+            boom::Statement::TypeDeclaration { name, typ } => {
+                let typ = self.ctx().resolve_type(typ.clone());
+                self.fn_ctx().rudder_fn.add_local_variable(*name, typ);
+            }
+            boom::Statement::Copy { expression, value } => {
+                self.build_copy(value.clone(), expression);
+            }
+            boom::Statement::FunctionCall {
+                expression,
+                name,
+                arguments,
+            } => {
+                self.build_function_call(arguments, name, expression);
+            }
+
+            boom::Statement::Label(_)
+            | boom::Statement::Goto(_)
+            | boom::Statement::Jump { .. }
+            | boom::Statement::End(_)
+            | boom::Statement::Undefined
+            | boom::Statement::If { .. } => {
+                unreachable!("no control flow should exist at this point in compilation!")
+            }
+            boom::Statement::Exit(_) | boom::Statement::Comment(_) => (),
+        }
+    }
+
+    fn build_copy(&mut self, value: Rc<RefCell<boom::Value>>, expression: &boom::Expression) {
+        let source = self.build_value(value.clone());
+
+        let source_type = source.typ();
+
+        match expression {
+            boom::Expression::Identifier(ident) => {
+                match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
+                    Some(symbol) => {
+                        let value = if symbol.typ() != source_type {
+                            self.generate_cast(source, source_type, symbol.typ())
+                        } else {
+                            source
+                        };
+
+                        self.statement_builder
+                            .build(StatementKind::WriteVariable { symbol, value });
+                    }
+                    None => {
+                        //register lookup
+                        let Some((register_type, offset)) =
+                            self.ctx().registers.get(ident).cloned()
+                        else {
+                            panic!("wtf is {ident}");
+                        };
+
+                        let value = if register_type != source_type {
+                            self.generate_cast(source, source_type, register_type.clone())
+                        } else {
+                            source
+                        };
+
+                        let offset = self.statement_builder.build(StatementKind::Constant {
+                            typ: Rc::new(Type::u32()),
+                            value: rudder::ConstantValue::UnsignedInteger(offset),
+                        });
+
+                        self.statement_builder.build(StatementKind::WriteRegister {
+                            offset: offset.clone(),
+                            value,
+                        });
+                    }
+                }
+            }
+            boom::Expression::Field { expression, field } => {
+                // todo: insert casts if necessary here!!
+                match &**expression {
+                    boom::Expression::Identifier(ident) => {
+                        // lookup identifier
+                        if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
+                            // copying into local variable
+                            let target_typ = symbol.typ();
+
+                            let structs = self.ctx().structs.clone();
+                            let (_, (struct_typ, fields)) = structs
+                                .iter()
+                                .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+                                .expect("failed to find struct :(");
+
+                            let idx = fields.get(field).unwrap();
+
+                            // read variable
+                            let read_var =
+                                self.statement_builder.build(StatementKind::ReadVariable {
+                                    symbol: symbol.clone(),
+                                });
+
+                            // cast to field type
+                            let field_type = {
+                                let Type::Composite(field_types) = &**struct_typ else {
+                                    unreachable!();
+                                };
+
+                                field_types[*idx].clone()
+                            };
+
+                            let cast = self.statement_builder.build(StatementKind::Cast {
+                                kind: CastOperationKind::Reinterpret,
+                                typ: field_type,
+                                value: source,
+                            });
+
+                            // modify field
+                            let mutate_field =
+                                self.statement_builder.build(StatementKind::MutateField {
+                                    composite: read_var,
+                                    field: *idx,
+                                    value: cast,
+                                });
+
+                            // write variable
+                            self.statement_builder.build(StatementKind::WriteVariable {
+                                symbol,
+                                value: mutate_field,
+                            });
+
+                            // todo: nesting, what's that?
+                        } else if let Some((typ, offset)) = self.ctx().registers.get(ident).cloned()
+                        {
+                            // writing into composite register
+
+                            let (idx, field_type) = {
+                                let target_typ = typ.clone();
+
+                                let (_, (struct_type, fields)) = self
+                                    .ctx()
+                                    .structs
+                                    .iter()
+                                    .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+                                    .expect("failed to find struct :(");
+
+                                let Type::Composite(field_types) = &**struct_type else {
+                                    unreachable!();
+                                };
+
+                                let idx = *fields.get(field).unwrap();
+
+                                (idx, field_types[idx].clone())
+                            };
+
+                            // push offset to statemetns
+                            let offset_statement =
+                                self.statement_builder.build(StatementKind::Constant {
+                                    typ: Rc::new(Type::u64()),
+                                    value: rudder::ConstantValue::UnsignedInteger(offset),
+                                });
+
+                            // read whole register
+                            let read_reg =
+                                self.statement_builder.build(StatementKind::ReadRegister {
+                                    typ: typ.clone(),
+                                    offset: offset_statement.clone(),
+                                });
+
+                            let cast = self.statement_builder.build(StatementKind::Cast {
+                                kind: CastOperationKind::Reinterpret,
+                                typ: field_type,
+                                value: source,
+                            });
+
+                            // mutate field
+                            let mutate_field =
+                                self.statement_builder.build(StatementKind::MutateField {
+                                    composite: read_reg,
+                                    field: idx,
+                                    value: cast,
+                                });
+
+                            // write whole register
+                            self.statement_builder.build(StatementKind::WriteRegister {
+                                offset: offset_statement,
+                                value: mutate_field,
+                            });
+                        } else {
+                            panic!("{ident} not local var or register");
+                        };
+                    }
+                    boom::Expression::Field { .. } => todo!("nested field expressions"),
+                    boom::Expression::Address(_) => todo!(),
+                }
+            }
+            boom::Expression::Address(_) => todo!(),
+        }
+    }
+
+    fn build_function_call(
+        &mut self,
+        arguments: &[Rc<RefCell<boom::Value>>],
+        name: &InternedString,
+        expression: &Option<boom::Expression>,
+    ) {
+        let args = arguments
+            .iter()
+            .map(|arg| self.build_value(arg.clone()))
+            .collect::<Vec<_>>();
+
+        if name.as_ref() == "trap" {
+            self.statement_builder.build(StatementKind::Trap);
+            return;
+        }
+
+        if name.as_ref() == "read_pc" {
+            self.statement_builder.build(StatementKind::ReadPc);
+            return;
+        }
+
+        if name.as_ref() == "vector_subrange_A" {
+            // end - start + 1
+            let one = self.statement_builder.build(StatementKind::Constant {
+                typ: args[1].typ(),
+                value: rudder::ConstantValue::SignedInteger(1),
+            });
+            let diff = self
+                .statement_builder
+                .build(StatementKind::BinaryOperation {
+                    kind: BinaryOperationKind::Sub,
+                    lhs: args[2].clone(),
+                    rhs: args[1].clone(),
+                });
+            let len = self
+                .statement_builder
+                .build(StatementKind::BinaryOperation {
+                    kind: BinaryOperationKind::Add,
+                    lhs: diff.clone(),
+                    rhs: one.clone(),
+                });
+
+            self.statement_builder.build(StatementKind::BitExtract {
+                value: args[0].clone(),
+                start: args[1].clone(),
+                length: len,
+            });
+            return;
+        }
+
+        if name.as_ref() == "slice" {
+            // uint64 n, uint64 start, uint64 len
+
+            self.statement_builder.build(StatementKind::BitExtract {
+                value: args[0].clone(),
+                start: args[1].clone(),
+                length: args[2].clone(),
+            });
+            return;
+        }
+
+        if name.as_ref().starts_with("vector_access_A") {
+            self.statement_builder.build(StatementKind::ReadElement {
+                vector: args[0].clone(),
+                index: args[1].clone(),
+            });
+            return;
+        }
+
+        if name.as_ref().starts_with("vector_update_B") {
+            self.statement_builder.build(StatementKind::MutateElement {
+                vector: args[0].clone(),
+                value: args[2].clone(),
+                index: args[1].clone(),
+            });
+            return;
+        }
+
+        if name.as_ref() == "u__raw_GetSlice_int" {
+            // u__raw_GetSlice_int(len, n, start)
+            self.statement_builder.build(StatementKind::BitExtract {
+                value: args[1].clone(),
+                start: args[2].clone(),
+                length: args[0].clone(),
+            });
+            return;
+        }
+
+        // if name.as_ref() == "ZeroExtend__0" {
+        //     return;
+        // }
+
+        let target = match self.ctx().functions.get(name).cloned() {
+            Some((_, target, _)) => target,
+            None => {
+                // do this so that unimplemented has the correct type
+                let crate::boom::Expression::Identifier(ident) = expression.as_ref().unwrap()
+                else {
+                    panic!();
+                };
+                let typ = self
+                    .fn_ctx()
+                    .rudder_fn
+                    .get_local_variable(*ident)
+                    .unwrap()
+                    .typ();
+
+                warn!("unknown function {name}");
+                Function {
+                    inner: Rc::new(RefCell::new(FunctionInner {
+                        name: format!("unimplemented_{name}").into(),
+                        return_type: typ,
+                        parameters: vec![
+                            Symbol {
+                                name: "removed".into(),
+                                kind: rudder::SymbolKind::Parameter,
+                                typ: Rc::new(rudder::Type::u64()),
+                            };
+                            64// todo: this is terrible, needed so that the casts on line `-9(%rip)` don't index out of bounds
+                        ],
+                        local_variables: HashMap::default(),
+                        entry_block: Block::new(),
+                    })),
+                }
+            }
+        };
+
+        // cast all arguments to the correct type
+        let casts = args
+            .iter()
+            .enumerate()
+            .map(|(i, stmt)| {
+                let typ = target.signature().1[i].typ();
+                self.statement_builder.build(StatementKind::Cast {
+                    kind: CastOperationKind::Reinterpret,
+                    typ,
+                    value: stmt.clone(),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        // call statement
+        let call = self.statement_builder.build(StatementKind::Call {
+            target,
+            args: casts.clone(),
+        });
+
+        // copy to expr statement
+        if let Some(expression) = expression {
+            match expression {
+                boom::Expression::Identifier(ident) => {
+                    match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
+                        Some(symbol) => {
+                            self.statement_builder.build(StatementKind::WriteVariable {
+                                symbol,
+                                value: call.clone(),
+                            });
+                        }
+                        None => {
+                            //register lookup
+                            let Some(reg) = self.ctx().registers.get(ident).cloned() else {
+                                panic!("wtf is {ident}");
+                            };
+                            let offset = self.statement_builder.build(StatementKind::Constant {
+                                typ: Rc::new(Type::u32()),
+                                value: rudder::ConstantValue::UnsignedInteger(reg.1),
+                            });
+                            self.statement_builder.build(StatementKind::WriteRegister {
+                                offset,
+                                value: call.clone(),
+                            });
+                        }
+                    }
+                }
+                boom::Expression::Field { .. } => todo!(),
+                boom::Expression::Address(_) => todo!(),
+            }
+        }
+    }
+
     /// Last statement returned is the value
-    fn transform_value(&mut self, boom_value: Rc<RefCell<boom::Value>>) -> Vec<Statement> {
+    fn build_value(&mut self, boom_value: Rc<RefCell<boom::Value>>) -> Statement {
         match &*boom_value.borrow() {
             boom::Value::Identifier(ident) => {
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                    return vec![Statement::from_kind(StatementKind::ReadVariable { symbol })];
+                    return self
+                        .statement_builder
+                        .build(StatementKind::ReadVariable { symbol });
                 }
 
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
-                    return vec![Statement::from_kind(StatementKind::ReadVariable { symbol })];
+                    return self
+                        .statement_builder
+                        .build(StatementKind::ReadVariable { symbol });
                 }
 
-                if let Some((typ, offset)) = self.ctx().registers.get(ident) {
-                    let offset_statement = Statement::from_kind(StatementKind::Constant {
+                if let Some((typ, offset)) = self.ctx().registers.get(ident).cloned() {
+                    let offset = self.statement_builder.build(StatementKind::Constant {
                         typ: Rc::new(Type::u32()),
-                        value: rudder::ConstantValue::UnsignedInteger(*offset),
+                        value: rudder::ConstantValue::UnsignedInteger(offset),
                     });
-                    return vec![
-                        offset_statement.clone(),
-                        Statement::from_kind(StatementKind::ReadRegister {
-                            typ: typ.clone(),
-                            offset: offset_statement,
-                        }),
-                    ];
+
+                    return self.statement_builder.build(StatementKind::ReadRegister {
+                        typ: typ.clone(),
+                        offset,
+                    });
                 }
 
                 if let Some(value) = self
@@ -386,11 +727,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .enums
                     .iter()
                     .find_map(|(_, (_, variants))| variants.get(ident))
+                    .cloned()
                 {
-                    return vec![Statement::from_kind(StatementKind::Constant {
+                    return self.statement_builder.build(StatementKind::Constant {
                         typ: Rc::new(Type::u32()),
-                        value: rudder::ConstantValue::UnsignedInteger((*value).try_into().unwrap()),
-                    })];
+                        value: rudder::ConstantValue::UnsignedInteger(value.try_into().unwrap()),
+                    });
                 }
 
                 panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
@@ -425,136 +767,191 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     boom::Literal::Reference(_) => todo!(),
                 };
 
-                vec![Statement::from_kind(kind)]
+                self.statement_builder.build(kind)
             }
-            boom::Value::Operation(op) => match op {
-                boom::Operation::Not(value) => {
-                    let mut stmts = self.transform_value(value.clone());
-                    let op = Statement::from_kind(StatementKind::UnaryOperation {
-                        kind: rudder::UnaryOperationKind::Not,
-                        value: stmts.last().unwrap().clone(),
-                    });
+            boom::Value::Operation(op) => self.build_operation(op),
+            boom::Value::Struct { name, fields } => {
+                let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
 
-                    stmts.push(op);
-                    stmts
-                }
-                boom::Operation::Complement(value) => {
-                    let mut stmts = self.transform_value(value.clone());
-                    let op = Statement::from_kind(StatementKind::UnaryOperation {
-                        kind: rudder::UnaryOperationKind::Complement,
-                        value: stmts.last().unwrap().clone(),
-                    });
+                let mut field_statements = vec![None; fields.len()];
 
-                    stmts.push(op);
-                    stmts
-                }
-                boom::Operation::Cast(value, typ) => {
-                    let target_type = self.ctx().resolve_type(typ.clone());
-                    let mut stmts = self.transform_value(value.clone());
-                    let value = stmts.last().unwrap().clone();
-
-                    let source_type = value.typ();
-
-                    let kind = match *source_type {
-                        Type::Composite(_) | Type::Vector { .. } => {
-                            panic!("cast on non-primitive type")
-                        }
-                        Type::Primitive(_) => {
-                            match source_type.width_bits().cmp(&target_type.width_bits()) {
-                                Ordering::Less => CastOperationKind::ZeroExtend,
-                                Ordering::Greater => CastOperationKind::Truncate,
-                                Ordering::Equal => CastOperationKind::Reinterpret,
-                            }
-                        }
-                    };
-
-                    let statement = Statement::from_kind(StatementKind::Cast {
-                        kind,
-                        typ: target_type,
-                        value,
-                    });
-
-                    stmts.push(statement);
-                    stmts
+                for NamedValue { name, value } in fields {
+                    let field_statement = self.build_value(value.clone());
+                    let idx = field_name_index_map.get(name).unwrap();
+                    field_statements[*idx] = Some(field_statement);
                 }
 
-                boom::Operation::LeftShift(value, amount)
-                | boom::Operation::RightShift(value, amount)
-                | boom::Operation::RotateRight(value, amount)
-                | boom::Operation::RotateLeft(value, amount) => {
-                    let value_statements = self.transform_value(value.clone());
-                    let amount_statements = self.transform_value(amount.clone());
+                self.statement_builder
+                    .build(StatementKind::CreateComposite {
+                        typ: typ.clone(),
+                        fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
+                    })
+            }
+            boom::Value::Field { value, field_name } => {
+                let ident = match &*value.borrow() {
+                    boom::Value::Identifier(ident) => *ident,
+                    _ => todo!(),
+                };
 
-                    let value = value_statements.last().unwrap().clone();
-                    let amount = amount_statements.last().unwrap().clone();
+                self.build_value(value.clone());
 
-                    let kind = match op {
-                        boom::Operation::LeftShift(_, _) => ShiftOperationKind::LogicalShiftLeft,
-                        boom::Operation::RightShift(_, _) => {
-                            // todo figure out if logical or arithmetic
-                            ShiftOperationKind::LogicalShiftRight
-                        }
-                        boom::Operation::RotateRight(_, _) => ShiftOperationKind::RotateRight,
-                        boom::Operation::RotateLeft(_, _) => ShiftOperationKind::RotateLeft,
+                // lookup identifier
+                if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(ident) {
+                    // copying into local variable
+                    let target_typ = symbol.typ();
 
-                        _ => unreachable!(),
-                    };
+                    let structs = self.ctx().structs.clone();
+                    let (_, (_, fields)) = structs
+                        .iter()
+                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+                        .expect("failed to find struct :(");
 
-                    let statement = Statement::from_kind(StatementKind::ShiftOperation {
-                        kind,
-                        value,
-                        amount,
+                    let idx = fields.get(field_name).unwrap();
+
+                    let read_var = self
+                        .statement_builder
+                        .build(StatementKind::ReadVariable { symbol });
+
+                    self.statement_builder.build(StatementKind::ReadField {
+                        composite: read_var.clone(),
+                        field: *idx,
+                    })
+                } else if let Some((typ, reg_offset)) = self.ctx().registers.get(&ident).cloned() {
+                    // writing into composite register
+
+                    let offset_statement = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(reg_offset),
                     });
 
-                    value_statements
-                        .into_iter()
-                        .chain(amount_statements)
-                        .chain([statement])
-                        .collect()
+                    let read_reg = self.statement_builder.build(StatementKind::ReadRegister {
+                        typ: typ.clone(),
+                        offset: offset_statement,
+                    });
+
+                    let target_typ = typ.clone();
+                    let structs = self.ctx().structs.clone();
+                    let (_, (_, fields)) = structs
+                        .iter()
+                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+                        .expect("failed to find struct :(");
+
+                    let idx = fields.get(field_name).unwrap();
+
+                    self.statement_builder.build(StatementKind::ReadField {
+                        composite: read_reg,
+                        field: *idx,
+                    })
+                } else {
+                    panic!("{ident} not local var or register");
                 }
 
-                boom::Operation::Equal(left, right)
-                | boom::Operation::NotEqual(left, right)
-                | boom::Operation::LessThan(left, right)
-                | boom::Operation::LessThanOrEqual(left, right)
-                | boom::Operation::GreaterThan(left, right)
-                | boom::Operation::GreaterThanOrEqual(left, right)
-                | boom::Operation::Subtract(left, right)
-                | boom::Operation::Add(left, right)
-                | boom::Operation::Or(left, right)
-                | boom::Operation::Multiply(left, right)
-                | boom::Operation::And(left, right)
-                | boom::Operation::Xor(left, right)
-                | boom::Operation::Divide(left, right) => {
-                    let mut left_statements = self.transform_value(left.clone());
-                    let mut right_statements = self.transform_value(right.clone());
+                // if value is register, find reg name + offset emit read_register
+                // if value is local variable, emit read_variable with Some(offset)
+            }
+            boom::Value::CtorKind { .. } => todo!(),
+            boom::Value::CtorUnwrap { .. } => todo!(),
+        }
+    }
 
-                    let mut lhs = left_statements.last().unwrap().clone();
-                    let mut rhs = right_statements.last().unwrap().clone();
+    fn build_operation(&mut self, op: &boom::Operation) -> Statement {
+        match op {
+            boom::Operation::Not(value) => {
+                let value = self.build_value(value.clone());
+                self.statement_builder.build(StatementKind::UnaryOperation {
+                    kind: rudder::UnaryOperationKind::Not,
+                    value,
+                })
+            }
+            boom::Operation::Complement(value) => {
+                let value = self.build_value(value.clone());
+                self.statement_builder.build(StatementKind::UnaryOperation {
+                    kind: rudder::UnaryOperationKind::Complement,
+                    value,
+                })
+            }
+            boom::Operation::Cast(value, typ) => {
+                let target_type = self.ctx().resolve_type(typ.clone());
+                let value = self.build_value(value.clone());
 
-                    if lhs.typ() != rhs.typ() {
-                        // need to insert casts
-                        let destination_type = if lhs.typ().width_bits() > rhs.typ().width_bits() {
-                            lhs.typ()
-                        } else {
-                            rhs.typ()
-                        };
+                let source_type = value.typ();
 
-                        lhs = {
-                            let cast =
-                                generate_cast(lhs.clone(), lhs.typ(), destination_type.clone());
-                            left_statements.push(cast.clone());
-                            cast
-                        };
-
-                        rhs = {
-                            let cast = generate_cast(rhs.clone(), rhs.typ(), destination_type);
-                            right_statements.push(cast.clone());
-                            cast
-                        };
+                let kind = match *source_type {
+                    Type::Composite(_) | Type::Vector { .. } => {
+                        panic!("cast on non-primitive type")
                     }
+                    Type::Primitive(_) => {
+                        match source_type.width_bits().cmp(&target_type.width_bits()) {
+                            Ordering::Less => CastOperationKind::ZeroExtend,
+                            Ordering::Greater => CastOperationKind::Truncate,
+                            Ordering::Equal => CastOperationKind::Reinterpret,
+                        }
+                    }
+                };
 
-                    let statement = Statement::from_kind(StatementKind::BinaryOperation {
+                self.statement_builder.build(StatementKind::Cast {
+                    kind,
+                    typ: target_type,
+                    value,
+                })
+            }
+
+            boom::Operation::LeftShift(value, amount)
+            | boom::Operation::RightShift(value, amount)
+            | boom::Operation::RotateRight(value, amount)
+            | boom::Operation::RotateLeft(value, amount) => {
+                let value = self.build_value(value.clone());
+                let amount = self.build_value(amount.clone());
+
+                let kind = match op {
+                    boom::Operation::LeftShift(_, _) => ShiftOperationKind::LogicalShiftLeft,
+                    boom::Operation::RightShift(_, _) => {
+                        // todo figure out if logical or arithmetic
+                        ShiftOperationKind::LogicalShiftRight
+                    }
+                    boom::Operation::RotateRight(_, _) => ShiftOperationKind::RotateRight,
+                    boom::Operation::RotateLeft(_, _) => ShiftOperationKind::RotateLeft,
+
+                    _ => unreachable!(),
+                };
+
+                self.statement_builder.build(StatementKind::ShiftOperation {
+                    kind,
+                    value,
+                    amount,
+                })
+            }
+
+            boom::Operation::Equal(left, right)
+            | boom::Operation::NotEqual(left, right)
+            | boom::Operation::LessThan(left, right)
+            | boom::Operation::LessThanOrEqual(left, right)
+            | boom::Operation::GreaterThan(left, right)
+            | boom::Operation::GreaterThanOrEqual(left, right)
+            | boom::Operation::Subtract(left, right)
+            | boom::Operation::Add(left, right)
+            | boom::Operation::Or(left, right)
+            | boom::Operation::Multiply(left, right)
+            | boom::Operation::And(left, right)
+            | boom::Operation::Xor(left, right)
+            | boom::Operation::Divide(left, right) => {
+                let mut lhs = self.build_value(left.clone());
+                let mut rhs = self.build_value(right.clone());
+
+                if lhs.typ() != rhs.typ() {
+                    // need to insert casts
+                    let destination_type = if lhs.typ().width_bits() > rhs.typ().width_bits() {
+                        lhs.typ()
+                    } else {
+                        rhs.typ()
+                    };
+
+                    lhs = self.generate_cast(lhs.clone(), lhs.typ(), destination_type.clone());
+                    rhs = self.generate_cast(rhs.clone(), rhs.typ(), destination_type);
+                }
+
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
                         kind: match op {
                             boom::Operation::Equal(_, _) => BinaryOperationKind::CmpEq,
                             boom::Operation::NotEqual(_, _) => BinaryOperationKind::CmpNe,
@@ -574,531 +971,21 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         },
                         lhs,
                         rhs,
-                    });
-
-                    left_statements
-                        .into_iter()
-                        .chain(right_statements)
-                        .chain([statement])
-                        .collect()
-                }
-            },
-            boom::Value::Struct { name, fields } => {
-                let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
-
-                let mut stmts = vec![];
-                let mut field_statements = vec![None; fields.len()];
-
-                for NamedValue { name, value } in fields {
-                    let statements = self.transform_value(value.clone());
-                    let last = statements.last().unwrap().clone();
-                    stmts.extend(statements);
-                    let idx = field_name_index_map.get(name).unwrap();
-                    field_statements[*idx] = Some(last);
-                }
-
-                stmts.push(Statement::from_kind(StatementKind::CreateComposite {
-                    typ: typ.clone(),
-                    fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
-                }));
-
-                stmts
-            }
-            boom::Value::Field { value, field_name } => {
-                let ident = match &*value.borrow() {
-                    boom::Value::Identifier(ident) => *ident,
-                    _ => todo!(),
-                };
-
-                let mut stmts = self.transform_value(value.clone());
-
-                // lookup identifier
-                if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(ident) {
-                    // copying into local variable
-                    let target_typ = symbol.typ();
-
-                    let (_, (_, fields)) = self
-                        .ctx()
-                        .structs
-                        .iter()
-                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                        .expect("failed to find struct :(");
-
-                    let idx = fields.get(field_name).unwrap();
-
-                    let read_var = Statement::from_kind(StatementKind::ReadVariable { symbol });
-                    let read_field = Statement::from_kind(StatementKind::ReadField {
-                        composite: read_var.clone(),
-                        field: *idx,
-                    });
-                    stmts.push(read_var);
-                    stmts.push(read_field);
-                } else if let Some((typ, reg_offset)) = self.ctx().registers.get(&ident) {
-                    // writing into composite register
-
-                    let offset_statement = Statement::from_kind(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
-                        value: rudder::ConstantValue::UnsignedInteger(*reg_offset),
-                    });
-                    stmts.push(offset_statement.clone());
-
-                    let read_reg = Statement::from_kind(StatementKind::ReadRegister {
-                        typ: typ.clone(),
-                        offset: offset_statement,
-                    });
-                    stmts.push(read_reg.clone());
-
-                    let target_typ = typ.clone();
-                    let (_, (_, fields)) = self
-                        .ctx()
-                        .structs
-                        .iter()
-                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                        .expect("failed to find struct :(");
-
-                    let idx = fields.get(field_name).unwrap();
-
-                    let read_field = Statement::from_kind(StatementKind::ReadField {
-                        composite: read_reg,
-                        field: *idx,
-                    });
-                    stmts.push(read_field);
-                } else {
-                    panic!("{ident} not local var or register");
-                };
-
-                // if value is register, find reg name + offset emit read_register
-                // if value is local variable, emit read_variable with Some(offset)
-
-                stmts
-            }
-            boom::Value::CtorKind { .. } => todo!(),
-            boom::Value::CtorUnwrap { .. } => todo!(),
-        }
-    }
-
-    fn build_statement(&mut self, statement: Rc<RefCell<boom::Statement>>) -> Vec<Statement> {
-        match &*statement.borrow() {
-            boom::Statement::TypeDeclaration { name, typ } => {
-                let typ = self.ctx().resolve_type(typ.clone());
-                self.fn_ctx().rudder_fn.add_local_variable(*name, typ);
-                vec![]
-            }
-            boom::Statement::Copy { expression, value } => {
-                let mut stmts = self.transform_value(value.clone());
-
-                let source = stmts.last().unwrap().clone();
-                let source_type = source.typ();
-
-                match expression {
-                    boom::Expression::Identifier(ident) => {
-                        match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                            Some(symbol) => {
-                                let value = if symbol.typ() != source_type {
-                                    let cast = generate_cast(source, source_type, symbol.typ());
-                                    stmts.push(cast.clone());
-                                    cast
-                                } else {
-                                    source
-                                };
-
-                                let statement =
-                                    Statement::from_kind(StatementKind::WriteVariable {
-                                        symbol,
-                                        value,
-                                    });
-                                stmts.push(statement);
-                            }
-                            None => {
-                                //register lookup
-                                let Some((register_type, offset)) = self.ctx().registers.get(ident)
-                                else {
-                                    panic!("wtf is {ident}");
-                                };
-
-                                let value = if **register_type != *source_type {
-                                    let cast =
-                                        generate_cast(source, source_type, register_type.clone());
-                                    stmts.push(cast.clone());
-                                    cast
-                                } else {
-                                    source
-                                };
-
-                                let offset = Statement::from_kind(StatementKind::Constant {
-                                    typ: Rc::new(Type::u32()),
-                                    value: rudder::ConstantValue::UnsignedInteger(*offset),
-                                });
-                                let statement =
-                                    Statement::from_kind(StatementKind::WriteRegister {
-                                        offset: offset.clone(),
-                                        value,
-                                    });
-                                stmts.push(offset);
-                                stmts.push(statement);
-                            }
-                        }
-                    }
-                    boom::Expression::Field { expression, field } => {
-                        // todo: insert casts if necessary here!!
-                        match &**expression {
-                            boom::Expression::Identifier(ident) => {
-                                // lookup identifier
-                                if let Some(symbol) =
-                                    self.fn_ctx().rudder_fn.get_local_variable(*ident)
-                                {
-                                    // copying into local variable
-                                    let target_typ = symbol.typ();
-
-                                    let (_, (struct_typ, fields)) = self
-                                        .ctx()
-                                        .structs
-                                        .iter()
-                                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                                        .expect("failed to find struct :(");
-
-                                    let idx = fields.get(field).unwrap();
-
-                                    // read variable
-                                    let read_var =
-                                        Statement::from_kind(StatementKind::ReadVariable {
-                                            symbol: symbol.clone(),
-                                        });
-
-                                    // cast to field type
-                                    let field_type = {
-                                        let Type::Composite(field_types) = &**struct_typ else {
-                                            unreachable!();
-                                        };
-
-                                        field_types[*idx].clone()
-                                    };
-
-                                    let cast = Statement::from_kind(StatementKind::Cast {
-                                        kind: CastOperationKind::Reinterpret,
-                                        typ: field_type,
-                                        value: source,
-                                    });
-
-                                    // modify field
-                                    let mutate_field =
-                                        Statement::from_kind(StatementKind::MutateField {
-                                            composite: read_var.clone(),
-                                            field: *idx,
-                                            value: cast.clone(),
-                                        });
-
-                                    // write variable
-                                    let write_var =
-                                        Statement::from_kind(StatementKind::WriteVariable {
-                                            symbol,
-                                            value: mutate_field.clone(),
-                                        });
-
-                                    // nesting, what's that?
-
-                                    stmts.push(read_var);
-                                    stmts.push(cast);
-                                    stmts.push(mutate_field);
-                                    stmts.push(write_var);
-                                } else if let Some((typ, offset)) =
-                                    self.ctx().registers.get(ident).cloned()
-                                {
-                                    // writing into composite register
-
-                                    let (idx, field_type) = {
-                                        let target_typ = typ.clone();
-
-                                        let (_, (struct_type, fields)) = self
-                                            .ctx()
-                                            .structs
-                                            .iter()
-                                            .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                                            .expect("failed to find struct :(");
-
-                                        let Type::Composite(field_types) = &**struct_type else {
-                                            unreachable!();
-                                        };
-
-                                        let idx = *fields.get(field).unwrap();
-
-                                        (idx, field_types[idx].clone())
-                                    };
-
-                                    // push offset to statemetns
-                                    let offset_statement =
-                                        Statement::from_kind(StatementKind::Constant {
-                                            typ: Rc::new(Type::u64()),
-                                            value: rudder::ConstantValue::UnsignedInteger(offset),
-                                        });
-                                    stmts.push(offset_statement.clone());
-
-                                    // read whole register
-                                    let read_reg =
-                                        Statement::from_kind(StatementKind::ReadRegister {
-                                            typ: typ.clone(),
-                                            offset: offset_statement.clone(),
-                                        });
-                                    stmts.push(read_reg.clone());
-
-                                    let cast = Statement::from_kind(StatementKind::Cast {
-                                        kind: CastOperationKind::Reinterpret,
-                                        typ: field_type,
-                                        value: source,
-                                    });
-                                    stmts.push(cast.clone());
-
-                                    // mutate field
-                                    let mutate_field =
-                                        Statement::from_kind(StatementKind::MutateField {
-                                            composite: read_reg,
-                                            field: idx,
-                                            value: cast,
-                                        });
-                                    stmts.push(mutate_field.clone());
-
-                                    // write whole register
-                                    stmts.push(Statement::from_kind(
-                                        StatementKind::WriteRegister {
-                                            offset: offset_statement,
-                                            value: mutate_field,
-                                        },
-                                    ));
-                                } else {
-                                    panic!("{ident} not local var or register");
-                                };
-                            }
-                            boom::Expression::Field { .. } => todo!("nested field expressions"),
-                            boom::Expression::Address(_) => todo!(),
-                        }
-                    }
-                    boom::Expression::Address(_) => todo!(),
-                }
-
-                stmts
-            }
-            boom::Statement::FunctionCall {
-                expression,
-                name,
-                arguments,
-            } => {
-                let (args, stmts): (Vec<Statement>, Vec<Vec<Statement>>) = arguments
-                    .iter()
-                    .map(|arg| self.transform_value(arg.clone()))
-                    .map(|stmts| (stmts.last().unwrap().clone(), stmts))
-                    .unzip();
-
-                let stmts = stmts.into_iter().flatten().collect::<Vec<_>>();
-
-                if name.as_ref() == "trap" {
-                    return vec![Statement::from_kind(StatementKind::Trap)];
-                }
-
-                if name.as_ref() == "read_pc" {
-                    return vec![Statement::from_kind(StatementKind::ReadPc)];
-                }
-
-                if name.as_ref() == "vector_subrange_A" {
-                    // end - start + 1
-                    let one = Statement::from_kind(StatementKind::Constant {
-                        typ: args[1].typ(),
-                        value: rudder::ConstantValue::SignedInteger(1),
-                    });
-                    let diff = Statement::from_kind(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Sub,
-                        lhs: args[2].clone(),
-                        rhs: args[1].clone(),
-                    });
-                    let len = Statement::from_kind(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs: diff.clone(),
-                        rhs: one.clone(),
-                    });
-
-                    return stmts
-                        .into_iter()
-                        .chain([
-                            one,
-                            diff,
-                            len.clone(),
-                            Statement::from_kind(StatementKind::BitExtract {
-                                value: args[0].clone(),
-                                start: args[1].clone(),
-                                length: len,
-                            }),
-                        ])
-                        .collect();
-                }
-
-                if name.as_ref() == "slice" {
-                    // uint64 n, uint64 start, uint64 len
-
-                    return stmts
-                        .into_iter()
-                        .chain([Statement::from_kind(StatementKind::BitExtract {
-                            value: args[0].clone(),
-                            start: args[1].clone(),
-                            length: args[2].clone(),
-                        })])
-                        .collect();
-                }
-
-                if name.as_ref().starts_with("vector_access_A") {
-                    return stmts
-                        .into_iter()
-                        .chain([Statement::from_kind(StatementKind::ReadElement {
-                            vector: args[0].clone(),
-                            index: args[1].clone(),
-                        })])
-                        .collect();
-                }
-
-                if name.as_ref().starts_with("vector_update_B") {
-                    return stmts
-                        .into_iter()
-                        .chain([Statement::from_kind(StatementKind::MutateElement {
-                            vector: args[0].clone(),
-                            value: args[2].clone(),
-                            index: args[1].clone(),
-                        })])
-                        .collect();
-                }
-
-                if name.as_ref() == "u__raw_GetSlice_int" {
-                    // u__raw_GetSlice_int(len, n, start)
-                    return stmts
-                        .into_iter()
-                        .chain([Statement::from_kind(StatementKind::BitExtract {
-                            value: args[1].clone(),
-                            start: args[2].clone(),
-                            length: args[0].clone(),
-                        })])
-                        .collect();
-                }
-
-                let target = match self.ctx().functions.get(name).cloned() {
-                    Some((_, target, _)) => target,
-                    None => {
-                        // do this so that unimplemented has the correct type
-                        let crate::boom::Expression::Identifier(ident) =
-                            expression.as_ref().unwrap()
-                        else {
-                            panic!();
-                        };
-                        let typ = self
-                            .fn_ctx()
-                            .rudder_fn
-                            .get_local_variable(*ident)
-                            .unwrap()
-                            .typ();
-
-                        warn!("unknown function {name}");
-                        Function {
-                            inner: Rc::new(RefCell::new(FunctionInner {
-                                name: format!("unimplemented_{name}").into(),
-                                return_type: typ,
-                                parameters: vec![
-                                    Symbol {
-                                        name: "removed".into(),
-                                        kind: rudder::SymbolKind::Parameter,
-                                        typ: Rc::new(rudder::Type::u64()),
-                                    };
-                                    64// todo: this is terrible, needed so that the casts on line `-9(%rip)` don't index out of bounds
-                                ],
-                                local_variables: HashMap::default(),
-                                entry_block: Block::new(),
-                            })),
-                        }
-                    }
-                };
-
-                // cast all arguments to the correct type
-                let casts = args
-                    .iter()
-                    .enumerate()
-                    .map(|(i, stmt)| {
-                        let typ = target.signature().1[i].typ();
-                        Statement::from_kind(StatementKind::Cast {
-                            kind: CastOperationKind::Reinterpret,
-                            typ,
-                            value: stmt.clone(),
-                        })
                     })
-                    .collect::<Vec<_>>();
-
-                // call statement
-                let call = Statement::from_kind(StatementKind::Call {
-                    target,
-                    args: casts.clone(),
-                });
-
-                // copy to expr statement
-                let copy = if let Some(expression) = expression {
-                    match expression {
-                        boom::Expression::Identifier(ident) => {
-                            match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                                Some(symbol) => {
-                                    let statement =
-                                        Statement::from_kind(StatementKind::WriteVariable {
-                                            symbol,
-                                            value: call.clone(),
-                                        });
-                                    vec![statement]
-                                }
-                                None => {
-                                    //register lookup
-                                    let Some(reg) = self.ctx().registers.get(ident) else {
-                                        panic!("wtf is {ident}");
-                                    };
-                                    let offset = Statement::from_kind(StatementKind::Constant {
-                                        typ: Rc::new(Type::u32()),
-                                        value: rudder::ConstantValue::UnsignedInteger(reg.1),
-                                    });
-                                    let statement =
-                                        Statement::from_kind(StatementKind::WriteRegister {
-                                            offset: offset.clone(),
-                                            value: call.clone(),
-                                        });
-                                    vec![offset, statement]
-                                }
-                            }
-                        }
-                        boom::Expression::Field { .. } => todo!(),
-                        boom::Expression::Address(_) => todo!(),
-                    }
-                } else {
-                    vec![]
-                };
-
-                stmts
-                    .into_iter()
-                    .chain(casts)
-                    .chain([call])
-                    .chain(copy)
-                    .collect()
             }
-            boom::Statement::Label(_)
-            | boom::Statement::Goto(_)
-            | boom::Statement::Jump { .. }
-            | boom::Statement::End(_)
-            | boom::Statement::Undefined
-            | boom::Statement::If { .. } => {
-                unreachable!("no control flow should exist at this point in compilation!")
-            }
-            boom::Statement::Exit(_) | boom::Statement::Comment(_) => vec![],
         }
     }
-}
-
-fn generate_cast(
-    source: Statement,
-    _source_type: Rc<Type>,
-    destination_type: Rc<Type>,
-) -> Statement {
-    // todo: do correct kind of cast for different source/dest pairs
-    Statement::from_kind(StatementKind::Cast {
-        kind: CastOperationKind::Reinterpret,
-        typ: destination_type,
-        value: source,
-    })
+    fn generate_cast(
+        &mut self,
+        source: Statement,
+        _source_type: Rc<Type>,
+        destination_type: Rc<Type>,
+    ) -> Statement {
+        // todo: do correct kind of cast for different source/dest pairs
+        self.statement_builder.build(StatementKind::Cast {
+            kind: CastOperationKind::Reinterpret,
+            typ: destination_type,
+            value: source,
+        })
+    }
 }

@@ -521,6 +521,8 @@ fn generate_decode_arguments(name: InternedString, arguments: &[DecodeParameter]
     quote! {
         #args
 
-        #name(#(#arg_idents),*)
+        #name(#(#arg_idents),*);
+
+        return ExecuteResult::Ok;
     }
 }
