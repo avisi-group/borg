@@ -22,7 +22,7 @@ impl Display for Type {
             Type::Vector {
                 element_count,
                 element_type,
-            } => write!(f, "v{element_count}{element_type}"),
+            } => write!(f, "[{element_type}; {element_count:?}]"),
         }
     }
 }

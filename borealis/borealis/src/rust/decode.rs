@@ -106,7 +106,7 @@ impl DecodeTree {
     ) -> TokenStream {
         let body = self.root.codegen(functions);
         quote! {
-            fn decode_execute(value: u32, state: &mut State) -> ExecuteResult {
+            fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
                 #body
                 ExecuteResult::UndefinedInstruction
             }
@@ -514,14 +514,21 @@ fn generate_decode_arguments(name: InternedString, arguments: &[DecodeParameter]
         })
         .collect::<TokenStream>();
 
-    let arg_idents = [InternedString::from_static("state")]
-        .into_iter()
-        .chain(arguments.iter().map(|(name, _)| *name));
+    let arg_idents = [
+        InternedString::from_static("state"),
+        InternedString::from_static("tracer"),
+    ]
+    .into_iter()
+    .chain(arguments.iter().map(|(name, _)| *name));
 
     quote! {
         #args
 
+        tracer.begin(state.pc);
+
         #name(#(#arg_idents),*);
+
+        tracer.end();
 
         return ExecuteResult::Ok;
     }

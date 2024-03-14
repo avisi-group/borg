@@ -8,3 +8,7 @@ libarch-sys/include/arm64-decode.h
 libarch-sys/include/arm64-decode.cpp
 libarch-sys/include/arm64-disasm.h
 libarch-sys/include/arm64-disasm.cpp
+
+data/sail-arm/arm-v8.5-a/aarch64
+data/sail-arm/arm-v8.5-a/aarch64.c
+**/z3_problems

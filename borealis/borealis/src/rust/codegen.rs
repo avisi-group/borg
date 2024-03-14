@@ -30,7 +30,7 @@ pub fn codegen(rudder: Context) -> TokenStream {
             let body = codegen_body(function);
 
             quote! {
-                fn #name(#parameters) -> #return_type {
+                fn #name<T: Tracer>(#parameters) -> #return_type {
                     #body
                 }
             }
@@ -74,7 +74,7 @@ pub fn codegen(rudder: Context) -> TokenStream {
 }
 
 fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
-    let parameters = [quote!(state: &mut State)]
+    let parameters = [quote!(state: &mut State, tracer: &mut T)]
         .into_iter()
         .chain(parameters.iter().map(|sym| {
             let name = sym.name();
@@ -133,8 +133,13 @@ pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
             element_count,
             element_type,
         } => {
+            let count = if let Some(c) = element_count {
+                quote!(#c)
+            } else {
+                quote!(_) // elide length and hope it's resolavable
+            };
             let element_type = codegen_type(element_type.clone());
-            quote!([#element_type; #element_count])
+            quote!([#element_type; #count])
         }
     }
 }
@@ -165,12 +170,8 @@ fn codegen_body(function: Function) -> TokenStream {
             let name = format_ident!("{}", symbol.name().to_string());
             let typ = codegen_type(symbol.typ());
 
-            if symbol.typ().is_unit() {
-                quote! { let mut #name: () = (); }
-            } else {
-                quote! {
-                    let mut #name: #typ = #typ::default();
-                }
+            quote! {
+                let mut #name: #typ;
             }
         })
         .collect::<TokenStream>();
@@ -184,7 +185,11 @@ fn codegen_body(function: Function) -> TokenStream {
             let block_name = format_ident!("BLOCK_{}", block.name().to_string());
             let block_impl = codegen_block(block);
 
-            quote! { #block_name => { #block_impl } }
+            quote! {
+                #block_name => {
+                    #block_impl
+                }
+            }
         })
         .collect::<TokenStream>();
 
@@ -257,7 +262,13 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::ReadRegister { typ, offset } => {
             let offset = get_ident(offset);
             let typ = codegen_type(typ);
-            quote!(unsafe {*(state.data.as_ptr().byte_offset(#offset as isize) as *const #typ)})
+            quote! {
+                {
+                    let value = unsafe {*(state.data.as_ptr().byte_offset(#offset as isize) as *const #typ)};
+                    tracer.read_register(#offset as usize, value);
+                    value
+                }
+            }
         }
         StatementKind::WriteRegister { .. } => quote!(todo!("write-reg")),
         StatementKind::ReadMemory { .. } => quote!(todo!("read-mem")),
@@ -327,7 +338,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! { unimplemented!(#msg) }
             } else {
                 quote! {
-                    #ident(state, #(#args),*)
+                    #ident(state, tracer, #(#args),*)
                 }
             }
         }

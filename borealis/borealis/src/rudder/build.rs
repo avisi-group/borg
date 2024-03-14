@@ -179,10 +179,10 @@ impl BuildContext {
             boom::Type::Union { name, .. } => self.unions.get(name).unwrap().0.clone(),
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
             boom::Type::List { .. } => todo!(),
-            boom::Type::Vector { .. } => {
-                //  let element_type = (*self.resolve_type(element_type.clone())).clone();
-                // todo: this is broken on purpose, Brian Campbell said the Sail C backend had functionality to staticize all bitvector lengths
-                Rc::new(rudder::Type::unit())
+            boom::Type::Vector { element_type } => {
+                let element_type = (*self.resolve_type(element_type.clone())).clone();
+                // todo: Brian Campbell said the Sail C backend had functionality to staticize all bitvector lengths
+                Rc::new(element_type.vectorize(None))
             }
             boom::Type::FixedVector {
                 length,
@@ -190,7 +190,7 @@ impl BuildContext {
             } => {
                 let element_type = (*self.resolve_type(element_type.clone())).clone();
 
-                Rc::new(element_type.vectorize(usize::try_from(*length).unwrap()))
+                Rc::new(element_type.vectorize(Some(usize::try_from(*length).unwrap())))
             }
             boom::Type::Reference(_) => todo!(),
         }
@@ -525,17 +525,115 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .map(|arg| self.build_value(arg.clone()))
             .collect::<Vec<_>>();
 
+        let fn_statement = if let Some(fn_statement) = self.build_specialized_function(*name, &args)
+        {
+            fn_statement
+        } else {
+            let target = match self.ctx().functions.get(name).cloned() {
+                Some((_, target, _)) => target,
+                None => {
+                    // do this so that unimplemented has the correct type
+                    let crate::boom::Expression::Identifier(ident) = expression.as_ref().unwrap()
+                    else {
+                        panic!();
+                    };
+                    let typ = self
+                        .fn_ctx()
+                        .rudder_fn
+                        .get_local_variable(*ident)
+                        .unwrap()
+                        .typ();
+
+                    warn!("unknown function {name}");
+                    Function {
+                        inner: Rc::new(RefCell::new(FunctionInner {
+                            name: format!("unimplemented_{name}").into(),
+                            return_type: typ,
+                            parameters: vec![
+                                Symbol {
+                                    name: "removed".into(),
+                                    kind: rudder::SymbolKind::Parameter,
+                                    typ: Rc::new(rudder::Type::u64()),
+                                };
+                                64// todo: this is terrible, needed so that the casts on line `-9(%rip)` don't index out of bounds
+                            ],
+                            local_variables: HashMap::default(),
+                            entry_block: Block::new(),
+                        })),
+                    }
+                }
+            };
+
+            // cast all arguments to the correct type
+            let casts = args
+                .iter()
+                .enumerate()
+                .map(|(i, stmt)| {
+                    let typ = target.signature().1[i].typ();
+                    self.statement_builder.build(StatementKind::Cast {
+                        kind: CastOperationKind::Reinterpret,
+                        typ,
+                        value: stmt.clone(),
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            // call statement
+            self.statement_builder.build(StatementKind::Call {
+                target,
+                args: casts.clone(),
+            })
+        };
+
+        // copy to expr statement
+        if let Some(expression) = expression {
+            match expression {
+                boom::Expression::Identifier(ident) => {
+                    match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
+                        Some(symbol) => {
+                            let cast = self.statement_builder.build(StatementKind::Cast {
+                                kind: CastOperationKind::Reinterpret,
+                                typ: symbol.typ(),
+                                value: fn_statement,
+                            });
+
+                            self.statement_builder.build(StatementKind::WriteVariable {
+                                symbol,
+                                value: cast,
+                            });
+                        }
+                        None => {
+                            //register lookup
+                            let Some(reg) = self.ctx().registers.get(ident).cloned() else {
+                                panic!("wtf is {ident}");
+                            };
+                            let offset = self.statement_builder.build(StatementKind::Constant {
+                                typ: Rc::new(Type::u32()),
+                                value: rudder::ConstantValue::UnsignedInteger(reg.1),
+                            });
+                            self.statement_builder.build(StatementKind::WriteRegister {
+                                offset,
+                                value: fn_statement,
+                            });
+                        }
+                    }
+                }
+                boom::Expression::Field { .. } => todo!(),
+                boom::Expression::Address(_) => todo!(),
+            }
+        }
+    }
+
+    fn build_specialized_function(
+        &mut self,
+        name: InternedString,
+        args: &[Statement],
+    ) -> Option<Statement> {
         if name.as_ref() == "trap" {
-            self.statement_builder.build(StatementKind::Trap);
-            return;
-        }
-
-        if name.as_ref() == "read_pc" {
-            self.statement_builder.build(StatementKind::ReadPc);
-            return;
-        }
-
-        if name.as_ref() == "vector_subrange_A" {
+            Some(self.statement_builder.build(StatementKind::Trap))
+        } else if name.as_ref() == "read_pc" {
+            Some(self.statement_builder.build(StatementKind::ReadPc))
+        } else if name.as_ref() == "vector_subrange_A" {
             // end - start + 1
             let one = self.statement_builder.build(StatementKind::Constant {
                 typ: args[1].typ(),
@@ -556,148 +654,47 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     rhs: one.clone(),
                 });
 
-            self.statement_builder.build(StatementKind::BitExtract {
+            Some(self.statement_builder.build(StatementKind::BitExtract {
                 value: args[0].clone(),
                 start: args[1].clone(),
                 length: len,
-            });
-            return;
-        }
-
-        if name.as_ref() == "slice" {
+            }))
+        } else if name.as_ref() == "slice" {
             // uint64 n, uint64 start, uint64 len
 
-            self.statement_builder.build(StatementKind::BitExtract {
+            Some(self.statement_builder.build(StatementKind::BitExtract {
                 value: args[0].clone(),
                 start: args[1].clone(),
                 length: args[2].clone(),
-            });
-            return;
-        }
-
-        if name.as_ref().starts_with("vector_access_A") {
-            self.statement_builder.build(StatementKind::ReadElement {
+            }))
+        } else if name.as_ref().starts_with("vector_access_A") {
+            Some(self.statement_builder.build(StatementKind::ReadElement {
                 vector: args[0].clone(),
                 index: args[1].clone(),
-            });
-            return;
-        }
-
-        if name.as_ref().starts_with("vector_update_B") {
-            self.statement_builder.build(StatementKind::MutateElement {
+            }))
+        } else if name.as_ref().starts_with("vector_update_B") {
+            Some(self.statement_builder.build(StatementKind::MutateElement {
                 vector: args[0].clone(),
                 value: args[2].clone(),
                 index: args[1].clone(),
-            });
-            return;
-        }
-
-        if name.as_ref() == "u__raw_GetSlice_int" {
+            }))
+        } else if name.as_ref() == "u__raw_GetSlice_int" {
             // u__raw_GetSlice_int(len, n, start)
-            self.statement_builder.build(StatementKind::BitExtract {
+            Some(self.statement_builder.build(StatementKind::BitExtract {
                 value: args[1].clone(),
                 start: args[2].clone(),
                 length: args[0].clone(),
-            });
-            return;
-        }
-
-        if name.as_ref() == "ZeroExtend__0" {
+            }))
+        } else if name.as_ref() == "ZeroExtend__0" {
             let value = args[0].clone();
             let _length = args[1].clone();
-            self.statement_builder.build(StatementKind::Cast {
+            Some(self.statement_builder.build(StatementKind::Cast {
                 kind: CastOperationKind::ZeroExtend,
                 typ: Rc::new(Type::u64()),
                 value,
-            });
-            return;
-        }
-
-        let target = match self.ctx().functions.get(name).cloned() {
-            Some((_, target, _)) => target,
-            None => {
-                // do this so that unimplemented has the correct type
-                let crate::boom::Expression::Identifier(ident) = expression.as_ref().unwrap()
-                else {
-                    panic!();
-                };
-                let typ = self
-                    .fn_ctx()
-                    .rudder_fn
-                    .get_local_variable(*ident)
-                    .unwrap()
-                    .typ();
-
-                warn!("unknown function {name}");
-                Function {
-                    inner: Rc::new(RefCell::new(FunctionInner {
-                        name: format!("unimplemented_{name}").into(),
-                        return_type: typ,
-                        parameters: vec![
-                            Symbol {
-                                name: "removed".into(),
-                                kind: rudder::SymbolKind::Parameter,
-                                typ: Rc::new(rudder::Type::u64()),
-                            };
-                            64// todo: this is terrible, needed so that the casts on line `-9(%rip)` don't index out of bounds
-                        ],
-                        local_variables: HashMap::default(),
-                        entry_block: Block::new(),
-                    })),
-                }
-            }
-        };
-
-        // cast all arguments to the correct type
-        let casts = args
-            .iter()
-            .enumerate()
-            .map(|(i, stmt)| {
-                let typ = target.signature().1[i].typ();
-                self.statement_builder.build(StatementKind::Cast {
-                    kind: CastOperationKind::Reinterpret,
-                    typ,
-                    value: stmt.clone(),
-                })
-            })
-            .collect::<Vec<_>>();
-
-        // call statement
-        let call = self.statement_builder.build(StatementKind::Call {
-            target,
-            args: casts.clone(),
-        });
-
-        // copy to expr statement
-        if let Some(expression) = expression {
-            match expression {
-                boom::Expression::Identifier(ident) => {
-                    match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                        Some(symbol) => {
-                            self.statement_builder.build(StatementKind::WriteVariable {
-                                symbol,
-                                value: call.clone(),
-                            });
-                        }
-                        None => {
-                            //register lookup
-                            let Some(reg) = self.ctx().registers.get(ident).cloned() else {
-                                panic!("wtf is {ident}");
-                            };
-                            let offset = self.statement_builder.build(StatementKind::Constant {
-                                typ: Rc::new(Type::u32()),
-                                value: rudder::ConstantValue::UnsignedInteger(reg.1),
-                            });
-                            self.statement_builder.build(StatementKind::WriteRegister {
-                                offset,
-                                value: call.clone(),
-                            });
-                        }
-                    }
-                }
-                boom::Expression::Field { .. } => todo!(),
-                boom::Expression::Address(_) => todo!(),
-            }
+            }))
+        } else {
+            None
         }
     }
 

@@ -72,13 +72,14 @@ pub fn sail_to_brig(
         // todo check this is necessary
         #[repr(align(8))]
         pub struct State {
-            // todo PC here
+            pc: u64,
             data: [u8; #len],
         }
 
         impl Default for State {
             fn default() -> Self {
                 Self {
+                    pc: 0,
                     data: [0; #len],
                 }
             }
@@ -91,10 +92,29 @@ pub fn sail_to_brig(
 
     let prelude = if standalone {
         quote! {
+            struct ConsoleTracer;
+
+            impl Tracer for ConsoleTracer {
+                fn begin(&self, pc: u64) {
+                    println!("begin @ {pc:x}");
+                }
+
+                fn end(&self) {
+                    println!("end");
+                }
+
+                fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
+                    println!("read-register {offset:x} = {value:?}");
+                }
+                fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
+                    println!("write-register {offset:x} = {value:?}");
+                }
+            }
+
             fn main() {
                 let arg = std::env::args().skip(1).next().unwrap();
                 let instruction = u32::from_str_radix(arg.trim_start_matches("0x"), 16).unwrap();
-                dbg!(decode_execute(instruction, &mut State::default()));
+                dbg!(decode_execute(instruction, &mut State::default(), &mut ConsoleTracer));
             }
         }
     } else {
@@ -150,6 +170,13 @@ pub fn sail_to_brig(
         //! BOREALIS GENERATED FILE DO NOT MODIFY
 
         #state
+
+        trait Tracer {
+            fn begin(&self, pc: u64);
+            fn end(&self);
+            fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
+            fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
+        }
 
         #[derive(Debug)]
         enum ExecuteResult {
