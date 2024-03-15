@@ -6,10 +6,11 @@
 //! detailed specifications for `sail.json` files; unfortunately this means
 //! there is a *very* wide range of possible inputs for the array of paths to
 //! files (absolute, relative, non-UTF8, etc).
+//!
+//! 2024-03-14 update: I'm hardcoding everything except the file list
 
 use {
     errctx::PathCtx,
-    log::warn,
     serde::Deserialize,
     std::{
         fs, io,
@@ -18,10 +19,8 @@ use {
 };
 
 /// Configuration for a Sail model
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct ModelConfig {
-    /// Sail compiler options as list of space-separated flags
-    pub options: Options,
     /// Ordered list of paths to Sail files
     pub files: Vec<PathBuf>,
 }
@@ -31,22 +30,10 @@ impl ModelConfig {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         let config_path = path.as_ref();
 
-        #[derive(Deserialize)]
-        struct Intermediate {
-            options: String,
-            files: Vec<PathBuf>,
-        }
+        let file = fs::File::open(config_path).map_err(PathCtx::f(config_path))?;
 
-        // read from JSON (using intermediate private struct to parse command line
-        // options)
-        let Intermediate { options, files } =
-            serde_json::from_reader(fs::File::open(config_path).map_err(PathCtx::f(config_path))?)
-                .map_err(PathCtx::f(config_path))?;
-
-        let mut config = ModelConfig {
-            options: options.as_str().try_into()?,
-            files,
-        };
+        let mut config =
+            serde_json::from_reader::<_, ModelConfig>(file).map_err(PathCtx::f(config_path))?;
 
         // directory that config file is in
         let config_dir = (config_path)
@@ -74,40 +61,6 @@ impl ModelConfig {
     }
 }
 
-/// Sail compiler options
-#[derive(Debug, Default)]
-pub struct Options {
-    /// When set, enables non-lexical flow
-    pub non_lexical_flow: bool,
-    /// When set, disables lexp bounds check
-    pub no_lexp_bounds_check: bool,
-    /// Memoize Z3
-    pub memo_z3: bool,
-}
-
-impl TryFrom<&str> for Options {
-    type Error = Error;
-
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        let mut options = Options {
-            non_lexical_flow: false,
-            no_lexp_bounds_check: false,
-            memo_z3: false,
-        };
-
-        for flag in s.split_ascii_whitespace() {
-            match flag {
-                "-non_lexical_flow" => options.non_lexical_flow = true,
-                "-no_lexp_bounds_check" => options.no_lexp_bounds_check = true,
-                "-memo_z3" => options.memo_z3 = true,
-                s => warn!("unknown flag {s:?}"),
-            }
-        }
-
-        Ok(options)
-    }
-}
-
 /// JSON model config error
 #[derive(Debug, displaydoc::Display, thiserror::Error)]
 pub enum Error {
@@ -122,20 +75,4 @@ pub enum Error {
 
     /// Path in `files` is not a file: {0:?}
     NotFile(PathBuf),
-
-    /// Encountered unknown or invalid flag in options: {0:?}
-    UnknownFlag(String),
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::json::ModelConfig;
-
-    #[test]
-    fn snapshot() {
-        insta::assert_debug_snapshot!(ModelConfig::load(
-            "../data/sail-arm/arm-v8.5-a/model/sail.json"
-        )
-        .unwrap());
-    }
 }

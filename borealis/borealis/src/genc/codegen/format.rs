@@ -126,10 +126,10 @@ pub struct InstructionDecodeInformation {
 pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDecodeInformation {
     trace!(
         "Processing decode function clause @ {}",
-        funcl.annotation.location
+        funcl.annotation.inner.loc
     );
 
-    let (pat, body) = match &funcl.inner.pattern_match.inner {
+    let (pat, body) = match &funcl.inner.pattern_match.inner.inner {
         PatternMatchAux::Expression(pat, body) => (pat, body),
         PatternMatchAux::When(pat, _, body) => {
             debug!("Function clause has condition, ignoring...");
@@ -459,8 +459,8 @@ pub fn expression_to_named_range(
     };
 
     let name = {
-        let LValueExpressionAux::Cast(_, ident) = &**lvalue else {
-            panic!("LValueExpression not a Cast");
+        let LValueExpressionAux::Typ(_, ident) = &**lvalue else {
+            panic!("LValueExpression not a Typ");
         };
 
         ident.as_interned()

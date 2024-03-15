@@ -3,22 +3,13 @@
 //! Imported OCaml functions
 
 use {
-    crate::{error::WrapperError, num::BigInt, parse_ast::Definition},
+    crate::{error::WrapperError, num::BigInt},
     ocaml::Value,
     std::collections::LinkedList,
 };
 
 ocaml::import! {
-    // ?loc:Parse_ast.l -> string -> string -> Lexer.comment list * Parse_ast.def list
-    pub fn parse_file(contents: String, filename: String) -> Result<(LinkedList<Value>, LinkedList<Definition>), WrapperError>;
-
-    // string ->
-    // string option ->
-    // (Arg.key * Arg.spec * Arg.doc) list ->
-    // Parse_ast.def list -> Parse_ast.def list
-    pub fn preprocess(sail_dir: String, target: Option<Value>, options: LinkedList<Value>, file_ast: LinkedList<Definition>) -> Result<LinkedList<Definition>, WrapperError>;
-
-    pub fn run_sail( definitions: LinkedList<(String, LinkedList<Definition>)>, comments: LinkedList<(String, LinkedList<Value>)>) -> Result<(Value, Value, Value), WrapperError>;
+    pub fn run_sail(filepaths: LinkedList<String>) -> Result<(Value, Value, Value), WrapperError>;
 
     pub fn generate_jib(ast: Value, effect_info: Value, env: Value) -> Result<Value, WrapperError>;
 

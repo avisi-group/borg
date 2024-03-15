@@ -2,8 +2,19 @@
   (dev
     (flags (:standard -w -27 -w -32 -w -33))))
 
+(rule
+ (target manifest.ml)
+ (mode fallback)
+ (action
+  (with-outputs-to
+   %{target}
+   (chdir
+    %{workspace_root}
+    (run sail_manifest -gen_manifest)))))
+
 (executable
  (name wrapper)
  (public_name wrapper)
- (libraries libsail gmp)
+ (link_flags -linkall)
+ (libraries libsail gmp dynlink)
  (modes exe object))

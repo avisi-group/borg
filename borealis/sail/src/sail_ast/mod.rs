@@ -20,34 +20,6 @@ use {
     strum::IntoStaticStr,
 };
 
-pub mod visitor;
-
-/// Location
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum Location {
-    /// Unknown location
-    Unknown,
-    /// Unique location
-    Unique(Int, Box<Location>),
-    /// Generated location
-    Generated(Box<Location>),
-    /// Hint
-    Hint(InternedString, Box<Location>, Box<Location>),
-    /// Range between two positions
-    Range(Position, Position),
-}
-
-impl Display for Location {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Location::Range(p0, _) => write!(f, "{p0}"),
-            _ => write!(f, "{self:?}"),
-        }
-    }
-}
-
 #[derive(
     Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
 )]
@@ -106,10 +78,32 @@ impl Walkable for Value {
     }
 }
 
-/// Annotation with generic value (ignored as unit here)
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct Annot {
-    pub location: Location,
+pub mod visitor;
+
+/// Location
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum Location {
+    /// Unknown location
+    Unknown,
+    /// Unique location
+    Unique(Int, Box<Location>),
+    /// Generated location
+    Generated(Box<Location>),
+    /// Hint
+    Hint(InternedString, Box<Location>, Box<Location>),
+    /// Range between two positions
+    Range(Position, Position),
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Location::Range(p0, _) => write!(f, "{p0}"),
+            _ => write!(f, "{self:?}"),
+        }
+    }
 }
 
 /// Loop kind
@@ -121,23 +115,41 @@ pub enum Loop {
     Until,
 }
 
+/// Annotation with generic value (ignored as unit here)
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct Annot {
+    pub location: Location,
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct Extern {
+    pure: bool,
+    bindings: LinkedList<(InternedString, InternedString)>,
+}
+
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct DefinitionAnnotation {
+    pub doc_comment: Option<InternedString>,
+    pub attrs: LinkedList<(Location, InternedString, InternedString)>,
+    pub loc: Location,
+}
+
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct ClauseAnnotation {
+    pub inner: DefinitionAnnotation,
+}
+
 /// Idenitifer
 pub type X = InternedString;
 
 /// Infix identifier
 pub type Xi = InternedString;
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-struct Extern {
-    pure: bool,
-    bindings: LinkedList<(InternedString, InternedString)>,
-}
-
 /// kinded IDs: Type, Int, and Order variables
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindIdentifierAux {
-    kind_identifier: KindIdentifierInner,
+    kind_identifier: X,
 }
 
 /// Base kind
@@ -149,8 +161,6 @@ pub enum KindAux {
     Type,
     /// Kind of natural number size expressions
     Int,
-    /// Kind of vector order specifications
-    Order,
     /// Kind of constraints
     Bool,
 }
@@ -253,16 +263,6 @@ impl Walkable for Identifier {
     }
 }
 
-/// Vector order specifications, of kind Order
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum OrderAux {
-    Variable(KindIdentifier),
-    Increasing,
-    Decreasing,
-}
-
 /// Optionally kind-annotated identifier
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -327,26 +327,10 @@ impl Walkable for NumericExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct Order {
-    pub inner: OrderAux,
-    pub location: Location,
-}
-
-impl Walkable for Order {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            OrderAux::Variable(kid) => visitor.visit_kind_identifier(kid),
-            OrderAux::Increasing | OrderAux::Decreasing => (),
-        }
-    }
-}
-
 /// Optionally kind-annotated identifier
-
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct KindedIdentifier {
-    pub inner: KindIdentifierAux,
+    pub inner: KindedIdentifierAux,
     pub location: Location,
 }
 
@@ -440,7 +424,6 @@ impl Walkable for Typ {
 pub enum TypArgAux {
     NExp(NumericExpression),
     Typ(Typ),
-    Order(Order),
     Bool(NConstraint),
 }
 
@@ -455,7 +438,6 @@ impl Walkable for TypArg {
         match &self.inner {
             TypArgAux::NExp(n) => visitor.visit_numeric_expression(n),
             TypArgAux::Typ(n) => visitor.visit_typ(n),
-            TypArgAux::Order(n) => visitor.visit_order(n),
             TypArgAux::Bool(n) => visitor.visit_nconstraint(n),
         }
     }
@@ -535,6 +517,15 @@ impl Walkable for NConstraint {
     }
 }
 
+/// Vector order specifications, of kind Order
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum OrderAux {
+    Increasing,
+    Decreasing,
+}
+
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Literal {
     pub inner: LiteralAux,
@@ -578,6 +569,14 @@ impl Walkable for TypPat {
     }
 }
 
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum FieldPatternWildcard {
+    Wild(Location),
+    NoWild,
+}
+
 /// Kinded identifier or Int constraint
 #[derive(
     Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
@@ -587,7 +586,18 @@ pub enum QuantItemAux {
     KindedIdentifier(KindedIdentifier),
     /// Constraint for this type
     Constraint(NConstraint),
-    Constant(LinkedList<KindedIdentifier>),
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct Order {
+    pub inner: OrderAux,
+    pub location: Location,
+}
+
+impl Walkable for Order {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        // leaf
+    }
 }
 
 /// Pattern
@@ -628,6 +638,9 @@ pub enum PatternAux {
     /// Concatenated vector pattern
     VectorConcat(LinkedList<Pattern>),
 
+    /// Vector subrange pattern
+    VectorSubrange(Identifier, BigInt, BigInt),
+
     /// Tuple pattern
     Tuple(LinkedList<Pattern>),
 
@@ -641,6 +654,8 @@ pub enum PatternAux {
     ///
     /// x^^y
     StringAppend(LinkedList<Pattern>),
+
+    Struct((LinkedList<(Identifier, Pattern)>, FieldPatternWildcard)),
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -689,6 +704,8 @@ impl Walkable for Pattern {
             PatternAux::StringAppend(pats) => {
                 pats.iter().for_each(|pat| visitor.visit_pattern(pat))
             }
+            PatternAux::VectorSubrange(_, _, _) => todo!(),
+            PatternAux::Struct(_) => todo!(),
         }
     }
 }
@@ -706,22 +723,25 @@ impl Walkable for QuantItem {
         match &self.inner {
             QuantItemAux::KindedIdentifier(n) => visitor.visit_kinded_identifier(n),
             QuantItemAux::Constraint(n) => visitor.visit_nconstraint(n),
-            QuantItemAux::Constant(ns) => {
-                ns.iter().for_each(|n| visitor.visit_kinded_identifier(n))
-            }
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub enum InternalLoopMeasureAux {
+    None,
+    Some(Box<Expression>),
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct InternalLoopMeasure {
-    pub inner: Option<Box<Expression>>,
+    pub inner: InternalLoopMeasureAux,
     pub location: Location,
 }
 
 impl Walkable for InternalLoopMeasure {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        if let Some(exp) = &self.inner {
+        if let InternalLoopMeasureAux::Some(exp) = &self.inner {
             visitor.visit_expression(exp)
         }
     }
@@ -793,16 +813,16 @@ pub enum ExpressionAux {
     Cons(Expression, Expression),
 
     /// Struct
-    Record(LinkedList<FieldExpression>),
+    Struct(LinkedList<FieldExpression>),
 
     /// Functional update of struct
-    RecordUpdate(Expression, LinkedList<FieldExpression>),
+    StructUpdate(Expression, LinkedList<FieldExpression>),
 
     /// Field projection from struct
     Field(Expression, Identifier),
 
     /// Pattern matching
-    Case(Expression, LinkedList<PatternMatch>),
+    Match(Expression, LinkedList<PatternMatch>),
 
     /// Let expression
     Let(LetBind, Expression),
@@ -929,10 +949,10 @@ impl Walkable for Expression {
                 visitor.visit_expression(exp0);
                 visitor.visit_expression(exp1);
             }
-            ExpressionAux::Record(exps) => exps
+            ExpressionAux::Struct(exps) => exps
                 .iter()
                 .for_each(|exp| visitor.visit_field_expression(exp)),
-            ExpressionAux::RecordUpdate(exp, exps) => {
+            ExpressionAux::StructUpdate(exp, exps) => {
                 visitor.visit_expression(exp);
                 exps.iter()
                     .for_each(|exp| visitor.visit_field_expression(exp))
@@ -941,7 +961,7 @@ impl Walkable for Expression {
                 visitor.visit_expression(exp);
                 visitor.visit_identifier(id);
             }
-            ExpressionAux::Case(exp, pats) => {
+            ExpressionAux::Match(exp, pats) => {
                 visitor.visit_expression(exp);
                 pats.iter().for_each(|pat| visitor.visit_pattern_match(pat));
             }
@@ -996,8 +1016,8 @@ impl Walkable for Expression {
 pub enum LValueExpressionAux {
     Identifier(Identifier),
     Deref(Expression),
-    Memory(Identifier, LinkedList<Expression>),
-    Cast(Typ, Identifier),
+    App(Identifier, LinkedList<Expression>),
+    Typ(Typ, Identifier),
     /// multiple (non-memory) assignment
     Tuple(LinkedList<LValueExpression>),
     /// vector concatenation L-exp
@@ -1023,12 +1043,12 @@ impl Walkable for LValueExpression {
 
             LValueExpressionAux::Deref(exp) => visitor.visit_expression(exp),
 
-            LValueExpressionAux::Memory(ident, exps) => {
+            LValueExpressionAux::App(ident, exps) => {
                 visitor.visit_identifier(ident);
                 exps.iter().for_each(|exp| visitor.visit_expression(exp));
             }
 
-            LValueExpressionAux::Cast(typ, ident) => {
+            LValueExpressionAux::Typ(typ, ident) => {
                 visitor.visit_typ(typ);
                 visitor.visit_identifier(ident);
             }
@@ -1159,6 +1179,7 @@ pub enum MappingPatternAux {
     Vector(LinkedList<MappingPattern>),
     /// Concatenated vector pattern
     VectorConcat(LinkedList<MappingPattern>),
+    VectorSubrange(Identifier, BigInt, BigInt),
     /// Tuple pattern
     Tuple(LinkedList<MappingPattern>),
     /// List pattern
@@ -1172,6 +1193,7 @@ pub enum MappingPatternAux {
     /// Typed pattern
     Type(MappingPattern, Typ),
     As(MappingPattern, Identifier),
+    Struct(LinkedList<(Identifier, MappingPattern)>),
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -1218,6 +1240,13 @@ impl Walkable for MappingPattern {
                 visitor.visit_mapping_pattern(mappat);
                 visitor.visit_identifier(ident);
             }
+            MappingPatternAux::VectorSubrange(ident, _, _) => visitor.visit_identifier(ident),
+            MappingPatternAux::Struct(fields) => {
+                fields.iter().for_each(|(id, mpat)| {
+                    visitor.visit_identifier(id);
+                    visitor.visit_mapping_pattern(mpat);
+                });
+            }
         }
     }
 }
@@ -1258,6 +1287,11 @@ impl Walkable for TypQuant {
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct PatternExpressionFunctionClause {
+    pub inner: PatternMatch,
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct MappingPatternExpression {
     pub inner: MappingPatternExpressionAux,
     pub annotation: Annot,
@@ -1275,12 +1309,10 @@ impl Walkable for MappingPatternExpression {
     }
 }
 
-/// Type scheme
-
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct TypeSchemeAux {
-    pub typ_quantifier: TypQuant,
+pub struct TypeUnionAux {
     pub typ: Typ,
+    pub id: Identifier,
 }
 
 /// Optional type annotation for functions
@@ -1290,32 +1322,6 @@ pub struct TypeSchemeAux {
 pub enum TypeAnnotationOptAux {
     None,
     Some(TypQuant, Typ),
-}
-
-/// Function clause
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct FunctionClauseAux {
-    pub identifier: Identifier,
-    pub pattern_match: PatternMatch,
-}
-
-/// Mapping clause (bidirectional pattern-match)
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum MappingClauseAux {
-    Bidirectional(MappingPatternExpression, MappingPatternExpression),
-    Forwards(MappingPatternExpression, Expression),
-    Backwards(MappingPatternExpression, Expression),
-}
-
-/// Type union constructors
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum TypeUnionAux {
-    Identifier(Typ, Identifier),
 }
 
 /// Optional recursive annotation for functions
@@ -1331,108 +1337,28 @@ pub enum RecursiveAnnotationOptAux {
     Measure(Pattern, Expression),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct TypeScheme {
-    pub inner: TypeSchemeAux,
-    pub location: Location,
-}
-
-impl Walkable for TypeScheme {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_typquant(&self.inner.typ_quantifier);
-        visitor.visit_typ(&self.inner.typ);
-    }
-}
+/// Function clause
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct TypeAnnotationOpt {
-    pub inner: TypeAnnotationOptAux,
-    pub location: Location,
+pub struct FunctionClauseAux {
+    pub identifier: Identifier,
+    pub pattern_match: PatternExpressionFunctionClause,
 }
 
-impl Walkable for TypeAnnotationOpt {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            TypeAnnotationOptAux::None => (),
-            TypeAnnotationOptAux::Some(typquant, typ) => {
-                visitor.visit_typquant(typquant);
-                visitor.visit_typ(typ);
-            }
-        }
-    }
+/// Mapping clause (bidirectional pattern-match)
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum MappingClauseAux {
+    Bidirectional(MappingPatternExpression, MappingPatternExpression),
+    Forwards(MappingPatternExpression, Expression),
+    Backwards(MappingPatternExpression, Expression),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct FunctionClause {
-    pub inner: FunctionClauseAux,
-    pub annotation: Annot,
-}
-
-impl Walkable for FunctionClause {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_identifier(&self.inner.identifier);
-        visitor.visit_pattern_match(&self.inner.pattern_match);
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct RecursiveAnnotationOpt {
-    pub inner: RecursiveAnnotationOptAux,
-    pub location: Location,
-}
-
-impl Walkable for RecursiveAnnotationOpt {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            RecursiveAnnotationOptAux::NonRecursive | RecursiveAnnotationOptAux::Recursive => (),
-            RecursiveAnnotationOptAux::Measure(pat, exp) => {
-                visitor.visit_pattern(pat);
-                visitor.visit_expression(exp);
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct TypeUnion {
-    pub inner: TypeUnionAux,
-    pub location: Location,
-}
-
-impl Walkable for TypeUnion {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            TypeUnionAux::Identifier(typ, ident) => {
-                visitor.visit_typ(typ);
-                visitor.visit_identifier(ident);
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct MappingClause {
-    pub inner: MappingClauseAux,
-    pub annotation: Annot,
-}
-
-impl Walkable for MappingClause {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            MappingClauseAux::Bidirectional(mappatexp0, mappatexp1) => {
-                visitor.visit_mapping_pattern_expression(mappatexp0);
-                visitor.visit_mapping_pattern_expression(mappatexp1);
-            }
-            MappingClauseAux::Forwards(mappatexp, exp) => {
-                visitor.visit_mapping_pattern_expression(mappatexp);
-                visitor.visit_expression(exp);
-            }
-            MappingClauseAux::Backwards(mappatexp, exp) => {
-                visitor.visit_mapping_pattern_expression(mappatexp);
-                visitor.visit_expression(exp);
-            }
-        }
-    }
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct TypeSchemeAux {
+    typ_quantifier: TypQuant,
+    typ: Typ,
 }
 
 /// Index specification, for bitfields in register types
@@ -1470,31 +1396,105 @@ impl Walkable for IndexRange {
     }
 }
 
-/// Function and type union definitions that can be spread across a file. Each
-/// one must end in $_$
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum ScatteredDefinitionAux {
-    /// Scattered function definition header
-    Function(RecursiveAnnotationOpt, TypeAnnotationOpt, Identifier),
-    /// Scattered function definition clause
-    FunctionClause(FunctionClause),
-    /// Scattered union definition header
-    Variant(Identifier, TypQuant),
-    /// Scattered union definition member
-    UnionClause(Identifier, TypeUnion),
-    Mapping(Identifier, TypeAnnotationOpt),
-    MappingClause(Identifier, MappingClause),
-    /// Scattered definition end
-    End(Identifier),
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct TypeUnion {
+    pub inner: TypeUnionAux,
+    pub location: Location,
 }
 
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum InstantiationSpecificationAux {
-    Id(Identifier),
+impl Walkable for TypeUnion {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_typ(&self.inner.typ);
+        visitor.visit_identifier(&self.inner.id);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct TypeAnnotationOpt {
+    pub inner: TypeAnnotationOptAux,
+    pub location: Location,
+}
+
+impl Walkable for TypeAnnotationOpt {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            TypeAnnotationOptAux::None => (),
+            TypeAnnotationOptAux::Some(typquant, typ) => {
+                visitor.visit_typquant(typquant);
+                visitor.visit_typ(typ);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct RecursiveAnnotationOpt {
+    pub inner: RecursiveAnnotationOptAux,
+    pub location: Location,
+}
+
+impl Walkable for RecursiveAnnotationOpt {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            RecursiveAnnotationOptAux::NonRecursive | RecursiveAnnotationOptAux::Recursive => (),
+            RecursiveAnnotationOptAux::Measure(pat, exp) => {
+                visitor.visit_pattern(pat);
+                visitor.visit_expression(exp);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct FunctionClause {
+    pub inner: FunctionClauseAux,
+    pub annotation: ClauseAnnotation,
+}
+
+impl Walkable for FunctionClause {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_identifier(&self.inner.identifier);
+        //visitor.visit_pattern_match(&self.inner.pattern_match);
+        todo!()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct MappingClause {
+    pub inner: MappingClauseAux,
+    pub annotation: ClauseAnnotation,
+}
+
+impl Walkable for MappingClause {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            MappingClauseAux::Bidirectional(mappatexp0, mappatexp1) => {
+                visitor.visit_mapping_pattern_expression(mappatexp0);
+                visitor.visit_mapping_pattern_expression(mappatexp1);
+            }
+            MappingClauseAux::Forwards(mappatexp, exp) => {
+                visitor.visit_mapping_pattern_expression(mappatexp);
+                visitor.visit_expression(exp);
+            }
+            MappingClauseAux::Backwards(mappatexp, exp) => {
+                visitor.visit_mapping_pattern_expression(mappatexp);
+                visitor.visit_expression(exp);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct TypeScheme {
+    inner: TypeSchemeAux,
+    l: Location,
+}
+
+impl Walkable for TypeScheme {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_typquant(&self.inner.typ_quantifier);
+        visitor.visit_typ(&self.inner.typ);
+    }
 }
 
 /// Type definition body
@@ -1514,12 +1514,22 @@ pub enum TypeDefinitionAux {
     Bitfield(Identifier, Typ, LinkedList<(Identifier, IndexRange)>),
 }
 
-/// Register declarations
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum DecSpecAux {
-    Register(Typ, Identifier, Option<Expression>),
+/// Function definition
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct FunctionDefinitionAux {
+    pub recursive_annotation: RecursiveAnnotationOpt,
+    pub type_annotation: TypeAnnotationOpt,
+    pub clauses: LinkedList<FunctionClause>,
+}
+
+/// Mapping definition (bidirectional pattern-match function)
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct MappingDefinitionAux {
+    pub ident: Identifier,
+    pub typ_annotation: TypeAnnotationOpt,
+    pub clauses: LinkedList<MappingClause>,
 }
 
 /// Instantiation substitution
@@ -1533,13 +1543,19 @@ pub enum SubstitutionAux {
     Id(Identifier, Identifier),
 }
 
-/// Mapping definition (bidirectional pattern-match function)
+/// Outcome declaration
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum OutcomeSpecificationAux {
+    Outcome(Identifier, TypeScheme, LinkedList<KindedIdentifier>),
+}
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct MappingDefinitionAux {
-    pub ident: Identifier,
-    pub typ_annotation: TypeAnnotationOpt,
-    pub clauses: LinkedList<MappingClause>,
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum InstantiationSpecificationAux {
+    Id(Identifier),
 }
 
 /// Value type specification
@@ -1548,16 +1564,7 @@ pub struct MappingDefinitionAux {
 pub struct ValueSpecificationAux {
     pub typ_scheme: TypeScheme,
     pub ident: Identifier,
-    pub a: (),
-    pub b: bool,
-}
-
-/// Outcome declaration
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum OutcomeSpecificationAux {
-    Outcome(Identifier, TypeScheme, LinkedList<KindedIdentifier>),
+    pub ext: Option<Extern>,
 }
 
 /// Default kinding or typing assumption
@@ -1568,13 +1575,41 @@ pub enum DefaultSpecAux {
     Order(Order),
 }
 
-/// Function definition
+/// Function and type union definitions that can be spread across a file. Each
+/// one must end in $_$
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum ScatteredDefinitionAux {
+    /// Scattered function definition header
+    Function(RecursiveAnnotationOpt, TypeAnnotationOpt, Identifier),
+    /// Scattered function definition clause
+    FunctionClause(FunctionClause),
+    /// Scattered union definition header
+    Variant(Identifier, TypQuant),
+    /// Scattered union definition member
+    UnionClause(Identifier, TypeUnion),
+    InternalUnionClauseRecord(
+        Identifier,
+        Identifier,
+        TypQuant,
+        LinkedList<(Typ, Identifier)>,
+    ),
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct FunctionDefinitionAux {
-    pub recursive_annotation: RecursiveAnnotationOpt,
-    pub type_annotation: TypeAnnotationOpt,
-    pub clauses: LinkedList<FunctionClause>,
+    Mapping(Identifier, TypeAnnotationOpt),
+    MappingClause(Identifier, MappingClause),
+    Enum(Identifier),
+    EnumClause(Identifier, Identifier),
+    /// Scattered definition end
+    End(Identifier),
+}
+
+/// Register declarations
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum DecSpecAux {
+    Register(Typ, Identifier, Option<Expression>),
 }
 
 /// Optional default value for indexed vectors
@@ -1588,55 +1623,11 @@ pub enum OptionalDefaultAux {
     Dec(Expression),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct ScatteredDefinition {
-    pub inner: ScatteredDefinitionAux,
-    pub annotation: Annot,
-}
-
-impl Walkable for ScatteredDefinition {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            ScatteredDefinitionAux::Function(recannotopt, typeannotopt, ident) => {
-                visitor.visit_recursive_annotation_opt(recannotopt);
-                visitor.visit_type_annotation_opt(typeannotopt);
-
-                visitor.visit_identifier(ident);
-            }
-            ScatteredDefinitionAux::FunctionClause(funcl) => visitor.visit_function_clause(funcl),
-            ScatteredDefinitionAux::Variant(ident, typquant) => {
-                visitor.visit_identifier(ident);
-                visitor.visit_typquant(typquant);
-            }
-            ScatteredDefinitionAux::UnionClause(ident, typeunion) => {
-                visitor.visit_identifier(ident);
-                visitor.visit_typunion(typeunion);
-            }
-            ScatteredDefinitionAux::Mapping(ident, typeannotopt) => {
-                visitor.visit_identifier(ident);
-                visitor.visit_type_annotation_opt(typeannotopt);
-            }
-            ScatteredDefinitionAux::MappingClause(ident, mapcl) => {
-                visitor.visit_identifier(ident);
-                visitor.visit_mapping_clause(mapcl);
-            }
-            ScatteredDefinitionAux::End(ident) => visitor.visit_identifier(ident),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct InstantiationSpecification {
-    pub inner: InstantiationSpecificationAux,
-    pub annotation: Annot,
-}
-
-impl Walkable for InstantiationSpecification {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            InstantiationSpecificationAux::Id(id) => visitor.visit_identifier(id),
-        }
-    }
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum ImplDefintionAux {
+    Impl(FunctionClause),
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -1687,23 +1678,36 @@ impl Walkable for TypeDefinition {
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct DecSpec {
-    pub inner: DecSpecAux,
+pub struct FunctionDefinition {
+    pub inner: FunctionDefinitionAux,
     pub annotation: Annot,
 }
 
-impl Walkable for DecSpec {
+impl Walkable for FunctionDefinition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            DecSpecAux::Register(typ, ident, exp) => {
-                visitor.visit_typ(typ);
-                visitor.visit_identifier(ident);
-                match exp {
-                    Some(exp) => visitor.visit_expression(exp),
-                    None => (),
-                }
-            }
-        }
+        visitor.visit_recursive_annotation_opt(&self.inner.recursive_annotation);
+        visitor.visit_type_annotation_opt(&self.inner.type_annotation);
+        self.inner
+            .clauses
+            .iter()
+            .for_each(|c| visitor.visit_function_clause(c));
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct MappingDefinition {
+    pub inner: MappingDefinitionAux,
+    pub annotation: Annot,
+}
+
+impl Walkable for MappingDefinition {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        visitor.visit_identifier(&self.inner.ident);
+        visitor.visit_type_annotation_opt(&self.inner.typ_annotation);
+        self.inner
+            .clauses
+            .iter()
+            .for_each(|mapcl| visitor.visit_mapping_clause(mapcl));
     }
 }
 
@@ -1729,19 +1733,22 @@ impl Walkable for Substitution {
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct MappingDefinition {
-    pub inner: MappingDefinitionAux,
+pub struct OutcomeSpecification {
+    pub inner: OutcomeSpecificationAux,
+    pub location: Location,
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct InstantiationSpecification {
+    pub inner: InstantiationSpecificationAux,
     pub annotation: Annot,
 }
 
-impl Walkable for MappingDefinition {
+impl Walkable for InstantiationSpecification {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_identifier(&self.inner.ident);
-        visitor.visit_type_annotation_opt(&self.inner.typ_annotation);
-        self.inner
-            .clauses
-            .iter()
-            .for_each(|mapcl| visitor.visit_mapping_clause(mapcl));
+        match &self.inner {
+            InstantiationSpecificationAux::Id(id) => visitor.visit_identifier(id),
+        }
     }
 }
 
@@ -1755,21 +1762,6 @@ impl Walkable for ValueSpecification {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_type_scheme(&self.inner.typ_scheme);
     }
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct OutcomeSpecification {
-    pub inner: OutcomeSpecificationAux,
-    pub location: Location,
-}
-
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum Prec {
-    Infix,
-    InfixLeft,
-    InfixRight,
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -1787,6 +1779,89 @@ impl Walkable for DefaultSpec {
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct ScatteredDefinition {
+    pub inner: ScatteredDefinitionAux,
+    pub annotation: Annot,
+}
+
+impl Walkable for ScatteredDefinition {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            ScatteredDefinitionAux::Function(recannotopt, typeannotopt, ident) => {
+                visitor.visit_recursive_annotation_opt(recannotopt);
+                visitor.visit_type_annotation_opt(typeannotopt);
+
+                visitor.visit_identifier(ident);
+            }
+            ScatteredDefinitionAux::FunctionClause(funcl) => visitor.visit_function_clause(funcl),
+            ScatteredDefinitionAux::Variant(ident, typquant) => {
+                visitor.visit_identifier(ident);
+                visitor.visit_typquant(typquant);
+            }
+            ScatteredDefinitionAux::UnionClause(ident, typeunion) => {
+                visitor.visit_identifier(ident);
+                visitor.visit_typunion(typeunion);
+            }
+            ScatteredDefinitionAux::Mapping(ident, typeannotopt) => {
+                visitor.visit_identifier(ident);
+                visitor.visit_type_annotation_opt(typeannotopt);
+            }
+            ScatteredDefinitionAux::MappingClause(ident, mapcl) => {
+                visitor.visit_identifier(ident);
+                visitor.visit_mapping_clause(mapcl);
+            }
+            ScatteredDefinitionAux::End(ident) => visitor.visit_identifier(ident),
+            ScatteredDefinitionAux::InternalUnionClauseRecord(a, b, tq, xs) => {
+                visitor.visit_identifier(a);
+                visitor.visit_identifier(b);
+                visitor.visit_typquant(tq);
+                xs.iter().for_each(|(typ, id)| {
+                    visitor.visit_typ(typ);
+                    visitor.visit_identifier(id);
+                });
+            }
+            ScatteredDefinitionAux::Enum(id) => {
+                visitor.visit_identifier(id);
+            }
+            ScatteredDefinitionAux::EnumClause(a, b) => {
+                visitor.visit_identifier(a);
+                visitor.visit_identifier(b);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct DecSpec {
+    pub inner: DecSpecAux,
+    pub annotation: Annot,
+}
+
+impl Walkable for DecSpec {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            DecSpecAux::Register(typ, ident, exp) => {
+                visitor.visit_typ(typ);
+                visitor.visit_identifier(ident);
+                match exp {
+                    Some(exp) => visitor.visit_expression(exp),
+                    None => (),
+                }
+            }
+        }
+    }
+}
+
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum Prec {
+    Infix,
+    InfixLeft,
+    InfixRight,
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct LoopMeasure {
     pub loop0: Loop,
     pub expression: Expression,
@@ -1796,30 +1871,6 @@ impl Walkable for LoopMeasure {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_expression(&self.expression);
     }
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct FunctionDefinition {
-    pub inner: FunctionDefinitionAux,
-    pub annotation: Annot,
-}
-
-impl Walkable for FunctionDefinition {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        visitor.visit_recursive_annotation_opt(&self.inner.recursive_annotation);
-        visitor.visit_type_annotation_opt(&self.inner.type_annotation);
-        self.inner
-            .clauses
-            .iter()
-            .for_each(|c| visitor.visit_function_clause(c));
-    }
-}
-
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum ImplDefintionAux {
-    Impl(FunctionClause),
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -1836,11 +1887,16 @@ impl Walkable for OptionalDefault {
     }
 }
 
-/// Top-level Sail2 definition
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct ImplDefintion {
+    inner: ImplDefintionAux,
+    l: Location,
+}
+
 #[derive(
     Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
 )]
-pub enum Definition {
+pub enum DefinitionAux {
     /// Type definition
     Type(TypeDefinition),
 
@@ -1897,25 +1953,34 @@ pub enum Definition {
     Pragma(InternedString, InternedString, Location),
 }
 
+/// Top-level Sail2 definition
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct Definition {
+    definition: DefinitionAux,
+    annotation: DefinitionAnnotation,
+}
+
 impl Walkable for Definition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self {
-            Definition::Type(typedef) => visitor.visit_type_definition(typedef),
-            Definition::Function(funcdef) => visitor.visit_function_definition(funcdef),
-            Definition::Mapping(mapdef) => visitor.visit_mapping_definition(mapdef),
-            Definition::Impl(_) => todo!(),
-            Definition::Value(letbind) => visitor.visit_letbind(letbind),
-            Definition::Spec(valuespec) => visitor.visit_value_specification(valuespec),
-            Definition::Outcome(_, _) => todo!(),
-            Definition::Instantiation(_, _) => todo!(),
-            Definition::Fixity(_, _, ident) => visitor.visit_identifier(ident),
-            Definition::Overload(id, ids) => {
+        match &self.definition {
+            DefinitionAux::Type(typedef) => visitor.visit_type_definition(typedef),
+            DefinitionAux::Function(funcdef) => visitor.visit_function_definition(funcdef),
+            DefinitionAux::Mapping(mapdef) => visitor.visit_mapping_definition(mapdef),
+            DefinitionAux::Impl(_) => todo!(),
+            DefinitionAux::Value(letbind) => visitor.visit_letbind(letbind),
+            DefinitionAux::Spec(valuespec) => visitor.visit_value_specification(valuespec),
+            DefinitionAux::Outcome(_, _) => todo!(),
+            DefinitionAux::Instantiation(_, _) => todo!(),
+            DefinitionAux::Fixity(_, _, ident) => visitor.visit_identifier(ident),
+            DefinitionAux::Overload(id, ids) => {
                 visitor.visit_identifier(id);
                 ids.iter().for_each(|id| visitor.visit_identifier(id));
             }
-            Definition::Default(default) => visitor.visit_default_spec(default),
-            Definition::Scattered(scattereddef) => visitor.visit_scattered_definition(scattereddef),
-            Definition::Measure {
+            DefinitionAux::Default(default) => visitor.visit_default_spec(default),
+            DefinitionAux::Scattered(scattereddef) => {
+                visitor.visit_scattered_definition(scattereddef)
+            }
+            DefinitionAux::Measure {
                 identifier,
                 pattern,
                 expression,
@@ -1924,18 +1989,33 @@ impl Walkable for Definition {
                 visitor.visit_pattern(pattern);
                 visitor.visit_expression(expression);
             }
-            Definition::LoopMeasures(ident, loopmeasures) => {
+            DefinitionAux::LoopMeasures(ident, loopmeasures) => {
                 visitor.visit_identifier(ident);
                 loopmeasures
                     .iter()
                     .for_each(|loopmeasure| visitor.visit_loop_measure(loopmeasure));
             }
-            Definition::Register(decspec) => visitor.visit_decspec(decspec),
-            Definition::Mutual(funcdefs) => funcdefs
+            DefinitionAux::Register(decspec) => visitor.visit_decspec(decspec),
+            DefinitionAux::Mutual(funcdefs) => funcdefs
                 .iter()
                 .for_each(|f| visitor.visit_function_definition(f)),
-            Definition::Pragma(_, _, _) => (),
+            DefinitionAux::Pragma(_, _, _) => (),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct Ast {
+    pub defs: LinkedList<Definition>,
+    pub comments: LinkedList<CommentRoot>,
+}
+
+impl Walkable for Ast {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        self.defs.iter().for_each(|d| visitor.visit_definition(d));
+        self.comments
+            .iter()
+            .for_each(|c| visitor.visit_comment_root(c));
     }
 }
 
@@ -1971,20 +2051,5 @@ pub struct Comment {
 impl Walkable for Comment {
     fn walk<V: Visitor>(&self, _: &mut V) {
         // leaf node
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct Ast {
-    pub defs: LinkedList<Definition>,
-    pub comments: LinkedList<CommentRoot>,
-}
-
-impl Walkable for Ast {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        self.defs.iter().for_each(|d| visitor.visit_definition(d));
-        self.comments
-            .iter()
-            .for_each(|c| visitor.visit_comment_root(c));
     }
 }

@@ -1,5 +1,4 @@
 {
-    "options": "-memo_z3 -c -O -Oconstant_fold",
     "files": [
         "sail-arm/arm-v9.4-a/src/prelude.sail",
         "sail-arm/arm-v9.4-a/src/decode_start.sail",

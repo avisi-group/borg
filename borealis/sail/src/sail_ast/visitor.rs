@@ -3,14 +3,14 @@
 //! Visitor trait has overridable methods
 
 use crate::sail_ast::{
-    Ast, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, Expression, FieldExpression,
-    FunctionClause, FunctionDefinition, Identifier, IndexRange, InstantiationSpecification,
-    InternalLoopMeasure, Kind, KindIdentifier, KindedIdentifier, LValueExpression, LetBind,
-    Literal, LoopMeasure, MappingClause, MappingDefinition, MappingPattern,
-    MappingPatternExpression, NConstraint, NumericExpression, OptionalDefault, Order, Pattern,
-    PatternMatch, QuantItem, RecursiveAnnotationOpt, ScatteredDefinition, Substitution, Typ,
-    TypArg, TypPat, TypQuant, TypeAnnotationOpt, TypeDefinition, TypeScheme, TypeUnion, Value,
-    ValueSpecification,
+    Ast, Comment, CommentRoot, DecSpec, DefaultSpec, Definition, DefinitionAux, Expression,
+    FieldExpression, FunctionClause, FunctionDefinition, Identifier, IndexRange,
+    InstantiationSpecification, InternalLoopMeasure, Kind, KindIdentifier, KindedIdentifier,
+    LValueExpression, LetBind, Literal, LoopMeasure, MappingClause, MappingDefinition,
+    MappingPattern, MappingPatternExpression, NConstraint, NumericExpression, OptionalDefault,
+    Order, Pattern, PatternMatch, QuantItem, RecursiveAnnotationOpt, ScatteredDefinition,
+    Substitution, Typ, TypArg, TypPat, TypQuant, TypeAnnotationOpt, TypeDefinition, TypeScheme,
+    TypeUnion, Value, ValueSpecification,
 };
 
 /// Visitor trait for interacting with Sail AST
