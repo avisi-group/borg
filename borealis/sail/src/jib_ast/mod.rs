@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 //! JIB AST
 //!
 //! JIB abstract syntax tree corresponding to data structures in `jib.ml`,
@@ -19,57 +21,7 @@ use {
 pub mod pretty_print;
 pub mod visitor;
 
-#[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum BitU {
-    B0,
-    B1,
-    BU,
-}
-
-/// Value2.vl
-#[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum Vl {
-    Bits(LinkedList<BitU>, bool),
-    Bit(BitU),
-    Bool(bool),
-    Unit,
-    Int(BigInt),
-    String(InternedString),
-    Real(InternedString),
-    EmptyList,
-    Enum(InternedString),
-    Ref(InternedString),
-    Undefined,
-}
-
-impl Walkable for Vl {
-    fn walk<V: Visitor>(&self, _: &mut V) {
-        // leaf node
-    }
-}
-
-/// Name
-#[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum Name {
-    Name(Identifier, Int),
-    Global(Identifier, Int),
-    HaveException(Int),
-    CurrentException(Int),
-    ThrowLocation(Int),
-    Return(Int),
-}
-
-impl Walkable for Name {
-    fn walk<V: Visitor>(&self, _: &mut V) {
-        // leaf node
-    }
-}
-
 /// C type
-#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum Type {
     Lint,
@@ -87,10 +39,10 @@ pub enum Type {
     RoundingMode,
     Tup(LinkedList<Self>),
     Enum(Identifier, LinkedList<Identifier>),
-    Struct(Identifier, LinkedList<(Identifier, Type)>),
-    Variant(Identifier, LinkedList<(Identifier, Type)>),
-    Fvector(Int, bool, Box<Self>),
-    Vector(bool, Box<Self>),
+    Struct(Identifier, LinkedList<(Identifier, Self)>),
+    Variant(Identifier, LinkedList<(Identifier, Self)>),
+    Fvector(Int, Box<Self>),
+    Vector(Box<Self>),
     List(Box<Self>),
     Ref(Box<Self>),
     Poly(KindIdentifier),
@@ -119,7 +71,7 @@ impl Walkable for Type {
                     visitor.visit_type(typ);
                 });
             }
-            Self::Fvector(_, _, typ) | Self::Vector(_, typ) | Self::List(typ) | Self::Ref(typ) => {
+            Self::Fvector(_, typ) | Self::Vector(typ) | Self::List(typ) | Self::Ref(typ) => {
                 visitor.visit_type(typ)
             }
             Self::Poly(_) => (),
@@ -127,8 +79,25 @@ impl Walkable for Type {
     }
 }
 
+/// Name
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub enum Name {
+    Name(Identifier, Int),
+    Global(Identifier, Int),
+    HaveException(Int),
+    CurrentException(Int),
+    ThrowLocation(Int),
+    Return(Int),
+}
+
+impl Walkable for Name {
+    fn walk<V: Visitor>(&self, _: &mut V) {
+        // leaf node
+    }
+}
+
 /// Operation
-#[allow(missing_docs)]
+
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum Op {
     Bnot,
@@ -136,6 +105,7 @@ pub enum Op {
     Band,
     ListHead,
     ListTail,
+    ListIsEmpty,
     Eq,
     Neq,
     Ilt,
@@ -168,54 +138,19 @@ impl Walkable for Op {
     }
 }
 
-/// clexp?
-#[allow(missing_docs)]
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub enum Expression {
-    Id(Name, Type),
-    Rmw(Name, Name, Type),
-    Field(Box<Self>, (Identifier, LinkedList<Type>)),
-    Addr(Box<Self>),
-    Tuple(Box<Self>, Int),
-    Void,
-}
-
-impl Walkable for Expression {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match self {
-            Self::Id(name, typ) => {
-                visitor.visit_name(name);
-                visitor.visit_type(typ);
-            }
-            Self::Rmw(name0, name1, typ) => {
-                visitor.visit_name(name0);
-                visitor.visit_name(name1);
-                visitor.visit_type(typ);
-            }
-            Self::Field(expression, (_, types)) => {
-                visitor.visit_expression(expression);
-                types.iter().for_each(|t| visitor.visit_type(t));
-            }
-            Self::Addr(expression) => visitor.visit_expression(expression),
-            Self::Tuple(expression, _) => visitor.visit_expression(expression),
-            Self::Void => (),
-        }
-    }
-}
-
 /// C value
-#[allow(missing_docs)]
+
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum Value {
     Id(Name, Type),
     Lit(Vl, Type),
     Tuple(LinkedList<Self>, Type),
-    Struct(LinkedList<((Identifier, LinkedList<Type>), Self)>, Type),
+    Struct(LinkedList<(Identifier, Self)>, Type),
     CtorKind(Box<Self>, Identifier, LinkedList<Type>, Type),
-    CtorUnwrap(Box<Self>, (Identifier, LinkedList<Type>), Type),
+    CtorUnwrap(Box<Self>, Identifier, LinkedList<Type>, Type),
     TupleMember(Box<Self>, Int, Int),
     Call(Op, LinkedList<Self>),
-    Field(Box<Self>, (Identifier, LinkedList<Type>)),
+    Field(Box<Self>, Identifier),
 }
 
 impl Walkable for Value {
@@ -234,8 +169,7 @@ impl Walkable for Value {
                 visitor.visit_type(typ);
             }
             Self::Struct(fields, typ) => {
-                fields.iter().for_each(|((_, types), value)| {
-                    types.iter().for_each(|t| visitor.visit_type(t));
+                fields.iter().for_each(|(_, value)| {
                     visitor.visit_value(value);
                 });
                 visitor.visit_type(typ);
@@ -245,7 +179,7 @@ impl Walkable for Value {
                 types.iter().for_each(|typ| visitor.visit_type(typ));
                 visitor.visit_type(typ)
             }
-            Self::CtorUnwrap(value, (_, types), typ) => {
+            Self::CtorUnwrap(value, _, types, typ) => {
                 visitor.visit_value(value);
                 types.iter().for_each(|typ| visitor.visit_type(typ));
                 visitor.visit_type(typ)
@@ -255,24 +189,80 @@ impl Walkable for Value {
                 visitor.visit_op(op);
                 values.iter().for_each(|value| visitor.visit_value(value));
             }
-            Self::Field(value, (_, types)) => {
+            Self::Field(value, _) => {
                 visitor.visit_value(value);
-                types.iter().for_each(|typ| visitor.visit_type(typ));
             }
         }
     }
 }
 
-/// Instruction annotation
-#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct InstructionAnnotation {
-    pub i: Int,
-    pub l: Location,
+pub enum BitU {
+    B0,
+    B1,
+    BU,
 }
 
+/// Value2.vl
+
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub enum Vl {
+    Bits(LinkedList<BitU>),
+    Bit(BitU),
+    Bool(bool),
+    Unit,
+    Int(BigInt),
+    String(InternedString),
+    Real(InternedString),
+    Enum(InternedString),
+    Ref(InternedString),
+    Undefined,
+}
+
+impl Walkable for Vl {
+    fn walk<V: Visitor>(&self, _: &mut V) {
+        // leaf node
+    }
+}
+
+/// clexp?
+
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub enum Expression {
+    Id(Name, Type),
+    Rmw(Name, Name, Type),
+    Field(Box<Self>, Identifier),
+    Addr(Box<Self>),
+    Tuple(Box<Self>, Int),
+    Void,
+}
+
+impl Walkable for Expression {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match self {
+            Self::Id(name, typ) => {
+                visitor.visit_name(name);
+                visitor.visit_type(typ);
+            }
+            Self::Rmw(name0, name1, typ) => {
+                visitor.visit_name(name0);
+                visitor.visit_name(name1);
+                visitor.visit_type(typ);
+            }
+            Self::Field(expression, _) => {
+                visitor.visit_expression(expression);
+            }
+            Self::Addr(expression) => visitor.visit_expression(expression),
+            Self::Tuple(expression, _) => visitor.visit_expression(expression),
+            Self::Void => (),
+        }
+    }
+}
+
+type InstructionAnnotation = (Int, Location);
+
 /// C type definition
-#[allow(missing_docs)]
+
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum TypeDefinition {
     Enum(Identifier, LinkedList<Identifier>),
@@ -293,7 +283,6 @@ impl Walkable for TypeDefinition {
     }
 }
 
-#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum InstructionAux {
     Decl(Type, Name),
@@ -304,7 +293,8 @@ pub enum InstructionAux {
     Funcall(
         Expression,
         bool,
-        (Identifier, LinkedList<Type>),
+        Identifier,
+        LinkedList<Type>,
         LinkedList<Value>,
     ),
     Copy(Expression, Value),
@@ -328,7 +318,6 @@ pub enum InstructionAux {
     Reinit(Type, Name, Value),
 }
 
-#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Instruction {
     pub inner: InstructionAux,
@@ -350,7 +339,7 @@ impl Walkable for Instruction {
             InstructionAux::Jump(value, _) => visitor.visit_value(value),
             InstructionAux::Goto(_) => {}
             InstructionAux::Label(_) => {}
-            InstructionAux::Funcall(expression, _, (_, parameter_types), parameters) => {
+            InstructionAux::Funcall(expression, _, _, parameter_types, parameters) => {
                 visitor.visit_expression(expression);
                 parameter_types
                     .iter()
@@ -399,7 +388,6 @@ impl Walkable for Instruction {
     }
 }
 
-#[allow(missing_docs)]
 #[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
 pub enum Definition {
     Register(Identifier, Type, LinkedList<Instruction>),

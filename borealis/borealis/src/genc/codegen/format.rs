@@ -129,7 +129,7 @@ pub fn process_decode_function_clause(funcl: &FunctionClause) -> InstructionDeco
         funcl.annotation.inner.loc
     );
 
-    let (pat, body) = match &funcl.inner.pattern_match.inner.inner {
+    let (pat, body) = match &funcl.inner.pattern_match.inner {
         PatternMatchAux::Expression(pat, body) => (pat, body),
         PatternMatchAux::When(pat, _, body) => {
             debug!("Function clause has condition, ignoring...");

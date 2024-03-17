@@ -241,7 +241,7 @@ impl Visitor for JibPrettyPrinter {
                 self.visit_name(name);
                 println!(")");
             }
-            InstructionAux::Funcall(exp, _, (name, _), args) => {
+            InstructionAux::Funcall(exp, _, name, _, args) => {
                 self.prindent("");
                 self.visit_expression(exp);
                 print!(" = {}(", name.as_interned());
@@ -337,7 +337,7 @@ impl Visitor for JibPrettyPrinter {
 
                 {
                     let _h = self.indent();
-                    fields.iter().for_each(|((ident, _), value)| {
+                    fields.iter().for_each(|(ident, value)| {
                         self.prindent(format!("{}: ", ident.as_interned()));
                         self.visit_value(value);
                         println!(",");
@@ -352,13 +352,13 @@ impl Visitor for JibPrettyPrinter {
                 print!(" is ");
                 self.print_uid(ctor, unifiers);
             }
-            Value::CtorUnwrap(f, (ctor, unifiers), _) => {
+            Value::CtorUnwrap(f, ctor, unifiers, _) => {
                 self.visit_value(f);
                 print!(" as ");
                 self.print_uid(ctor, unifiers);
             }
             Value::TupleMember(_, _, _) => todo!(),
-            Value::Field(value, (ident, _)) => {
+            Value::Field(value, ident) => {
                 self.visit_value(value);
                 print!(".");
                 print!("{}", ident.as_interned());
@@ -370,7 +370,7 @@ impl Visitor for JibPrettyPrinter {
         match node {
             Expression::Id(name, _) => self.visit_name(name),
             Expression::Rmw(_, _, _) => todo!(),
-            Expression::Field(expression, (ident, _)) => {
+            Expression::Field(expression, ident) => {
                 self.visit_expression(expression);
                 print!(".");
                 print!("{}", ident.as_interned());
@@ -416,12 +416,12 @@ impl Visitor for JibPrettyPrinter {
             Type::Struct(ident, _) => print!("struct {}", ident.as_interned()),
             Type::Variant(ident, _) => print!("union {}", ident.as_interned()),
 
-            Type::Vector(_, typ) => {
+            Type::Vector(typ) => {
                 print!("%vec<");
                 self.visit_type(typ);
                 print!(">");
             }
-            Type::Fvector(n, _, typ) => {
+            Type::Fvector(n, typ) => {
                 print!("%fvec<{n}, ");
                 self.visit_type(typ);
                 print!(">");

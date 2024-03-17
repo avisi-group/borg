@@ -49,8 +49,10 @@ pub fn load_from_config<P: AsRef<Path>>(
         trace!("Generating JIB IR");
         let jib = unsafe { generate_jib(rt, ast.clone(), env, effect_info) }??;
 
-        trace!("Parsing Sail and JIB ASTs");
+        trace!("Parsing Sail AST");
         let ast = Ast::from_value(ast);
+
+        trace!("Parsing JIB AST");
         let jib = LinkedList::<jib_ast::Definition>::from_value(jib);
 
         Ok((ast, jib))

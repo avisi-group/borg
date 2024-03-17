@@ -164,11 +164,11 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
             name: name.as_interned(),
             fields: convert_fields(fields),
         },
-        jib_ast::Type::Fvector(length, _, typ) => boom::Type::FixedVector {
+        jib_ast::Type::Fvector(length, typ) => boom::Type::FixedVector {
             length: *length,
             element_type: convert_type(&**typ),
         },
-        jib_ast::Type::Vector(_, typ) => boom::Type::Vector {
+        jib_ast::Type::Vector(typ) => boom::Type::Vector {
             element_type: (convert_type(&**typ)),
         },
         jib_ast::Type::List(typ) => boom::Type::List {
@@ -210,7 +210,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         }],
         jib_ast::InstructionAux::Goto(s) => vec![boom::Statement::Goto(*s)],
         jib_ast::InstructionAux::Label(s) => vec![boom::Statement::Label(*s)],
-        jib_ast::InstructionAux::Funcall(expression, _, (name, _), args) => {
+        jib_ast::InstructionAux::Funcall(expression, _, name, _, args) => {
             vec![boom::Statement::FunctionCall {
                 expression: Some(convert_expression(expression)),
                 name: name.as_interned(),
@@ -265,7 +265,7 @@ fn convert_expression(expression: &jib_ast::Expression) -> boom::Expression {
     match expression {
         jib_ast::Expression::Id(name, _) => boom::Expression::Identifier(convert_name(name)),
         jib_ast::Expression::Rmw(_, _, _) => todo!(),
-        jib_ast::Expression::Field(expression, (ident, _)) => boom::Expression::Field {
+        jib_ast::Expression::Field(expression, ident) => boom::Expression::Field {
             expression: Box::new(convert_expression(expression)),
             field: ident.as_interned(),
         },
@@ -286,7 +286,7 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
             name: ident.as_interned(),
             fields: fields
                 .iter()
-                .map(|((ident, _), value)| boom::NamedValue {
+                .map(|(ident, value)| boom::NamedValue {
                     name: ident.as_interned(),
                     value: convert_value(value),
                 })
@@ -298,7 +298,7 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
             identifier: ctor.as_interned(),
             types: unifiers.iter().map(convert_type).collect(),
         },
-        jib_ast::Value::CtorUnwrap(value, (ctor, unifiers), _) => boom::Value::CtorUnwrap {
+        jib_ast::Value::CtorUnwrap(value, ctor, unifiers, _) => boom::Value::CtorUnwrap {
             value: (convert_value(value)),
             identifier: ctor.as_interned(),
             types: unifiers.iter().map(convert_type).collect(),
@@ -346,10 +346,11 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
                 jib_ast::Op::Sslice(_) => todo!(),
                 jib_ast::Op::SetSlice => todo!(),
                 jib_ast::Op::Replicate(_) => todo!(),
+                jib_ast::Op::ListIsEmpty => todo!(),
             };
             boom::Value::Operation(op)
         }
-        jib_ast::Value::Field(value, (ident, _)) => boom::Value::Field {
+        jib_ast::Value::Field(value, ident) => boom::Value::Field {
             value: (convert_value(value)),
             field_name: ident.as_interned(),
         },
@@ -358,13 +359,9 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
 
 fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
     Rc::new(RefCell::new(match literal {
-        jib_ast::Vl::Bits(bits, is_big_endian) => {
-            let bits = if *is_big_endian {
-                bits.iter().rev().map(convert_bit).collect()
-            } else {
-                bits.iter().map(convert_bit).collect()
-            };
-            boom::Literal::Bits(bits)
+        jib_ast::Vl::Bits(bits) => {
+            // todo: this may need a `.rev`
+            boom::Literal::Bits(bits.iter().map(convert_bit).collect())
         }
         jib_ast::Vl::Bit(bit) => boom::Literal::Bit(convert_bit(bit)),
         jib_ast::Vl::Bool(b) => boom::Literal::Bool(*b),
@@ -372,7 +369,6 @@ fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
         jib_ast::Vl::Int(bigint) => boom::Literal::Int(bigint.0.clone()),
         jib_ast::Vl::String(s) => boom::Literal::String(*s),
         jib_ast::Vl::Real(_) => todo!(),
-        jib_ast::Vl::EmptyList => todo!(),
         jib_ast::Vl::Enum(_) => todo!(),
         jib_ast::Vl::Ref(s) => boom::Literal::Reference(*s),
         jib_ast::Vl::Undefined => todo!(),

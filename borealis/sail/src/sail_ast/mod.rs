@@ -595,7 +595,7 @@ pub struct Order {
 }
 
 impl Walkable for Order {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
+    fn walk<V: Visitor>(&self, _: &mut V) {
         // leaf
     }
 }
@@ -1286,10 +1286,7 @@ impl Walkable for TypQuant {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct PatternExpressionFunctionClause {
-    pub inner: PatternMatch,
-}
+type PatternExpressionFunctionClause = PatternMatch;
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct MappingPatternExpression {
@@ -1399,7 +1396,7 @@ impl Walkable for IndexRange {
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct TypeUnion {
     pub inner: TypeUnionAux,
-    pub location: Location,
+    pub annotation: DefinitionAnnotation,
 }
 
 impl Walkable for TypeUnion {
@@ -1544,18 +1541,16 @@ pub enum SubstitutionAux {
 }
 
 /// Outcome declaration
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum OutcomeSpecificationAux {
-    Outcome(Identifier, TypeScheme, LinkedList<KindedIdentifier>),
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct OutcomeSpecificationAux {
+    id: Identifier,
+    typschm: TypeScheme,
+    kids: LinkedList<KindedIdentifier>,
 }
 
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum InstantiationSpecificationAux {
-    Id(Identifier),
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct InstantiationSpecificationAux {
+    id: Identifier,
 }
 
 /// Value type specification
@@ -1568,11 +1563,9 @@ pub struct ValueSpecificationAux {
 }
 
 /// Default kinding or typing assumption
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum DefaultSpecAux {
-    Order(Order),
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct DefaultSpecAux {
+    order: Order,
 }
 
 /// Function and type union definitions that can be spread across a file. Each
@@ -1605,11 +1598,11 @@ pub enum ScatteredDefinitionAux {
 }
 
 /// Register declarations
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum DecSpecAux {
-    Register(Typ, Identifier, Option<Expression>),
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct DecSpecAux {
+    typ: Typ,
+    id: Identifier,
+    exp: Option<Expression>,
 }
 
 /// Optional default value for indexed vectors
@@ -1623,11 +1616,9 @@ pub enum OptionalDefaultAux {
     Dec(Expression),
 }
 
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum ImplDefintionAux {
-    Impl(FunctionClause),
+#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+pub struct ImplDefintionAux {
+    inner: FunctionClause,
 }
 
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
@@ -1746,9 +1737,7 @@ pub struct InstantiationSpecification {
 
 impl Walkable for InstantiationSpecification {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            InstantiationSpecificationAux::Id(id) => visitor.visit_identifier(id),
-        }
+        visitor.visit_identifier(&self.inner.id);
     }
 }
 
@@ -1772,9 +1761,7 @@ pub struct DefaultSpec {
 
 impl Walkable for DefaultSpec {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            DefaultSpecAux::Order(order) => visitor.visit_order(order),
-        }
+        visitor.visit_order(&self.inner.order)
     }
 }
 
@@ -1839,15 +1826,11 @@ pub struct DecSpec {
 
 impl Walkable for DecSpec {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            DecSpecAux::Register(typ, ident, exp) => {
-                visitor.visit_typ(typ);
-                visitor.visit_identifier(ident);
-                match exp {
-                    Some(exp) => visitor.visit_expression(exp),
-                    None => (),
-                }
-            }
+        visitor.visit_typ(&self.inner.typ);
+        visitor.visit_identifier(&self.inner.id);
+        match &self.inner.exp {
+            Some(exp) => visitor.visit_expression(exp),
+            None => (),
         }
     }
 }
@@ -2007,7 +1990,7 @@ impl Walkable for Definition {
 #[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
 pub struct Ast {
     pub defs: LinkedList<Definition>,
-    pub comments: LinkedList<CommentRoot>,
+    pub comments: LinkedList<(InternedString, LinkedList<Comment>)>,
 }
 
 impl Walkable for Ast {
@@ -2015,27 +1998,9 @@ impl Walkable for Ast {
         self.defs.iter().for_each(|d| visitor.visit_definition(d));
         self.comments
             .iter()
-            .for_each(|c| visitor.visit_comment_root(c));
-    }
-}
-
-#[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
-)]
-pub enum CommentType {
-    Block,
-    Line,
-}
-
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct CommentRoot {
-    pub path: InternedString,
-    pub comments: LinkedList<Comment>,
-}
-
-impl Walkable for CommentRoot {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        self.comments.iter().for_each(|c| visitor.visit_comment(c))
+            .map(|(_, cs)| cs)
+            .flatten()
+            .for_each(|c| visitor.visit_comment(c));
     }
 }
 
@@ -2052,4 +2017,12 @@ impl Walkable for Comment {
     fn walk<V: Visitor>(&self, _: &mut V) {
         // leaf node
     }
+}
+
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf, IntoStaticStr,
+)]
+pub enum CommentType {
+    Block,
+    Line,
 }
