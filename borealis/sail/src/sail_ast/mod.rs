@@ -7,7 +7,7 @@ use {
     crate::{
         num::{BigInt, Num},
         sail_ast::visitor::{Visitor, Walkable},
-        types::{KindIdentifierInner, Position},
+        types::Position,
     },
     common::{intern::InternedString, HashMap},
     deepsize::DeepSizeOf,
@@ -88,11 +88,11 @@ pub enum Location {
     /// Unknown location
     Unknown,
     /// Unique location
-    Unique(Int, Box<Location>),
+    Unique(Int, Box<Self>),
     /// Generated location
-    Generated(Box<Location>),
+    Generated(Box<Self>),
     /// Hint
-    Hint(InternedString, Box<Location>, Box<Location>),
+    Hint(InternedString, Box<Self>, Box<Self>),
     /// Range between two positions
     Range(Position, Position),
 }

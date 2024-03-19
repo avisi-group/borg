@@ -20,6 +20,7 @@
         "sail-arm/arm-v9.4-a/src/decode_end.sail",
         "sail-arm/arm-v9.4-a/src/map_clauses.sail",
         "sail-arm/arm-v9.4-a/src/event_clauses.sail",
-        "sail-arm/arm-v9.4-a/src/stubs.sail"
+        "sail-arm/arm-v9.4-a/src/stubs.sail",
+        "sail-arm/arm-v9.4-a/src/elfmain.sail"
     ]
 }

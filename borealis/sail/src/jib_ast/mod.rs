@@ -146,8 +146,8 @@ pub enum Value {
     Lit(Vl, Type),
     Tuple(LinkedList<Self>, Type),
     Struct(LinkedList<(Identifier, Self)>, Type),
-    CtorKind(Box<Self>, Identifier, LinkedList<Type>, Type),
-    CtorUnwrap(Box<Self>, Identifier, LinkedList<Type>, Type),
+    CtorKind(Box<Self>, (Identifier, LinkedList<Type>), Type),
+    CtorUnwrap(Box<Self>, (Identifier, LinkedList<Type>), Type),
     TupleMember(Box<Self>, Int, Int),
     Call(Op, LinkedList<Self>),
     Field(Box<Self>, Identifier),
@@ -174,12 +174,12 @@ impl Walkable for Value {
                 });
                 visitor.visit_type(typ);
             }
-            Self::CtorKind(value, _, types, typ) => {
+            Self::CtorKind(value, (_, types), typ) => {
                 visitor.visit_value(value);
                 types.iter().for_each(|typ| visitor.visit_type(typ));
                 visitor.visit_type(typ)
             }
-            Self::CtorUnwrap(value, _, types, typ) => {
+            Self::CtorUnwrap(value, (_, types), typ) => {
                 visitor.visit_value(value);
                 types.iter().for_each(|typ| visitor.visit_type(typ));
                 visitor.visit_type(typ)
@@ -293,8 +293,7 @@ pub enum InstructionAux {
     Funcall(
         Expression,
         bool,
-        Identifier,
-        LinkedList<Type>,
+        (Identifier, LinkedList<Type>),
         LinkedList<Value>,
     ),
     Copy(Expression, Value),
@@ -339,7 +338,7 @@ impl Walkable for Instruction {
             InstructionAux::Jump(value, _) => visitor.visit_value(value),
             InstructionAux::Goto(_) => {}
             InstructionAux::Label(_) => {}
-            InstructionAux::Funcall(expression, _, _, parameter_types, parameters) => {
+            InstructionAux::Funcall(expression, _, (_, parameter_types), parameters) => {
                 visitor.visit_expression(expression);
                 parameter_types
                     .iter()

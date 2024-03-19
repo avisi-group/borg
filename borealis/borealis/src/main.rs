@@ -6,6 +6,7 @@ use {
     },
     clap::{Parser, Subcommand},
     color_eyre::eyre::{Result, WrapErr},
+    deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::info,
     lz4_flex::frame::{BlockMode, FrameEncoder as Lz4Encoder, FrameInfo},
@@ -96,6 +97,9 @@ fn main() -> Result<()> {
             standalone,
         } => {
             let (ast, jib) = load_sail(input)?;
+
+            dbg!(ast.deep_size_of());
+            dbg!(jib.deep_size_of());
 
             info!("Converting Sail model to brig module");
             let mut writer = File::create(output)?;

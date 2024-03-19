@@ -210,7 +210,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         }],
         jib_ast::InstructionAux::Goto(s) => vec![boom::Statement::Goto(*s)],
         jib_ast::InstructionAux::Label(s) => vec![boom::Statement::Label(*s)],
-        jib_ast::InstructionAux::Funcall(expression, _, name, _, args) => {
+        jib_ast::InstructionAux::Funcall(expression, _, (name, _), args) => {
             vec![boom::Statement::FunctionCall {
                 expression: Some(convert_expression(expression)),
                 name: name.as_interned(),
@@ -293,16 +293,21 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
                 .collect(),
         },
         jib_ast::Value::Struct(_, _) => panic!("encountered struct with non-struct type"),
-        jib_ast::Value::CtorKind(value, ctor, unifiers, _) => boom::Value::CtorKind {
-            value: (convert_value(value)),
-            identifier: ctor.as_interned(),
-            types: unifiers.iter().map(convert_type).collect(),
-        },
-        jib_ast::Value::CtorUnwrap(value, ctor, unifiers, _) => boom::Value::CtorUnwrap {
-            value: (convert_value(value)),
-            identifier: ctor.as_interned(),
-            types: unifiers.iter().map(convert_type).collect(),
-        },
+        jib_ast::Value::CtorKind(value, unifiers, _) => {
+            todo!()
+            // boom::Value::CtorKind {
+            // value: (convert_value(value)),
+            // identifier: ctor.as_interned(),
+            // types: unifiers.iter().map(convert_type).collect(),
+        }
+        jib_ast::Value::CtorUnwrap(value, unifiers, _) => {
+            todo!()
+            //     boom::Value::CtorUnwrap {
+            //     value: (convert_value(value)),
+            //     identifier: ctor.as_interned(),
+            //     types: unifiers.iter().map(convert_type).collect(),
+            // }
+        }
         jib_ast::Value::TupleMember(_, _, _) => todo!(),
         jib_ast::Value::Call(op, values) => {
             let values = values.iter().map(convert_value).collect::<Vec<_>>();

@@ -241,7 +241,7 @@ impl Visitor for JibPrettyPrinter {
                 self.visit_name(name);
                 println!(")");
             }
-            InstructionAux::Funcall(exp, _, name, _, args) => {
+            InstructionAux::Funcall(exp, _, (name, _), args) => {
                 self.prindent("");
                 self.visit_expression(exp);
                 print!(" = {}(", name.as_interned());
@@ -347,12 +347,12 @@ impl Visitor for JibPrettyPrinter {
                 self.prindentln("}")
             }
             Value::Struct(_, _) => panic!("encountered struct with non-struct type"),
-            Value::CtorKind(f, ctor, unifiers, _) => {
+            Value::CtorKind(f, (ctor, unifiers), _) => {
                 self.visit_value(f);
                 print!(" is ");
                 self.print_uid(ctor, unifiers);
             }
-            Value::CtorUnwrap(f, ctor, unifiers, _) => {
+            Value::CtorUnwrap(f, (ctor, unifiers), _) => {
                 self.visit_value(f);
                 print!(" as ");
                 self.print_uid(ctor, unifiers);
