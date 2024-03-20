@@ -16,7 +16,7 @@ use {
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
-    sail::jib_ast::Definition,
+    sailrs::jib_ast::Definition,
     std::{cell::RefCell, rc::Rc},
 };
 

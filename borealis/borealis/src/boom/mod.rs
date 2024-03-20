@@ -13,7 +13,7 @@ use {
     common::{intern::InternedString, shared_key::SharedKey, HashMap, HashSet},
     kinded::Kinded,
     num_bigint::BigInt,
-    sail::jib_ast,
+    sailrs::jib_ast,
     std::{cell::RefCell, fmt::Debug, ops::Add, rc::Rc},
 };
 

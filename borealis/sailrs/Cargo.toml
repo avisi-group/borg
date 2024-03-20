@@ -1,5 +1,5 @@
 [package]
-name = "sail"
+name = "sailrs"
 version = "0.1.1"
 edition = "2021"
 authors = ["AVISI Research Group"]
@@ -21,11 +21,8 @@ deepsize = "0.2.0"
 num-bigint = { version = "0.4.4", features = ["serde"] }
 serde_json = "1.0.114"
 strum = { version = "0.26.2", features = ["derive"] }
-phf = { version = "0.11.2", features = ["macros"] }
 regex = "1.10.3"
-
 color-eyre = { version = "0.6.2", default-features = false }
-pretty_assertions = "1.4.0"
 clap = { version = "4.5.2", features = ["derive"] }
 rkyv = {version = "0.7.44", default-features = false, features = ["std", "alloc", "size_64"] }
 
@@ -35,6 +32,5 @@ color-eyre = "0.6.2"
 
 [dev-dependencies]
 color-eyre = { version = "0.6.2", default-features = false }
-insta = { version = "1.36.1", features = ["json", "filters"] }
 proptest = "1.4.0"
 serde_json = "1.0.114"

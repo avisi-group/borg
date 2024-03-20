@@ -7,7 +7,7 @@ use {
     errctx::PathCtx,
     log::trace,
     rkyv::Deserialize,
-    sail::{jib_ast::Definition, runtime::DEFAULT_RUNTIME_THREAD_STACK_SIZE, types::ListVec},
+    sailrs::{jib_ast::Definition, runtime::DEFAULT_RUNTIME_THREAD_STACK_SIZE, types::ListVec},
     std::{fs::File, io::Write, path::Path, thread},
 };
 
@@ -19,12 +19,16 @@ pub mod rust;
 pub fn run<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O, standalone: bool) {
     let jib = load_model(input);
 
-    let mut writer = File::create(output).unwrap();
     let tokens = sail_to_brig(jib.as_ref(), standalone);
 
     let syntax_tree = syn::parse_file(&tokens.to_string()).unwrap();
+
     let formatted = prettyplease::unparse(&syntax_tree);
-    writer.write_all(formatted.as_bytes()).unwrap();
+
+    File::create(output)
+        .unwrap()
+        .write_all(formatted.as_bytes())
+        .unwrap();
 }
 
 /// Deserializes an AST from an archive.

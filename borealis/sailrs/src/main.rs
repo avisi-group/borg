@@ -5,7 +5,7 @@ use {
     deepsize::DeepSizeOf,
     log::{info, trace},
     rkyv::ser::{serializers::AllocSerializer, Serializer},
-    sail::load_from_config,
+    sailrs::load_from_config,
     std::{io::Write, path::PathBuf},
 };
 
