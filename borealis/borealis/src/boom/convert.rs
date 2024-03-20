@@ -55,15 +55,15 @@ impl BoomEmitter {
                 let def = match type_def {
                     jib_ast::TypeDefinition::Enum(name, variants) => boom::Definition::Enum {
                         name: name.as_interned(),
-                        variants: convert_variants(variants),
+                        variants: todo!(), //convert_variants(variants),
                     },
                     jib_ast::TypeDefinition::Struct(name, fields) => boom::Definition::Struct {
                         name: name.as_interned(),
-                        fields: convert_fields(fields),
+                        fields: todo!(), //convert_fields(fields),
                     },
                     jib_ast::TypeDefinition::Variant(name, fields) => boom::Definition::Union {
                         name: name.as_interned(),
-                        fields: convert_fields(fields),
+                        fields: todo!(), //convert_fields(fields),
                     },
                 };
                 self.ast.definitions.push(def);
@@ -77,7 +77,7 @@ impl BoomEmitter {
                             typ: convert_type(typ),
                         })
                         .collect(),
-                    body: convert_body(body),
+                    body: todo!(), //convert_body(body),
                 });
             }
             jib_ast::Definition::Val(id, _, parameters, out) => {
@@ -108,10 +108,10 @@ impl BoomEmitter {
 
                 let name = name.as_interned();
 
-                let body = convert_body(body);
+                let body = todo!(); //convert_body(body);
 
                 //debug!("building new control flow graph for {name}");
-                let control_flow = build_graph(&body);
+                //  let control_flow = build_graph(&body);
 
                 self.ast.functions.insert(
                     name,
@@ -121,7 +121,7 @@ impl BoomEmitter {
                             parameters,
                             return_type,
                         },
-                        entry_block: control_flow,
+                        entry_block: todo!(), //control_flow,
                     },
                 );
             }
@@ -154,15 +154,15 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
 
         jib_ast::Type::Enum(name, variants) => boom::Type::Enum {
             name: name.as_interned(),
-            variants: convert_variants(variants),
+            variants: todo!(), //convert_variants(variants),
         },
         jib_ast::Type::Struct(name, fields) => boom::Type::Struct {
             name: name.as_interned(),
-            fields: convert_fields(fields),
+            fields: todo!(), //convert_fields(fields),
         },
         jib_ast::Type::Variant(name, fields) => boom::Type::Union {
             name: name.as_interned(),
-            fields: convert_fields(fields),
+            fields: todo!(), //convert_fields(fields),
         },
         jib_ast::Type::Fvector(length, typ) => boom::Type::FixedVector {
             length: *length,
@@ -195,7 +195,7 @@ fn convert_body(
 
 fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom::Statement>>> {
     if let jib_ast::InstructionAux::Block(instructions) = statement {
-        return convert_body(instructions);
+        return todo!(); //convert_body(instructions);
     }
 
     let statements = match statement {
@@ -228,8 +228,8 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         jib_ast::InstructionAux::If(condition, if_body, else_body, _) => {
             vec![boom::Statement::If {
                 condition: convert_value(condition),
-                if_body: convert_body(if_body),
-                else_body: convert_body(else_body),
+                if_body: todo!(),   // convert_body(if_body),
+                else_body: todo!(), //convert_body(else_body),
             }]
         }
 

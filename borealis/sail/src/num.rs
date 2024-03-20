@@ -5,12 +5,28 @@ use {
     crate::ffi::{bigint_to_string, string_to_bigint},
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
-    serde::{Deserialize, Serialize},
+    rkyv::{
+        ser::ScratchSpace,
+        vec::{ArchivedVec, VecResolver},
+        Fallible,
+    },
     std::str::FromStr,
 };
 
 /// Arbitrary precision number from `Num.num` OCaml type
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub enum Num {
     /// Integer
     Int(Int),
@@ -20,8 +36,31 @@ pub enum Num {
     Ratio(Ratio),
 }
 
+/// Ratio of big integers from `num.Ratio.ratio` OCaml type
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub struct Ratio {
+    /// Numerator
+    pub numerator: BigInt,
+    /// Denominator
+    pub denominator: BigInt,
+    /// Normalized
+    pub normalized: bool,
+}
+
 /// Signed big integer from `Nat_big_num.num` OCaml type
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BigInt(pub num_bigint::BigInt);
 
 unsafe impl FromValue for BigInt {
@@ -47,15 +86,30 @@ impl DeepSizeOf for BigInt {
     }
 }
 
-/// Ratio of big integers from `num.Ratio.ratio` OCaml type
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
-pub struct Ratio {
-    /// Numerator
-    pub numerator: BigInt,
-    /// Denominator
-    pub denominator: BigInt,
-    /// Normalized
-    pub normalized: bool,
+impl rkyv::Archive for BigInt {
+    type Archived = ArchivedVec<u8>;
+
+    type Resolver = VecResolver;
+
+    unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
+        ArchivedVec::resolve_from_slice(self.0.to_signed_bytes_be().as_slice(), pos, resolver, out);
+    }
+}
+
+impl<S: Fallible + ScratchSpace + rkyv::ser::Serializer> rkyv::Serialize<S> for BigInt {
+    fn serialize(
+        &self,
+        serializer: &mut S,
+    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+        ArchivedVec::serialize_from_slice(self.0.to_signed_bytes_be().as_slice(), serializer)
+    }
+}
+
+impl<D: Fallible> rkyv::Deserialize<BigInt, D> for ArchivedVec<u8> {
+    fn deserialize(&self, deserializer: &mut D) -> Result<BigInt, <D as Fallible>::Error> {
+        ArchivedVec::deserialize(&self, deserializer)
+            .map(|digits: Vec<u8>| BigInt(num_bigint::BigInt::from_signed_bytes_be(&digits)))
+    }
 }
 
 #[cfg(test)]

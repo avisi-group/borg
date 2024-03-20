@@ -2,10 +2,9 @@
 //! `parse_ast.ml`, which itself is generated from `l2_parse.ott`.
 
 use {
-    crate::sail_ast::Location,
+    crate::{sail_ast::Location, types::ListVec},
     common::intern::InternedString,
     ocaml::{FromValue, ToValue, Value},
-    std::collections::LinkedList,
     strum::IntoStaticStr,
 };
 
@@ -28,7 +27,7 @@ pub enum Definition {
     Value(Value),
 
     /// Operator overload specifications
-    Overload(Value, LinkedList<Value>),
+    Overload(Value, ListVec<Value>),
 
     /// Fixity declaration
     Fixity(Value, Value, Value),
@@ -37,10 +36,10 @@ pub enum Definition {
     Spec(Value),
 
     /// Top-level outcome definition
-    Outcome(Value, LinkedList<Definition>),
+    Outcome(Value, ListVec<Definition>),
 
     /// Instantiation
-    Instantiation(Value, LinkedList<Value>),
+    Instantiation(Value, ListVec<Value>),
 
     /// Default type and kind assumptions
     Default(Value),
@@ -52,7 +51,7 @@ pub enum Definition {
     Measure(Value, Value, Value),
 
     /// Separate termination measure declaration
-    LoopMeasures(Value, LinkedList<Value>),
+    LoopMeasures(Value, ListVec<Value>),
 
     /// Register declaration
     Register(Value),
@@ -61,5 +60,5 @@ pub enum Definition {
     Pragma(InternedString, InternedString, Location),
 
     /// Internal mutrec
-    Mutual(LinkedList<Value>),
+    Mutual(ListVec<Value>),
 }

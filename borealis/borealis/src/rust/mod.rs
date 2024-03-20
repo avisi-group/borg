@@ -16,19 +16,14 @@ use {
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
-    sail::{jib_ast::Definition, sail_ast},
-    std::{cell::RefCell, collections::LinkedList, rc::Rc},
+    sail::jib_ast::Definition,
+    std::{cell::RefCell, rc::Rc},
 };
 
 mod codegen;
-mod decode;
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig(
-    sail_ast: &sail_ast::Ast,
-    jib_ast: &LinkedList<Definition>,
-    standalone: bool,
-) -> TokenStream {
+pub fn sail_to_brig(jib_ast: &[Definition], standalone: bool) -> TokenStream {
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(jib_ast);
 
@@ -85,8 +80,6 @@ pub fn sail_to_brig(
             }
         }
     };
-
-    let decode_fn = decode::generate_fn(sail_ast, &rudder);
 
     let execute_fns = crate::rust::codegen(rudder);
 
@@ -186,8 +179,6 @@ pub fn sail_to_brig(
         }
 
         #prelude
-
-        #decode_fn
 
         #execute_fns
     }

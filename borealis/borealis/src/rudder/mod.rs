@@ -535,7 +535,8 @@ impl StatementBuilder {
         Self { statements: vec![] }
     }
 
-    /// Builds a new `Statement` from a `StatementKind`, adds it to the builder, and returns it
+    /// Builds a new `Statement` from a `StatementKind`, adds it to the builder,
+    /// and returns it
     pub fn build(&mut self, kind: StatementKind) -> Statement {
         let statement = Statement {
             inner: Rc::new(RefCell::new(StatementInner {

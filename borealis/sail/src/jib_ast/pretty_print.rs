@@ -10,7 +10,6 @@ use {
     },
     common::{intern::InternedString, HashSet},
     std::{
-        collections::LinkedList,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -55,7 +54,7 @@ impl JibPrettyPrinter {
         }
     }
 
-    fn print_uid(&mut self, id: &Identifier, typs: &LinkedList<Type>) {
+    fn print_uid(&mut self, id: &Identifier, typs: &[Type]) {
         print!("{}", id.as_interned());
 
         if !typs.is_empty() {
@@ -283,7 +282,14 @@ impl Visitor for JibPrettyPrinter {
 
                 self.prindentln("}");
             }
-            InstructionAux::Init(_, _, _) => todo!(),
+            InstructionAux::Init(typ, name, value) => {
+                self.prindent(format!("init "));
+                self.visit_type(typ);
+                print!(" ");
+                self.visit_name(name);
+                print!(" ");
+                self.visit_value(value);
+            }
             InstructionAux::Jump(value, s) => {
                 self.prindent(format!("jump {} ", s));
                 self.visit_value(value);
@@ -350,12 +356,12 @@ impl Visitor for JibPrettyPrinter {
             Value::CtorKind(f, (ctor, unifiers), _) => {
                 self.visit_value(f);
                 print!(" is ");
-                self.print_uid(ctor, unifiers);
+                self.print_uid(ctor, unifiers.as_ref());
             }
             Value::CtorUnwrap(f, (ctor, unifiers), _) => {
                 self.visit_value(f);
                 print!(" as ");
-                self.print_uid(ctor, unifiers);
+                self.print_uid(ctor, unifiers.as_ref());
             }
             Value::TupleMember(_, _, _) => todo!(),
             Value::Field(value, ident) => {

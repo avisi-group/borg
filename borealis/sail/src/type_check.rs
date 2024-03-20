@@ -4,11 +4,12 @@ use {
     crate::{
         ffi::{bindings_to_list, effectset_elements, effectset_of_list, list_to_bindings},
         sail_ast::{Identifier, Mut, Typ, TypQuant, TypeUnion},
+        types::ListVec,
     },
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Runtime, ToValue, Value},
     serde::{Deserialize, Serialize},
-    std::{collections::LinkedList, fmt::Debug},
+    std::fmt::Debug,
 };
 
 /// Env type as can be automatically derived, requires further parsing
@@ -32,10 +33,10 @@ struct RawEnv {
     _records: Value,
     _accessors: Value,
     _externs: Value,
-    casts: LinkedList<Identifier>,
+    casts: ListVec<Identifier>,
     allow_casts: bool,
     allow_bindings: bool,
-    _constraints: LinkedList<Value>,
+    _constraints: ListVec<Value>,
     _default_order: Option<Value>,
     _ret_typ: Option<Value>,
     _poly_undefineds: bool,
@@ -52,27 +53,27 @@ struct RawEnv {
 #[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf)]
 pub struct Env {
     /// Top value specifications
-    pub top_val_specs: LinkedList<(Identifier, (TypQuant, Typ))>,
+    pub top_val_specs: ListVec<(Identifier, (TypQuant, Typ))>,
 
     // defined_val_specs: Value,
     /// Local variables
-    pub locals: LinkedList<(Identifier, (Mut, Typ))>,
+    pub locals: ListVec<(Identifier, (Mut, Typ))>,
 
     // top_letbinds: Value,
     /// Union identifiers
-    pub union_ids: LinkedList<(Identifier, (TypQuant, Typ))>,
+    pub union_ids: ListVec<(Identifier, (TypQuant, Typ))>,
 
     /// Registers
-    //pub registers: LinkedList<(Identifier, (Value, Effect, Typ))>,
+    //pub registers: ListVec<(Identifier, (Value, Effect, Typ))>,
 
     /// Variants
-    pub variants: LinkedList<(Identifier, (TypQuant, LinkedList<TypeUnion>))>,
+    pub variants: ListVec<(Identifier, (TypQuant, ListVec<TypeUnion>))>,
 
     /// Scattered variant environments
     pub scattered_variant_envs: Vec<(Identifier, Env)>,
 
     /// Mappings
-    pub mappings: LinkedList<(Identifier, (TypQuant, Typ, Typ))>,
+    pub mappings: ListVec<(Identifier, (TypQuant, Typ, Typ))>,
 
     // typ_vars: Value,
     // shadow_vars: Value,
@@ -83,7 +84,7 @@ pub struct Env {
     // accessors: Value,
     // externs: Value,
     /// Casts
-    pub casts: LinkedList<Identifier>,
+    pub casts: ListVec<Identifier>,
 
     /// Allow casts
     pub allow_casts: bool,
@@ -91,7 +92,7 @@ pub struct Env {
     /// Allow bindings
     pub allow_bindings: bool,
 
-    // constraints: LinkedList<Value>,
+    // constraints: ListVec<Value>,
     // default_order: Option<Value>,
     // ret_typ: Option<Value>,
     // poly_undefineds: bool,
@@ -113,7 +114,7 @@ unsafe impl FromValue for Env {
                 .unwrap()
                 .unwrap()
         }
-        .into::<LinkedList<(Identifier, Value)>>()
+        .into::<ListVec<(Identifier, Value)>>()
         .into_iter()
         {
             scattered_variant_envs.push((id, Env::from_value(value)));
@@ -166,11 +167,11 @@ pub enum SideEffect {
 #[derive(Debug, Clone)]
 pub struct SideEffectInfo {
     /// Function side effects
-    pub functions: LinkedList<(Identifier, LinkedList<SideEffect>)>,
+    pub functions: ListVec<(Identifier, ListVec<SideEffect>)>,
     /// Letbind side effects
-    pub letbinds: LinkedList<(Identifier, LinkedList<SideEffect>)>,
+    pub letbinds: ListVec<(Identifier, ListVec<SideEffect>)>,
     /// Mapping side effects
-    pub mappings: LinkedList<(Identifier, LinkedList<SideEffect>)>,
+    pub mappings: ListVec<(Identifier, ListVec<SideEffect>)>,
 }
 
 unsafe impl FromValue for SideEffectInfo {
@@ -190,8 +191,8 @@ unsafe impl FromValue for SideEffectInfo {
 fn effectset_bindings_to_list(
     rt: &Runtime,
     value: Value,
-) -> LinkedList<(Identifier, LinkedList<SideEffect>)> {
-    <LinkedList<(Identifier, Value)>>::from_value(
+) -> ListVec<(Identifier, ListVec<SideEffect>)> {
+    <ListVec<(Identifier, Value)>>::from_value(
         unsafe { bindings_to_list(rt, value) }.unwrap().unwrap(),
     )
     .into_iter()
@@ -219,7 +220,7 @@ unsafe impl ToValue for SideEffectInfo {
 
 fn list_to_effectset_bindings(
     rt: &Runtime,
-    list: &LinkedList<(Identifier, LinkedList<SideEffect>)>,
+    list: &ListVec<(Identifier, ListVec<SideEffect>)>,
 ) -> Value {
     let list = list
         .iter()
@@ -231,7 +232,7 @@ fn list_to_effectset_bindings(
                     .unwrap(),
             )
         })
-        .collect::<LinkedList<_>>()
+        .collect::<ListVec<_>>()
         .to_value(rt);
 
     unsafe { list_to_bindings(rt, list) }.unwrap().unwrap()

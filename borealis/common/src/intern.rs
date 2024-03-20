@@ -7,6 +7,10 @@ use {
     once_cell::sync::Lazy,
     proc_macro2::{Ident, Span, TokenStream},
     quote::{ToTokens, TokenStreamExt},
+    rkyv::{
+        string::{ArchivedString, StringResolver},
+        Fallible,
+    },
     std::hash::BuildHasherDefault,
     twox_hash::XxHash64,
 };
@@ -115,5 +119,30 @@ impl DeepSizeOf for InternedString {
 impl ToTokens for InternedString {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.append(Ident::new(self.as_ref(), Span::call_site()));
+    }
+}
+
+impl rkyv::Archive for InternedString {
+    type Archived = ArchivedString;
+
+    type Resolver = StringResolver;
+
+    unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
+        ArchivedString::resolve_from_str(self.as_ref(), pos, resolver, out);
+    }
+}
+
+impl<S: Fallible + rkyv::ser::Serializer> rkyv::Serialize<S> for InternedString {
+    fn serialize(
+        &self,
+        serializer: &mut S,
+    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+        ArchivedString::serialize_from_str(self.as_ref(), serializer)
+    }
+}
+
+impl<D: Fallible> rkyv::Deserialize<InternedString, D> for ArchivedString {
+    fn deserialize(&self, _: &mut D) -> Result<InternedString, <D as Fallible>::Error> {
+        Ok(InternedString::from(self.as_str()))
     }
 }

@@ -181,7 +181,8 @@ impl BuildContext {
             boom::Type::List { .. } => todo!(),
             boom::Type::Vector { element_type } => {
                 let element_type = (*self.resolve_type(element_type.clone())).clone();
-                // todo: Brian Campbell said the Sail C backend had functionality to staticize all bitvector lengths
+                // todo: Brian Campbell said the Sail C backend had functionality to staticize
+                // all bitvector lengths
                 Rc::new(element_type.vectorize(None))
             }
             boom::Type::FixedVector {
@@ -850,8 +851,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     panic!("{ident} not local var or register");
                 }
 
-                // if value is register, find reg name + offset emit read_register
-                // if value is local variable, emit read_variable with Some(offset)
+                // if value is register, find reg name + offset emit
+                // read_register if value is local variable,
+                // emit read_variable with Some(offset)
             }
             boom::Value::CtorKind { .. } => todo!(),
             boom::Value::CtorUnwrap { .. } => todo!(),

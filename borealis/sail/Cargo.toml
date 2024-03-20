@@ -24,6 +24,11 @@ strum = { version = "0.26.2", features = ["derive"] }
 phf = { version = "0.11.2", features = ["macros"] }
 regex = "1.10.3"
 
+color-eyre = { version = "0.6.2", default-features = false }
+pretty_assertions = "1.4.0"
+clap = { version = "4.5.2", features = ["derive"] }
+rkyv = {version = "0.7.44", default-features = false, features = ["std", "alloc", "size_64"] }
+
 [build-dependencies]
 cc = "1.0.90"
 color-eyre = "0.6.2"

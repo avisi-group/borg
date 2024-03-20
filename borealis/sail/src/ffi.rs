@@ -3,18 +3,17 @@
 //! Imported OCaml functions
 
 use {
-    crate::{error::WrapperError, num::BigInt},
+    crate::{error::WrapperError, num::BigInt, types::ListVec},
     ocaml::Value,
-    std::collections::LinkedList,
 };
 
 ocaml::import! {
-    pub fn run_sail(filepaths: LinkedList<String>) -> Result<(Value, Value, Value), WrapperError>;
+    pub fn run_sail(filepaths: ListVec<String>) -> Result<(Value, Value, Value), WrapperError>;
 
     pub fn generate_jib(ast: Value, effect_info: Value, env: Value) -> Result<Value, WrapperError>;
 
     // Utility
-    pub fn util_dedup(l: LinkedList<i32>) -> Result<LinkedList<i32>, WrapperError>;
+    pub fn util_dedup(l: ListVec<i32>) -> Result<ListVec<i32>, WrapperError>;
     pub fn bindings_to_list(input: Value) -> Result<Value, WrapperError>;
     pub fn list_to_bindings(input: Value) -> Result<Value, WrapperError>;
     pub fn effectset_elements(input: Value) -> Result<Value, WrapperError>;

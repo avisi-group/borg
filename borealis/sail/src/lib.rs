@@ -9,10 +9,11 @@ use {
         json::ModelConfig,
         runtime::RT,
         sail_ast::Ast,
+        types::ListVec,
     },
     log::trace,
     ocaml::FromValue,
-    std::{collections::LinkedList, path::Path},
+    std::path::Path,
 };
 
 pub mod error;
@@ -31,7 +32,7 @@ pub mod types;
 /// Parses supplied Sail files and returns the AST
 pub fn load_from_config<P: AsRef<Path>>(
     config_path: P,
-) -> Result<(Ast, LinkedList<jib_ast::Definition>), Error> {
+) -> Result<(Ast, ListVec<jib_ast::Definition>), Error> {
     let ModelConfig { files } = ModelConfig::load(config_path.as_ref())?;
 
     RT.lock().execute(move |rt| {
@@ -53,7 +54,7 @@ pub fn load_from_config<P: AsRef<Path>>(
         let ast = Ast::from_value(ast);
 
         trace!("Parsing JIB AST");
-        let jib = LinkedList::<jib_ast::Definition>::from_value(jib);
+        let jib = ListVec::<jib_ast::Definition>::from_value(jib);
 
         Ok((ast, jib))
     })?

@@ -10,19 +10,32 @@ use {
         jib_ast::visitor::{Visitor, Walkable},
         num::BigInt,
         sail_ast::{Identifier, KindIdentifier, Location},
+        types::ListVec,
     },
     common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
-    serde::{Deserialize, Serialize},
-    std::collections::LinkedList,
 };
 
 pub mod pretty_print;
 pub mod visitor;
 
 /// C type
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
+
 pub enum Type {
     Lint,
     Fint(Int),
@@ -37,14 +50,14 @@ pub enum Type {
     Real,
     Float(Int),
     RoundingMode,
-    Tup(LinkedList<Self>),
-    Enum(Identifier, LinkedList<Identifier>),
-    Struct(Identifier, LinkedList<(Identifier, Self)>),
-    Variant(Identifier, LinkedList<(Identifier, Self)>),
-    Fvector(Int, Box<Self>),
-    Vector(Box<Self>),
-    List(Box<Self>),
-    Ref(Box<Self>),
+    Tup(#[omit_bounds] ListVec<Self>),
+    Enum(Identifier, ListVec<Identifier>),
+    Struct(Identifier, #[omit_bounds] ListVec<(Identifier, Self)>),
+    Variant(Identifier, #[omit_bounds] ListVec<(Identifier, Self)>),
+    Fvector(Int, #[omit_bounds] Box<Self>),
+    Vector(#[omit_bounds] Box<Self>),
+    List(#[omit_bounds] Box<Self>),
+    Ref(#[omit_bounds] Box<Self>),
     Poly(KindIdentifier),
 }
 
@@ -80,7 +93,19 @@ impl Walkable for Type {
 }
 
 /// Name
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub enum Name {
     Name(Identifier, Int),
     Global(Identifier, Int),
@@ -98,7 +123,19 @@ impl Walkable for Name {
 
 /// Operation
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub enum Op {
     Bnot,
     Bor,
@@ -140,17 +177,30 @@ impl Walkable for Op {
 
 /// C value
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
 pub enum Value {
     Id(Name, Type),
     Lit(Vl, Type),
-    Tuple(LinkedList<Self>, Type),
-    Struct(LinkedList<(Identifier, Self)>, Type),
-    CtorKind(Box<Self>, (Identifier, LinkedList<Type>), Type),
-    CtorUnwrap(Box<Self>, (Identifier, LinkedList<Type>), Type),
-    TupleMember(Box<Self>, Int, Int),
-    Call(Op, LinkedList<Self>),
-    Field(Box<Self>, Identifier),
+    Tuple(#[omit_bounds] ListVec<Self>, Type),
+    Struct(#[omit_bounds] ListVec<(Identifier, Self)>, Type),
+    CtorKind(#[omit_bounds] Box<Self>, (Identifier, ListVec<Type>), Type),
+    CtorUnwrap(#[omit_bounds] Box<Self>, (Identifier, ListVec<Type>), Type),
+    TupleMember(#[omit_bounds] Box<Self>, Int, Int),
+    Call(Op, #[omit_bounds] ListVec<Self>),
+    Field(#[omit_bounds] Box<Self>, Identifier),
 }
 
 impl Walkable for Value {
@@ -196,7 +246,19 @@ impl Walkable for Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub enum BitU {
     B0,
     B1,
@@ -205,9 +267,21 @@ pub enum BitU {
 
 /// Value2.vl
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub enum Vl {
-    Bits(LinkedList<BitU>),
+    Bits(ListVec<BitU>),
     Bit(BitU),
     Bool(bool),
     Unit,
@@ -227,13 +301,26 @@ impl Walkable for Vl {
 
 /// clexp?
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
 pub enum Expression {
     Id(Name, Type),
     Rmw(Name, Name, Type),
-    Field(Box<Self>, Identifier),
-    Addr(Box<Self>),
-    Tuple(Box<Self>, Int),
+    Field(#[omit_bounds] Box<Self>, Identifier),
+    Addr(#[omit_bounds] Box<Self>),
+    Tuple(#[omit_bounds] Box<Self>, Int),
     Void,
 }
 
@@ -263,11 +350,23 @@ type InstructionAnnotation = (Int, Location);
 
 /// C type definition
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub enum TypeDefinition {
-    Enum(Identifier, LinkedList<Identifier>),
-    Struct(Identifier, LinkedList<(Identifier, Type)>),
-    Variant(Identifier, LinkedList<(Identifier, Type)>),
+    Enum(Identifier, ListVec<Identifier>),
+    Struct(Identifier, ListVec<(Identifier, Type)>),
+    Variant(Identifier, ListVec<(Identifier, Type)>),
 }
 
 impl Walkable for TypeDefinition {
@@ -283,7 +382,20 @@ impl Walkable for TypeDefinition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
 pub enum InstructionAux {
     Decl(Type, Name),
     Init(Type, Name, Value),
@@ -293,8 +405,8 @@ pub enum InstructionAux {
     Funcall(
         Expression,
         bool,
-        (Identifier, LinkedList<Type>),
-        LinkedList<Value>,
+        (Identifier, ListVec<Type>),
+        ListVec<Value>,
     ),
     Copy(Expression, Value),
     Clear(Type, Name),
@@ -303,12 +415,12 @@ pub enum InstructionAux {
     End(Name),
     If(
         Value,
-        LinkedList<Instruction>,
-        LinkedList<Instruction>,
+        #[omit_bounds] ListVec<Instruction>,
+        #[omit_bounds] ListVec<Instruction>,
         Type,
     ),
-    Block(LinkedList<Instruction>),
-    TryBlock(LinkedList<Instruction>),
+    Block(#[omit_bounds] ListVec<Instruction>),
+    TryBlock(#[omit_bounds] ListVec<Instruction>),
     Throw(Value),
     Comment(InternedString),
     Raw(InternedString),
@@ -317,7 +429,19 @@ pub enum InstructionAux {
     Reinit(Type, Name, Value),
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub struct Instruction {
     pub inner: InstructionAux,
     pub annot: InstructionAnnotation,
@@ -387,20 +511,32 @@ impl Walkable for Instruction {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
 pub enum Definition {
-    Register(Identifier, Type, LinkedList<Instruction>),
+    Register(Identifier, Type, ListVec<Instruction>),
     Type(TypeDefinition),
-    Let(Int, LinkedList<(Identifier, Type)>, LinkedList<Instruction>),
-    Val(Identifier, Option<InternedString>, LinkedList<Type>, Type),
+    Let(Int, ListVec<(Identifier, Type)>, ListVec<Instruction>),
+    Val(Identifier, Option<InternedString>, ListVec<Type>, Type),
     Fundef(
         Identifier,
         Option<Identifier>,
-        LinkedList<Identifier>,
-        LinkedList<Instruction>,
+        ListVec<Identifier>,
+        ListVec<Instruction>,
     ),
-    Startup(Identifier, LinkedList<Instruction>),
-    Finish(Identifier, LinkedList<Instruction>),
+    Startup(Identifier, ListVec<Instruction>),
+    Finish(Identifier, ListVec<Instruction>),
     Pragma(InternedString, InternedString),
 }
 

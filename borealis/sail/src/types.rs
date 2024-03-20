@@ -4,15 +4,25 @@ use {
     common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
-    serde::{Deserialize, Serialize},
-    std::{ffi::OsStr, fmt::Display, path::PathBuf},
+    std::{collections::LinkedList, ffi::OsStr, fmt::Display, path::PathBuf, slice, vec},
 };
 
 /// Kind identifier
 ///
 /// In the Sail AST kind identifiers are strings, but they are invalid Rust
 /// `String`s and so are represented here as a `Vec<u8>`.
-#[derive(Debug, Clone, Serialize, Deserialize, DeepSizeOf, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Deserialize,
+    rkyv::Serialize,
+    DeepSizeOf,
+    PartialEq,
+    Eq,
+)]
 pub struct KindIdentifierInner(Vec<u8>);
 
 unsafe impl FromValue for KindIdentifierInner {
@@ -31,7 +41,19 @@ unsafe impl ToValue for KindIdentifierInner {
 ///
 /// Can be converted from `Lexing.position` value <https://v2.ocaml.org/api/Lexing.html>.
 
-#[derive(Debug, Clone, FromValue, ToValue, PartialEq, Serialize, Deserialize, DeepSizeOf)]
+#[derive(
+    Debug,
+    Clone,
+    FromValue,
+    ToValue,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Deserialize,
+    rkyv::Serialize,
+    DeepSizeOf,
+)]
 pub struct Position {
     /// File name
     pub pos_fname: InternedString,
@@ -55,5 +77,60 @@ impl Display for Position {
             self.pos_lnum,
             self.pos_cnum - self.pos_bol
         )
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Deserialize,
+    rkyv::Serialize,
+    DeepSizeOf,
+)]
+/// `Vec` wrapper for converting OCaml linked lists into Rust `Vec`.
+pub struct ListVec<T>(Vec<T>);
+
+impl<T> ListVec<T> {
+    /// Returns an iterator over the inner `Vec`.
+    pub fn iter(&self) -> slice::Iter<T> {
+        self.0.iter()
+    }
+}
+
+impl<T> IntoIterator for ListVec<T> {
+    type Item = T;
+
+    type IntoIter = vec::IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<T> FromIterator<T> for ListVec<T> {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(Vec::from_iter(iter))
+    }
+}
+
+impl<T> AsRef<[T]> for ListVec<T> {
+    fn as_ref(&self) -> &[T] {
+        self.0.as_ref()
+    }
+}
+
+unsafe impl<T: FromValue> FromValue for ListVec<T> {
+    fn from_value(v: Value) -> Self {
+        Self(LinkedList::from_value(v).into_iter().collect())
+    }
+}
+
+unsafe impl<T: ToValue> ToValue for ListVec<T> {
+    fn to_value(&self, rt: &ocaml::Runtime) -> Value {
+        self.0.iter().collect::<LinkedList<_>>().to_value(rt)
     }
 }
