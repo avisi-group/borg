@@ -191,21 +191,7 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
         .functions
         .clone()
         .into_iter()
-        .filter(|(k, _)| {
-            [
-                "integer_arithmetic_addsub_immediate_decode",
-                "u__id",
-                "ReservedValue",
-                "u__PostDecode",
-                "integer_arithmetic_addsub_immediate",
-                "aget_X",
-                "AddWithCarry",
-                "u__GetSlice_int",
-                "IsZero",
-                "aset_X",
-            ]
-            .contains(&k.as_ref())
-        })
+        .filter(|(k, _)| [].contains(&k.as_ref()))
         .collect();
     ast.borrow_mut().functions = funcs;
 }

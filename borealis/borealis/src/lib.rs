@@ -2,13 +2,17 @@
 
 use {
     crate::rust::sail_to_brig,
-    common::intern::INTERNER,
+    common::{
+        bytes,
+        intern::{init_interner, interner},
+        HashMap,
+    },
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::trace,
     rkyv::Deserialize,
-    sailrs::{jib_ast::Definition, runtime::DEFAULT_RUNTIME_THREAD_STACK_SIZE, types::ListVec},
-    std::{fs::File, io::Write, path::Path, thread},
+    sailrs::{jib_ast::Definition, types::ListVec},
+    std::{fs::File, io::Write, path::Path},
 };
 
 pub mod boom;
@@ -22,7 +26,6 @@ pub fn run<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O, standalone: bool
     let tokens = sail_to_brig(jib.as_ref(), standalone);
 
     let syntax_tree = syn::parse_file(&tokens.to_string()).unwrap();
-
     let formatted = prettyplease::unparse(&syntax_tree);
 
     File::create(output)
@@ -39,29 +42,22 @@ fn load_model<P: AsRef<Path>>(path: P) -> ListVec<Definition> {
     let file = File::open(&path).map_err(PathCtx::f(&path)).unwrap();
     let mmap = unsafe { memmap2::Mmap::map(&file) }.unwrap();
 
-    let thread = thread::Builder::new().stack_size(DEFAULT_RUNTIME_THREAD_STACK_SIZE);
+    trace!("deserializing");
 
-    let handle = thread
-        .spawn(move || {
-            trace!("deserializing");
-            let jib = unsafe { rkyv::archived_root::<ListVec<Definition>>(&mmap) }
-                .deserialize(&mut rkyv::Infallible)
-                .unwrap();
-            trace!("done");
-            jib
-        })
-        .map_err(PathCtx::f(&path))
-        .unwrap();
+    let (jib, strs): (ListVec<Definition>, _) =
+        unsafe { rkyv::archived_root::<(ListVec<Definition>, HashMap<String, u32>)>(&mmap) }
+            .deserialize(&mut rkyv::Infallible)
+            .unwrap();
 
-    let jib: ListVec<Definition> = handle
-        .join()
-        .expect("Failed to join on deserializing thread");
+    trace!("initializing interner");
 
-    trace!("JIB size: {} bytes", jib.deep_size_of());
+    init_interner(&strs);
+
+    trace!("JIB size: {:.}", bytes(jib.deep_size_of()));
     trace!(
-        "INTERNER size: {} bytes, {} strings",
-        INTERNER.current_memory_usage(),
-        INTERNER.len()
+        "INTERNER size: {:.}, {} strings",
+        bytes(interner().current_memory_usage()),
+        interner().len()
     );
 
     jib

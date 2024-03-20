@@ -1,7 +1,11 @@
 use {
     clap::Parser,
     color_eyre::Result,
-    common::{bytes, create_file, init_logger, intern::INTERNER},
+    common::{
+        bytes, create_file, init_logger,
+        intern::{get_interner_state, init_interner, interner},
+        HashMap,
+    },
     deepsize::DeepSizeOf,
     log::{info, trace},
     rkyv::ser::{serializers::AllocSerializer, Serializer},
@@ -30,9 +34,13 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     // set up the logger, defaulting to no output if the CLI flag was not supplied
-    init_logger(args.log.as_deref().unwrap_or(""))?;
+    init_logger(args.log.as_deref().unwrap_or("info"))?;
+
+    init_interner(&HashMap::default());
 
     let (ast, jib) = load_from_config(args.input)?;
+
+    sailrs::jib_ast::pretty_print::print_ast(jib.iter());
 
     trace!(
         "Size: AST {:.2} bytes, JIB {:.2} bytes",
@@ -41,15 +49,19 @@ fn main() -> Result<()> {
     );
     trace!(
         "INTERNER size: {:.2} bytes, {} strings",
-        bytes(INTERNER.current_memory_usage()),
-        INTERNER.len()
+        bytes(interner().current_memory_usage()),
+        interner().len()
     );
 
+    let state = (jib, get_interner_state());
+
     info!("serializing");
+
     let mut serializer = AllocSerializer::<0>::default();
-    serializer.serialize_value(&jib).unwrap();
+    serializer.serialize_value(&state).unwrap();
     let bytes = serializer.into_serializer().into_inner();
-    create_file(args.output)?.write_all(&bytes)?;
+    create_file(&args.output)?.write_all(&bytes)?;
+
     info!("done");
 
     Ok(())

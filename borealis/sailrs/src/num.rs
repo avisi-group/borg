@@ -107,7 +107,7 @@ impl<S: Fallible + ScratchSpace + rkyv::ser::Serializer> rkyv::Serialize<S> for 
 
 impl<D: Fallible> rkyv::Deserialize<BigInt, D> for ArchivedVec<u8> {
     fn deserialize(&self, deserializer: &mut D) -> Result<BigInt, <D as Fallible>::Error> {
-        ArchivedVec::deserialize(&self, deserializer)
+        ArchivedVec::deserialize(self, deserializer)
             .map(|digits: Vec<u8>| BigInt(num_bigint::BigInt::from_signed_bytes_be(&digits)))
     }
 }

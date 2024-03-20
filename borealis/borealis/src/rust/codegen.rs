@@ -8,8 +8,11 @@ use {
         BinaryOperationKind, Block, ConstantValue, Context, Function, PrimitiveTypeClass,
         ShiftOperationKind, Statement, StatementKind, Symbol, Type, UnaryOperationKind,
     },
+    common::intern::InternedString,
+    once_cell::sync::Lazy,
     proc_macro2::{Ident, Literal, Span, TokenStream},
     quote::{format_ident, quote, ToTokens},
+    regex::Regex,
     std::{
         borrow::Borrow,
         hash::{DefaultHasher, Hash, Hasher},
@@ -24,6 +27,7 @@ pub fn codegen(rudder: Context) -> TokenStream {
         .get_functions()
         .into_iter()
         .map(|(name, function)| {
+            let name = codegen_ident(name);
             let (return_type, parameters) = function.signature();
             let return_type = codegen_type(return_type);
             let parameters = codegen_parameters(parameters);
@@ -77,7 +81,7 @@ fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
     let parameters = [quote!(state: &mut State, tracer: &mut T)]
         .into_iter()
         .chain(parameters.iter().map(|sym| {
-            let name = sym.name();
+            let name = codegen_ident(sym.name());
             let typ = codegen_type(sym.typ());
             quote!(#name: #typ)
         }));
@@ -88,14 +92,7 @@ fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
 }
 
 fn promote_width(width: usize) -> usize {
-    match width {
-        0 => 0,
-        1..=8 => 8,
-        9..=16 => 16,
-        17..=32 => 32,
-        33..=64 => 64,
-        width => panic!("width = {width}"),
-    }
+    width.next_power_of_two()
 }
 
 pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
@@ -167,7 +164,7 @@ fn codegen_body(function: Function) -> TokenStream {
         .local_variables()
         .iter()
         .map(|symbol| {
-            let name = format_ident!("{}", symbol.name().to_string());
+            let name = codegen_ident(symbol.name());
             let typ = codegen_type(symbol.typ());
 
             quote! {
@@ -251,11 +248,11 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::ReadVariable { symbol } => {
-            let var = format_ident!("{}", symbol.name().to_string());
+            let var = codegen_ident(symbol.name());
             quote! {#var}
         }
         StatementKind::WriteVariable { symbol, value } => {
-            let var = format_ident!("{}", symbol.name().to_string());
+            let var = codegen_ident(symbol.name());
             let value = get_ident(value);
             quote! {#var = #value}
         }
@@ -326,7 +323,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::Call { target, args } => {
-            let ident = format_ident!("{}", target.name().to_string());
+            let ident = codegen_ident(target.name());
             let args = args.iter().map(|arg| {
                 let arg = get_ident(arg.clone());
                 quote! {#arg}
@@ -387,7 +384,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
         StatementKind::Return { value } => match value {
             Some(value) => {
-                let name = value.name();
+                let name = codegen_ident(value.name());
                 quote! {return #name;}
             }
             None => {
@@ -495,4 +492,32 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
 
 fn codegen_member(idx: usize) -> Ident {
     Ident::new(&format!("_{idx}"), Span::call_site())
+}
+
+fn codegen_ident(input: InternedString) -> Ident {
+    static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
+
+    let s = input.as_ref();
+
+    let mut buf = String::with_capacity(s.len());
+
+    for ch in s.chars() {
+        match ch {
+            '%' => buf.push_str("_pcnt_"),
+            '&' => buf.push_str("_ref_"),
+            '?' => buf.push_str("_unknown_"),
+            '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' => buf.push('_'),
+            _ => buf.push(ch),
+        }
+    }
+
+    if buf.starts_with('_') {
+        buf = "u".to_owned() + &buf;
+    }
+
+    if !VALIDATOR.is_match(&buf) {
+        panic!("identifier {buf:?} not normalized even after normalizing");
+    }
+
+    Ident::new(&buf, Span::call_site())
 }

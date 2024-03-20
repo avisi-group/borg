@@ -9,12 +9,9 @@ use {
         sail_ast::visitor::{Visitor, Walkable},
         types::{ListVec, Position},
     },
-    common::{intern::InternedString, HashMap},
+    common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
-    once_cell::sync::Lazy,
-    parking_lot::Mutex,
-    regex::Regex,
     std::fmt::Display,
     strum::IntoStaticStr,
 };
@@ -319,47 +316,10 @@ pub struct Identifier {
 
 impl Identifier {
     pub fn as_interned(&self) -> InternedString {
-        static VALIDATOR: Lazy<Regex> =
-            Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
-        static NORMALIZED: Lazy<Mutex<HashMap<InternedString, InternedString>>> =
-            Lazy::new(|| Mutex::new(HashMap::default()));
-
-        let raw = match self.inner {
+        match self.inner {
             IdentifierAux::Identifier(s) => s,
             IdentifierAux::Operator(s) => s,
-        };
-
-        if let Some(&normalized) = NORMALIZED.lock().get(&raw) {
-            return normalized;
         }
-
-        let s = raw.as_ref();
-
-        let mut buf = String::with_capacity(s.len());
-
-        for ch in s.chars() {
-            match ch {
-                '%' => buf.push_str("_pcnt_"),
-                '&' => buf.push_str("_ref_"),
-                '?' => buf.push_str("_unknown_"),
-                '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' => buf.push('_'),
-                _ => buf.push(ch),
-            }
-        }
-
-        if buf.starts_with('_') {
-            buf = "u".to_owned() + &buf;
-        }
-
-        if !VALIDATOR.is_match(&buf) {
-            panic!("identifier {buf:?} not normalized even after normalizing");
-        }
-
-        let normalized = InternedString::from(buf);
-
-        NORMALIZED.lock().insert(raw, normalized);
-
-        normalized
     }
 }
 
@@ -2425,8 +2385,7 @@ impl Walkable for Ast {
         self.defs.iter().for_each(|d| visitor.visit_definition(d));
         self.comments
             .iter()
-            .map(|(_, cs)| cs.iter())
-            .flatten()
+            .flat_map(|(_, cs)| cs.iter())
             .for_each(|c| visitor.visit_comment(c));
     }
 }

@@ -283,12 +283,13 @@ impl Visitor for JibPrettyPrinter {
                 self.prindentln("}");
             }
             InstructionAux::Init(typ, name, value) => {
-                self.prindent(format!("init "));
+                self.prindent("init ");
                 self.visit_type(typ);
                 print!(" ");
                 self.visit_name(name);
                 print!(" ");
                 self.visit_value(value);
+                println!();
             }
             InstructionAux::Jump(value, s) => {
                 self.prindent(format!("jump {} ", s));

@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
 
     // set up the logger, defaulting to no output if the CLI flag was not supplied
-    init_logger(args.log.as_deref().unwrap_or("")).unwrap();
+    init_logger(args.log.as_deref().unwrap_or("info")).unwrap();
 
     run(args.input, args.output, args.standalone);
 
