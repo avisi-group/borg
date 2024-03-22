@@ -468,6 +468,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Literal::String(s) => write!(self.writer, "{s:?}"),
             Literal::Unit => write!(self.writer, "()"),
             Literal::Reference(s) => write!(self.writer, "&{s}"),
+            Literal::Undefined => write!(self.writer, "undefined"),
         }
         .unwrap()
     }

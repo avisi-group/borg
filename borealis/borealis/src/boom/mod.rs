@@ -609,6 +609,7 @@ pub enum Literal {
     String(InternedString),
     Unit,
     Reference(InternedString),
+    Undefined,
 }
 
 impl Walkable for Rc<RefCell<Literal>> {

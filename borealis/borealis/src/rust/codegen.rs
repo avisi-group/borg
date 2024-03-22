@@ -9,6 +9,7 @@ use {
         ShiftOperationKind, Statement, StatementKind, Symbol, Type, UnaryOperationKind,
     },
     common::intern::InternedString,
+    log::warn,
     once_cell::sync::Lazy,
     proc_macro2::{Ident, Literal, Span, TokenStream},
     quote::{format_ident, quote, ToTokens},
@@ -70,8 +71,53 @@ pub fn codegen(rudder: Context) -> TokenStream {
         })
         .collect();
 
+    let unions: TokenStream = rudder
+        .get_unions()
+        .into_iter()
+        .map(|typ| {
+            let ident = codegen_type(typ.clone());
+
+            let Type::Composite(fields) = typ.borrow() else {
+                panic!("union must be composite type");
+            };
+
+            let variants: TokenStream = fields
+                .iter()
+                .enumerate()
+                .map(|(i, typ)| {
+                    let name = codegen_member(i);
+                    let typ = codegen_type(typ.clone());
+                    quote!(#name(#typ),)
+                })
+                .collect();
+
+            quote! {
+                #[derive(Debug, Clone, Copy)]
+                enum #ident {
+                    #variants
+                }
+
+                impl Default for #ident {
+                    fn default() -> Self {
+                        Self::_0(Default::default())
+                    }
+                }
+            }
+        })
+        .collect();
+
+    let entrypoint = quote!(u__DecodeA64(state, tracer, state.pc, value););
+
     quote! {
         #structs
+
+        #unions
+
+        fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
+            #entrypoint
+
+            unreachable!("possibly failed to decode instruction or otherwise returned from entrypoint");
+        }
 
         #fns
     }
@@ -92,7 +138,18 @@ fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
 }
 
 fn promote_width(width: usize) -> usize {
-    width.next_power_of_two()
+    match width {
+        0 => 0,
+        1..=8 => 8,
+        9..=16 => 16,
+        17..=32 => 32,
+        33..=64 => 64,
+        65..=128 => 128,
+        width => {
+            warn!("unsupported width: {width}");
+            64
+        }
+    }
 }
 
 pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
@@ -168,7 +225,7 @@ fn codegen_body(function: Function) -> TokenStream {
             let typ = codegen_type(symbol.typ());
 
             quote! {
-                let mut #name: #typ;
+                let mut #name: #typ = Default::default();
             }
         })
         .collect::<TokenStream>();
@@ -267,14 +324,40 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::WriteRegister { .. } => quote!(todo!("write-reg")),
+        StatementKind::WriteRegister { offset, value } => {
+            let offset = get_ident(offset);
+            let typ = codegen_type(value.typ());
+            let value = get_ident(value);
+            quote! {
+                {
+                    unsafe { *(state.data.as_mut_ptr().byte_offset(#offset as isize) as *mut #typ) = #value };
+                    tracer.write_register(#offset as usize, #value);
+                }
+            }
+        }
         StatementKind::ReadMemory { .. } => quote!(todo!("read-mem")),
         StatementKind::WriteMemory { .. } => quote!(todo!("write-mem")),
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            let left = get_ident(lhs.clone());
-            let right = get_ident(rhs.clone());
+            let mut left = get_ident(lhs.clone());
+            let mut right = get_ident(rhs.clone());
+
+            // hard to decide whether this belongs, but since it's a Rust issue that u1 is not like other types, casting is a codegen thing
+            match (lhs.typ().width_bits(), rhs.typ().width_bits()) {
+                // both bools, do nothing
+                (1, 1) => (),
+                (1, _) => {
+                    let typ = codegen_type(rhs.typ());
+                    left = quote!(((#left) as #typ));
+                }
+                (_, 1) => {
+                    let typ = codegen_type(lhs.typ());
+                    right = quote!(((#right) as #typ));
+                }
+                // both not bools, do nothing
+                (_, _) => (),
+            }
 
             let op = match kind {
                 BinaryOperationKind::CmpEq => quote! { (#left) == (#right) },

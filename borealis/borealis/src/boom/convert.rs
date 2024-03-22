@@ -37,6 +37,8 @@ impl BoomEmitter {
 
     /// Emit BOOM AST
     pub fn finish(self) -> boom::Ast {
+        // dbg!(self.function_types.keys().collect::<Vec<_>>());
+
         self.ast
     }
 
@@ -370,7 +372,8 @@ fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
     Rc::new(RefCell::new(match literal {
         jib_ast::Vl::Bits(bits) => {
             // todo: this may need a `.rev`
-            boom::Literal::Bits(bits.iter().map(convert_bit).collect())
+            // update 2024-03-21: turns out it does on sail17arm94
+            boom::Literal::Bits(bits.iter().rev().map(convert_bit).collect())
         }
         jib_ast::Vl::Bit(bit) => boom::Literal::Bit(convert_bit(bit)),
         jib_ast::Vl::Bool(b) => boom::Literal::Bool(*b),
@@ -380,7 +383,7 @@ fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
         jib_ast::Vl::Real(_) => todo!(),
         jib_ast::Vl::Enum(_) => todo!(),
         jib_ast::Vl::Ref(s) => boom::Literal::Reference(*s),
-        jib_ast::Vl::Undefined => boom::Literal::Unit,
+        jib_ast::Vl::Undefined => boom::Literal::Undefined,
     }))
 }
 

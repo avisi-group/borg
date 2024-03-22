@@ -379,6 +379,7 @@ impl Emit for Rc<RefCell<Literal>> {
             Literal::String(s) => write!(w, "{s:?}"),
             Literal::Unit => write!(w, "()"),
             Literal::Reference(s) => write!(w, "{s}&"),
+            Literal::Undefined => write!(w, "undefined"),
         }
     }
 }

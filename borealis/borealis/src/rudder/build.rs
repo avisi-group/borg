@@ -1,6 +1,6 @@
 use {
     crate::{
-        boom::{self, NamedValue},
+        boom::{self, NamedType, NamedValue},
         rudder::{
             self, BinaryOperationKind, Block, CastOperationKind, Context, Function, FunctionInner,
             FunctionKind, ShiftOperationKind, Statement, StatementBuilder, StatementKind, Symbol,
@@ -20,9 +20,16 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
         boom::Definition::Enum { name, variants } => build_ctx.add_enum(*name, variants),
         boom::Definition::Union { name, fields } => build_ctx.add_union(*name, fields),
         boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
+        boom::Definition::Let { bindings, .. } => {
+            //todo handle body as like a setup fn or something?
+            assert_eq!(1, bindings.len());
+            let NamedType { name, typ } = &bindings[0];
+
+            let typ = build_ctx.resolve_type(typ.clone());
+            build_ctx.add_register(*name, typ);
+        }
         // todo
         boom::Definition::Pragma { .. } => (),
-        boom::Definition::Let { .. } => (),
     });
 
     ast.registers.iter().for_each(|(name, typ)| {
@@ -193,7 +200,10 @@ impl BuildContext {
 
                 Rc::new(element_type.vectorize(Some(usize::try_from(*length).unwrap())))
             }
-            boom::Type::Reference(_) => todo!(),
+            boom::Type::Reference(inner) => {
+                // todo: this is broken:(
+                self.resolve_type(inner.clone())
+            }
         }
     }
 
@@ -351,6 +361,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     fn build_copy(&mut self, value: Rc<RefCell<boom::Value>>, expression: &boom::Expression) {
+        // ignore copies of undefined
+        if let boom::Value::Literal(lit) = &*value.borrow() {
+            if let boom::Literal::Undefined = *lit.borrow() {
+                return;
+            }
+        }
+
         let source = self.build_value(value.clone());
 
         let source_type = source.typ();
@@ -534,16 +551,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Some((_, target, _)) => target,
                 None => {
                     // do this so that unimplemented has the correct type
-                    let crate::boom::Expression::Identifier(ident) = expression.as_ref().unwrap()
-                    else {
-                        panic!();
+                    let typ = if let Some(boom::Expression::Identifier(ident)) = expression.as_ref()
+                    {
+                        self.fn_ctx()
+                            .rudder_fn
+                            .get_local_variable(*ident)
+                            .unwrap()
+                            .typ()
+                    } else {
+                        Rc::new(Type::unit())
                     };
-                    let typ = self
-                        .fn_ctx()
-                        .rudder_fn
-                        .get_local_variable(*ident)
-                        .unwrap()
-                        .typ();
 
                     warn!("unknown function {name}");
                     Function {
@@ -625,78 +642,176 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
+    /// Sail compiler builtin functions only!
     fn build_specialized_function(
         &mut self,
         name: InternedString,
         args: &[Statement],
     ) -> Option<Statement> {
-        if name.as_ref() == "trap" {
-            Some(self.statement_builder.build(StatementKind::Trap))
-        } else if name.as_ref() == "read_pc" {
-            Some(self.statement_builder.build(StatementKind::ReadPc))
-        } else if name.as_ref() == "vector_subrange_A" {
-            // end - start + 1
-            let one = self.statement_builder.build(StatementKind::Constant {
-                typ: args[1].typ(),
-                value: rudder::ConstantValue::SignedInteger(1),
-            });
-            let diff = self
-                .statement_builder
-                .build(StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Sub,
-                    lhs: args[2].clone(),
-                    rhs: args[1].clone(),
-                });
-            let len = self
-                .statement_builder
-                .build(StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Add,
-                    lhs: diff.clone(),
-                    rhs: one.clone(),
-                });
-
-            Some(self.statement_builder.build(StatementKind::BitExtract {
+        match name.as_ref() {
+            "trap" => Some(self.statement_builder.build(StatementKind::Trap)),
+            "%i64->%i" => Some(self.statement_builder.build(StatementKind::Cast {
+                kind: CastOperationKind::ZeroExtend,
+                typ: Rc::new(Type::u64()),
                 value: args[0].clone(),
-                start: args[1].clone(),
-                length: len,
-            }))
-        } else if name.as_ref() == "slice" {
-            // uint64 n, uint64 start, uint64 len
-
-            Some(self.statement_builder.build(StatementKind::BitExtract {
+            })),
+            "%i->%i64" => Some(self.statement_builder.build(StatementKind::Cast {
+                kind: CastOperationKind::ZeroExtend,
+                typ: Rc::new(Type::u64()),
                 value: args[0].clone(),
-                start: args[1].clone(),
-                length: args[2].clone(),
-            }))
-        } else if name.as_ref().starts_with("vector_access_A") {
-            Some(self.statement_builder.build(StatementKind::ReadElement {
-                vector: args[0].clone(),
-                index: args[1].clone(),
-            }))
-        } else if name.as_ref().starts_with("vector_update_B") {
-            Some(self.statement_builder.build(StatementKind::MutateElement {
-                vector: args[0].clone(),
-                value: args[2].clone(),
-                index: args[1].clone(),
-            }))
-        } else if name.as_ref() == "u__raw_GetSlice_int" {
-            // u__raw_GetSlice_int(len, n, start)
-            Some(self.statement_builder.build(StatementKind::BitExtract {
+            })),
+            "subrange_bits" => {
+                // end - start + 1
+                let one = self.statement_builder.build(StatementKind::Constant {
+                    typ: args[1].typ(),
+                    value: rudder::ConstantValue::SignedInteger(1),
+                });
+                let diff = self
+                    .statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Sub,
+                        lhs: args[1].clone(),
+                        rhs: args[2].clone(),
+                    });
+                let len = self
+                    .statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Add,
+                        lhs: diff.clone(),
+                        rhs: one.clone(),
+                    });
+
+                Some(self.statement_builder.build(StatementKind::BitExtract {
+                    value: args[0].clone(),
+                    start: args[2].clone(),
+                    length: len,
+                }))
+            }
+            "eq_bits" => Some(
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::CmpEq,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            ),
+            "slice" => {
+                // uint64 n, uint64 start, uint64 len
+                Some(self.statement_builder.build(StatementKind::BitExtract {
+                    value: args[0].clone(),
+                    start: args[1].clone(),
+                    length: args[2].clone(),
+                }))
+            }
+            // todo: should probably be casts
+            "UInt0" => Some(args[0].clone()),
+            "SInt0" => Some(args[0].clone()),
+
+            "ZeroExtend0" => {
+                let value = args[0].clone();
+                let _length = args[1].clone();
+                Some(self.statement_builder.build(StatementKind::Cast {
+                    kind: CastOperationKind::ZeroExtend,
+                    typ: Rc::new(Type::u64()),
+                    value,
+                }))
+            }
+            "read_gpr_from_vector" => Some(self.statement_builder.build(StatementKind::Constant {
+                typ: Rc::new(Type::u64()),
+                value: rudder::ConstantValue::UnsignedInteger(0),
+            })),
+            "get_slice_int" => Some(self.statement_builder.build(StatementKind::BitExtract {
                 value: args[1].clone(),
                 start: args[2].clone(),
                 length: args[0].clone(),
-            }))
-        } else if name.as_ref() == "ZeroExtend__0" {
-            let value = args[0].clone();
-            let _length = args[1].clone();
-            Some(self.statement_builder.build(StatementKind::Cast {
-                kind: CastOperationKind::ZeroExtend,
-                typ: Rc::new(Type::u64()),
-                value,
-            }))
-        } else {
-            None
+            })),
+            "bitvector_access" => {
+                let length = self.statement_builder.build(StatementKind::Constant {
+                    typ: Rc::new(Type::u64()),
+                    value: rudder::ConstantValue::UnsignedInteger(1),
+                });
+                let bitex = self.statement_builder.build(StatementKind::BitExtract {
+                    value: args[0].clone(),
+                    start: args[1].clone(),
+                    length,
+                });
+
+                Some(self.statement_builder.build(StatementKind::Cast {
+                    kind: CastOperationKind::Truncate,
+                    typ: Rc::new(Type::u1()),
+                    value: bitex,
+                }))
+            }
+            _ => None,
         }
+        // if name.as_ref() == "trap" {
+        //     Some(self.statement_builder.build(StatementKind::Trap))
+        // } else if name.as_ref() == "read_pc" {
+        //     Some(self.statement_builder.build(StatementKind::ReadPc))
+        // } else if name.as_ref() == "vector_subrange_A" {
+        //     // end - start + 1
+        //     let one = self.statement_builder.build(StatementKind::Constant {
+        //         typ: args[1].typ(),
+        //         value: rudder::ConstantValue::SignedInteger(1),
+        //     });
+        //     let diff = self
+        //         .statement_builder
+        //         .build(StatementKind::BinaryOperation {
+        //             kind: BinaryOperationKind::Sub,
+        //             lhs: args[2].clone(),
+        //             rhs: args[1].clone(),
+        //         });
+        //     let len = self
+        //         .statement_builder
+        //         .build(StatementKind::BinaryOperation {
+        //             kind: BinaryOperationKind::Add,
+        //             lhs: diff.clone(),
+        //             rhs: one.clone(),
+        //         });
+
+        //     Some(self.statement_builder.build(StatementKind::BitExtract {
+        //         value: args[0].clone(),
+        //         start: args[1].clone(),
+        //         length: len,
+        //     }))
+        // } else if name.as_ref() == "slice" {
+
+        // } else if name.as_ref().starts_with("vector_access_A") {
+        //     Some(self.statement_builder.build(StatementKind::ReadElement {
+        //         vector: args[0].clone(),
+        //         index: args[1].clone(),
+        //     }))
+        // } else if name.as_ref().starts_with("vector_update_B") {
+        //     Some(self.statement_builder.build(StatementKind::MutateElement {
+        //         vector: args[0].clone(),
+        //         value: args[2].clone(),
+        //         index: args[1].clone(),
+        //     }))
+        // } else if name.as_ref() == "u__raw_GetSlice_int" {
+        //     // u__raw_GetSlice_int(len, n, start)
+        //     Some(self.statement_builder.build(StatementKind::BitExtract {
+        //         value: args[1].clone(),
+        //         start: args[2].clone(),
+        //         length: args[0].clone(),
+        //     }))
+        // } else if name.as_ref() == "ZeroExtend__0" {
+        //     let value = args[0].clone();
+        //     let _length = args[1].clone();
+        //     Some(self.statement_builder.build(StatementKind::Cast {
+        //         kind: CastOperationKind::ZeroExtend,
+        //         typ: Rc::new(Type::u64()),
+        //         value,
+        //     }))
+        // } else if name.as_ref() == "%i64->%i" {
+        //     let value = args[0].clone();
+        //     Some(self.statement_builder.build(StatementKind::Cast {
+        //         kind: CastOperationKind::ZeroExtend,
+        //         typ: Rc::new(Type::u64()),
+        //         value,
+        //     }))
+        // } else {
+        //     None
+        // }
     }
 
     /// Last statement returned is the value
@@ -770,6 +885,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         value: rudder::ConstantValue::Unit,
                     },
                     boom::Literal::Reference(_) => todo!(),
+                    boom::Literal::Undefined => unimplemented!(),
                 };
 
                 self.statement_builder.build(kind)
