@@ -16,19 +16,28 @@ use {
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
-    sail::{jib_ast::Definition, sail_ast},
-    std::{cell::RefCell, collections::LinkedList, rc::Rc},
+    sailrs::jib_ast::Definition,
+    std::{cell::RefCell, rc::Rc},
 };
 
+const FN_ALLOWLIST: &[&str] = &[
+    "__DecodeA64",
+    "__DecodeA64_DataProcImm",
+    "decode_add_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
+    "execute_aarch64_instrs_integer_arithmetic_add_sub_immediate",
+    "SP_read",
+    "X_read",
+    "get_R",
+    "read_gpr",
+    "AddWithCarry",
+    "integer_subrange",
+    "IsZero",
+];
+
 mod codegen;
-mod decode;
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig(
-    sail_ast: &sail_ast::Ast,
-    jib_ast: &LinkedList<Definition>,
-    standalone: bool,
-) -> TokenStream {
+pub fn sail_to_brig(jib_ast: &[Definition], standalone: bool) -> TokenStream {
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(jib_ast);
 
@@ -60,35 +69,35 @@ pub fn sail_to_brig(
 
     info!("Generating Rust");
 
-    let max = rudder
-        .get_registers()
-        .into_iter()
-        .max_by_key(|(typ, offset)| offset + typ.width_bytes())
-        .unwrap();
+    let registers_len = {
+        let (last_register, last_offset) = rudder
+            .get_registers()
+            .into_iter()
+            .max_by_key(|(typ, offset)| offset + typ.width_bytes())
+            .unwrap();
 
-    let len = max.0.width_bytes() + max.1;
+        last_offset + last_register.width_bytes()
+    };
 
     let state = quote! {
         // todo check this is necessary
         #[repr(align(8))]
         pub struct State {
             pc: u64,
-            data: [u8; #len],
+            data: [u8; #registers_len],
         }
 
         impl Default for State {
             fn default() -> Self {
                 Self {
                     pc: 0,
-                    data: [0; #len],
+                    data: [0; #registers_len],
                 }
             }
         }
     };
 
-    let decode_fn = decode::generate_fn(sail_ast, &rudder);
-
-    let execute_fns = crate::rust::codegen(rudder);
+    let body = codegen(rudder);
 
     let prelude = if standalone {
         quote! {
@@ -166,6 +175,7 @@ pub fn sail_to_brig(
         #![allow(unused_mut)]
         #![allow(unused_parens)]
         #![allow(unused_variables)]
+        #![allow(unreachable_code)]
 
         //! BOREALIS GENERATED FILE DO NOT MODIFY
 
@@ -187,9 +197,7 @@ pub fn sail_to_brig(
 
         #prelude
 
-        #decode_fn
-
-        #execute_fns
+        #body
     }
 }
 
@@ -200,21 +208,7 @@ fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
         .functions
         .clone()
         .into_iter()
-        .filter(|(k, _)| {
-            [
-                "integer_arithmetic_addsub_immediate_decode",
-                "u__id",
-                "ReservedValue",
-                "u__PostDecode",
-                "integer_arithmetic_addsub_immediate",
-                "aget_X",
-                "AddWithCarry",
-                "u__GetSlice_int",
-                "IsZero",
-                "aset_X",
-            ]
-            .contains(&k.as_ref())
-        })
+        .filter(|(k, _)| FN_ALLOWLIST.contains(&k.as_ref()))
         .collect();
     ast.borrow_mut().functions = funcs;
 }

@@ -1,5 +1,0 @@
-(executable
- (name wrapper)
- (public_name wrapper)
- (libraries libsail gmp)
- (modes exe object))

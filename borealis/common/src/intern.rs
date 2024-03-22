@@ -1,19 +1,30 @@
 //! String interning
 
 use {
+    crate::HashMap,
     deepsize::DeepSizeOf,
-    lasso::{Spur, ThreadedRodeo},
+    lasso::{Key, Spur, ThreadedRodeo},
     ocaml::{FromValue, ToValue, Value},
-    once_cell::sync::Lazy,
-    proc_macro2::{Ident, Span, TokenStream},
-    quote::{ToTokens, TokenStreamExt},
+    rkyv::{Archive, Archived, Fallible},
     std::hash::BuildHasherDefault,
     twox_hash::XxHash64,
 };
 
 /// String interner instance
-pub static INTERNER: Lazy<ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>>> =
-    Lazy::new(|| ThreadedRodeo::with_hasher(Default::default()));
+static mut INTERNER: Option<ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>>> = None;
+
+/// Gets the current interner
+pub fn interner() -> &'static ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>> {
+    unsafe { INTERNER.as_ref() }.unwrap()
+}
+
+/// Gets the strings and associated keys of the current interner
+pub fn get_interner_state() -> HashMap<String, u32> {
+    interner()
+        .strings()
+        .map(|s| (s.to_owned(), InternedString::new(s).key()))
+        .collect()
+}
 
 /// Key for an interned string
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Hash, Ord)]
@@ -22,12 +33,12 @@ pub struct InternedString(Spur);
 impl InternedString {
     /// Create a new interned string
     pub fn new<A: AsRef<str>>(str: A) -> Self {
-        Self(INTERNER.get_or_intern(str))
+        Self(interner().get_or_intern(str))
     }
 
     /// Create a new interned string from a static str
     pub fn from_static(key: &'static str) -> Self {
-        Self(INTERNER.get_or_intern_static(key))
+        Self(interner().get_or_intern_static(key))
     }
 
     /// Gets the inner key of the interned string
@@ -38,7 +49,7 @@ impl InternedString {
 
 impl AsRef<str> for InternedString {
     fn as_ref(&self) -> &str {
-        INTERNER.resolve(&self.0)
+        interner().resolve(&self.0)
     }
 }
 
@@ -62,13 +73,13 @@ impl From<&'_ str> for InternedString {
 
 impl std::fmt::Debug for InternedString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        INTERNER.resolve(&self.0).fmt(f)
+        interner().resolve(&self.0).fmt(f)
     }
 }
 
 impl std::fmt::Display for InternedString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        INTERNER.resolve(&self.0).fmt(f)
+        interner().resolve(&self.0).fmt(f)
     }
 }
 
@@ -112,8 +123,37 @@ impl DeepSizeOf for InternedString {
     }
 }
 
-impl ToTokens for InternedString {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(Ident::new(self.as_ref(), Span::call_site()));
+impl rkyv::Archive for InternedString {
+    type Archived = u32;
+
+    type Resolver = ();
+
+    unsafe fn resolve(&self, _pos: usize, _resolver: Self::Resolver, out: *mut Self::Archived) {
+        out.write(self.key());
     }
+}
+
+impl<S: Fallible + rkyv::ser::Serializer> rkyv::Serialize<S> for InternedString {
+    fn serialize(
+        &self,
+        _serializer: &mut S,
+    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+        Ok(())
+    }
+}
+
+impl<D: Fallible> rkyv::Deserialize<InternedString, D>
+    for Archived<<InternedString as Archive>::Archived>
+{
+    fn deserialize(&self, _: &mut D) -> Result<InternedString, <D as Fallible>::Error> {
+        Ok(InternedString::from(
+            // try from usize adds 1, -1 to bring it back down
+            Spur::try_from_usize(usize::try_from(*self).unwrap() - 1).unwrap(),
+        ))
+    }
+}
+
+/// Initializes the internet with an initial state
+pub fn init_interner(state: &HashMap<String, u32>) {
+    unsafe { INTERNER = Some(bincode::deserialize(&bincode::serialize(state).unwrap()).unwrap()) };
 }

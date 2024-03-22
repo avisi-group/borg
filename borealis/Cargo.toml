@@ -1,5 +1,5 @@
 [workspace]
-members = ["sail", "borealis", "common"]
+members = ["sailrs", "borealis", "common"]
 resolver = "2"
 
 # deserializing/converting the AST takes forever and overflows the stack without optimisations

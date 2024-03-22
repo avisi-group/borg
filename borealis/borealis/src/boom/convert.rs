@@ -5,8 +5,8 @@ use {
         self, control_flow::build_graph, Bit, FunctionSignature, NamedType, Parameter, Size,
     },
     common::{intern::InternedString, HashMap},
-    sail::{jib_ast, sail_ast},
-    std::{borrow::Borrow, cell::RefCell, collections::LinkedList, rc::Rc},
+    sailrs::{jib_ast, sail_ast},
+    std::{borrow::Borrow, cell::RefCell, rc::Rc},
 };
 
 type Parameters = Vec<Rc<RefCell<boom::Type>>>;
@@ -37,12 +37,14 @@ impl BoomEmitter {
 
     /// Emit BOOM AST
     pub fn finish(self) -> boom::Ast {
+        // dbg!(self.function_types.keys().collect::<Vec<_>>());
+
         self.ast
     }
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
         match definition {
-            jib_ast::Definition::RegDec(ident, typ, _) => {
+            jib_ast::Definition::Register(ident, typ, _) => {
                 if ident.as_interned().as_ref() == "R" {
                     panic!("{:#?}", ident);
                 }
@@ -55,15 +57,15 @@ impl BoomEmitter {
                 let def = match type_def {
                     jib_ast::TypeDefinition::Enum(name, variants) => boom::Definition::Enum {
                         name: name.as_interned(),
-                        variants: convert_variants(variants),
+                        variants: convert_variants(variants.as_ref()),
                     },
                     jib_ast::TypeDefinition::Struct(name, fields) => boom::Definition::Struct {
                         name: name.as_interned(),
-                        fields: convert_fields(fields),
+                        fields: convert_fields(fields.iter()),
                     },
                     jib_ast::TypeDefinition::Variant(name, fields) => boom::Definition::Union {
                         name: name.as_interned(),
-                        fields: convert_fields(fields),
+                        fields: convert_fields(fields.iter()),
                     },
                 };
                 self.ast.definitions.push(def);
@@ -77,10 +79,10 @@ impl BoomEmitter {
                             typ: convert_type(typ),
                         })
                         .collect(),
-                    body: convert_body(body),
+                    body: convert_body(body.as_ref()),
                 });
             }
-            jib_ast::Definition::Spec(id, _, parameters, out) => {
+            jib_ast::Definition::Val(id, _, parameters, out) => {
                 self.function_types.insert(
                     id.as_interned(),
                     (
@@ -108,7 +110,7 @@ impl BoomEmitter {
 
                 let name = name.as_interned();
 
-                let body = convert_body(body);
+                let body = convert_body(body.as_ref());
 
                 //debug!("building new control flow graph for {name}");
                 let control_flow = build_graph(&body);
@@ -137,11 +139,11 @@ impl BoomEmitter {
 
 fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
     Rc::new(RefCell::new(match typ.borrow() {
-        jib_ast::Type::Lint | jib_ast::Type::Lbits(_) => boom::Type::Int {
+        jib_ast::Type::Lint | jib_ast::Type::Lbits => boom::Type::Int {
             signed: false,
             size: Size::Unknown,
         },
-        jib_ast::Type::Fint(i) | jib_ast::Type::Fbits(i, _) => boom::Type::Int {
+        jib_ast::Type::Fint(i) | jib_ast::Type::Fbits(i) => boom::Type::Int {
             signed: false,
             size: Size::Static(usize::try_from(*i).unwrap()),
         },
@@ -154,21 +156,21 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
 
         jib_ast::Type::Enum(name, variants) => boom::Type::Enum {
             name: name.as_interned(),
-            variants: convert_variants(variants),
+            variants: convert_variants(variants.as_ref()),
         },
         jib_ast::Type::Struct(name, fields) => boom::Type::Struct {
             name: name.as_interned(),
-            fields: convert_fields(fields),
+            fields: convert_fields(fields.as_ref()),
         },
         jib_ast::Type::Variant(name, fields) => boom::Type::Union {
             name: name.as_interned(),
-            fields: convert_fields(fields),
+            fields: convert_fields(fields.as_ref()),
         },
-        jib_ast::Type::Fvector(length, _, typ) => boom::Type::FixedVector {
+        jib_ast::Type::Fvector(length, typ) => boom::Type::FixedVector {
             length: *length,
             element_type: convert_type(&**typ),
         },
-        jib_ast::Type::Vector(_, typ) => boom::Type::Vector {
+        jib_ast::Type::Vector(typ) => boom::Type::Vector {
             element_type: (convert_type(&**typ)),
         },
         jib_ast::Type::List(typ) => boom::Type::List {
@@ -176,7 +178,7 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
         },
         jib_ast::Type::Ref(typ) => boom::Type::Reference(convert_type(&**typ)),
         jib_ast::Type::Constant(_)
-        | jib_ast::Type::Sbits(_, _)
+        | jib_ast::Type::Sbits(_)
         | jib_ast::Type::Float(_)
         | jib_ast::Type::RoundingMode
         | jib_ast::Type::Tup(_)
@@ -184,9 +186,7 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
     }))
 }
 
-fn convert_body(
-    instructions: &LinkedList<jib_ast::Instruction>,
-) -> Vec<Rc<RefCell<boom::Statement>>> {
+fn convert_body(instructions: &[jib_ast::Instruction]) -> Vec<Rc<RefCell<boom::Statement>>> {
     instructions
         .iter()
         .flat_map(|instr| convert_statement(&instr.inner))
@@ -195,7 +195,7 @@ fn convert_body(
 
 fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom::Statement>>> {
     if let jib_ast::InstructionAux::Block(instructions) = statement {
-        return convert_body(instructions);
+        return convert_body(instructions.as_ref());
     }
 
     let statements = match statement {
@@ -203,7 +203,18 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
             name: convert_name(name),
             typ: convert_type(typ),
         }],
-        jib_ast::InstructionAux::Init(_, _, _) => todo!(),
+        jib_ast::InstructionAux::Init(typ, name, value) => {
+            vec![
+                boom::Statement::TypeDeclaration {
+                    name: convert_name(name),
+                    typ: convert_type(typ),
+                },
+                boom::Statement::Copy {
+                    expression: boom::Expression::Identifier(convert_name(name)),
+                    value: convert_value(value),
+                },
+            ]
+        }
         jib_ast::InstructionAux::Jump(condition, target) => vec![boom::Statement::Jump {
             condition: convert_value(condition),
             target: *target,
@@ -228,8 +239,8 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         jib_ast::InstructionAux::If(condition, if_body, else_body, _) => {
             vec![boom::Statement::If {
                 condition: convert_value(condition),
-                if_body: convert_body(if_body),
-                else_body: convert_body(else_body),
+                if_body: convert_body(if_body.as_ref()),
+                else_body: convert_body(else_body.as_ref()),
             }]
         }
 
@@ -265,7 +276,7 @@ fn convert_expression(expression: &jib_ast::Expression) -> boom::Expression {
     match expression {
         jib_ast::Expression::Id(name, _) => boom::Expression::Identifier(convert_name(name)),
         jib_ast::Expression::Rmw(_, _, _) => todo!(),
-        jib_ast::Expression::Field(expression, (ident, _)) => boom::Expression::Field {
+        jib_ast::Expression::Field(expression, ident) => boom::Expression::Field {
             expression: Box::new(convert_expression(expression)),
             field: ident.as_interned(),
         },
@@ -286,14 +297,14 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
             name: ident.as_interned(),
             fields: fields
                 .iter()
-                .map(|((ident, _), value)| boom::NamedValue {
+                .map(|(ident, value)| boom::NamedValue {
                     name: ident.as_interned(),
                     value: convert_value(value),
                 })
                 .collect(),
         },
         jib_ast::Value::Struct(_, _) => panic!("encountered struct with non-struct type"),
-        jib_ast::Value::CtorKind(value, ctor, unifiers, _) => boom::Value::CtorKind {
+        jib_ast::Value::CtorKind(value, (ctor, unifiers), _) => boom::Value::CtorKind {
             value: (convert_value(value)),
             identifier: ctor.as_interned(),
             types: unifiers.iter().map(convert_type).collect(),
@@ -346,10 +357,11 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
                 jib_ast::Op::Sslice(_) => todo!(),
                 jib_ast::Op::SetSlice => todo!(),
                 jib_ast::Op::Replicate(_) => todo!(),
+                jib_ast::Op::ListIsEmpty => todo!(),
             };
             boom::Value::Operation(op)
         }
-        jib_ast::Value::Field(value, (ident, _)) => boom::Value::Field {
+        jib_ast::Value::Field(value, ident) => boom::Value::Field {
             value: (convert_value(value)),
             field_name: ident.as_interned(),
         },
@@ -358,13 +370,10 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
 
 fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
     Rc::new(RefCell::new(match literal {
-        jib_ast::Vl::Bits(bits, is_big_endian) => {
-            let bits = if *is_big_endian {
-                bits.iter().rev().map(convert_bit).collect()
-            } else {
-                bits.iter().map(convert_bit).collect()
-            };
-            boom::Literal::Bits(bits)
+        jib_ast::Vl::Bits(bits) => {
+            // todo: this may need a `.rev`
+            // update 2024-03-21: turns out it does on sail17arm94
+            boom::Literal::Bits(bits.iter().rev().map(convert_bit).collect())
         }
         jib_ast::Vl::Bit(bit) => boom::Literal::Bit(convert_bit(bit)),
         jib_ast::Vl::Bool(b) => boom::Literal::Bool(*b),
@@ -372,10 +381,9 @@ fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
         jib_ast::Vl::Int(bigint) => boom::Literal::Int(bigint.0.clone()),
         jib_ast::Vl::String(s) => boom::Literal::String(*s),
         jib_ast::Vl::Real(_) => todo!(),
-        jib_ast::Vl::EmptyList => todo!(),
         jib_ast::Vl::Enum(_) => todo!(),
         jib_ast::Vl::Ref(s) => boom::Literal::Reference(*s),
-        jib_ast::Vl::Undefined => todo!(),
+        jib_ast::Vl::Undefined => boom::Literal::Undefined,
     }))
 }
 
@@ -388,7 +396,7 @@ fn convert_bit(bit: &jib_ast::BitU) -> boom::Bit {
 }
 
 /// Converts variants of an enum from JIB to BOOM
-fn convert_variants(variants: &LinkedList<sail_ast::Identifier>) -> Vec<InternedString> {
+fn convert_variants(variants: &[sail_ast::Identifier]) -> Vec<InternedString> {
     variants
         .iter()
         .map(sail_ast::Identifier::as_interned)
@@ -403,13 +411,13 @@ fn convert_variants(variants: &LinkedList<sail_ast::Identifier>) -> Vec<Interned
 fn convert_fields<
     'a,
     TYPE: Borrow<jib_ast::Type> + 'a,
-    ITER: IntoIterator<Item = &'a ((sail_ast::Identifier, LinkedList<jib_ast::Type>), TYPE)>,
+    ITER: IntoIterator<Item = &'a (sail_ast::Identifier, TYPE)>,
 >(
     fields: ITER,
 ) -> Vec<NamedType> {
     fields
         .into_iter()
-        .map(|((name, _), typ)| NamedType {
+        .map(|(name, typ)| NamedType {
             name: name.as_interned(),
             typ: convert_type(typ.borrow()),
         })

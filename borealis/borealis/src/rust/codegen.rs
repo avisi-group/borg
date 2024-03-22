@@ -8,8 +8,12 @@ use {
         BinaryOperationKind, Block, ConstantValue, Context, Function, PrimitiveTypeClass,
         ShiftOperationKind, Statement, StatementKind, Symbol, Type, UnaryOperationKind,
     },
+    common::intern::InternedString,
+    log::warn,
+    once_cell::sync::Lazy,
     proc_macro2::{Ident, Literal, Span, TokenStream},
     quote::{format_ident, quote, ToTokens},
+    regex::Regex,
     std::{
         borrow::Borrow,
         hash::{DefaultHasher, Hash, Hasher},
@@ -24,6 +28,7 @@ pub fn codegen(rudder: Context) -> TokenStream {
         .get_functions()
         .into_iter()
         .map(|(name, function)| {
+            let name = codegen_ident(name);
             let (return_type, parameters) = function.signature();
             let return_type = codegen_type(return_type);
             let parameters = codegen_parameters(parameters);
@@ -66,8 +71,53 @@ pub fn codegen(rudder: Context) -> TokenStream {
         })
         .collect();
 
+    let unions: TokenStream = rudder
+        .get_unions()
+        .into_iter()
+        .map(|typ| {
+            let ident = codegen_type(typ.clone());
+
+            let Type::Composite(fields) = typ.borrow() else {
+                panic!("union must be composite type");
+            };
+
+            let variants: TokenStream = fields
+                .iter()
+                .enumerate()
+                .map(|(i, typ)| {
+                    let name = codegen_member(i);
+                    let typ = codegen_type(typ.clone());
+                    quote!(#name(#typ),)
+                })
+                .collect();
+
+            quote! {
+                #[derive(Debug, Clone, Copy)]
+                enum #ident {
+                    #variants
+                }
+
+                impl Default for #ident {
+                    fn default() -> Self {
+                        Self::_0(Default::default())
+                    }
+                }
+            }
+        })
+        .collect();
+
+    let entrypoint = quote!(u__DecodeA64(state, tracer, state.pc, value););
+
     quote! {
         #structs
+
+        #unions
+
+        fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
+            #entrypoint
+
+            unreachable!("possibly failed to decode instruction or otherwise returned from entrypoint");
+        }
 
         #fns
     }
@@ -77,7 +127,7 @@ fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
     let parameters = [quote!(state: &mut State, tracer: &mut T)]
         .into_iter()
         .chain(parameters.iter().map(|sym| {
-            let name = sym.name();
+            let name = codegen_ident(sym.name());
             let typ = codegen_type(sym.typ());
             quote!(#name: #typ)
         }));
@@ -94,7 +144,11 @@ fn promote_width(width: usize) -> usize {
         9..=16 => 16,
         17..=32 => 32,
         33..=64 => 64,
-        width => panic!("width = {width}"),
+        65..=128 => 128,
+        width => {
+            warn!("unsupported width: {width}");
+            64
+        }
     }
 }
 
@@ -167,11 +221,11 @@ fn codegen_body(function: Function) -> TokenStream {
         .local_variables()
         .iter()
         .map(|symbol| {
-            let name = format_ident!("{}", symbol.name().to_string());
+            let name = codegen_ident(symbol.name());
             let typ = codegen_type(symbol.typ());
 
             quote! {
-                let mut #name: #typ;
+                let mut #name: #typ = Default::default();
             }
         })
         .collect::<TokenStream>();
@@ -251,11 +305,11 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::ReadVariable { symbol } => {
-            let var = format_ident!("{}", symbol.name().to_string());
+            let var = codegen_ident(symbol.name());
             quote! {#var}
         }
         StatementKind::WriteVariable { symbol, value } => {
-            let var = format_ident!("{}", symbol.name().to_string());
+            let var = codegen_ident(symbol.name());
             let value = get_ident(value);
             quote! {#var = #value}
         }
@@ -270,14 +324,40 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::WriteRegister { .. } => quote!(todo!("write-reg")),
+        StatementKind::WriteRegister { offset, value } => {
+            let offset = get_ident(offset);
+            let typ = codegen_type(value.typ());
+            let value = get_ident(value);
+            quote! {
+                {
+                    unsafe { *(state.data.as_mut_ptr().byte_offset(#offset as isize) as *mut #typ) = #value };
+                    tracer.write_register(#offset as usize, #value);
+                }
+            }
+        }
         StatementKind::ReadMemory { .. } => quote!(todo!("read-mem")),
         StatementKind::WriteMemory { .. } => quote!(todo!("write-mem")),
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            let left = get_ident(lhs.clone());
-            let right = get_ident(rhs.clone());
+            let mut left = get_ident(lhs.clone());
+            let mut right = get_ident(rhs.clone());
+
+            // hard to decide whether this belongs, but since it's a Rust issue that u1 is not like other types, casting is a codegen thing
+            match (lhs.typ().width_bits(), rhs.typ().width_bits()) {
+                // both bools, do nothing
+                (1, 1) => (),
+                (1, _) => {
+                    let typ = codegen_type(rhs.typ());
+                    left = quote!(((#left) as #typ));
+                }
+                (_, 1) => {
+                    let typ = codegen_type(lhs.typ());
+                    right = quote!(((#right) as #typ));
+                }
+                // both not bools, do nothing
+                (_, _) => (),
+            }
 
             let op = match kind {
                 BinaryOperationKind::CmpEq => quote! { (#left) == (#right) },
@@ -326,7 +406,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::Call { target, args } => {
-            let ident = format_ident!("{}", target.name().to_string());
+            let ident = codegen_ident(target.name());
             let args = args.iter().map(|arg| {
                 let arg = get_ident(arg.clone());
                 quote! {#arg}
@@ -387,7 +467,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
         StatementKind::Return { value } => match value {
             Some(value) => {
-                let name = value.name();
+                let name = codegen_ident(value.name());
                 quote! {return #name;}
             }
             None => {
@@ -495,4 +575,32 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
 
 fn codegen_member(idx: usize) -> Ident {
     Ident::new(&format!("_{idx}"), Span::call_site())
+}
+
+fn codegen_ident(input: InternedString) -> Ident {
+    static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
+
+    let s = input.as_ref();
+
+    let mut buf = String::with_capacity(s.len());
+
+    for ch in s.chars() {
+        match ch {
+            '%' => buf.push_str("_pcnt_"),
+            '&' => buf.push_str("_ref_"),
+            '?' => buf.push_str("_unknown_"),
+            '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' => buf.push('_'),
+            _ => buf.push(ch),
+        }
+    }
+
+    if buf.starts_with('_') {
+        buf = "u".to_owned() + &buf;
+    }
+
+    if !VALIDATOR.is_match(&buf) {
+        panic!("identifier {buf:?} not normalized even after normalizing");
+    }
+
+    Ident::new(&buf, Span::call_site())
 }

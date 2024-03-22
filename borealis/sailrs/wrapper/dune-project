@@ -1,0 +1,9 @@
+(lang dune 3.14)
+
+(name wrapper)
+
+(generate_opam_files true)
+
+(package
+ (name wrapper)
+ (depends ocaml dune sail gmp))
