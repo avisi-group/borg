@@ -39,7 +39,18 @@ chef-cook:
     COPY (+chef-prepare/recipe.json) .
     RUN eval `opam env` && cargo chef cook --recipe-path recipe.json --target $RUST_TARGET
 
-build:
+build-sailrs:
+    FROM +chef-cook
+
+    # copy full source
+    COPY --dir sailrs common .
+
+    # build borealis
+    RUN eval `opam env` && cargo build --target $RUST_TARGET
+
+    SAVE ARTIFACT target/$RUST_TARGET/debug/sailrs sailrs
+
+build-borealis:
     FROM +chef-cook
 
     # copy full source
@@ -49,7 +60,6 @@ build:
     RUN eval `opam env` && cargo build --target $RUST_TARGET
 
     SAVE ARTIFACT target/$RUST_TARGET/debug/borealis borealis
-    SAVE ARTIFACT target/$RUST_TARGET/debug/sailrs sailrs
 
 test:
     BUILD +unit-test
@@ -61,7 +71,6 @@ test-chef-cook:
     RUN eval `opam env` && cargo chef cook --recipe-path recipe.json --target $RUST_TARGET --tests
 
 unit-test:
-    BUILD +build
     FROM +test-chef-cook
 
     # copy full source
@@ -73,7 +82,6 @@ unit-test:
     # build and run tests
     RUN eval `opam env` && cargo test --target $RUST_TARGET --no-fail-fast
 
-
 ### BRIG ###
 e2e-test-sailrs:
     FROM +base-image
@@ -81,7 +89,7 @@ e2e-test-sailrs:
     ENV SAIL_DIR=/root/.opam/4.14.1+options/share/sail
 
     COPY data data
-    COPY (+build/sailrs) sailrs
+    COPY (+build-sailrs/sailrs) sailrs
 
     RUN find $SAIL_DIR/lib -type f -name '*.sail' | xargs sed -i '/lem_extern_type\|coq_extern_type/d'
 
@@ -92,8 +100,8 @@ e2e-test-brig:
     FROM rust:alpine
 
     COPY (+e2e-test-sailrs/arm-v9.4-a.rkyv) arm-v9.4-a.rkyv
-    COPY (+build/borealis) borealis
+    COPY (+build-borealis/borealis) borealis
 
     RUN ./borealis --standalone arm-v9.4-a.rkyv aarch64.rs
-    #RUN rustc --edition 2021 aarch64.rs
+    RUN rustc --edition 2021 aarch64.rs
  #   RUN ./aarch64 91500421
