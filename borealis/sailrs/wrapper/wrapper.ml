@@ -40,10 +40,12 @@ let run_sail filepaths =
   let opt_splice = [] in
   let opt_file_out = None in
   let config = None in
+  Rewrites.opt_mono_rewrites := true;
 
   Util.opt_verbosity := 2;
 
-  (match Sys.getenv_opt "SAIL_NO_PLUGINS" with
+  (* plugins broken with linker errors, removing lem and coq lines from sail stdlib as patch fix *)
+  (* (match Sys.getenv_opt "SAIL_NO_PLUGINS" with
   | Some _ -> ()
   | None -> (
       match get_plugin_dir () with
@@ -54,7 +56,7 @@ let run_sail filepaths =
               if Filename.extension plugin = ".cmxs" then
                 load_plugin options path)
             (Array.to_list (Sys.readdir dir))
-      | [] -> ()));
+      | [] -> ())); *)
 
   Constraint.load_digests ();
 
@@ -73,9 +75,7 @@ let run_sail filepaths =
   let effect_info =
     Effects.infer_side_effects (Target.asserts_termination tgt) ast
   in
-  Reporting.opt_warnings := false;
 
-  (* Don't show warnings during re-writing for now *)
   Target.run_pre_rewrites_hook tgt ast effect_info env;
   let ast, effect_info, env =
     Rewrites.rewrite effect_info env (Target.rewrites tgt) ast
