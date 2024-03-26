@@ -77,7 +77,6 @@ let isla_rewrites =
     ("toplevel_nexps", []);
     ("monomorphise", [String_arg "c"]);
     ("atoms_to_singletons", [String_arg "c"]);
-    ("remove_impossible_int_cases", []);
     ("recheck_defs", []);
     ("undefined", [Bool_arg false]);
     ("vector_string_pats_to_bit_list", []);

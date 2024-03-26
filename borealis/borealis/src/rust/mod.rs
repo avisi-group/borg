@@ -2,17 +2,20 @@
 
 use {
     crate::{
-        boom::Ast,
-        passes::{
-            self, builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-            fold_unconditionals::FoldUnconditionals, make_exception_bool::MakeExceptionBool,
-            remove_const_branch::RemoveConstBranch,
-            remove_redundant_assigns::RemoveRedundantAssigns,
-            resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
+        boom::{
+            passes::{
+                self, builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
+                fold_unconditionals::FoldUnconditionals, make_exception_bool::MakeExceptionBool,
+                remove_const_branch::RemoveConstBranch,
+                remove_redundant_assigns::RemoveRedundantAssigns,
+                resolve_bitvectors::ResolveBitvectors, resolve_return_assigns::ResolveReturns,
+            },
+            Ast,
         },
         rudder,
         rust::codegen::codegen,
     },
+    common::create_file,
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
@@ -26,12 +29,10 @@ const FN_ALLOWLIST: &[&str] = &[
     "decode_add_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
     "execute_aarch64_instrs_integer_arithmetic_add_sub_immediate",
     "SP_read",
-    "X_read",
-    "get_R",
-    "read_gpr",
-    "AddWithCarry",
-    "integer_subrange",
-    "IsZero",
+    "place_slice",
+    "slice_mask",
+    "sail_mask",
+    "size_itself_int",
 ];
 
 mod codegen;
@@ -59,9 +60,8 @@ pub fn sail_to_brig(jib_ast: &[Definition], standalone: bool) -> TokenStream {
         ],
     );
 
-    // // useful for debugging
-    // crate::boom::pretty_print::print_ast(&mut std::io::stdout(), ast.clone());
-    // panic!();
+    // useful for debugging
+    crate::boom::pretty_print::print_ast(&mut create_file("target/ast.boom").unwrap(), ast.clone());
 
     info!("Building rudder");
 

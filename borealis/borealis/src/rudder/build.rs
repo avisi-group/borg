@@ -2,13 +2,11 @@ use {
     crate::{
         boom::{self, NamedType, NamedValue},
         rudder::{
-            self, BinaryOperationKind, Block, CastOperationKind, Context, Function, FunctionInner,
-            FunctionKind, ShiftOperationKind, Statement, StatementBuilder, StatementKind, Symbol,
-            Type,
+            self, BinaryOperationKind, CastOperationKind, Context, Function, FunctionKind,
+            ShiftOperationKind, Statement, StatementBuilder, StatementKind, Type,
         },
     },
     common::{intern::InternedString, HashMap},
-    log::warn,
     std::{cell::RefCell, cmp::Ordering, rc::Rc},
 };
 
@@ -176,7 +174,7 @@ impl BuildContext {
 
                 let element_width = match size {
                     boom::Size::Static(size) => *size,
-                    boom::Size::Runtime(_) | boom::Size::Unknown => 64, /* todo blame tom when this inevitably breaks */
+                    boom::Size::Runtime(_) | boom::Size::Unknown => panic!("BOOM bitvector monomorphisation pass should ensure all bitvectors have static length before rudder conversion"),
                 };
 
                 Rc::new(rudder::Type::new_primitive(tc, element_width))
@@ -549,37 +547,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         } else {
             let target = match self.ctx().functions.get(name).cloned() {
                 Some((_, target, _)) => target,
-                None => {
-                    // do this so that unimplemented has the correct type
-                    let typ = if let Some(boom::Expression::Identifier(ident)) = expression.as_ref()
-                    {
-                        self.fn_ctx()
-                            .rudder_fn
-                            .get_local_variable(*ident)
-                            .unwrap()
-                            .typ()
-                    } else {
-                        Rc::new(Type::unit())
-                    };
-
-                    warn!("unknown function {name}");
-                    Function {
-                        inner: Rc::new(RefCell::new(FunctionInner {
-                            name: format!("unimplemented_{name}").into(),
-                            return_type: typ,
-                            parameters: vec![
-                                Symbol {
-                                    name: "removed".into(),
-                                    kind: rudder::SymbolKind::Parameter,
-                                    typ: Rc::new(rudder::Type::u64()),
-                                };
-                                64// todo: this is terrible, needed so that the casts on line `-9(%rip)` don't index out of bounds
-                            ],
-                            local_variables: HashMap::default(),
-                            entry_block: Block::new(),
-                        })),
-                    }
-                }
+                None => panic!("unknown function {name}"),
             };
 
             // cast all arguments to the correct type
@@ -742,6 +710,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     value: bitex,
                 }))
             }
+            "make_the_value" => Some(args[0].clone()),
+            "size_itself_int" => Some(args[0].clone()),
+            "truncate" => Some(self.statement_builder.build(StatementKind::Cast {
+                kind: CastOperationKind::Truncate,
+                typ: Rc::new(Type::new_primitive(
+                    rudder::PrimitiveTypeClass::UnsignedInteger,
+                    8,
+                )),
+                value: args[0].clone(),
+            })),
             _ => None,
         }
         // if name.as_ref() == "trap" {

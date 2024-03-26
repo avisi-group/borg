@@ -37,8 +37,12 @@ impl BoomEmitter {
 
     /// Emit BOOM AST
     pub fn finish(self) -> boom::Ast {
-        // dbg!(self.function_types.keys().collect::<Vec<_>>());
-
+        if !self.function_types.is_empty() {
+            panic!(
+                "missing definitions for: \n{:#?}",
+                self.function_types.keys().collect::<Vec<_>>()
+            );
+        }
         self.ast
     }
 
