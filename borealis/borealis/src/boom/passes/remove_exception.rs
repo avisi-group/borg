@@ -9,6 +9,8 @@
 //! * assignments to `throw`
 //! * assignments where the value is a union
 //! * whole of the if exception branch, replace with a `trap()` function call
+//!
+//! NOTE 2024-03-24 all non-rudder passes were deleted, this one was kept in case `make_exception_bool` turns out to be insufficient
 
 use {
     crate::boom::{

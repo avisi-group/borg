@@ -343,7 +343,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let mut left = get_ident(lhs.clone());
             let mut right = get_ident(rhs.clone());
 
-            // hard to decide whether this belongs, but since it's a Rust issue that u1 is not like other types, casting is a codegen thing
+            // hard to decide whether this belongs, but since it's a Rust issue that u1 is
+            // not like other types, casting is a codegen thing
             match (lhs.typ().width_bits(), rhs.typ().width_bits()) {
                 // both bools, do nothing
                 (1, 1) => (),

@@ -19,18 +19,9 @@ use {
 pub mod any;
 pub mod builtin_fns;
 pub mod cycle_finder;
-pub mod destruct_structs;
-pub mod destructure;
 pub mod fold_unconditionals;
-pub mod lower_enums;
 pub mod make_exception_bool;
-pub mod registers;
 pub mod remove_const_branch;
-pub mod remove_exception;
-pub mod remove_redundant_assigns;
-pub mod remove_unit;
-pub mod replace_bools;
-pub mod replace_strings;
 pub mod resolve_bitvectors;
 pub mod resolve_return_assigns;
 

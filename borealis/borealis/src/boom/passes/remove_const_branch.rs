@@ -11,8 +11,7 @@ use {
     std::{cell::RefCell, rc::Rc},
 };
 
-/// Control flow blocks with only one parent and one child (unconditional jump
-/// to target) are folded into their parent
+/// Branches with a constant condition can be removed
 #[derive(Debug, Default)]
 pub struct RemoveConstBranch;
 

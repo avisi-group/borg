@@ -1,7 +1,7 @@
 //! Sail frontend for GenSim
 
 use {
-    crate::rust::sail_to_brig,
+    crate::brig::sail_to_brig,
     common::{
         bytes,
         intern::{init_interner, interner},
@@ -16,8 +16,8 @@ use {
 };
 
 pub mod boom;
+pub mod brig;
 pub mod rudder;
-pub mod rust;
 
 pub fn run<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O, standalone: bool) {
     let jib = load_model(input);
