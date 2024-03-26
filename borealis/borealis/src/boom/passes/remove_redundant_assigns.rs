@@ -3,13 +3,11 @@
 //! TODO: remove never used variables
 
 use {
-    crate::{
-        boom::{
-            control_flow::Terminator,
-            visitor::{Visitor, Walkable},
-            Ast, Expression, FunctionDefinition, Statement, Value,
-        },
+    crate::boom::{
+        control_flow::Terminator,
         passes::{any::AnyExt, Pass},
+        visitor::{Visitor, Walkable},
+        Ast, Expression, FunctionDefinition, Statement, Value,
     },
     common::{intern::InternedString, HashMap},
     std::{cell::RefCell, rc::Rc},

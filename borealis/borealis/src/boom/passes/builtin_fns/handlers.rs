@@ -1,11 +1,8 @@
 use {
-    crate::{
-        boom::{
-            control_flow::{ControlFlowBlock, Terminator},
-            Ast, FunctionDefinition, Literal, Operation, OperationKind, Size, Statement, Type,
-            Value,
-        },
+    crate::boom::{
+        control_flow::{ControlFlowBlock, Terminator},
         passes::builtin_fns::HandlerFunction,
+        Ast, FunctionDefinition, Literal, Operation, OperationKind, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, HashMap},
     itertools::Itertools,

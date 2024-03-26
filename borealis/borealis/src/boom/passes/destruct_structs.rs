@@ -29,12 +29,10 @@
 //! baz)
 
 use {
-    crate::{
-        boom::{
-            control_flow::Terminator, visitor::Visitor, Ast, Expression, FunctionDefinition,
-            FunctionSignature, NamedType, NamedValue, Parameter, Statement, Type, Value,
-        },
-        passes::Pass,
+    crate::boom::{
+        control_flow::Terminator, passes::Pass, visitor::Visitor, Ast, Expression,
+        FunctionDefinition, FunctionSignature, NamedType, NamedValue, Parameter, Statement, Type,
+        Value,
     },
     common::{intern::InternedString, HashMap},
     std::{cell::RefCell, rc::Rc},

@@ -1,12 +1,10 @@
 //! Unconditional folding logic
 
 use {
-    crate::{
-        boom::{
-            control_flow::{ControlFlowBlock, Terminator},
-            Ast,
-        },
+    crate::boom::{
+        control_flow::{ControlFlowBlock, Terminator},
         passes::{any::AnyExt, Pass},
+        Ast,
     },
     common::HashSet,
     log::{debug, trace},

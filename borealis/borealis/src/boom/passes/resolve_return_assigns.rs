@@ -5,13 +5,11 @@
 //! assigned value. Must return the value last assigned to the return variable.
 
 use {
-    crate::{
-        boom::{
-            control_flow::{ControlFlowBlock, Terminator},
-            visitor::{Visitor, Walkable},
-            Ast, Expression, Statement, Type, Value,
-        },
+    crate::boom::{
+        control_flow::{ControlFlowBlock, Terminator},
         passes::{any::AnyExt, Pass},
+        visitor::{Visitor, Walkable},
+        Ast, Expression, Statement, Type, Value,
     },
     std::{cell::RefCell, rc::Rc},
 };

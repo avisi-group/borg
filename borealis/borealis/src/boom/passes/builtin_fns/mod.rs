@@ -2,9 +2,9 @@
 //! functions in BOOM
 
 use {
-    crate::{
-        boom::{Ast, FunctionDefinition, Statement},
+    crate::boom::{
         passes::{any::AnyExt, builtin_fns::handlers::HANDLERS, Pass},
+        Ast, FunctionDefinition, Statement,
     },
     common::{intern::InternedString, HashMap, HashSet},
     once_cell::sync::Lazy,

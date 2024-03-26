@@ -3,9 +3,10 @@
 //! GenC doesn't have bools, so we need to replace all bools with uint8
 
 use {
-    crate::{
-        boom::{visitor::Visitor, Ast, Literal, Size, Type},
+    crate::boom::{
         passes::{any::AnyExt, Pass},
+        visitor::Visitor,
+        Ast, Literal, Size, Type,
     },
     std::{cell::RefCell, rc::Rc},
 };

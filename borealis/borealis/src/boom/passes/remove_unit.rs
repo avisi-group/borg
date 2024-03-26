@@ -2,13 +2,11 @@
 //! definitions, and void arguments from function calls
 
 use {
-    crate::{
-        boom::{
-            control_flow::ControlFlowBlock,
-            visitor::{Visitor, Walkable},
-            Ast, Expression, FunctionDefinition, Literal, Parameter, Statement, Type, Value,
-        },
+    crate::boom::{
+        control_flow::ControlFlowBlock,
         passes::{any::AnyExt, Pass},
+        visitor::{Visitor, Walkable},
+        Ast, Expression, FunctionDefinition, Literal, Parameter, Statement, Type, Value,
     },
     common::{intern::InternedString, HashSet},
     log::trace,

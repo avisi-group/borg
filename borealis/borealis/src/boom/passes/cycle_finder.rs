@@ -1,7 +1,7 @@
 //! Finds cycles in the control flow graph
 
 use {
-    crate::{boom::Ast, passes::Pass},
+    crate::boom::{passes::Pass, Ast},
     log::warn,
     std::{cell::RefCell, rc::Rc},
 };

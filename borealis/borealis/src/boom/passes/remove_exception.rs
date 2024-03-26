@@ -1,33 +1,37 @@
-//! Remove non-bool assignments to `exception`
+//! Remove all exception handling logic
 //!
 //! Remove:
 //!
+//! * type declarations with the type of union exception (or just union as there
+//!   is only one union)
+//! * assignments to any of the previous type declarations
+//! * any assignments to exception that arent boolean(?)
+//! * assignments to `throw`
 //! * assignments where the value is a union
+//! * whole of the if exception branch, replace with a `trap()` function call
 
 use {
-    crate::{
-        boom::{
-            control_flow::{ControlFlowBlock, Terminator},
-            visitor::{Visitor, Walkable},
-            Ast, Expression, Literal, Size, Statement, Type, Value,
-        },
+    crate::boom::{
+        control_flow::{ControlFlowBlock, Terminator},
         passes::Pass,
+        visitor::{Visitor, Walkable},
+        Ast, Expression, FunctionDefinition, Literal, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, HashSet},
     std::{cell::RefCell, rc::Rc},
 };
 
 /// Remove all exception handling logic
-pub struct MakeExceptionBool;
+pub struct RemoveExceptions;
 
-impl MakeExceptionBool {
+impl RemoveExceptions {
     /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::new(Self)
     }
 }
 
-impl Pass for MakeExceptionBool {
+impl Pass for RemoveExceptions {
     fn name(&self) -> &'static str {
         "RemoveExceptions"
     }
@@ -35,6 +39,7 @@ impl Pass for MakeExceptionBool {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
+        // first pass to remove exceptions
         ast.borrow().functions.values().for_each(|def| {
             {
                 let mut statements = def.entry_block.statements();
@@ -42,7 +47,6 @@ impl Pass for MakeExceptionBool {
                 if let Some(stmt) = statements.first() {
                     if let Statement::TypeDeclaration { name, .. } = &*stmt.borrow() {
                         if name.as_ref() == "exception" {
-                            // skip if already done?
                             return;
                         }
                     }
@@ -73,12 +77,16 @@ impl Pass for MakeExceptionBool {
             self.visit_function_definition(def);
         });
 
+        // second pass identifying exception blocks and raising back into if statements
+        // to simplify control flow graph
+        ast.borrow().functions.values().for_each(raise_exceptions);
+
         // TODO: write comment proving this only ever needs one pass
         false
     }
 }
 
-impl Visitor for MakeExceptionBool {
+impl Visitor for RemoveExceptions {
     fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
         let mut deleted_exception_vars = HashSet::default();
 
@@ -179,4 +187,76 @@ fn statement_filter(
 
         _ => Some(statement_cloned),
     }
+}
+
+fn raise_exceptions(fn_def: &FunctionDefinition) {
+    // first, find exception blocks (likely candidates are the target of "if
+    // exception"s and contain a single `trap()` instruction)
+    let exception_blocks = fn_def
+        .entry_block
+        .iter()
+        .filter(|block| {
+            block.statements().len() == 1
+                && (if let Statement::FunctionCall { name, .. } = &*block.statements()[0].borrow() {
+                    name.as_ref() == "trap"
+                } else {
+                    false
+                } || if let Statement::Copy {
+                    expression: Expression::Identifier(ident),
+                    ..
+                } = &*block.statements()[0].borrow()
+                {
+                    ident.as_ref() == "exception"
+                } else {
+                    false
+                })
+        })
+        .collect::<HashSet<_>>();
+
+    fn_def.entry_block.iter().for_each(|block| {
+        if let Terminator::Conditional {
+            condition,
+            target,
+            fallthrough,
+        } = block.terminator()
+        {
+            if exception_blocks.contains(&target) {
+                let mut statements = block.statements();
+                statements.push(
+                    Statement::If {
+                        condition: Rc::new(RefCell::new(condition)),
+                        if_body: vec![Statement::FunctionCall {
+                            expression: None,
+                            name: "trap".into(),
+                            arguments: vec![],
+                        }
+                        .into()],
+                        else_body: vec![],
+                    }
+                    .into(),
+                );
+                block.set_statements(statements);
+                block.set_terminator(Terminator::Unconditional {
+                    target: fallthrough,
+                });
+            } else if exception_blocks.contains(&fallthrough) {
+                let mut statements = block.statements();
+                statements.push(
+                    Statement::If {
+                        condition: Rc::new(RefCell::new(condition)),
+                        if_body: vec![],
+                        else_body: vec![Statement::FunctionCall {
+                            expression: None,
+                            name: "trap".into(),
+                            arguments: vec![],
+                        }
+                        .into()],
+                    }
+                    .into(),
+                );
+                block.set_statements(statements);
+                block.set_terminator(Terminator::Unconditional { target });
+            }
+        }
+    });
 }

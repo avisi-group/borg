@@ -23,14 +23,12 @@
 //! the length
 
 use {
-    crate::{
-        boom::{
-            bits_to_int,
-            visitor::{Visitor, Walkable},
-            Ast, Expression, FunctionDefinition, Literal, Operation, Parameter, Size, Statement,
-            Type, Value,
-        },
+    crate::boom::{
+        bits_to_int,
         passes::{any::AnyExt, Pass},
+        visitor::{Visitor, Walkable},
+        Ast, Expression, FunctionDefinition, Literal, Operation, Parameter, Size, Statement, Type,
+        Value,
     },
     common::{intern::InternedString, HashMap},
     num_bigint::BigInt,
@@ -222,9 +220,10 @@ impl ResolveBitvectors {
                 ("Zeros", zeros_handler as HandlerFunction),
                 ("Ones", ones_handler),
                 ("bitvector_concat", concat_handler),
-                ("eq_vec", eq_handler),
-                ("undefined_bitvector", undefined_handler),
-                ("slice", slice_handler),
+                ("eq_bits", eq_handler),
+                ("truncate", truncate_handler),
+                // ("undefined_bitvector", undefined_handler),
+                // ("slice", slice_handler),
             ]
             .into_iter()
             .map(|(s, f)| (InternedString::from_static(s), f));
@@ -439,37 +438,26 @@ fn eq_handler(
     celf.did_change = true;
 }
 
-fn undefined_handler(
+fn truncate_handler(
     celf: &mut ResolveBitvectors,
-    statement: Rc<RefCell<Statement>>,
+    _statement: Rc<RefCell<Statement>>,
     expression: &Expression,
     arguments: &[Rc<RefCell<Value>>],
 ) {
-    // TODO: assign dest bitvector length to supplied argument
-    // either by detecting const or evaluating what the value would be at that point
-    // in execution (symbolic execution?)
-
-    assert!(arguments.len() == 1);
+    assert!(arguments.len() == 2);
 
     let Expression::Identifier(dest) = expression else {
         panic!();
     };
 
-    let dest_size = celf.get_size(*dest).unwrap();
-
-    if let Size::Unknown = dest_size {
-        celf.set_size(*dest, Size::Runtime(arguments[0].clone()));
+    if let Some(Size::Static(_)) = celf.get_size(*dest) {
+    } else {
+        celf.set_size(*dest, Size::Runtime(arguments[1].clone()));
+        //  celf.did_change = true;
     }
-
-    *statement.borrow_mut() = Statement::Copy {
-        expression: expression.clone(),
-        value: Literal::Int(0.into()).into(),
-    };
-
-    celf.did_change = true;
 }
 
-fn slice_handler(
+fn _slice_handler(
     celf: &mut ResolveBitvectors,
     _statement: Rc<RefCell<Statement>>,
     expression: &Expression,

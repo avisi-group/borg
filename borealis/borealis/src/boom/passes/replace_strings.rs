@@ -1,9 +1,10 @@
 //! Replace strings with integers
 
 use {
-    crate::{
-        boom::{visitor::Visitor, Ast, Literal, Size, Type},
+    crate::boom::{
         passes::{any::AnyExt, Pass},
+        visitor::Visitor,
+        Ast, Literal, Size, Type,
     },
     std::{cell::RefCell, rc::Rc},
 };

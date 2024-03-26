@@ -2,11 +2,9 @@
 //! register
 
 use {
-    crate::{
-        boom::{
-            control_flow::ControlFlowBlock, visitor::Visitor, Ast, Expression, Statement, Value,
-        },
-        passes::Pass,
+    crate::boom::{
+        control_flow::ControlFlowBlock, passes::Pass, visitor::Visitor, Ast, Expression, Statement,
+        Value,
     },
     common::{identifiable::unique_id, intern::InternedString},
     std::{cell::RefCell, rc::Rc},

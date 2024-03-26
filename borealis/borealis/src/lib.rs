@@ -16,7 +16,6 @@ use {
 };
 
 pub mod boom;
-pub mod passes;
 pub mod rudder;
 pub mod rust;
 
