@@ -8,7 +8,7 @@ use {
         BinaryOperationKind, Block, ConstantValue, Context, Function, PrimitiveTypeClass,
         ShiftOperationKind, Statement, StatementKind, Symbol, Type, UnaryOperationKind,
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashSet},
     log::warn,
     once_cell::sync::Lazy,
     proc_macro2::{Ident, Literal, Span, TokenStream},
@@ -24,15 +24,19 @@ use {
 pub fn codegen(rudder: Context) -> TokenStream {
     rudder.update_names();
 
-    let fns: TokenStream = rudder
-        .get_functions()
+    let fn_names = get_functions_to_codegen(&rudder, "__DecodeA64".into());
+
+    let rudder_fns = rudder.get_functions();
+
+    let fns: TokenStream = fn_names
         .into_iter()
+        .map(|k| (k, rudder_fns.get(&k).unwrap()))
         .map(|(name, function)| {
             let name = codegen_ident(name);
             let (return_type, parameters) = function.signature();
             let return_type = codegen_type(return_type);
             let parameters = codegen_parameters(parameters);
-            let body = codegen_body(function);
+            let body = codegen_body(function.clone());
 
             quote! {
                 fn #name<T: Tracer>(#parameters) -> #return_type {
@@ -604,4 +608,38 @@ fn codegen_ident(input: InternedString) -> Ident {
     }
 
     Ident::new(&buf, Span::call_site())
+}
+
+fn get_functions_to_codegen(rudder: &Context, entrypoint: InternedString) -> Vec<InternedString> {
+    let rudder_fns = rudder.get_functions();
+
+    let mut fns = HashSet::default();
+    let mut todo = vec![entrypoint];
+
+    fn get_calls(f: &Function) -> Vec<InternedString> {
+        f.entry_block()
+            .iter()
+            .map(|b| b.statements().into_iter())
+            .flatten()
+            .filter_map(|s| {
+                if let StatementKind::Call { target, .. } = s.kind() {
+                    Some(target.name())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    while let Some(next) = todo.pop() {
+        if fns.contains(&next) {
+            continue;
+        }
+
+        let next_children = get_calls(rudder_fns.get(&next).unwrap());
+        todo.extend(next_children);
+        fns.insert(next);
+    }
+
+    fns.into_iter().collect()
 }

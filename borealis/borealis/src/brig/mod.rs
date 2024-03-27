@@ -30,11 +30,7 @@ const FN_ALLOWLIST: &[&str] = &[
     "__DecodeA64_DataProcImm",
     "decode_add_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
     "execute_aarch64_instrs_integer_arithmetic_add_sub_immediate",
-    // "SP_read",
-    // "place_slice",
-    // "slice_mask",
-    // "sail_mask",
-    // "size_itself_int",
+    "place_slice",
 ];
 
 mod codegen;

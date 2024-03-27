@@ -101,7 +101,7 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         //     replace_with_op(ast, f, s, OperationKind::Divide)
         // }),
         // ("SInt", replace_with_copy), // probably need to take another look at this
-        // ("bitvector_length", bv_length_handler),
+        ("bitvector_length", bv_length_handler),
         // ("bitvector_access_B", bv_access_handler),
         // ("bitvector_access_A", bv_access_handler),
         // ("raw_GetSlice_int", noop),
