@@ -115,6 +115,7 @@ impl Task {
         context.rsp = u64::try_from(stack_end as usize).unwrap();
         context.cs = 0x8; // TODO: Less magic
         context.ss = 0x10;
+        context.rbp = 0x0;
 
         let inner = Rc::new_cyclic(|weak| InnerTask {
             tcb: TaskControlBlock {
@@ -148,11 +149,15 @@ impl Task {
 }
 
 extern "C" fn task_wrapper(cb: extern "C" fn()) {
+    // todo: push 0 to base pointer here for backtraces?
+
     cb();
 
     Task::current().stop();
 
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 // safe because TaskManager is kept behind mutex??

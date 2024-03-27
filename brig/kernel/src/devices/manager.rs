@@ -75,6 +75,6 @@ impl SharedDeviceManager {
 
     pub fn get_device_by_alias<S: AsRef<str>>(&self, alias: S) -> Option<SharedDevice> {
         let id = &self.lookup_alias(alias)?;
-        self.inner.lock().devices.get(&id).cloned()
+        self.inner.lock().devices.get(id).cloned()
     }
 }

@@ -38,18 +38,18 @@ pub fn init() {
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
             let stack_start = VirtAddr::from_ptr(unsafe { addr_of!(STACK) });
-            stack_start + STACK_SIZE // stack end
+            stack_start + u64::try_from(STACK_SIZE).unwrap() // stack end
         };
         tss
     });
 
     GDT.call_once(|| {
         let mut gdt = GlobalDescriptorTable::new();
-        let kernel_code_selector = gdt.add_entry(Descriptor::kernel_code_segment());
-        let kernel_data_selector = gdt.add_entry(Descriptor::kernel_data_segment());
-        let user_data_selector = gdt.add_entry(Descriptor::user_data_segment());
-        let user_code_selector = gdt.add_entry(Descriptor::user_code_segment());
-        let tss_selector = gdt.add_entry(Descriptor::tss_segment(TSS.get().unwrap()));
+        let kernel_code_selector = gdt.append(Descriptor::kernel_code_segment());
+        let kernel_data_selector = gdt.append(Descriptor::kernel_data_segment());
+        let user_data_selector = gdt.append(Descriptor::user_data_segment());
+        let user_code_selector = gdt.append(Descriptor::user_code_segment());
+        let tss_selector = gdt.append(Descriptor::tss_segment(TSS.get().unwrap()));
         (
             gdt,
             Selectors {

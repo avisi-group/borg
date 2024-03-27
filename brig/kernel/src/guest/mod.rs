@@ -2,7 +2,10 @@ use {
     crate::{
         devices::manager::SharedDeviceManager,
         guest::{
-            devices::GuestDevice,
+            devices::{
+                core::aarch64::{AArch64CoreState, AArch64Interpreter},
+                GuestDevice,
+            },
             memory::{AddressSpace, AddressSpaceRegion},
         },
     },
@@ -51,6 +54,7 @@ impl GuestExecutionContext {
 /// Start guest emulation
 pub fn start() {
     log::trace!("starting guest");
+
     //check each connected block device for guest config
     let device_manager = SharedDeviceManager::get();
     let device = device_manager
@@ -61,7 +65,7 @@ pub fn start() {
 
     log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
 
-    unsafe { GUEST.call_once(|| Guest::new()) };
+    unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();
 
     // create memory
@@ -70,15 +74,15 @@ pub fn start() {
 
         for (name, region) in regions {
             let (start, end) = (
-                usize::from_str_radix(&region.start.trim_start_matches("0x"), 16).unwrap(),
-                usize::from_str_radix(&region.end.trim_start_matches("0x"), 16).unwrap(),
+                usize::from_str_radix(region.start.trim_start_matches("0x"), 16).unwrap(),
+                usize::from_str_radix(region.end.trim_start_matches("0x"), 16).unwrap(),
             );
 
             addrspace.add_region(AddressSpaceRegion::new(
                 name,
                 start,
                 end - start,
-                memory::AddressSpaceRegionKind::RAM,
+                memory::AddressSpaceRegionKind::Ram,
             ));
         }
 
@@ -88,7 +92,20 @@ pub fn start() {
     // create devices, including cores
     for (name, device) in config.devices {
         let dev: Rc<dyn GuestDevice> = match device.kind.as_str() {
-            "arm64generic" => Rc::new(self::devices::arm64generic::Arm64Generic::new()),
+            "core" => match device
+                .extra
+                .get("arch".into())
+                .expect("missing arch definition")
+                .as_str()
+            {
+                "arm64" => Rc::new(self::devices::core::GenericCore::new::<
+                    AArch64CoreState,
+                    AArch64Interpreter,
+                >()),
+                _ => {
+                    panic!("unsupported core arch")
+                }
+            },
             "pl011" => Rc::new(self::devices::pl011::PL011::new()),
             "virtio-blk" => Rc::new(self::devices::virtio::VirtIOBlock::new()),
             _ => {
@@ -119,7 +136,7 @@ pub fn start() {
                     attachment.address_space, name
                 );
             }
-        } else if let Some(_) = dev.as_io_handler() {
+        } else if dev.as_io_handler().is_some() {
             panic!("io device missing address space attachment");
         }
     }

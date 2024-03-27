@@ -42,7 +42,8 @@ impl Backtracer {
     fn lookup_symbol(&self, pc: VirtAddr) -> &'static str {
         // todo: check that it is within kernel range
         // todo: make backtrace struct and this a method on it
-        if !(self.kernel_image_virt_addr..self.kernel_image_virt_addr + self.kernel_image_len)
+        if !(self.kernel_image_virt_addr
+            ..self.kernel_image_virt_addr + u64::try_from(self.kernel_image_len).unwrap())
             .contains(&pc)
         {
             return "???";
@@ -66,7 +67,8 @@ pub fn init(kernel_load_addr: VirtAddr, kernel_image_address: PhysAddr, kernel_i
     BACKTRACER
         .call_once(|| Backtracer::new(kernel_load_addr, kernel_image_address, kernel_image_len));
 
-    // push null to base pointer to prevent recursing indefinitely
+    // Push null to base pointer to prevent recursing indefinitely when
+    // printing backtrace
     unsafe { asm!("mov rbp, 0") };
 }
 
@@ -89,7 +91,15 @@ pub fn backtrace() {
     }
 
     while !stk.is_null() {
-        let pc = VirtAddr::new(unsafe { &*stk }.rip);
+        let rip = unsafe { &*stk }.rip;
+        let pc = match VirtAddr::try_new(rip) {
+            Ok(pc) => pc,
+            Err(e) => {
+                log::error!("    backtrace failed: {e:?}");
+                return;
+            }
+        };
+
         let symbol = rustc_demangle::demangle(BACKTRACER.get().unwrap().lookup_symbol(pc));
         log::error!("    {:x} : {}", pc, symbol);
         unsafe { stk = (*stk).rbp };

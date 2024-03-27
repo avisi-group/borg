@@ -18,6 +18,7 @@ use {
 };
 
 mod arch;
+mod dbt;
 mod devices;
 mod fs;
 mod guest;

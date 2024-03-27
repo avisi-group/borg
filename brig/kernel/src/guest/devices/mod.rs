@@ -1,6 +1,7 @@
 use {crate::guest::memory::IOMemoryHandler, alloc::rc::Rc};
 
-pub mod arm64generic;
+pub mod arch;
+pub mod core;
 pub mod pl011;
 pub mod virtio;
 

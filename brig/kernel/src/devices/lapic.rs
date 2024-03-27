@@ -58,10 +58,12 @@ impl LocalApic {
 }
 
 fn calibrate_timer_frequency(lapic: &mut x2apic::lapic::LocalApic) -> u32 {
-    unsafe { lapic.set_timer_initial(1) };
-    unsafe { lapic.set_timer_mode(TimerMode::OneShot) };
-    unsafe { lapic.set_timer_divide(TimerDivide::Div16) };
-    unsafe { lapic.enable_timer() };
+    unsafe {
+        lapic.set_timer_initial(1);
+        lapic.set_timer_mode(TimerMode::OneShot);
+        lapic.set_timer_divide(TimerDivide::Div16);
+        lapic.enable_timer();
+    };
 
     let factor = 1000;
     let calibration_period = 10;
@@ -72,9 +74,7 @@ fn calibrate_timer_frequency(lapic: &mut x2apic::lapic::LocalApic) -> u32 {
     unsafe { lapic.set_timer_initial(u32::MAX) };
 
     while !pit::is_expired() {
-        unsafe {
-            core::arch::asm!("nop");
-        }
+        x86_64::instructions::nop()
     }
 
     unsafe { lapic.disable_timer() };

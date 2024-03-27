@@ -35,7 +35,7 @@ impl Core {
             CORES
                 .get(get_local_pid() as usize)
                 .unwrap()
-                .call_once(|| Core::default())
+                .call_once(Core::default)
         };
     }
 
@@ -59,7 +59,6 @@ impl Core {
         let key = TypeId::of::<O>();
         self.state
             .get_mut(&key)
-            .map(|any| any.downcast_mut::<O>())
-            .flatten()
+            .and_then(|any| any.downcast_mut::<O>())
     }
 }

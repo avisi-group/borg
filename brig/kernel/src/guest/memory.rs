@@ -53,7 +53,7 @@ pub trait IoMemoryHandlerExt {
 }
 
 pub enum AddressSpaceRegionKind {
-    RAM,
+    Ram,
     IO(Rc<dyn IOMemoryHandler>),
 }
 

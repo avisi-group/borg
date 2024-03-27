@@ -7,20 +7,27 @@ use {
         guest::memory::AddressSpaceRegionKind,
         scheduler,
     },
+    alloc::{alloc::alloc_zeroed, collections::BTreeSet},
     core::alloc::Layout,
     proc_macro_lib::irq_handler,
     spin::Once,
+    x86::irq::{BREAKPOINT_VECTOR, GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR},
     x86_64::{
         registers::control::Cr2,
         structures::{
-            idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
+            idt::{InterruptDescriptorTable, PageFaultErrorCode},
             paging::{Page, PageTableFlags, PhysFrame, Size4KiB},
         },
         VirtAddr,
     },
 };
 
-static IDT: Once<InterruptDescriptorTable> = Once::INIT;
+static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;
+
+struct IrqManager {
+    idt: InterruptDescriptorTable,
+    avail: BTreeSet<u8>,
+}
 
 #[irq_handler(with_code = false)]
 fn timer_interrupt() {
@@ -38,7 +45,7 @@ fn timer_interrupt() {
 
 #[irq_handler(with_code = true)]
 fn page_fault_exception(machine_context: *mut MachineContext) {
-    let faulting_address = Cr2::read();
+    let faulting_address = Cr2::read().unwrap();
 
     let error_code =
         PageFaultErrorCode::from_bits(unsafe { (*machine_context).error_code }).unwrap();
@@ -53,10 +60,10 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             //log::trace!("located region {}", rgn);
 
             match rgn.kind() {
-                AddressSpaceRegionKind::RAM => {
+                AddressSpaceRegionKind::Ram => {
                     let faulting_page = faulting_address.align_down(0x1000u64);
                     let backing_page = VirtAddr::from_ptr(unsafe {
-                        alloc::alloc::alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
+                        alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
                     })
                     .to_phys();
 
@@ -81,23 +88,80 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 }
 
 pub fn init() {
-    IDT.call_once(|| {
-        let mut idt = InterruptDescriptorTable::new();
-        idt.breakpoint.set_handler_fn(breakpoint_handler);
-        idt.general_protection_fault
-            .set_handler_fn(general_protection_handler);
-        idt.double_fault.set_handler_fn(double_fault_handler);
+    unsafe {
+        IRQ_MANAGER.call_once(|| IrqManager {
+            idt: InterruptDescriptorTable::new(),
+            avail: BTreeSet::new(),
+        });
 
+        IRQ_MANAGER.get_mut().unwrap().init_default();
+    }
+
+    //IRQ_MANAGER.init_default();
+
+    //    IRQ_MANAGER.get().unwrap().load();
+}
+
+enum IrqError {
+    IrqAlreadyReserved,
+    NoAvailableIrqs,
+}
+
+pub type IrqHandlerFn = unsafe extern "C" fn();
+
+impl IrqManager {
+    pub fn init_default(&'static mut self) {
+        self.assign_irq(BREAKPOINT_VECTOR, breakpoint_exception);
+        self.assign_irq(PAGE_FAULT_VECTOR, page_fault_exception);
+        self.assign_irq(GENERAL_PROTECTION_FAULT_VECTOR, gpf_exception);
+
+        // TODO: Pop this out
+        self.reserve_irq(0x20, timer_interrupt);
+
+        for i in 32..=255 {
+            self.avail.insert(i);
+        }
+
+        self.idt.load();
+    }
+
+    pub fn assign_irq(&mut self, nr: u8, handler: IrqHandlerFn) {
         unsafe {
-            idt.page_fault
-                .set_handler_addr(VirtAddr::from_ptr(page_fault_exception as *const u8));
-            idt[32].set_handler_addr(VirtAddr::from_ptr(timer_interrupt as *const u8));
-        };
+            match nr {
+                PAGE_FAULT_VECTOR => {
+                    self.idt
+                        .page_fault
+                        .set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
+                }
+                GENERAL_PROTECTION_FAULT_VECTOR => {
+                    self.idt
+                        .general_protection_fault
+                        .set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
+                }
+                nr => {
+                    self.idt[nr].set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
+                }
+            }
+        }
+    }
 
-        idt
-    });
+    pub fn reserve_irq(&mut self, nr: u8, handler: IrqHandlerFn) -> Result<(), IrqError> {
+        if self.avail.contains(&nr) {
+            return Err(IrqError::IrqAlreadyReserved);
+        }
 
-    IDT.get().unwrap().load();
+        self.assign_irq(nr, handler);
+
+        Ok(())
+    }
+
+    pub fn allocate_irq(&mut self, handler: IrqHandlerFn) -> Result<(), IrqError> {
+        let nr = self.avail.pop_first().ok_or(IrqError::NoAvailableIrqs)?;
+
+        self.assign_irq(nr, handler);
+
+        Ok(())
+    }
 }
 
 pub fn _local_enable() {
@@ -108,23 +172,17 @@ pub fn local_disable() {
     x86_64::instructions::interrupts::disable();
 }
 
-extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
-    log::error!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
+#[irq_handler(with_code = false)]
+fn breakpoint_exception() {
+    log::error!("EXCEPTION: BREAKPOINT");
 }
 
-extern "x86-interrupt" fn double_fault_handler(
-    stack_frame: InterruptStackFrame,
-    error_code: u64,
-) -> ! {
-    panic!(
-        "EXCEPTION: DOUBLE FAULT code {error_code}\n{:#?}",
-        stack_frame
-    );
+#[irq_handler(with_code = true)]
+fn double_fault_exception() {
+    log::error!("EXCEPTION: DOUBLE-FAULT");
 }
 
-extern "x86-interrupt" fn general_protection_handler(
-    stack_frame: InterruptStackFrame,
-    error_code: u64,
-) {
-    panic!("general protection fault code {error_code}\n{stack_frame:#?}");
+#[irq_handler(with_code = true)]
+fn gpf_exception() {
+    log::error!("EXCEPTION: GENERAL PROTECTION FAULT");
 }
