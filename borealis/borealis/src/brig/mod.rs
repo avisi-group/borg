@@ -18,8 +18,11 @@ use {
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
-    sailrs::jib_ast::Definition,
-    std::{cell::RefCell, rc::Rc},
+    sailrs::{
+        jib_ast::{Definition, Instruction},
+        sail_ast::{Identifier, IdentifierAux, Location},
+        types::ListVec,
+    },
 };
 
 const FN_ALLOWLIST: &[&str] = &[
@@ -27,22 +30,25 @@ const FN_ALLOWLIST: &[&str] = &[
     "__DecodeA64_DataProcImm",
     "decode_add_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
     "execute_aarch64_instrs_integer_arithmetic_add_sub_immediate",
-    "SP_read",
-    "place_slice",
-    "slice_mask",
-    "sail_mask",
-    "size_itself_int",
+    // "SP_read",
+    // "place_slice",
+    // "slice_mask",
+    // "sail_mask",
+    // "size_itself_int",
 ];
 
 mod codegen;
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig(jib_ast: &[Definition], standalone: bool) -> TokenStream {
+pub fn sail_to_brig<I: Iterator<Item = Definition>>(jib_ast: I, standalone: bool) -> TokenStream {
     info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(jib_ast);
+    let ast = Ast::from_jib(apply_fn_allowlist(jib_ast));
 
-    // only run on a subset of the model, for now
-    apply_function_denylist(ast.clone());
+    // useful for debugging
+    crate::boom::pretty_print::print_ast(
+        &mut create_file("target/ast_raw.boom").unwrap(),
+        ast.clone(),
+    );
 
     info!("Running passes on BOOM");
     passes::run_fixed_point(
@@ -59,7 +65,10 @@ pub fn sail_to_brig(jib_ast: &[Definition], standalone: bool) -> TokenStream {
     );
 
     // useful for debugging
-    crate::boom::pretty_print::print_ast(&mut create_file("target/ast.boom").unwrap(), ast.clone());
+    crate::boom::pretty_print::print_ast(
+        &mut create_file("target/ast_processed.boom").unwrap(),
+        ast.clone(),
+    );
 
     info!("Building rudder");
 
@@ -173,6 +182,7 @@ pub fn sail_to_brig(jib_ast: &[Definition], standalone: bool) -> TokenStream {
         #![allow(unused_mut)]
         #![allow(unused_parens)]
         #![allow(unused_variables)]
+        #![allow(dead_code)]
         #![allow(unreachable_code)]
 
         //! BOREALIS GENERATED FILE DO NOT MODIFY
@@ -199,14 +209,42 @@ pub fn sail_to_brig(jib_ast: &[Definition], standalone: bool) -> TokenStream {
     }
 }
 
-fn apply_function_denylist(ast: Rc<RefCell<Ast>>) {
-    // filter out non addsub functions
-    let funcs = ast
-        .borrow()
-        .functions
-        .clone()
-        .into_iter()
-        .filter(|(k, _)| FN_ALLOWLIST.contains(&k.as_ref()))
-        .collect();
-    ast.borrow_mut().functions = funcs;
+fn apply_fn_allowlist<I: Iterator<Item = Definition>>(iter: I) -> impl Iterator<Item = Definition> {
+    // stub out functions not in the allowlist
+
+    iter.map(|def| {
+        if let Definition::Fundef(name, idk, arguments, body) = def {
+            let body = if FN_ALLOWLIST.contains(&name.as_interned().as_ref()) {
+                body
+            } else {
+                ListVec::from(vec![
+                    Instruction {
+                        inner: sailrs::jib_ast::InstructionAux::Funcall(
+                            sailrs::jib_ast::Expression::Void,
+                            false,
+                            (
+                                Identifier {
+                                    inner: IdentifierAux::Identifier("trap".into()),
+                                    location: Location::Unknown,
+                                },
+                                ListVec::new(),
+                            ),
+                            ListVec::new(),
+                        ),
+                        annot: (0, Location::Unknown),
+                    },
+                    Instruction {
+                        inner: sailrs::jib_ast::InstructionAux::Undefined(
+                            sailrs::jib_ast::Type::Unit,
+                        ),
+                        annot: (0, Location::Unknown),
+                    },
+                ])
+            };
+
+            Definition::Fundef(name, idk, arguments, body)
+        } else {
+            def
+        }
+    })
 }

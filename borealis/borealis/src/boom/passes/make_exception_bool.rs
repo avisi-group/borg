@@ -126,7 +126,7 @@ fn statement_filter(
 
                     None
                 } else {
-                    panic!("found non-exception union type decl")
+                    Some(statement_cloned)
                 }
             } else {
                 Some(statement_cloned)

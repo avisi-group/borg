@@ -174,7 +174,7 @@ impl BuildContext {
 
                 let element_width = match size {
                     boom::Size::Static(size) => *size,
-                    boom::Size::Runtime(_) | boom::Size::Unknown => panic!("BOOM bitvector monomorphisation pass should ensure all bitvectors have static length before rudder conversion"),
+                    boom::Size::Runtime(_) | boom::Size::Unknown => 64, //panic!("BOOM bitvector monomorphisation pass should ensure all bitvectors have static length before rudder conversion"),
                 };
 
                 Rc::new(rudder::Type::new_primitive(tc, element_width))
@@ -188,7 +188,7 @@ impl BuildContext {
                 let element_type = (*self.resolve_type(element_type.clone())).clone();
                 // todo: Brian Campbell said the Sail C backend had functionality to staticize
                 // all bitvector lengths
-                Rc::new(element_type.vectorize(None))
+                Rc::new(element_type.vectorize(0))
             }
             boom::Type::FixedVector {
                 length,
@@ -196,7 +196,7 @@ impl BuildContext {
             } => {
                 let element_type = (*self.resolve_type(element_type.clone())).clone();
 
-                Rc::new(element_type.vectorize(Some(usize::try_from(*length).unwrap())))
+                Rc::new(element_type.vectorize(usize::try_from(*length).unwrap()))
             }
             boom::Type::Reference(inner) => {
                 // todo: this is broken:(

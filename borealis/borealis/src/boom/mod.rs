@@ -5,7 +5,6 @@
 
 use {
     crate::boom::{
-        builtins::builtin_fns,
         control_flow::ControlFlowBlock,
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
@@ -17,7 +16,6 @@ use {
     std::{cell::RefCell, fmt::Debug, ops::Add, rc::Rc},
 };
 
-pub mod builtins;
 pub mod control_flow;
 pub mod convert;
 pub mod passes;
@@ -37,15 +35,11 @@ pub struct Ast {
 
 impl Ast {
     /// Converts JIB AST into BOOM AST
-    pub fn from_jib<'a, I: IntoIterator<Item = &'a jib_ast::Definition>>(
-        iter: I,
-    ) -> Rc<RefCell<Self>> {
+    pub fn from_jib<'a, I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Rc<RefCell<Self>> {
         let mut emitter = BoomEmitter::new();
         emitter.process(iter);
 
-        let mut ast = emitter.finish();
-
-        ast.functions.extend(builtin_fns());
+        let ast = emitter.finish();
 
         Rc::new(RefCell::new(ast))
     }

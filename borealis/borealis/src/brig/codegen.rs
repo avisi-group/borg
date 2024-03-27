@@ -187,11 +187,7 @@ pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
             element_count,
             element_type,
         } => {
-            let count = if let Some(c) = element_count {
-                quote!(#c)
-            } else {
-                quote!(_) // elide length and hope it's resolavable
-            };
+            let count = quote!(#element_count);
             let element_type = codegen_type(element_type.clone());
             quote!([#element_type; #count])
         }
@@ -583,6 +579,10 @@ fn codegen_ident(input: InternedString) -> Ident {
 
     let s = input.as_ref();
 
+    if s == "main" {
+        return Ident::new("model_main", Span::call_site());
+    }
+
     let mut buf = String::with_capacity(s.len());
 
     for ch in s.chars() {
@@ -590,7 +590,7 @@ fn codegen_ident(input: InternedString) -> Ident {
             '%' => buf.push_str("_pcnt_"),
             '&' => buf.push_str("_ref_"),
             '?' => buf.push_str("_unknown_"),
-            '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' => buf.push('_'),
+            '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' | '\'' => buf.push('_'),
             _ => buf.push(ch),
         }
     }

@@ -99,6 +99,11 @@ impl<T> ListVec<T> {
     pub fn iter(&self) -> slice::Iter<T> {
         self.0.iter()
     }
+
+    /// Returns a new, empty ListVec
+    pub fn new() -> Self {
+        Self(vec![])
+    }
 }
 
 impl<T> IntoIterator for ListVec<T> {
@@ -120,6 +125,12 @@ impl<T> FromIterator<T> for ListVec<T> {
 impl<T> AsRef<[T]> for ListVec<T> {
     fn as_ref(&self) -> &[T] {
         self.0.as_ref()
+    }
+}
+
+impl<T> From<Vec<T>> for ListVec<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self(value)
     }
 }
 

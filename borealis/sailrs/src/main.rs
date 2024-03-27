@@ -40,7 +40,7 @@ fn main() -> Result<()> {
 
     let (ast, jib) = load_from_config(args.input)?;
 
-    //sailrs::jib_ast::pretty_print::print_ast(jib.iter());
+    sailrs::jib_ast::pretty_print::print_ast(jib.iter());
 
     trace!(
         "Size: AST {:.2} bytes, JIB {:.2} bytes",

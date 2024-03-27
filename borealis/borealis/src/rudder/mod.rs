@@ -44,8 +44,7 @@ pub enum Type {
     Primitive(PrimitiveType),
     Composite(Vec<Rc<Type>>),
     Vector {
-        // None = unknown
-        element_count: Option<usize>,
+        element_count: usize,
         element_type: Rc<Type>,
     },
 }
@@ -91,7 +90,7 @@ impl Type {
             Type::Vector {
                 element_count,
                 element_type,
-            } => element_type.width_bits() * element_count.unwrap_or(0),
+            } => element_type.width_bits() * element_count,
         }
     }
     pub fn width_bytes(&self) -> usize {
@@ -110,7 +109,7 @@ impl Type {
     type_def_helper!(f32, FloatingPoint, 32);
     type_def_helper!(f64, FloatingPoint, 64);
 
-    pub fn vectorize(self, element_count: Option<usize>) -> Self {
+    pub fn vectorize(self, element_count: usize) -> Self {
         Self::Vector {
             element_count,
             element_type: Rc::new(self),

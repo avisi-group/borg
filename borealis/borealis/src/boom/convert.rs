@@ -2,9 +2,12 @@
 
 use {
     crate::boom::{
-        self, control_flow::build_graph, Bit, FunctionSignature, NamedType, Parameter, Size,
+        self,
+        control_flow::{build_graph, ControlFlowBlock},
+        Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Statement,
     },
     common::{intern::InternedString, HashMap},
+    log::warn,
     sailrs::{jib_ast, sail_ast},
     std::{borrow::Borrow, cell::RefCell, rc::Rc},
 };
@@ -29,19 +32,99 @@ impl BoomEmitter {
     }
 
     /// Process a sequence of JIB definitions
-    pub fn process<'a, I: IntoIterator<Item = &'a jib_ast::Definition>>(&mut self, definitions: I) {
+    pub fn process<I: IntoIterator<Item = jib_ast::Definition>>(&mut self, definitions: I) {
         definitions
             .into_iter()
-            .for_each(|def| self.process_definition(def));
+            .for_each(|def| self.process_definition(&def));
     }
 
     /// Emit BOOM AST
-    pub fn finish(self) -> boom::Ast {
+    pub fn finish(mut self) -> boom::Ast {
         if !self.function_types.is_empty() {
-            panic!(
-                "missing definitions for: \n{:#?}",
+            warn!(
+                "missing fn definitions, adding empty bodies for:\n{:#?}",
                 self.function_types.keys().collect::<Vec<_>>()
             );
+
+            for (name, (parameters, return_type)) in self.function_types {
+                let entry_block = ControlFlowBlock::new();
+                entry_block.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
+                    expression: None,
+                    name: "trap".into(),
+                    arguments: vec![],
+                }))]);
+
+                self.ast.functions.insert(
+                    name,
+                    FunctionDefinition {
+                        signature: FunctionSignature {
+                            name: name,
+                            parameters: Rc::new(RefCell::new(
+                                parameters
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, typ)| Parameter {
+                                        name: format!("_{i}").into(),
+                                        typ: typ.clone(),
+                                        is_ref: false,
+                                    })
+                                    .collect::<Vec<_>>(),
+                            )),
+                            return_type,
+                        },
+                        entry_block,
+                    },
+                );
+            }
+
+            {
+                let entry_block = ControlFlowBlock::new();
+                entry_block.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
+                    expression: None,
+                    name: "trap".into(),
+                    arguments: vec![],
+                }))]);
+
+                self.ast.functions.insert(
+                    "update_fbits".into(),
+                    FunctionDefinition {
+                        signature: FunctionSignature {
+                            name: "update_fbits".into(),
+                            parameters: Rc::new(RefCell::new(vec![
+                                Parameter {
+                                    name: "value".into(),
+                                    typ: Rc::new(RefCell::new(boom::Type::Int {
+                                        signed: false,
+                                        size: Size::Static(64),
+                                    })),
+                                    is_ref: false,
+                                },
+                                Parameter {
+                                    name: "position".into(),
+                                    typ: Rc::new(RefCell::new(boom::Type::Int {
+                                        signed: false,
+                                        size: Size::Static(64),
+                                    })),
+                                    is_ref: false,
+                                },
+                                Parameter {
+                                    name: "bit".into(),
+                                    typ: Rc::new(RefCell::new(boom::Type::Int {
+                                        signed: false,
+                                        size: Size::Static(64),
+                                    })),
+                                    is_ref: false,
+                                },
+                            ])),
+                            return_type: Rc::new(RefCell::new(boom::Type::Int {
+                                signed: false,
+                                size: Size::Static(64),
+                            })),
+                        },
+                        entry_block,
+                    },
+                );
+            }
         }
         self.ast
     }
@@ -227,13 +310,13 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         jib_ast::InstructionAux::Label(s) => vec![boom::Statement::Label(*s)],
         jib_ast::InstructionAux::Funcall(expression, _, (name, _), args) => {
             vec![boom::Statement::FunctionCall {
-                expression: Some(convert_expression(expression)),
+                expression: convert_expression(expression),
                 name: name.as_interned(),
                 arguments: args.iter().map(convert_value).collect(),
             }]
         }
         jib_ast::InstructionAux::Copy(expression, value) => vec![boom::Statement::Copy {
-            expression: convert_expression(expression),
+            expression: convert_expression(expression).unwrap(),
             value: convert_value(value),
         }],
         jib_ast::InstructionAux::Clear(_, _) => vec![],
@@ -276,19 +359,19 @@ fn convert_name(name: &jib_ast::Name) -> InternedString {
     }
 }
 
-fn convert_expression(expression: &jib_ast::Expression) -> boom::Expression {
+fn convert_expression(expression: &jib_ast::Expression) -> Option<boom::Expression> {
     match expression {
-        jib_ast::Expression::Id(name, _) => boom::Expression::Identifier(convert_name(name)),
+        jib_ast::Expression::Id(name, _) => Some(boom::Expression::Identifier(convert_name(name))),
         jib_ast::Expression::Rmw(_, _, _) => todo!(),
-        jib_ast::Expression::Field(expression, ident) => boom::Expression::Field {
-            expression: Box::new(convert_expression(expression)),
+        jib_ast::Expression::Field(expression, ident) => Some(boom::Expression::Field {
+            expression: Box::new(convert_expression(expression).unwrap()),
             field: ident.as_interned(),
-        },
-        jib_ast::Expression::Addr(expr) => {
-            boom::Expression::Address(Box::new(convert_expression(expr)))
-        }
+        }),
+        jib_ast::Expression::Addr(expr) => Some(boom::Expression::Address(Box::new(
+            convert_expression(expr).unwrap(),
+        ))),
         jib_ast::Expression::Tuple(_, _) => todo!(),
-        jib_ast::Expression::Void => todo!(),
+        jib_ast::Expression::Void => None,
     }
 }
 

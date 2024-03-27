@@ -12,146 +12,144 @@ use {
 
 pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
     let mappings = [
-        // this is a GenC builtin function so can be left as a noop here (technically not needed
-        // but just being explicit)
         ("trap", noop as HandlerFunction),
-        // requires bitvector conversion logic
-        ("UInt", replace_with_copy),
-        // we represent integers as u64s so these can be removed
-        ("u_pcnt_i___pcnt_i64", replace_with_copy),
-        ("u_pcnt_i64___pcnt_i", replace_with_copy),
-        // replace with equality test
-        ("eq_bool", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("eq_string", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("eq_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("neq_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::NotEqual)
-        }),
+        // // requires bitvector conversion logic
+        // ("UInt", replace_with_copy),
+        // // we represent integers as u64s so these can be removed
+        // ("u_pcnt_i___pcnt_i64", replace_with_copy),
+        // ("u_pcnt_i64___pcnt_i", replace_with_copy),
+        // // replace with equality test
+        // ("eq_bool", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("eq_string", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("eq_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("neq_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::NotEqual)
+        // }),
         ("lt_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LessThan)
         }),
-        ("gt_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::GreaterThan)
-        }),
-        ("lteq_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::LessThanOrEqual)
-        }),
-        ("gteq_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
-        }),
-        ("u_shl_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::LeftShift)
-        }),
-        ("u_shl8", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::LeftShift)
-        }),
-        ("eq_vec", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("not_vec", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Complement)
-        }),
-        ("not_bool", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Not)
-        }),
-        ("add_atom", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Add)
-        }),
-        ("sub_atom", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Subtract)
-        }),
-        ("mult_atom", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Multiply)
-        }),
-        ("xor_vec", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Xor)
-        }),
-        ("or_vec", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Or)
-        }),
-        ("and_vec", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::And)
-        }),
-        ("add_vec", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Add)
-        }),
-        ("add_vec_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Add)
-        }),
-        ("neq_vec", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::NotEqual)
-        }),
-        ("ROR", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::RotateRight)
-        }),
-        ("ASR", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::RightShift)
-        }),
-        ("LSR", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::RightShift)
-        }),
-        ("LSL", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::LeftShift)
-        }),
-        ("ediv_int", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Divide)
-        }),
-        ("SInt", replace_with_copy), // probably need to take another look at this
-        ("bitvector_length", bv_length_handler),
-        ("bitvector_access_B", bv_access_handler),
-        ("bitvector_access_A", bv_access_handler),
-        ("raw_GetSlice_int", noop),
-        ("ZeroExtend__0", zero_extend_handler),
-        ("ZeroExtend__1", zero_extend_handler),
-        ("SignExtend__0", sign_extend_handler),
-        ("eq_anything_EArchVersion_pcnt__", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("eq_anything_EMoveWideOp_pcnt__", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("eq_anything_EBranchType_pcnt__", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("eq_anything_EMemOp_pcnt__", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("eq_anything_EConstraint_pcnt__", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::Equal)
-        }),
-        ("neq_anything_EMemOp_pcnt__", |ast, f, s| {
-            replace_with_op(ast, f, s, OperationKind::NotEqual)
-        }),
-        ("slice", noop),
-        ("Zeros", noop),
-        ("undefined_bitvector", noop),
-        ("bitvector_concat", noop),
-        ("aget_PC", |ast, f, s| rename(ast, f, s, "read_pc".into())),
-        // these two handlers originally replaced the call with an "inline" if statement, rather
-        // than splitting the control flow blocks, etc
-        ("sail_assert", assert_handler),
-        ("min_int", noop),
-        //
-        // delete undefined initializers
-        ("undefined_bool", delete),
-        ("undefined_LogicalOp", delete),
-        ("undefined_int", delete),
-        ("undefined_MoveWideOp", delete),
-        ("undefined_MemOp", delete),
-        ("undefined_Constraint", delete),
-        ("undefined_SystemHintOp", delete),
-        ("undefined_BranchType", delete),
-        ("replicate_bits", replicate_bits_handler),
-        ("SetSlice_int", noop),
-        ("u__SetSlice_bits", set_slice_handler),
-        ("Extend__0", extend_handler),
-        ("update_fbits", update_fbits_handler),
+        // ("gt_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::GreaterThan)
+        // }),
+        // ("lteq_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::LessThanOrEqual)
+        // }),
+        // ("gteq_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
+        // }),
+        // ("u_shl_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::LeftShift)
+        // }),
+        // ("u_shl8", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::LeftShift)
+        // }),
+        // ("eq_vec", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("not_vec", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Complement)
+        // }),
+        // ("not_bool", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Not)
+        // }),
+        // ("add_atom", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Add)
+        // }),
+        // ("sub_atom", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Subtract)
+        // }),
+        // ("mult_atom", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Multiply)
+        // }),
+        // ("xor_vec", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Xor)
+        // }),
+        // ("or_vec", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Or)
+        // }),
+        // ("and_vec", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::And)
+        // }),
+        // ("add_vec", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Add)
+        // }),
+        // ("add_vec_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Add)
+        // }),
+        // ("neq_vec", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::NotEqual)
+        // }),
+        // ("ROR", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::RotateRight)
+        // }),
+        // ("ASR", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::RightShift)
+        // }),
+        // ("LSR", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::RightShift)
+        // }),
+        // ("LSL", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::LeftShift)
+        // }),
+        // ("ediv_int", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Divide)
+        // }),
+        // ("SInt", replace_with_copy), // probably need to take another look at this
+        // ("bitvector_length", bv_length_handler),
+        // ("bitvector_access_B", bv_access_handler),
+        // ("bitvector_access_A", bv_access_handler),
+        // ("raw_GetSlice_int", noop),
+        // ("ZeroExtend__0", zero_extend_handler),
+        // ("ZeroExtend__1", zero_extend_handler),
+        // ("SignExtend__0", sign_extend_handler),
+        // ("eq_anything_EArchVersion_pcnt__", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("eq_anything_EMoveWideOp_pcnt__", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("eq_anything_EBranchType_pcnt__", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("eq_anything_EMemOp_pcnt__", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("eq_anything_EConstraint_pcnt__", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::Equal)
+        // }),
+        // ("neq_anything_EMemOp_pcnt__", |ast, f, s| {
+        //     replace_with_op(ast, f, s, OperationKind::NotEqual)
+        // }),
+        // ("slice", noop),
+        // ("Zeros", noop),
+        // ("undefined_bitvector", noop),
+        // ("bitvector_concat", noop),
+        // ("aget_PC", |ast, f, s| rename(ast, f, s, "read_pc".into())),
+        // // these two handlers originally replaced the call with an "inline" if statement, rather
+        // // than splitting the control flow blocks, etc
+        // ("sail_assert", assert_handler),
+        // ("min_int", noop),
+        // //
+        // // delete undefined initializers
+        // ("undefined_bool", delete),
+        // ("undefined_LogicalOp", delete),
+        // ("undefined_int", delete),
+        // ("undefined_MoveWideOp", delete),
+        // ("undefined_MemOp", delete),
+        // ("undefined_Constraint", delete),
+        // ("undefined_SystemHintOp", delete),
+        // ("undefined_BranchType", delete),
+        // ("replicate_bits", replicate_bits_handler),
+        // ("SetSlice_int", noop),
+        // ("u__SetSlice_bits", set_slice_handler),
+        // ("Extend__0", extend_handler),
+        // ("update_fbits", update_fbits_handler),
     ]
     .into_iter()
     .map(|(s, f)| (InternedString::from_static(s), f));

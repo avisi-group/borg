@@ -22,7 +22,7 @@ pub mod rudder;
 pub fn run<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O, standalone: bool) {
     let jib = load_model(input);
 
-    let tokens = sail_to_brig(jib.as_ref(), standalone);
+    let tokens = sail_to_brig(jib.into_iter(), standalone);
 
     let syntax_tree = syn::parse_file(&tokens.to_string()).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
