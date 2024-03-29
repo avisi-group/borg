@@ -8,7 +8,7 @@
 //! * any assignments to exception that arent boolean(?)
 //! * assignments to `throw`
 //! * assignments where the value is a union
-//! * whole of the if exception branch, replace with a `trap()` function call
+//! * whole of the if exception branch, replace with a panic statement
 //!
 //! NOTE 2024-03-24 all non-rudder passes were deleted, this one was kept in case `make_exception_bool` turns out to be insufficient
 
@@ -107,12 +107,7 @@ impl Visitor for RemoveExceptions {
         } = block.terminator()
         {
             if ident.as_ref() == "exception" {
-                target.set_statements(vec![Statement::FunctionCall {
-                    expression: None,
-                    name: "trap".into(),
-                    arguments: vec![],
-                }
-                .into()]);
+                target.set_statements(vec![Statement::Panic(vec![]).into()]);
                 target.set_terminator(Terminator::Return(None));
             }
         }
@@ -193,14 +188,14 @@ fn statement_filter(
 
 fn raise_exceptions(fn_def: &FunctionDefinition) {
     // first, find exception blocks (likely candidates are the target of "if
-    // exception"s and contain a single `trap()` instruction)
+    // exception"s and contain a single panic instruction)
     let exception_blocks = fn_def
         .entry_block
         .iter()
         .filter(|block| {
             block.statements().len() == 1
-                && (if let Statement::FunctionCall { name, .. } = &*block.statements()[0].borrow() {
-                    name.as_ref() == "trap"
+                && (if let Statement::Panic(_) = &*block.statements()[0].borrow() {
+                    true
                 } else {
                     false
                 } || if let Statement::Copy {
@@ -227,12 +222,7 @@ fn raise_exceptions(fn_def: &FunctionDefinition) {
                 statements.push(
                     Statement::If {
                         condition: Rc::new(RefCell::new(condition)),
-                        if_body: vec![Statement::FunctionCall {
-                            expression: None,
-                            name: "trap".into(),
-                            arguments: vec![],
-                        }
-                        .into()],
+                        if_body: vec![Statement::Panic(vec![]).into()],
                         else_body: vec![],
                     }
                     .into(),
@@ -247,12 +237,7 @@ fn raise_exceptions(fn_def: &FunctionDefinition) {
                     Statement::If {
                         condition: Rc::new(RefCell::new(condition)),
                         if_body: vec![],
-                        else_body: vec![Statement::FunctionCall {
-                            expression: None,
-                            name: "trap".into(),
-                            arguments: vec![],
-                        }
-                        .into()],
+                        else_body: vec![Statement::Panic(vec![]).into()],
                     }
                     .into(),
                 );

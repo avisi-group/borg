@@ -50,6 +50,11 @@ pub fn print_statement<W: Write>(w: &mut W, statement: Rc<RefCell<Statement>>) {
     visitor.visit_statement(statement);
 }
 
+pub fn print_value<W: Write>(w: &mut W, value: Rc<RefCell<Value>>) {
+    let mut visitor = PrettyPrinter::new(w);
+    visitor.visit_value(value);
+}
+
 /// Pretty-print BOOM AST
 pub struct PrettyPrinter<'writer, W> {
     indent: Rc<AtomicUsize>,
@@ -291,6 +296,25 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
             Statement::End(_) => todo!(),
             Statement::Undefined => todo!(),
+            Statement::Cast {
+                expression,
+                value,
+                typ,
+            } => {
+                self.visit_expression(expression);
+                write!(self.writer, " = ").unwrap();
+                self.visit_value(value.clone());
+                write!(self.writer, " as ").unwrap();
+                self.visit_type(typ.clone());
+            }
+            Statement::Panic(values) => {
+                write!(self.writer, "panic(").unwrap();
+                values.iter().for_each(|v| {
+                    self.visit_value(v.clone());
+                    write!(self.writer, ", ").unwrap();
+                });
+                write!(self.writer, ")").unwrap();
+            }
         }
     }
 
@@ -425,6 +449,27 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_value(value.clone());
                 write!(self.writer, " as ").unwrap();
                 write_uid(self, *identifier, types);
+            }
+
+            Value::Access { value, index } => {
+                self.visit_value(value.clone());
+                write!(self.writer, "[").unwrap();
+                self.visit_value(index.clone());
+                write!(self.writer, "]").unwrap();
+            }
+            Value::Range {
+                value,
+                start,
+                length,
+            } => {
+                self.visit_value(value.clone());
+                write!(self.writer, "[").unwrap();
+                self.visit_value(start.clone());
+                write!(self.writer, "..").unwrap();
+                self.visit_value(start.clone());
+                write!(self.writer, " + ").unwrap();
+                self.visit_value(length.clone());
+                write!(self.writer, "]").unwrap();
             }
         }
     }

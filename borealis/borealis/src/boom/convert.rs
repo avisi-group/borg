@@ -2,9 +2,7 @@
 
 use {
     crate::boom::{
-        self,
-        control_flow::{build_graph, ControlFlowBlock},
-        Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Statement,
+        self, control_flow::build_graph, Bit, FunctionSignature, NamedType, Parameter, Size,
     },
     common::{intern::InternedString, HashMap},
     log::warn,
@@ -39,103 +37,20 @@ impl BoomEmitter {
     }
 
     /// Emit BOOM AST
-    pub fn finish(mut self) -> boom::Ast {
-        if !self.function_types.is_empty() {
-            warn!(
-                "missing fn definitions, adding empty bodies for:\n{:#?}",
-                self.function_types.keys().collect::<Vec<_>>()
-            );
-
-            for (name, (parameters, return_type)) in self.function_types {
-                let entry_block = ControlFlowBlock::new();
-                entry_block.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
-                    expression: None,
-                    name: "trap".into(),
-                    arguments: vec![],
-                }))]);
-
-                self.ast.functions.insert(
-                    name,
-                    FunctionDefinition {
-                        signature: FunctionSignature {
-                            name: name,
-                            parameters: Rc::new(RefCell::new(
-                                parameters
-                                    .iter()
-                                    .enumerate()
-                                    .map(|(i, typ)| Parameter {
-                                        name: format!("_{i}").into(),
-                                        typ: typ.clone(),
-                                        is_ref: false,
-                                    })
-                                    .collect::<Vec<_>>(),
-                            )),
-                            return_type,
-                        },
-                        entry_block,
-                    },
-                );
-            }
-
-            {
-                let entry_block = ControlFlowBlock::new();
-                entry_block.set_statements(vec![Rc::new(RefCell::new(Statement::FunctionCall {
-                    expression: None,
-                    name: "trap".into(),
-                    arguments: vec![],
-                }))]);
-
-                self.ast.functions.insert(
-                    "update_fbits".into(),
-                    FunctionDefinition {
-                        signature: FunctionSignature {
-                            name: "update_fbits".into(),
-                            parameters: Rc::new(RefCell::new(vec![
-                                Parameter {
-                                    name: "value".into(),
-                                    typ: Rc::new(RefCell::new(boom::Type::Int {
-                                        signed: false,
-                                        size: Size::Static(64),
-                                    })),
-                                    is_ref: false,
-                                },
-                                Parameter {
-                                    name: "position".into(),
-                                    typ: Rc::new(RefCell::new(boom::Type::Int {
-                                        signed: false,
-                                        size: Size::Static(64),
-                                    })),
-                                    is_ref: false,
-                                },
-                                Parameter {
-                                    name: "bit".into(),
-                                    typ: Rc::new(RefCell::new(boom::Type::Int {
-                                        signed: false,
-                                        size: Size::Static(64),
-                                    })),
-                                    is_ref: false,
-                                },
-                            ])),
-                            return_type: Rc::new(RefCell::new(boom::Type::Int {
-                                signed: false,
-                                size: Size::Static(64),
-                            })),
-                        },
-                        entry_block,
-                    },
-                );
-            }
-        }
+    pub fn finish(self) -> boom::Ast {
+        // todo, assert empty?
+        // if !self.function_types.is_empty() {
+        //     warn!(
+        //         "missing fn definitions:\n{:#?}",
+        //         self.function_types.keys().collect::<Vec<_>>()
+        //     );
+        // }
         self.ast
     }
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
         match definition {
             jib_ast::Definition::Register(ident, typ, _) => {
-                if ident.as_interned().as_ref() == "R" {
-                    panic!("{:#?}", ident);
-                }
-
                 self.ast
                     .registers
                     .insert(ident.as_interned(), convert_type(typ));
@@ -332,7 +247,9 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         }
 
         jib_ast::InstructionAux::TryBlock(_) => vec![],
-        jib_ast::InstructionAux::Throw(_) => todo!(),
+        jib_ast::InstructionAux::Throw(value) => {
+            vec![boom::Statement::Panic(vec![convert_value(value)])]
+        }
         jib_ast::InstructionAux::Comment(s) => vec![boom::Statement::Comment(*s)],
         jib_ast::InstructionAux::Block(..) => unimplemented!(),
         jib_ast::InstructionAux::Raw(_) => todo!(),

@@ -5,8 +5,9 @@
 
 use {
     crate::rudder::{
-        BinaryOperationKind, Block, ConstantValue, Context, Function, PrimitiveTypeClass,
-        ShiftOperationKind, Statement, StatementKind, Symbol, Type, UnaryOperationKind,
+        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
+        PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind, Symbol, Type,
+        UnaryOperationKind,
     },
     common::{intern::InternedString, HashSet},
     log::warn,
@@ -21,10 +22,10 @@ use {
     },
 };
 
-pub fn codegen(rudder: Context) -> TokenStream {
+pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
     rudder.update_names();
 
-    let fn_names = get_functions_to_codegen(&rudder, "__DecodeA64".into());
+    let fn_names = get_functions_to_codegen(&rudder, entrypoint);
 
     let rudder_fns = rudder.get_functions();
 
@@ -110,7 +111,9 @@ pub fn codegen(rudder: Context) -> TokenStream {
         })
         .collect();
 
-    let entrypoint = quote!(u__DecodeA64(state, tracer, state.pc, value););
+    let entrypoint = codegen_ident(entrypoint);
+    let entrypoint =
+        quote!(#entrypoint(state, tracer, Bundle { value: state.pc, length: 64 }, value););
 
     quote! {
         #structs
@@ -195,6 +198,11 @@ pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
             let element_type = codegen_type(element_type.clone());
             quote!([#element_type; #count])
         }
+        Type::Bundled { value, len } => {
+            let value_type = codegen_type(value.clone());
+            let len_type = codegen_type(len.clone());
+            quote!(Bundle<#value_type, #len_type>)
+        }
     }
 }
 
@@ -272,7 +280,7 @@ fn codegen_block(block: Block) -> TokenStream {
         .collect()
 }
 
-fn get_ident(stmt: Statement) -> TokenStream {
+fn get_ident(stmt: &Statement) -> TokenStream {
     format_ident!("{}", stmt.name().to_string()).to_token_stream()
 }
 
@@ -281,7 +289,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
 
     let value = match stmt.kind() {
         StatementKind::Constant { value, typ } => {
-            match value {
+            let v = match value {
                 // todo: do not emit type info here
                 ConstantValue::UnsignedInteger(v) => {
                     if *typ == Type::u1() {
@@ -302,6 +310,13 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
 
                 ConstantValue::Unit => quote!(()),
+            };
+
+            if let Type::Bundled { .. } = &*stmt.typ() {
+                let length = Literal::usize_unsuffixed(typ.width_bits());
+                quote!(Bundle {value: #v, length: #length})
+            } else {
+                v
             }
         }
         StatementKind::ReadVariable { symbol } => {
@@ -310,11 +325,11 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::WriteVariable { symbol, value } => {
             let var = codegen_ident(symbol.name());
-            let value = get_ident(value);
+            let value = get_ident(&value);
             quote! {#var = #value}
         }
         StatementKind::ReadRegister { typ, offset } => {
-            let offset = get_ident(offset);
+            let offset = get_ident(&offset);
             let typ = codegen_type(typ);
             quote! {
                 {
@@ -325,9 +340,9 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::WriteRegister { offset, value } => {
-            let offset = get_ident(offset);
+            let offset = get_ident(&offset);
             let typ = codegen_type(value.typ());
-            let value = get_ident(value);
+            let value = get_ident(&value);
             quote! {
                 {
                     unsafe { *(state.data.as_mut_ptr().byte_offset(#offset as isize) as *mut #typ) = #value };
@@ -340,8 +355,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            let mut left = get_ident(lhs.clone());
-            let mut right = get_ident(rhs.clone());
+            let mut left = get_ident(&lhs);
+            let mut right = get_ident(&rhs);
 
             // hard to decide whether this belongs, but since it's a Rust issue that u1 is
             // not like other types, casting is a codegen thing
@@ -361,7 +376,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
 
             let op = match kind {
-                BinaryOperationKind::CmpEq => quote! { (#left) == (#right) },
+                BinaryOperationKind::CompareEqual => quote! { (#left) == (#right) },
                 BinaryOperationKind::Add => quote! { (#left) + (#right) },
                 BinaryOperationKind::Sub => quote! { (#left) - (#right) },
                 BinaryOperationKind::Multiply => quote! { (#left) * (#right) },
@@ -370,17 +385,17 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 BinaryOperationKind::And => quote! { (#left) & (#right) },
                 BinaryOperationKind::Or => quote! { (#left) | (#right) },
                 BinaryOperationKind::Xor => quote! { (#left) ^ (#right) },
-                BinaryOperationKind::CmpNe => quote! { (#left) != (#right) },
-                BinaryOperationKind::CmpLt => quote! { (#left) < (#right) },
-                BinaryOperationKind::CmpLe => quote! { (#left) <= (#right) },
-                BinaryOperationKind::CmpGt => quote! { (#left) > (#right) },
-                BinaryOperationKind::CmpGe => quote! { (#left) >= (#right) },
+                BinaryOperationKind::CompareNotEqual => quote! { (#left) != (#right) },
+                BinaryOperationKind::CompareLessThan => quote! { (#left) < (#right) },
+                BinaryOperationKind::CompareLessThanOrEqual => quote! { (#left) <= (#right) },
+                BinaryOperationKind::CompareGreaterThan => quote! { (#left) > (#right) },
+                BinaryOperationKind::CompareGreaterThanOrEqual => quote! { (#left) >= (#right) },
             };
 
             quote! { (#op) }
         }
         StatementKind::UnaryOperation { kind, value } => {
-            let value = get_ident(value);
+            let value = get_ident(&value);
 
             match kind {
                 UnaryOperationKind::Not => quote! {!#value},
@@ -393,8 +408,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             value,
             amount,
         } => {
-            let value = get_ident(value);
-            let amount = get_ident(amount);
+            let value = get_ident(&value);
+            let amount = get_ident(&amount);
 
             match kind {
                 ShiftOperationKind::LogicalShiftLeft => quote! {#value << #amount},
@@ -408,10 +423,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::Call { target, args } => {
             let ident = codegen_ident(target.name());
-            let args = args.iter().map(|arg| {
-                let arg = get_ident(arg.clone());
-                quote! {#arg}
-            });
+            let args = args.iter().map(get_ident);
 
             // todo: remove this
             if target.name().as_ref().starts_with("unimplemented_") {
@@ -423,12 +435,13 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::Cast { typ, value, .. } => {
+        StatementKind::Cast { typ, value, kind } => {
             let source = value.typ();
             let target = typ;
-            let ident = get_ident(value);
+            let ident = get_ident(&value);
 
             if source == target {
+                // todo: check this never happens
                 quote! {
                     ((#ident))
                 }
@@ -439,10 +452,45 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                     ((#ident) != 0)
                 }
             } else {
-                let target = codegen_type(target);
+                match kind {
+                    CastOperationKind::ZeroExtend => {
+                        // safe even if underlying rudder types are smaller than codegen'd rust types (u7 -> u13 == u8 -> u16)
+                        let target = codegen_type(target);
+                        quote! {
+                            (#ident as #target)
+                        }
+                    }
 
-                quote! {
-                    ((#ident) as #target)
+                    CastOperationKind::Truncate => {
+                        match (&*source, &*target) {
+                            (Type::Primitive(_), Type::Primitive(_)) => {
+                                assert!(target.width_bits() < source.width_bits());
+
+                                // create mask of length target
+                                let mask =
+                                    Literal::u64_unsuffixed((1u64 << target.width_bits()) - 1);
+
+                                // cast to target type and apply mask to source
+                                let target = codegen_type(target);
+
+                                quote!(((#ident as #target) & #mask))
+                            }
+                            (Type::Bundled { .. }, Type::Bundled { .. }) => {
+                                panic!("cannot truncate bundles, target length not known by type system")
+                            }
+                            _ => todo!(),
+                        }
+                    }
+
+                    CastOperationKind::SignExtend => todo!(),
+                    CastOperationKind::Reinterpret => {
+                        let target = codegen_type(target);
+                        quote! {
+                            (#ident as #target)
+                        }
+                    }
+                    CastOperationKind::Convert => todo!(),
+                    CastOperationKind::Broadcast => todo!(),
                 }
             }
         }
@@ -457,7 +505,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             true_target,
             false_target,
         } => {
-            let condition = get_ident(condition);
+            let condition = get_ident(&condition);
             let true_target = format_ident!("BLOCK_{}", true_target.name().to_string());
             let false_target = format_ident!("BLOCK_{}", false_target.name().to_string());
 
@@ -475,31 +523,64 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! {return return_value;}
             }
         },
-        StatementKind::Select { .. } => quote!(todo!("select")),
+        StatementKind::Select {
+            condition,
+            true_value,
+            false_value,
+        } => {
+            let condition = get_ident(&condition);
+            let true_value = get_ident(&true_value);
+            let false_value = get_ident(&false_value);
+            quote! { if #condition { #true_value } else { #false_value } }
+        }
         StatementKind::BitExtract {
             value,
             start,
             length,
         } => {
-            let typ = codegen_type(value.typ());
+            if let Type::Bundled { .. } = &*value.typ() {
+                let length = if let Type::Bundled { .. } = &*length.typ() {
+                    let length = get_ident(&length);
+                    quote!(#length.value as u32)
+                } else {
+                    let length = get_ident(&length);
+                    quote!(#length as u32)
+                };
 
-            let value = get_ident(value);
-            let start = get_ident(start);
-            let length = get_ident(length);
+                let value = get_ident(&value);
+                let start = get_ident(&start);
 
-            // todo: pre-cast length to u32
-
-            quote! (
-                (
-                    (#value >> #start) &
-                    ((1 as #typ).checked_shl(#length as u32).map(|x| x - 1).unwrap_or(!0))
+                quote! (
+                    (
+                        (#value >> #start) &
+                        Bundle { value: ((1u64).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #value.length }
+                    )
                 )
-            )
+            } else {
+                let typ = codegen_type(value.typ());
+
+                let value = get_ident(&value);
+                let start = get_ident(&start);
+                let length = get_ident(&length);
+
+                // todo: pre-cast length to u32
+
+                quote! (
+                    (
+                        (#value >> #start) &
+                        ((1 as #typ).checked_shl(#length as u32).map(|x| x - 1).unwrap_or(!0))
+                    )
+                )
+            }
         }
         StatementKind::BitInsert { .. } => quote!(todo!("bitins")),
-        StatementKind::Trap => quote!(panic!("it's a trap")),
+        StatementKind::Panic(statements) => {
+            let args = statements.iter().map(get_ident);
+
+            quote!(panic!("{:?}", (#(#args),*)))
+        }
         StatementKind::ReadField { composite, field } => {
-            let composite = get_ident(composite);
+            let composite = get_ident(&composite);
             let field = codegen_member(field);
             quote!(#composite.#field)
         }
@@ -508,9 +589,9 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             field,
             value,
         } => {
-            let composite = get_ident(composite);
+            let composite = get_ident(&composite);
             let field = format_ident!("_{field}");
-            let value = get_ident(value);
+            let value = get_ident(&value);
             quote! {
                 {
                     let mut local = #composite.clone();
@@ -520,8 +601,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::ReadElement { vector, index } => {
-            let vector = get_ident(vector);
-            let index = get_ident(index);
+            let vector = get_ident(&vector);
+            let index = get_ident(&index);
             // todo remove this cast, need "machine word" size in rudder?
             quote!(#vector[(#index) as usize])
         }
@@ -530,9 +611,9 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             value,
             index,
         } => {
-            let vector = get_ident(vector);
-            let index = get_ident(index);
-            let value = get_ident(value);
+            let vector = get_ident(&vector);
+            let index = get_ident(&index);
+            let value = get_ident(&value);
             // todo remove this cast, need "machine word" size in rudder?
             quote! {
                 {
@@ -549,13 +630,30 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 .enumerate()
                 .map(|(index, statement)| {
                     let field_name = codegen_member(index);
-                    let value = get_ident(statement.clone());
+                    let value = get_ident(&statement);
                     quote!(#field_name: #value,)
                 })
                 .collect::<TokenStream>();
             quote!(#typ { #fields })
 
             // struct { _0: foo, _1: bar }
+        }
+        StatementKind::Bundle { value, length } => {
+            let value = get_ident(&value);
+            let length = get_ident(&length);
+            quote!(Bundle { value: #value, length: #length })
+        }
+        StatementKind::UnbundleValue { bundle } => {
+            let bundle = get_ident(&bundle);
+            quote!((#bundle.value))
+        }
+        StatementKind::UnbundleLength { bundle } => {
+            let bundle = get_ident(&bundle);
+            quote!((#bundle.length))
+        }
+        StatementKind::Assert { condition } => {
+            let condition = get_ident(&condition);
+            quote!(assert!(#condition))
         }
     };
 

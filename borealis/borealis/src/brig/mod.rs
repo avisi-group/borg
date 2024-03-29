@@ -18,25 +18,39 @@ use {
     log::info,
     proc_macro2::TokenStream,
     quote::quote,
-    sailrs::{
-        jib_ast::{Definition, Instruction},
-        sail_ast::{Identifier, IdentifierAux, Location},
-        types::ListVec,
-    },
+    sailrs::{jib_ast, types::ListVec},
+    std::io::Write,
 };
 
+const ENTRYPOINT: &str = "__DecodeA64";
+
 const FN_ALLOWLIST: &[&str] = &[
-    "__DecodeA64",
+    ENTRYPOINT,
     "__DecodeA64_DataProcImm",
     "decode_add_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
-    "execute_aarch64_instrs_integer_arithmetic_add_sub_immediate",
     "place_slice",
+    "slice_mask",
+    "sail_ones",
+    "extzv",
+    "execute_aarch64_instrs_integer_arithmetic_add_sub_immediate",
+    "X_read",
+    "neq_int",
+    "get_R",
+    "read_gpr",
+    "AddWithCarry",
+    "integer_subrange",
+    "IsZero",
+    "X_set",
+    "set_R",
 ];
 
 mod codegen;
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig<I: Iterator<Item = Definition>>(jib_ast: I, standalone: bool) -> TokenStream {
+pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
+    jib_ast: I,
+    standalone: bool,
+) -> TokenStream {
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(apply_fn_allowlist(jib_ast));
 
@@ -54,8 +68,8 @@ pub fn sail_to_brig<I: Iterator<Item = Definition>>(jib_ast: I, standalone: bool
             RemoveConstBranch::new_boxed(),
             ResolveReturns::new_boxed(),
             MakeExceptionBool::new_boxed(),
-            ResolveBitvectors::new_boxed(),
-            AddBuiltinFns::new_boxed(),
+            // ResolveBitvectors::new_boxed(),
+            // AddBuiltinFns::new_boxed(),
             CycleFinder::new_boxed(),
         ],
     );
@@ -69,6 +83,8 @@ pub fn sail_to_brig<I: Iterator<Item = Definition>>(jib_ast: I, standalone: bool
     info!("Building rudder");
 
     let rudder = rudder::build::from_boom(&ast.borrow());
+
+    writeln!(&mut create_file("target/ast.rudder").unwrap(), "{rudder}").unwrap();
 
     info!("Generating Rust");
 
@@ -100,7 +116,7 @@ pub fn sail_to_brig<I: Iterator<Item = Definition>>(jib_ast: I, standalone: bool
         }
     };
 
-    let body = codegen(rudder);
+    let body = codegen(rudder, ENTRYPOINT.into());
 
     let prelude = if standalone {
         quote! {
@@ -199,14 +215,111 @@ pub fn sail_to_brig<I: Iterator<Item = Definition>>(jib_ast: I, standalone: bool
             UndefinedInstruction
         }
 
+        #[derive(Default, Clone, Copy, Debug)]
+        struct Bundle<V, L> {
+            value: V,
+            length: L,
+        }
+
+        impl<V: core::ops::BitAnd<Output = V>, L> core::ops::BitAnd for Bundle<V, L> {
+            type Output = Self;
+
+            fn bitand(self, rhs: Self) -> Self::Output {
+                Self {
+                    value:  self.value & rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V: core::ops::Shl<Output = V>, L> core::ops::Shl for Bundle<V, L> {
+            type Output = Self;
+
+            fn shl(self, rhs: Self) -> Self::Output {
+                Self {
+                    value:  self.value << rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V: core::ops::Shr<Output = V>, L> core::ops::Shr for Bundle<V, L> {
+            type Output = Self;
+
+            fn shr(self, rhs: Self) -> Self::Output {
+                Self {
+                    value:  self.value >> rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+
+        impl<V: core::ops::Sub<Output = V>, L> core::ops::Sub for Bundle<V, L> {
+            type Output = Self;
+
+            fn sub(self, rhs: Self) -> Self::Output {
+                Self {
+                    value:  self.value - rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V: core::ops::Add<Output = V>, L> core::ops::Add for Bundle<V, L> {
+            type Output = Self;
+
+            fn add(self, rhs: Self) -> Self::Output {
+                Self {
+                    value:  self.value + rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V: core::ops::Not<Output = V>, L> core::ops::Not for Bundle<V, L> {
+            type Output = Self;
+            fn not(self) -> Self {
+                Self {
+                    value: !self.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V: core::cmp::PartialOrd, L> core::cmp::PartialOrd for Bundle<V, L> {
+            fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+                self.value.partial_cmp(&other.value)
+            }
+        }
+
+        impl<V: core::cmp::PartialEq, L> core::cmp::PartialEq for Bundle<V, L> {
+            fn eq(&self, other: &Self) -> bool {
+                self.value.eq(&other.value)
+            }
+        }
+
+        impl<V: core::cmp::PartialEq, L> core::cmp::Eq for Bundle<V, L> {
+
+        }
+
+
+
+
         #prelude
 
         #body
     }
 }
 
-fn apply_fn_allowlist<I: Iterator<Item = Definition>>(iter: I) -> impl Iterator<Item = Definition> {
-    // stub out functions not in the allowlist
+/// Stub out functions not in the allowlist
+fn apply_fn_allowlist<I: Iterator<Item = jib_ast::Definition>>(
+    iter: I,
+) -> impl Iterator<Item = jib_ast::Definition> {
+    use sailrs::{
+        jib_ast::{Definition, Instruction, InstructionAux, Type, Value, Vl},
+        sail_ast::Location,
+    };
 
     iter.map(|def| {
         if let Definition::Fundef(name, idk, arguments, body) = def {
@@ -215,24 +328,11 @@ fn apply_fn_allowlist<I: Iterator<Item = Definition>>(iter: I) -> impl Iterator<
             } else {
                 ListVec::from(vec![
                     Instruction {
-                        inner: sailrs::jib_ast::InstructionAux::Funcall(
-                            sailrs::jib_ast::Expression::Void,
-                            false,
-                            (
-                                Identifier {
-                                    inner: IdentifierAux::Identifier("trap".into()),
-                                    location: Location::Unknown,
-                                },
-                                ListVec::new(),
-                            ),
-                            ListVec::new(),
-                        ),
+                        inner: InstructionAux::Throw(Value::Lit(Vl::Unit, Type::Unit)),
                         annot: (0, Location::Unknown),
                     },
                     Instruction {
-                        inner: sailrs::jib_ast::InstructionAux::Undefined(
-                            sailrs::jib_ast::Type::Unit,
-                        ),
+                        inner: InstructionAux::Undefined(Type::Unit),
                         annot: (0, Location::Unknown),
                     },
                 ])

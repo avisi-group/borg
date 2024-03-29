@@ -23,6 +23,7 @@ impl Display for Type {
                 element_count,
                 element_type,
             } => write!(f, "[{element_type}; {element_count:?}]"),
+            Type::Bundled { value, len } => write!(f, "bundle({value}, {len})"),
         }
     }
 }
@@ -73,12 +74,12 @@ impl Display for StatementKind {
                     BinaryOperationKind::Multiply => "mul",
                     BinaryOperationKind::Divide => "div",
                     BinaryOperationKind::Modulo => "mod",
-                    BinaryOperationKind::CmpEq => "cmp-eq",
-                    BinaryOperationKind::CmpNe => "cmp-ne",
-                    BinaryOperationKind::CmpLt => "cmp-lt",
-                    BinaryOperationKind::CmpLe => "cmp-le",
-                    BinaryOperationKind::CmpGt => "cmp-gt",
-                    BinaryOperationKind::CmpGe => "cmp-ge",
+                    BinaryOperationKind::CompareEqual => "cmp-eq",
+                    BinaryOperationKind::CompareNotEqual => "cmp-ne",
+                    BinaryOperationKind::CompareLessThan => "cmp-lt",
+                    BinaryOperationKind::CompareLessThanOrEqual => "cmp-le",
+                    BinaryOperationKind::CompareGreaterThan => "cmp-gt",
+                    BinaryOperationKind::CompareGreaterThanOrEqual => "cmp-ge",
                     BinaryOperationKind::And => "and",
                     BinaryOperationKind::Or => "or",
                     BinaryOperationKind::Xor => "xor",
@@ -172,7 +173,16 @@ impl Display for StatementKind {
                     false_value.name()
                 )
             }
-            StatementKind::Trap => write!(f, "trap"),
+            StatementKind::Panic(statements) => {
+                write!(f, "panic(")?;
+
+                statements
+                    .iter()
+                    .map(Statement::name)
+                    .try_for_each(|n| write!(f, "{n}, "))?;
+
+                write!(f, ")")
+            }
             StatementKind::ReadPc => write!(f, "read-pc"),
             StatementKind::WritePc { value } => write!(f, "write-pc {}", value.name()),
             StatementKind::BitExtract {
@@ -234,6 +244,18 @@ impl Display for StatementKind {
                     typ,
                     fields.iter().map(Statement::name).collect::<Vec<_>>()
                 )
+            }
+            StatementKind::Bundle { value, length } => {
+                write!(f, "bundle {}, {} ", value.name(), length.name())
+            }
+            StatementKind::UnbundleValue { bundle } => {
+                write!(f, "unbundle-value {}", bundle.name())
+            }
+            StatementKind::UnbundleLength { bundle } => {
+                write!(f, "unbundle-length {}", bundle.name())
+            }
+            StatementKind::Assert { condition } => {
+                write!(f, "assert {}", condition.name())
             }
         }
     }

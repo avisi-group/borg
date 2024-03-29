@@ -95,12 +95,7 @@ impl Visitor for MakeExceptionBool {
         } = block.terminator()
         {
             if ident.as_ref() == "exception" {
-                target.set_statements(vec![Statement::FunctionCall {
-                    expression: None,
-                    name: "trap".into(),
-                    arguments: vec![],
-                }
-                .into()]);
+                target.set_statements(vec![Statement::Panic(vec![]).into()]);
                 target.set_terminator(Terminator::Return(None));
             }
         }

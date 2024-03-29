@@ -12,40 +12,41 @@ use {
 
 pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(|| {
     let mappings = [
-        ("trap", noop as HandlerFunction),
-        // // requires bitvector conversion logic
-        // ("UInt", replace_with_copy),
-        // // we represent integers as u64s so these can be removed
-        // ("u_pcnt_i___pcnt_i64", replace_with_copy),
-        // ("u_pcnt_i64___pcnt_i", replace_with_copy),
-        // // replace with equality test
+        ("", noop as HandlerFunction),
+        // appeared after enabling monomorphisation in sail, appears to do nothing
+        ("size_itself_int", replace_with_copy),
+        // todo: make this a proper cast
+        ("%i64->%i", replace_with_copy),
         // ("eq_bool", |ast, f, s| {
         //     replace_with_op(ast, f, s, OperationKind::Equal)
         // }),
         // ("eq_string", |ast, f, s| {
         //     replace_with_op(ast, f, s, OperationKind::Equal)
         // }),
-        // ("eq_int", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::Equal)
-        // }),
-        // ("neq_int", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::NotEqual)
-        // }),
+        ("eq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Equal)
+        }),
+        ("neq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::NotEqual)
+        }),
         ("lt_int", |ast, f, s| {
             replace_with_op(ast, f, s, OperationKind::LessThan)
         }),
-        // ("gt_int", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::GreaterThan)
-        // }),
-        // ("lteq_int", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::LessThanOrEqual)
-        // }),
-        // ("gteq_int", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
-        // }),
-        // ("u_shl_int", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::LeftShift)
-        // }),
+        ("gt_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::GreaterThan)
+        }),
+        ("lteq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::LessThanOrEqual)
+        }),
+        ("gteq_int", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::GreaterThanOrEqual)
+        }),
+        ("sail_shiftleft", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::LeftShift)
+        }),
+        ("sail_shiftright", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::RightShift)
+        }),
         // ("u_shl8", |ast, f, s| {
         //     replace_with_op(ast, f, s, OperationKind::LeftShift)
         // }),
@@ -61,9 +62,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         // ("add_atom", |ast, f, s| {
         //     replace_with_op(ast, f, s, OperationKind::Add)
         // }),
-        // ("sub_atom", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::Subtract)
-        // }),
+        ("sub_bits", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::Subtract)
+        }),
         // ("mult_atom", |ast, f, s| {
         //     replace_with_op(ast, f, s, OperationKind::Multiply)
         // }),
@@ -73,9 +74,9 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         // ("or_vec", |ast, f, s| {
         //     replace_with_op(ast, f, s, OperationKind::Or)
         // }),
-        // ("and_vec", |ast, f, s| {
-        //     replace_with_op(ast, f, s, OperationKind::And)
-        // }),
+        ("and_vec", |ast, f, s| {
+            replace_with_op(ast, f, s, OperationKind::And)
+        }),
         // ("add_vec", |ast, f, s| {
         //     replace_with_op(ast, f, s, OperationKind::Add)
         // }),
@@ -102,10 +103,11 @@ pub static HANDLERS: Lazy<HashMap<InternedString, HandlerFunction>> = Lazy::new(
         // }),
         // ("SInt", replace_with_copy), // probably need to take another look at this
         ("bitvector_length", bv_length_handler),
+        ("subrange_bits", subrange_bits_handler),
         // ("bitvector_access_B", bv_access_handler),
         // ("bitvector_access_A", bv_access_handler),
         // ("raw_GetSlice_int", noop),
-        // ("ZeroExtend__0", zero_extend_handler),
+        ("sail_zero_extend", zero_extend_handler),
         // ("ZeroExtend__1", zero_extend_handler),
         // ("SignExtend__0", sign_extend_handler),
         // ("eq_anything_EArchVersion_pcnt__", |ast, f, s| {
@@ -380,10 +382,8 @@ pub fn zero_extend_handler(
     };
 
     // zero-extend value to length bits
-    let (value, length) = if name.as_ref() == "ZeroExtend__0" {
+    let (value, length) = if name.as_ref() == "sail_zero_extend" {
         (arguments[0].clone(), arguments[1].clone())
-    } else if name.as_ref() == "ZeroExtend__1" {
-        (arguments[1].clone(), arguments[0].clone())
     } else {
         panic!();
     };
@@ -402,7 +402,10 @@ pub fn zero_extend_handler(
             ..
         } => value,
         // TODO: write comment proving why this is false not true
-        _ => return false,
+        t => {
+            log::error!("handle this");
+            return false;
+        }
     };
 
     let size = match &*length.borrow() {
@@ -435,6 +438,8 @@ pub fn zero_extend_handler(
         )
         .into(),
     };
+
+    log::info!("{:?}", statement);
 
     true
 }
@@ -813,19 +818,14 @@ pub fn assert_handler(
     second.set_statements(second_statements);
     second.set_terminator(terminator);
 
-    let trap_block = ControlFlowBlock::new();
-    trap_block.set_statements(vec![
+    let panic_block = ControlFlowBlock::new();
+    panic_block.set_statements(vec![
         Statement::Comment(format!("{:?}", str).into()).into(),
-        Statement::FunctionCall {
-            expression: None,
-            name: "trap".into(),
-            arguments: vec![],
-        }
-        .into(),
+        Statement::Panic(vec![]).into(),
     ]);
     // never reached but required to maintain common block (should maybe jump to end
     // block?)
-    trap_block.set_terminator(Terminator::Unconditional {
+    panic_block.set_terminator(Terminator::Unconditional {
         target: second.clone(),
     });
 
@@ -833,9 +833,46 @@ pub fn assert_handler(
     // done in this order to avoid borealis/src/genc/codegen/functions.rs:580
     block.set_terminator(Terminator::Conditional {
         condition: Value::Operation(Operation::Not(value)),
-        target: trap_block,
+        target: panic_block,
         fallthrough: second,
     });
+
+    true
+}
+
+pub fn subrange_bits_handler(
+    _ast: Rc<RefCell<Ast>>,
+    _function: FunctionDefinition,
+    statement: Rc<RefCell<Statement>>,
+) -> bool {
+    let (destination, value, end, start) = {
+        let Statement::FunctionCall {
+            expression,
+            arguments,
+            ..
+        } = &*statement.borrow()
+        else {
+            panic!();
+        };
+
+        (
+            expression.clone(),
+            arguments[0].clone(),
+            arguments[1].clone(),
+            arguments[2].clone(),
+        )
+    };
+
+    *statement.borrow_mut() = Statement::Copy {
+        expression: destination.unwrap(),
+        value: Rc::new(RefCell::new(Value::Range {
+            value,
+            start: start.clone(),
+            length: Rc::new(RefCell::new(Value::Operation(Operation::Subtract(
+                end, start,
+            )))),
+        })),
+    };
 
     true
 }

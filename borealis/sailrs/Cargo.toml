@@ -19,11 +19,11 @@ log = "0.4.21"
 serde = { version = "1.0.197", features = ["derive"] }
 deepsize = "0.2.0"
 num-bigint = { version = "0.4.4", features = ["serde"] }
-serde_json = "1.0.114"
+serde_json = "1.0.115"
 strum = { version = "0.26.2", features = ["derive"] }
-regex = "1.10.3"
+regex = "1.10.4"
 color-eyre = { version = "0.6.3", default-features = false }
-clap = { version = "4.5.3", features = ["derive"] }
+clap = { version = "4.5.4", features = ["derive"] }
 rkyv = {version = "0.7.44", default-features = false, features = ["std", "alloc", "size_64"] }
 memmap2 = "0.9.4"
 
@@ -34,4 +34,4 @@ color-eyre = "0.6.3"
 [dev-dependencies]
 color-eyre = { version = "0.6.3", default-features = false }
 proptest = "1.4.0"
-serde_json = "1.0.114"
+serde_json = "1.0.115"

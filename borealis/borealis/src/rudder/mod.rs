@@ -47,6 +47,10 @@ pub enum Type {
         element_count: usize,
         element_type: Rc<Type>,
     },
+    Bundled {
+        value: Rc<Type>,
+        len: Rc<Type>,
+    },
 }
 
 macro_rules! type_def_helper {
@@ -87,10 +91,11 @@ impl Type {
         match self {
             Self::Composite(xs) => xs.iter().map(|x| x.width_bits()).sum(),
             Self::Primitive(p) => p.element_width_in_bits,
-            Type::Vector {
+            Self::Vector {
                 element_count,
                 element_type,
             } => element_type.width_bits() * element_count,
+            Self::Bundled { value, .. } => value.width_bits(),
         }
     }
     pub fn width_bytes(&self) -> usize {
@@ -211,12 +216,12 @@ pub enum BinaryOperationKind {
     And,
     Or,
     Xor,
-    CmpEq,
-    CmpNe,
-    CmpLt,
-    CmpLe,
-    CmpGt,
-    CmpGe,
+    CompareEqual,
+    CompareNotEqual,
+    CompareLessThan,
+    CompareLessThanOrEqual,
+    CompareGreaterThan,
+    CompareGreaterThanOrEqual,
 }
 
 #[derive(Clone)]
@@ -367,12 +372,31 @@ pub enum StatementKind {
         value: Statement,
         index: Statement,
     },
-    Trap,
+
+    /// Fatal error, printing values of supplied statements for debugging purposes
+    Panic(Vec<Statement>),
+
+    Assert {
+        condition: Statement,
+    },
 
     CreateComposite {
         typ: Rc<Type>,
         /// Index of fields should match type
         fields: Vec<Statement>,
+    },
+
+    Bundle {
+        value: Statement,
+        length: Statement,
+    },
+
+    UnbundleValue {
+        bundle: Statement,
+    },
+
+    UnbundleLength {
+        bundle: Statement,
     },
 }
 
@@ -421,7 +445,7 @@ impl Statement {
             StatementKind::PhiNode { .. } => todo!(),
             StatementKind::Return { .. } => todo!(),
             StatementKind::Select { .. } => todo!(),
-            StatementKind::Trap => todo!(),
+            StatementKind::Panic(_) => todo!(),
             StatementKind::ReadPc => ValueClass::Dynamic,
             StatementKind::WritePc { .. } => todo!(),
             StatementKind::BitExtract { .. } => todo!(),
@@ -433,6 +457,10 @@ impl Statement {
             StatementKind::ReadElement { .. } => todo!(),
             StatementKind::MutateElement { .. } => todo!(),
             StatementKind::CreateComposite { .. } => todo!(),
+            StatementKind::Bundle { .. } => todo!(),
+            StatementKind::UnbundleValue { .. } => todo!(),
+            StatementKind::UnbundleLength { .. } => todo!(),
+            StatementKind::Assert { .. } => todo!(),
         }
     }
 
@@ -446,27 +474,27 @@ impl Statement {
             StatementKind::ReadMemory { typ, .. } => typ,
             StatementKind::WriteMemory { .. } => Rc::new(Type::void()),
             StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::CmpEq,
+                kind: BinaryOperationKind::CompareEqual,
                 ..
             }
             | StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::CmpNe,
+                kind: BinaryOperationKind::CompareNotEqual,
                 ..
             }
             | StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::CmpGe,
+                kind: BinaryOperationKind::CompareGreaterThanOrEqual,
                 ..
             }
             | StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::CmpGt,
+                kind: BinaryOperationKind::CompareGreaterThan,
                 ..
             }
             | StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::CmpLe,
+                kind: BinaryOperationKind::CompareLessThanOrEqual,
                 ..
             }
             | StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::CmpLt,
+                kind: BinaryOperationKind::CompareLessThan,
                 ..
             } => Rc::new(Type::u1()),
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
@@ -482,7 +510,7 @@ impl Statement {
                 .unwrap_or_else(|| Rc::new(Type::void())),
             StatementKind::Return { .. } => Rc::new(Type::void()),
             StatementKind::Select { true_value, .. } => true_value.typ(),
-            StatementKind::Trap => Rc::new(Type::void()),
+            StatementKind::Panic(_) => Rc::new(Type::void()),
             StatementKind::ReadPc => Rc::new(Type::u64()),
             StatementKind::WritePc { .. } => Rc::new(Type::void()),
             StatementKind::BitExtract { value, .. } => value.typ(),
@@ -510,6 +538,23 @@ impl Statement {
                 vector.typ()
             }
             StatementKind::CreateComposite { typ, .. } => typ,
+            StatementKind::Bundle { value, length } => Rc::new(Type::Bundled {
+                value: value.typ(),
+                len: length.typ(),
+            }),
+            StatementKind::UnbundleValue { bundle } => {
+                let Type::Bundled { value, .. } = &*bundle.typ() else {
+                    panic!("cannot unbundle non-bundle");
+                };
+                value.clone()
+            }
+            StatementKind::UnbundleLength { bundle } => {
+                let Type::Bundled { len, .. } = &*bundle.typ() else {
+                    panic!("cannot unbundle non-bundle");
+                };
+                len.clone()
+            }
+            StatementKind::Assert { .. } => Rc::new(Type::unit()),
         }
     }
 
