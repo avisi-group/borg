@@ -123,7 +123,7 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
         fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
             #entrypoint
 
-            unreachable!("possibly failed to decode instruction or otherwise returned from entrypoint");
+            ExecuteResult::Ok
         }
 
         #fns

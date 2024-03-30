@@ -470,7 +470,7 @@ impl Statement {
             StatementKind::ReadVariable { symbol } => symbol.typ(),
             StatementKind::WriteVariable { .. } => Rc::new(Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
-            StatementKind::WriteRegister { .. } => Rc::new(Type::void()),
+            StatementKind::WriteRegister { .. } => Rc::new(Type::unit()),
             StatementKind::ReadMemory { typ, .. } => typ,
             StatementKind::WriteMemory { .. } => Rc::new(Type::void()),
             StatementKind::BinaryOperation {

@@ -42,6 +42,11 @@ const FN_ALLOWLIST: &[&str] = &[
     "IsZero",
     "X_set",
     "set_R",
+    "write_gpr",
+    "decode_movz_aarch64_instrs_integer_ins_ext_insert_movewide",
+    "execute_aarch64_instrs_integer_ins_ext_insert_movewide",
+    "Zeros",
+    "__id",
 ];
 
 mod codegen;
@@ -141,8 +146,19 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
             fn main() {
                 let arg = std::env::args().skip(1).next().unwrap();
-                let instruction = u32::from_str_radix(arg.trim_start_matches("0x"), 16).unwrap();
-                dbg!(decode_execute(instruction, &mut State::default(), &mut ConsoleTracer));
+                let text = std::fs::read(arg).unwrap();
+
+                let mut state = State::default();
+
+                text.chunks(4).map(|c| {
+                    let mut buf = [0u8;4];
+                    buf.copy_from_slice(c);
+                    u32::from_le_bytes(buf)
+                }).for_each(|insr| {
+                    dbg!(decode_execute(insr, &mut state, &mut ConsoleTracer));
+                })
+
+
             }
         }
     } else {
@@ -227,6 +243,17 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             fn bitand(self, rhs: Self) -> Self::Output {
                 Self {
                     value:  self.value & rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V: core::ops::BitOr<Output = V>, L> core::ops::BitOr for Bundle<V, L> {
+            type Output = Self;
+
+            fn bitor(self, rhs: Self) -> Self::Output {
+                Self {
+                    value:  self.value | rhs.value,
                     length: self.length
                 }
             }

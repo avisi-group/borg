@@ -623,6 +623,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         name: InternedString,
         args: &[Statement],
     ) -> Option<Statement> {
+        //  if Regex::new(r"\b\w{13}\b").unwrap().is_match(name) {}
+
         match name.as_ref() {
             "%i64->%i" | "%i->%i64" => {
                 Some(self.generate_cast(args[0].clone(), Rc::new(Type::u64())))
@@ -656,7 +658,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     length: len,
                 }))
             }
-            "eq_bits" | "eq_int" => Some(self.statement_builder.build(
+            "eq_bits" | "eq_int" | "eq_any<EMoveWideOp%>" => Some(self.statement_builder.build(
                 StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::CompareEqual,
                     lhs: args[0].clone(),
@@ -1037,6 +1039,90 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 start: args[2].clone(),
                 length: args[0].clone(),
             })),
+
+            "update_subrange_bits" => {
+                let destination = args[0].clone();
+                let end = args[1].clone();
+                let start = args[2].clone();
+                let source = args[3].clone();
+
+                // copy source[0..(end - start + 1)] into dest[start..(end + 1)]
+
+                // let length = end - start
+                let length = self
+                    .statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Sub,
+                        lhs: end,
+                        rhs: start.clone(),
+                    });
+
+                // let source_mask = (1 << (length) - 1);
+                let one = self.statement_builder.build(StatementKind::Constant {
+                    typ: args[1].typ(),
+                    value: rudder::ConstantValue::SignedInteger(1),
+                });
+                let shifted = self.statement_builder.build(StatementKind::ShiftOperation {
+                    kind: ShiftOperationKind::LogicalShiftLeft,
+                    value: one.clone(),
+                    amount: length,
+                });
+                let source_mask = self
+                    .statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Sub,
+                        lhs: shifted,
+                        rhs: one,
+                    });
+
+                // let masked_source = source & source_mask
+                let masked_source = self
+                    .statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::And,
+                        lhs: source,
+                        rhs: source_mask.clone(),
+                    });
+
+                // let source = masked_source << start
+                let source = self.statement_builder.build(StatementKind::ShiftOperation {
+                    kind: ShiftOperationKind::LogicalShiftLeft,
+                    value: masked_source,
+                    amount: start.clone(),
+                });
+
+                // let dest_mask = ~(source_mask << start)
+                let shifted_source_mask =
+                    self.statement_builder.build(StatementKind::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: source_mask,
+                        amount: start,
+                    });
+                let destination_mask =
+                    self.statement_builder.build(StatementKind::UnaryOperation {
+                        kind: rudder::UnaryOperationKind::Complement,
+                        value: shifted_source_mask,
+                    });
+
+                // let dest = dest & dest_mask
+                let destination = self
+                    .statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::And,
+                        lhs: destination,
+                        rhs: destination_mask,
+                    });
+
+                // let result = source | dest
+                Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Or,
+                            lhs: destination,
+                            rhs: source,
+                        }),
+                )
+            }
 
             // "truncate" => Some(self.statement_builder.build(StatementKind::Cast {
             //     kind: CastOperationKind::Truncate,
