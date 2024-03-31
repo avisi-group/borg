@@ -7,7 +7,6 @@ use {
         },
     },
     common::{intern::InternedString, HashMap},
-    log::warn,
     std::{cell::RefCell, cmp::Ordering, rc::Rc},
 };
 
@@ -359,11 +358,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 unreachable!("no control flow should exist at this point in compilation!")
             }
             boom::Statement::Exit(_) | boom::Statement::Comment(_) => (),
-            boom::Statement::Cast {
-                expression,
-                value,
-                typ,
-            } => todo!(),
             boom::Statement::Panic(values) => {
                 let statements = values
                     .iter()
@@ -673,14 +667,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: args[1].clone(),
                     }),
             ),
-            "add_atom" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
+            "add_atom" | "add_bits" => Some(self.statement_builder.build(
+                StatementKind::BinaryOperation {
+                    kind: BinaryOperationKind::Add,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
             "sub_bits" | "sub_atom" => Some(self.statement_builder.build(
                 StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::Sub,
@@ -700,6 +693,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.statement_builder
                     .build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareLessThanOrEqual,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            ),
+            "gt_int" => Some(
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::CompareGreaterThan,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
                     }),
@@ -729,6 +730,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "sail_shiftright" => {
                 Some(self.statement_builder.build(StatementKind::ShiftOperation {
                     kind: ShiftOperationKind::LogicalShiftRight,
+                    value: args[0].clone(),
+                    amount: args[1].clone(),
+                }))
+            }
+            "sail_arith_shiftright" => {
+                Some(self.statement_builder.build(StatementKind::ShiftOperation {
+                    kind: ShiftOperationKind::ArithmeticShiftRight,
                     value: args[0].clone(),
                     amount: args[1].clone(),
                 }))
@@ -846,38 +854,41 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }))
             }
 
-            "ZeroExtend0" | "sail_zero_extend" | "truncate" => {
-                let mut value = args[0].clone();
+            "ZeroExtend0" | "sail_zero_extend" | "truncate" | "SignExtend0" => {
                 let length = args[1].clone();
 
-                if name.as_ref() == "truncate" {
-                    let one = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
-                        value: rudder::ConstantValue::UnsignedInteger(1),
-                    });
-                    let cast_length = self.generate_cast(length.clone(), Rc::new(Type::u64()));
-                    let shift = self.statement_builder.build(StatementKind::ShiftOperation {
-                        kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: one.clone(),
-                        amount: cast_length,
-                    });
-                    let mask = self
-                        .statement_builder
-                        .build(StatementKind::BinaryOperation {
-                            kind: BinaryOperationKind::Sub,
-                            lhs: shift,
-                            rhs: one,
+                let value = match name.as_ref() {
+                    "truncate" => {
+                        let one = self.statement_builder.build(StatementKind::Constant {
+                            typ: Rc::new(Type::u64()),
+                            value: rudder::ConstantValue::UnsignedInteger(1),
                         });
+                        let cast_length = self.generate_cast(length.clone(), Rc::new(Type::u64()));
+                        let shift = self.statement_builder.build(StatementKind::ShiftOperation {
+                            kind: ShiftOperationKind::LogicalShiftLeft,
+                            value: one.clone(),
+                            amount: cast_length,
+                        });
+                        let mask = self
+                            .statement_builder
+                            .build(StatementKind::BinaryOperation {
+                                kind: BinaryOperationKind::Sub,
+                                lhs: shift,
+                                rhs: one,
+                            });
 
-                    let cast_value = self.generate_cast(value, Rc::new(Type::u64()));
-                    value = self
-                        .statement_builder
-                        .build(StatementKind::BinaryOperation {
-                            kind: BinaryOperationKind::And,
-                            lhs: mask,
-                            rhs: cast_value,
-                        });
-                }
+                        let cast_value = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+                        self.statement_builder
+                            .build(StatementKind::BinaryOperation {
+                                kind: BinaryOperationKind::And,
+                                lhs: mask,
+                                rhs: cast_value,
+                            })
+                    }
+                    // todo: probably wrong
+                    "SignExtend0" => self.generate_cast(args[0].clone(), Rc::new(Type::s64())),
+                    _ => args[0].clone(),
+                };
 
                 let value_cast = self.generate_cast(value, Rc::new(Type::u64()));
                 let length_cast = self.generate_cast(length, Rc::new(Type::u8()));
@@ -1371,12 +1382,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
             boom::Value::CtorKind { .. } => todo!(),
             boom::Value::CtorUnwrap { .. } => todo!(),
-            boom::Value::Access { value, index } => todo!(),
-            boom::Value::Range {
-                value,
-                start,
-                length,
-            } => todo!(),
         }
     }
 
@@ -1511,43 +1516,51 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     // No-op if same type
     fn generate_cast(&mut self, source: Statement, destination_type: Rc<Type>) -> Statement {
-        if &*source.typ() == &*destination_type {
+        if source.typ() == destination_type {
             return source;
         }
 
         match (&*source.typ(), &*destination_type) {
             // both primitives, do a cast
             (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
-                if source_primitive.width() > dest_primitive.width() {
-                    self.statement_builder.build(StatementKind::Cast {
+                // compare widths
+                match source_primitive.width().cmp(&dest_primitive.width()) {
+                    // source is larger than destination
+                    Ordering::Greater => self.statement_builder.build(StatementKind::Cast {
                         kind: CastOperationKind::Truncate,
                         typ: destination_type,
                         value: source,
-                    })
-                } else if source_primitive.width() < dest_primitive.width() {
-                    let kind = match source_primitive.type_class() {
-                        rudder::PrimitiveTypeClass::Void => panic!("cannot cast void"),
-                        rudder::PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
-                        rudder::PrimitiveTypeClass::UnsignedInteger => {
-                            CastOperationKind::ZeroExtend
-                        }
-                        rudder::PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
-                        rudder::PrimitiveTypeClass::FloatingPoint => {
-                            panic!("cannot cast floating point")
-                        }
-                    };
+                    }),
 
-                    self.statement_builder.build(StatementKind::Cast {
-                        kind,
-                        typ: destination_type,
-                        value: source,
-                    })
-                } else {
-                    self.statement_builder.build(StatementKind::Cast {
+                    // destination is larger than source
+                    Ordering::Less => {
+                        let kind = match source_primitive.type_class() {
+                            rudder::PrimitiveTypeClass::Void => panic!("cannot cast void"),
+                            rudder::PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
+                            rudder::PrimitiveTypeClass::UnsignedInteger => {
+                                CastOperationKind::ZeroExtend
+                            }
+                            rudder::PrimitiveTypeClass::SignedInteger => {
+                                CastOperationKind::SignExtend
+                            }
+                            rudder::PrimitiveTypeClass::FloatingPoint => {
+                                panic!("cannot cast floating point")
+                            }
+                        };
+
+                        self.statement_builder.build(StatementKind::Cast {
+                            kind,
+                            typ: destination_type,
+                            value: source,
+                        })
+                    }
+
+                    // equal width
+                    Ordering::Equal => self.statement_builder.build(StatementKind::Cast {
                         kind: CastOperationKind::Reinterpret,
                         typ: destination_type,
                         value: source,
-                    })
+                    }),
                 }
             }
 
@@ -1563,7 +1576,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
 
             // bundled to primitive, get value and cast
-            (Type::Bundled { value, len }, Type::Primitive(source_primitive)) => {
+            (Type::Bundled { .. }, Type::Primitive(_)) => {
                 let value = self
                     .statement_builder
                     .build(StatementKind::UnbundleValue { bundle: source });

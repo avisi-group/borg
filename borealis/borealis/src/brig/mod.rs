@@ -4,9 +4,8 @@ use {
     crate::{
         boom::{
             passes::{
-                self, builtin_fns::AddBuiltinFns, cycle_finder::CycleFinder,
-                fold_unconditionals::FoldUnconditionals, make_exception_bool::MakeExceptionBool,
-                remove_const_branch::RemoveConstBranch, resolve_bitvectors::ResolveBitvectors,
+                self, cycle_finder::CycleFinder, fold_unconditionals::FoldUnconditionals,
+                make_exception_bool::MakeExceptionBool, remove_const_branch::RemoveConstBranch,
                 resolve_return_assigns::ResolveReturns,
             },
             Ast,
@@ -47,6 +46,14 @@ const FN_ALLOWLIST: &[&str] = &[
     "execute_aarch64_instrs_integer_ins_ext_insert_movewide",
     "Zeros",
     "__id",
+    "__DecodeA64_DataProcReg",
+    "decode_subs_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+    "DecodeShift",
+    "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+    "ShiftReg",
+    "__DecodeA64_BranchExcSys",
+    "decode_b_cond_aarch64_instrs_branch_conditional_cond",
+    "execute_aarch64_instrs_branch_conditional_cond",
 ];
 
 mod codegen;
@@ -73,8 +80,6 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             RemoveConstBranch::new_boxed(),
             ResolveReturns::new_boxed(),
             MakeExceptionBool::new_boxed(),
-            // ResolveBitvectors::new_boxed(),
-            // AddBuiltinFns::new_boxed(),
             CycleFinder::new_boxed(),
         ],
     );

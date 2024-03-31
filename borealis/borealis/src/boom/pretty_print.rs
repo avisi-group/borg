@@ -296,17 +296,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
             Statement::End(_) => todo!(),
             Statement::Undefined => todo!(),
-            Statement::Cast {
-                expression,
-                value,
-                typ,
-            } => {
-                self.visit_expression(expression);
-                write!(self.writer, " = ").unwrap();
-                self.visit_value(value.clone());
-                write!(self.writer, " as ").unwrap();
-                self.visit_type(typ.clone());
-            }
             Statement::Panic(values) => {
                 write!(self.writer, "panic(").unwrap();
                 values.iter().for_each(|v| {
@@ -449,27 +438,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_value(value.clone());
                 write!(self.writer, " as ").unwrap();
                 write_uid(self, *identifier, types);
-            }
-
-            Value::Access { value, index } => {
-                self.visit_value(value.clone());
-                write!(self.writer, "[").unwrap();
-                self.visit_value(index.clone());
-                write!(self.writer, "]").unwrap();
-            }
-            Value::Range {
-                value,
-                start,
-                length,
-            } => {
-                self.visit_value(value.clone());
-                write!(self.writer, "[").unwrap();
-                self.visit_value(start.clone());
-                write!(self.writer, "..").unwrap();
-                self.visit_value(start.clone());
-                write!(self.writer, " + ").unwrap();
-                self.visit_value(length.clone());
-                write!(self.writer, "]").unwrap();
             }
         }
     }

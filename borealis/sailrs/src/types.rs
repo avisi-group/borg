@@ -106,6 +106,12 @@ impl<T> ListVec<T> {
     }
 }
 
+impl<T> Default for ListVec<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> IntoIterator for ListVec<T> {
     type Item = T;
 

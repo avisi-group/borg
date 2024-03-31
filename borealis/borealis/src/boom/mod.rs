@@ -35,7 +35,7 @@ pub struct Ast {
 
 impl Ast {
     /// Converts JIB AST into BOOM AST
-    pub fn from_jib<'a, I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Rc<RefCell<Self>> {
+    pub fn from_jib<I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Rc<RefCell<Self>> {
         let mut emitter = BoomEmitter::new();
         emitter.process(iter);
 
@@ -409,11 +409,6 @@ pub enum Statement {
     },
     Exit(InternedString),
     Comment(InternedString),
-    Cast {
-        expression: Expression,
-        value: Rc<RefCell<Value>>,
-        typ: Rc<RefCell<Type>>,
-    },
     /// Fatal error, printing the supplied values
     Panic(Vec<Rc<RefCell<Value>>>),
 }
@@ -466,16 +461,6 @@ impl Walkable for Statement {
             Self::Exit(_) => (),
             Self::Comment(_) => (),
 
-            Self::Cast {
-                expression,
-                value,
-                typ,
-            } => {
-                visitor.visit_expression(expression);
-                visitor.visit_value(value.clone());
-                visitor.visit_type(typ.clone());
-            }
-
             Self::Panic(values) => values.iter().for_each(|v| visitor.visit_value(v.clone())),
         }
     }
@@ -515,17 +500,6 @@ pub enum Value {
     Field {
         value: Rc<RefCell<Self>>,
         field_name: InternedString,
-    },
-    // vector access
-    Access {
-        value: Rc<RefCell<Self>>,
-        index: Rc<RefCell<Self>>,
-    },
-    // vector range extract
-    Range {
-        value: Rc<RefCell<Self>>,
-        start: Rc<RefCell<Self>>,
-        length: Rc<RefCell<Self>>,
     },
     CtorKind {
         value: Rc<RefCell<Self>>,
@@ -607,19 +581,6 @@ impl Walkable for Value {
             Value::CtorKind { value, types, .. } | Value::CtorUnwrap { value, types, .. } => {
                 visitor.visit_value(value.clone());
                 types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
-            }
-            Value::Access { value, index } => {
-                visitor.visit_value(value.clone());
-                visitor.visit_value(index.clone());
-            }
-            Value::Range {
-                value,
-                start,
-                length,
-            } => {
-                visitor.visit_value(value.clone());
-                visitor.visit_value(start.clone());
-                visitor.visit_value(length.clone());
             }
         }
     }

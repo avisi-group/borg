@@ -121,6 +121,11 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
         #unions
 
         fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
+            // reset SEE
+            unsafe {
+                *(state.data.as_mut_ptr().byte_offset(0x38f0) as *mut u64) = 0
+            };
+
             #entrypoint
 
             ExecuteResult::Ok
@@ -630,7 +635,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 .enumerate()
                 .map(|(index, statement)| {
                     let field_name = codegen_member(index);
-                    let value = get_ident(&statement);
+                    let value = get_ident(statement);
                     quote!(#field_name: #value,)
                 })
                 .collect::<TokenStream>();
@@ -717,8 +722,7 @@ fn get_functions_to_codegen(rudder: &Context, entrypoint: InternedString) -> Vec
     fn get_calls(f: &Function) -> Vec<InternedString> {
         f.entry_block()
             .iter()
-            .map(|b| b.statements().into_iter())
-            .flatten()
+            .flat_map(|b| b.statements().into_iter())
             .filter_map(|s| {
                 if let StatementKind::Call { target, .. } = s.kind() {
                     Some(target.name())

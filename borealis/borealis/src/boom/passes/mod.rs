@@ -17,12 +17,10 @@ use {
 };
 
 pub mod any;
-pub mod builtin_fns;
 pub mod cycle_finder;
 pub mod fold_unconditionals;
 pub mod make_exception_bool;
 pub mod remove_const_branch;
-pub mod resolve_bitvectors;
 pub mod resolve_return_assigns;
 
 /// Pass that performs an operation on an AST

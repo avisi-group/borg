@@ -5,7 +5,6 @@ use {
         self, control_flow::build_graph, Bit, FunctionSignature, NamedType, Parameter, Size,
     },
     common::{intern::InternedString, HashMap},
-    log::warn,
     sailrs::{jib_ast, sail_ast},
     std::{borrow::Borrow, cell::RefCell, rc::Rc},
 };
@@ -38,13 +37,6 @@ impl BoomEmitter {
 
     /// Emit BOOM AST
     pub fn finish(self) -> boom::Ast {
-        // todo, assert empty?
-        // if !self.function_types.is_empty() {
-        //     warn!(
-        //         "missing fn definitions:\n{:#?}",
-        //         self.function_types.keys().collect::<Vec<_>>()
-        //     );
-        // }
         self.ast
     }
 
