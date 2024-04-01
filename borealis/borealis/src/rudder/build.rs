@@ -69,6 +69,8 @@ impl BuildContext {
         self.registers
             .insert(name, (typ.clone(), self.next_register_offset));
 
+        log::warn!("adding register {name} @ {:x}", self.next_register_offset);
+
         // 8 byte aligned
         self.next_register_offset += typ.width_bytes().next_multiple_of(8)
     }
@@ -652,13 +654,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     length: len,
                 }))
             }
-            "eq_bits" | "eq_int" | "eq_any<EMoveWideOp%>" => Some(self.statement_builder.build(
-                StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::CompareEqual,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                },
-            )),
+            "eq_bits" | "eq_int" | "eq_any<EMoveWideOp%>" | "eq_any<EBranchType%>" => Some(
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::CompareEqual,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            ),
             "neq_bits" => Some(
                 self.statement_builder
                     .build(StatementKind::BinaryOperation {
@@ -667,7 +670,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: args[1].clone(),
                     }),
             ),
-            "add_atom" | "add_bits" => Some(self.statement_builder.build(
+            "add_atom" | "add_bits" | "add_bits_int" => Some(self.statement_builder.build(
                 StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::Add,
                     lhs: args[0].clone(),
@@ -727,6 +730,22 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: args[1].clone(),
                     }),
             ),
+            "xor_vec" => Some(
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Xor,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            ),
+            "or_vec" => Some(
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Or,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            ),
             "sail_shiftright" => {
                 Some(self.statement_builder.build(StatementKind::ShiftOperation {
                     kind: ShiftOperationKind::LogicalShiftRight,
@@ -753,6 +772,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     value: args[0].clone(),
                     start: args[1].clone(),
                     length: args[2].clone(),
+                }))
+            }
+
+            "plain_vector_access<o>" => {
+                Some(self.statement_builder.build(StatementKind::ReadElement {
+                    vector: args[0].clone(),
+                    index: args[1].clone(),
                 }))
             }
 
@@ -886,7 +912,68 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             })
                     }
                     // todo: probably wrong
-                    "SignExtend0" => self.generate_cast(args[0].clone(), Rc::new(Type::s64())),
+                    "SignExtend0" => {
+                        let value = args[0].clone();
+                        let target_length = args[1].clone();
+
+                        let sixtyfour = self.statement_builder.build(StatementKind::Constant {
+                            typ: Rc::new(Type::u8()),
+                            value: rudder::ConstantValue::UnsignedInteger(64),
+                        });
+
+                        let source_length =
+                            self.statement_builder.build(StatementKind::UnbundleLength {
+                                bundle: value.clone(),
+                            });
+
+                        let shift_amount =
+                            self.statement_builder
+                                .build(StatementKind::BinaryOperation {
+                                    kind: BinaryOperationKind::Sub,
+                                    lhs: sixtyfour.clone(),
+                                    rhs: source_length,
+                                });
+
+                        let shift_amount_cast =
+                            self.generate_cast(shift_amount, Rc::new(Type::s64()));
+
+                        let shift_amount_bundle =
+                            self.statement_builder.build(StatementKind::Bundle {
+                                value: shift_amount_cast,
+                                length: sixtyfour,
+                            });
+
+                        let value_bundle = self.generate_cast(
+                            value,
+                            Rc::new(Type::Bundled {
+                                value: Rc::new(Type::s64()),
+                                len: Rc::new(Type::u8()),
+                            }),
+                        );
+
+                        // shift left up to top
+                        let left_shift =
+                            self.statement_builder.build(StatementKind::ShiftOperation {
+                                kind: ShiftOperationKind::LogicalShiftLeft,
+                                value: value_bundle,
+                                amount: shift_amount_bundle.clone(),
+                            });
+
+                        // shift right to target length
+                        let right_shift =
+                            self.statement_builder.build(StatementKind::ShiftOperation {
+                                kind: ShiftOperationKind::ArithmeticShiftRight,
+                                value: left_shift,
+                                amount: shift_amount_bundle,
+                            });
+
+                        // explicitly no masking to length
+
+                        self.statement_builder.build(StatementKind::Bundle {
+                            value: right_shift,
+                            length: target_length,
+                        })
+                    }
                     _ => args[0].clone(),
                 };
 
@@ -1135,84 +1222,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 )
             }
 
-            // "truncate" => Some(self.statement_builder.build(StatementKind::Cast {
-            //     kind: CastOperationKind::Truncate,
-            //     typ: Rc::new(Type::new_primitive(
-            //         rudder::PrimitiveTypeClass::UnsignedInteger,
-            //         8,
-            //     )),
-            //     value: args[0].clone(),
-            // })),
+            "sail_branch_announce" => Some(self.statement_builder.build(StatementKind::Constant {
+                typ: Rc::new(Type::unit()),
+                value: rudder::ConstantValue::Unit,
+            })),
+
             _ => None,
         }
-        // if name.as_ref() == "trap" {
-        //     Some(self.statement_builder.build(StatementKind::Trap))
-        // } else if name.as_ref() == "read_pc" {
-        //     Some(self.statement_builder.build(StatementKind::ReadPc))
-        // } else if name.as_ref() == "vector_subrange_A" {
-        //     // end - start + 1
-        //     let one = self.statement_builder.build(StatementKind::Constant {
-        //         typ: args[1].typ(),
-        //         value: rudder::ConstantValue::SignedInteger(1),
-        //     });
-        //     let diff = self
-        //         .statement_builder
-        //         .build(StatementKind::BinaryOperation {
-        //             kind: BinaryOperationKind::Sub,
-        //             lhs: args[2].clone(),
-        //             rhs: args[1].clone(),
-        //         });
-        //     let len = self
-        //         .statement_builder
-        //         .build(StatementKind::BinaryOperation {
-        //             kind: BinaryOperationKind::Add,
-        //             lhs: diff.clone(),
-        //             rhs: one.clone(),
-        //         });
-
-        //     Some(self.statement_builder.build(StatementKind::BitExtract {
-        //         value: args[0].clone(),
-        //         start: args[1].clone(),
-        //         length: len,
-        //     }))
-        // } else if name.as_ref() == "slice" {
-
-        // } else if name.as_ref().starts_with("vector_access_A") {
-        //     Some(self.statement_builder.build(StatementKind::ReadElement {
-        //         vector: args[0].clone(),
-        //         index: args[1].clone(),
-        //     }))
-        // } else if name.as_ref().starts_with("vector_update_B") {
-        //     Some(self.statement_builder.build(StatementKind::MutateElement {
-        //         vector: args[0].clone(),
-        //         value: args[2].clone(),
-        //         index: args[1].clone(),
-        //     }))
-        // } else if name.as_ref() == "u__raw_GetSlice_int" {
-        //     // u__raw_GetSlice_int(len, n, start)
-        //     Some(self.statement_builder.build(StatementKind::BitExtract {
-        //         value: args[1].clone(),
-        //         start: args[2].clone(),
-        //         length: args[0].clone(),
-        //     }))
-        // } else if name.as_ref() == "ZeroExtend__0" {
-        //     let value = args[0].clone();
-        //     let _length = args[1].clone();
-        //     Some(self.statement_builder.build(StatementKind::Cast {
-        //         kind: CastOperationKind::ZeroExtend,
-        //         typ: Rc::new(Type::u64()),
-        //         value,
-        //     }))
-        // } else if name.as_ref() == "%i64->%i" {
-        //     let value = args[0].clone();
-        //     Some(self.statement_builder.build(StatementKind::Cast {
-        //         kind: CastOperationKind::ZeroExtend,
-        //         typ: Rc::new(Type::u64()),
-        //         value,
-        //     }))
-        // } else {
-        //     None
-        // }
     }
 
     /// Last statement returned is the value
@@ -1326,7 +1342,28 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.build_value(value.clone());
 
                 // lookup identifier
+                // todo: parameters should just be read-only local vars?
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(ident) {
+                    // copying into local variable
+                    let target_typ = symbol.typ();
+
+                    let structs = self.ctx().structs.clone();
+                    let (_, (_, fields)) = structs
+                        .iter()
+                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+                        .expect("failed to find struct :(");
+
+                    let idx = fields.get(field_name).unwrap();
+
+                    let read_var = self
+                        .statement_builder
+                        .build(StatementKind::ReadVariable { symbol });
+
+                    self.statement_builder.build(StatementKind::ReadField {
+                        composite: read_var.clone(),
+                        field: *idx,
+                    })
+                } else if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(ident) {
                     // copying into local variable
                     let target_typ = symbol.typ();
 
@@ -1586,8 +1623,59 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.generate_cast(value, destination_type)
             }
 
+            // bundle to bundle
+            (
+                Type::Bundled { .. },
+                Type::Bundled {
+                    value: dest_value_type,
+                    len: dest_len_type,
+                },
+            ) => {
+                let source_value = self.statement_builder.build(StatementKind::UnbundleValue {
+                    bundle: source.clone(),
+                });
+                let source_len = self
+                    .statement_builder
+                    .build(StatementKind::UnbundleValue { bundle: source });
+
+                let cast_value = self.generate_cast(source_value, dest_value_type.clone());
+                let cast_len = self.generate_cast(source_len, dest_len_type.clone());
+
+                self.statement_builder.build(StatementKind::Bundle {
+                    value: cast_value,
+                    length: cast_len,
+                })
+            }
+
+            (
+                Type::Vector {
+                    element_count: src_count,
+                    element_type: src_type,
+                },
+                Type::Vector {
+                    element_count: dst_count,
+                    element_type: dst_type,
+                },
+            ) => {
+                if src_type != dst_type {
+                    todo!();
+                }
+
+                if *src_count > 0 && *dst_count == 0 {
+                    // casting known to unknown
+                    self.statement_builder.build(StatementKind::Cast {
+                        kind: CastOperationKind::Convert,
+                        typ: destination_type,
+                        value: source,
+                    })
+                } else {
+                    todo!()
+                }
+            }
+
             (src, dst) => {
-                panic!("cannot cast from {src} to {dst}");
+                log::warn!("cannot cast from {src} to {dst}");
+                return source;
             }
         }
     }

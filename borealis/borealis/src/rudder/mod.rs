@@ -94,10 +94,11 @@ impl Type {
             Self::Vector {
                 element_count,
                 element_type,
-            } => element_type.width_bits() * element_count,
+            } => element_type.width_bits().max(8) * element_count,
             Self::Bundled { value, .. } => value.width_bits(),
         }
     }
+
     pub fn width_bytes(&self) -> usize {
         self.width_bits().div_ceil(8)
     }
@@ -136,6 +137,37 @@ impl Type {
                 matches!(tc, PrimitiveTypeClass::Unit)
             }
             _ => false,
+        }
+    }
+
+    pub fn is_unknown_length_vector(&self) -> bool {
+        matches!(
+            self,
+            Self::Vector {
+                element_count: 0,
+                ..
+            }
+        )
+    }
+
+    pub fn as_signed(&self) -> Self {
+        match &*self {
+            Self::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::UnsignedInteger,
+                element_width_in_bits,
+            }) => Self::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::SignedInteger,
+                element_width_in_bits: *element_width_in_bits,
+            }),
+
+            Self::Bundled { value, len } => Self::Bundled {
+                value: Rc::new(value.as_signed()),
+                len: len.clone(),
+            },
+
+            _ => {
+                panic!("cannot convert to signed: {}", self);
+            }
         }
     }
 

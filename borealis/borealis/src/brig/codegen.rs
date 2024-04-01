@@ -122,8 +122,9 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
 
         fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
             // reset SEE
+            // todo: for the love of god make this not break if registers are regenerated
             unsafe {
-                *(state.data.as_mut_ptr().byte_offset(0x38f0) as *mut u64) = 0
+                *(state.data.as_mut_ptr().byte_offset(0x3920) as *mut u64) = 0
             };
 
             #entrypoint
@@ -199,9 +200,14 @@ pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
             element_count,
             element_type,
         } => {
-            let count = quote!(#element_count);
             let element_type = codegen_type(element_type.clone());
-            quote!([#element_type; #count])
+
+            if *element_count == 0 {
+                quote!(Vec<#element_type>)
+            } else {
+                let count = quote!(#element_count);
+                quote!([#element_type; #count])
+            }
         }
         Type::Bundled { value, len } => {
             let value_type = codegen_type(value.clone());
@@ -456,6 +462,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! {
                     ((#ident) != 0)
                 }
+            } else if target.is_unknown_length_vector() {
+                quote!(Vec::from(#ident))
             } else {
                 match kind {
                     CastOperationKind::ZeroExtend => {
@@ -606,10 +614,16 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::ReadElement { vector, index } => {
+            let index_typ = index.typ();
+
             let vector = get_ident(&vector);
             let index = get_ident(&index);
-            // todo remove this cast, need "machine word" size in rudder?
-            quote!(#vector[(#index) as usize])
+
+            if let Type::Bundled { .. } = &*index_typ {
+                quote!(#vector[(#index.value) as usize])
+            } else {
+                quote!(#vector[(#index) as usize])
+            }
         }
         StatementKind::MutateElement {
             vector,
@@ -619,7 +633,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let vector = get_ident(&vector);
             let index = get_ident(&index);
             let value = get_ident(&value);
-            // todo remove this cast, need "machine word" size in rudder?
+            // todo: support bundle indexes
             quote! {
                 {
                     let mut local = #vector.clone();

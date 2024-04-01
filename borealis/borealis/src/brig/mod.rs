@@ -54,6 +54,48 @@ const FN_ALLOWLIST: &[&str] = &[
     "__DecodeA64_BranchExcSys",
     "decode_b_cond_aarch64_instrs_branch_conditional_cond",
     "execute_aarch64_instrs_branch_conditional_cond",
+    "ConditionHolds",
+    "BranchNotTaken",
+    "HaveStatisticalProfiling",
+    "IsFeatureImplemented",
+    "num_of_Feature",
+    "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+    "decode_orr_log_shift_aarch64_instrs_integer_logical_shiftedreg",
+    "execute_aarch64_instrs_integer_logical_shiftedreg",
+    "decode_b_uncond_aarch64_instrs_branch_unconditional_immediate",
+    "execute_aarch64_instrs_branch_unconditional_immediate",
+    "PC_read",
+    "BranchTo",
+    "Hint_Branch",
+    "UsingAArch32",
+    "HaveAArch32",
+    "HaveAArch64",
+    "AArch64_BranchAddr",
+    "AddrTop",
+    "HaveEL",
+    "S1TranslationRegime",
+    "ELUsingAArch32",
+    "IsSecureBelowEL3",
+    "SCR_GEN_read",
+    "Mk_SCRType",
+    "_get_SCRType_NS",
+    "ELStateUsingAArch32",
+    "ELStateUsingAArch32K",
+    "HaveAArch32EL",
+    "HaveVirtHostExt",
+    "EffectiveTBI",
+    "_get_TCR_EL1_Type_TBI0",
+    "HavePACExt",
+    "HaveBRBExt",
+    "decode_svc_aarch64_instrs_system_exceptions_runtime_svc",
+    "execute_aarch64_instrs_system_exceptions_runtime_svc",
+    "AArch64_CheckForSVCTrap",
+    "HaveFGTExt",
+    "AArch64_CallSupervisor",
+    "SSAdvance",
+    "decode_hvc_aarch64_instrs_system_exceptions_runtime_hvc",
+    "DebugTarget",
+    "CurrentSecurityState",
 ];
 
 mod codegen;
@@ -155,15 +197,48 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
                 let mut state = State::default();
 
-                text.chunks(4).map(|c| {
-                    let mut buf = [0u8;4];
-                    buf.copy_from_slice(c);
-                    u32::from_le_bytes(buf)
-                }).for_each(|insr| {
+                // set enabled features
+                unsafe {
+                    *(state.data.as_mut_ptr().byte_offset(0x18ed0) as *mut [bool; 259]) = [
+                        false, false, false, false, true, true, true, false, false, true, true, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false, false, false, false, false, false, false,
+                        false, false, false, false, false, false,
+                    ]
+                };
+
+
+                loop {
+                    let pc = unsafe { (state.data.as_mut_ptr().byte_offset(12704) as *mut u64) };
+                    let insr = unsafe { *(text.as_ptr().offset(dbg!(unsafe {*pc}) as isize) as *mut u32) };
                     dbg!(decode_execute(insr, &mut state, &mut ConsoleTracer));
-                })
 
+                    let branch_taken = unsafe { (state.data.as_mut_ptr().byte_offset(14856) as *mut bool) };
 
+                    if !unsafe {*branch_taken} {
+                        unsafe { *pc += 4};
+                    }
+
+                    unsafe {*branch_taken = false};
+                }
             }
         }
     } else {
@@ -259,6 +334,17 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             fn bitor(self, rhs: Self) -> Self::Output {
                 Self {
                     value:  self.value | rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V: core::ops::BitXor<Output = V>, L> core::ops::BitXor for Bundle<V, L> {
+            type Output = Self;
+
+            fn bitxor(self, rhs: Self) -> Self::Output {
+                Self {
+                    value:  self.value ^ rhs.value,
                     length: self.length
                 }
             }
