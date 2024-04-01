@@ -96,6 +96,23 @@ const FN_ALLOWLIST: &[&str] = &[
     "decode_hvc_aarch64_instrs_system_exceptions_runtime_hvc",
     "DebugTarget",
     "CurrentSecurityState",
+    "SecurityStateAtEL",
+    "HaveRME",
+    "DebugTargetFrom",
+    "HaveSecureEL2Ext",
+    "_get_MDSCR_EL1_Type_SS",
+    "EL2Enabled",
+    "decode_ccmp_imm_aarch64_instrs_integer_conditional_compare_immediate",
+    "IsSecureEL2Enabled",
+    "execute_aarch64_instrs_integer_conditional_compare_immediate",
+    "decode_bl_aarch64_instrs_branch_unconditional_immediate",
+    "HaveGCS",
+    "decode_mrs_aarch64_instrs_system_register_system",
+    "NextInstrAddr",
+    "ThisInstrLength",
+    "AArch64_CheckSystemAccess",
+    "HaveBTIExt",
+    "fdiv_int",
 ];
 
 mod codegen;
@@ -172,9 +189,11 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
     let prelude = if standalone {
         quote! {
-            struct ConsoleTracer;
+            extern crate alloc;
 
-            impl Tracer for ConsoleTracer {
+            struct PrintlnTracer;
+
+            impl Tracer for PrintlnTracer {
                 fn begin(&self, pc: u64) {
                     println!("begin @ {pc:x}");
                 }
@@ -225,19 +244,11 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
                     ]
                 };
 
-
                 loop {
-                    let pc = unsafe { (state.data.as_mut_ptr().byte_offset(12704) as *mut u64) };
-                    let insr = unsafe { *(text.as_ptr().offset(dbg!(unsafe {*pc}) as isize) as *mut u32) };
-                    dbg!(decode_execute(insr, &mut state, &mut ConsoleTracer));
-
-                    let branch_taken = unsafe { (state.data.as_mut_ptr().byte_offset(14856) as *mut bool) };
-
-                    if !unsafe {*branch_taken} {
-                        unsafe { *pc += 4};
-                    }
-
-                    unsafe {*branch_taken = false};
+                    let pc_ptr = unsafe { (state.data.as_mut_ptr().byte_offset(12704) as *mut u64) };
+                    let pc = dbg!(unsafe { *pc_ptr });
+                    let insr = unsafe { *(text.as_ptr().offset(pc as isize) as *mut u32) };
+                    dbg!(decode_execute(insr, &mut state, &mut PrintlnTracer));
                 }
             }
         }
@@ -245,32 +256,81 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
         quote! {
             use super::{CoreState, ExecutionEngine};
 
-            pub struct AArch64Interpreter;
+            pub struct Interpreter;
 
             impl CoreState for State {
                 fn pc(&self) -> usize {
-                    self.pc as usize
+                    unsafe { *(self.data.as_ptr().byte_offset(12704) as *const usize) }
                 }
 
                 fn new(pc: usize) -> Self {
-                    Self { pc: pc as u64, sp: 0, x: [0; 31] }
+                    let mut celf = State::default();
+                    unsafe { *(celf.data.as_mut_ptr().byte_offset(12704) as *mut usize) = pc };
+
+                    // set enabled features
+                    unsafe {
+                        *(celf.data.as_mut_ptr().byte_offset(0x18ed0) as *mut [bool; 259]) = [
+                            false, false, false, false, true, true, true, false, false, true, true, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false, false, false, false, false, false, false,
+                            false, false, false, false, false, false,
+                        ]
+                    };
+
+                    celf
                 }
             }
+
+            struct LogTracer;
+
+            impl Tracer for LogTracer {
+                fn begin(&self, pc: u64) {
+                    log::trace!("begin @ {pc:x}");
+                }
+
+                fn end(&self) {
+                    log::trace!("end");
+                }
+
+                fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
+                    log::trace!("read-register {offset:x} = {value:?}");
+                }
+                fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
+                    log::trace!("write-register {offset:x} = {value:?}");
+                }
+            }
+
 
             fn fetch(pc: usize) -> u32 {
                 unsafe { *(pc as *const u32) }
             }
 
-            impl ExecutionEngine<State> for AArch64Interpreter {
+            impl ExecutionEngine<State> for Interpreter {
                 fn step(amount: super::StepAmount, state: &mut State) -> super::StepResult {
                     let insn_data = fetch(state.pc());
                     log::trace!("fetch @ {} = {:08x}", state.pc(), insn_data);
 
-                    match decode_execute(insn_data, state) {
+                    match decode_execute(insn_data, state, &mut LogTracer) {
                         ExecuteResult::Ok => {
-                            state.pc += 4;
-                            super::StepResult::Ok
-
+                                                       super::StepResult::Ok
                         },
                         ExecuteResult::EndOfBlock => {
                             super::StepResult::Ok
@@ -372,24 +432,34 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             }
         }
 
-
-        impl<V: core::ops::Sub<Output = V>, L> core::ops::Sub for Bundle<V, L> {
+        impl<V, L> core::ops::Sub for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Sub<Output = core::num::Wrapping<V>> {
             type Output = Self;
 
             fn sub(self, rhs: Self) -> Self::Output {
                 Self {
-                    value:  self.value - rhs.value,
+                    value: (core::num::Wrapping(self.value) - core::num::Wrapping(rhs.value)).0,
                     length: self.length
                 }
             }
         }
 
-        impl<V: core::ops::Add<Output = V>, L> core::ops::Add for Bundle<V, L> {
+        impl<V, L> core::ops::Add for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Add<Output = core::num::Wrapping<V>> {
             type Output = Self;
 
             fn add(self, rhs: Self) -> Self::Output {
                 Self {
-                    value:  self.value + rhs.value,
+                    value: (core::num::Wrapping(self.value) + core::num::Wrapping(rhs.value)).0,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V, L> core::ops::Div for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Div<Output = core::num::Wrapping<V>> {
+            type Output = Self;
+
+            fn div(self, rhs: Self) -> Self::Output {
+                Self {
+                    value: (core::num::Wrapping(self.value) / core::num::Wrapping(rhs.value)).0,
                     length: self.length
                 }
             }
@@ -417,12 +487,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             }
         }
 
-        impl<V: core::cmp::PartialEq, L> core::cmp::Eq for Bundle<V, L> {
-
-        }
-
-
-
+        impl<V: core::cmp::PartialEq, L> core::cmp::Eq for Bundle<V, L> {}
 
         #prelude
 

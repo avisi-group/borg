@@ -69,7 +69,7 @@ impl BuildContext {
         self.registers
             .insert(name, (typ.clone(), self.next_register_offset));
 
-        log::warn!("adding register {name} @ {:x}", self.next_register_offset);
+        log::debug!("adding register {name} @ {:x}", self.next_register_offset);
 
         // 8 byte aligned
         self.next_register_offset += typ.width_bytes().next_multiple_of(8)
@@ -654,22 +654,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     length: len,
                 }))
             }
-            "eq_bits" | "eq_int" | "eq_any<EMoveWideOp%>" | "eq_any<EBranchType%>" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::CompareEqual,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "neq_bits" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::CompareNotEqual,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
+            "eq_bits"
+            | "eq_int"
+            | "eq_any<EMoveWideOp%>"
+            | "eq_any<EBranchType%>"
+            | "eq_any<ESecurityState%>"
+            | "eq_any<E__InstrEnc%>" => Some(self.statement_builder.build(
+                StatementKind::BinaryOperation {
+                    kind: BinaryOperationKind::CompareEqual,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+            "neq_bits" | "neq_any<ESecurityState%>" => Some(self.statement_builder.build(
+                StatementKind::BinaryOperation {
+                    kind: BinaryOperationKind::CompareNotEqual,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
             "add_atom" | "add_bits" | "add_bits_int" => Some(self.statement_builder.build(
                 StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::Add,
@@ -684,6 +687,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     rhs: args[1].clone(),
                 },
             )),
+            "tdiv_int" => Some(
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Divide,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            ),
             "lt_int" => Some(
                 self.statement_builder
                     .build(StatementKind::BinaryOperation {
@@ -746,6 +757,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: args[1].clone(),
                     }),
             ),
+
             "sail_shiftright" => {
                 Some(self.statement_builder.build(StatementKind::ShiftOperation {
                     kind: ShiftOperationKind::LogicalShiftRight,

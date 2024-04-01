@@ -129,6 +129,15 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
 
             #entrypoint
 
+            // increment PC if no branch was taken
+            let branch_taken = unsafe { (state.data.as_mut_ptr().byte_offset(14856) as *mut bool) };
+
+            if !unsafe { *branch_taken } {
+                unsafe { *(state.data.as_ptr().byte_offset(12704) as *mut usize) += 4 };
+            }
+
+            unsafe { *branch_taken = false };
+
             ExecuteResult::Ok
         }
 
@@ -203,7 +212,7 @@ pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
             let element_type = codegen_type(element_type.clone());
 
             if *element_count == 0 {
-                quote!(Vec<#element_type>)
+                quote!(alloc::vec::Vec<#element_type>)
             } else {
                 let count = quote!(#element_count);
                 quote!([#element_type; #count])
@@ -463,7 +472,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
                     ((#ident) != 0)
                 }
             } else if target.is_unknown_length_vector() {
-                quote!(Vec::from(#ident))
+                quote!(alloc::vec::Vec::from(#ident))
             } else {
                 match kind {
                     CastOperationKind::ZeroExtend => {
