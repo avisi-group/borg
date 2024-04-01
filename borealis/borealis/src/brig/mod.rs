@@ -10,7 +10,7 @@ use {
             },
             Ast,
         },
-        brig::codegen::codegen,
+        brig::{codegen::codegen, state::codegen_state},
         rudder,
     },
     common::create_file,
@@ -20,6 +20,9 @@ use {
     sailrs::{jib_ast, types::ListVec},
     std::io::Write,
 };
+
+mod codegen;
+mod state;
 
 const ENTRYPOINT: &str = "__DecodeA64";
 
@@ -115,8 +118,6 @@ const FN_ALLOWLIST: &[&str] = &[
     "fdiv_int",
 ];
 
-mod codegen;
-
 /// Compiles a Sail model to a Brig module
 pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
     jib_ast: I,
@@ -157,33 +158,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
     info!("Generating Rust");
 
-    let registers_len = {
-        let (last_register, last_offset) = rudder
-            .get_registers()
-            .into_iter()
-            .max_by_key(|(typ, offset)| offset + typ.width_bytes())
-            .unwrap();
-
-        last_offset + last_register.width_bytes()
-    };
-
-    let state = quote! {
-        // todo check this is necessary
-        #[repr(align(8))]
-        pub struct State {
-            pc: u64,
-            data: [u8; #registers_len],
-        }
-
-        impl Default for State {
-            fn default() -> Self {
-                Self {
-                    pc: 0,
-                    data: [0; #registers_len],
-                }
-            }
-        }
-    };
+    let state = codegen_state(&rudder);
 
     let body = codegen(rudder, ENTRYPOINT.into());
 
@@ -214,39 +189,10 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
                 let arg = std::env::args().skip(1).next().unwrap();
                 let text = std::fs::read(arg).unwrap();
 
-                let mut state = State::default();
-
-                // set enabled features
-                unsafe {
-                    *(state.data.as_mut_ptr().byte_offset(0x18ed0) as *mut [bool; 259]) = [
-                        false, false, false, false, true, true, true, false, false, true, true, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false, false, false, false, false, false, false,
-                        false, false, false, false, false, false,
-                    ]
-                };
+                let mut state = State::init();
 
                 loop {
-                    let pc_ptr = unsafe { (state.data.as_mut_ptr().byte_offset(12704) as *mut u64) };
-                    let pc = dbg!(unsafe { *pc_ptr });
+                    let pc = state.read_register::<u64>(12704);
                     let insr = unsafe { *(text.as_ptr().offset(pc as isize) as *mut u32) };
                     dbg!(decode_execute(insr, &mut state, &mut PrintlnTracer));
                 }
@@ -260,40 +206,13 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
             impl CoreState for State {
                 fn pc(&self) -> usize {
-                    unsafe { *(self.data.as_ptr().byte_offset(12704) as *const usize) }
+                    self.read_register(12704)
                 }
 
                 fn new(pc: usize) -> Self {
-                    let mut celf = State::default();
-                    unsafe { *(celf.data.as_mut_ptr().byte_offset(12704) as *mut usize) = pc };
+                    let mut celf = State::init();
 
-                    // set enabled features
-                    unsafe {
-                        *(celf.data.as_mut_ptr().byte_offset(0x18ed0) as *mut [bool; 259]) = [
-                            false, false, false, false, true, true, true, false, false, true, true, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false, false, false, false, false, false, false,
-                            false, false, false, false, false, false,
-                        ]
-                    };
+                    celf.write_register(12704, pc);
 
                     celf
                 }

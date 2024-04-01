@@ -112,8 +112,7 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
         .collect();
 
     let entrypoint = codegen_ident(entrypoint);
-    let entrypoint =
-        quote!(#entrypoint(state, tracer, Bundle { value: state.pc, length: 64 }, value););
+    let entrypoint = quote!(#entrypoint(state, tracer, Bundle { value: state.read_register(12704), length: 64 }, value););
 
     quote! {
         #structs
@@ -123,20 +122,19 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
         fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
             // reset SEE
             // todo: for the love of god make this not break if registers are regenerated
-            unsafe {
-                *(state.data.as_mut_ptr().byte_offset(0x3920) as *mut u64) = 0
-            };
+            state.write_register(0x3920, 0u64);
 
             #entrypoint
 
             // increment PC if no branch was taken
-            let branch_taken = unsafe { (state.data.as_mut_ptr().byte_offset(14856) as *mut bool) };
+            let branch_taken = state.read_register::<bool>(14856);
 
-            if !unsafe { *branch_taken } {
-                unsafe { *(state.data.as_ptr().byte_offset(12704) as *mut usize) += 4 };
+            if !branch_taken {
+                let pc = state.read_register::<u64>(12704);
+                state.write_register(12704, pc + 4);
             }
 
-            unsafe { *branch_taken = false };
+            state.write_register(14856, false);
 
             ExecuteResult::Ok
         }
@@ -353,7 +351,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let typ = codegen_type(typ);
             quote! {
                 {
-                    let value = unsafe {*(state.data.as_ptr().byte_offset(#offset as isize) as *const #typ)};
+                    let value = state.read_register::<#typ>(#offset as isize);
                     tracer.read_register(#offset as usize, value);
                     value
                 }
@@ -365,7 +363,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             let value = get_ident(&value);
             quote! {
                 {
-                    unsafe { *(state.data.as_mut_ptr().byte_offset(#offset as isize) as *mut #typ) = #value };
+                    state.write_register::<#typ>(#offset as isize, #value);
                     tracer.write_register(#offset as usize, #value);
                 }
             }
