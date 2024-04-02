@@ -261,13 +261,17 @@ impl<'ctx> FunctionBuildContext<'ctx> {
 struct BlockBuildContext<'ctx, 'fn_ctx> {
     function_build_context: &'fn_ctx mut FunctionBuildContext<'ctx>,
     statement_builder: StatementBuilder,
+    block: rudder::Block,
 }
 
 impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     pub fn new(function_build_context: &'fn_ctx mut FunctionBuildContext<'ctx>) -> Self {
+        let block = rudder::Block::new();
+
         Self {
             function_build_context,
-            statement_builder: StatementBuilder::new(),
+            statement_builder: StatementBuilder::new(block.weak()),
+            block,
         }
     }
 
@@ -330,9 +334,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         self.statement_builder.build(kind);
 
-        let rudder_block = rudder::Block::new();
-        rudder_block.set_statements(self.statement_builder.finish().into_iter());
-        rudder_block
+        self.block
+            .set_statements(self.statement_builder.finish().into_iter());
+        self.block
     }
 
     fn build_statement(&mut self, statement: Rc<RefCell<boom::Statement>>) {
@@ -788,7 +792,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }))
             }
 
-            "plain_vector_access<o>" => {
+            "plain_vector_access<o>"
+            | "plain_vector_access<RBRBINFType>"
+            | "plain_vector_access<RBRBSRCType>"
+            | "plain_vector_access<RBRBTGTType>"
+            | "plain_vector_access<RERRnFR_ElemType>"
+            | "plain_vector_access<B64>"
+            | "plain_vector_access<RPMEVTYPER_EL0_Type>" => {
                 Some(self.statement_builder.build(StatementKind::ReadElement {
                     vector: args[0].clone(),
                     index: args[1].clone(),
@@ -1151,6 +1161,26 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 length: args[0].clone(),
             })),
 
+            "set_slice_bits" => {
+                //val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv
+                // len, slen, x, pos, y
+                let _len = args[0].clone();
+                let slen = args[1].clone();
+                let destination = args[2].clone();
+                let start = args[3].clone();
+                let source = args[4].clone();
+
+                // destination[start..] = source[0..source.len()]
+
+                Some(generate_set_slice(
+                    &mut self.statement_builder,
+                    destination,
+                    source,
+                    slen,
+                    start,
+                ))
+            }
+
             "update_subrange_bits" => {
                 let destination = args[0].clone();
                 let end = args[1].clone();
@@ -1160,7 +1190,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // copy source[0..(end - start + 1)] into dest[start..(end + 1)]
 
                 // let length = end - start
-                let length = self
+                let source_length = self
                     .statement_builder
                     .build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
@@ -1168,71 +1198,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: start.clone(),
                     });
 
-                // let source_mask = (1 << (length) - 1);
-                let one = self.statement_builder.build(StatementKind::Constant {
-                    typ: args[1].typ(),
-                    value: rudder::ConstantValue::SignedInteger(1),
-                });
-                let shifted = self.statement_builder.build(StatementKind::ShiftOperation {
-                    kind: ShiftOperationKind::LogicalShiftLeft,
-                    value: one.clone(),
-                    amount: length,
-                });
-                let source_mask = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Sub,
-                        lhs: shifted,
-                        rhs: one,
-                    });
-
-                // let masked_source = source & source_mask
-                let masked_source = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::And,
-                        lhs: source,
-                        rhs: source_mask.clone(),
-                    });
-
-                // let source = masked_source << start
-                let source = self.statement_builder.build(StatementKind::ShiftOperation {
-                    kind: ShiftOperationKind::LogicalShiftLeft,
-                    value: masked_source,
-                    amount: start.clone(),
-                });
-
-                // let dest_mask = ~(source_mask << start)
-                let shifted_source_mask =
-                    self.statement_builder.build(StatementKind::ShiftOperation {
-                        kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: source_mask,
-                        amount: start,
-                    });
-                let destination_mask =
-                    self.statement_builder.build(StatementKind::UnaryOperation {
-                        kind: rudder::UnaryOperationKind::Complement,
-                        value: shifted_source_mask,
-                    });
-
-                // let dest = dest & dest_mask
-                let destination = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::And,
-                        lhs: destination,
-                        rhs: destination_mask,
-                    });
-
-                // let result = source | dest
-                Some(
-                    self.statement_builder
-                        .build(StatementKind::BinaryOperation {
-                            kind: BinaryOperationKind::Or,
-                            lhs: destination,
-                            rhs: source,
-                        }),
-                )
+                Some(generate_set_slice(
+                    &mut self.statement_builder,
+                    destination,
+                    source,
+                    source_length,
+                    start,
+                ))
             }
 
             "sail_branch_announce" => Some(self.statement_builder.build(StatementKind::Constant {
@@ -1692,4 +1664,77 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
         }
     }
+}
+
+/// Copies source[0..source_length] into dest[start..start + source_length]
+fn generate_set_slice(
+    builder: &mut StatementBuilder,
+    destination: Statement,
+    source: Statement,
+    source_length: Statement,
+    destination_start_offset: Statement,
+) -> Statement {
+    // // let length = end - start
+    // let length = self
+    //     .statement_builder
+    //     .build(StatementKind::BinaryOperation {
+    //         kind: BinaryOperationKind::Sub,
+    //         lhs: end,
+    //         rhs: start.clone(),
+    //     });
+
+    // let source_mask = (1 << (length) - 1);
+    let one = builder.build(StatementKind::Constant {
+        typ: source.typ(),
+        value: rudder::ConstantValue::UnsignedInteger(1),
+    });
+    let shifted = builder.build(StatementKind::ShiftOperation {
+        kind: ShiftOperationKind::LogicalShiftLeft,
+        value: one.clone(),
+        amount: source_length,
+    });
+    let source_mask = builder.build(StatementKind::BinaryOperation {
+        kind: BinaryOperationKind::Sub,
+        lhs: shifted,
+        rhs: one,
+    });
+
+    // let masked_source = source & source_mask
+    let masked_source = builder.build(StatementKind::BinaryOperation {
+        kind: BinaryOperationKind::And,
+        lhs: source,
+        rhs: source_mask.clone(),
+    });
+
+    // let source = masked_source << start
+    let source = builder.build(StatementKind::ShiftOperation {
+        kind: ShiftOperationKind::LogicalShiftLeft,
+        value: masked_source,
+        amount: destination_start_offset.clone(),
+    });
+
+    // let dest_mask = ~(source_mask << start)
+    let shifted_source_mask = builder.build(StatementKind::ShiftOperation {
+        kind: ShiftOperationKind::LogicalShiftLeft,
+        value: source_mask,
+        amount: destination_start_offset,
+    });
+    let destination_mask = builder.build(StatementKind::UnaryOperation {
+        kind: rudder::UnaryOperationKind::Complement,
+        value: shifted_source_mask,
+    });
+
+    // let dest = dest & dest_mask
+    let destination = builder.build(StatementKind::BinaryOperation {
+        kind: BinaryOperationKind::And,
+        lhs: destination,
+        rhs: destination_mask,
+    });
+
+    // let result = source | dest
+    builder.build(StatementKind::BinaryOperation {
+        kind: BinaryOperationKind::Or,
+        lhs: destination,
+        rhs: source,
+    })
 }

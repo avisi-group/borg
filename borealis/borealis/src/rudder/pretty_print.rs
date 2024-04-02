@@ -1,4 +1,5 @@
 use {
+    super::analysis,
     crate::rudder::{
         BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
         FunctionKind, PrimitiveTypeClass, Statement, StatementKind, Symbol, Type,
@@ -269,8 +270,6 @@ impl Display for Statement {
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        writeln!(f, "  block {}:", self.name())?;
-
         for stmt in &(*self.inner).borrow().statements {
             writeln!(f, "    {}", stmt)?;
         }
@@ -281,11 +280,30 @@ impl Display for Block {
 
 impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let cfg = analysis::cfg::ControlFlowGraphAnalysis::new(self.clone());
+
         self.inner
             .borrow()
             .entry_block
             .iter()
-            .try_for_each(|block| write!(f, "{}", block))
+            .try_for_each(|block| {
+                let preds = cfg
+                    .predecessors_for(&block)
+                    .unwrap()
+                    .iter()
+                    .map(|b| b.name())
+                    .join(", ");
+
+                let succs = cfg
+                    .successors_for(&block)
+                    .unwrap()
+                    .iter()
+                    .map(|b| b.name())
+                    .join(", ");
+
+                writeln!(f, "  block {}: preds={{{preds}}}, succs={{{succs}}}", block.name())?;
+                write!(f, "{}", block)
+            })
     }
 }
 

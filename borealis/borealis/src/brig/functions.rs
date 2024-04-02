@@ -22,7 +22,7 @@ use {
     },
 };
 
-pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
+pub fn codegen_functions(rudder: Context, entrypoint: InternedString) -> TokenStream {
     rudder.update_names();
 
     let fn_names = get_functions_to_codegen(&rudder, entrypoint);
@@ -112,7 +112,7 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
         .collect();
 
     let entrypoint = codegen_ident(entrypoint);
-    let entrypoint = quote!(#entrypoint(state, tracer, Bundle { value: state.read_register(12704), length: 64 }, value););
+    let entrypoint = quote!(#entrypoint(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value););
 
     quote! {
         #structs
@@ -122,19 +122,19 @@ pub fn codegen(rudder: Context, entrypoint: InternedString) -> TokenStream {
         fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
             // reset SEE
             // todo: for the love of god make this not break if registers are regenerated
-            state.write_register(0x3920, 0u64);
+            state.write_register(REG_SEE, 0u64);
 
             #entrypoint
 
             // increment PC if no branch was taken
-            let branch_taken = state.read_register::<bool>(14856);
+            let branch_taken = state.read_register::<bool>(REG_U__BRANCHTAKEN);
 
             if !branch_taken {
-                let pc = state.read_register::<u64>(12704);
-                state.write_register(12704, pc + 4);
+                let pc = state.read_register::<u64>(REG_U_PC);
+                state.write_register(REG_U_PC, pc + 4);
             }
 
-            state.write_register(14856, false);
+            state.write_register(REG_U__BRANCHTAKEN, false);
 
             ExecuteResult::Ok
         }
@@ -537,10 +537,10 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Return { value } => match value {
             Some(value) => {
                 let name = codegen_ident(value.name());
-                quote! {return #name;}
+                quote! { return #name; }
             }
             None => {
-                quote! {return return_value;}
+                quote! { return; }
             }
         },
         StatementKind::Select {
@@ -683,16 +683,16 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
     };
 
-    let msg = stmt.to_string();
+    let msg = format!(" {stmt}");
     if stmt.has_value() {
         let typ = codegen_type(stmt.typ());
         quote! {
-            let _ = #msg;
+            #[doc = #msg]
             let #stmt_name: #typ = #value;
         }
     } else {
         quote! {
-            let _ = #msg;
+            #[doc = #msg]
             #value;
         }
     }

@@ -7,12 +7,13 @@ use {
         cell::RefCell,
         collections::LinkedList,
         hash::{Hash, Hasher},
-        rc::Rc,
+        rc::{Rc, Weak},
     },
 };
 
+pub mod analysis;
 pub mod build;
-//pub mod opt;
+pub mod opt;
 mod pretty_print;
 
 #[derive(Hash, Clone, Copy, Eq, PartialEq)]
@@ -212,7 +213,7 @@ pub enum ConstantValue {
     Unit,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub enum SymbolKind {
     Parameter,
     LocalVariable,
@@ -406,7 +407,8 @@ pub enum StatementKind {
         index: Statement,
     },
 
-    /// Fatal error, printing values of supplied statements for debugging purposes
+    /// Fatal error, printing values of supplied statements for debugging
+    /// purposes
     Panic(Vec<Statement>),
 
     Assert {
@@ -448,6 +450,7 @@ pub struct Statement {
 pub struct StatementInner {
     name: InternedString,
     kind: StatementKind,
+    parent: WeakBlock,
 }
 
 impl Statement {
@@ -457,6 +460,10 @@ impl Statement {
 
     pub fn name(&self) -> InternedString {
         (*self.inner).borrow().name
+    }
+
+    pub fn parent(&self) -> WeakBlock {
+        (*self.inner).borrow().parent.clone()
     }
 
     pub fn update_names(&self, name: InternedString) {
@@ -628,12 +635,16 @@ impl StatementInner {
 
 struct StatementBuilder {
     statements: Vec<Statement>,
+    parent: WeakBlock,
 }
 
 impl StatementBuilder {
     /// Creates a new `StatementBuilder`
-    pub fn new() -> Self {
-        Self { statements: vec![] }
+    pub fn new(parent: WeakBlock) -> Self {
+        Self {
+            statements: vec![],
+            parent,
+        }
     }
 
     /// Builds a new `Statement` from a `StatementKind`, adds it to the builder,
@@ -643,6 +654,7 @@ impl StatementBuilder {
             inner: Rc::new(RefCell::new(StatementInner {
                 name: "".into(),
                 kind,
+                parent: self.parent.clone(),
             })),
         };
 
@@ -662,9 +674,28 @@ pub struct Block {
     inner: Rc<RefCell<BlockInner>>,
 }
 
+#[derive(Clone)]
+pub struct WeakBlock {
+    inner: Weak<RefCell<BlockInner>>,
+}
+
+impl WeakBlock {
+    pub fn upgrade(&self) -> Block {
+        Block {
+            inner: self.inner.upgrade().unwrap(),
+        }
+    }
+}
+
 impl Block {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn weak(&self) -> WeakBlock {
+        WeakBlock {
+            inner: Rc::downgrade(&self.inner),
+        }
     }
 
     pub fn name(&self) -> InternedString {
@@ -677,6 +708,10 @@ impl Block {
 
     pub fn statements(&self) -> LinkedList<Statement> {
         self.inner.borrow().statements.clone()
+    }
+
+    pub fn terminator_statement(&self) -> Option<Statement> {
+        self.inner.borrow().statements.back().cloned()
     }
 
     pub fn set_statements<I: Iterator<Item = Statement>>(&self, statements: I) {
@@ -888,6 +923,13 @@ impl Function {
             .collect()
     }
 
+    pub fn remove_local_variable(&self, symbol: &Symbol) {
+        self.inner
+            .borrow_mut()
+            .local_variables
+            .remove(&symbol.name());
+    }
+
     pub fn get_parameter(&self, name: InternedString) -> Option<Symbol> {
         self.inner
             .borrow()
@@ -936,8 +978,8 @@ impl Context {
         }
     }
 
-    pub fn optimise(&mut self) {
-        todo!()
+    pub fn optimise(&mut self, level: opt::OptLevel) {
+        opt::optimise(self, level);
     }
 
     pub fn get_functions(&self) -> HashMap<InternedString, Function> {

@@ -10,7 +10,7 @@ use {
             },
             Ast,
         },
-        brig::{codegen::codegen, state::codegen_state},
+        brig::{bundle::codegen_bundle, functions::codegen_functions, state::codegen_state},
         rudder,
     },
     common::create_file,
@@ -21,7 +21,8 @@ use {
     std::io::Write,
 };
 
-mod codegen;
+mod bundle;
+mod functions;
 mod state;
 
 const ENTRYPOINT: &str = "__DecodeA64";
@@ -116,6 +117,15 @@ const FN_ALLOWLIST: &[&str] = &[
     "AArch64_CheckSystemAccess",
     "HaveBTIExt",
     "fdiv_int",
+    "HaveTME",
+    "execute_aarch64_instrs_system_register_system",
+    "AArch64_SysRegRead",
+    "AArch64_AutoGen_SysRegRead",
+    "CurrentEL_SysRegRead_94be544516d41cc8",
+    "_get_HCR_EL2_Type_NV",
+    "AArch64_CheckNVCondsIfCurrentEL",
+    "__UNKNOWN_boolean",
+    "decode_subs_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
 ];
 
 /// Compiles a Sail model to a Brig module
@@ -152,15 +162,23 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
     info!("Building rudder");
 
-    let rudder = rudder::build::from_boom(&ast.borrow());
-
+    let mut rudder = rudder::build::from_boom(&ast.borrow());
     writeln!(&mut create_file("target/ast.rudder").unwrap(), "{rudder}").unwrap();
+
+    info!("Optimising rudder");
+    rudder.optimise(rudder::opt::OptLevel::Level3);
+
+    writeln!(
+        &mut create_file("target/ast.opt.rudder").unwrap(),
+        "{rudder}"
+    )
+    .unwrap();
 
     info!("Generating Rust");
 
     let state = codegen_state(&rudder);
 
-    let body = codegen(rudder, ENTRYPOINT.into());
+    let body = codegen_functions(rudder, ENTRYPOINT.into());
 
     let prelude = if standalone {
         quote! {
@@ -263,6 +281,8 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
         }
     };
 
+    let bundle = codegen_bundle();
+
     quote! {
         #![allow(non_snake_case)]
         #![allow(unused_assignments)]
@@ -271,6 +291,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
         #![allow(unused_variables)]
         #![allow(dead_code)]
         #![allow(unreachable_code)]
+        #![allow(unused_doc_comments)]
 
         //! BOREALIS GENERATED FILE DO NOT MODIFY
 
@@ -290,123 +311,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             UndefinedInstruction
         }
 
-        #[derive(Default, Clone, Copy, Debug)]
-        struct Bundle<V, L> {
-            value: V,
-            length: L,
-        }
-
-        impl<V: core::ops::BitAnd<Output = V>, L> core::ops::BitAnd for Bundle<V, L> {
-            type Output = Self;
-
-            fn bitand(self, rhs: Self) -> Self::Output {
-                Self {
-                    value:  self.value & rhs.value,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V: core::ops::BitOr<Output = V>, L> core::ops::BitOr for Bundle<V, L> {
-            type Output = Self;
-
-            fn bitor(self, rhs: Self) -> Self::Output {
-                Self {
-                    value:  self.value | rhs.value,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V: core::ops::BitXor<Output = V>, L> core::ops::BitXor for Bundle<V, L> {
-            type Output = Self;
-
-            fn bitxor(self, rhs: Self) -> Self::Output {
-                Self {
-                    value:  self.value ^ rhs.value,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V: core::ops::Shl<Output = V>, L> core::ops::Shl for Bundle<V, L> {
-            type Output = Self;
-
-            fn shl(self, rhs: Self) -> Self::Output {
-                Self {
-                    value:  self.value << rhs.value,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V: core::ops::Shr<Output = V>, L> core::ops::Shr for Bundle<V, L> {
-            type Output = Self;
-
-            fn shr(self, rhs: Self) -> Self::Output {
-                Self {
-                    value:  self.value >> rhs.value,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V, L> core::ops::Sub for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Sub<Output = core::num::Wrapping<V>> {
-            type Output = Self;
-
-            fn sub(self, rhs: Self) -> Self::Output {
-                Self {
-                    value: (core::num::Wrapping(self.value) - core::num::Wrapping(rhs.value)).0,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V, L> core::ops::Add for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Add<Output = core::num::Wrapping<V>> {
-            type Output = Self;
-
-            fn add(self, rhs: Self) -> Self::Output {
-                Self {
-                    value: (core::num::Wrapping(self.value) + core::num::Wrapping(rhs.value)).0,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V, L> core::ops::Div for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Div<Output = core::num::Wrapping<V>> {
-            type Output = Self;
-
-            fn div(self, rhs: Self) -> Self::Output {
-                Self {
-                    value: (core::num::Wrapping(self.value) / core::num::Wrapping(rhs.value)).0,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V: core::ops::Not<Output = V>, L> core::ops::Not for Bundle<V, L> {
-            type Output = Self;
-            fn not(self) -> Self {
-                Self {
-                    value: !self.value,
-                    length: self.length
-                }
-            }
-        }
-
-        impl<V: core::cmp::PartialOrd, L> core::cmp::PartialOrd for Bundle<V, L> {
-            fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-                self.value.partial_cmp(&other.value)
-            }
-        }
-
-        impl<V: core::cmp::PartialEq, L> core::cmp::PartialEq for Bundle<V, L> {
-            fn eq(&self, other: &Self) -> bool {
-                self.value.eq(&other.value)
-            }
-        }
-
-        impl<V: core::cmp::PartialEq, L> core::cmp::Eq for Bundle<V, L> {}
+        #bundle
 
         #prelude
 
