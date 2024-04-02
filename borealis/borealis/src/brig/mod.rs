@@ -192,7 +192,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
                 let mut state = State::init();
 
                 loop {
-                    let pc = state.read_register::<u64>(12704);
+                    let pc = state.read_register::<u64>(REG_U_PC);
                     let insr = unsafe { *(text.as_ptr().offset(pc as isize) as *mut u32) };
                     dbg!(decode_execute(insr, &mut state, &mut PrintlnTracer));
                 }
@@ -206,13 +206,13 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
             impl CoreState for State {
                 fn pc(&self) -> usize {
-                    self.read_register(12704)
+                    self.read_register(REG_U_PC)
                 }
 
                 fn new(pc: usize) -> Self {
                     let mut celf = State::init();
 
-                    celf.write_register(12704, pc);
+                    celf.write_register(REG_U_PC, pc);
 
                     celf
                 }

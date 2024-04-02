@@ -219,7 +219,8 @@ impl BuildContext {
                 .collect(),
             structs: self.structs.into_iter().map(|(_, (typ, _))| typ).collect(),
             unions: self.unions.into_iter().map(|(_, (typ, _))| typ).collect(),
-            registers: self.registers.into_values().collect(),
+            // register names kept for debugging
+            registers: self.registers,
         }
     }
 }

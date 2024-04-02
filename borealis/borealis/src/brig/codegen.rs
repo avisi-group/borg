@@ -702,7 +702,7 @@ fn codegen_member(idx: usize) -> Ident {
     Ident::new(&format!("_{idx}"), Span::call_site())
 }
 
-fn codegen_ident(input: InternedString) -> Ident {
+pub fn codegen_ident(input: InternedString) -> Ident {
     static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
 
     let s = input.as_ref();

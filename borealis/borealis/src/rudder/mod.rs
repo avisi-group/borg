@@ -12,6 +12,7 @@ use {
 };
 
 pub mod build;
+//pub mod opt;
 mod pretty_print;
 
 #[derive(Hash, Clone, Copy, Eq, PartialEq)]
@@ -433,7 +434,9 @@ pub enum StatementKind {
 }
 
 pub enum ValueClass {
-    Fixed,
+    None,
+    Constant,
+    Static,
     Dynamic,
 }
 
@@ -462,24 +465,46 @@ impl Statement {
 
     pub fn classify(&self) -> ValueClass {
         match self.kind() {
-            StatementKind::Constant { .. } => ValueClass::Fixed,
-            StatementKind::ReadRegister { .. } => todo!(),
-            StatementKind::WriteRegister { .. } => todo!(),
-            StatementKind::ReadMemory { .. } => todo!(),
-            StatementKind::WriteMemory { .. } => todo!(),
-            StatementKind::BinaryOperation { .. } => todo!(),
-            StatementKind::UnaryOperation { .. } => todo!(),
+            StatementKind::Constant { .. } => ValueClass::Constant,
+            StatementKind::ReadRegister { .. } => ValueClass::Dynamic,
+            StatementKind::WriteRegister { .. } => ValueClass::None,
+            StatementKind::ReadMemory { .. } => ValueClass::Dynamic,
+            StatementKind::WriteMemory { .. } => ValueClass::None,
+            StatementKind::BinaryOperation { lhs, rhs, .. } => {
+                match (lhs.classify(), rhs.classify()) {
+                    (ValueClass::Constant, ValueClass::Constant) => ValueClass::Constant,
+                    (ValueClass::Constant, ValueClass::Static) => ValueClass::Static,
+                    (ValueClass::Static, ValueClass::Constant) => ValueClass::Static,
+                    (ValueClass::Dynamic, ValueClass::Constant) => ValueClass::Dynamic,
+                    (ValueClass::Dynamic, ValueClass::Static) => ValueClass::Dynamic,
+                    (ValueClass::Dynamic, ValueClass::Dynamic) => ValueClass::Dynamic,
+                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
+                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
+                    _ => panic!("cannot classify binary operation"),
+                }
+            }
+            StatementKind::UnaryOperation { value, .. } => match value.classify() {
+                ValueClass::Constant => ValueClass::Constant,
+                ValueClass::Static => ValueClass::Static,
+                ValueClass::Dynamic => ValueClass::Dynamic,
+                _ => panic!("cannot classify unary operation"),
+            },
             StatementKind::ShiftOperation { .. } => todo!(),
             StatementKind::Call { .. } => todo!(),
-            StatementKind::Cast { .. } => todo!(),
-            StatementKind::Jump { .. } => todo!(),
-            StatementKind::Branch { .. } => todo!(),
+            StatementKind::Cast { value, .. } => match value.classify() {
+                ValueClass::Constant => ValueClass::Constant,
+                ValueClass::Static => ValueClass::Static,
+                ValueClass::Dynamic => ValueClass::Dynamic,
+                _ => panic!("cannot classify unary operation"),
+            },
+            StatementKind::Jump { .. } => ValueClass::None,
+            StatementKind::Branch { .. } => ValueClass::None,
             StatementKind::PhiNode { .. } => todo!(),
-            StatementKind::Return { .. } => todo!(),
+            StatementKind::Return { .. } => ValueClass::None,
             StatementKind::Select { .. } => todo!(),
-            StatementKind::Panic(_) => todo!(),
+            StatementKind::Panic(_) => ValueClass::None,
             StatementKind::ReadPc => ValueClass::Dynamic,
-            StatementKind::WritePc { .. } => todo!(),
+            StatementKind::WritePc { .. } => ValueClass::None,
             StatementKind::BitExtract { .. } => todo!(),
             StatementKind::BitInsert { .. } => todo!(),
             StatementKind::ReadVariable { .. } => todo!(),
@@ -492,7 +517,7 @@ impl Statement {
             StatementKind::Bundle { .. } => todo!(),
             StatementKind::UnbundleValue { .. } => todo!(),
             StatementKind::UnbundleLength { .. } => todo!(),
-            StatementKind::Assert { .. } => todo!(),
+            StatementKind::Assert { .. } => ValueClass::None,
         }
     }
 
@@ -891,7 +916,7 @@ pub enum FunctionKind {
 pub struct Context {
     fns: HashMap<InternedString, (FunctionKind, Function)>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
-    registers: Vec<(Rc<Type>, usize)>,
+    registers: HashMap<InternedString, (Rc<Type>, usize)>,
     structs: HashSet<Rc<Type>>,
     unions: HashSet<Rc<Type>>,
 }
@@ -922,7 +947,7 @@ impl Context {
             .collect()
     }
 
-    pub fn get_registers(&self) -> Vec<(Rc<Type>, usize)> {
+    pub fn get_registers(&self) -> HashMap<InternedString, (Rc<Type>, usize)> {
         self.registers.clone()
     }
 
