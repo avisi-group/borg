@@ -812,7 +812,7 @@ impl Iterator for BlockIterator {
                     false_target,
                     ..
                 } => vec![true_target.clone(), false_target.clone()],
-                StatementKind::Return { .. } => vec![],
+                StatementKind::Return { .. } | StatementKind::Panic(_) => vec![],
                 _ => {
                     warn!("block missing terminator");
                     vec![]

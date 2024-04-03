@@ -157,7 +157,7 @@ impl ControlFlowBlock {
             .for_each(|child| child.remove_parent(self));
 
         match &terminator {
-            Terminator::Return(_) => (),
+            Terminator::Return(_) | Terminator::Panic(_) => (),
             Terminator::Conditional {
                 target,
                 fallthrough,
@@ -219,6 +219,7 @@ impl Eq for ControlFlowBlockWeak {}
 pub enum Terminator {
     /// Function return with optional value
     Return(Option<Value>),
+    Panic(Vec<Rc<RefCell<Value>>>),
     /// If condition evaluates to true, then jump to target, otherwise jump to
     /// fallthrough
     Conditional {
@@ -246,7 +247,7 @@ impl Terminator {
     /// Gets the targets of a terminator
     pub fn targets(&self) -> Vec<ControlFlowBlock> {
         match self {
-            Terminator::Return(_) => vec![],
+            Terminator::Return(_) | Terminator::Panic(_) => vec![],
             Terminator::Conditional {
                 target,
                 fallthrough,

@@ -211,6 +211,14 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                     Terminator::Unconditional { target } => {
                         writeln!(self.writer, "        goto {target};").unwrap();
                     }
+                    Terminator::Panic(values) => {
+                        write!(self.writer, "        panic ").unwrap();
+                        for value in values {
+                            self.visit_value(value);
+                            writeln!(self.writer, ", ").unwrap();
+                        }
+                        writeln!(self.writer, ";").unwrap();
+                    }
                 }
             }
             writeln!(self.writer).unwrap();

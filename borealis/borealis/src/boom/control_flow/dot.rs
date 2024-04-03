@@ -80,13 +80,14 @@ impl Graph {
                     format!("if ({condition})")
                 }
                 Terminator::Unconditional { .. } => "goto".to_owned(),
+                Terminator::Panic(_) => "panic".to_owned(),
             };
 
             format!("{{{}|{statements}|{terminator}}}", node)
         };
 
         let children = match node.terminator() {
-            Terminator::Return(_) => vec![],
+            Terminator::Return(_) | Terminator::Panic(_) => vec![],
             Terminator::Conditional {
                 target,
                 fallthrough,

@@ -125,7 +125,9 @@ impl Visitor for ResolveReturns {
                 panic!("return already set to non-identifier, should never occur");
             }
             // do nothing
-            Terminator::Conditional { .. } | Terminator::Unconditional { .. } => (),
+            Terminator::Conditional { .. }
+            | Terminator::Unconditional { .. }
+            | Terminator::Panic(_) => (),
         }
 
         block.walk(self);

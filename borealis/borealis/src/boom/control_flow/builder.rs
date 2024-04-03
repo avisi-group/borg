@@ -140,6 +140,16 @@ impl ControlFlowGraphBuilder {
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
                 }
+                Statement::Panic(values) => {
+                    // end current block
+                    self.current_block
+                        .borrow_mut()
+                        .set_terminator(MaybeUnresolvedTerminator::Panic(values.clone()));
+
+                    // start new, "detached" block
+                    self.current_block = MaybeUnresolvedControlFlowBlock::new();
+                }
+
                 _ => self.current_block.borrow_mut().add_statement(statement),
             }
         }
@@ -191,6 +201,7 @@ impl ControlFlowGraphBuilder {
             MaybeUnresolvedTerminator::Return | MaybeUnresolvedTerminator::Undefined => {
                 Terminator::Return(None)
             }
+            MaybeUnresolvedTerminator::Panic(values) => Terminator::Panic(values.clone()),
             MaybeUnresolvedTerminator::Conditional {
                 condition,
                 target,
@@ -274,6 +285,7 @@ enum MaybeUnresolvedTerminator {
     Unconditional(MaybeUnresolvedJumpTarget),
     Undefined,
     Unknown,
+    Panic(Vec<Rc<RefCell<Value>>>),
 }
 
 impl Default for MaybeUnresolvedTerminator {

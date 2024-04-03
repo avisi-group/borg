@@ -330,6 +330,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     target: rudder_target,
                 }
             }
+            boom::control_flow::Terminator::Panic(values) => {
+                let values = values.iter().map(|v| self.build_value(v.clone())).collect();
+
+                StatementKind::Panic(values)
+            }
         };
 
         self.statement_builder.build(kind);
