@@ -26,10 +26,11 @@ pub fn run<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O, standalone: bool
 
     let syntax_tree = syn::parse_file(&tokens.to_string()).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
+    let fixed_comments = formatted.replace("///", "//");
 
     File::create(output)
         .unwrap()
-        .write_all(formatted.as_bytes())
+        .write_all(fixed_comments.as_bytes())
         .unwrap();
 }
 
