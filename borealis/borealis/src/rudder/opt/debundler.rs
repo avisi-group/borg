@@ -1,3 +1,4 @@
+use core::panic;
 use std::rc::Rc;
 
 use {common::HashMap, log::trace};
@@ -140,6 +141,10 @@ fn _transform_constant_length_bundles(block: &Block) -> bool {
 // bundles as constant values? what's all that about?
 
 fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
+    let mut changed = false;
+
+    let sua = StatementUseAnalysis::new(&block);
+
     for stmt in block.statements() {
         match stmt.kind() {
             StatementKind::BinaryOperation {
@@ -158,16 +163,54 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
                             length: rl,
                         },
                     ) => {
-                        trace!("f={}, block={}", f.name(), block.name());
+                        match (ll.kind(), rl.kind()) {
+                            (
+                                StatementKind::Constant { value: llv, .. },
+                                StatementKind::Constant { value: rlv, .. },
+                            ) => {
+                                if llv != rlv {
+                                    continue;
+                                }
 
-                        // if lhs and rhs are both from "bundle" instruction, and they both have constant lengths that are the same, then we have a candidate.
-                        trace!("lhs={} rhs={}", lhs, rhs);
+                                if !sua.get_uses(&stmt).iter().all(|use_| {
+                                    matches!(use_.kind(), StatementKind::UnbundleValue { .. })
+                                }) {
+                                    continue;
+                                }
 
-                        // replace lhs with bundle input, possibly casting.  same for rhs
+                                trace!("CANDIDATE! f={}, block={}", f.name(), block.name());
 
-                        // check that all uses of this statement go to an "unbundle"
-                        // replace uses of related unbundle-value with this statement
-                        // replace uses of related unbundle-length with constant value of original bundle length
+                                // if lhs and rhs are both from "bundle" instruction, and they both have constant lengths that are the same, then we have a candidate.
+                                trace!("lhs={} rhs={}", lhs, rhs);
+
+                                // replace lhs with bundle input, possibly casting.  same for rhs
+
+                                stmt.replace_use(lhs, lv);
+                                stmt.replace_use(rhs, rv);
+
+                                // check that all uses of this statement go to an "unbundle"
+                                for use_of_binop in sua.get_uses(&stmt) {
+                                    if let StatementKind::UnbundleValue { .. } = use_of_binop.kind()
+                                    {
+                                        for use_of_unbundle in sua.get_uses(use_of_binop) {
+                                            use_of_unbundle
+                                                .replace_use(use_of_binop.clone(), stmt.clone());
+                                        }
+                                    } else {
+                                        panic!(
+                                            "use of statement was not an unbundle value {}",
+                                            use_of_binop
+                                        );
+                                    }
+                                }
+
+                                // replace uses of related unbundle-value with this statement
+                                // replace uses of related unbundle-length with constant value of original bundle length
+
+                                changed = true;
+                            }
+                            _ => {}
+                        }
                     }
                     _ => {}
                 }
@@ -175,5 +218,6 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
             _ => {}
         }
     }
-    false
+
+    changed
 }

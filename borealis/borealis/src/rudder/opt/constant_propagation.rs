@@ -32,7 +32,18 @@ pub fn run(f: Function) -> bool {
             if let StatementKind::Constant { typ, value } = value_written.kind() {
                 trace!("identified candidate symbol: {}", symbol);
 
-                // TODO
+                // FIXME: DOMINATED READS
+                // replace all reads, in all blocks, with the constant
+                if sua.symbol_has_reads(&symbol) {
+                    for read in sua.get_symbol_reads(&symbol) {
+                        read.replace_kind(StatementKind::Constant {
+                            typ: typ.clone(),
+                            value: value.clone(),
+                        });
+
+                        changed = true;
+                    }
+                }
             }
         }
     }

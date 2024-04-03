@@ -102,6 +102,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             for pass in &passes {
                 trace!("running pass {}", pass.0);
 
+                f.1.update_names();
                 while pass.1(f.1.clone()) {
                     changed = true;
                 }

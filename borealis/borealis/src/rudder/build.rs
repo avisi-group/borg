@@ -744,13 +744,49 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     rhs: args[1].clone(),
                 },
             )),
-            "add_atom" | "add_bits" | "add_bits_int" => Some(self.statement_builder.build(
-                StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Add,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                },
-            )),
+
+            // val add_atom : (%i, %i) -> %i
+            "add_atom" => {
+                let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_signed()));
+                let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_signed()));
+                Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Add,
+                            lhs,
+                            rhs,
+                        }),
+                )
+            }
+
+            // val add_bits : (%bv, %bv) -> %bv
+            "add_bits" => {
+                let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+                let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Add,
+                            lhs,
+                            rhs,
+                        }),
+                )
+            }
+
+            // val add_bits_int : (%bv, %i) -> %bv
+            "add_bits_int" => {
+                let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+                let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Add,
+                            lhs,
+                            rhs,
+                        }),
+                )
+            }
+
             "sub_bits" | "sub_atom" => Some(self.statement_builder.build(
                 StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::Sub,
@@ -773,6 +809,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     rhs: args[1].clone(),
                 },
             )),
+
+            "emod_nat" => Some(
+                self.statement_builder
+                    .build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Modulo,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            ),
             "negate_atom" => Some(self.statement_builder.build(StatementKind::UnaryOperation {
                 kind: UnaryOperationKind::Negate,
                 value: args[0].clone(),
@@ -982,7 +1027,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }))
             }
 
-            "ZeroExtend0" | "sail_zero_extend" | "truncate" | "SignExtend0" => {
+            "ZeroExtend0" | "sail_zero_extend" | "truncate" | "SignExtend0"
+            | "sail_sign_extend" => {
                 let length = args[1].clone();
 
                 let value = match name.as_ref() {
@@ -1014,7 +1060,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             })
                     }
                     // todo: move this to codegen
-                    "SignExtend0" => {
+                    "SignExtend0" | "sail_sign_extend" => {
                         let value = args[0].clone();
                         let target_length = args[1].clone();
 

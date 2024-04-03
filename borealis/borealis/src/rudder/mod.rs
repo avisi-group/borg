@@ -92,6 +92,19 @@ impl Type {
         })
     }
 
+    pub fn bundle_unsigned() -> Self {
+        Self::Bundled {
+            value: Rc::new(Type::u64()),
+            len: Rc::new(Type::u8()),
+        }
+    }
+    pub fn bundle_signed() -> Self {
+        Self::Bundled {
+            value: Rc::new(Type::s64()),
+            len: Rc::new(Type::u8()),
+        }
+    }
+
     pub fn width_bits(&self) -> usize {
         match self {
             Self::Composite(xs) => xs.iter().map(|x| x.width_bits()).sum(),
@@ -191,7 +204,7 @@ impl Type {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ConstantValue {
     UnsignedInteger(usize),
     SignedInteger(isize),

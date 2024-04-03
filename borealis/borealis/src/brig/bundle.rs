@@ -41,12 +41,23 @@ pub fn codegen_bundle() -> TokenStream {
             }
         }
 
-        impl<V: core::ops::Shl<Output = V>, L> core::ops::Shl for Bundle<V, L> {
+        impl core::ops::Shl for Bundle<u64, u8> {
             type Output = Self;
 
             fn shl(self, rhs: Self) -> Self::Output {
                 Self {
-                    value:  self.value << rhs.value,
+                    value: self.value.checked_shl(u32::try_from(rhs.value).unwrap()).unwrap_or(0),
+                    length: self.length
+                }
+            }
+        }
+
+        impl core::ops::Shl for Bundle<i64, u8> {
+            type Output = Self;
+
+            fn shl(self, rhs: Self) -> Self::Output {
+                Self {
+                    value: self.value.checked_shl(u32::try_from(rhs.value).unwrap()).unwrap_or(0),
                     length: self.length
                 }
             }
@@ -91,6 +102,17 @@ pub fn codegen_bundle() -> TokenStream {
             fn div(self, rhs: Self) -> Self::Output {
                 Self {
                     value: (core::num::Wrapping(self.value) / core::num::Wrapping(rhs.value)).0,
+                    length: self.length
+                }
+            }
+        }
+
+        impl<V, L> core::ops::Rem for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Rem<Output = core::num::Wrapping<V>> {
+            type Output = Self;
+
+            fn rem(self, rhs: Self) -> Self::Output {
+                Self {
+                    value: (core::num::Wrapping(self.value) % core::num::Wrapping(rhs.value)).0,
                     length: self.length
                 }
             }
