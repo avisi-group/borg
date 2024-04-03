@@ -96,6 +96,17 @@ pub fn codegen_bundle() -> TokenStream {
             }
         }
 
+        impl<V, L> core::ops::Mul for Bundle<V, L> where core::num::Wrapping<V>: core::ops::Mul<Output = core::num::Wrapping<V>> {
+            type Output = Self;
+
+            fn mul(self, rhs: Self) -> Self::Output {
+                Self {
+                    value: (core::num::Wrapping(self.value) * core::num::Wrapping(rhs.value)).0,
+                    length: self.length
+                }
+            }
+        }
+
         impl<V: core::ops::Not<Output = V>, L> core::ops::Not for Bundle<V, L> {
             type Output = Self;
             fn not(self) -> Self {

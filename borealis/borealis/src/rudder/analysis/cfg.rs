@@ -2,6 +2,7 @@ use std::collections::{HashSet, LinkedList};
 
 use crate::rudder::{Block, Function};
 use common::HashMap;
+use log::trace;
 
 pub struct ControlFlowGraphAnalysis {
     f: Function,
@@ -10,9 +11,9 @@ pub struct ControlFlowGraphAnalysis {
 }
 
 impl ControlFlowGraphAnalysis {
-    pub fn new(f: Function) -> Self {
+    pub fn new(f: &Function) -> Self {
         let mut celf = Self {
-            f,
+            f: f.clone(),
             block_preds: HashMap::default(),
             block_succs: HashMap::default(),
         };
@@ -22,6 +23,8 @@ impl ControlFlowGraphAnalysis {
     }
 
     fn analyse(&mut self) {
+        trace!("analysing function {}", self.f.name());
+
         let mut seen_list = HashSet::new();
         let mut work_list = LinkedList::new();
         work_list.push_back(self.f.entry_block());
@@ -58,7 +61,8 @@ impl ControlFlowGraphAnalysis {
                     work_list.push_back(true_target.clone());
                     work_list.push_back(false_target.clone());
                 }
-                crate::rudder::StatementKind::Return { .. } => {
+                crate::rudder::StatementKind::Return { .. }
+                | crate::rudder::StatementKind::Panic { .. } => {
                     self.block_succs.insert(current.clone(), Vec::new());
                 }
                 _ => panic!("invalid terminator statement for block"),

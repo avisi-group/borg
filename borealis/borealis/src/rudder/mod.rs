@@ -5,8 +5,8 @@ use {
     quote::ToTokens,
     std::{
         cell::RefCell,
-        collections::LinkedList,
         hash::{Hash, Hasher},
+        ops::{Add, Sub},
         rc::{Rc, Weak},
     },
 };
@@ -211,6 +211,64 @@ pub enum ConstantValue {
     SignedInteger(isize),
     FloatingPoint(f64),
     Unit,
+}
+
+impl ConstantValue {
+    pub fn zero(&self) -> bool {
+        match self {
+            ConstantValue::UnsignedInteger(v) => *v == 0,
+            ConstantValue::SignedInteger(v) => *v == 0,
+            ConstantValue::FloatingPoint(v) => *v == 0.,
+            ConstantValue::Unit => false,
+        }
+    }
+
+    pub fn zero_or_unit(&self) -> bool {
+        match self {
+            ConstantValue::UnsignedInteger(v) => *v == 0,
+            ConstantValue::SignedInteger(v) => *v == 0,
+            ConstantValue::FloatingPoint(v) => *v == 0.,
+            ConstantValue::Unit => true,
+        }
+    }
+}
+
+impl Add for ConstantValue {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
+                ConstantValue::UnsignedInteger(l + r)
+            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
+                ConstantValue::SignedInteger(l + r)
+            }
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
+                ConstantValue::FloatingPoint(l + r)
+            }
+            _ => panic!("invalid types for add"),
+        }
+    }
+}
+
+impl Sub for ConstantValue {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
+                ConstantValue::UnsignedInteger(l - r)
+            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
+                ConstantValue::SignedInteger(l - r)
+            }
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
+                ConstantValue::FloatingPoint(l - r)
+            }
+            _ => panic!("invalid types for sub"),
+        }
+    }
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
@@ -435,6 +493,7 @@ pub enum StatementKind {
     },
 }
 
+#[derive(Eq, PartialEq)]
 pub enum ValueClass {
     None,
     Constant,
@@ -447,6 +506,20 @@ pub struct Statement {
     inner: Rc<RefCell<StatementInner>>,
 }
 
+impl Hash for Statement {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        core::ptr::hash(self.inner.as_ptr(), state)
+    }
+}
+
+impl PartialEq for Statement {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for Statement {}
+
 pub struct StatementInner {
     name: InternedString,
     kind: StatementKind,
@@ -456,6 +529,14 @@ pub struct StatementInner {
 impl Statement {
     pub fn kind(&self) -> StatementKind {
         (*self.inner).borrow().kind.clone()
+    }
+
+    pub fn replace_kind(&self, kind: StatementKind) {
+        (*self.inner).borrow_mut().replace_kind(kind);
+    }
+
+    pub fn replace_use(&self, use_of: Statement, with: Statement) {
+        (*self.inner).borrow_mut().replace_use(use_of, with);
     }
 
     pub fn name(&self) -> InternedString {
@@ -481,12 +562,13 @@ impl Statement {
                 match (lhs.classify(), rhs.classify()) {
                     (ValueClass::Constant, ValueClass::Constant) => ValueClass::Constant,
                     (ValueClass::Constant, ValueClass::Static) => ValueClass::Static,
+                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
                     (ValueClass::Static, ValueClass::Constant) => ValueClass::Static,
+                    (ValueClass::Static, ValueClass::Static) => ValueClass::Static,
+                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
                     (ValueClass::Dynamic, ValueClass::Constant) => ValueClass::Dynamic,
                     (ValueClass::Dynamic, ValueClass::Static) => ValueClass::Dynamic,
                     (ValueClass::Dynamic, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
                     _ => panic!("cannot classify binary operation"),
                 }
             }
@@ -496,8 +578,30 @@ impl Statement {
                 ValueClass::Dynamic => ValueClass::Dynamic,
                 _ => panic!("cannot classify unary operation"),
             },
-            StatementKind::ShiftOperation { .. } => todo!(),
-            StatementKind::Call { .. } => todo!(),
+            StatementKind::ShiftOperation { value, amount, .. } => {
+                match (value.classify(), amount.classify()) {
+                    (ValueClass::Constant, ValueClass::Constant) => ValueClass::Constant,
+                    (ValueClass::Constant, ValueClass::Static) => ValueClass::Static,
+                    (ValueClass::Static, ValueClass::Constant) => ValueClass::Static,
+                    (ValueClass::Dynamic, ValueClass::Constant) => ValueClass::Dynamic,
+                    (ValueClass::Dynamic, ValueClass::Static) => ValueClass::Dynamic,
+                    (ValueClass::Dynamic, ValueClass::Dynamic) => ValueClass::Dynamic,
+                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
+                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
+                    _ => panic!("cannot classify shift operation"),
+                }
+            }
+            StatementKind::Call { args, .. } => {
+                if args.iter().any(|a| a.classify() == ValueClass::None) {
+                    panic!("illegal arguments to function call");
+                }
+
+                if args.iter().any(|a| a.classify() == ValueClass::Dynamic) {
+                    ValueClass::Dynamic
+                } else {
+                    ValueClass::Static
+                }
+            }
             StatementKind::Cast { value, .. } => match value.classify() {
                 ValueClass::Constant => ValueClass::Constant,
                 ValueClass::Static => ValueClass::Static,
@@ -508,22 +612,37 @@ impl Statement {
             StatementKind::Branch { .. } => ValueClass::None,
             StatementKind::PhiNode { .. } => todo!(),
             StatementKind::Return { .. } => ValueClass::None,
-            StatementKind::Select { .. } => todo!(),
+            StatementKind::Select {
+                condition,
+                true_value,
+                false_value,
+            } => {
+                match (
+                    condition.classify(),
+                    true_value.classify(),
+                    false_value.classify(),
+                ) {
+                    (ValueClass::Static, ValueClass::Static, ValueClass::Static) => {
+                        ValueClass::Static
+                    }
+                    _ => ValueClass::Dynamic,
+                }
+            }
             StatementKind::Panic(_) => ValueClass::None,
             StatementKind::ReadPc => ValueClass::Dynamic,
             StatementKind::WritePc { .. } => ValueClass::None,
-            StatementKind::BitExtract { .. } => todo!(),
-            StatementKind::BitInsert { .. } => todo!(),
-            StatementKind::ReadVariable { .. } => todo!(),
-            StatementKind::WriteVariable { .. } => todo!(),
-            StatementKind::ReadField { .. } => todo!(),
-            StatementKind::MutateField { .. } => todo!(),
-            StatementKind::ReadElement { .. } => todo!(),
-            StatementKind::MutateElement { .. } => todo!(),
-            StatementKind::CreateComposite { .. } => todo!(),
-            StatementKind::Bundle { .. } => todo!(),
-            StatementKind::UnbundleValue { .. } => todo!(),
-            StatementKind::UnbundleLength { .. } => todo!(),
+            StatementKind::BitExtract { .. } => ValueClass::Dynamic,
+            StatementKind::BitInsert { .. } => ValueClass::Dynamic,
+            StatementKind::ReadVariable { .. } => ValueClass::Dynamic,
+            StatementKind::WriteVariable { .. } => ValueClass::Dynamic,
+            StatementKind::ReadField { .. } => ValueClass::Dynamic,
+            StatementKind::MutateField { .. } => ValueClass::Dynamic,
+            StatementKind::ReadElement { .. } => ValueClass::Dynamic,
+            StatementKind::MutateElement { .. } => ValueClass::Dynamic,
+            StatementKind::CreateComposite { .. } => ValueClass::Dynamic,
+            StatementKind::Bundle { .. } => ValueClass::Dynamic,
+            StatementKind::UnbundleValue { .. } => ValueClass::Dynamic,
+            StatementKind::UnbundleLength { .. } => ValueClass::Dynamic,
             StatementKind::Assert { .. } => ValueClass::None,
         }
     }
@@ -625,11 +744,263 @@ impl Statement {
     pub fn has_value(&self) -> bool {
         !self.typ().is_void()
     }
+
+    pub fn has_side_effects(&self) -> bool {
+        match self.kind() {
+            StatementKind::WriteVariable { .. } => true,
+            StatementKind::WriteRegister { .. } => true,
+            StatementKind::WriteMemory { .. } => true,
+            StatementKind::WritePc { .. } => true,
+            StatementKind::Call { .. } => true,
+            StatementKind::Jump { .. } => true,
+            StatementKind::Branch { .. } => true,
+            StatementKind::Return { .. } => true,
+            StatementKind::Panic(_) => true,
+            StatementKind::Assert { .. } => true,
+            _ => false,
+        }
+    }
 }
 
 impl StatementInner {
     pub fn update_names(&mut self, name: InternedString) {
         self.name = name;
+    }
+
+    pub fn replace_kind(&mut self, kind: StatementKind) {
+        self.kind = kind;
+    }
+
+    pub fn replace_use(&mut self, use_of: Statement, with: Statement) {
+        match self.kind.clone() {
+            StatementKind::Return { .. } => {
+                self.kind = StatementKind::Return {
+                    value: Some(with.clone()),
+                };
+            }
+            StatementKind::Branch {
+                true_target,
+                false_target,
+                ..
+            } => {
+                self.kind = StatementKind::Branch {
+                    condition: with.clone(),
+                    true_target: true_target,
+                    false_target: false_target,
+                };
+            }
+            StatementKind::WriteVariable { symbol, .. } => {
+                self.kind = StatementKind::WriteVariable {
+                    symbol,
+                    value: with.clone(),
+                };
+            }
+            StatementKind::BinaryOperation { kind, lhs, rhs } => {
+                if lhs == use_of {
+                    self.kind = StatementKind::BinaryOperation {
+                        kind,
+                        lhs: with.clone(),
+                        rhs,
+                    };
+                } else if rhs == use_of {
+                    self.kind = StatementKind::BinaryOperation {
+                        kind,
+                        lhs,
+                        rhs: with.clone(),
+                    };
+                } else {
+                    panic!("should not get here");
+                }
+            }
+            StatementKind::UnaryOperation { kind, .. } => {
+                self.kind = StatementKind::UnaryOperation {
+                    kind,
+                    value: with.clone(),
+                };
+            }
+            StatementKind::UnbundleValue { .. } => {
+                self.kind = StatementKind::UnbundleValue {
+                    bundle: with.clone(),
+                };
+            }
+            StatementKind::UnbundleLength { .. } => {
+                self.kind = StatementKind::UnbundleLength {
+                    bundle: with.clone(),
+                };
+            }
+            StatementKind::Cast { kind, typ, .. } => {
+                self.kind = StatementKind::Cast {
+                    kind,
+                    typ: typ,
+                    value: with.clone(),
+                };
+            }
+            StatementKind::Call { target, args } => {
+                let args = args
+                    .iter()
+                    .map(|arg| {
+                        if *arg == use_of {
+                            with.clone()
+                        } else {
+                            arg.clone()
+                        }
+                    })
+                    .collect();
+
+                self.kind = StatementKind::Call { target, args };
+            }
+            StatementKind::BitExtract {
+                value,
+                start,
+                length,
+            } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                let start = if start == use_of {
+                    with.clone()
+                } else {
+                    start.clone()
+                };
+
+                let length = if length == use_of {
+                    with.clone()
+                } else {
+                    length.clone()
+                };
+
+                self.kind = StatementKind::BitExtract {
+                    value,
+                    start,
+                    length,
+                };
+            }
+            StatementKind::Bundle { value, length } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                let length = if length == use_of {
+                    with.clone()
+                } else {
+                    length.clone()
+                };
+
+                self.kind = StatementKind::Bundle { value, length };
+            }
+            StatementKind::Assert { .. } => {
+                self.kind = StatementKind::Assert {
+                    condition: with.clone(),
+                };
+            }
+            StatementKind::ShiftOperation {
+                kind,
+                value,
+                amount,
+            } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                let amount = if amount == use_of {
+                    with.clone()
+                } else {
+                    amount.clone()
+                };
+
+                self.kind = StatementKind::ShiftOperation {
+                    kind,
+                    value,
+                    amount,
+                };
+            }
+            StatementKind::WriteRegister { offset, value } => {
+                let offset = if offset == use_of {
+                    with.clone()
+                } else {
+                    offset.clone()
+                };
+
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::WriteRegister { offset, value };
+            }
+            StatementKind::MutateField {
+                composite,
+                field,
+                value,
+            } => {
+                let composite = if composite == use_of {
+                    with.clone()
+                } else {
+                    composite.clone()
+                };
+
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::MutateField {
+                    composite,
+                    field,
+                    value,
+                };
+            }
+            StatementKind::ReadElement { vector, index } => {
+                let vector = if vector == use_of {
+                    with.clone()
+                } else {
+                    vector.clone()
+                };
+
+                let index = if index == use_of {
+                    with.clone()
+                } else {
+                    index.clone()
+                };
+
+                self.kind = StatementKind::ReadElement { vector, index };
+            }
+            StatementKind::ReadField { composite, field } => {
+                let composite = if composite == use_of {
+                    with.clone()
+                } else {
+                    composite.clone()
+                };
+
+                self.kind = StatementKind::ReadField { composite, field };
+            }
+            StatementKind::CreateComposite { typ, fields } => {
+                let fields = fields
+                    .iter()
+                    .map(|field| {
+                        if *field == use_of {
+                            with.clone()
+                        } else {
+                            field.clone()
+                        }
+                    })
+                    .collect();
+
+                self.kind = StatementKind::CreateComposite { typ, fields };
+            }
+            _ => {
+                panic!("use replacement not implemented for {}", self.kind);
+            }
+        }
     }
 }
 
@@ -706,12 +1077,12 @@ impl Block {
         (*self.inner).borrow_mut().update_names(name);
     }
 
-    pub fn statements(&self) -> LinkedList<Statement> {
+    pub fn statements(&self) -> Vec<Statement> {
         self.inner.borrow().statements.clone()
     }
 
     pub fn terminator_statement(&self) -> Option<Statement> {
-        self.inner.borrow().statements.back().cloned()
+        self.inner.borrow().statements.last().cloned()
     }
 
     pub fn set_statements<I: Iterator<Item = Statement>>(&self, statements: I) {
@@ -722,8 +1093,36 @@ impl Block {
         self.inner.borrow_mut().statements.extend(stmts)
     }
 
+    pub fn kill_statement(&self, stmt: &Statement) {
+        //assert!(Rc::ptr_eq()
+
+        let (index, _) = self
+            .inner
+            .borrow()
+            .statements
+            .iter()
+            .enumerate()
+            .find(|(_, candidate)| *candidate == stmt)
+            .unwrap();
+
+        self.inner.borrow_mut().statements.remove(index);
+    }
+
     pub fn iter(&self) -> BlockIterator {
         BlockIterator::new(self.clone())
+    }
+
+    pub fn targets(&self) -> Vec<Block> {
+        match self.terminator_statement().unwrap().kind() {
+            StatementKind::Jump { target } => vec![target],
+            StatementKind::Branch {
+                true_target,
+                false_target,
+                ..
+            } => vec![true_target, false_target],
+            StatementKind::Return { .. } | StatementKind::Panic(_) => vec![],
+            _ => panic!("invalid terminator for block"),
+        }
     }
 }
 
@@ -732,7 +1131,7 @@ impl Default for Block {
         Self {
             inner: Rc::new(RefCell::new(BlockInner {
                 name: "???".into(),
-                statements: LinkedList::new(),
+                statements: Vec::new(),
             })),
         }
     }
@@ -754,7 +1153,7 @@ impl Eq for Block {}
 
 pub struct BlockInner {
     name: InternedString,
-    statements: LinkedList<Statement>,
+    statements: Vec<Statement>,
 }
 
 impl BlockInner {
@@ -804,7 +1203,7 @@ impl Iterator for BlockIterator {
         self.visited.insert(current.clone());
 
         // push children to visit
-        if let Some(last) = current.statements().back() {
+        if let Some(last) = current.statements().last() {
             self.remaining.extend(match &last.inner.borrow().kind {
                 StatementKind::Jump { target } => vec![target.clone()],
                 StatementKind::Branch {

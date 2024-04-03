@@ -1,3 +1,3 @@
-pub fn run(f: crate::rudder::Function) -> bool {
+pub fn run(_f: crate::rudder::Function) -> bool {
     false
 }

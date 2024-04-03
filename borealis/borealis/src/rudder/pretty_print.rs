@@ -1,5 +1,5 @@
 use {
-    super::analysis,
+    super::{analysis, ValueClass},
     crate::rudder::{
         BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
         FunctionKind, PrimitiveTypeClass, Statement, StatementKind, Symbol, Type,
@@ -280,7 +280,7 @@ impl Display for Block {
 
 impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let cfg = analysis::cfg::ControlFlowGraphAnalysis::new(self.clone());
+        let cfg = analysis::cfg::ControlFlowGraphAnalysis::new(self);
 
         self.inner
             .borrow()
@@ -301,7 +301,11 @@ impl Display for Function {
                     .map(|b| b.name())
                     .join(", ");
 
-                writeln!(f, "  block {}: preds={{{preds}}}, succs={{{succs}}}", block.name())?;
+                writeln!(
+                    f,
+                    "  block {}: preds={{{preds}}}, succs={{{succs}}}",
+                    block.name()
+                )?;
                 write!(f, "{}", block)
             })
     }
@@ -330,5 +334,16 @@ impl Display for Context {
         }
 
         Ok(())
+    }
+}
+
+impl Display for ValueClass {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        match self {
+            ValueClass::None => write!(f, "N"),
+            ValueClass::Constant => write!(f, "C"),
+            ValueClass::Static => write!(f, "S"),
+            ValueClass::Dynamic => write!(f, "D"),
+        }
     }
 }

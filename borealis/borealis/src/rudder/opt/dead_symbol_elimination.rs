@@ -1,9 +1,9 @@
 use log::trace;
 
-use crate::rudder::{analysis, Block, StatementKind};
+use crate::rudder::analysis;
 
 pub fn run(f: crate::rudder::Function) -> bool {
-    let dfa = analysis::dfa::SymbolUseAnalysis::new(f.clone());
+    let dfa = analysis::dfa::SymbolUseAnalysis::new(&f);
 
     let mut changed = false;
 

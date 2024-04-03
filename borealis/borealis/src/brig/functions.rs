@@ -256,34 +256,44 @@ fn codegen_body(function: Function) -> TokenStream {
         })
         .collect::<TokenStream>();
 
-    let entry_block_name = format_ident!("BLOCK_{}", function.entry_block().name().to_string());
+    if function.entry_block().iter().count() == 1 {
+        let block_impl = codegen_block(function.entry_block());
 
-    let block_arms = function
-        .entry_block()
-        .iter()
-        .map(|block| {
-            let block_name = format_ident!("BLOCK_{}", block.name().to_string());
-            let block_impl = codegen_block(block);
+        quote! {
+            #local_vars
 
-            quote! {
-                #block_name => {
-                    #block_impl
+            #block_impl
+        }
+    } else {
+        let entry_block_name = format_ident!("BLOCK_{}", function.entry_block().name().to_string());
+
+        let block_arms = function
+            .entry_block()
+            .iter()
+            .map(|block| {
+                let block_name = format_ident!("BLOCK_{}", block.name().to_string());
+                let block_impl = codegen_block(block);
+
+                quote! {
+                    #block_name => {
+                        #block_impl
+                    }
                 }
-            }
-        })
-        .collect::<TokenStream>();
+            })
+            .collect::<TokenStream>();
 
-    quote! {
-        #block_defs
+        quote! {
+            #block_defs
 
-        #local_vars
+            #local_vars
 
-        let mut current_block = #entry_block_name;
+            let mut current_block = #entry_block_name;
 
-        loop {
-            match current_block {
-                #block_arms
-                u => panic!("undefined block {u}")
+            loop {
+                match current_block {
+                    #block_arms
+                    u => panic!("undefined block {u}")
+                }
             }
         }
     }
@@ -683,7 +693,7 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
     };
 
-    let msg = format!(" {stmt}");
+    let msg = format!(" {} {stmt}", stmt.classify());
     if stmt.has_value() {
         let typ = codegen_type(stmt.typ());
         quote! {
@@ -759,7 +769,11 @@ fn get_functions_to_codegen(rudder: &Context, entrypoint: InternedString) -> Vec
             continue;
         }
 
-        let next_children = get_calls(rudder_fns.get(&next).unwrap());
+        let Some(f) = rudder_fns.get(&next) else {
+            panic!("function {next:?} called but not found in rudder context");
+        };
+
+        let next_children = get_calls(f);
         todo.extend(next_children);
         fns.insert(next);
     }

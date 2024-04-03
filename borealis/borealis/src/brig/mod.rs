@@ -126,6 +126,15 @@ const FN_ALLOWLIST: &[&str] = &[
     "AArch64_CheckNVCondsIfCurrentEL",
     "__UNKNOWN_boolean",
     "decode_subs_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
+    "SCTLR_EL1_SysRegRead_ce1d601189e8030e",
+    "_get_HCR_EL2_Type_TRVM",
+    "_get_SCR_EL3_Type_FGTEn",
+    "_get_HFGRTR_EL2_Type_SCTLR_EL1",
+    "_get_HCR_EL2_Type_E2H",
+    "decode_tbnz_aarch64_instrs_branch_conditional_test",
+    "execute_aarch64_instrs_branch_conditional_test",
+    "decode_ands_log_imm_aarch64_instrs_integer_logical_immediate",
+    "DecodeBitMasks",
 ];
 
 /// Compiles a Sail model to a Brig module
@@ -163,6 +172,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
     info!("Building rudder");
 
     let mut rudder = rudder::build::from_boom(&ast.borrow());
+
     writeln!(&mut create_file("target/ast.rudder").unwrap(), "{rudder}").unwrap();
 
     info!("Optimising rudder");
@@ -334,12 +344,9 @@ fn apply_fn_allowlist<I: Iterator<Item = jib_ast::Definition>>(
                 body
             } else {
                 ListVec::from(vec![
+                    // throw so that panic is created in rudder
                     Instruction {
                         inner: InstructionAux::Throw(Value::Lit(Vl::Unit, Type::Unit)),
-                        annot: (0, Location::Unknown),
-                    },
-                    Instruction {
-                        inner: InstructionAux::Undefined(Type::Unit),
                         annot: (0, Location::Unknown),
                     },
                 ])
