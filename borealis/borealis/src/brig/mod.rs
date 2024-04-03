@@ -136,6 +136,7 @@ const FN_ALLOWLIST: &[&str] = &[
     "decode_ands_log_imm_aarch64_instrs_integer_logical_immediate",
     "DecodeBitMasks",
     "_get_SCR_EL3_Type_NS",
+    // "HighestSetBit",
 ];
 
 /// Compiles a Sail model to a Brig module

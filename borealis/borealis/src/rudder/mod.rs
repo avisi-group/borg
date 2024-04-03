@@ -14,6 +14,7 @@ use {
 
 pub mod analysis;
 pub mod build;
+mod internal_fns;
 pub mod opt;
 mod pretty_print;
 pub mod validator;

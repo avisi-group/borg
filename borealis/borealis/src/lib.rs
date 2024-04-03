@@ -53,9 +53,9 @@ fn load_model<P: AsRef<Path>>(path: P) -> ListVec<Definition> {
 
     init_interner(&strs);
 
-    trace!("JIB size: {:.}", bytes(jib.deep_size_of()));
+    trace!("JIB size: {:.2}", bytes(jib.deep_size_of()));
     trace!(
-        "INTERNER size: {:.}, {} strings",
+        "INTERNER size: {:.2}, {} strings",
         bytes(interner().current_memory_usage()),
         interner().len()
     );
