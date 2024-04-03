@@ -1,11 +1,11 @@
-use std::{cell::RefCell, rc::Rc};
-
-use common::{intern::InternedString, HashMap};
-use once_cell::sync::Lazy;
-
-use crate::rudder::{
-    BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, FunctionInner,
-    ShiftOperationKind, Statement, StatementInner, StatementKind, Symbol, SymbolKind, Type,
+use {
+    crate::rudder::{
+        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, FunctionInner,
+        ShiftOperationKind, Statement, StatementInner, StatementKind, Symbol, SymbolKind, Type,
+    },
+    common::{intern::InternedString, HashMap},
+    once_cell::sync::Lazy,
+    std::{cell::RefCell, rc::Rc},
 };
 
 // terrible

@@ -90,6 +90,10 @@ impl SymbolUseAnalysis {
         self.symbol_writes.get(&symbol.name()).unwrap()
     }
 
+    pub fn get_symbol_reads(&self, symbol: &Symbol) -> &Vec<Statement> {
+        self.symbol_reads.get(&symbol.name()).unwrap()
+    }
+
     pub fn is_symbol_local(&self, symbol: &Symbol) -> bool {
         self.symbol_blocks.get(&symbol.name()).unwrap().len() == 1
     }

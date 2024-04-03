@@ -6,8 +6,8 @@
 use {
     crate::rudder::{
         BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
-        PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind, Symbol, Type,
-        UnaryOperationKind,
+        PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind, Symbol,
+        Type, UnaryOperationKind,
     },
     common::{intern::InternedString, HashSet},
     log::warn,
@@ -448,7 +448,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 ShiftOperationKind::RotateLeft => todo!(),
             }
         }
-        StatementKind::Call { target, args } => {
+        StatementKind::Call { target, args, tail } => {
             let ident = codegen_ident(target.name());
             let args = args.iter().map(get_ident);
 
@@ -457,8 +457,14 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 let msg = target.name().to_string();
                 quote! { unimplemented!(#msg) }
             } else {
-                quote! {
-                    #ident(state, tracer, #(#args),*)
+                if tail {
+                    quote! {
+                        return #ident(state, tracer, #(#args),*)
+                    }
+                } else {
+                    quote! {
+                        #ident(state, tracer, #(#args),*)
+                    }
                 }
             }
         }
@@ -568,7 +574,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             start,
             length,
         } => {
-            if let Type::Bundled { .. } = &*value.typ() {
+            if let Type::Bundled {
+                value: bundle_value_type,
+                ..
+            } = &*value.typ()
+            {
                 let length = if let Type::Bundled { .. } = &*length.typ() {
                     let length = get_ident(&length);
                     quote!(#length.value as u32)
@@ -580,10 +590,26 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 let value = get_ident(&value);
                 let start = get_ident(&start);
 
+                let mask_bit = match &**bundle_value_type {
+                    Type::Primitive(PrimitiveType {
+                        tc,
+                        element_width_in_bits,
+                    }) => {
+                        assert!(*element_width_in_bits == 64);
+
+                        match tc {
+                            PrimitiveTypeClass::UnsignedInteger => quote!(1u64),
+                            PrimitiveTypeClass::SignedInteger => quote!(1i64),
+                            _ => panic!("non integer bundle value type"),
+                        }
+                    }
+                    _ => panic!("non primitive bundle value type"),
+                };
+
                 quote! (
                     (
                         (#value >> #start) &
-                        Bundle { value: ((1u64).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #value.length }
+                        Bundle { value: ((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #value.length }
                     )
                 )
             } else {

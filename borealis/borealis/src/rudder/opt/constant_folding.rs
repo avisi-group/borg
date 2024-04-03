@@ -1,7 +1,7 @@
 use {
     crate::rudder::{
-        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, PrimitiveType,
-        PrimitiveTypeClass, Statement, StatementKind, Type, ValueClass,
+        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, Statement,
+        StatementKind, ValueClass,
     },
     log::trace,
 };

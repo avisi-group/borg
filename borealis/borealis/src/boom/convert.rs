@@ -133,12 +133,21 @@ impl BoomEmitter {
 
 fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
     Rc::new(RefCell::new(match typ.borrow() {
-        jib_ast::Type::Lint | jib_ast::Type::Lbits => boom::Type::Int {
+        jib_ast::Type::Lbits => boom::Type::Int {
             signed: false,
             size: Size::Unknown,
         },
-        jib_ast::Type::Fint(i) | jib_ast::Type::Fbits(i) => boom::Type::Int {
+        jib_ast::Type::Fbits(i) => boom::Type::Int {
             signed: false,
+            size: Size::Static(usize::try_from(*i).unwrap()),
+        },
+
+        jib_ast::Type::Lint => boom::Type::Int {
+            signed: true,
+            size: Size::Unknown,
+        },
+        jib_ast::Type::Fint(i) => boom::Type::Int {
+            signed: true,
             size: Size::Static(usize::try_from(*i).unwrap()),
         },
 

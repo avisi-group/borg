@@ -224,7 +224,11 @@ impl BuildContext {
                     boom::Size::Static(size) => Rc::new(rudder::Type::new_primitive(tc, *size)),
                     boom::Size::Runtime(_) | boom::Size::Unknown => {
                         Rc::new(rudder::Type::Bundled {
-                            value: Rc::new(rudder::Type::u64()),
+                            value: Rc::new(match signed {
+                                true => rudder::Type::s64(),
+                                false => rudder::Type::u64(),
+                            }),
+
                             len: Rc::new(rudder::Type::u8()),
                         })
                     }
@@ -640,7 +644,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.statement_builder.build(StatementKind::Call {
                     target,
                     args: casts.clone(),
-                    tail: false
+                    tail: false,
                 })
             }
         };
@@ -690,7 +694,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         match name.as_ref() {
             "%i64->%i" | "%i->%i64" => {
-                Some(self.generate_cast(args[0].clone(), Rc::new(Type::u64())))
+                Some(self.generate_cast(args[0].clone(), Rc::new(Type::s64())))
             }
             // todo: should probably be casts
             "UInt0" | "SInt0" | "make_the_value" | "size_itself_int" => Some(args[0].clone()),
@@ -1009,7 +1013,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                 rhs: cast_value,
                             })
                     }
-                    // todo: probably wrong
+                    // todo: move this to codegen
                     "SignExtend0" => {
                         let value = args[0].clone();
                         let target_length = args[1].clone();
@@ -1110,6 +1114,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "write_gpr_from_vector" => {
                 // todo assert args[2] is always "GPRs"
                 // assuming GPRs are contiguoous
+
+                // %i argument to unsigned
+                let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+
                 let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
 
                 let base = self.statement_builder.build(StatementKind::Constant {
@@ -1126,7 +1134,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .statement_builder
                     .build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Multiply,
-                        lhs: args[0].clone(),
+                        lhs: n,
                         rhs: eight,
                     });
 
@@ -1146,6 +1154,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "read_gpr_from_vector" => {
                 // todo assert args[1] is always "GPRs"
                 // assuming GPRs are contiguoous
+
+                // %i argument to unsigned
+                let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+
                 let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
 
                 let base = self.statement_builder.build(StatementKind::Constant {
@@ -1162,7 +1174,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .statement_builder
                     .build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Multiply,
-                        lhs: args[0].clone(),
+                        lhs: n,
                         rhs: eight,
                     });
 
@@ -1335,7 +1347,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Some(self.statement_builder.build(StatementKind::Call {
                     target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
                     args: vec![args[0].clone(), count],
-                    tail: false
+                    tail: false,
                 }))
             }
 

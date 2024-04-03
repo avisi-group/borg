@@ -54,19 +54,19 @@ impl Display for StatementKind {
                 write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
             }
             StatementKind::WriteVariable { symbol, value } => {
-                write!(f, "write-var {} = {}", symbol.name(), value.name())
+                write!(f, "write-var {} <= {}", symbol.name(), value.name())
             }
             StatementKind::ReadRegister { typ, offset } => {
                 write!(f, "read-reg {}:{}", offset.name(), typ)
             }
             StatementKind::WriteRegister { offset, value } => {
-                write!(f, "write-reg {} = {}", offset.name(), value.name())
+                write!(f, "write-reg {} <= {}", offset.name(), value.name())
             }
             StatementKind::ReadMemory { typ, offset } => {
                 write!(f, "read-mem {}:{}", offset.name(), typ)
             }
             StatementKind::WriteMemory { offset, value } => {
-                write!(f, "write-mem {} = {}", offset.name(), value.name())
+                write!(f, "write-mem {} <= {}", offset.name(), value.name())
             }
             StatementKind::BinaryOperation { kind, lhs, rhs } => {
                 let op = match kind {
@@ -112,10 +112,11 @@ impl Display for StatementKind {
 
                 write!(f, "{} {} {}", op, value.name(), amount.name())
             }
-            StatementKind::Call { target, args } => {
+            StatementKind::Call { target, args, tail } => {
                 write!(
                     f,
-                    "call {}({})",
+                    "{}call {}({})",
+                    if *tail { "tail-" } else { "" },
                     target.name(),
                     args.iter().map(Statement::name).join(", ")
                 )
@@ -130,9 +131,9 @@ impl Display for StatementKind {
                     CastOperationKind::Broadcast => "bcast",
                 };
 
-                write!(f, "cast {} {}:{}", op, value.name(), typ)
+                write!(f, "cast {} {} -> {}", op, value.name(), typ)
             }
-            StatementKind::Jump { target } => write!(f, "jump {}", target.name()),
+            StatementKind::Jump { target } => write!(f, "jump b{}", target.name()),
             StatementKind::Branch {
                 condition,
                 true_target,
@@ -140,7 +141,7 @@ impl Display for StatementKind {
             } => {
                 write!(
                     f,
-                    "branch {} {} {}",
+                    "branch {} b{} b{}",
                     condition.name(),
                     true_target.name(),
                     false_target.name()
@@ -175,14 +176,11 @@ impl Display for StatementKind {
                 )
             }
             StatementKind::Panic(statements) => {
-                write!(f, "panic(")?;
-
-                statements
-                    .iter()
-                    .map(Statement::name)
-                    .try_for_each(|n| write!(f, "{n}, "))?;
-
-                write!(f, ")")
+                write!(
+                    f,
+                    "panic {}",
+                    statements.iter().map(Statement::name).join(" ")
+                )
             }
             StatementKind::ReadPc => write!(f, "read-pc"),
             StatementKind::WritePc { value } => write!(f, "write-pc {}", value.name()),
@@ -219,7 +217,7 @@ impl Display for StatementKind {
                 value,
             } => write!(
                 f,
-                "mutate-field {}.{} = {}",
+                "mutate-field {}.{} <= {}",
                 composite.name(),
                 field,
                 value.name()
@@ -233,7 +231,7 @@ impl Display for StatementKind {
                 index,
             } => write!(
                 f,
-                "mutate-element {}[{}] = {}",
+                "mutate-element {}[{}] <= {}",
                 vector.name(),
                 index.name(),
                 value.name()

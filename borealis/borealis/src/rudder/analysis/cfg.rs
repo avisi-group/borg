@@ -6,7 +6,6 @@ use {
 };
 
 pub struct ControlFlowGraphAnalysis {
-    f: Function,
     block_preds: HashMap<Block, Vec<Block>>,
     block_succs: HashMap<Block, Vec<Block>>,
 }
@@ -14,21 +13,20 @@ pub struct ControlFlowGraphAnalysis {
 impl ControlFlowGraphAnalysis {
     pub fn new(f: &Function) -> Self {
         let mut celf = Self {
-            f: f.clone(),
             block_preds: HashMap::default(),
             block_succs: HashMap::default(),
         };
 
-        celf.analyse();
+        celf.analyse(f);
         celf
     }
 
-    fn analyse(&mut self) {
-        trace!("analysing function {}", self.f.name());
+    fn analyse(&mut self, f: &Function) {
+        trace!("analysing function {}", f.name());
 
         let mut seen_list = HashSet::default();
         let mut work_list = LinkedList::new();
-        work_list.push_back(self.f.entry_block());
+        work_list.push_back(f.entry_block());
 
         self.block_preds
             .insert(work_list.front().unwrap().clone(), Vec::new());
@@ -63,6 +61,7 @@ impl ControlFlowGraphAnalysis {
                     work_list.push_back(false_target.clone());
                 }
                 crate::rudder::StatementKind::Return { .. }
+                | crate::rudder::StatementKind::Call { tail: true, .. }
                 | crate::rudder::StatementKind::Panic { .. } => {
                     self.block_succs.insert(current.clone(), Vec::new());
                 }

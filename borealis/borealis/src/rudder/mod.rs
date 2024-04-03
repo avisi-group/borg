@@ -30,8 +30,8 @@ pub enum PrimitiveTypeClass {
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct PrimitiveType {
-    tc: PrimitiveTypeClass,
-    element_width_in_bits: usize,
+    pub tc: PrimitiveTypeClass,
+    pub element_width_in_bits: usize,
 }
 
 impl PrimitiveType {
@@ -186,36 +186,9 @@ impl Type {
         }
     }
 
-    /*pub fn is_integer(&self) -> bool {
-        matches!(
-            self.tc,
-            TypeClass::UnsignedInteger | TypeClass::SignedInteger
-        )
+    pub fn is_compatible_with(&self, other: &Self) -> bool {
+        self == other
     }
-
-    pub fn is_signed(&self) -> Option<bool> {
-        match self.tc {
-            TypeClass::SignedInteger => Some(true),
-            TypeClass::UnsignedInteger => Some(false),
-            _ => None,
-        }
-    }
-
-    pub fn is_unsigned(&self) -> Option<bool> {
-        match self.tc {
-            TypeClass::SignedInteger => Some(false),
-            TypeClass::UnsignedInteger => Some(true),
-            _ => None,
-        }
-    }
-
-    pub fn is_float(&self) -> bool {
-        matches!(self.tc, TypeClass::FloatingPoint)
-    }
-
-    pub fn is_vector(&self) -> bool {
-        self.element_count > 1
-    }*/
 }
 
 #[derive(Debug, Clone)]
@@ -435,6 +408,7 @@ pub enum StatementKind {
     Call {
         target: Function,
         args: Vec<Statement>,
+        tail: bool,
     },
     Cast {
         kind: CastOperationKind,
@@ -863,7 +837,7 @@ impl StatementInner {
                     value: with.clone(),
                 };
             }
-            StatementKind::Call { target, args } => {
+            StatementKind::Call { target, args, tail } => {
                 let args = args
                     .iter()
                     .map(|arg| {
@@ -875,7 +849,7 @@ impl StatementInner {
                     })
                     .collect();
 
-                self.kind = StatementKind::Call { target, args };
+                self.kind = StatementKind::Call { target, args, tail };
             }
             StatementKind::BitExtract {
                 value,
@@ -1154,7 +1128,9 @@ impl Block {
                 false_target,
                 ..
             } => vec![true_target, false_target],
-            StatementKind::Return { .. } | StatementKind::Panic(_) => vec![],
+            StatementKind::Return { .. }
+            | StatementKind::Panic(_)
+            | StatementKind::Call { tail: true, .. } => vec![],
             _ => panic!("invalid terminator for block"),
         }
     }
@@ -1245,7 +1221,9 @@ impl Iterator for BlockIterator {
                     false_target,
                     ..
                 } => vec![true_target.clone(), false_target.clone()],
-                StatementKind::Return { .. } | StatementKind::Panic(_) => vec![],
+                StatementKind::Return { .. }
+                | StatementKind::Panic(_)
+                | StatementKind::Call { tail: true, .. } => vec![],
                 _ => {
                     warn!("block missing terminator");
                     vec![]
@@ -1421,8 +1399,8 @@ impl Context {
         opt::optimise(self, level);
     }
 
-    pub fn validate(&mut self) {
-        validator::validate(self);
+    pub fn validate(&mut self) -> Vec<validator::ValidationMessage> {
+        validator::validate(self)
     }
 
     pub fn get_functions(&self) -> HashMap<InternedString, Function> {

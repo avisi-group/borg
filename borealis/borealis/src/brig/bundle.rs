@@ -117,6 +117,16 @@ pub fn codegen_bundle() -> TokenStream {
             }
         }
 
+        impl<V: core::ops::Neg<Output = V>, L> core::ops::Neg for Bundle<V, L> {
+            type Output = Self;
+            fn neg(self) -> Self {
+                Self {
+                    value: -self.value,
+                    length: self.length
+                }
+            }
+        }
+
         impl<V: core::cmp::PartialOrd, L> core::cmp::PartialOrd for Bundle<V, L> {
             fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
                 self.value.partial_cmp(&other.value)
@@ -130,5 +140,46 @@ pub fn codegen_bundle() -> TokenStream {
         }
 
         impl<V: core::cmp::PartialEq, L> core::cmp::Eq for Bundle<V, L> {}
+
+        impl core::ops::Shr<Bundle<i64, u8>> for Bundle<u64, u8> {
+            type Output = Self;
+
+            fn shr(self, rhs: Bundle<i64, u8>) -> Self::Output {
+                Self {
+                    value:  self.value >> rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl core::ops::Shl<Bundle<i64, u8>> for Bundle<u64, u8> {
+            type Output = Self;
+
+            fn shl(self, rhs: Bundle<i64, u8>) -> Self::Output {
+                Self {
+                    value:  self.value << rhs.value,
+                    length: self.length
+                }
+            }
+        }
+
+        impl core::ops::Add<Bundle<i64, u8>> for Bundle<u64, u8> {
+            type Output = Self;
+
+            fn add(self, rhs: Bundle<i64, u8>) -> Self::Output {
+                let value = match rhs.value.is_positive() {
+                    true => {
+                        self.value + u64::try_from(rhs.value.abs()).unwrap()
+                    },
+                    false => {
+                        self.value - u64::try_from(rhs.value.abs()).unwrap()
+                    }
+                };
+                Self {
+                    value,
+                    length: self.length
+                }
+            }
+        }
     }
 }

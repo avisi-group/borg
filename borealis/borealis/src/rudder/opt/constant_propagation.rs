@@ -2,10 +2,12 @@ use log::trace;
 
 use crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, StatementKind};
 
+// execute_aarch64_instrs_branch_conditional_cond
+
 pub fn run(f: Function) -> bool {
     let mut changed = false;
 
-    trace!("constant propagation {}", f.name());
+    //trace!("constant propagation {}", f.name());
 
     // if there is a single write to a variable, and it's a constant value, replace
     // all reads with the constant value

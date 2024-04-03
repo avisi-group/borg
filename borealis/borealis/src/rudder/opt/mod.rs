@@ -13,6 +13,7 @@ pub mod inliner;
 pub mod jump_threading;
 pub mod phi_analysis;
 pub mod return_propagation;
+pub mod tail_calls;
 pub mod variable_elimination;
 
 pub enum OptLevel {
@@ -39,6 +40,7 @@ static DEBUNDLER: FunctionPass = ("debundler", debundler::run);
 static RETURN_PROPAGATION: FunctionPass = ("return-propagation", return_propagation::run);
 static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_simplification::run);
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
+static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 
 pub fn optimise(ctx: &mut Context, level: OptLevel) {
     let passes: Vec<FunctionPass> = match level {
@@ -48,6 +50,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
             RETURN_PROPAGATION,
+            TAIL_CALL,
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
             DEAD_STMT_ELIMINATION,
@@ -62,6 +65,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
             RETURN_PROPAGATION,
+            TAIL_CALL,
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
             DEAD_STMT_ELIMINATION,
@@ -76,6 +80,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
             RETURN_PROPAGATION,
+            TAIL_CALL,
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
             DEAD_STMT_ELIMINATION,

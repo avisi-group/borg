@@ -14,7 +14,7 @@ use {
         rudder,
     },
     common::create_file,
-    log::info,
+    log::{info, warn},
     proc_macro2::TokenStream,
     quote::quote,
     sailrs::{jib_ast, types::ListVec},
@@ -136,7 +136,7 @@ const FN_ALLOWLIST: &[&str] = &[
     "decode_ands_log_imm_aarch64_instrs_integer_logical_immediate",
     "DecodeBitMasks",
     "_get_SCR_EL3_Type_NS",
-    // "HighestSetBit",
+    "HighestSetBit",
 ];
 
 /// Compiles a Sail model to a Brig module
@@ -178,7 +178,10 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
     writeln!(&mut create_file("target/ast.rudder").unwrap(), "{rudder}").unwrap();
 
     info!("Validating rudder");
-    rudder.validate();
+    let msgs = rudder.validate();
+    for msg in msgs {
+        warn!("{msg}");
+    }
 
     info!("Optimising rudder");
     rudder.optimise(rudder::opt::OptLevel::Level3);
@@ -190,7 +193,10 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
     .unwrap();
 
     info!("Validating rudder again");
-    rudder.validate();
+    let msgs = rudder.validate();
+    for msg in msgs {
+        warn!("{msg}");
+    }
 
     info!("Generating Rust");
 
