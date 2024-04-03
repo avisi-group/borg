@@ -54,7 +54,7 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
         trace!("processing {current}");
 
         // continue if we have already processed the current node
-        if processed.contains(&current) {
+        if processed.contains(&current.id()) {
             continue;
         }
 
@@ -69,9 +69,9 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                 trace!("only has one parent {}", child.parents()[0]);
 
                 // smoke test that the child's parent is the current node
-                assert_eq!(current, child.parents()[0]);
+                assert_eq!(current.id(), child.parents()[0].id());
                 // smoke test that the child is *not* the current node
-                assert_ne!(current, child);
+                assert_ne!(current.id(), child.id());
 
                 // move all statements and the terminator from the child to the current node
                 let mut statements = current.statements();
@@ -98,13 +98,13 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                             fallthrough,
                             condition,
                         } => {
-                            if target == current {
+                            if target.id() == current.id() {
                                 Terminator::Conditional {
                                     condition,
                                     target: child.clone(),
                                     fallthrough,
                                 }
-                            } else if fallthrough == current {
+                            } else if fallthrough.id() == current.id() {
                                 Terminator::Conditional {
                                     condition,
                                     target,
@@ -115,7 +115,7 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                             }
                         }
                         Terminator::Unconditional { target } => {
-                            if target == current {
+                            if target.id() == current.id() {
                                 Terminator::Unconditional {
                                     target: child.clone(),
                                 }
@@ -139,7 +139,7 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
         }
 
         // mark current node as processed
-        processed.insert(current.clone());
+        processed.insert(current.id());
 
         // push children to visit
         to_visit.extend(current.terminator().targets());

@@ -35,23 +35,23 @@ impl ControlFlowBlock {
             trace!("processing {}", current);
 
             // continue if we have already processed the current node
-            if processed.contains(&current) {
+            if processed.contains(&current.id()) {
                 continue;
             }
 
-            processed.insert(current.clone());
-            currently_processing.insert(current.clone());
+            processed.insert(current.id());
+            currently_processing.insert(current.id());
 
             // Visit children of the current node
             for child in current.terminator().targets() {
-                if currently_processing.contains(&child) {
+                if currently_processing.contains(&child.id()) {
                     // Found a cycle!
                     return true;
                 }
                 to_visit.push_back(child);
             }
 
-            currently_processing.remove(&current);
+            currently_processing.remove(&current.id());
         }
 
         false
@@ -168,7 +168,7 @@ pub fn find_common_block(
     let result = left_path.into_iter().find(|left_block| {
         right_path
             .iter()
-            .any(|right_block| *left_block == *right_block)
+            .any(|right_block| left_block.id() == right_block.id())
     });
 
     if let Some(common) = &result {

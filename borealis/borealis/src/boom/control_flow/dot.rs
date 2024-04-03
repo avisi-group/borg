@@ -3,7 +3,7 @@ use {
         self,
         control_flow::{ControlFlowBlock, Terminator},
     },
-    common::HashMap,
+    common::{identifiable::Id, HashMap},
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
     std::{cell::RefCell, io, rc::Rc},
 };
@@ -15,6 +15,9 @@ pub fn render<W: io::Write>(w: &mut W, block: &ControlFlowBlock) -> io::Result<(
 
     dot::render(&graph, w)
 }
+
+type NodeId = Id;
+type EdgeId = (NodeId, NodeId);
 
 #[derive(Default)]
 struct Graph {
@@ -30,7 +33,7 @@ impl Graph {
     }
 
     fn process_node(&mut self, node: ControlFlowBlock) {
-        let id: NodeId = node.clone();
+        let id = node.id();
 
         if self.nodes.contains(&id) {
             // already visited
@@ -97,8 +100,8 @@ impl Graph {
         };
 
         for child in &children {
-            let id = (id.clone(), child.0.clone());
-            self.edges.push(id.clone());
+            let id = (id, child.0.id());
+            self.edges.push(id);
             self.edge_labels.insert(id, child.1);
         }
 
@@ -111,16 +114,13 @@ impl Graph {
     }
 }
 
-type NodeId = ControlFlowBlock;
-type EdgeId = (NodeId, NodeId);
-
 impl<'ast> Labeller<'ast, NodeId, EdgeId> for Graph {
     fn graph_id(&'ast self) -> dot::Id<'ast> {
         dot::Id::new("AST").unwrap()
     }
 
     fn node_id(&'ast self, n: &NodeId) -> dot::Id<'ast> {
-        dot::Id::new(format!("n{}", n)).unwrap()
+        dot::Id::new(format!("n{:x}", n)).unwrap()
     }
 
     fn node_label(&'ast self, n: &NodeId) -> dot::LabelText<'ast> {

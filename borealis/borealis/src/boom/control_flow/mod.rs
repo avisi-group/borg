@@ -14,19 +14,18 @@ use {
         visitor::{Visitor, Walkable},
         Statement, Value,
     },
-    common::{intern::InternedString, HashSet},
+    common::{identifiable::Id, intern::InternedString, HashSet},
     std::{
         cell::RefCell,
-        collections::hash_map::DefaultHasher,
         fmt::{self, Display, Formatter},
-        hash::{Hash, Hasher},
+        hash::{DefaultHasher, Hash, Hasher},
         ptr,
         rc::{Rc, Weak},
     },
 };
 
 mod builder;
-mod dot;
+pub mod dot;
 pub mod util;
 
 /// Creates a control flow graph from a slice of statements.
@@ -45,6 +44,8 @@ pub struct ControlFlowBlock {
 
 #[derive(Debug, Default)]
 struct ControlFlowBlockInner {
+    /// Unique block ID
+    id: Id,
     /// Optional block label, otherwise the `SharedKey` `Display` format should
     /// be used
     label: Option<InternedString>,
@@ -56,27 +57,13 @@ struct ControlFlowBlockInner {
     terminator: Terminator,
 }
 
-impl Hash for ControlFlowBlock {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        ptr::hash(self.inner.as_ptr(), state)
-    }
-}
-
-impl PartialEq for ControlFlowBlock {
-    fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.inner, &other.inner)
-    }
-}
-
-impl Eq for ControlFlowBlock {}
-
 impl Display for ControlFlowBlock {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.inner.borrow().label {
             Some(label) => write!(f, "{label}"),
             None => {
                 let mut state = DefaultHasher::new();
-                self.hash(&mut state);
+                self.id().hash(&mut state);
                 write!(f, "{:016X}", state.finish())
             }
         }
@@ -95,6 +82,10 @@ impl Walkable for ControlFlowBlock {
 impl ControlFlowBlock {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn id(&self) -> Id {
+        self.inner.borrow().id
     }
 
     /// Creates a new weak pointer to a `ControlFlowBlock`
@@ -260,7 +251,7 @@ impl Terminator {
 
 #[derive(Debug)]
 pub struct ControlFlowBlockIterator {
-    visited: HashSet<ControlFlowBlock>,
+    visited: HashSet<Id>,
     remaining: Vec<ControlFlowBlock>,
 }
 
@@ -284,7 +275,7 @@ impl Iterator for ControlFlowBlockIterator {
             };
 
             // if we've already visited the node, get the next one
-            if self.visited.contains(&current) {
+            if self.visited.contains(&current.id()) {
                 continue;
             } else {
                 // otherwise return it
@@ -293,7 +284,7 @@ impl Iterator for ControlFlowBlockIterator {
         };
 
         // mark current node as processed
-        self.visited.insert(current.clone());
+        self.visited.insert(current.id());
 
         // push children to visit
         self.remaining.extend(current.terminator().targets());

@@ -52,12 +52,12 @@ fn remove_const_branch(entry_block: ControlFlowBlock) -> bool {
 
         // continue (try next unvisited node) if we have already processed the current
         // node
-        if processed.contains(&current) {
+        if processed.contains(&current.id()) {
             continue;
         }
 
         // mark current node as processed
-        processed.insert(current.clone());
+        processed.insert(current.id());
 
         // push children to visit
         to_visit.extend(current.terminator().targets());

@@ -65,11 +65,11 @@ impl Ast {
                 let mut to_visit = vec![control_flow.clone()];
 
                 while let Some(current) = to_visit.pop() {
-                    if visited.contains(&current) {
+                    if visited.contains(&current.id()) {
                         return;
                     }
 
-                    visited.insert(current.clone());
+                    visited.insert(current.id());
                     to_visit.extend(current.terminator().targets());
 
                     statements.extend(current.statements().into_iter().map(Into::into));

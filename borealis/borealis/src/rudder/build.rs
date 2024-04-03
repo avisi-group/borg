@@ -14,7 +14,8 @@ use {
             UnaryOperationKind,
         },
     },
-    common::{intern::InternedString, HashMap},
+    common::{identifiable::Id, intern::InternedString, HashMap},
+    log::trace,
     std::{cell::RefCell, cmp::Ordering, rc::Rc},
 };
 
@@ -273,7 +274,7 @@ impl BuildContext {
 struct FunctionBuildContext<'ctx> {
     build_context: &'ctx mut BuildContext,
     rudder_fn: Function,
-    blocks: HashMap<boom::control_flow::ControlFlowBlock, rudder::Block>,
+    blocks: HashMap<Id, rudder::Block>,
 }
 
 impl<'ctx> FunctionBuildContext<'ctx> {
@@ -289,16 +290,22 @@ impl<'ctx> FunctionBuildContext<'ctx> {
         &mut self,
         boom_block: boom::control_flow::ControlFlowBlock,
     ) -> rudder::Block {
-        if let Some(block) = self.blocks.get(&boom_block) {
+        trace!("resolving: {:x}", boom_block.id());
+
+        if let Some(block) = self.blocks.get(&boom_block.id()) {
+            trace!("already resolved: {:x}", boom_block.id());
             block.clone()
         } else {
-            let block = BlockBuildContext::new(self).build_block(boom_block.clone());
-            self.blocks.insert(boom_block, block.clone());
-            block
+            trace!("building: {:x}", boom_block.id());
+            BlockBuildContext::new(self).build_block(boom_block)
         }
     }
 
     pub fn build_fn(&mut self, boom_fn: boom::FunctionDefinition) {
+        trace!(
+            "converting function {:?} from boom to rudder",
+            boom_fn.signature.name
+        );
         self.rudder_fn.inner.borrow_mut().entry_block = self.resolve_block(boom_fn.entry_block);
     }
 }
@@ -329,7 +336,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     fn build_block(mut self, boom_block: boom::control_flow::ControlFlowBlock) -> rudder::Block {
-        log::trace!("building block: {}", boom_block);
+        // pre-insert empty rudder block to avoid infinite recursion with cyclic blocks
+        {
+            let rudder_block = self.block.clone();
+            self.fn_ctx().blocks.insert(boom_block.id(), rudder_block);
+        }
 
         // convert statements
         boom_block
@@ -629,6 +640,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.statement_builder.build(StatementKind::Call {
                     target,
                     args: casts.clone(),
+                    tail: false
                 })
             }
         };
@@ -1323,6 +1335,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Some(self.statement_builder.build(StatementKind::Call {
                     target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
                     args: vec![args[0].clone(), count],
+                    tail: false
                 }))
             }
 
