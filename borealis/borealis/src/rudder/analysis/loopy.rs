@@ -1,5 +1,4 @@
-use std::collections::VecDeque;
-use common::HashSet;
+use {common::HashSet, std::collections::VecDeque};
 
 use crate::rudder::Function;
 

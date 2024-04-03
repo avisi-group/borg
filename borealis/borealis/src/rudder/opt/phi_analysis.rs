@@ -1,5 +1,7 @@
-use common::{intern::InternedString, HashMap};
-use log::trace;
+use {
+    common::{intern::InternedString, HashMap},
+    log::trace,
+};
 
 use crate::rudder::{analysis::loopy::LoopAnalysis, Block, Function, Statement, StatementKind};
 

@@ -3,7 +3,8 @@ use log::trace;
 use crate::rudder::{Function, StatementKind};
 
 pub fn run(f: Function) -> bool {
-    // check condition for branch.  if it's const, replace with a jump.  if both targets are the same, replace with a jump
+    // check condition for branch.  if it's const, replace with a jump.  if both
+    // targets are the same, replace with a jump
 
     let mut changed = false;
     for block in f.entry_block().iter() {

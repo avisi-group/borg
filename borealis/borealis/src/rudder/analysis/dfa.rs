@@ -1,5 +1,7 @@
-use crate::rudder::{Block, Function, Statement, StatementKind, Symbol};
-use common::{intern::InternedString, HashMap, HashSet};
+use {
+    crate::rudder::{Block, Function, Statement, StatementKind, Symbol},
+    common::{intern::InternedString, HashMap, HashSet},
+};
 
 pub struct SymbolUseAnalysis {
     f: Function,

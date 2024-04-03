@@ -1,8 +1,9 @@
-use std::collections::{HashSet, LinkedList};
-
-use crate::rudder::{Block, Function};
-use common::HashMap;
-use log::trace;
+use {
+    crate::rudder::{Block, Function},
+    common::{HashMap, HashSet},
+    log::trace,
+    std::collections::LinkedList,
+};
 
 pub struct ControlFlowGraphAnalysis {
     f: Function,

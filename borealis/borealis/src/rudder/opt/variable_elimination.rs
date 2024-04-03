@@ -1,5 +1,4 @@
-use common::HashMap;
-use log::trace;
+use {common::HashMap, log::trace};
 
 use crate::rudder::{analysis, Block, Function, StatementKind, SymbolKind};
 

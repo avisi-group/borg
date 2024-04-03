@@ -7,7 +7,8 @@ pub fn run(f: Function) -> bool {
 
     trace!("constant propagation {}", f.name());
 
-    // if there is a single write to a variable, and it's a constant value, replace all reads with the constant value
+    // if there is a single write to a variable, and it's a constant value, replace
+    // all reads with the constant value
 
     let sua = SymbolUseAnalysis::new(&f);
 

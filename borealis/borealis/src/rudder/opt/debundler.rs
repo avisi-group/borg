@@ -1,7 +1,6 @@
 use std::rc::Rc;
 
-use common::HashMap;
-use log::trace;
+use {common::HashMap, log::trace};
 
 use crate::rudder::{
     analysis::dfa::StatementUseAnalysis, Block, CastOperationKind, ConstantValue,
@@ -49,7 +48,10 @@ fn do_direct_debundle(block: &Block) -> bool {
                 };
 
                 if sua.is_dead(&stmt) {
-                    panic!("dead unbundle-val that hasn't been eliminated: {} in block {}", stmt, block)
+                    panic!(
+                        "dead unbundle-val that hasn't been eliminated: {} in block {}",
+                        stmt, block
+                    )
                 }
 
                 for use_ in sua.get_uses(&stmt) {

@@ -5,7 +5,8 @@ use crate::rudder::{analysis::cfg::ControlFlowGraphAnalysis, Function, Statement
 pub fn run(f: Function) -> bool {
     let cfg = ControlFlowGraphAnalysis::new(&f);
 
-    // If a block contains only a return statement, replace call sites that jump (not branch) to it
+    // If a block contains only a return statement, replace call sites that jump
+    // (not branch) to it
 
     let mut changed = false;
     for block in f.entry_block().iter() {
@@ -33,7 +34,8 @@ pub fn run(f: Function) -> bool {
                             changed = true;
                         }
 
-                        // if they end in a branch, try to coalesce to a single return block.
+                        // if they end in a branch, try to coalesce to a single
+                        // return block.
                     }
                 }
                 _ => {
