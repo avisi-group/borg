@@ -312,13 +312,12 @@ fn get_ident(stmt: &Statement) -> TokenStream {
     format_ident!("{}", stmt.name().to_string()).to_token_stream()
 }
 
-fn codegen_stmt(stmt: Statement) -> TokenStream {
+pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
     let value = match stmt.kind() {
         StatementKind::Constant { value, typ } => {
             let v = match value {
-                // todo: do not emit type info here
                 ConstantValue::UnsignedInteger(v) => {
                     if *typ == Type::u1() {
                         let b = v != 0;
@@ -484,7 +483,8 @@ fn codegen_stmt(stmt: Statement) -> TokenStream {
             } else {
                 match kind {
                     CastOperationKind::ZeroExtend => {
-                        // safe even if underlying rudder types are smaller than codegen'd rust types (u7 -> u13 == u8 -> u16)
+                        // safe even if underlying rudder types are smaller than codegen'd rust
+                        // types (u7 -> u13 == u8 -> u16)
                         let target = codegen_type(target);
                         quote! {
                             (#ident as #target)

@@ -135,6 +135,7 @@ const FN_ALLOWLIST: &[&str] = &[
     "execute_aarch64_instrs_branch_conditional_test",
     "decode_ands_log_imm_aarch64_instrs_integer_logical_immediate",
     "DecodeBitMasks",
+    "_get_SCR_EL3_Type_NS",
 ];
 
 /// Compiles a Sail model to a Brig module
@@ -175,6 +176,9 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
     writeln!(&mut create_file("target/ast.rudder").unwrap(), "{rudder}").unwrap();
 
+    info!("Validating rudder");
+    rudder.validate();
+
     info!("Optimising rudder");
     rudder.optimise(rudder::opt::OptLevel::Level3);
 
@@ -183,6 +187,9 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
         "{rudder}"
     )
     .unwrap();
+
+    info!("Validating rudder again");
+    rudder.validate();
 
     info!("Generating Rust");
 

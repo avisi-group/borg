@@ -5,6 +5,7 @@ use {
     quote::ToTokens,
     std::{
         cell::RefCell,
+        fmt::Debug,
         hash::{Hash, Hasher},
         ops::{Add, Sub},
         rc::{Rc, Weak},
@@ -15,8 +16,9 @@ pub mod analysis;
 pub mod build;
 pub mod opt;
 mod pretty_print;
+pub mod validator;
 
-#[derive(Hash, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]
 pub enum PrimitiveTypeClass {
     Void,
     Unit,
@@ -25,7 +27,7 @@ pub enum PrimitiveTypeClass {
     FloatingPoint,
 }
 
-#[derive(Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct PrimitiveType {
     tc: PrimitiveTypeClass,
     element_width_in_bits: usize,
@@ -41,7 +43,7 @@ impl PrimitiveType {
     }
 }
 
-#[derive(Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(PrimitiveType),
     Composite(Vec<Rc<Type>>),
@@ -142,6 +144,16 @@ impl Type {
         }
     }
 
+    pub fn is_u1(&self) -> bool {
+        match self {
+            Self::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::UnsignedInteger,
+                element_width_in_bits,
+            }) => *element_width_in_bits == 1,
+            _ => false,
+        }
+    }
+
     pub fn is_unknown_length_vector(&self) -> bool {
         matches!(
             self,
@@ -205,7 +217,7 @@ impl Type {
     }*/
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum ConstantValue {
     UnsignedInteger(usize),
     SignedInteger(isize),
@@ -229,6 +241,20 @@ impl ConstantValue {
             ConstantValue::SignedInteger(v) => *v == 0,
             ConstantValue::FloatingPoint(v) => *v == 0.,
             ConstantValue::Unit => true,
+        }
+    }
+
+    pub fn is_unsigned(&self) -> bool {
+        match self {
+            ConstantValue::UnsignedInteger(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_signed(&self) -> bool {
+        match self {
+            ConstantValue::SignedInteger(_) => true,
+            _ => false,
         }
     }
 }
@@ -271,13 +297,13 @@ impl Sub for ConstantValue {
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum SymbolKind {
     Parameter,
     LocalVariable,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Symbol {
     name: InternedString,
     kind: SymbolKind,
@@ -298,7 +324,7 @@ impl Symbol {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum BinaryOperationKind {
     Add,
     Sub,
@@ -316,14 +342,14 @@ pub enum BinaryOperationKind {
     CompareGreaterThanOrEqual,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum UnaryOperationKind {
     Not,
     Negate,
     Complement,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum CastOperationKind {
     ZeroExtend,
     SignExtend,
@@ -333,7 +359,7 @@ pub enum CastOperationKind {
     Broadcast,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum ShiftOperationKind {
     LogicalShiftLeft,
     LogicalShiftRight,
@@ -342,7 +368,7 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum StatementKind {
     Constant {
         typ: Rc<Type>,
@@ -501,7 +527,7 @@ pub enum ValueClass {
     Dynamic,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Statement {
     inner: Rc<RefCell<StatementInner>>,
 }
@@ -520,6 +546,7 @@ impl PartialEq for Statement {
 
 impl Eq for Statement {}
 
+#[derive(Debug)]
 pub struct StatementInner {
     name: InternedString,
     kind: StatementKind,
@@ -1045,7 +1072,13 @@ pub struct Block {
     inner: Rc<RefCell<BlockInner>>,
 }
 
-#[derive(Clone)]
+impl Debug for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner.borrow().name)
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct WeakBlock {
     inner: Weak<RefCell<BlockInner>>,
 }
@@ -1228,6 +1261,12 @@ pub struct Function {
     inner: Rc<RefCell<FunctionInner>>,
 }
 
+impl Debug for Function {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.inner.borrow().name)
+    }
+}
+
 impl ToTokens for Function {
     fn to_tokens(&self, _: &mut TokenStream) {
         todo!()
@@ -1379,6 +1418,10 @@ impl Context {
 
     pub fn optimise(&mut self, level: opt::OptLevel) {
         opt::optimise(self, level);
+    }
+
+    pub fn validate(&mut self) {
+        validator::validate(self);
     }
 
     pub fn get_functions(&self) -> HashMap<InternedString, Function> {

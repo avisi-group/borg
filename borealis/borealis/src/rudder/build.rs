@@ -23,7 +23,8 @@ const REPLICATE_BITS_BOREALIS_INTERNAL_NAME: Lazy<InternedString> =
     Lazy::new(|| InternedString::from_static("replicate_bits_borealis_internal"));
 
 static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
-    // // bits << (bits.len() * 0) | bits << (bits.len() * 1) | bits << (bits.len() * 2) ...
+    // // bits << (bits.len() * 0) | bits << (bits.len() * 1) | bits << (bits.len()
+    // * 2) ...
 
     // todo!();
 
@@ -1647,9 +1648,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // let count = args[1].clone();
 
                 // // allowed count values as constant statements
-                // let allowed_counts = [1,2,4,8,16,32,64].into_iter().map(|count| self.statement_builder.build(StatementKind::Constant { typ: Rc::new(Type::u64()), value: ConstantValue::UnsignedInteger(count) })).collect::<Vec<_>>();
+                // let allowed_counts = [1,2,4,8,16,32,64].into_iter().map(|count|
+                // self.statement_builder.build(StatementKind::Constant { typ:
+                // Rc::new(Type::u64()), value: ConstantValue::UnsignedInteger(count)
+                // })).collect::<Vec<_>>();
 
-                // let allowed_count_compares = allowed_counts.iter().cloned().map(|constant| self.statement_builder.build(StatementKind::BinaryOperation { kind: BinaryOperationKind::CompareEqual, lhs: count.clone(), rhs: constant }));
+                // let allowed_count_compares = allowed_counts.iter().cloned().map(|constant|
+                // self.statement_builder.build(StatementKind::BinaryOperation { kind:
+                // BinaryOperationKind::CompareEqual, lhs: count.clone(), rhs: constant }));
 
                 // self.statement_builder
                 //     .build(StatementKind::Assert { condition: () });
@@ -1733,7 +1739,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Value::Literal(literal) => {
                 let kind = match &*literal.borrow() {
                     boom::Literal::Int(i) => StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Rc::new(Type::s64()),
                         value: rudder::ConstantValue::SignedInteger(i.try_into().unwrap()),
                     },
                     boom::Literal::Bits(bits) => StatementKind::Constant {

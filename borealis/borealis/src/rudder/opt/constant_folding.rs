@@ -1,8 +1,12 @@
-use log::trace;
+use {
+    crate::rudder::{
+        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, PrimitiveType,
+        PrimitiveTypeClass, Statement, StatementKind, Type, ValueClass,
+    },
+    log::trace,
+};
 
-use crate::rudder::{Block, CastOperationKind, Statement, StatementKind, ValueClass};
-
-pub fn run(f: crate::rudder::Function) -> bool {
+pub fn run(f: Function) -> bool {
     let mut changed = false;
 
     trace!("constant folding {}", f.name());
@@ -43,20 +47,20 @@ fn run_on_stmt(stmt: Statement) -> bool {
             };
 
             let cv = match kind {
-                crate::rudder::BinaryOperationKind::Add => lhs + rhs,
-                crate::rudder::BinaryOperationKind::Sub => lhs - rhs,
-                crate::rudder::BinaryOperationKind::Multiply => todo!(),
-                crate::rudder::BinaryOperationKind::Divide => todo!(),
-                crate::rudder::BinaryOperationKind::Modulo => todo!(),
-                crate::rudder::BinaryOperationKind::And => todo!(),
-                crate::rudder::BinaryOperationKind::Or => todo!(),
-                crate::rudder::BinaryOperationKind::Xor => todo!(),
-                crate::rudder::BinaryOperationKind::CompareEqual => todo!(),
-                crate::rudder::BinaryOperationKind::CompareNotEqual => todo!(),
-                crate::rudder::BinaryOperationKind::CompareLessThan => todo!(),
-                crate::rudder::BinaryOperationKind::CompareLessThanOrEqual => todo!(),
-                crate::rudder::BinaryOperationKind::CompareGreaterThan => todo!(),
-                crate::rudder::BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
+                BinaryOperationKind::Add => lhs + rhs,
+                BinaryOperationKind::Sub => lhs - rhs,
+                BinaryOperationKind::Multiply => todo!(),
+                BinaryOperationKind::Divide => todo!(),
+                BinaryOperationKind::Modulo => todo!(),
+                BinaryOperationKind::And => todo!(),
+                BinaryOperationKind::Or => todo!(),
+                BinaryOperationKind::Xor => todo!(),
+                BinaryOperationKind::CompareEqual => todo!(),
+                BinaryOperationKind::CompareNotEqual => todo!(),
+                BinaryOperationKind::CompareLessThan => todo!(),
+                BinaryOperationKind::CompareLessThanOrEqual => todo!(),
+                BinaryOperationKind::CompareGreaterThan => todo!(),
+                BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
             };
 
             stmt.replace_kind(StatementKind::Constant {
@@ -85,7 +89,37 @@ fn run_on_stmt(stmt: Statement) -> bool {
             value,
         } => {
             let StatementKind::Constant { value, .. } = value.kind() else {
-                panic!("operand to cast must be constant ({})", value)
+                panic!(
+                    "operand to cast must be constant stmt={stmt}; value={}",
+                    value
+                )
+            };
+
+            if typ.is_u1() {
+                if let ConstantValue::SignedInteger(signed_value) = value {
+                    stmt.replace_kind(StatementKind::Constant {
+                        typ,
+                        value: ConstantValue::UnsignedInteger(signed_value.try_into().unwrap()),
+                    });
+                } else {
+                    stmt.replace_kind(StatementKind::Constant { typ, value });
+                }
+            } else {
+                stmt.replace_kind(StatementKind::Constant { typ, value });
+            }
+
+            true
+        }
+        StatementKind::Cast {
+            kind: CastOperationKind::Reinterpret,
+            typ,
+            value,
+        } => {
+            let StatementKind::Constant { value, .. } = value.kind() else {
+                panic!(
+                    "operand to cast must be constant stmt={stmt}; value={}",
+                    value
+                )
             };
 
             stmt.replace_kind(StatementKind::Constant { typ, value });

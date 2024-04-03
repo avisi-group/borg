@@ -32,9 +32,9 @@ impl Display for Type {
 impl Display for ConstantValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
-            ConstantValue::UnsignedInteger(v) => write!(f, "{v}"),
-            ConstantValue::SignedInteger(v) => write!(f, "{v}"),
-            ConstantValue::FloatingPoint(v) => write!(f, "{v}"),
+            ConstantValue::UnsignedInteger(v) => write!(f, "{v}u"),
+            ConstantValue::SignedInteger(v) => write!(f, "{v}s"),
+            ConstantValue::FloatingPoint(v) => write!(f, "{v}f"),
             ConstantValue::Unit => write!(f, "()"),
         }
     }

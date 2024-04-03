@@ -26,7 +26,7 @@ impl ControlFlowGraphAnalysis {
     fn analyse(&mut self) {
         trace!("analysing function {}", self.f.name());
 
-        let mut seen_list = HashSet::new();
+        let mut seen_list = HashSet::default();
         let mut work_list = LinkedList::new();
         work_list.push_back(self.f.entry_block());
 
