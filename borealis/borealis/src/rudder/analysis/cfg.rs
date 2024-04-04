@@ -1,7 +1,6 @@
 use {
     crate::rudder::{Block, Context, Function, StatementKind},
     common::{intern::InternedString, HashMap, HashSet},
-    itertools::Itertools,
     log::trace,
     std::collections::VecDeque,
 };

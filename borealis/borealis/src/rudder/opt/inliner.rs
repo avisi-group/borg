@@ -1,5 +1,5 @@
 use crate::rudder::Function;
 
-pub fn run(f: Function) -> bool {
+pub fn run(_f: Function) -> bool {
     false
 }

@@ -13,16 +13,9 @@ use {
         },
     },
     common::{intern::InternedString, HashSet},
-    log::warn,
-    once_cell::sync::Lazy,
-    proc_macro2::{Ident, Literal, Span, TokenStream},
+    proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
-    regex::Regex,
-    std::{
-        borrow::Borrow,
-        hash::{DefaultHasher, Hash, Hasher},
-        rc::Rc,
-    },
+    std::rc::Rc,
 };
 
 pub fn codegen_functions(
@@ -35,7 +28,7 @@ pub fn codegen_functions(
 
     let rudder_fns = rudder.get_functions();
 
-    let mut fns: Vec<(InternedString, TokenStream)> = fn_names
+    fn_names
         .into_iter()
         .map(|k| (k, rudder_fns.get(&k).unwrap()))
         .map(|(name, function)| {
@@ -54,9 +47,7 @@ pub fn codegen_functions(
                 },
             )
         })
-        .collect();
-
-    fns
+        .collect()
 }
 
 fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {

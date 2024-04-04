@@ -89,7 +89,7 @@ fn _transform_constant_length_bundles(block: &Block) -> bool {
         changed |= match stmt.kind() {
             StatementKind::Bundle { value, length } => {
                 if let StatementKind::Constant {
-                    typ: length_type,
+                    typ: _length_type,
                     value: ConstantValue::UnsignedInteger(target_length),
                 } = length.kind()
                 {

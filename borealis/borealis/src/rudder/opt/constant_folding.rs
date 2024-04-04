@@ -1,9 +1,6 @@
-use {
-    crate::rudder::{
-        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, Statement,
-        StatementKind, ValueClass,
-    },
-    log::trace,
+use crate::rudder::{
+    BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, Statement,
+    StatementKind,
 };
 
 pub fn run(f: Function) -> bool {

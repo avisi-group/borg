@@ -35,3 +35,4 @@ parking_lot = "0.12.1"
 cargo-util-schemas = "0.2.0"
 toml = "0.8.12"
 semver = { version = "1.0.22", features = ["serde"] }
+walkdir = "2.5.0"

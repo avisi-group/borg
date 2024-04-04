@@ -12,15 +12,11 @@ use {
         },
         brig::{
             allowlist::apply_fn_allowlist, bundle::codegen_bundle,
-            functions_interpreter::codegen_functions, state::codegen_state,
+            functions_interpreter::codegen_functions, state::codegen_state, workspace_diff::write_workspace,
         },
         rudder::{
             self, analysis::cfg::FunctionCallGraphAnalysis, Context, PrimitiveTypeClass, Type,
         },
-    },
-    cargo_util_schemas::manifest::{
-        InheritableDependency, InheritableField, PackageName, RustVersion, TomlDependency,
-        TomlDetailedDependency, TomlManifest, TomlPackage, TomlWorkspace,
     },
     common::{create_file, intern::InternedString, HashMap, HashSet},
     log::{info, warn},
@@ -29,15 +25,11 @@ use {
     quote::{format_ident, quote},
     regex::Regex,
     sailrs::jib_ast,
-    semver::{BuildMetadata, Prerelease, Version},
     std::{
-        collections::BTreeMap,
-        fs,
         hash::{DefaultHasher, Hash, Hasher},
         io::Write,
         path::Path,
         rc::Rc,
-        str::FromStr,
     },
     syn::Ident,
 };
@@ -47,6 +39,7 @@ mod bundle;
 mod functions_dbt;
 mod functions_interpreter;
 mod state;
+mod workspace_diff;
 
 const ENTRYPOINT: &str = "__DecodeA64";
 
@@ -54,7 +47,7 @@ const ENTRYPOINT: &str = "__DecodeA64";
 pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>, P: AsRef<Path>>(
     jib_ast: I,
     path: P,
-    standalone: bool,
+    _standalone: bool,
 ) {
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(apply_fn_allowlist(jib_ast));
@@ -443,181 +436,6 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
             )
             .collect(),
     }
-}
-
-fn write_workspace<P: AsRef<Path>>(workspace: &Workspace, path: P) {
-    // make root dir, cargo.toml containing
-    // [workspace]
-    // members = [workspace.crates.keys()]
-    // resolver = "2"
-
-    let workspace_dir = path.as_ref();
-
-    fs::remove_dir_all(&workspace_dir).unwrap();
-    fs::create_dir(&workspace_dir).unwrap();
-
-    fs::write(
-        workspace_dir.join("Cargo.toml"),
-        toml::to_string_pretty(&TomlManifest {
-            cargo_features: None,
-            package: None,
-            project: None,
-            profile: None,
-            lib: None,
-            bin: None,
-            example: None,
-            test: None,
-            bench: None,
-            dependencies: None,
-            dev_dependencies: None,
-            dev_dependencies2: None,
-            build_dependencies: None,
-            build_dependencies2: None,
-            features: None,
-            target: None,
-            replace: None,
-            patch: None,
-            workspace: Some(TomlWorkspace {
-                members: Some(workspace.crates.keys().map(ToString::to_string).collect()),
-                resolver: Some("2".to_owned()),
-                exclude: None,
-                default_members: None,
-                metadata: None,
-                package: None,
-                dependencies: None,
-                lints: None,
-            }),
-            badges: None,
-            lints: None,
-        })
-        .unwrap(),
-    )
-    .unwrap();
-
-    // for each crate
-    // make crate dir, cargo.toml with appropriate dependencies
-    // make src/lib.rs, insert contents
-    workspace.crates.iter().for_each(
-        |(
-            name,
-            Crate {
-                dependencies,
-                contents,
-            },
-        )| {
-            let crate_dir = workspace_dir.join(name.as_ref());
-            let src_dir = crate_dir.join("src");
-            fs::create_dir_all(&src_dir).unwrap();
-
-            fs::write(
-                crate_dir.join("Cargo.toml"),
-                toml::to_string_pretty(&TomlManifest {
-                    cargo_features: None,
-                    package: Some(Box::new(TomlPackage {
-                        edition: Some(InheritableField::Value("2021".to_owned())),
-                        rust_version: None,
-                        name: PackageName::new(name.as_ref().to_owned()).unwrap(),
-                        version: Some(InheritableField::Value(Version {
-                            major: 0,
-                            minor: 0,
-                            patch: 0,
-                            pre: Prerelease::EMPTY,
-                            build: BuildMetadata::EMPTY,
-                        })),
-                        authors: None,
-                        build: None,
-                        metabuild: None,
-                        default_target: None,
-                        forced_target: None,
-                        links: None,
-                        exclude: None,
-                        include: None,
-                        publish: None,
-                        workspace: None,
-                        im_a_teapot: None,
-                        autobins: None,
-                        autoexamples: None,
-                        autotests: None,
-                        autobenches: None,
-                        default_run: None,
-                        description: None,
-                        homepage: None,
-                        documentation: None,
-                        readme: None,
-                        keywords: None,
-                        categories: None,
-                        license: None,
-                        license_file: None,
-                        repository: None,
-                        resolver: None,
-                        metadata: None,
-                        _invalid_cargo_features: None,
-                    })),
-                    project: None,
-                    profile: None,
-                    lib: None,
-                    bin: None,
-                    example: None,
-                    test: None,
-                    bench: None,
-                    dependencies: Some(
-                        dependencies
-                            .iter()
-                            .map(|n| (n, PackageName::new(n.to_string()).unwrap()))
-                            .map(|(n, package_name)| {
-                                (
-                                    package_name,
-                                    InheritableDependency::Value(TomlDependency::Detailed(
-                                        TomlDetailedDependency {
-                                            version: None,
-                                            registry: None,
-                                            registry_index: None,
-                                            path: Some(
-                                                workspace_dir
-                                                    .join(n.as_ref())
-                                                    .to_str()
-                                                    .unwrap()
-                                                    .to_owned(),
-                                            ),
-                                            git: None,
-                                            branch: None,
-                                            tag: None,
-                                            rev: None,
-                                            features: None,
-                                            optional: None,
-                                            default_features: None,
-                                            default_features2: None,
-                                            package: None,
-                                            public: None,
-                                            artifact: None,
-                                            lib: None,
-                                            target: None,
-                                            _unused_keys: BTreeMap::new(),
-                                        },
-                                    )),
-                                )
-                            })
-                            .collect(),
-                    ),
-                    dev_dependencies: None,
-                    dev_dependencies2: None,
-                    build_dependencies: None,
-                    build_dependencies2: None,
-                    features: None,
-                    target: None,
-                    replace: None,
-                    patch: None,
-                    workspace: None,
-                    badges: None,
-                    lints: None,
-                })
-                .unwrap(),
-            )
-            .unwrap();
-
-            fs::write(src_dir.join("lib.rs"), tokens_to_string(contents)).unwrap();
-        },
-    );
 }
 
 struct Workspace {
