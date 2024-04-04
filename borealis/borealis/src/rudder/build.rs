@@ -884,6 +884,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         value: args[0].clone(),
                     }))
                 }
+                "pow2" => Some(self.statement_builder.build(StatementKind::UnaryOperation {
+                    kind: UnaryOperationKind::Power2,
+                    value: args[0].clone(),
+                })),
                 "lt_int" => Some(
                     self.statement_builder
                         .build(StatementKind::BinaryOperation {

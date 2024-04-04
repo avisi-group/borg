@@ -334,6 +334,7 @@ pub enum UnaryOperationKind {
     Not,
     Negate,
     Complement,
+    Power2,
 }
 
 #[derive(Debug, Clone)]
