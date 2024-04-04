@@ -3,7 +3,8 @@ use log::trace;
 use crate::rudder::{Function, StatementKind};
 
 pub fn run(f: Function) -> bool {
-    // If a block contains a call followed by a return, optimise this into a tail call
+    // If a block contains a call followed by a return, optimise this into a tail
+    // call
 
     let mut changed = false;
     for block in f.entry_block().iter() {

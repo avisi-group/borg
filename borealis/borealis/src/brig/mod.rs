@@ -10,7 +10,9 @@ use {
             },
             Ast,
         },
-        brig::{bundle::codegen_bundle, functions::codegen_functions, state::codegen_state},
+        brig::{
+            bundle::codegen_bundle, codegen_interpreter::codegen_functions, state::codegen_state,
+        },
         rudder,
     },
     common::create_file,
@@ -22,7 +24,8 @@ use {
 };
 
 mod bundle;
-mod functions;
+mod codegen_dbt;
+mod codegen_interpreter;
 mod state;
 
 const ENTRYPOINT: &str = "__DecodeA64";
@@ -140,6 +143,32 @@ const FN_ALLOWLIST: &[&str] = &[
     "zext_ones",
     "extsv",
     "ROR",
+    "execute_aarch64_instrs_integer_logical_immediate",
+    "IsZeroBit",
+    "decode_and_log_imm_aarch64_instrs_integer_logical_immediate",
+    "decode_csel_aarch64_instrs_integer_conditional_select",
+    "execute_aarch64_instrs_integer_conditional_select",
+    "decode_ret_aarch64_instrs_branch_unconditional_register",
+    "execute_aarch64_instrs_branch_unconditional_register",
+    "decode_adrp_aarch64_instrs_integer_arithmetic_address_pc_rel",
+    "execute_aarch64_instrs_integer_arithmetic_address_pc_rel",
+    "set_subrange_zeros",
+    "set_slice_zeros",
+    "sail_mask",
+    "__DecodeA64_LoadStore",
+    "decode_stp_gen_aarch64_instrs_memory_pair_general_offset",
+    "execute_aarch64_instrs_memory_pair_general_post_idx",
+    "CreateAccDescGPR",
+    "NewAccDesc",
+    "decode_dsb_aarch64_instrs_system_barriers_dsb_nxs",
+    "GenMPAMcurEL",
+    "GenMPAMatEL",
+    "SPMACCESSR_EL3_SysRegRead_04a853a73f22109c",
+    "PARTIDspaceFromSS",
+    "HaveMPAMv0p1Ext",
+    "HaveMPAMv1p1Ext",
+    "MPAMisEnabled",
+    "HighestEL",
 ];
 
 /// Compiles a Sail model to a Brig module

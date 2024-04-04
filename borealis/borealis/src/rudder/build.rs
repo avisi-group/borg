@@ -16,6 +16,7 @@ use {
     },
     common::{identifiable::Id, intern::InternedString, HashMap},
     log::trace,
+    regex::Regex,
     std::{cell::RefCell, cmp::Ordering, rc::Rc},
 };
 
@@ -678,7 +679,59 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         }
                     }
                 }
-                boom::Expression::Field { .. } => todo!(),
+                boom::Expression::Field { expression, field } => match &**expression {
+                    boom::Expression::Identifier(ident) => {
+                        // copied from build_copy
+
+                        // lookup identifier
+                        if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
+                            // copying into local variable
+                            let target_typ = symbol.typ();
+
+                            let structs = self.ctx().structs.clone();
+                            let (_, (struct_typ, fields)) = structs
+                                .iter()
+                                .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
+                                .expect("failed to find struct :(");
+
+                            let idx = fields.get(field).unwrap();
+
+                            // read variable
+                            let read_var =
+                                self.statement_builder.build(StatementKind::ReadVariable {
+                                    symbol: symbol.clone(),
+                                });
+
+                            // cast to field type
+                            let field_type = {
+                                let Type::Composite(field_types) = &**struct_typ else {
+                                    unreachable!();
+                                };
+
+                                field_types[*idx].clone()
+                            };
+
+                            let cast = self.generate_cast(fn_statement, field_type);
+
+                            // modify field
+                            let mutate_field =
+                                self.statement_builder.build(StatementKind::MutateField {
+                                    composite: read_var,
+                                    field: *idx,
+                                    value: cast,
+                                });
+
+                            // write variable
+                            self.statement_builder.build(StatementKind::WriteVariable {
+                                symbol,
+                                value: mutate_field,
+                            });
+                        } else {
+                            todo!()
+                        }
+                    }
+                    _ => todo!(),
+                },
                 boom::Expression::Address(_) => todo!(),
             }
         }
@@ -690,714 +743,731 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         name: InternedString,
         args: &[Statement],
     ) -> Option<Statement> {
-        //  if Regex::new(r"\b\w{13}\b").unwrap().is_match(name) {}
-
-        match name.as_ref() {
-            "%i64->%i" | "%i->%i64" => {
-                Some(self.generate_cast(args[0].clone(), Rc::new(Type::s64())))
-            }
-            // todo: should probably be casts
-            "UInt0" | "SInt0" | "make_the_value" | "size_itself_int" => Some(args[0].clone()),
-            "subrange_bits" => {
-                // end - start + 1
-                let one = self.statement_builder.build(StatementKind::Constant {
-                    typ: args[1].typ(),
-                    value: rudder::ConstantValue::SignedInteger(1),
-                });
-                let diff = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Sub,
-                        lhs: args[1].clone(),
-                        rhs: args[2].clone(),
-                    });
-                let len = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs: diff.clone(),
-                        rhs: one.clone(),
-                    });
-
-                Some(self.statement_builder.build(StatementKind::BitExtract {
-                    value: args[0].clone(),
-                    start: args[2].clone(),
-                    length: len,
-                }))
-            }
-            "eq_bits"
-            | "eq_int"
-            | "eq_any<EMoveWideOp%>"
-            | "eq_any<EBranchType%>"
-            | "eq_any<ESecurityState%>"
-            | "eq_any<E__InstrEnc%>" => Some(self.statement_builder.build(
-                StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::CompareEqual,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                },
-            )),
-            "neq_bits" | "neq_any<ESecurityState%>" => Some(self.statement_builder.build(
-                StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::CompareNotEqual,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                },
-            )),
-
-            // val add_atom : (%i, %i) -> %i
-            "add_atom" => {
-                let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_signed()));
-                let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_signed()));
-                Some(
-                    self.statement_builder
-                        .build(StatementKind::BinaryOperation {
-                            kind: BinaryOperationKind::Add,
-                            lhs,
-                            rhs,
-                        }),
-                )
-            }
-
-            // val add_bits : (%bv, %bv) -> %bv
-            "add_bits" => {
-                let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
-                let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
-                Some(
-                    self.statement_builder
-                        .build(StatementKind::BinaryOperation {
-                            kind: BinaryOperationKind::Add,
-                            lhs,
-                            rhs,
-                        }),
-                )
-            }
-
-            // val add_bits_int : (%bv, %i) -> %bv
-            "add_bits_int" => {
-                let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
-                let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
-                Some(
-                    self.statement_builder
-                        .build(StatementKind::BinaryOperation {
-                            kind: BinaryOperationKind::Add,
-                            lhs,
-                            rhs,
-                        }),
-                )
-            }
-
-            "sub_bits" | "sub_atom" => Some(self.statement_builder.build(
-                StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Sub,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                },
-            )),
-            "mult_atom" => Some(
+        if Regex::new(r"eq_any<([a-zA-Z_]+)%>")
+            .unwrap()
+            .is_match(name.as_ref())
+        {
+            Some(
                 self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Multiply,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "tdiv_int" | "ediv_int" | "ediv_nat" => Some(self.statement_builder.build(
-                StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Divide,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                },
-            )),
-
-            "emod_nat" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Modulo,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "negate_atom" => Some(self.statement_builder.build(StatementKind::UnaryOperation {
-                kind: UnaryOperationKind::Negate,
-                value: args[0].clone(),
-            })),
-            "lt_int" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::CompareLessThan,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "lteq_int" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::CompareLessThanOrEqual,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "gt_int" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::CompareGreaterThan,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "gteq_int" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::CompareGreaterThanOrEqual,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "not_vec" | "not_bool" => {
-                Some(self.statement_builder.build(StatementKind::UnaryOperation {
-                    kind: rudder::UnaryOperationKind::Not,
-                    value: args[0].clone(),
-                }))
-            }
-            "and_vec" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::And,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "xor_vec" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Xor,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-            "or_vec" => Some(
-                self.statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Or,
-                        lhs: args[0].clone(),
-                        rhs: args[1].clone(),
-                    }),
-            ),
-
-            "sail_shiftright" => {
-                Some(self.statement_builder.build(StatementKind::ShiftOperation {
-                    kind: ShiftOperationKind::LogicalShiftRight,
-                    value: args[0].clone(),
-                    amount: args[1].clone(),
-                }))
-            }
-            "sail_arith_shiftright" => {
-                Some(self.statement_builder.build(StatementKind::ShiftOperation {
-                    kind: ShiftOperationKind::ArithmeticShiftRight,
-                    value: args[0].clone(),
-                    amount: args[1].clone(),
-                }))
-            }
-            "sail_shiftleft" | "_shl_int" => {
-                Some(self.statement_builder.build(StatementKind::ShiftOperation {
-                    kind: ShiftOperationKind::LogicalShiftLeft,
-                    value: args[0].clone(),
-                    amount: args[1].clone(),
-                }))
-            }
-
-            "slice" => {
-                // uint64 n, uint64 start, uint64 len
-                Some(self.statement_builder.build(StatementKind::BitExtract {
-                    value: args[0].clone(),
-                    start: args[1].clone(),
-                    length: args[2].clone(),
-                }))
-            }
-
-            "plain_vector_access<o>"
-            | "plain_vector_access<RBRBINFType>"
-            | "plain_vector_access<RBRBSRCType>"
-            | "plain_vector_access<RBRBTGTType>"
-            | "plain_vector_access<RERRnFR_ElemType>"
-            | "plain_vector_access<B64>"
-            | "plain_vector_access<RPMEVTYPER_EL0_Type>" => {
-                Some(self.statement_builder.build(StatementKind::ReadElement {
-                    vector: args[0].clone(),
-                    index: args[1].clone(),
-                }))
-            }
-
-            "bitvector_access" => {
-                let length = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u64()),
-                    value: rudder::ConstantValue::UnsignedInteger(1),
-                });
-                let bitex = self.statement_builder.build(StatementKind::BitExtract {
-                    value: args[0].clone(),
-                    start: args[1].clone(),
-                    length,
-                });
-
-                Some(self.generate_cast(bitex, Rc::new(Type::u1())))
-            }
-
-            "bitvector_length" => {
-                assert!(matches!(*args[0].typ(), Type::Bundled { .. }));
-
-                Some(self.statement_builder.build(StatementKind::UnbundleLength {
-                    bundle: args[0].clone(),
-                }))
-            }
-
-            "update_fbits" => {
-                //     if ((bit & 1) == 1) {
-                //         return op | (bit << n);
-                //    } else {
-                //         return op & ~(bit << n);
-                //    }
-                let op = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
-                let n = args[1].clone();
-                let bit = self.statement_builder.build(StatementKind::Cast {
-                    kind: CastOperationKind::ZeroExtend,
-                    typ: Rc::new(Type::u64()),
-                    value: args[2].clone(),
-                });
-
-                // 1
-                let one = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u64()),
-                    value: rudder::ConstantValue::UnsignedInteger(1),
-                });
-
-                // (bit & 1)
-                let and = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::And,
-                        lhs: bit.clone(),
-                        rhs: one.clone(),
-                    });
-
-                //  (bit & 1) == 1
-                let condition = self
-                    .statement_builder
                     .build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareEqual,
-                        lhs: and,
-                        rhs: one,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }),
+            )
+        } else {
+            match name.as_ref() {
+                "%i64->%i" | "%i->%i64" => {
+                    Some(self.generate_cast(args[0].clone(), Rc::new(Type::s64())))
+                }
+                // todo: should probably be casts
+                "UInt0" | "SInt0" | "make_the_value" | "size_itself_int" => Some(args[0].clone()),
+                "subrange_bits" => {
+                    // end - start + 1
+                    let one = self.statement_builder.build(StatementKind::Constant {
+                        typ: args[1].typ(),
+                        value: rudder::ConstantValue::SignedInteger(1),
                     });
-
-                // bit << n
-                let shift = self.statement_builder.build(StatementKind::ShiftOperation {
-                    kind: ShiftOperationKind::LogicalShiftLeft,
-                    value: bit.clone(),
-                    amount: n,
-                });
-
-                // op | (bit << n)
-                let true_value = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Or,
-                        lhs: op.clone(),
-                        rhs: shift.clone(),
-                    });
-
-                // ~(bit << n)
-                let inverse = self.statement_builder.build(StatementKind::UnaryOperation {
-                    kind: rudder::UnaryOperationKind::Complement,
-                    value: shift,
-                });
-
-                // op & ~(bit << n)
-                let false_value = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::And,
-                        lhs: op,
-                        rhs: inverse,
-                    });
-
-                Some(self.statement_builder.build(StatementKind::Select {
-                    condition,
-                    true_value,
-                    false_value,
-                }))
-            }
-
-            "ZeroExtend0" | "sail_zero_extend" | "truncate" | "SignExtend0"
-            | "sail_sign_extend" => {
-                let length = args[1].clone();
-
-                let value = match name.as_ref() {
-                    "truncate" => {
-                        let one = self.statement_builder.build(StatementKind::Constant {
-                            typ: Rc::new(Type::u64()),
-                            value: rudder::ConstantValue::UnsignedInteger(1),
+                    let diff = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Sub,
+                            lhs: args[1].clone(),
+                            rhs: args[2].clone(),
                         });
-                        let cast_length = self.generate_cast(length.clone(), Rc::new(Type::u64()));
-                        let shift = self.statement_builder.build(StatementKind::ShiftOperation {
-                            kind: ShiftOperationKind::LogicalShiftLeft,
-                            value: one.clone(),
-                            amount: cast_length,
+                    let len = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Add,
+                            lhs: diff.clone(),
+                            rhs: one.clone(),
                         });
-                        let mask = self
-                            .statement_builder
+
+                    Some(self.statement_builder.build(StatementKind::BitExtract {
+                        value: args[0].clone(),
+                        start: args[2].clone(),
+                        length: len,
+                    }))
+                }
+                "eq_bits" | "eq_int" => Some(self.statement_builder.build(
+                    StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::CompareEqual,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    },
+                )),
+                "neq_bits" | "neq_any<ESecurityState%>" => Some(self.statement_builder.build(
+                    StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::CompareNotEqual,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    },
+                )),
+
+                // val add_atom : (%i, %i) -> %i
+                "add_atom" => {
+                    let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_signed()));
+                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_signed()));
+                    Some(
+                        self.statement_builder
                             .build(StatementKind::BinaryOperation {
-                                kind: BinaryOperationKind::Sub,
-                                lhs: shift,
-                                rhs: one,
-                            });
+                                kind: BinaryOperationKind::Add,
+                                lhs,
+                                rhs,
+                            }),
+                    )
+                }
 
-                        let cast_value = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+                // val add_bits : (%bv, %bv) -> %bv
+                "add_bits" => {
+                    let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                    Some(
+                        self.statement_builder
+                            .build(StatementKind::BinaryOperation {
+                                kind: BinaryOperationKind::Add,
+                                lhs,
+                                rhs,
+                            }),
+                    )
+                }
+
+                // val add_bits_int : (%bv, %i) -> %bv
+                "add_bits_int" => {
+                    let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                    Some(
+                        self.statement_builder
+                            .build(StatementKind::BinaryOperation {
+                                kind: BinaryOperationKind::Add,
+                                lhs,
+                                rhs,
+                            }),
+                    )
+                }
+
+                "sub_bits" | "sub_atom" => Some(self.statement_builder.build(
+                    StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Sub,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    },
+                )),
+                "mult_atom" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Multiply,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "tdiv_int" | "ediv_int" | "ediv_nat" => Some(self.statement_builder.build(
+                    StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Divide,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    },
+                )),
+
+                "emod_nat" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Modulo,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "negate_atom" => {
+                    Some(self.statement_builder.build(StatementKind::UnaryOperation {
+                        kind: UnaryOperationKind::Negate,
+                        value: args[0].clone(),
+                    }))
+                }
+                "lt_int" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::CompareLessThan,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "lteq_int" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::CompareLessThanOrEqual,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "gt_int" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::CompareGreaterThan,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "gteq_int" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::CompareGreaterThanOrEqual,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "not_vec" | "not_bool" => {
+                    Some(self.statement_builder.build(StatementKind::UnaryOperation {
+                        kind: rudder::UnaryOperationKind::Not,
+                        value: args[0].clone(),
+                    }))
+                }
+                "and_vec" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::And,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "xor_vec" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Xor,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+                "or_vec" => Some(
+                    self.statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Or,
+                            lhs: args[0].clone(),
+                            rhs: args[1].clone(),
+                        }),
+                ),
+
+                "sail_shiftright" | "_shr_int" => {
+                    Some(self.statement_builder.build(StatementKind::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftRight,
+                        value: args[0].clone(),
+                        amount: args[1].clone(),
+                    }))
+                }
+                "sail_arith_shiftright" => {
+                    Some(self.statement_builder.build(StatementKind::ShiftOperation {
+                        kind: ShiftOperationKind::ArithmeticShiftRight,
+                        value: args[0].clone(),
+                        amount: args[1].clone(),
+                    }))
+                }
+                "sail_shiftleft" | "_shl_int" | "_shl8" => {
+                    Some(self.statement_builder.build(StatementKind::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: args[0].clone(),
+                        amount: args[1].clone(),
+                    }))
+                }
+
+                "slice" => {
+                    // uint64 n, uint64 start, uint64 len
+                    Some(self.statement_builder.build(StatementKind::BitExtract {
+                        value: args[0].clone(),
+                        start: args[1].clone(),
+                        length: args[2].clone(),
+                    }))
+                }
+
+                "plain_vector_access<o>"
+                | "plain_vector_access<RBRBINFType>"
+                | "plain_vector_access<RBRBSRCType>"
+                | "plain_vector_access<RBRBTGTType>"
+                | "plain_vector_access<RERRnFR_ElemType>"
+                | "plain_vector_access<B64>"
+                | "plain_vector_access<RPMEVTYPER_EL0_Type>" => {
+                    Some(self.statement_builder.build(StatementKind::ReadElement {
+                        vector: args[0].clone(),
+                        index: args[1].clone(),
+                    }))
+                }
+
+                "bitvector_access" => {
+                    let length = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(1),
+                    });
+                    let bitex = self.statement_builder.build(StatementKind::BitExtract {
+                        value: args[0].clone(),
+                        start: args[1].clone(),
+                        length,
+                    });
+
+                    Some(self.generate_cast(bitex, Rc::new(Type::u1())))
+                }
+
+                "bitvector_length" => {
+                    assert!(matches!(*args[0].typ(), Type::Bundled { .. }));
+
+                    Some(self.statement_builder.build(StatementKind::UnbundleLength {
+                        bundle: args[0].clone(),
+                    }))
+                }
+
+                "update_fbits" => {
+                    //     if ((bit & 1) == 1) {
+                    //         return op | (bit << n);
+                    //    } else {
+                    //         return op & ~(bit << n);
+                    //    }
+                    let op = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+                    let n = args[1].clone();
+                    let bit = self.statement_builder.build(StatementKind::Cast {
+                        kind: CastOperationKind::ZeroExtend,
+                        typ: Rc::new(Type::u64()),
+                        value: args[2].clone(),
+                    });
+
+                    // 1
+                    let one = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(1),
+                    });
+
+                    // (bit & 1)
+                    let and = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::And,
+                            lhs: bit.clone(),
+                            rhs: one.clone(),
+                        });
+
+                    //  (bit & 1) == 1
+                    let condition = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::CompareEqual,
+                            lhs: and,
+                            rhs: one,
+                        });
+
+                    // bit << n
+                    let shift = self.statement_builder.build(StatementKind::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: bit.clone(),
+                        amount: n,
+                    });
+
+                    // op | (bit << n)
+                    let true_value = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Or,
+                            lhs: op.clone(),
+                            rhs: shift.clone(),
+                        });
+
+                    // ~(bit << n)
+                    let inverse = self.statement_builder.build(StatementKind::UnaryOperation {
+                        kind: rudder::UnaryOperationKind::Complement,
+                        value: shift,
+                    });
+
+                    // op & ~(bit << n)
+                    let false_value =
                         self.statement_builder
                             .build(StatementKind::BinaryOperation {
                                 kind: BinaryOperationKind::And,
-                                lhs: mask,
-                                rhs: cast_value,
-                            })
-                    }
-                    // todo: move this to codegen
-                    "SignExtend0" | "sail_sign_extend" => {
-                        let value = args[0].clone();
-                        let target_length = args[1].clone();
-
-                        let sixtyfour = self.statement_builder.build(StatementKind::Constant {
-                            typ: Rc::new(Type::u8()),
-                            value: rudder::ConstantValue::UnsignedInteger(64),
-                        });
-
-                        let source_length =
-                            self.statement_builder.build(StatementKind::UnbundleLength {
-                                bundle: value.clone(),
+                                lhs: op,
+                                rhs: inverse,
                             });
 
-                        let shift_amount =
+                    Some(self.statement_builder.build(StatementKind::Select {
+                        condition,
+                        true_value,
+                        false_value,
+                    }))
+                }
+
+                "ZeroExtend0" | "sail_zero_extend" | "truncate" | "SignExtend0"
+                | "sail_sign_extend" => {
+                    let length = args[1].clone();
+
+                    let value = match name.as_ref() {
+                        "truncate" => {
+                            let one = self.statement_builder.build(StatementKind::Constant {
+                                typ: Rc::new(Type::u64()),
+                                value: rudder::ConstantValue::UnsignedInteger(1),
+                            });
+                            let cast_length =
+                                self.generate_cast(length.clone(), Rc::new(Type::u64()));
+                            let shift =
+                                self.statement_builder.build(StatementKind::ShiftOperation {
+                                    kind: ShiftOperationKind::LogicalShiftLeft,
+                                    value: one.clone(),
+                                    amount: cast_length,
+                                });
+                            let mask =
+                                self.statement_builder
+                                    .build(StatementKind::BinaryOperation {
+                                        kind: BinaryOperationKind::Sub,
+                                        lhs: shift,
+                                        rhs: one,
+                                    });
+
+                            let cast_value =
+                                self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
                             self.statement_builder
                                 .build(StatementKind::BinaryOperation {
-                                    kind: BinaryOperationKind::Sub,
-                                    lhs: sixtyfour.clone(),
-                                    rhs: source_length,
+                                    kind: BinaryOperationKind::And,
+                                    lhs: mask,
+                                    rhs: cast_value,
+                                })
+                        }
+                        // todo: move this to codegen
+                        "SignExtend0" | "sail_sign_extend" => {
+                            let value = args[0].clone();
+                            let target_length = args[1].clone();
+
+                            let sixtyfour = self.statement_builder.build(StatementKind::Constant {
+                                typ: Rc::new(Type::u8()),
+                                value: rudder::ConstantValue::UnsignedInteger(64),
+                            });
+
+                            let source_length =
+                                self.statement_builder.build(StatementKind::UnbundleLength {
+                                    bundle: value.clone(),
                                 });
 
-                        let shift_amount_cast =
-                            self.generate_cast(shift_amount, Rc::new(Type::s64()));
+                            let shift_amount =
+                                self.statement_builder
+                                    .build(StatementKind::BinaryOperation {
+                                        kind: BinaryOperationKind::Sub,
+                                        lhs: sixtyfour.clone(),
+                                        rhs: source_length,
+                                    });
 
-                        let shift_amount_bundle =
+                            let shift_amount_cast =
+                                self.generate_cast(shift_amount, Rc::new(Type::s64()));
+
+                            let shift_amount_bundle =
+                                self.statement_builder.build(StatementKind::Bundle {
+                                    value: shift_amount_cast,
+                                    length: sixtyfour,
+                                });
+
+                            let value_bundle = self.generate_cast(
+                                value,
+                                Rc::new(Type::Bundled {
+                                    value: Rc::new(Type::s64()),
+                                    len: Rc::new(Type::u8()),
+                                }),
+                            );
+
+                            // shift left up to top
+                            let left_shift =
+                                self.statement_builder.build(StatementKind::ShiftOperation {
+                                    kind: ShiftOperationKind::LogicalShiftLeft,
+                                    value: value_bundle,
+                                    amount: shift_amount_bundle.clone(),
+                                });
+
+                            // shift right to target length
+                            let right_shift =
+                                self.statement_builder.build(StatementKind::ShiftOperation {
+                                    kind: ShiftOperationKind::ArithmeticShiftRight,
+                                    value: left_shift,
+                                    amount: shift_amount_bundle,
+                                });
+
+                            // explicitly no masking to length
+
                             self.statement_builder.build(StatementKind::Bundle {
-                                value: shift_amount_cast,
-                                length: sixtyfour,
-                            });
+                                value: right_shift,
+                                length: target_length,
+                            })
+                        }
+                        _ => args[0].clone(),
+                    };
 
-                        let value_bundle = self.generate_cast(
-                            value,
-                            Rc::new(Type::Bundled {
-                                value: Rc::new(Type::s64()),
-                                len: Rc::new(Type::u8()),
-                            }),
-                        );
+                    let value_cast = self.generate_cast(value, Rc::new(Type::u64()));
+                    let length_cast = self.generate_cast(length, Rc::new(Type::u8()));
 
-                        // shift left up to top
-                        let left_shift =
-                            self.statement_builder.build(StatementKind::ShiftOperation {
-                                kind: ShiftOperationKind::LogicalShiftLeft,
-                                value: value_bundle,
-                                amount: shift_amount_bundle.clone(),
-                            });
-
-                        // shift right to target length
-                        let right_shift =
-                            self.statement_builder.build(StatementKind::ShiftOperation {
-                                kind: ShiftOperationKind::ArithmeticShiftRight,
-                                value: left_shift,
-                                amount: shift_amount_bundle,
-                            });
-
-                        // explicitly no masking to length
-
-                        self.statement_builder.build(StatementKind::Bundle {
-                            value: right_shift,
-                            length: target_length,
-                        })
-                    }
-                    _ => args[0].clone(),
-                };
-
-                let value_cast = self.generate_cast(value, Rc::new(Type::u64()));
-                let length_cast = self.generate_cast(length, Rc::new(Type::u8()));
-
-                let bundle = self.statement_builder.build(StatementKind::Bundle {
-                    value: value_cast,
-                    length: length_cast,
-                });
-
-                Some(bundle)
-            }
-
-            "sail_zeros" => {
-                let length = args[0].clone();
-                let value = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u64()),
-                    value: rudder::ConstantValue::UnsignedInteger(0),
-                });
-
-                let length_cast = self.generate_cast(length, Rc::new(Type::u8()));
-
-                let bundle = self.statement_builder.build(StatementKind::Bundle {
-                    value,
-                    length: length_cast,
-                });
-
-                Some(bundle)
-            }
-
-            "sail_assert" => Some(self.statement_builder.build(StatementKind::Assert {
-                condition: args[0].clone(),
-            })),
-
-            "write_gpr_from_vector" => {
-                // todo assert args[2] is always "GPRs"
-                // assuming GPRs are contiguoous
-
-                // %i argument to unsigned
-                let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
-
-                let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
-
-                let base = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u64()),
-                    value: rudder::ConstantValue::UnsignedInteger(base),
-                });
-
-                let eight = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u64()),
-                    value: rudder::ConstantValue::UnsignedInteger(8),
-                });
-
-                let offset = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Multiply,
-                        lhs: n,
-                        rhs: eight,
+                    let bundle = self.statement_builder.build(StatementKind::Bundle {
+                        value: value_cast,
+                        length: length_cast,
                     });
 
-                let offset = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs: base,
-                        rhs: offset,
-                    });
-
-                Some(self.statement_builder.build(StatementKind::WriteRegister {
-                    offset,
-                    value: args[1].clone(),
-                }))
-            }
-            "read_gpr_from_vector" => {
-                // todo assert args[1] is always "GPRs"
-                // assuming GPRs are contiguoous
-
-                // %i argument to unsigned
-                let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
-
-                let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
-
-                let base = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u64()),
-                    value: rudder::ConstantValue::UnsignedInteger(base),
-                });
-
-                let eight = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u64()),
-                    value: rudder::ConstantValue::UnsignedInteger(8),
-                });
-
-                let offset = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Multiply,
-                        lhs: n,
-                        rhs: eight,
-                    });
-
-                let offset = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs: base,
-                        rhs: offset,
-                    });
-
-                Some(self.statement_builder.build(StatementKind::ReadRegister {
-                    typ: Rc::new(Type::u64()),
-                    offset,
-                }))
-            }
-
-            "bitvector_concat" => {
-                let lhs = args[0].clone();
-                let rhs = args[1].clone();
-
-                match (&*lhs.typ(), &*rhs.typ()) {
-                    (Type::Bundled { .. }, Type::Bundled { .. }) => {
-                        let l_value = self.statement_builder.build(StatementKind::UnbundleValue {
-                            bundle: lhs.clone(),
-                        });
-                        let l_length = self
-                            .statement_builder
-                            .build(StatementKind::UnbundleLength { bundle: lhs });
-                        let r_value = self.statement_builder.build(StatementKind::UnbundleValue {
-                            bundle: rhs.clone(),
-                        });
-                        let r_length = self
-                            .statement_builder
-                            .build(StatementKind::UnbundleLength { bundle: rhs });
-
-                        let shift = self.statement_builder.build(StatementKind::ShiftOperation {
-                            kind: ShiftOperationKind::LogicalShiftLeft,
-                            value: l_value,
-                            amount: r_length.clone(),
-                        });
-
-                        let value = self
-                            .statement_builder
-                            .build(StatementKind::BinaryOperation {
-                                kind: BinaryOperationKind::Or,
-                                lhs: shift,
-                                rhs: r_value,
-                            });
-                        let length = self
-                            .statement_builder
-                            .build(StatementKind::BinaryOperation {
-                                kind: BinaryOperationKind::Add,
-                                lhs: l_length,
-                                rhs: r_length,
-                            });
-
-                        // lhs.value << rhs.len | rhs.value
-                        // lhs.len + rhs.len
-                        Some(
-                            self.statement_builder
-                                .build(StatementKind::Bundle { value, length }),
-                        )
-                    }
-                    _ => todo!(),
+                    Some(bundle)
                 }
-            }
-            "get_slice_int" => Some(self.statement_builder.build(StatementKind::BitExtract {
-                value: args[1].clone(),
-                start: args[2].clone(),
-                length: args[0].clone(),
-            })),
 
-            "set_slice_bits" => {
-                //val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv
-                // len, slen, x, pos, y
-                let _len = args[0].clone();
-                let slen = args[1].clone();
-                let destination = args[2].clone();
-                let start = args[3].clone();
-                let source = args[4].clone();
-
-                // destination[start..] = source[0..source.len()]
-
-                Some(generate_set_slice(
-                    &mut self.statement_builder,
-                    destination,
-                    source,
-                    slen,
-                    start,
-                ))
-            }
-
-            "update_subrange_bits" => {
-                let destination = args[0].clone();
-                let end = args[1].clone();
-                let start = args[2].clone();
-                let source = args[3].clone();
-
-                // copy source[0..(end - start + 1)] into dest[start..(end + 1)]
-
-                // let length = end - start
-                let source_length = self
-                    .statement_builder
-                    .build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Sub,
-                        lhs: end,
-                        rhs: start.clone(),
+                "sail_zeros" => {
+                    let length = args[0].clone();
+                    let value = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(0),
                     });
 
-                Some(generate_set_slice(
-                    &mut self.statement_builder,
-                    destination,
-                    source,
-                    source_length,
-                    start,
-                ))
+                    let length_cast = self.generate_cast(length, Rc::new(Type::u8()));
+
+                    let bundle = self.statement_builder.build(StatementKind::Bundle {
+                        value,
+                        length: length_cast,
+                    });
+
+                    Some(bundle)
+                }
+
+                "sail_assert" => Some(self.statement_builder.build(StatementKind::Assert {
+                    condition: args[0].clone(),
+                })),
+
+                "write_gpr_from_vector" => {
+                    // todo assert args[2] is always "GPRs"
+                    // assuming GPRs are contiguoous
+
+                    // %i argument to unsigned
+                    let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+
+                    let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
+
+                    let base = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(base),
+                    });
+
+                    let eight = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(8),
+                    });
+
+                    let offset = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Multiply,
+                            lhs: n,
+                            rhs: eight,
+                        });
+
+                    let offset = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Add,
+                            lhs: base,
+                            rhs: offset,
+                        });
+
+                    Some(self.statement_builder.build(StatementKind::WriteRegister {
+                        offset,
+                        value: args[1].clone(),
+                    }))
+                }
+                "read_gpr_from_vector" => {
+                    // todo assert args[1] is always "GPRs"
+                    // assuming GPRs are contiguoous
+
+                    // %i argument to unsigned
+                    let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+
+                    let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
+
+                    let base = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(base),
+                    });
+
+                    let eight = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: rudder::ConstantValue::UnsignedInteger(8),
+                    });
+
+                    let offset = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Multiply,
+                            lhs: n,
+                            rhs: eight,
+                        });
+
+                    let offset = self
+                        .statement_builder
+                        .build(StatementKind::BinaryOperation {
+                            kind: BinaryOperationKind::Add,
+                            lhs: base,
+                            rhs: offset,
+                        });
+
+                    Some(self.statement_builder.build(StatementKind::ReadRegister {
+                        typ: Rc::new(Type::u64()),
+                        offset,
+                    }))
+                }
+
+                "bitvector_concat" => {
+                    let lhs = args[0].clone();
+                    let rhs = args[1].clone();
+
+                    match (&*lhs.typ(), &*rhs.typ()) {
+                        (Type::Bundled { .. }, Type::Bundled { .. }) => {
+                            let l_value =
+                                self.statement_builder.build(StatementKind::UnbundleValue {
+                                    bundle: lhs.clone(),
+                                });
+                            let l_length = self
+                                .statement_builder
+                                .build(StatementKind::UnbundleLength { bundle: lhs });
+                            let r_value =
+                                self.statement_builder.build(StatementKind::UnbundleValue {
+                                    bundle: rhs.clone(),
+                                });
+                            let r_length = self
+                                .statement_builder
+                                .build(StatementKind::UnbundleLength { bundle: rhs });
+
+                            let shift =
+                                self.statement_builder.build(StatementKind::ShiftOperation {
+                                    kind: ShiftOperationKind::LogicalShiftLeft,
+                                    value: l_value,
+                                    amount: r_length.clone(),
+                                });
+
+                            let value =
+                                self.statement_builder
+                                    .build(StatementKind::BinaryOperation {
+                                        kind: BinaryOperationKind::Or,
+                                        lhs: shift,
+                                        rhs: r_value,
+                                    });
+                            let length =
+                                self.statement_builder
+                                    .build(StatementKind::BinaryOperation {
+                                        kind: BinaryOperationKind::Add,
+                                        lhs: l_length,
+                                        rhs: r_length,
+                                    });
+
+                            // lhs.value << rhs.len | rhs.value
+                            // lhs.len + rhs.len
+                            Some(
+                                self.statement_builder
+                                    .build(StatementKind::Bundle { value, length }),
+                            )
+                        }
+                        _ => todo!(),
+                    }
+                }
+                "get_slice_int" => Some(self.statement_builder.build(StatementKind::BitExtract {
+                    value: args[1].clone(),
+                    start: args[2].clone(),
+                    length: args[0].clone(),
+                })),
+
+                "set_slice_bits" => {
+                    //val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv
+                    // len, slen, x, pos, y
+                    let _len = args[0].clone();
+                    let slen = args[1].clone();
+                    let destination = args[2].clone();
+                    let start = args[3].clone();
+                    let source = args[4].clone();
+
+                    // destination[start..] = source[0..source.len()]
+
+                    Some(generate_set_slice(
+                        &mut self.statement_builder,
+                        destination,
+                        source,
+                        slen,
+                        start,
+                    ))
+                }
+
+                "update_subrange_bits" => {
+                    let destination = args[0].clone();
+                    let end = args[1].clone();
+                    let start = args[2].clone();
+                    let source = args[3].clone();
+
+                    // copy source[0..(end - start + 1)] into dest[start..(end + 1)]
+
+                    // let length = end - start
+                    let source_length =
+                        self.statement_builder
+                            .build(StatementKind::BinaryOperation {
+                                kind: BinaryOperationKind::Sub,
+                                lhs: end,
+                                rhs: start.clone(),
+                            });
+
+                    Some(generate_set_slice(
+                        &mut self.statement_builder,
+                        destination,
+                        source,
+                        source_length,
+                        start,
+                    ))
+                }
+
+                "sail_branch_announce" => {
+                    Some(self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::unit()),
+                        value: rudder::ConstantValue::Unit,
+                    }))
+                }
+
+                "replicate_bits" => {
+                    // let bits = args[0].clone();
+
+                    // let bits_length = self
+                    //     .statement_builder
+                    //     .build(StatementKind::UnbundleLength { bundle: bits });
+
+                    // let count = args[1].clone();
+
+                    // // allowed count values as constant statements
+                    // let allowed_counts = [1,2,4,8,16,32,64].into_iter().map(|count|
+                    // self.statement_builder.build(StatementKind::Constant { typ:
+                    // Rc::new(Type::u64()), value: ConstantValue::UnsignedInteger(count)
+                    // })).collect::<Vec<_>>();
+
+                    // let allowed_count_compares = allowed_counts.iter().cloned().map(|constant|
+                    // self.statement_builder.build(StatementKind::BinaryOperation { kind:
+                    // BinaryOperationKind::CompareEqual, lhs: count.clone(), rhs: constant }));
+
+                    // self.statement_builder
+                    //     .build(StatementKind::Assert { condition: () });
+
+                    // self.statement_builder.build(StatementKind::Select {
+                    //     condition: is_one,
+                    //     true_value: replicate_1,
+                    //     false_value: panic,
+                    // });
+                    // self.statement_builder.build(StatementKind::Select {
+                    //     condition: is_two,
+                    //     true_value: replicate_2,
+                    //     false_value: (),
+                    // });
+                    // self.statement_builder.build(StatementKind::Select {
+                    //     condition: is_four,
+                    //     true_value: replicate_4,
+                    //     false_value: (),
+                    // });
+                    // self.statement_builder.build(StatementKind::Select {
+                    //     condition: is_eight,
+                    //     true_value: replicate_8,
+                    //     false_value: ,
+                    // });
+
+                    // // bundle length = bits_length * count
+                    let count = self.generate_cast(args[1].clone(), Rc::new(Type::u64()));
+                    Some(self.statement_builder.build(StatementKind::Call {
+                        target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
+                        args: vec![args[0].clone(), count],
+                        tail: false,
+                    }))
+                }
+
+                _ => None,
             }
-
-            "sail_branch_announce" => Some(self.statement_builder.build(StatementKind::Constant {
-                typ: Rc::new(Type::unit()),
-                value: rudder::ConstantValue::Unit,
-            })),
-
-            "replicate_bits" => {
-                // let bits = args[0].clone();
-
-                // let bits_length = self
-                //     .statement_builder
-                //     .build(StatementKind::UnbundleLength { bundle: bits });
-
-                // let count = args[1].clone();
-
-                // // allowed count values as constant statements
-                // let allowed_counts = [1,2,4,8,16,32,64].into_iter().map(|count|
-                // self.statement_builder.build(StatementKind::Constant { typ:
-                // Rc::new(Type::u64()), value: ConstantValue::UnsignedInteger(count)
-                // })).collect::<Vec<_>>();
-
-                // let allowed_count_compares = allowed_counts.iter().cloned().map(|constant|
-                // self.statement_builder.build(StatementKind::BinaryOperation { kind:
-                // BinaryOperationKind::CompareEqual, lhs: count.clone(), rhs: constant }));
-
-                // self.statement_builder
-                //     .build(StatementKind::Assert { condition: () });
-
-                // self.statement_builder.build(StatementKind::Select {
-                //     condition: is_one,
-                //     true_value: replicate_1,
-                //     false_value: panic,
-                // });
-                // self.statement_builder.build(StatementKind::Select {
-                //     condition: is_two,
-                //     true_value: replicate_2,
-                //     false_value: (),
-                // });
-                // self.statement_builder.build(StatementKind::Select {
-                //     condition: is_four,
-                //     true_value: replicate_4,
-                //     false_value: (),
-                // });
-                // self.statement_builder.build(StatementKind::Select {
-                //     condition: is_eight,
-                //     true_value: replicate_8,
-                //     false_value: ,
-                // });
-
-                // // bundle length = bits_length * count
-                let count = self.generate_cast(args[1].clone(), Rc::new(Type::u64()));
-                Some(self.statement_builder.build(StatementKind::Call {
-                    target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
-                    args: vec![args[0].clone(), count],
-                    tail: false,
-                }))
-            }
-
-            _ => None,
         }
     }
 

@@ -514,6 +514,8 @@ pub enum Value {
 }
 
 impl Value {
+    /// Attempts to evaluate the value of a value as a boolean, returning None
+    /// on failure
     pub fn evaluate_bool(&self, ctx: &ControlFlowBlock) -> Option<bool> {
         match &self {
             Self::Identifier(identifier) => {
@@ -542,10 +544,7 @@ impl Value {
                     return None;
                 }
 
-                // variable should be assigned to exactly once
-                assert!(defs.len() == 1);
-
-                let value = defs[0].borrow();
+                let value = defs.last().unwrap().borrow();
                 value.evaluate_bool(ctx)
             }
             Self::Literal(literal) => match &*literal.borrow() {

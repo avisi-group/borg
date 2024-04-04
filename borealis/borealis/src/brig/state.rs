@@ -1,5 +1,5 @@
 use {
-    crate::{brig::functions::codegen_ident, rudder::Context},
+    crate::{brig::codegen_interpreter::codegen_ident, rudder::Context},
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
 };

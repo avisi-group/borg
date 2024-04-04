@@ -1,5 +1,4 @@
-use core::panic;
-use std::rc::Rc;
+use {core::panic, std::rc::Rc};
 
 use {common::HashMap, log::trace};
 
@@ -151,6 +150,11 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
                 kind: BinaryOperationKind::Add,
                 lhs,
                 rhs,
+            }
+            | StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::Sub,
+                lhs,
+                rhs,
             } => {
                 match (lhs.kind(), rhs.kind()) {
                     (
@@ -180,7 +184,9 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
 
                                 trace!("CANDIDATE! f={}, block={}", f.name(), block.name());
 
-                                // if lhs and rhs are both from "bundle" instruction, and they both have constant lengths that are the same, then we have a candidate.
+                                // if lhs and rhs are both from "bundle" instruction, and they both
+                                // have constant lengths that are the same, then we have a
+                                // candidate.
                                 trace!("lhs={} rhs={}", lhs, rhs);
 
                                 // replace lhs with bundle input, possibly casting.  same for rhs
@@ -205,7 +211,8 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
                                 }
 
                                 // replace uses of related unbundle-value with this statement
-                                // replace uses of related unbundle-length with constant value of original bundle length
+                                // replace uses of related unbundle-length with constant value of
+                                // original bundle length
 
                                 changed = true;
                             }
