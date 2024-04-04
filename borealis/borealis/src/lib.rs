@@ -12,7 +12,7 @@ use {
     log::trace,
     rkyv::Deserialize,
     sailrs::{jib_ast::Definition, types::ListVec},
-    std::{fs::File, io::Write, path::Path},
+    std::{fs::File, path::Path},
 };
 
 pub mod boom;
@@ -20,18 +20,7 @@ pub mod brig;
 pub mod rudder;
 
 pub fn run<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O, standalone: bool) {
-    let jib = load_model(input);
-
-    let tokens = sail_to_brig(jib.into_iter(), standalone);
-
-    let syntax_tree = syn::parse_file(&tokens.to_string()).unwrap();
-    let formatted = prettyplease::unparse(&syntax_tree);
-    let fixed_comments = formatted.replace("///", "//");
-
-    File::create(output)
-        .unwrap()
-        .write_all(fixed_comments.as_bytes())
-        .unwrap();
+    sail_to_brig(load_model(input).into_iter(), output, standalone);
 }
 
 /// Deserializes an AST from an archive.

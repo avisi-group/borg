@@ -1,5 +1,5 @@
 use {
-    crate::{brig::codegen_interpreter::codegen_ident, rudder::Context},
+    crate::{brig::codegen_ident, rudder::Context},
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
 };
@@ -18,7 +18,7 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
                     .to_ascii_uppercase()
             );
             let offset = Literal::usize_unsuffixed(offset);
-            quote!(const #name: isize = #offset;)
+            quote!(pub const #name: isize = #offset;)
         })
         .collect::<TokenStream>();
 

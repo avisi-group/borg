@@ -4,10 +4,13 @@
 //! quotes
 
 use {
-    crate::rudder::{
-        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
-        PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind, Symbol,
-        Type, UnaryOperationKind,
+    crate::{
+        brig::{codegen_ident, codegen_member, codegen_type},
+        rudder::{
+            BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
+            PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind,
+            Symbol, Type, UnaryOperationKind,
+        },
     },
     common::{intern::InternedString, HashSet},
     log::warn,
@@ -22,109 +25,47 @@ use {
     },
 };
 
-pub fn codegen_functions(rudder: Context, entrypoint: InternedString) -> TokenStream {
+pub fn codegen_functions(
+    rudder: &Context,
+    entrypoint: InternedString,
+) -> Vec<(InternedString, TokenStream)> {
     rudder.update_names();
 
     let fn_names = get_functions_to_codegen(&rudder, entrypoint);
 
     let rudder_fns = rudder.get_functions();
 
-    let fns: TokenStream = fn_names
+    let mut fns: Vec<(InternedString, TokenStream)> = fn_names
         .into_iter()
         .map(|k| (k, rudder_fns.get(&k).unwrap()))
         .map(|(name, function)| {
-            let name = codegen_ident(name);
+            let name_ident = codegen_ident(name);
             let (return_type, parameters) = function.signature();
             let return_type = codegen_type(return_type);
             let parameters = codegen_parameters(parameters);
             let body = codegen_body(function.clone());
 
-            quote! {
-                fn #name<T: Tracer>(#parameters) -> #return_type {
-                    #body
-                }
-            }
-        })
-        .collect();
-
-    let structs: TokenStream = rudder
-        .get_structs()
-        .into_iter()
-        .map(|typ| {
-            let ident = codegen_type(typ.clone());
-
-            let Type::Composite(fields) = typ.borrow() else {
-                panic!("struct must be composite type");
-            };
-
-            let fields: TokenStream = fields
-                .iter()
-                .enumerate()
-                .map(|(i, typ)| {
-                    let name = codegen_member(i);
-                    let typ = codegen_type(typ.clone());
-                    quote!(#name: #typ,)
-                })
-                .collect();
-
-            quote! {
-                #[derive(Default, Debug, Clone, Copy)]
-                struct #ident {
-                    #fields
-                }
-            }
-        })
-        .collect();
-
-    let unions: TokenStream = rudder
-        .get_unions()
-        .into_iter()
-        .map(|typ| {
-            let ident = codegen_type(typ.clone());
-
-            let Type::Composite(fields) = typ.borrow() else {
-                panic!("union must be composite type");
-            };
-
-            let variants: TokenStream = fields
-                .iter()
-                .enumerate()
-                .map(|(i, typ)| {
-                    let name = codegen_member(i);
-                    let typ = codegen_type(typ.clone());
-                    quote!(#name(#typ),)
-                })
-                .collect();
-
-            quote! {
-                #[derive(Debug, Clone, Copy)]
-                enum #ident {
-                    #variants
-                }
-
-                impl Default for #ident {
-                    fn default() -> Self {
-                        Self::_0(Default::default())
+            (
+                name,
+                quote! {
+                    pub fn #name_ident<T: Tracer>(#parameters) -> #return_type {
+                        #body
                     }
-                }
-            }
+                },
+            )
         })
         .collect();
 
-    let entrypoint = codegen_ident(entrypoint);
-    let entrypoint = quote!(#entrypoint(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value););
+    let entrypoint_ident = codegen_ident(entrypoint);
+    let entrypoint_fn_call = quote!(#entrypoint_ident(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value););
 
-    quote! {
-        #structs
-
-        #unions
-
+    fns.push((entrypoint, quote! {
         fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
             // reset SEE
             // todo: for the love of god make this not break if registers are regenerated
             state.write_register(REG_SEE, 0u64);
 
-            #entrypoint
+            #entrypoint_fn_call
 
             // increment PC if no branch was taken
             let branch_taken = state.read_register::<bool>(REG_U__BRANCHTAKEN);
@@ -138,9 +79,9 @@ pub fn codegen_functions(rudder: Context, entrypoint: InternedString) -> TokenSt
 
             ExecuteResult::Ok
         }
+    }));
 
-        #fns
-    }
+    fns
 }
 
 fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
@@ -154,73 +95,6 @@ fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
 
     quote! {
         #(#parameters),*
-    }
-}
-
-fn promote_width(width: usize) -> usize {
-    match width {
-        0 => 0,
-        1..=8 => 8,
-        9..=16 => 16,
-        17..=32 => 32,
-        33..=64 => 64,
-        65..=128 => 128,
-        width => {
-            warn!("unsupported width: {width}");
-            64
-        }
-    }
-}
-
-pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
-    match &*typ {
-        Type::Primitive(typ) => {
-            if typ.type_class() == PrimitiveTypeClass::UnsignedInteger && typ.width() == 1 {
-                return quote!(bool);
-            }
-
-            let width = promote_width(typ.width());
-
-            let rust_type = match typ.type_class() {
-                PrimitiveTypeClass::Void => return quote!(()),
-                PrimitiveTypeClass::Unit => return quote!(()),
-                PrimitiveTypeClass::UnsignedInteger => {
-                    format_ident!("u{}", width)
-                }
-                PrimitiveTypeClass::SignedInteger => {
-                    format_ident!("i{}", width)
-                }
-                PrimitiveTypeClass::FloatingPoint => {
-                    format_ident!("f{}", width)
-                }
-            };
-
-            quote!(#rust_type)
-        }
-        Type::Composite(t) => {
-            let mut hasher = DefaultHasher::new();
-            t.hash(&mut hasher);
-            let hashed = format_ident!("CompositeType{:x}", hasher.finish());
-            quote! {#hashed}
-        }
-        Type::Vector {
-            element_count,
-            element_type,
-        } => {
-            let element_type = codegen_type(element_type.clone());
-
-            if *element_count == 0 {
-                quote!(alloc::vec::Vec<#element_type>)
-            } else {
-                let count = quote!(#element_count);
-                quote!([#element_type; #count])
-            }
-        }
-        Type::Bundled { value, len } => {
-            let value_type = codegen_type(value.clone());
-            let len_type = codegen_type(len.clone());
-            quote!(Bundle<#value_type, #len_type>)
-        }
     }
 }
 
@@ -827,42 +701,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             #value;
         }
     }
-}
-
-fn codegen_member(idx: usize) -> Ident {
-    Ident::new(&format!("_{idx}"), Span::call_site())
-}
-
-pub fn codegen_ident(input: InternedString) -> Ident {
-    static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
-
-    let s = input.as_ref();
-
-    if s == "main" {
-        return Ident::new("model_main", Span::call_site());
-    }
-
-    let mut buf = String::with_capacity(s.len());
-
-    for ch in s.chars() {
-        match ch {
-            '%' => buf.push_str("_pcnt_"),
-            '&' => buf.push_str("_ref_"),
-            '?' => buf.push_str("_unknown_"),
-            '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' | '\'' => buf.push('_'),
-            _ => buf.push(ch),
-        }
-    }
-
-    if buf.starts_with('_') {
-        buf = "u".to_owned() + &buf;
-    }
-
-    if !VALIDATOR.is_match(&buf) {
-        panic!("identifier {buf:?} not normalized even after normalizing");
-    }
-
-    Ident::new(&buf, Span::call_site())
 }
 
 fn get_functions_to_codegen(rudder: &Context, entrypoint: InternedString) -> Vec<InternedString> {

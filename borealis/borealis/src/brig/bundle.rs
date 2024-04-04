@@ -3,13 +3,13 @@ use {proc_macro2::TokenStream, quote::quote};
 pub fn codegen_bundle() -> TokenStream {
     quote! {
         #[derive(Default, Clone, Copy, Debug)]
-        struct Bundle<V, L> {
-            value: V,
-            length: L,
+        pub struct Bundle<V, L> {
+            pub value: V,
+            pub length: L,
         }
 
         impl<V, L> Bundle<V, L> where core::num::Wrapping<V>: core::ops::Add<Output = core::num::Wrapping<V>> {
-            fn wrapping_add(self, rhs: Self) -> Self {
+            pub fn wrapping_add(self, rhs: Self) -> Self {
                self + rhs
             }
         }
