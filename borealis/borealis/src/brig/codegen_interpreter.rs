@@ -378,7 +378,38 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::ReadMemory { .. } => quote!(todo!("read-mem")),
-        StatementKind::WriteMemory { .. } => quote!(todo!("write-mem")),
+        StatementKind::WriteMemory { offset, value } => {
+            let offset = get_ident(&offset);
+
+            // find size of value, either bundle.length or in type
+
+            // emit match on this length to create mut pointer
+
+            let (length, value) = match &*value.typ() {
+                Type::Primitive(PrimitiveType {
+                    element_width_in_bits,
+                    ..
+                }) => {
+                    let value = get_ident(&value);
+                    (quote!(#element_width_in_bits), quote!(#value))
+                }
+                Type::Bundled { .. } => {
+                    let value = get_ident(&value);
+                    (quote!(#value.length), quote!(#value.value))
+                }
+                _ => todo!(),
+            };
+
+            quote! {
+                match #length {
+                    8 => unsafe { *(#offset as *mut u8) = #value as u8; },
+                    16 => unsafe { *(#offset as *mut u16) = #value as u16; },
+                    32 => unsafe { *(#offset as *mut u32) = #value as u32; },
+                    64 => unsafe { *(#offset as *mut u64) = #value as u64; },
+                    _ => panic!("unsupported length")
+                }
+            }
+        }
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
@@ -629,7 +660,69 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 )
             }
         }
-        StatementKind::BitInsert { .. } => quote!(todo!("bitins")),
+        StatementKind::BitInsert {
+            original_value,
+            insert_value,
+            start,
+            length,
+        } => {
+            if let Type::Bundled {
+                value: bundle_value_type,
+                ..
+            } = &*original_value.typ()
+            {
+                let length = if let Type::Bundled { .. } = &*length.typ() {
+                    let length = get_ident(&length);
+                    quote!(#length.value as u32)
+                } else {
+                    let length = get_ident(&length);
+                    quote!(#length as u32)
+                };
+
+                let mask_bit = match &**bundle_value_type {
+                    Type::Primitive(PrimitiveType {
+                        tc,
+                        element_width_in_bits,
+                    }) => {
+                        assert!(*element_width_in_bits == 64);
+
+                        match tc {
+                            PrimitiveTypeClass::UnsignedInteger => quote!(1u64),
+                            PrimitiveTypeClass::SignedInteger => quote!(1i64),
+                            _ => panic!("non integer bundle value type"),
+                        }
+                    }
+                    _ => panic!("non primitive bundle value type"),
+                };
+
+                let original_value = get_ident(&original_value);
+                let insert_value = get_ident(&insert_value);
+                let start = get_ident(&start);
+
+                quote! {
+                    {
+                        let mask = !Bundle { value: ((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #original_value.length };
+                        (#original_value & mask) | (#insert_value << #start)
+                    }
+                }
+            } else {
+                let typ = codegen_type(original_value.typ());
+
+                let original_value = get_ident(&original_value);
+                let insert_value = get_ident(&insert_value);
+                let start = get_ident(&start);
+                let length = get_ident(&length);
+
+                // todo: pre-cast length to u32
+
+                quote! {
+                    {
+                        let mask = !(((1 as #typ).checked_shl(#length as u32).map(|x| x - 1).unwrap_or(!0)) << #start);
+                        (#original_value & mask) | (#insert_value << #start)
+                    }
+                }
+            }
+        }
         StatementKind::Panic(statements) => {
             let args = statements.iter().map(get_ident);
 

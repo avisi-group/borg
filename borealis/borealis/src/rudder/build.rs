@@ -9,9 +9,9 @@ use {
             internal_fns::{
                 REPLICATE_BITS_BOREALIS_INTERNAL, REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
             },
-            BinaryOperationKind, Block, CastOperationKind, Context, Function, FunctionInner,
-            FunctionKind, ShiftOperationKind, Statement, StatementBuilder, StatementKind, Type,
-            UnaryOperationKind,
+            BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
+            FunctionInner, FunctionKind, ShiftOperationKind, Statement, StatementBuilder,
+            StatementKind, Type, UnaryOperationKind,
         },
     },
     common::{identifiable::Id, intern::InternedString, HashMap},
@@ -789,7 +789,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length: len,
                     }))
                 }
-                "eq_bits" | "eq_int" => Some(self.statement_builder.build(
+                "eq_bits" | "eq_int" | "eq_bool" => Some(self.statement_builder.build(
                     StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareEqual,
                         lhs: args[0].clone(),
@@ -1302,6 +1302,26 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
+                // val bitvector_update : (%bv, %i, %bit) -> %bv
+                "bitvector_update" => {
+                    let target =
+                        self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+                    let i = args[1].clone();
+                    let bit = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+
+                    let _1 = self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::u64()),
+                        value: ConstantValue::UnsignedInteger(1),
+                    });
+
+                    Some(self.statement_builder.build(StatementKind::BitInsert {
+                        original_value: target,
+                        insert_value: bit,
+                        start: i,
+                        length: _1,
+                    }))
+                }
+
                 "bitvector_concat" => {
                     let lhs = args[0].clone();
                     let rhs = args[1].clone();
@@ -1415,48 +1435,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "replicate_bits" => {
-                    // let bits = args[0].clone();
-
-                    // let bits_length = self
-                    //     .statement_builder
-                    //     .build(StatementKind::UnbundleLength { bundle: bits });
-
-                    // let count = args[1].clone();
-
-                    // // allowed count values as constant statements
-                    // let allowed_counts = [1,2,4,8,16,32,64].into_iter().map(|count|
-                    // self.statement_builder.build(StatementKind::Constant { typ:
-                    // Rc::new(Type::u64()), value: ConstantValue::UnsignedInteger(count)
-                    // })).collect::<Vec<_>>();
-
-                    // let allowed_count_compares = allowed_counts.iter().cloned().map(|constant|
-                    // self.statement_builder.build(StatementKind::BinaryOperation { kind:
-                    // BinaryOperationKind::CompareEqual, lhs: count.clone(), rhs: constant }));
-
-                    // self.statement_builder
-                    //     .build(StatementKind::Assert { condition: () });
-
-                    // self.statement_builder.build(StatementKind::Select {
-                    //     condition: is_one,
-                    //     true_value: replicate_1,
-                    //     false_value: panic,
-                    // });
-                    // self.statement_builder.build(StatementKind::Select {
-                    //     condition: is_two,
-                    //     true_value: replicate_2,
-                    //     false_value: (),
-                    // });
-                    // self.statement_builder.build(StatementKind::Select {
-                    //     condition: is_four,
-                    //     true_value: replicate_4,
-                    //     false_value: (),
-                    // });
-                    // self.statement_builder.build(StatementKind::Select {
-                    //     condition: is_eight,
-                    //     true_value: replicate_8,
-                    //     false_value: ,
-                    // });
-
                     // // bundle length = bits_length * count
                     let count = self.generate_cast(args[1].clone(), Rc::new(Type::u64()));
                     Some(self.statement_builder.build(StatementKind::Call {
@@ -1466,6 +1444,20 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
+                /* ### NON-BUILTIN FUNCTIONS BELOW THIS POINT ### */
+                /* To maintain correctness, borealis must only specialize on actual Sail compiler builtins, specializing other functions means restricting compatibiliy on a specific model, however memory access simply must be overwritten */
+                "Mem_set" => {
+                    // todo: check size is correct, maybe do something with access description
+                    let address = args[0].clone();
+                    let _size = args[1].clone();
+                    let _accdesc = args[2].clone();
+                    let value_in_name = args[3].clone();
+
+                    Some(self.statement_builder.build(StatementKind::WriteMemory {
+                        offset: address,
+                        value: value_in_name,
+                    }))
+                }
                 _ => None,
             }
         }

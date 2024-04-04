@@ -169,6 +169,20 @@ const FN_ALLOWLIST: &[&str] = &[
     "HaveMPAMv1p1Ext",
     "MPAMisEnabled",
     "HighestEL",
+    "AMEVCNTVOFF0_EL2_SysRegRead_0058ecc12215fa39",
+    "MPAM3_EL3_read",
+    "MPAM3_EL3_write",
+    "MPAM3_EL3_SysRegRead_2770962b9f8f46c1",
+    "MPAM3_EL3_SysRegWrite_350da3ad09fd23ed",
+    "Bit",
+    "_get_MPAM3_EL3_Type_MPAMEN",
+    "DefaultMPAMinfo",
+    "HaveLSE2Ext",
+    "Mem_set",
+    "decode_cbnz_aarch64_instrs_branch_conditional_compare",
+    "execute_aarch64_instrs_branch_conditional_compare",
+    "decode_dmb_aarch64_instrs_system_barriers_dmb",
+    "execute_aarch64_instrs_system_barriers_dmb",
 ];
 
 /// Compiles a Sail model to a Brig module

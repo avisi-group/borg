@@ -621,7 +621,7 @@ impl Statement {
                 ValueClass::Constant => ValueClass::Constant,
                 ValueClass::Static => ValueClass::Static,
                 ValueClass::Dynamic => ValueClass::Dynamic,
-                _ => panic!("cannot classify unary operation"),
+                _ => panic!("cannot classify cast operation {} in {}", value, self),
             },
             StatementKind::Jump { .. } => ValueClass::None,
             StatementKind::Branch { .. } => ValueClass::None,
@@ -670,7 +670,7 @@ impl Statement {
             StatementKind::ReadRegister { typ, .. } => typ,
             StatementKind::WriteRegister { .. } => Rc::new(Type::unit()),
             StatementKind::ReadMemory { typ, .. } => typ,
-            StatementKind::WriteMemory { .. } => Rc::new(Type::void()),
+            StatementKind::WriteMemory { .. } => Rc::new(Type::unit()),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
                 ..
@@ -951,6 +951,21 @@ impl StatementInner {
 
                 self.kind = StatementKind::WriteRegister { offset, value };
             }
+            StatementKind::WriteMemory { offset, value } => {
+                let offset = if offset == use_of {
+                    with.clone()
+                } else {
+                    offset.clone()
+                };
+
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::WriteMemory { offset, value }
+            }
             StatementKind::MutateField {
                 composite,
                 field,
@@ -1012,6 +1027,25 @@ impl StatementInner {
 
                 self.kind = StatementKind::CreateComposite { typ, fields };
             }
+            StatementKind::BitInsert {
+                original_value,
+                insert_value,
+                start,
+                length,
+            } => {
+                let stmts = [original_value, insert_value, start, length]
+                    .into_iter()
+                    .map(|s| if s == use_of { with.clone() } else { s })
+                    .collect::<Vec<_>>();
+
+                self.kind = StatementKind::BitInsert {
+                    original_value: stmts[0].clone(),
+                    insert_value: stmts[1].clone(),
+                    start: stmts[2].clone(),
+                    length: stmts[3].clone(),
+                }
+            }
+
             _ => {
                 panic!("use replacement not implemented for {}", self.kind);
             }
