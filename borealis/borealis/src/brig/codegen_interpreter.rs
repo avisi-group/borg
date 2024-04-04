@@ -341,7 +341,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             if let Type::Bundled { .. } = &*stmt.typ() {
                 let length = Literal::usize_unsuffixed(typ.width_bits());
-                quote!(Bundle {value: #v, length: #length})
+                quote!(Bundle { value: #v, length: #length })
             } else {
                 v
             }
@@ -435,7 +435,9 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             let op = match kind {
                 BinaryOperationKind::CompareEqual => quote! { (#left) == (#right) },
-                BinaryOperationKind::Add => quote! { (#left) + (#right) },
+                BinaryOperationKind::Add => {
+                    quote! { #left.wrapping_add(#right) }
+                }
                 BinaryOperationKind::Sub => quote! { (#left) - (#right) },
                 BinaryOperationKind::Multiply => quote! { (#left) * (#right) },
                 BinaryOperationKind::Divide => quote! { (#left) / (#right) },

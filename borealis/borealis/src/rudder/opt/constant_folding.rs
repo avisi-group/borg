@@ -9,7 +9,7 @@ use {
 pub fn run(f: Function) -> bool {
     let mut changed = false;
 
-    trace!("constant folding {}", f.name());
+    //trace!("constant folding {}", f.name());
     for block in f.entry_block().iter() {
         changed |= run_on_block(block);
     }
@@ -32,104 +32,156 @@ fn run_on_stmt(stmt: Statement) -> bool {
         return false;
     }
 
-    if stmt.classify() != ValueClass::Constant {
-        return false;
-    }
-
     match stmt.kind() {
-        StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            let StatementKind::Constant { value: lhs, .. } = lhs.kind() else {
-                panic!("lhs must be constant ({})", lhs)
-            };
+        StatementKind::BinaryOperation { kind, lhs, rhs } => match (lhs.kind(), rhs.kind()) {
+            (
+                StatementKind::Constant { value: lhs, .. },
+                StatementKind::Constant { value: rhs, .. },
+            ) => {
+                let cv = match kind {
+                    BinaryOperationKind::Add => lhs + rhs,
+                    BinaryOperationKind::Sub => lhs - rhs,
+                    BinaryOperationKind::Multiply => todo!(),
+                    BinaryOperationKind::Divide => todo!(),
+                    BinaryOperationKind::Modulo => todo!(),
+                    BinaryOperationKind::And => todo!(),
+                    BinaryOperationKind::Or => todo!(),
+                    BinaryOperationKind::Xor => todo!(),
+                    BinaryOperationKind::CompareEqual => todo!(),
+                    BinaryOperationKind::CompareNotEqual => todo!(),
+                    BinaryOperationKind::CompareLessThan => todo!(),
+                    BinaryOperationKind::CompareLessThanOrEqual => todo!(),
+                    BinaryOperationKind::CompareGreaterThan => todo!(),
+                    BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
+                };
 
-            let StatementKind::Constant { value: rhs, .. } = rhs.kind() else {
-                panic!("rhs must be constant ({})", rhs)
-            };
+                stmt.replace_kind(StatementKind::Constant {
+                    typ: stmt.typ(),
+                    value: cv,
+                });
 
-            let cv = match kind {
-                BinaryOperationKind::Add => lhs + rhs,
-                BinaryOperationKind::Sub => lhs - rhs,
-                BinaryOperationKind::Multiply => todo!(),
-                BinaryOperationKind::Divide => todo!(),
-                BinaryOperationKind::Modulo => todo!(),
-                BinaryOperationKind::And => todo!(),
-                BinaryOperationKind::Or => todo!(),
-                BinaryOperationKind::Xor => todo!(),
-                BinaryOperationKind::CompareEqual => todo!(),
-                BinaryOperationKind::CompareNotEqual => todo!(),
-                BinaryOperationKind::CompareLessThan => todo!(),
-                BinaryOperationKind::CompareLessThanOrEqual => todo!(),
-                BinaryOperationKind::CompareGreaterThan => todo!(),
-                BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
-            };
+                true
+            }
+            /*(
+                StatementKind::Bundle {
+                    value: lv,
+                    length: ll,
+                },
+                StatementKind::Bundle {
+                    value: rv,
+                    length: rl,
+                },
+            ) => {
+                let (
+                    StatementKind::Constant {
+                        typ: lvt,
+                        value: lvv,
+                    },
+                    StatementKind::Constant {
+                        typ: llt,
+                        value: llv,
+                    },
+                    StatementKind::Constant {
+                        typ: rvt,
+                        value: rvv,
+                    },
+                    StatementKind::Constant {
+                        typ: rlt,
+                        value: rlv,
+                    },
+                ) = (lv.kind(), ll.kind(), rv.kind(), rl.kind())
+                else {
+                    return false;
+                };
 
-            stmt.replace_kind(StatementKind::Constant {
-                typ: stmt.typ(),
-                value: cv,
-            });
+                if llv != rlv {
+                    return false;
+                }
 
-            true
-        }
+                trace!("maybe foldable with two bundles");
+
+                // replace this statement with a constant bundle
+                // _get_HFGRTR_EL2_Type_SCTLR_EL1
+
+                let cv = match kind {
+                    BinaryOperationKind::Add => lvv + rvv,
+                    BinaryOperationKind::Sub => lvv - rvv,
+                    BinaryOperationKind::Multiply => {
+                        return false;
+                    }
+                    BinaryOperationKind::Divide => todo!(),
+                    BinaryOperationKind::Modulo => todo!(),
+                    BinaryOperationKind::And => todo!(),
+                    BinaryOperationKind::Or => todo!(),
+                    BinaryOperationKind::Xor => todo!(),
+                    BinaryOperationKind::CompareEqual => todo!(),
+                    BinaryOperationKind::CompareNotEqual => todo!(),
+                    BinaryOperationKind::CompareLessThan => todo!(),
+                    BinaryOperationKind::CompareLessThanOrEqual => todo!(),
+                    BinaryOperationKind::CompareGreaterThan => todo!(),
+                    BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
+                };
+
+                stmt.replace_kind(StatementKind::Constant {
+                    typ: lhs.typ().clone(),
+                    value: cv,
+                });
+
+                true
+            }*/
+            _ => false,
+        },
         StatementKind::Cast {
             kind: CastOperationKind::ZeroExtend,
             typ,
             value,
         } => {
-            let StatementKind::Constant { value, .. } = value.kind() else {
-                panic!("operand to cast must be constant ({})", value)
-            };
-
-            stmt.replace_kind(StatementKind::Constant { typ, value });
-
-            true
+            if let StatementKind::Constant { value, .. } = value.kind() {
+                stmt.replace_kind(StatementKind::Constant { typ, value });
+                true
+            } else {
+                false
+            }
         }
         StatementKind::Cast {
             kind: CastOperationKind::Truncate,
             typ,
             value,
         } => {
-            let StatementKind::Constant { value, .. } = value.kind() else {
-                panic!(
-                    "operand to cast must be constant stmt={stmt}; value={}",
-                    value
-                )
-            };
-
-            if typ.is_u1() {
-                if let ConstantValue::SignedInteger(signed_value) = value {
-                    stmt.replace_kind(StatementKind::Constant {
-                        typ,
-                        value: ConstantValue::UnsignedInteger(signed_value.try_into().unwrap()),
-                    });
+            if let StatementKind::Constant { value, .. } = value.kind() {
+                if typ.is_u1() {
+                    if let ConstantValue::SignedInteger(signed_value) = value {
+                        stmt.replace_kind(StatementKind::Constant {
+                            typ,
+                            value: ConstantValue::UnsignedInteger(signed_value.try_into().unwrap()),
+                        });
+                    } else {
+                        stmt.replace_kind(StatementKind::Constant { typ, value });
+                    }
                 } else {
                     stmt.replace_kind(StatementKind::Constant { typ, value });
                 }
-            } else {
-                stmt.replace_kind(StatementKind::Constant { typ, value });
-            }
 
-            true
+                true
+            } else {
+                false
+            }
         }
         StatementKind::Cast {
             kind: CastOperationKind::Reinterpret,
             typ,
             value,
         } => {
-            let StatementKind::Constant { value, .. } = value.kind() else {
-                panic!(
-                    "operand to cast must be constant stmt={stmt}; value={}",
-                    value
-                )
-            };
-
-            stmt.replace_kind(StatementKind::Constant { typ, value });
-
-            true
+            if let StatementKind::Constant { value, .. } = value.kind() {
+                stmt.replace_kind(StatementKind::Constant { typ, value });
+                true
+            } else {
+                false
+            }
         }
 
         _ => {
-            trace!("candidate for folding not implemented: {}", stmt);
-
+            //trace!("candidate for folding not implemented: {}", stmt);
             false
         }
     }

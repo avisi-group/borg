@@ -173,6 +173,11 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
                                 StatementKind::Constant { value: rlv, .. },
                             ) => {
                                 if llv != rlv {
+                                    trace!(
+                                        "constant bundle length, but lengths mismatch l={}, r={}",
+                                        llv,
+                                        rlv
+                                    );
                                     continue;
                                 }
 

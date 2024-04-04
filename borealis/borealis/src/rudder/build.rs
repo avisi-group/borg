@@ -765,9 +765,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "subrange_bits" => {
                     // end - start + 1
                     let one = self.statement_builder.build(StatementKind::Constant {
-                        typ: args[1].typ(),
+                        typ: Rc::new(Type::s64()),
                         value: rudder::ConstantValue::SignedInteger(1),
                     });
+                    let one = self.generate_cast(one, args[1].typ());
                     let diff = self
                         .statement_builder
                         .build(StatementKind::BinaryOperation {
@@ -960,7 +961,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         amount: args[1].clone(),
                     }))
                 }
-                "sail_shiftleft" | "_shl_int" | "_shl8" => {
+                "sail_shiftleft" | "_shl_int" | "_shl8" | "_shl32" => {
                     Some(self.statement_builder.build(StatementKind::ShiftOperation {
                         kind: ShiftOperationKind::LogicalShiftLeft,
                         value: args[0].clone(),
@@ -1392,13 +1393,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     // destination[start..] = source[0..source.len()]
 
-                    Some(generate_set_slice(
-                        &mut self.statement_builder,
-                        destination,
-                        source,
-                        slen,
-                        start,
-                    ))
+                    Some(self.generate_set_slice(destination, source, slen, start))
                 }
 
                 "update_subrange_bits" => {
@@ -1418,13 +1413,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                 rhs: start.clone(),
                             });
 
-                    Some(generate_set_slice(
-                        &mut self.statement_builder,
-                        destination,
-                        source,
-                        source_length,
-                        start,
-                    ))
+                    Some(self.generate_set_slice(destination, source, source_length, start))
                 }
 
                 "sail_branch_announce" => {
@@ -1456,6 +1445,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(self.statement_builder.build(StatementKind::WriteMemory {
                         offset: address,
                         value: value_in_name,
+                    }))
+                }
+                "DataMemoryBarrier" => {
+                    Some(self.statement_builder.build(StatementKind::Constant {
+                        typ: Rc::new(Type::unit()),
+                        value: ConstantValue::Unit,
                     }))
                 }
                 _ => None,
@@ -1911,77 +1906,85 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
         }
     }
-}
 
-/// Copies source[0..source_length] into dest[start..start + source_length]
-fn generate_set_slice(
-    builder: &mut StatementBuilder,
-    destination: Statement,
-    source: Statement,
-    source_length: Statement,
-    destination_start_offset: Statement,
-) -> Statement {
-    // // let length = end - start
-    // let length = self
-    //     .statement_builder
-    //     .build(StatementKind::BinaryOperation {
-    //         kind: BinaryOperationKind::Sub,
-    //         lhs: end,
-    //         rhs: start.clone(),
-    //     });
+    /// Copies source[0..source_length] into dest[start..start + source_length]
+    fn generate_set_slice(
+        &mut self,
+        destination: Statement,
+        source: Statement,
+        source_length: Statement,
+        destination_start_offset: Statement,
+    ) -> Statement {
+        // // let length = end - start
+        // let length = self
+        //     .statement_builder
+        //     .build(StatementKind::BinaryOperation {
+        //         kind: BinaryOperationKind::Sub,
+        //         lhs: end,
+        //         rhs: start.clone(),
+        //     });
 
-    // let source_mask = (1 << (length) - 1);
-    let one = builder.build(StatementKind::Constant {
-        typ: source.typ(),
-        value: rudder::ConstantValue::UnsignedInteger(1),
-    });
-    let shifted = builder.build(StatementKind::ShiftOperation {
-        kind: ShiftOperationKind::LogicalShiftLeft,
-        value: one.clone(),
-        amount: source_length,
-    });
-    let source_mask = builder.build(StatementKind::BinaryOperation {
-        kind: BinaryOperationKind::Sub,
-        lhs: shifted,
-        rhs: one,
-    });
+        // let source_mask = (1 << (length) - 1);
+        let one = self.statement_builder.build(StatementKind::Constant {
+            typ: Rc::new(Type::u64()),
+            value: rudder::ConstantValue::UnsignedInteger(1),
+        });
+        let one = self.generate_cast(one, source.typ());
+        let shifted = self.statement_builder.build(StatementKind::ShiftOperation {
+            kind: ShiftOperationKind::LogicalShiftLeft,
+            value: one.clone(),
+            amount: source_length,
+        });
+        let source_mask = self
+            .statement_builder
+            .build(StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::Sub,
+                lhs: shifted,
+                rhs: one,
+            });
 
-    // let masked_source = source & source_mask
-    let masked_source = builder.build(StatementKind::BinaryOperation {
-        kind: BinaryOperationKind::And,
-        lhs: source,
-        rhs: source_mask.clone(),
-    });
+        // let masked_source = source & source_mask
+        let masked_source = self
+            .statement_builder
+            .build(StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::And,
+                lhs: source,
+                rhs: source_mask.clone(),
+            });
 
-    // let source = masked_source << start
-    let source = builder.build(StatementKind::ShiftOperation {
-        kind: ShiftOperationKind::LogicalShiftLeft,
-        value: masked_source,
-        amount: destination_start_offset.clone(),
-    });
+        // let source = masked_source << start
+        let source = self.statement_builder.build(StatementKind::ShiftOperation {
+            kind: ShiftOperationKind::LogicalShiftLeft,
+            value: masked_source,
+            amount: destination_start_offset.clone(),
+        });
 
-    // let dest_mask = ~(source_mask << start)
-    let shifted_source_mask = builder.build(StatementKind::ShiftOperation {
-        kind: ShiftOperationKind::LogicalShiftLeft,
-        value: source_mask,
-        amount: destination_start_offset,
-    });
-    let destination_mask = builder.build(StatementKind::UnaryOperation {
-        kind: rudder::UnaryOperationKind::Complement,
-        value: shifted_source_mask,
-    });
+        // let dest_mask = ~(source_mask << start)
+        let shifted_source_mask = self.statement_builder.build(StatementKind::ShiftOperation {
+            kind: ShiftOperationKind::LogicalShiftLeft,
+            value: source_mask,
+            amount: destination_start_offset,
+        });
+        let destination_mask = self.statement_builder.build(StatementKind::UnaryOperation {
+            kind: rudder::UnaryOperationKind::Complement,
+            value: shifted_source_mask,
+        });
 
-    // let dest = dest & dest_mask
-    let destination = builder.build(StatementKind::BinaryOperation {
-        kind: BinaryOperationKind::And,
-        lhs: destination,
-        rhs: destination_mask,
-    });
+        // let dest = dest & dest_mask
+        let destination = self
+            .statement_builder
+            .build(StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::And,
+                lhs: destination,
+                rhs: destination_mask,
+            });
 
-    // let result = source | dest
-    builder.build(StatementKind::BinaryOperation {
-        kind: BinaryOperationKind::Or,
-        lhs: destination,
-        rhs: source,
-    })
+        // let result = source | dest
+        self.statement_builder
+            .build(StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::Or,
+                lhs: destination,
+                rhs: source,
+            })
+    }
 }

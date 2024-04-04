@@ -11,7 +11,8 @@ use {
             Ast,
         },
         brig::{
-            bundle::codegen_bundle, codegen_interpreter::codegen_functions, state::codegen_state,
+            allowlist::apply_fn_allowlist, bundle::codegen_bundle,
+            codegen_interpreter::codegen_functions, state::codegen_state,
         },
         rudder,
     },
@@ -19,171 +20,17 @@ use {
     log::{info, warn},
     proc_macro2::TokenStream,
     quote::quote,
-    sailrs::{jib_ast, types::ListVec},
+    sailrs::jib_ast,
     std::io::Write,
 };
 
+mod allowlist;
 mod bundle;
 mod codegen_dbt;
 mod codegen_interpreter;
 mod state;
 
 const ENTRYPOINT: &str = "__DecodeA64";
-
-const FN_ALLOWLIST: &[&str] = &[
-    ENTRYPOINT,
-    "__DecodeA64_DataProcImm",
-    "decode_add_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
-    "place_slice",
-    "slice_mask",
-    "sail_ones",
-    "extzv",
-    "execute_aarch64_instrs_integer_arithmetic_add_sub_immediate",
-    "X_read",
-    "neq_int",
-    "get_R",
-    "read_gpr",
-    "AddWithCarry",
-    "integer_subrange",
-    "IsZero",
-    "X_set",
-    "set_R",
-    "write_gpr",
-    "decode_movz_aarch64_instrs_integer_ins_ext_insert_movewide",
-    "execute_aarch64_instrs_integer_ins_ext_insert_movewide",
-    "Zeros",
-    "__id",
-    "__DecodeA64_DataProcReg",
-    "decode_subs_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
-    "DecodeShift",
-    "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
-    "ShiftReg",
-    "__DecodeA64_BranchExcSys",
-    "decode_b_cond_aarch64_instrs_branch_conditional_cond",
-    "execute_aarch64_instrs_branch_conditional_cond",
-    "ConditionHolds",
-    "BranchNotTaken",
-    "HaveStatisticalProfiling",
-    "IsFeatureImplemented",
-    "num_of_Feature",
-    "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
-    "decode_orr_log_shift_aarch64_instrs_integer_logical_shiftedreg",
-    "execute_aarch64_instrs_integer_logical_shiftedreg",
-    "decode_b_uncond_aarch64_instrs_branch_unconditional_immediate",
-    "execute_aarch64_instrs_branch_unconditional_immediate",
-    "PC_read",
-    "BranchTo",
-    "Hint_Branch",
-    "UsingAArch32",
-    "HaveAArch32",
-    "HaveAArch64",
-    "AArch64_BranchAddr",
-    "AddrTop",
-    "HaveEL",
-    "S1TranslationRegime",
-    "ELUsingAArch32",
-    "IsSecureBelowEL3",
-    "SCR_GEN_read",
-    "Mk_SCRType",
-    "_get_SCRType_NS",
-    "ELStateUsingAArch32",
-    "ELStateUsingAArch32K",
-    "HaveAArch32EL",
-    "HaveVirtHostExt",
-    "EffectiveTBI",
-    "_get_TCR_EL1_Type_TBI0",
-    "HavePACExt",
-    "HaveBRBExt",
-    "decode_svc_aarch64_instrs_system_exceptions_runtime_svc",
-    "execute_aarch64_instrs_system_exceptions_runtime_svc",
-    "AArch64_CheckForSVCTrap",
-    "HaveFGTExt",
-    "AArch64_CallSupervisor",
-    "SSAdvance",
-    "decode_hvc_aarch64_instrs_system_exceptions_runtime_hvc",
-    "DebugTarget",
-    "CurrentSecurityState",
-    "SecurityStateAtEL",
-    "HaveRME",
-    "DebugTargetFrom",
-    "HaveSecureEL2Ext",
-    "_get_MDSCR_EL1_Type_SS",
-    "EL2Enabled",
-    "decode_ccmp_imm_aarch64_instrs_integer_conditional_compare_immediate",
-    "IsSecureEL2Enabled",
-    "execute_aarch64_instrs_integer_conditional_compare_immediate",
-    "decode_bl_aarch64_instrs_branch_unconditional_immediate",
-    "HaveGCS",
-    "decode_mrs_aarch64_instrs_system_register_system",
-    "NextInstrAddr",
-    "ThisInstrLength",
-    "AArch64_CheckSystemAccess",
-    "HaveBTIExt",
-    "fdiv_int",
-    "HaveTME",
-    "execute_aarch64_instrs_system_register_system",
-    "AArch64_SysRegRead",
-    "AArch64_AutoGen_SysRegRead",
-    "CurrentEL_SysRegRead_94be544516d41cc8",
-    "_get_HCR_EL2_Type_NV",
-    "AArch64_CheckNVCondsIfCurrentEL",
-    "__UNKNOWN_boolean",
-    "decode_subs_addsub_imm_aarch64_instrs_integer_arithmetic_add_sub_immediate",
-    "SCTLR_EL1_SysRegRead_ce1d601189e8030e",
-    "_get_HCR_EL2_Type_TRVM",
-    "_get_SCR_EL3_Type_FGTEn",
-    "_get_HFGRTR_EL2_Type_SCTLR_EL1",
-    "_get_HCR_EL2_Type_E2H",
-    "decode_tbnz_aarch64_instrs_branch_conditional_test",
-    "execute_aarch64_instrs_branch_conditional_test",
-    "decode_ands_log_imm_aarch64_instrs_integer_logical_immediate",
-    "DecodeBitMasks",
-    "_get_SCR_EL3_Type_NS",
-    "HighestSetBit",
-    "zext_ones",
-    "extsv",
-    "ROR",
-    "execute_aarch64_instrs_integer_logical_immediate",
-    "IsZeroBit",
-    "decode_and_log_imm_aarch64_instrs_integer_logical_immediate",
-    "decode_csel_aarch64_instrs_integer_conditional_select",
-    "execute_aarch64_instrs_integer_conditional_select",
-    "decode_ret_aarch64_instrs_branch_unconditional_register",
-    "execute_aarch64_instrs_branch_unconditional_register",
-    "decode_adrp_aarch64_instrs_integer_arithmetic_address_pc_rel",
-    "execute_aarch64_instrs_integer_arithmetic_address_pc_rel",
-    "set_subrange_zeros",
-    "set_slice_zeros",
-    "sail_mask",
-    "__DecodeA64_LoadStore",
-    "decode_stp_gen_aarch64_instrs_memory_pair_general_offset",
-    "execute_aarch64_instrs_memory_pair_general_post_idx",
-    "CreateAccDescGPR",
-    "NewAccDesc",
-    "decode_dsb_aarch64_instrs_system_barriers_dsb_nxs",
-    "GenMPAMcurEL",
-    "GenMPAMatEL",
-    "SPMACCESSR_EL3_SysRegRead_04a853a73f22109c",
-    "PARTIDspaceFromSS",
-    "HaveMPAMv0p1Ext",
-    "HaveMPAMv1p1Ext",
-    "MPAMisEnabled",
-    "HighestEL",
-    "AMEVCNTVOFF0_EL2_SysRegRead_0058ecc12215fa39",
-    "MPAM3_EL3_read",
-    "MPAM3_EL3_write",
-    "MPAM3_EL3_SysRegRead_2770962b9f8f46c1",
-    "MPAM3_EL3_SysRegWrite_350da3ad09fd23ed",
-    "Bit",
-    "_get_MPAM3_EL3_Type_MPAMEN",
-    "DefaultMPAMinfo",
-    "HaveLSE2Ext",
-    "Mem_set",
-    "decode_cbnz_aarch64_instrs_branch_conditional_compare",
-    "execute_aarch64_instrs_branch_conditional_compare",
-    "decode_dmb_aarch64_instrs_system_barriers_dmb",
-    "execute_aarch64_instrs_system_barriers_dmb",
-];
 
 /// Compiles a Sail model to a Brig module
 pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
@@ -387,34 +234,4 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
         #body
     }
-}
-
-/// Stub out functions not in the allowlist
-fn apply_fn_allowlist<I: Iterator<Item = jib_ast::Definition>>(
-    iter: I,
-) -> impl Iterator<Item = jib_ast::Definition> {
-    use sailrs::{
-        jib_ast::{Definition, Instruction, InstructionAux, Type, Value, Vl},
-        sail_ast::Location,
-    };
-
-    iter.map(|def| {
-        if let Definition::Fundef(name, idk, arguments, body) = def {
-            let body = if FN_ALLOWLIST.contains(&name.as_interned().as_ref()) {
-                body
-            } else {
-                ListVec::from(vec![
-                    // throw so that panic is created in rudder
-                    Instruction {
-                        inner: InstructionAux::Throw(Value::Lit(Vl::Unit, Type::Unit)),
-                        annot: (0, Location::Unknown),
-                    },
-                ])
-            };
-
-            Definition::Fundef(name, idk, arguments, body)
-        } else {
-            def
-        }
-    })
 }

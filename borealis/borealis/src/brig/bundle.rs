@@ -8,6 +8,12 @@ pub fn codegen_bundle() -> TokenStream {
             length: L,
         }
 
+        impl<V, L> Bundle<V, L> where core::num::Wrapping<V>: core::ops::Add<Output = core::num::Wrapping<V>> {
+            fn wrapping_add(self, rhs: Self) -> Self {
+               self + rhs
+            }
+        }
+
         impl<V: core::ops::BitAnd<Output = V>, L> core::ops::BitAnd for Bundle<V, L> {
             type Output = Self;
 
