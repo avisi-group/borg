@@ -113,110 +113,6 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>, P: AsRef<Path>>(
     info!("Generating Rust");
 
     write_workspace(&codegen_workspace(&rudder), path);
-
-    // let state = codegen_state(&rudder);
-
-    // let body = codegen_functions(rudder, ENTRYPOINT.into());
-
-    // let prelude = if standalone {
-    //     quote! {
-    //         extern crate alloc;
-
-    //         struct PrintlnTracer;
-
-    //         impl Tracer for PrintlnTracer {
-    //             fn begin(&self, pc: u64) {
-    //                 println!("begin @ {pc:x}");
-    //             }
-
-    //             fn end(&self) {
-    //                 println!("end");
-    //             }
-
-    //             fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
-    //                 println!("read-register {offset:x} = {value:?}");
-    //             }
-    //             fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
-    //                 println!("write-register {offset:x} = {value:?}");
-    //             }
-    //         }
-
-    //         fn main() {
-    //             let arg = std::env::args().skip(1).next().unwrap();
-    //             let text = std::fs::read(arg).unwrap();
-
-    //             let mut state = State::init();
-
-    //             loop {
-    //                 let pc = state.read_register::<u64>(REG_U_PC);
-    //                 let insr = unsafe { *(text.as_ptr().offset(pc as isize) as *mut u32) };
-    //                 dbg!(decode_execute(insr, &mut state, &mut PrintlnTracer));
-    //             }
-    //         }
-    //     }
-    // } else {
-    //     quote! {
-    //         use super::{CoreState, ExecutionEngine};
-
-    //         pub struct Interpreter;
-
-    //         impl CoreState for State {
-    //             fn pc(&self) -> usize {
-    //                 self.read_register(REG_U_PC)
-    //             }
-
-    //             fn new(pc: usize) -> Self {
-    //                 let mut celf = State::init();
-
-    //                 celf.write_register(REG_U_PC, pc);
-
-    //                 celf
-    //             }
-    //         }
-
-    //         struct LogTracer;
-
-    //         impl Tracer for LogTracer {
-    //             fn begin(&self, pc: u64) {
-    //                 log::trace!("begin @ {pc:x}");
-    //             }
-
-    //             fn end(&self) {
-    //                 log::trace!("end");
-    //             }
-
-    //             fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
-    //                 log::trace!("read-register {offset:x} = {value:?}");
-    //             }
-    //             fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
-    //                 log::trace!("write-register {offset:x} = {value:?}");
-    //             }
-    //         }
-
-    //         fn fetch(pc: usize) -> u32 {
-    //             unsafe { *(pc as *const u32) }
-    //         }
-
-    //         impl ExecutionEngine<State> for Interpreter {
-    //             fn step(amount: super::StepAmount, state: &mut State) -> super::StepResult {
-    //                 let insn_data = fetch(state.pc());
-    //                 log::trace!("fetch @ {} = {:08x}", state.pc(), insn_data);
-
-    //                 match decode_execute(insn_data, state, &mut LogTracer) {
-    //                     ExecuteResult::Ok => {
-    //                                                    super::StepResult::Ok
-    //                     },
-    //                     ExecuteResult::EndOfBlock => {
-    //                         super::StepResult::Ok
-    //                     },
-    //                     ExecuteResult::UndefinedInstruction => {
-    //                         panic!("undefined instruction {:08x}", insn_data)
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-    // };
 }
 
 fn promote_width(width: usize) -> usize {
@@ -449,13 +345,40 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
     };
 
     // one top-level crate containing prelude
-    let arch = (
-        "arch".into(),
-        Crate {
-            dependencies: HashSet::default(),
-            contents: quote! {},
-        },
-    );
+    let arch = {
+        let entrypoint_ident = codegen_ident(ENTRYPOINT.into());
+        (
+            "arch".into(),
+            Crate {
+                dependencies: ["common".into(), entrypoint_ident.to_string().into()]
+                    .into_iter()
+                    .collect(),
+                contents: quote! {
+                        pub use common::*;
+
+                        use #entrypoint_ident::#entrypoint_ident;
+
+                        pub fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
+                            // reset SEE
+                            state.write_register(REG_SEE, 0u64);
+
+                            #entrypoint_ident(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value);
+
+                            // increment PC if no branch was taken
+                            if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
+                                let pc = state.read_register::<u64>(REG_U_PC);
+                                state.write_register(REG_U_PC, pc + 4);
+                            }
+
+                            state.write_register(REG_U__BRANCHTAKEN, false);
+
+                            ExecuteResult::Ok
+                        }
+
+                },
+            },
+        )
+    };
 
     let cfg = FunctionCallGraphAnalysis::new(rudder);
 

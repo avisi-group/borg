@@ -56,31 +56,6 @@ pub fn codegen_functions(
         })
         .collect();
 
-    let entrypoint_ident = codegen_ident(entrypoint);
-    let entrypoint_fn_call = quote!(#entrypoint_ident(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value););
-
-    fns.push((entrypoint, quote! {
-        fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &mut T) -> ExecuteResult {
-            // reset SEE
-            // todo: for the love of god make this not break if registers are regenerated
-            state.write_register(REG_SEE, 0u64);
-
-            #entrypoint_fn_call
-
-            // increment PC if no branch was taken
-            let branch_taken = state.read_register::<bool>(REG_U__BRANCHTAKEN);
-
-            if !branch_taken {
-                let pc = state.read_register::<u64>(REG_U_PC);
-                state.write_register(REG_U_PC, pc + 4);
-            }
-
-            state.write_register(REG_U__BRANCHTAKEN, false);
-
-            ExecuteResult::Ok
-        }
-    }));
-
     fns
 }
 
