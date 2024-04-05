@@ -2,14 +2,12 @@ use {
     crate::{
         devices::manager::SharedDeviceManager,
         guest::{
-            devices::{
-                core::aarch64::{AArch64CoreState, AArch64Interpreter},
-                GuestDevice,
-            },
+            devices::{core::Interpreter, GuestDevice},
             memory::{AddressSpace, AddressSpaceRegion},
         },
     },
     alloc::{boxed::Box, collections::BTreeMap, rc::Rc, string::String},
+    core::ptr,
     spin::Once,
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
@@ -99,8 +97,8 @@ pub fn start() {
                 .as_str()
             {
                 "arm64" => Rc::new(self::devices::core::GenericCore::new::<
-                    AArch64CoreState,
-                    AArch64Interpreter,
+                    arch::State,
+                    Interpreter,
                 >()),
                 _ => {
                     panic!("unsupported core arch")
@@ -162,13 +160,13 @@ pub fn start() {
 
             // load kernel and dtb into guest physical memory
             unsafe {
-                core::ptr::copy(
+                ptr::copy(
                     kernel.as_ptr(),
                     (usize::try_from(header.text_offset).unwrap() + KERNEL_LOAD_BIAS) as *mut u8,
                     kernel.len(),
                 );
 
-                core::ptr::copy(dtb.as_ptr(), (DTB_LOAD_OFFSET) as *mut u8, dtb.len());
+                ptr::copy(dtb.as_ptr(), (DTB_LOAD_OFFSET) as *mut u8, dtb.len());
             }
         }
     }

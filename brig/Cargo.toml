@@ -1,4 +1,0 @@
-[workspace]
-members = ["brig-cli", "kernel", "proc_macro_lib"]
-default-members = ["brig-cli"]
-resolver = "2"

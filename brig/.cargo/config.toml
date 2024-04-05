@@ -1,8 +1,0 @@
-[unstable]
-# enable the unstable artifact-dependencies feature, see
-# https://doc.rust-lang.org/nightly/cargo/reference/unstable.html#artifact-dependencies
-bindeps = true
-
-[build]
-rustflags = ["-C", "force-frame-pointers=yes"] # ideally only enabled for debug builds
-target-dir = "./target" # required to fix deadlock in release builds of `bootloader(build)` UEFI

@@ -3,11 +3,14 @@ name = "kernel"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+members = ["proc_macro_lib"]
+
 [dependencies]
-proc_macro_lib = { path = "../proc_macro_lib" }
+proc_macro_lib = { path = "./proc_macro_lib" }
+arch = { path = "../../brig-aarch64/arch" }
 
 bootloader_api = "0.11.7"
-
 x86_64 = "0.15.1"
 x86 = "0.52.0"
 x2apic = "0.4.3"

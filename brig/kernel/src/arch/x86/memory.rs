@@ -5,7 +5,6 @@ use {
     byte_unit::{Byte, UnitType},
     core::{alloc::Layout, ops::Deref},
     x86_64::{
-        self,
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
             FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame,
