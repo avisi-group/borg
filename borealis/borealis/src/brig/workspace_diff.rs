@@ -4,7 +4,7 @@ use {
         InheritableDependency, InheritableField, PackageName, TomlDependency,
         TomlDetailedDependency, TomlManifest, TomlPackage, TomlWorkspace,
     },
-    common::HashMap,
+    common::{HashMap, HashSet},
     semver::{BuildMetadata, Prerelease, Version},
     std::{
         collections::BTreeMap,
@@ -21,27 +21,53 @@ pub fn write_workspace<P: AsRef<Path>>(workspace: &Workspace, path: P) {
     write_difference(target_fs, current_fs, path.as_ref());
 }
 
-// todo: check for extra files that need deleting
-// todo: make folders?
 fn write_difference(
-    target: HashMap<PathBuf, String>,
-    current: HashMap<PathBuf, String>,
-    path: &Path,
+    (target_files, target_dirs): (HashMap<PathBuf, String>, HashSet<PathBuf>),
+    (mut current_files, mut current_dirs): (HashMap<PathBuf, String>, HashSet<PathBuf>),
+    workspace_path: &Path,
 ) {
-    for (k, v) in target {
-        if let Some(contents) = current.get(&k) {
-            if *contents != v {
-                println!("diff @ {k:?}");
-                fs::write(path.join(k), v).unwrap();
+    {
+        for path in target_dirs {
+            if !current_dirs.remove(&path) {
+                log::info!("new dir @ {path:?}");
+                fs::create_dir_all(workspace_path.join(path)).unwrap();
             }
-        } else {
-            todo!()
+        }
+
+        for path in current_dirs {
+            log::info!("delete dir @ {path:?}");
+            fs::remove_dir_all(workspace_path.join(path)).unwrap();
+        }
+    }
+
+    {
+        for (path, target_contents) in target_files {
+            if let Some(contents) = current_files.remove(&path) {
+                if *contents != target_contents {
+                    log::info!("diff @ {path:?}");
+                    fs::write(workspace_path.join(path), target_contents).unwrap();
+                }
+            } else {
+                log::info!("new @ {path:?}");
+                fs::write(workspace_path.join(path), target_contents).unwrap();
+            }
+        }
+
+        for (path, _) in current_files {
+            log::info!("delete @ {path:?}");
+            // hide errors if parent dir was already deleted
+            fs::remove_file(workspace_path.join(path)).ok();
         }
     }
 }
 
-fn read_fs(path: &Path) -> HashMap<PathBuf, String> {
-    WalkDir::new(path)
+/// Reads files, their contents, and directories at the supplied path'
+fn read_fs(path: &Path) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
+    if !path.exists() {
+        return Default::default();
+    }
+
+    let files = WalkDir::new(path)
         .into_iter()
         .filter(|entry| entry.as_ref().unwrap().file_type().is_file())
         .map(|entry| {
@@ -49,10 +75,19 @@ fn read_fs(path: &Path) -> HashMap<PathBuf, String> {
             let adjusted_path = entry.path().strip_prefix(path).unwrap().to_owned();
             (adjusted_path, read_to_string(entry.path()).unwrap())
         })
-        .collect()
+        .collect();
+
+    let dirs = WalkDir::new(path)
+        .into_iter()
+        .filter(|entry| entry.as_ref().unwrap().file_type().is_dir())
+        .map(|entry| entry.unwrap().path().strip_prefix(path).unwrap().to_owned())
+        .filter(|path| path.ends_with("src"))
+        .collect();
+
+    (files, dirs)
 }
 
-fn build_fs(workspace: &Workspace) -> HashMap<PathBuf, String> {
+fn build_fs(workspace: &Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     let workspace_manifest = (
         PathBuf::from("Cargo.toml"),
         toml::to_string_pretty(&TomlManifest {
@@ -90,7 +125,7 @@ fn build_fs(workspace: &Workspace) -> HashMap<PathBuf, String> {
         .unwrap(),
     );
 
-    workspace
+    let files = workspace
         .crates
         .iter()
         .flat_map(
@@ -209,5 +244,14 @@ fn build_fs(workspace: &Workspace) -> HashMap<PathBuf, String> {
             },
         )
         .chain([workspace_manifest])
-        .collect()
+        .collect();
+
+    let dirs = workspace
+        .crates
+        .keys()
+        .map(|name| [PathBuf::from(name.as_ref()).join("src")].into_iter())
+        .flatten()
+        .collect();
+
+    (files, dirs)
 }
