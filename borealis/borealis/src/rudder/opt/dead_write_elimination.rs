@@ -1,6 +1,4 @@
-use log::trace;
-
-use crate::rudder::analysis;
+use {crate::rudder::analysis, log::trace};
 
 pub fn run(f: crate::rudder::Function) -> bool {
     let dfa = analysis::dfa::SymbolUseAnalysis::new(&f);

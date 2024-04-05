@@ -1,6 +1,7 @@
-use log::trace;
-
-use crate::rudder::{Function, StatementKind};
+use {
+    crate::rudder::{Function, StatementKind},
+    log::trace,
+};
 
 pub fn run(f: Function) -> bool {
     // If a block contains a call followed by a return, optimise this into a tail

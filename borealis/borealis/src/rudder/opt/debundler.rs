@@ -1,10 +1,12 @@
-use {core::panic, std::rc::Rc};
-
-use {common::HashMap, log::trace};
-
-use crate::rudder::{
-    analysis::dfa::StatementUseAnalysis, BinaryOperationKind, Block, CastOperationKind,
-    ConstantValue, Function, PrimitiveTypeClass, StatementKind, Type,
+use {
+    crate::rudder::{
+        analysis::dfa::StatementUseAnalysis, BinaryOperationKind, Block, CastOperationKind,
+        ConstantValue, Function, PrimitiveTypeClass, StatementKind, Type,
+    },
+    common::HashMap,
+    core::panic,
+    log::trace,
+    std::rc::Rc,
 };
 
 pub fn run(f: Function) -> bool {
@@ -23,7 +25,45 @@ fn run_on_block(f: &Function, block: &Block) -> bool {
 
     changed |= do_direct_debundle(block);
     changed |= do_indirect_debundle(f, block);
-    //changed |= transform_constant_length_bundles(&block);
+    changed |= remove_illegal_unbundles(&block);
+    // changed |= transform_constant_length_bundles(&block);
+    // changed |= remove_illegal_unbundles(&block);
+
+    changed
+}
+
+fn remove_illegal_unbundles(block: &Block) -> bool {
+    let mut changed = false;
+
+    let sua = StatementUseAnalysis::new(block);
+
+    for stmt in block.statements() {
+        match stmt.kind() {
+            StatementKind::UnbundleValue { bundle } => {
+                if !bundle.typ().is_bundle() {
+                    if !sua.is_dead(&stmt) {
+                        for use_ in sua.get_uses(&stmt) {
+                            use_.replace_use(stmt.clone(), bundle.clone());
+                            changed = true;
+                        }
+                    }
+
+                    block.kill_statement(&stmt);
+                }
+            }
+            StatementKind::UnbundleLength { bundle } => {
+                if !bundle.typ().is_bundle() {
+                    stmt.replace_kind(StatementKind::Constant {
+                        typ: Rc::new(Type::u8()),
+                        value: ConstantValue::UnsignedInteger(bundle.typ().width_bits()),
+                    });
+
+                    changed = true;
+                }
+            }
+            _ => {}
+        };
+    }
 
     changed
 }
@@ -82,8 +122,12 @@ fn do_direct_debundle(block: &Block) -> bool {
     changed
 }
 
-fn _transform_constant_length_bundles(block: &Block) -> bool {
+fn transform_constant_length_bundles(block: &Block) -> bool {
     let mut changed = false;
+
+    for stmt in block.statements() {
+        //
+    }
 
     for stmt in block.statements() {
         changed |= match stmt.kind() {
@@ -152,6 +196,11 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
                 rhs,
             }
             | StatementKind::BinaryOperation {
+                kind: BinaryOperationKind::CompareEqual,
+                lhs,
+                rhs,
+            }
+            | StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::Sub,
                 lhs,
                 rhs,
@@ -182,7 +231,11 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
                                 }
 
                                 if !sua.get_uses(&stmt).iter().all(|use_| {
-                                    matches!(use_.kind(), StatementKind::UnbundleValue { .. })
+                                    matches!(
+                                        use_.kind(),
+                                        StatementKind::UnbundleValue { .. }
+                                            | StatementKind::Branch { .. }
+                                    )
                                 }) {
                                     continue;
                                 }
@@ -207,6 +260,10 @@ fn do_indirect_debundle(f: &Function, block: &Block) -> bool {
                                             use_of_unbundle
                                                 .replace_use(use_of_binop.clone(), stmt.clone());
                                         }
+                                    } else if let StatementKind::Branch { .. } = use_of_binop.kind()
+                                    {
+                                        use_of_binop
+                                            .replace_use(use_of_binop.clone(), stmt.clone());
                                     } else {
                                         panic!(
                                             "use of statement was not an unbundle value {}",

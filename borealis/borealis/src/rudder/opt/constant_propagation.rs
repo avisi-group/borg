@@ -1,6 +1,7 @@
-use log::trace;
-
-use crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, StatementKind};
+use {
+    crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, StatementKind},
+    log::trace,
+};
 
 // execute_aarch64_instrs_branch_conditional_cond
 

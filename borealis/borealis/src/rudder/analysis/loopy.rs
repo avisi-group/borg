@@ -1,29 +1,25 @@
-use {common::HashSet, std::collections::VecDeque};
-
-use crate::rudder::Function;
+use {crate::rudder::Function, common::HashSet, std::collections::VecDeque};
 
 pub struct LoopAnalysis {
-    f: Function,
     contains_loop: bool,
 }
 
 impl LoopAnalysis {
     pub fn new(f: &Function) -> Self {
         let mut selph = Self {
-            f: f.clone(),
             contains_loop: false,
         };
 
-        selph.analyse();
+        selph.analyse(f);
 
         selph
     }
 
-    fn analyse(&mut self) {
+    fn analyse(&mut self, f: &Function) {
         let mut work_list = VecDeque::new();
         let mut seen_list = HashSet::default();
 
-        work_list.push_back(self.f.entry_block());
+        work_list.push_back(f.entry_block());
 
         while !work_list.is_empty() {
             let current = work_list.pop_front().unwrap();

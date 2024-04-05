@@ -1,6 +1,7 @@
-use log::trace;
-
-use crate::rudder::{analysis::dfa::StatementUseAnalysis, Block};
+use {
+    crate::rudder::{analysis::dfa::StatementUseAnalysis, Block},
+    log::trace,
+};
 
 pub fn run(f: crate::rudder::Function) -> bool {
     let mut changed = false;

@@ -1,6 +1,8 @@
-use {common::HashMap, log::trace};
-
-use crate::rudder::{analysis, Block, Function, StatementKind, SymbolKind};
+use {
+    crate::rudder::{analysis, Block, Function, StatementKind, SymbolKind},
+    common::HashMap,
+    log::trace,
+};
 
 pub fn run(f: Function) -> bool {
     let symbol_ua = analysis::dfa::SymbolUseAnalysis::new(&f);

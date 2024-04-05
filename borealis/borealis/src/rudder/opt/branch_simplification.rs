@@ -1,6 +1,7 @@
-use log::trace;
-
-use crate::rudder::{Function, StatementKind};
+use {
+    crate::rudder::{Function, StatementKind},
+    log::trace,
+};
 
 pub fn run(f: Function) -> bool {
     // check condition for branch.  if it's const, replace with a jump.  if both

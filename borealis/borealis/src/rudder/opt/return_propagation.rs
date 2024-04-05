@@ -1,6 +1,7 @@
-use log::trace;
-
-use crate::rudder::{analysis::cfg::ControlFlowGraphAnalysis, Function, StatementKind};
+use {
+    crate::rudder::{analysis::cfg::ControlFlowGraphAnalysis, Function, StatementKind},
+    log::trace,
+};
 
 pub fn run(f: Function) -> bool {
     let cfg = ControlFlowGraphAnalysis::new(&f);
