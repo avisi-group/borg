@@ -1,8 +1,9 @@
 use {
     crate::rudder::{Block, Context, Function, StatementKind},
     common::{intern::InternedString, HashMap, HashSet},
+    dot::{GraphWalk, Labeller},
     log::trace,
-    std::collections::VecDeque,
+    std::{collections::VecDeque, io},
 };
 
 pub struct ControlFlowGraphAnalysis {
@@ -94,13 +95,15 @@ impl ControlFlowGraphAnalysis {
 }
 
 pub struct FunctionCallGraphAnalysis {
-    pub fns: HashMap<InternedString, HashSet<InternedString>>,
+    fn_callers: HashMap<InternedString, HashSet<InternedString>>,
+    fn_callees: HashMap<InternedString, HashSet<InternedString>>,
 }
 
 impl FunctionCallGraphAnalysis {
     pub fn new(ctx: &Context) -> Self {
         let mut selph = Self {
-            fns: HashMap::default(),
+            fn_callers: HashMap::default(),
+            fn_callees: HashMap::default(),
         };
 
         selph.analyse(ctx);
@@ -109,14 +112,19 @@ impl FunctionCallGraphAnalysis {
     }
 
     fn analyse(&mut self, ctx: &Context) {
+        for (fname, f) in ctx.get_functions() {
+            assert!(fname == f.name());
+
+            self.fn_callees.insert(f.name(), HashSet::default());
+            self.fn_callers.insert(f.name(), HashSet::default());
+        }
+
         for (_, f) in ctx.get_functions() {
             self.analyse_function(&f);
         }
     }
 
     fn analyse_function(&mut self, f: &Function) {
-        let mut callees = HashSet::default();
-
         for block in f.entry_block().iter() {
             let statements = block.statements();
             let call_targets = statements.iter().filter_map(|s| match s.kind() {
@@ -125,9 +133,94 @@ impl FunctionCallGraphAnalysis {
             });
             // TODO .unique();
 
-            callees.extend(call_targets);
-        }
+            for call_target in call_targets {
+                // Callees are functions that *this* function calls.
+                self.fn_callees.entry(f.name()).and_modify(|callees| {
+                    callees.insert(call_target);
+                });
 
-        self.fns.insert(f.name(), callees);
+                // Callers are functions that call the target function
+                self.fn_callers.entry(call_target).and_modify(|callers| {
+                    callers.insert(f.name());
+                });
+            }
+        }
+    }
+
+    pub fn get_callers_for(&self, f: &InternedString) -> Vec<InternedString> {
+        self.fn_callers
+            .get(f)
+            .map_or(vec![], |f| f.iter().cloned().collect())
+    }
+
+    pub fn get_callees_for(&self, f: &InternedString) -> Vec<InternedString> {
+        self.fn_callees
+            .get(f)
+            .map_or(vec![], |f| f.iter().cloned().collect())
+    }
+
+    pub fn to_dot<W: io::Write>(&self, w: &mut W) -> io::Result<()> {
+        dot::render(self, w)
+    }
+}
+
+type NodeId = InternedString;
+type EdgeId = (NodeId, NodeId);
+
+impl<'ast> Labeller<'ast, NodeId, EdgeId> for FunctionCallGraphAnalysis {
+    fn graph_id(&'ast self) -> dot::Id<'ast> {
+        dot::Id::new("FCG").unwrap()
+    }
+
+    fn node_id(&'ast self, n: &NodeId) -> dot::Id<'ast> {
+        dot::Id::new(n.to_string()).unwrap()
+    }
+}
+
+impl<'ast> GraphWalk<'ast, NodeId, EdgeId> for FunctionCallGraphAnalysis {
+    fn nodes(&'ast self) -> dot::Nodes<'ast, NodeId> {
+        self.fn_callees
+            .keys()
+            .cloned()
+            .map(|n| crate::brig::codegen_ident(n).to_string().into())
+            .collect::<Vec<InternedString>>()
+            .into()
+    }
+
+    fn edges(&'ast self) -> dot::Edges<'ast, EdgeId> {
+        let edges = Vec::new();
+
+        /*for (caller, callees) in &self.fn_callees {
+            for callee in callees {
+                edges.push((caller.clone(), callee.clone()));
+            }
+        }*/
+
+        edges.into()
+    }
+
+    fn source(&'ast self, edge: &EdgeId) -> NodeId {
+        edge.0
+    }
+
+    fn target(&'ast self, edge: &EdgeId) -> NodeId {
+        edge.1
+    }
+}
+
+pub struct FunctionCallGraphPartitioner;
+
+impl FunctionCallGraphPartitioner {
+    pub fn new(ctx: &Context) -> Self {
+        let fcg = FunctionCallGraphAnalysis::new(ctx);
+
+        let mut selph = Self;
+        selph.analyse(fcg);
+
+        selph
+    }
+
+    fn analyse(&mut self, fcg: FunctionCallGraphAnalysis) {
+        //
     }
 }
