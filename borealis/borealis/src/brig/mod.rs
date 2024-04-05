@@ -12,7 +12,8 @@ use {
         },
         brig::{
             allowlist::apply_fn_allowlist, bundle::codegen_bundle,
-            functions_interpreter::codegen_functions, state::codegen_state, workspace_diff::write_workspace,
+            functions_interpreter::codegen_functions, state::codegen_state,
+            workspace_diff::write_workspace,
         },
         rudder::{
             self, analysis::cfg::FunctionCallGraphAnalysis, Context, PrimitiveTypeClass, Type,
@@ -234,6 +235,7 @@ fn codegen_types(rudder: &Context) -> TokenStream {
 
             quote! {
                 #[derive(Default, Debug, Clone, Copy)]
+                #[repr(C)]
                 pub struct #ident {
                     #fields
                 }
@@ -300,7 +302,8 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
         //! BOREALIS GENERATED FILE DO NOT MODIFY
     };
 
-    // common crate depended on by all containing bundle, tracer, state, and structs/enums/unions
+    // common crate depended on by all containing bundle, tracer, state, and
+    // structs/enums/unions
     let common = {
         let types = codegen_types(rudder);
 
@@ -374,12 +377,14 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
     };
 
     let cfg = FunctionCallGraphAnalysis::new(rudder);
+    cfg.to_dot(&mut create_file("target/fcg.dot").unwrap())
+        .unwrap();
 
     let functions = codegen_functions(rudder, ENTRYPOINT.into())
         .into_iter()
         .map(|(name, contents)| {
-            let mut dependencies = cfg.fns.get(&name).unwrap().clone();
-            dependencies.insert("common".into());
+            let mut dependencies = cfg.get_callees_for(&name); // fns.get(&name).unwrap().clone();
+            dependencies.push("common".into());
 
             let imports: TokenStream = dependencies
                 .iter()

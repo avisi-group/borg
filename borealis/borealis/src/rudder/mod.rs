@@ -105,6 +105,21 @@ impl Type {
         }
     }
 
+    /// Gets the offset in bytes of a field of a composite or an element of a
+    /// vector
+    pub fn byte_offset(&self, element_field: usize) -> Option<usize> {
+        match self {
+            Type::Composite(fields) => Some(
+                fields
+                    .iter()
+                    .take(element_field)
+                    .fold(0, |acc, typ| acc + typ.width_bytes()),
+            ),
+            Type::Vector { element_type, .. } => Some(element_field * element_type.width_bytes()),
+            _ => None,
+        }
+    }
+
     pub fn width_bits(&self) -> usize {
         match self {
             Self::Composite(xs) => xs.iter().map(|x| x.width_bits()).sum(),
@@ -156,6 +171,10 @@ impl Type {
             }
             _ => false,
         }
+    }
+
+    pub fn is_bundle(&self) -> bool {
+        matches!(self, Self::Bundled { .. })
     }
 
     pub fn is_u1(&self) -> bool {
@@ -335,6 +354,7 @@ pub enum UnaryOperationKind {
     Negate,
     Complement,
     Power2,
+    Absolute,
 }
 
 #[derive(Debug, Clone)]
@@ -1149,17 +1169,26 @@ impl Block {
         self.inner.borrow_mut().statements.extend(stmts)
     }
 
-    pub fn kill_statement(&self, stmt: &Statement) {
-        //assert!(Rc::ptr_eq()
-
-        let (index, _) = self
-            .inner
+    fn index_of_statement(&self, reference: &Statement) -> usize {
+        self.inner
             .borrow()
             .statements
             .iter()
             .enumerate()
-            .find(|(_, candidate)| *candidate == stmt)
-            .unwrap();
+            .find(|(_, candidate)| *candidate == reference)
+            .unwrap()
+            .0
+    }
+
+    pub fn insert_statement_before(&self, reference: &Statement, new: Statement) {
+        let index = self.index_of_statement(reference);
+        self.inner.borrow_mut().statements.insert(index, new);
+    }
+
+    pub fn kill_statement(&self, stmt: &Statement) {
+        //assert!(Rc::ptr_eq()
+
+        let index = self.index_of_statement(stmt);
 
         self.inner.borrow_mut().statements.remove(index);
     }
@@ -1344,6 +1373,10 @@ impl Function {
 
     pub fn name(&self) -> InternedString {
         self.inner.borrow().name
+    }
+
+    pub fn weight(&self) -> u64 {
+        0 //self.inner.borrow().entry_block().iter().
     }
 
     pub fn signature(&self) -> (Rc<Type>, Vec<Symbol>) {

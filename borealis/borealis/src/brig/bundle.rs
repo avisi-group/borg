@@ -14,6 +14,22 @@ pub fn codegen_bundle() -> TokenStream {
             }
         }
 
+        impl Bundle<i64, u8>  {
+            pub fn abs(self) -> Self {
+               Self {
+                    value: self.value.abs(),
+                    length: self.length
+               }
+            }
+
+            pub fn pow2(self) -> Self {
+                Self {
+                    value: self.value.pow(2),
+                    length: self.length
+               }
+            }
+        }
+
         impl<V: core::ops::BitAnd<Output = V>, L> core::ops::BitAnd for Bundle<V, L> {
             type Output = Self;
 

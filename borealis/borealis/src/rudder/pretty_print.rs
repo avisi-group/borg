@@ -94,6 +94,7 @@ impl Display for StatementKind {
                     UnaryOperationKind::Not => "not",
                     UnaryOperationKind::Negate => "neg",
                     UnaryOperationKind::Power2 => "pow2",
+                    UnaryOperationKind::Absolute => "abs",
                 };
 
                 write!(f, "{} {}", op, value.name())

@@ -302,6 +302,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 UnaryOperationKind::Negate => quote! {-#value},
                 UnaryOperationKind::Complement => quote! {!#value},
                 UnaryOperationKind::Power2 => quote! { (#value).pow2() },
+                UnaryOperationKind::Absolute => quote! { (#value).abs() },
             }
         }
         StatementKind::ShiftOperation {
