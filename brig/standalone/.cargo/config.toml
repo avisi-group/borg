@@ -1,0 +1,3 @@
+[build]
+# parallel frontend
+rustflags = ["-Z", "threads=12"]

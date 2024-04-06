@@ -1,7 +1,12 @@
+
 [package]
 name = "standalone"
 version = "0.1.0"
 edition = "2021"
+
+[profile.dev]
+opt-level = 1
+codegen-units = 1024
 
 [dependencies]
 arch = { path = "../../brig-aarch64/arch" }
