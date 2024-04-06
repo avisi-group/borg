@@ -1,8 +1,10 @@
-use cargo_metadata::{Artifact, Message};
-use itertools::Itertools;
-use std::{
-    io::BufReader,
-    process::{Command, Stdio},
+use {
+    cargo_metadata::{Artifact, Message},
+    itertools::Itertools,
+    std::{
+        io::BufReader,
+        process::{Command, Stdio},
+    },
 };
 
 fn main() {
