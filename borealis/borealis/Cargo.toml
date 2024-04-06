@@ -26,7 +26,7 @@ dot = "0.1.4"
 itertools = "0.12.1"
 kinded = "0.3.0"
 quote = "1.0.35"
-syn = { version = "2.0.57",  features = ["full", "parsing"] }
+syn = { version = "2.0.58",  features = ["full", "parsing"] }
 prettyplease = "0.2.17"
 proc-macro2 = "1.0.79"
 memmap2 = "0.9.4"

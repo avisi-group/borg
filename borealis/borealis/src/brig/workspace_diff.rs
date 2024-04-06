@@ -18,6 +18,12 @@ pub fn write_workspace<P: AsRef<Path>>(workspace: &Workspace, path: P) {
     let target_fs = build_fs(workspace);
     let current_fs = read_fs(path.as_ref());
 
+    log::info!(
+        "writing workspace: {} files, {} folders",
+        target_fs.0.len(),
+        target_fs.1.len()
+    );
+
     write_difference(target_fs, current_fs, path.as_ref());
 }
 
