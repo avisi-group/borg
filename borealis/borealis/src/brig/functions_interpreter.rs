@@ -34,15 +34,74 @@ pub fn codegen_functions(
         .map(|(name, function)| {
             let name_ident = codegen_ident(name);
             let (return_type, parameters) = function.signature();
+
+            let function_parameters = codegen_parameters(&parameters);
             let return_type = codegen_type(return_type);
-            let parameters = codegen_parameters(parameters);
-            let body = codegen_body(function.clone());
+
+            let fn_state = {
+                let fields = function
+                    .local_variables()
+                    .iter()
+                    .chain(&parameters)
+                    .map(|symbol| {
+                        let name = codegen_ident(symbol.name());
+                        let typ = codegen_type(symbol.typ());
+
+                        quote! {
+                            #name: #typ,
+                        }
+                    })
+            .collect::<TokenStream>();
+
+            // copy from parameters into fn state
+                let parameter_copies = parameters.iter().map(|symbol| {
+                let name = codegen_ident(symbol.name());
+
+                    quote! {
+                        #name,
+                    }
+                })
+                .collect::<TokenStream>();
+
+                quote! {
+                    #[derive(Default)]
+                    struct FunctionState {
+                        #fields
+                    }
+
+                    let fn_state = FunctionState {
+                        #parameter_copies
+                        ..Default::default()
+                    };
+                }
+            };
+
+            let entry_block = format_ident!("block_{}", function.entry_block().name().to_string());
+
+            let block_fns = function
+                .entry_block()
+                .iter()
+                .map(|block| {
+                    let block_name = format_ident!("block_{}", block.name().to_string());
+                    let block_impl = codegen_block(block);
+
+                    quote! {
+                        fn #block_name(state: &mut State, mut fn_state: FunctionState) -> #return_type {
+                            #block_impl
+                        }
+                    }
+                })
+                .collect::<TokenStream>();
 
             (
                 name,
                 quote! {
-                    pub fn #name_ident<T: Tracer>(#parameters) -> #return_type {
-                        #body
+                    pub fn #name_ident(#function_parameters) -> #return_type {
+                        #fn_state
+
+                        return #entry_block(state, fn_state);
+
+                        #block_fns
                     }
                 },
             )
@@ -50,8 +109,8 @@ pub fn codegen_functions(
         .collect()
 }
 
-fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
-    let parameters = [quote!(state: &mut State, tracer: &mut T)]
+fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
+    let parameters = [quote!(state: &mut State)]
         .into_iter()
         .chain(parameters.iter().map(|sym| {
             let name = codegen_ident(sym.name());
@@ -61,81 +120,6 @@ fn codegen_parameters(parameters: Vec<Symbol>) -> TokenStream {
 
     quote! {
         #(#parameters),*
-    }
-}
-
-fn codegen_body(function: Function) -> TokenStream {
-    // local variables
-    // block indicies
-    // current block
-
-    let block_defs = function
-        .entry_block()
-        .iter()
-        .enumerate()
-        .map(|(idx, block)| {
-            let block_name = format_ident!("BLOCK_{}", block.name().to_string());
-            let idx = u32::try_from(idx).unwrap();
-
-            quote! {
-                const #block_name: u32 = #idx;
-            }
-        })
-        .collect::<TokenStream>();
-
-    let local_vars = function
-        .local_variables()
-        .iter()
-        .map(|symbol| {
-            let name = codegen_ident(symbol.name());
-            let typ = codegen_type(symbol.typ());
-
-            quote! {
-                let mut #name: #typ = Default::default();
-            }
-        })
-        .collect::<TokenStream>();
-
-    if function.entry_block().iter().count() == 1 {
-        let block_impl = codegen_block(function.entry_block());
-
-        quote! {
-            #local_vars
-
-            #block_impl
-        }
-    } else {
-        let entry_block_name = format_ident!("BLOCK_{}", function.entry_block().name().to_string());
-
-        let block_arms = function
-            .entry_block()
-            .iter()
-            .map(|block| {
-                let block_name = format_ident!("BLOCK_{}", block.name().to_string());
-                let block_impl = codegen_block(block);
-
-                quote! {
-                    #block_name => {
-                        #block_impl
-                    }
-                }
-            })
-            .collect::<TokenStream>();
-
-        quote! {
-            #block_defs
-
-            #local_vars
-
-            let mut current_block = #entry_block_name;
-
-            loop {
-                match current_block {
-                    #block_arms
-                    u => panic!("undefined block {u}")
-                }
-            }
-        }
     }
 }
 
@@ -152,6 +136,7 @@ fn get_ident(stmt: &Statement) -> TokenStream {
     format_ident!("{}", stmt.name().to_string()).to_token_stream()
 }
 
+//
 pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
@@ -188,12 +173,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::ReadVariable { symbol } => {
             let var = codegen_ident(symbol.name());
-            quote! {#var}
+            quote! {fn_state.#var}
         }
         StatementKind::WriteVariable { symbol, value } => {
             let var = codegen_ident(symbol.name());
             let value = get_ident(&value);
-            quote! {#var = #value}
+            quote! {fn_state.#var = #value}
         }
         StatementKind::ReadRegister { typ, offset } => {
             let offset = get_ident(&offset);
@@ -201,7 +186,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     let value = state.read_register::<#typ>(#offset as isize);
-                    tracer.read_register(#offset as usize, value);
+                   // tracer.read_register(#offset as usize, value);
                     value
                 }
             }
@@ -213,7 +198,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     state.write_register::<#typ>(#offset as isize, #value);
-                    tracer.write_register(#offset as usize, #value);
+                  //  tracer.write_register(#offset as usize, #value);
                 }
             }
         }
@@ -334,11 +319,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             } else {
                 if tail {
                     quote! {
-                        return #ident(state, tracer, #(#args),*)
+                        return #ident(state, #(#args),*)
                     }
                 } else {
                     quote! {
-                        #ident(state, tracer, #(#args),*)
+                        #ident(state, #(#args),*)
                     }
                 }
             }
@@ -406,9 +391,9 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::Jump { target } => {
-            let target = format_ident!("BLOCK_{}", target.name().to_string());
+            let target = format_ident!("block_{}", target.name().to_string());
             quote! {
-                current_block = #target;
+               return #target(state, fn_state);
             }
         }
         StatementKind::Branch {
@@ -417,11 +402,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             false_target,
         } => {
             let condition = get_ident(&condition);
-            let true_target = format_ident!("BLOCK_{}", true_target.name().to_string());
-            let false_target = format_ident!("BLOCK_{}", false_target.name().to_string());
+            let true_target = format_ident!("block_{}", true_target.name().to_string());
+            let false_target = format_ident!("block_{}", false_target.name().to_string());
 
             quote! {
-                current_block = if #condition { #true_target } else { #false_target };
+                if #condition { return #true_target(state, fn_state); } else { return #false_target(state, fn_state); }
             }
         }
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
