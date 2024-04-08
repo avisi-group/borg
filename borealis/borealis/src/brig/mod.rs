@@ -354,11 +354,13 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
 
                         use #entrypoint_ident::#entrypoint_ident;
 
-                        pub fn decode_execute(value: u32, state: &mut State) -> ExecuteResult {
+                        pub fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &T) -> ExecuteResult {
                             // reset SEE
                             state.write_register(REG_SEE, 0u64);
 
-                            #entrypoint_ident(state, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value);
+                            tracer.begin(state.read_register::<u64>(REG_U_PC));
+
+                            #entrypoint_ident(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value);
 
                             // increment PC if no branch was taken
                             if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
@@ -367,6 +369,8 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
                             }
 
                             state.write_register(REG_U__BRANCHTAKEN, false);
+
+                            tracer.end();
 
                             ExecuteResult::Ok
                         }

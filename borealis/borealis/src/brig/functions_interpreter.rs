@@ -86,7 +86,7 @@ pub fn codegen_functions(
                     let block_impl = codegen_block(block);
 
                     quote! {
-                        fn #block_name(state: &mut State, mut fn_state: FunctionState) -> #return_type {
+                        fn #block_name<T: Tracer>(state: &mut State, tracer: &T, mut fn_state: FunctionState) -> #return_type {
                             #block_impl
                         }
                     }
@@ -96,10 +96,10 @@ pub fn codegen_functions(
             (
                 name,
                 quote! {
-                    pub fn #name_ident(#function_parameters) -> #return_type {
+                    pub fn #name_ident<T: Tracer>(#function_parameters) -> #return_type {
                         #fn_state
 
-                        return #entry_block(state, fn_state);
+                        return #entry_block(state, tracer, fn_state);
 
                         #block_fns
                     }
@@ -110,7 +110,7 @@ pub fn codegen_functions(
 }
 
 fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
-    let parameters = [quote!(state: &mut State)]
+    let parameters = [quote!(state: &mut State), quote!(tracer: &T)]
         .into_iter()
         .chain(parameters.iter().map(|sym| {
             let name = codegen_ident(sym.name());
@@ -186,7 +186,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     let value = state.read_register::<#typ>(#offset as isize);
-                   // tracer.read_register(#offset as usize, value);
+                    tracer.read_register(#offset as usize, value);
                     value
                 }
             }
@@ -198,7 +198,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     state.write_register::<#typ>(#offset as isize, #value);
-                  //  tracer.write_register(#offset as usize, #value);
+                    tracer.write_register(#offset as usize, #value);
                 }
             }
         }
@@ -319,11 +319,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             } else {
                 if tail {
                     quote! {
-                        return #ident(state, #(#args),*)
+                        return #ident(state, tracer, #(#args),*)
                     }
                 } else {
                     quote! {
-                        #ident(state, #(#args),*)
+                        #ident(state, tracer, #(#args),*)
                     }
                 }
             }
@@ -393,7 +393,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Jump { target } => {
             let target = format_ident!("block_{}", target.name().to_string());
             quote! {
-               return #target(state, fn_state);
+               return #target(state, tracer, fn_state);
             }
         }
         StatementKind::Branch {
@@ -406,7 +406,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let false_target = format_ident!("block_{}", false_target.name().to_string());
 
             quote! {
-                if #condition { return #true_target(state, fn_state); } else { return #false_target(state, fn_state); }
+                if #condition { return #true_target(state, tracer, fn_state); } else { return #false_target(state, tracer, fn_state); }
             }
         }
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
