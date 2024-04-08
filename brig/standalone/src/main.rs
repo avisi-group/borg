@@ -16,6 +16,26 @@ impl Tracer for NoopTracer {
     fn write_register<T: Debug>(&self, _offset: usize, _value: T) {}
 }
 
+struct PrintlnTracer;
+
+impl Tracer for PrintlnTracer {
+    fn begin(&self, pc: u64) {
+        print!("[{pc:x}] ");
+    }
+
+    fn end(&self) {
+        println!();
+    }
+
+    fn read_register<T: Debug>(&self, offset: usize, value: T) {
+        print!("R[{offset:x}] -> {value:?}) ");
+    }
+
+    fn write_register<T: Debug>(&self, offset: usize, value: T) {
+        print!("R[{offset:x}] <- {value:?}) ");
+    }
+}
+
 fn main() {
     unsafe {
         rustix::mm::mmap_anonymous(
@@ -34,8 +54,8 @@ fn main() {
     // todo read kernel from TAR
 
     // read header from kernel
-    let header = unsafe { &*(kernel.as_ptr() as *const Arm64KernelHeader) };
-    assert_eq!(ARM64_MAGIC, header.magic);
+    // let header = unsafe { &*(kernel.as_ptr() as *const Arm64KernelHeader) };
+    // assert_eq!(ARM64_MAGIC, header.magic);
 
     let mut state = State::init();
 
@@ -50,7 +70,7 @@ fn main() {
 
         // println!("fetch @ {:x} = {:08x}", pc, insn_data);
 
-        match decode_execute(insn_data, &mut state, &mut NoopTracer) {
+        match decode_execute(insn_data, &mut state, &PrintlnTracer) {
             ExecuteResult::Ok | ExecuteResult::EndOfBlock => {
                 instructions_retired += 1;
             }

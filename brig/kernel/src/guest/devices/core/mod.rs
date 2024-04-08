@@ -125,7 +125,7 @@ impl ExecutionEngine<arch::State> for Interpreter {
         let insn_data = fetch(state.pc());
         // log::trace!("fetch @ {:x} = {:08x}", state.pc(), insn_data);
 
-        match arch::decode_execute(insn_data, state, &mut LogTracer) {
+        match arch::decode_execute(insn_data, state, &LogTracer) {
             arch::ExecuteResult::Ok | arch::ExecuteResult::EndOfBlock => {
                 self.instructions_retired += 1;
                 StepResult::Ok
