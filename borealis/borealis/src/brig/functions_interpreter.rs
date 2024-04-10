@@ -16,6 +16,7 @@ use {
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
     std::rc::Rc,
+    syn::Ident,
 };
 
 pub fn codegen_functions(
@@ -76,13 +77,13 @@ pub fn codegen_functions(
                 }
             };
 
-            let entry_block = format_ident!("block_{}", function.entry_block().name().to_string());
+            let entry_block = get_block_fn_ident(&function.entry_block());
 
             let block_fns = function
                 .entry_block()
                 .iter()
                 .map(|block| {
-                    let block_name = format_ident!("block_{}", block.name().to_string());
+                    let block_name = get_block_fn_ident(&block);
                     let block_impl = codegen_block(block);
 
                     quote! {
@@ -134,6 +135,10 @@ fn codegen_block(block: Block) -> TokenStream {
 
 fn get_ident(stmt: &Statement) -> TokenStream {
     format_ident!("{}", stmt.name().to_string()).to_token_stream()
+}
+
+fn get_block_fn_ident(b: &Block) -> Ident {
+    format_ident!("block_{}", b.name().as_ref())
 }
 
 //
@@ -363,8 +368,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                                 assert!(target.width_bits() < source.width_bits());
 
                                 // create mask of length target
-                                let mask =
-                                    Literal::u64_unsuffixed((1u64 << target.width_bits()) - 1);
+
+                                let mask = Literal::u64_unsuffixed(
+                                    1u64.checked_shl(u32::try_from(target.width_bits()).unwrap())
+                                        .map(|x| x - 1)
+                                        .unwrap_or(!0),
+                                );
 
                                 // cast to target type and apply mask to source
                                 let target = codegen_type(target);
@@ -391,7 +400,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::Jump { target } => {
-            let target = format_ident!("block_{}", target.name().to_string());
+            let target = get_block_fn_ident(&target);
             quote! {
                return #target(state, tracer, fn_state);
             }
@@ -402,8 +411,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             false_target,
         } => {
             let condition = get_ident(&condition);
-            let true_target = format_ident!("block_{}", true_target.name().to_string());
-            let false_target = format_ident!("block_{}", false_target.name().to_string());
+            let true_target = get_block_fn_ident(&true_target);
+            let false_target = get_block_fn_ident(&false_target);
 
             quote! {
                 if #condition { return #true_target(state, tracer, fn_state); } else { return #false_target(state, tracer, fn_state); }

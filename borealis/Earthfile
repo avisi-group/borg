@@ -102,7 +102,6 @@ e2e-test-brig:
     COPY (+e2e-test-sailrs/arm-v9.4-a.rkyv) arm-v9.4-a.rkyv
     COPY (+build-borealis/borealis) borealis
 
-    RUN mkdir target
-    RUN ./borealis --standalone arm-v9.4-a.rkyv aarch64.rs
-    RUN rustc --edition 2021 aarch64.rs
+    RUN ./borealis --standalone arm-v9.4-a.rkyv aarch64
+    RUN cd aarch64 && cargo c
  #   RUN ./aarch64 91500421

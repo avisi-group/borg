@@ -679,7 +679,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         }
                     }
                 }
-                boom::Expression::Field { expression, field } => match &**expression {
+                boom::Expression::Field {
+                    expression,
+                    field: inner_field,
+                } => match &**expression {
                     boom::Expression::Identifier(ident) => {
                         // copied from build_copy
 
@@ -694,7 +697,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                 .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
                                 .expect("failed to find struct :(");
 
-                            let idx = fields.get(field).unwrap();
+                            let idx = fields.get(inner_field).unwrap();
 
                             // read variable
                             let read_var =
@@ -730,7 +733,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             todo!()
                         }
                     }
-                    _ => todo!(),
+                    boom::Expression::Field {
+                        expression,
+                        field: outer_field,
+                    } => match &**expression {
+                        boom::Expression::Identifier(ident) => {
+                            // ident.inner_field.outer_field
+                            todo!()
+                        }
+                        boom::Expression::Field { expression, field } => todo!(),
+                        boom::Expression::Address(_) => todo!(),
+                    },
+                    boom::Expression::Address { .. } => todo!(),
                 },
                 boom::Expression::Address(_) => todo!(),
             }
@@ -1390,6 +1404,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val append_64 : (%bv, %bv64) -> %bv
                 "append_64" => {
+                    log::warn!("append_64 will overflow u64-backed bundle");
                     let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
                     Some(self.generate_concat(args[0].clone(), rhs))
                 }
