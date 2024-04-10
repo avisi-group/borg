@@ -38,7 +38,12 @@ fn main() {
         })
         // get *one* executable compiler artifact path
         .exactly_one()
-        .map_err(|rest| format!("did not get exactly one matching compiler artifact: {:?}", rest.collect::<Vec<_>>()))
+        .map_err(|rest| {
+            format!(
+                "did not get exactly one matching compiler artifact: {:?}",
+                rest.collect::<Vec<_>>()
+            )
+        })
         .unwrap()
         .canonicalize()
         .unwrap();
