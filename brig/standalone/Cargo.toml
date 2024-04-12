@@ -9,4 +9,5 @@ debug = true
 
 [dependencies]
 arch = { path = "../../brig-aarch64/arch" }
+clap = { version = "4.5.4", features = ["derive"] }
 rustix = { version = "0.38.32", features = ["mm"] }

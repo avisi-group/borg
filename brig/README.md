@@ -30,4 +30,4 @@ The `standalone` directory can be built to run the generated ISA model outside o
 
 ### Panic Abort Errors
 
-Make sure you are in the root dir not `kernel` when running `cargo r`.
+Make sure you are in the `brig-cli` directory not `brig` when running `cargo r`.

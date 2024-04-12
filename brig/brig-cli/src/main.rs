@@ -14,7 +14,7 @@ fn main() {
 
     let mut cmd = Command::new("cargo")
         .args(["build", "--message-format=json"])
-        .current_dir("../kernel")
+        .current_dir("../brig")
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
