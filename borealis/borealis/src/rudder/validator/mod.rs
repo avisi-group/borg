@@ -165,18 +165,15 @@ fn check_operand_types(ctx: &Context) -> Vec<ValidationMessage> {
     for (_, f) in ctx.get_functions() {
         for b in f.entry_block().iter() {
             for s in b.statements() {
-                match s.kind() {
-                    StatementKind::BinaryOperation { lhs, rhs, .. } => {
-                        if !lhs.typ().is_compatible_with(&*rhs.typ()) {
-                            messages.push(ValidationMessage::stmt_err(
-                                &f,
-                                &b,
-                                &s,
-                                "incompatible operand types in binary operation",
-                            ));
-                        }
+                if let StatementKind::BinaryOperation { lhs, rhs, .. } = s.kind() {
+                    if !lhs.typ().is_compatible_with(&*rhs.typ()) {
+                        messages.push(ValidationMessage::stmt_err(
+                            &f,
+                            &b,
+                            &s,
+                            "incompatible operand types in binary operation",
+                        ));
                     }
-                    _ => {}
                 }
             }
         }

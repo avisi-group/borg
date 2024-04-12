@@ -178,12 +178,24 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::ReadVariable { symbol } => {
             let var = codegen_ident(symbol.name());
-            quote! {fn_state.#var}
+            quote! {fn_state.#var.clone()}
         }
-        StatementKind::WriteVariable { symbol, value } => {
+        StatementKind::WriteVariable {
+            symbol,
+            indices,
+            value,
+        } => {
             let var = codegen_ident(symbol.name());
+
+            let indices = indices
+                .iter()
+                .copied()
+                .map(codegen_member)
+                .map(|field| quote!(.#field))
+                .collect::<TokenStream>();
+
             let value = get_ident(&value);
-            quote! {fn_state.#var = #value}
+            quote! {fn_state.#var #indices = #value}
         }
         StatementKind::ReadRegister { typ, offset } => {
             let offset = get_ident(&offset);
@@ -317,19 +329,13 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let ident = codegen_ident(target.name());
             let args = args.iter().map(get_ident);
 
-            // todo: remove this
-            if target.name().as_ref().starts_with("unimplemented_") {
-                let msg = target.name().to_string();
-                quote! { unimplemented!(#msg) }
+            if tail {
+                quote! {
+                    return #ident(state, tracer, #(#args),*)
+                }
             } else {
-                if tail {
-                    quote! {
-                        return #ident(state, tracer, #(#args),*)
-                    }
-                } else {
-                    quote! {
-                        #ident(state, tracer, #(#args),*)
-                    }
+                quote! {
+                    #ident(state, tracer, #(#args),*)
                 }
             }
         }

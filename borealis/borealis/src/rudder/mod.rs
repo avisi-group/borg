@@ -389,6 +389,10 @@ pub enum StatementKind {
 
     WriteVariable {
         symbol: Symbol,
+        /// Indices, when not empty, indicate access to fields/elements
+        ///
+        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a struct of a vec of structs
+        indices: Vec<usize>,
         value: Statement,
     },
 
@@ -825,9 +829,12 @@ impl StatementInner {
                     false_target: false_target,
                 };
             }
-            StatementKind::WriteVariable { symbol, .. } => {
+            StatementKind::WriteVariable {
+                symbol, indices, ..
+            } => {
                 self.kind = StatementKind::WriteVariable {
                     symbol,
+                    indices,
                     value: with.clone(),
                 };
             }

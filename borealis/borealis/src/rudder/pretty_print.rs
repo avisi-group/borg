@@ -53,8 +53,20 @@ impl Display for StatementKind {
             StatementKind::ReadVariable { symbol } => {
                 write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
             }
-            StatementKind::WriteVariable { symbol, value } => {
-                write!(f, "write-var {} <= {}", symbol.name(), value.name())
+            StatementKind::WriteVariable {
+                symbol,
+                indices,
+                value,
+            } => {
+                if indices.is_empty() {
+                    write!(f, "write-var {} <= {}", symbol.name(), value.name())
+                } else {
+                    write!(f, "write-var {}", symbol.name())?;
+                    for index in indices {
+                        write!(f, ".{}", index)?;
+                    }
+                    write!(f, " <= {}", value.name())
+                }
             }
             StatementKind::ReadRegister { typ, offset } => {
                 write!(f, "read-reg {}:{}", offset.name(), typ)

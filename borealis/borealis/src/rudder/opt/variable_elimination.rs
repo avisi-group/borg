@@ -2,6 +2,7 @@ use {
     crate::rudder::{analysis, Block, Function, StatementKind, SymbolKind},
     common::HashMap,
     log::trace,
+    std::collections::hash_map::Entry,
 };
 
 pub fn run(f: Function) -> bool {
@@ -39,22 +40,26 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
 
     let mut changed = false;
     for stmt in block.statements() {
-        if let StatementKind::WriteVariable { symbol, value } = stmt.kind() {
+        // todo: ask tom about fields
+        if let StatementKind::WriteVariable { symbol, value, .. } = stmt.kind() {
             // Ignore global symbols (for now)
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }
 
             trace!("considering variable write to {}", symbol.name());
-            if live_writes.contains_key(&symbol.name()) {
-                trace!(
-                    "already live write to symbol {}, updating live value",
-                    symbol.name()
-                );
-                live_writes.insert(symbol.name(), value.clone());
-            } else {
-                trace!("starting live range for symbol {}", symbol.name());
-                live_writes.insert(symbol.name(), value.clone());
+            match live_writes.entry(symbol.name()) {
+                Entry::Occupied(mut e) => {
+                    trace!(
+                        "already live write to symbol {}, updating live value",
+                        symbol.name()
+                    );
+                    e.insert(value.clone());
+                }
+                Entry::Vacant(e) => {
+                    trace!("starting live range for symbol {}", symbol.name());
+                    e.insert(value.clone());
+                }
             }
         } else if let StatementKind::ReadVariable { symbol } = stmt.kind() {
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {

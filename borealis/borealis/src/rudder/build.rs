@@ -454,158 +454,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         let source = self.build_value(value.clone());
 
-        let source_type = source.typ();
-
-        match expression {
-            boom::Expression::Identifier(ident) => {
-                match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                    Some(symbol) => {
-                        let value = if symbol.typ() != source_type {
-                            self.generate_cast(source, symbol.typ())
-                        } else {
-                            source
-                        };
-
-                        self.statement_builder
-                            .build(StatementKind::WriteVariable { symbol, value });
-                    }
-                    None => {
-                        //register lookup
-                        let Some((register_type, offset)) =
-                            self.ctx().registers.get(ident).cloned()
-                        else {
-                            panic!("wtf is {ident}");
-                        };
-
-                        let value = if register_type != source_type {
-                            self.generate_cast(source, register_type.clone())
-                        } else {
-                            source
-                        };
-
-                        let offset = self.statement_builder.build(StatementKind::Constant {
-                            typ: Rc::new(Type::u32()),
-                            value: rudder::ConstantValue::UnsignedInteger(offset),
-                        });
-
-                        self.statement_builder.build(StatementKind::WriteRegister {
-                            offset: offset.clone(),
-                            value,
-                        });
-                    }
-                }
-            }
-            boom::Expression::Field { expression, field } => {
-                // todo: insert casts if necessary here!!
-                match &**expression {
-                    boom::Expression::Identifier(ident) => {
-                        // lookup identifier
-                        if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                            // copying into local variable
-                            let target_typ = symbol.typ();
-
-                            let structs = self.ctx().structs.clone();
-                            let (_, (struct_typ, fields)) = structs
-                                .iter()
-                                .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                                .expect("failed to find struct :(");
-
-                            let idx = fields.get(field).unwrap();
-
-                            // read variable
-                            let read_var =
-                                self.statement_builder.build(StatementKind::ReadVariable {
-                                    symbol: symbol.clone(),
-                                });
-
-                            // cast to field type
-                            let field_type = {
-                                let Type::Composite(field_types) = &**struct_typ else {
-                                    unreachable!();
-                                };
-
-                                field_types[*idx].clone()
-                            };
-
-                            let cast = self.generate_cast(source, field_type);
-
-                            // modify field
-                            let mutate_field =
-                                self.statement_builder.build(StatementKind::MutateField {
-                                    composite: read_var,
-                                    field: *idx,
-                                    value: cast,
-                                });
-
-                            // write variable
-                            self.statement_builder.build(StatementKind::WriteVariable {
-                                symbol,
-                                value: mutate_field,
-                            });
-
-                            // todo: nesting, what's that?
-                        } else if let Some((typ, offset)) = self.ctx().registers.get(ident).cloned()
-                        {
-                            // writing into composite register
-
-                            let (idx, field_type) = {
-                                let target_typ = typ.clone();
-
-                                let (_, (struct_type, fields)) = self
-                                    .ctx()
-                                    .structs
-                                    .iter()
-                                    .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                                    .expect("failed to find struct :(");
-
-                                let Type::Composite(field_types) = &**struct_type else {
-                                    unreachable!();
-                                };
-
-                                let idx = *fields.get(field).unwrap();
-
-                                (idx, field_types[idx].clone())
-                            };
-
-                            // push offset to statemetns
-                            let offset_statement =
-                                self.statement_builder.build(StatementKind::Constant {
-                                    typ: Rc::new(Type::u64()),
-                                    value: rudder::ConstantValue::UnsignedInteger(offset),
-                                });
-
-                            // read whole register
-                            let read_reg =
-                                self.statement_builder.build(StatementKind::ReadRegister {
-                                    typ: typ.clone(),
-                                    offset: offset_statement.clone(),
-                                });
-
-                            let cast = self.generate_cast(source, field_type);
-
-                            // mutate field
-                            let mutate_field =
-                                self.statement_builder.build(StatementKind::MutateField {
-                                    composite: read_reg,
-                                    field: idx,
-                                    value: cast,
-                                });
-
-                            // write whole register
-                            self.statement_builder.build(StatementKind::WriteRegister {
-                                offset: offset_statement,
-                                value: mutate_field,
-                            });
-                        } else {
-                            panic!("{ident} not local var or register");
-                        };
-                    }
-                    boom::Expression::Field { .. } => todo!("nested field expressions"),
-                    boom::Expression::Address(_) => todo!(),
-                }
-            }
-            boom::Expression::Address(_) => todo!(),
-        }
+        self.build_expression_write(expression, source);
     }
 
     fn build_function_call(
@@ -650,104 +499,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
         };
 
-        // copy to expr statement
         if let Some(expression) = expression {
-            match expression {
-                boom::Expression::Identifier(ident) => {
-                    match self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                        Some(symbol) => {
-                            let cast = self.generate_cast(fn_statement, symbol.typ());
-
-                            self.statement_builder.build(StatementKind::WriteVariable {
-                                symbol,
-                                value: cast,
-                            });
-                        }
-                        None => {
-                            //register lookup
-                            let Some(reg) = self.ctx().registers.get(ident).cloned() else {
-                                panic!("wtf is {ident}");
-                            };
-                            let offset = self.statement_builder.build(StatementKind::Constant {
-                                typ: Rc::new(Type::u32()),
-                                value: rudder::ConstantValue::UnsignedInteger(reg.1),
-                            });
-                            self.statement_builder.build(StatementKind::WriteRegister {
-                                offset,
-                                value: fn_statement,
-                            });
-                        }
-                    }
-                }
-                boom::Expression::Field {
-                    expression,
-                    field: inner_field,
-                } => match &**expression {
-                    boom::Expression::Identifier(ident) => {
-                        // copied from build_copy
-
-                        // lookup identifier
-                        if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                            // copying into local variable
-                            let target_typ = symbol.typ();
-
-                            let structs = self.ctx().structs.clone();
-                            let (_, (struct_typ, fields)) = structs
-                                .iter()
-                                .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                                .expect("failed to find struct :(");
-
-                            let idx = fields.get(inner_field).unwrap();
-
-                            // read variable
-                            let read_var =
-                                self.statement_builder.build(StatementKind::ReadVariable {
-                                    symbol: symbol.clone(),
-                                });
-
-                            // cast to field type
-                            let field_type = {
-                                let Type::Composite(field_types) = &**struct_typ else {
-                                    unreachable!();
-                                };
-
-                                field_types[*idx].clone()
-                            };
-
-                            let cast = self.generate_cast(fn_statement, field_type);
-
-                            // modify field
-                            let mutate_field =
-                                self.statement_builder.build(StatementKind::MutateField {
-                                    composite: read_var,
-                                    field: *idx,
-                                    value: cast,
-                                });
-
-                            // write variable
-                            self.statement_builder.build(StatementKind::WriteVariable {
-                                symbol,
-                                value: mutate_field,
-                            });
-                        } else {
-                            todo!()
-                        }
-                    }
-                    boom::Expression::Field {
-                        expression,
-                        field: outer_field,
-                    } => match &**expression {
-                        boom::Expression::Identifier(ident) => {
-                            // ident.inner_field.outer_field
-                            todo!()
-                        }
-                        boom::Expression::Field { expression, field } => todo!(),
-                        boom::Expression::Address(_) => todo!(),
-                    },
-                    boom::Expression::Address { .. } => todo!(),
-                },
-                boom::Expression::Address(_) => todo!(),
-            }
+            self.build_expression_write(expression, fn_statement);
         }
     }
 
@@ -1492,6 +1245,110 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
+    /// Generates rudder for a writing a statement to a boom::Expression
+    fn build_expression_write(&mut self, target: &boom::Expression, source: Statement) {
+        let idents = expression_field_collapse(target);
+        let (root, fields) = idents
+            .split_first()
+            .expect("expression should always at least contain the root");
+
+        match self.fn_ctx().rudder_fn.get_local_variable(*root) {
+            Some(symbol) => {
+                let (indices, outer_type) = {
+                    let mut current_type = symbol.typ();
+
+                    let mut indices = vec![];
+
+                    fields.iter().rev().for_each(|field| {
+                        // get the fields of the current struct
+                        let (_, (struct_typ, fields)) = self
+                            .ctx()
+                            .structs
+                            .iter()
+                            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
+                            .expect("failed to find struct :(");
+
+                        // get index and push
+                        let idx = *fields.get(field).unwrap();
+                        indices.push(idx);
+
+                        // update current struct to point to field
+                        let Type::Composite(fields) = &**struct_typ else {
+                            panic!("cannot get fields of non-composite")
+                        };
+                        current_type = fields[idx].clone();
+                    });
+
+                    indices.reverse();
+
+                    (indices, current_type)
+                };
+
+                let cast = self.generate_cast(source, outer_type);
+
+                self.statement_builder.build(StatementKind::WriteVariable {
+                    symbol,
+                    indices,
+                    value: cast,
+                });
+            }
+            None => {
+                //register lookup
+                let Some((register_type, register_offset)) =
+                    self.ctx().registers.get(root).cloned()
+                else {
+                    panic!("wtf is {root}");
+                };
+
+                let (field_offsets, outer_type) = {
+                    let mut current_type = register_type;
+
+                    let mut offsets = vec![];
+
+                    fields.iter().rev().for_each(|field| {
+                        // get the fields of the current struct
+                        let (_, (struct_typ, fields)) = self
+                            .ctx()
+                            .structs
+                            .iter()
+                            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
+                            .expect("failed to find struct :(");
+
+                        // get index and push
+                        let idx = *fields.get(field).unwrap();
+                        offsets.push(struct_typ.byte_offset(idx).unwrap());
+
+                        // update current struct to point to field
+                        let Type::Composite(fields) = &**struct_typ else {
+                            panic!("cannot get fields of non-composite")
+                        };
+                        current_type = fields[idx].clone();
+                    });
+
+                    offsets.reverse();
+
+                    (offsets, current_type)
+                };
+
+                // offset + offset of each field
+                let offset = register_offset + field_offsets.iter().sum::<usize>();
+
+                // cast to outermost type
+                let cast = self.generate_cast(source, outer_type);
+
+                let offset = self.statement_builder.build(StatementKind::Constant {
+                    typ: Rc::new(Type::u32()),
+                    value: rudder::ConstantValue::UnsignedInteger(offset),
+                });
+
+                self.statement_builder.build(StatementKind::WriteRegister {
+                    offset,
+                    value: cast,
+                });
+            }
+        }
+    }
+
     /// Last statement returned is the value
     fn build_value(&mut self, boom_value: Rc<RefCell<boom::Value>>) -> Statement {
         match &*boom_value.borrow() {
@@ -1535,47 +1392,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
             }
-            boom::Value::Literal(literal) => {
-                let kind = match &*literal.borrow() {
-                    boom::Literal::Int(i) => StatementKind::Constant {
-                        typ: Rc::new(Type::s64()),
-                        value: rudder::ConstantValue::SignedInteger(i.try_into().unwrap()),
-                    },
-                    boom::Literal::Bits(bits) => StatementKind::Constant {
-                        typ: Rc::new(Type::new_primitive(
-                            rudder::PrimitiveTypeClass::UnsignedInteger,
-                            bits.len(),
-                        )),
-                        value: rudder::ConstantValue::UnsignedInteger(
-                            bits_to_int(bits).try_into().unwrap(),
-                        ),
-                    },
-                    boom::Literal::Bit(bit) => StatementKind::Constant {
-                        typ: Rc::new(Type::u1()),
-                        value: rudder::ConstantValue::UnsignedInteger(
-                            bit.value().try_into().unwrap(),
-                        ),
-                    },
-                    boom::Literal::Bool(b) => StatementKind::Constant {
-                        typ: Rc::new(Type::u1()),
-                        value: rudder::ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
-                    },
-                    boom::Literal::String(str) => StatementKind::Constant {
-                        typ: Rc::new(Type::u32()),
-                        value: rudder::ConstantValue::UnsignedInteger(
-                            str.key().try_into().unwrap(),
-                        ),
-                    },
-                    boom::Literal::Unit => StatementKind::Constant {
-                        typ: Rc::new(Type::unit()),
-                        value: rudder::ConstantValue::Unit,
-                    },
-                    boom::Literal::Reference(_) => todo!(),
-                    boom::Literal::Undefined => unimplemented!(),
-                };
-
-                self.statement_builder.build(kind)
-            }
+            boom::Value::Literal(literal) => self.build_literal(&literal.borrow()),
             boom::Value::Operation(op) => self.build_operation(op),
             boom::Value::Struct { name, fields } => {
                 let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
@@ -1681,6 +1498,44 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Value::CtorKind { .. } => todo!(),
             boom::Value::CtorUnwrap { .. } => todo!(),
         }
+    }
+
+    fn build_literal(&mut self, literal: &boom::Literal) -> Statement {
+        let kind = match literal {
+            boom::Literal::Int(i) => StatementKind::Constant {
+                typ: Rc::new(Type::s64()),
+                value: rudder::ConstantValue::SignedInteger(i.try_into().unwrap()),
+            },
+            boom::Literal::Bits(bits) => StatementKind::Constant {
+                typ: Rc::new(Type::new_primitive(
+                    rudder::PrimitiveTypeClass::UnsignedInteger,
+                    bits.len(),
+                )),
+                value: rudder::ConstantValue::UnsignedInteger(
+                    bits_to_int(bits).try_into().unwrap(),
+                ),
+            },
+            boom::Literal::Bit(bit) => StatementKind::Constant {
+                typ: Rc::new(Type::u1()),
+                value: rudder::ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
+            },
+            boom::Literal::Bool(b) => StatementKind::Constant {
+                typ: Rc::new(Type::u1()),
+                value: rudder::ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
+            },
+            boom::Literal::String(str) => StatementKind::Constant {
+                typ: Rc::new(Type::u32()),
+                value: rudder::ConstantValue::UnsignedInteger(str.key().try_into().unwrap()),
+            },
+            boom::Literal::Unit => StatementKind::Constant {
+                typ: Rc::new(Type::unit()),
+                value: rudder::ConstantValue::Unit,
+            },
+            boom::Literal::Reference(_) => todo!(),
+            boom::Literal::Undefined => unimplemented!(),
+        };
+
+        self.statement_builder.build(kind)
     }
 
     fn build_operation(&mut self, op: &boom::Operation) -> Statement {
@@ -2065,6 +1920,30 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .build(StatementKind::Bundle { value, length })
             }
             _ => todo!(),
+        }
+    }
+}
+
+/// Function to collapse nested expression fields
+///
+/// Returns the root identifier followed by any and all fields
+fn expression_field_collapse(expression: &boom::Expression) -> Vec<InternedString> {
+    let mut result = vec![];
+
+    let mut current_expression = expression;
+
+    loop {
+        match current_expression {
+            boom::Expression::Identifier(ident) => {
+                result.push(*ident);
+                result.reverse();
+                return result;
+            }
+            boom::Expression::Field { expression, field } => {
+                result.push(*field);
+                current_expression = &expression;
+            }
+            boom::Expression::Address(_) => panic!("addresses not supported"),
         }
     }
 }

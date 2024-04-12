@@ -19,8 +19,6 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     // // bits << (bits.len() * 0) | bits << (bits.len() * 1) | bits << (bits.len()
     // * 2) ...
 
-    // todo!();
-
     // for i in 0..count {
     //     acc <<= bits.len();
     //     acc |= bits;
@@ -181,6 +179,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             kind: StatementKind::WriteVariable {
                 symbol: local_count_symbol.clone(),
                 value: decrement.clone(),
+                indices: vec![],
             },
             parent: shift_block.weak(),
         })),
@@ -280,6 +279,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             kind: StatementKind::WriteVariable {
                 symbol: result_symbol.clone(),
                 value: or_result.clone(),
+                indices: vec![],
             },
             parent: shift_block.weak(),
         })),
@@ -334,6 +334,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
                 kind: StatementKind::WriteVariable {
                     symbol: local_count_symbol.clone(),
                     value: read_count.clone(),
+                    indices: vec![],
                 },
                 parent: entry_block.weak(),
             })),
