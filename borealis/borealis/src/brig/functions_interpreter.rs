@@ -176,9 +176,17 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 v
             }
         }
-        StatementKind::ReadVariable { symbol } => {
+        StatementKind::ReadVariable { symbol, indices } => {
             let var = codegen_ident(symbol.name());
-            quote! {fn_state.#var.clone()}
+
+            let indices = indices
+                .iter()
+                .copied()
+                .map(codegen_member)
+                .map(|field| quote!(.#field))
+                .collect::<TokenStream>();
+
+            quote! {fn_state.#var #indices.clone()}
         }
         StatementKind::WriteVariable {
             symbol,
@@ -536,7 +544,13 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                             _ => panic!("non integer bundle value type"),
                         }
                     }
-                    _ => panic!("non primitive bundle value type"),
+                    t => {
+                        log::error!(
+                            "non primitive bundle value type: {t:?} {:?}",
+                            codegen_type(bundle_value_type.clone()).to_string()
+                        );
+                        quote!(1u64)
+                    }
                 };
 
                 let original_value = get_ident(&original_value);

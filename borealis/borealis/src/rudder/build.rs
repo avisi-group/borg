@@ -1254,35 +1254,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         match self.fn_ctx().rudder_fn.get_local_variable(*root) {
             Some(symbol) => {
-                let (indices, outer_type) = {
-                    let mut current_type = symbol.typ();
-
-                    let mut indices = vec![];
-
-                    fields.iter().rev().for_each(|field| {
-                        // get the fields of the current struct
-                        let (_, (struct_typ, fields)) = self
-                            .ctx()
-                            .structs
-                            .iter()
-                            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
-                            .expect("failed to find struct :(");
-
-                        // get index and push
-                        let idx = *fields.get(field).unwrap();
-                        indices.push(idx);
-
-                        // update current struct to point to field
-                        let Type::Composite(fields) = &**struct_typ else {
-                            panic!("cannot get fields of non-composite")
-                        };
-                        current_type = fields[idx].clone();
-                    });
-
-                    indices.reverse();
-
-                    (indices, current_type)
-                };
+                let (indices, outer_type) =
+                    fields_to_indices(&self.ctx().structs, symbol.typ(), fields);
 
                 let cast = self.generate_cast(source, outer_type);
 
@@ -1300,35 +1273,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     panic!("wtf is {root}");
                 };
 
-                let (field_offsets, outer_type) = {
-                    let mut current_type = register_type;
-
-                    let mut offsets = vec![];
-
-                    fields.iter().rev().for_each(|field| {
-                        // get the fields of the current struct
-                        let (_, (struct_typ, fields)) = self
-                            .ctx()
-                            .structs
-                            .iter()
-                            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
-                            .expect("failed to find struct :(");
-
-                        // get index and push
-                        let idx = *fields.get(field).unwrap();
-                        offsets.push(struct_typ.byte_offset(idx).unwrap());
-
-                        // update current struct to point to field
-                        let Type::Composite(fields) = &**struct_typ else {
-                            panic!("cannot get fields of non-composite")
-                        };
-                        current_type = fields[idx].clone();
-                    });
-
-                    offsets.reverse();
-
-                    (offsets, current_type)
-                };
+                let (field_offsets, outer_type) =
+                    fields_to_offsets(&self.ctx().structs, register_type, fields);
 
                 // offset + offset of each field
                 let offset = register_offset + field_offsets.iter().sum::<usize>();
@@ -1351,32 +1297,51 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     /// Last statement returned is the value
     fn build_value(&mut self, boom_value: Rc<RefCell<boom::Value>>) -> Statement {
-        match &*boom_value.borrow() {
+        let (base, fields) = value_field_collapse(boom_value.clone());
+
+        let borrow = base.borrow();
+
+        match &*borrow {
             boom::Value::Identifier(ident) => {
+                // local variable
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
+                    let (indices, _) =
+                        fields_to_indices(&self.ctx().structs, symbol.typ(), &fields);
+
                     return self
                         .statement_builder
-                        .build(StatementKind::ReadVariable { symbol });
+                        .build(StatementKind::ReadVariable { symbol, indices });
                 }
 
+                // parameter
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
+                    let (indices, _) =
+                        fields_to_indices(&self.ctx().structs, symbol.typ(), &fields);
+
                     return self
                         .statement_builder
-                        .build(StatementKind::ReadVariable { symbol });
+                        .build(StatementKind::ReadVariable { symbol, indices });
                 }
 
-                if let Some((typ, offset)) = self.ctx().registers.get(ident).cloned() {
+                // register
+                if let Some((typ, register_offset)) = self.ctx().registers.get(ident).cloned() {
+                    let (offsets, outer_type) =
+                        fields_to_offsets(&self.ctx().structs, typ.clone(), &fields);
+
+                    let offset = register_offset + offsets.iter().sum::<usize>();
+
                     let offset = self.statement_builder.build(StatementKind::Constant {
                         typ: Rc::new(Type::u32()),
                         value: rudder::ConstantValue::UnsignedInteger(offset),
                     });
 
                     return self.statement_builder.build(StatementKind::ReadRegister {
-                        typ: typ.clone(),
+                        typ: outer_type,
                         offset,
                     });
                 }
 
+                // enum
                 if let Some(value) = self
                     .ctx()
                     .enums
@@ -1392,6 +1357,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
             }
+
             boom::Value::Literal(literal) => self.build_literal(&literal.borrow()),
             boom::Value::Operation(op) => self.build_operation(op),
             boom::Value::Struct { name, fields } => {
@@ -1411,90 +1377,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
                     })
             }
-            boom::Value::Field { value, field_name } => {
-                let ident = match &*value.borrow() {
-                    boom::Value::Identifier(ident) => *ident,
-                    _ => todo!(),
-                };
 
-                self.build_value(value.clone());
+            boom::Value::Field { .. } => panic!("fields should have already been flattened"),
 
-                // lookup identifier
-                // todo: parameters should just be read-only local vars?
-                if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(ident) {
-                    // copying into local variable
-                    let target_typ = symbol.typ();
-
-                    let structs = self.ctx().structs.clone();
-                    let (_, (_, fields)) = structs
-                        .iter()
-                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                        .expect("failed to find struct :(");
-
-                    let idx = fields.get(field_name).unwrap();
-
-                    let read_var = self
-                        .statement_builder
-                        .build(StatementKind::ReadVariable { symbol });
-
-                    self.statement_builder.build(StatementKind::ReadField {
-                        composite: read_var.clone(),
-                        field: *idx,
-                    })
-                } else if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(ident) {
-                    // copying into local variable
-                    let target_typ = symbol.typ();
-
-                    let structs = self.ctx().structs.clone();
-                    let (_, (_, fields)) = structs
-                        .iter()
-                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                        .expect("failed to find struct :(");
-
-                    let idx = fields.get(field_name).unwrap();
-
-                    let read_var = self
-                        .statement_builder
-                        .build(StatementKind::ReadVariable { symbol });
-
-                    self.statement_builder.build(StatementKind::ReadField {
-                        composite: read_var.clone(),
-                        field: *idx,
-                    })
-                } else if let Some((typ, reg_offset)) = self.ctx().registers.get(&ident).cloned() {
-                    // writing into composite register
-
-                    let offset_statement = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
-                        value: rudder::ConstantValue::UnsignedInteger(reg_offset),
-                    });
-
-                    let read_reg = self.statement_builder.build(StatementKind::ReadRegister {
-                        typ: typ.clone(),
-                        offset: offset_statement,
-                    });
-
-                    let target_typ = typ.clone();
-                    let structs = self.ctx().structs.clone();
-                    let (_, (_, fields)) = structs
-                        .iter()
-                        .find(|(_, (typ, _))| Rc::ptr_eq(&target_typ, typ))
-                        .expect("failed to find struct :(");
-
-                    let idx = fields.get(field_name).unwrap();
-
-                    self.statement_builder.build(StatementKind::ReadField {
-                        composite: read_reg,
-                        field: *idx,
-                    })
-                } else {
-                    panic!("{ident} not local var or register");
-                }
-
-                // if value is register, find reg name + offset emit
-                // read_register if value is local variable,
-                // emit read_variable with Some(offset)
-            }
             boom::Value::CtorKind { .. } => todo!(),
             boom::Value::CtorUnwrap { .. } => todo!(),
         }
@@ -1946,4 +1831,101 @@ fn expression_field_collapse(expression: &boom::Expression) -> Vec<InternedStrin
             boom::Expression::Address(_) => panic!("addresses not supported"),
         }
     }
+}
+
+/// Function to collapse nested value fields
+///
+/// Returns the base value and a vec of field accesses
+fn value_field_collapse(
+    value: Rc<RefCell<boom::Value>>,
+) -> (Rc<RefCell<boom::Value>>, Vec<InternedString>) {
+    let mut fields = vec![];
+
+    let mut current_value = value;
+
+    loop {
+        // get next value and field name out of current value
+        // done this way to avoid borrow issues
+        let extract = match &*current_value.borrow() {
+            boom::Value::Field { value, field_name } => Some((value.clone(), *field_name)),
+            _ => None,
+        };
+
+        // if there waas one, push field and update current value
+        if let Some((new_value, field_name)) = extract {
+            fields.push(field_name);
+            current_value = new_value;
+        } else {
+            // otherwise hit end so return
+            fields.reverse();
+            return (current_value, fields);
+        }
+    }
+}
+
+fn fields_to_indices(
+    structs: &HashMap<InternedString, (Rc<Type>, HashMap<InternedString, usize>)>,
+    initial_type: Rc<Type>,
+    fields: &[InternedString],
+) -> (Vec<usize>, Rc<Type>) {
+    let (indices, outer_type) = {
+        let mut current_type = initial_type;
+
+        let mut indices = vec![];
+
+        fields.iter().rev().for_each(|field| {
+            // get the fields of the current struct
+            let (_, (struct_typ, fields)) = structs
+                .iter()
+                .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
+                .expect("failed to find struct :(");
+
+            // get index and push
+            let idx = *fields.get(field).unwrap();
+            indices.push(idx);
+
+            // update current struct to point to field
+            let Type::Composite(fields) = &**struct_typ else {
+                panic!("cannot get fields of non-composite")
+            };
+            current_type = fields[idx].clone();
+        });
+
+        indices.reverse();
+
+        (indices, current_type)
+    };
+    (indices, outer_type)
+}
+
+fn fields_to_offsets(
+    structs: &HashMap<InternedString, (Rc<Type>, HashMap<InternedString, usize>)>,
+    initial_type: Rc<Type>,
+    fields: &[InternedString],
+) -> (Vec<usize>, Rc<Type>) {
+    let mut current_type = initial_type;
+
+    let mut offsets = vec![];
+
+    fields.iter().rev().for_each(|field| {
+        // get the fields of the current struct
+        let (_, (struct_typ, fields)) = structs
+            .iter()
+            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
+            .expect("failed to find struct :(");
+
+        // get index and push
+        let idx = *fields.get(field).unwrap();
+        offsets.push(struct_typ.byte_offset(idx).unwrap());
+
+        // update current struct to point to field
+        let Type::Composite(fields) = &**struct_typ else {
+            panic!("cannot get fields of non-composite")
+        };
+        current_type = fields[idx].clone();
+    });
+
+    offsets.reverse();
+
+    (offsets, current_type)
 }

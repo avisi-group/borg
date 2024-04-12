@@ -29,7 +29,7 @@ impl SymbolUseAnalysis {
         for block in self.f.entry_block().iter() {
             for stmt in block.statements() {
                 match stmt.kind() {
-                    crate::rudder::StatementKind::ReadVariable { symbol } => {
+                    crate::rudder::StatementKind::ReadVariable { symbol, .. } => {
                         self.insert_use(&symbol, &stmt)
                     }
                     crate::rudder::StatementKind::WriteVariable { symbol, .. } => {

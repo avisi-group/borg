@@ -50,8 +50,16 @@ impl Display for StatementKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self {
             StatementKind::Constant { typ, value } => write!(f, "const #{} : {}", value, typ),
-            StatementKind::ReadVariable { symbol } => {
-                write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
+            StatementKind::ReadVariable { symbol, indices } => {
+                if indices.is_empty() {
+                    write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
+                } else {
+                    write!(f, "read-var {}", symbol.name())?;
+                    for index in indices {
+                        write!(f, ".{}", index)?;
+                    }
+                    write!(f, ":{}", symbol.typ())
+                }
             }
             StatementKind::WriteVariable {
                 symbol,

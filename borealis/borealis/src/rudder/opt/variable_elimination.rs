@@ -61,7 +61,7 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
                     e.insert(value.clone());
                 }
             }
-        } else if let StatementKind::ReadVariable { symbol } = stmt.kind() {
+        } else if let StatementKind::ReadVariable { symbol, .. } = stmt.kind() {
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }

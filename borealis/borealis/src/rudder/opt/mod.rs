@@ -12,7 +12,6 @@ pub mod debundler;
 pub mod inliner;
 pub mod jump_threading;
 pub mod phi_analysis;
-pub mod read_reg_expander;
 pub mod return_propagation;
 pub mod tail_calls;
 pub mod variable_elimination;
@@ -42,7 +41,6 @@ static RETURN_PROPAGATION: FunctionPass = ("return-propagation", return_propagat
 static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_simplification::run);
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
-static READ_REG_EXPANDER: FunctionPass = ("read-reg-expander", read_reg_expander::run);
 
 pub fn optimise(ctx: &mut Context, level: OptLevel) {
     let passes: Vec<FunctionPass> = match level {
@@ -60,7 +58,6 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
             DEBUNDLER,
-            READ_REG_EXPANDER,
             PHI_ANALYSIS,
         ],
         OptLevel::Level2 => vec![
@@ -76,7 +73,6 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
             DEBUNDLER,
-            READ_REG_EXPANDER,
             PHI_ANALYSIS,
         ],
         OptLevel::Level3 => vec![
@@ -91,8 +87,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
-            DEBUNDLER,
-            READ_REG_EXPANDER,
+            // DEBUNDLER,
             PHI_ANALYSIS,
         ],
     };

@@ -385,6 +385,10 @@ pub enum StatementKind {
 
     ReadVariable {
         symbol: Symbol,
+        /// Indices, when not empty, indicate access to fields/elements
+        ///
+        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a struct of a vec of structs
+        indices: Vec<usize>,
     },
 
     WriteVariable {
@@ -690,7 +694,19 @@ impl Statement {
     pub fn typ(&self) -> Rc<Type> {
         match self.kind() {
             StatementKind::Constant { typ, .. } => typ,
-            StatementKind::ReadVariable { symbol } => symbol.typ(),
+            StatementKind::ReadVariable { symbol, indices } => {
+                let mut current_type = symbol.typ();
+
+                for index in indices {
+                    if let Type::Composite(fields) = &*current_type {
+                        current_type = fields[index].clone();
+                    } else {
+                        panic!("cannot get field of non-composite type")
+                    }
+                }
+
+                current_type
+            }
             StatementKind::WriteVariable { .. } => Rc::new(Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
             StatementKind::WriteRegister { .. } => Rc::new(Type::unit()),
