@@ -1588,7 +1588,10 @@ const FN_ALLOWLIST: &[&str] = &[
     "_get_HCR_EL2_Type_TPCP",
     "_get_HFGITR_EL2_Type_DCIVAC",
     "_get_MDCR_EL2_Type_TDE",
-   // "ExceptionSyndrome"
+    "ExceptionSyndrome",
+    "__UNKNOWN_PASpace",
+    "__UNKNOWN_bits",
+    //"AArch64_TakeException" disabled until Tom fixes whatever optimisation in block 165 is trying to give a 1024u12 a length of 1024 when bundled
 ];
 
 // "execute_FADD_Z_P_ZS__"

@@ -1863,39 +1863,35 @@ fn value_field_collapse(
     }
 }
 
+/// Given a type and array of field accesses, produce a corresponding array of indices to each field access, and the type of the outermost access
 fn fields_to_indices(
     structs: &HashMap<InternedString, (Rc<Type>, HashMap<InternedString, usize>)>,
     initial_type: Rc<Type>,
     fields: &[InternedString],
 ) -> (Vec<usize>, Rc<Type>) {
-    let (indices, outer_type) = {
-        let mut current_type = initial_type;
+    let mut current_type = initial_type;
 
-        let mut indices = vec![];
+    let mut indices = vec![];
 
-        fields.iter().rev().for_each(|field| {
-            // get the fields of the current struct
-            let (_, (struct_typ, fields)) = structs
-                .iter()
-                .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
-                .expect("failed to find struct :(");
+    fields.iter().for_each(|field| {
+        // get the fields of the current struct
+        let (_, (struct_typ, fields)) = structs
+            .iter()
+            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
+            .expect("failed to find struct :(");
 
-            // get index and push
-            let idx = *fields.get(field).unwrap();
-            indices.push(idx);
+        // get index and push
+        let idx = *fields.get(field).unwrap();
+        indices.push(idx);
 
-            // update current struct to point to field
-            let Type::Composite(fields) = &**struct_typ else {
-                panic!("cannot get fields of non-composite")
-            };
-            current_type = fields[idx].clone();
-        });
+        // update current struct to point to field
+        let Type::Composite(fields) = &**struct_typ else {
+            panic!("cannot get fields of non-composite")
+        };
+        current_type = fields[idx].clone();
+    });
 
-        indices.reverse();
-
-        (indices, current_type)
-    };
-    (indices, outer_type)
+    (indices, current_type)
 }
 
 fn fields_to_offsets(
@@ -1907,7 +1903,7 @@ fn fields_to_offsets(
 
     let mut offsets = vec![];
 
-    fields.iter().rev().for_each(|field| {
+    fields.iter().for_each(|field| {
         // get the fields of the current struct
         let (_, (struct_typ, fields)) = structs
             .iter()
@@ -1924,8 +1920,6 @@ fn fields_to_offsets(
         };
         current_type = fields[idx].clone();
     });
-
-    offsets.reverse();
 
     (offsets, current_type)
 }

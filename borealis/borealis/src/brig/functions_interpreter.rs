@@ -186,7 +186,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 .map(|field| quote!(.#field))
                 .collect::<TokenStream>();
 
-            quote! {fn_state.#var #indices.clone()}
+            quote! {fn_state.#var #indices}
         }
         StatementKind::WriteVariable {
             symbol,

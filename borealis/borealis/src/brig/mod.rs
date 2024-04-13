@@ -381,8 +381,8 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
     };
 
     let cfg = FunctionCallGraphAnalysis::new(rudder);
-    cfg.to_dot(&mut create_file("target/fcg.dot").unwrap())
-        .unwrap();
+    // cfg.to_dot(&mut create_file("target/fcg.dot").unwrap())
+    //     .unwrap();
 
     let functions = codegen_functions(rudder, ENTRYPOINT.into())
         .into_iter()
