@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, StatementKind},
+    crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, Statement, StatementKind},
     log::trace,
 };
 
@@ -24,14 +24,12 @@ pub fn run(f: Function) -> bool {
         if writes.len() == 1 {
             let StatementKind::WriteVariable {
                 value: value_written,
-                indices,
+                indices: write_indices,
                 ..
             } = writes.first().unwrap().kind()
             else {
                 panic!("not a write")
             };
-
-            panic!("indices not handled {:?}", indices);
 
             if let StatementKind::Constant { typ, value } = value_written.kind() {
                 trace!("identified candidate symbol: {}", symbol);
@@ -40,12 +38,22 @@ pub fn run(f: Function) -> bool {
                 // replace all reads, in all blocks, with the constant
                 if sua.symbol_has_reads(&symbol) {
                     for read in sua.get_symbol_reads(&symbol) {
-                        read.replace_kind(StatementKind::Constant {
-                            typ: typ.clone(),
-                            value: value.clone(),
-                        });
+                        let StatementKind::ReadVariable {
+                            indices: read_indices,
+                            ..
+                        } = read.kind()
+                        else {
+                            panic!("not a read");
+                        };
 
-                        changed = true;
+                        if write_indices == read_indices {
+                            read.replace_kind(StatementKind::Constant {
+                                typ: typ.clone(),
+                                value: value.clone(),
+                            });
+
+                            changed = true;
+                        }
                     }
                 }
             }

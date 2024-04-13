@@ -1,6 +1,5 @@
+use crate::rudder::{Context, Function};
 use log::trace;
-
-use super::{Context, Function};
 
 pub mod branch_simplification;
 pub mod constant_folding;
@@ -15,6 +14,7 @@ pub mod phi_analysis;
 pub mod return_propagation;
 pub mod tail_calls;
 pub mod variable_elimination;
+pub mod vector_folding;
 
 pub enum OptLevel {
     Level0,
@@ -41,6 +41,7 @@ static RETURN_PROPAGATION: FunctionPass = ("return-propagation", return_propagat
 static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_simplification::run);
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
+static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
 
 pub fn optimise(ctx: &mut Context, level: OptLevel) {
     let passes: Vec<FunctionPass> = match level {
@@ -58,6 +59,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
             DEBUNDLER,
+            VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
         OptLevel::Level2 => vec![
@@ -73,6 +75,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
             DEBUNDLER,
+            VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
         OptLevel::Level3 => vec![
@@ -88,6 +91,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
             DEBUNDLER,
+            VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
     };
