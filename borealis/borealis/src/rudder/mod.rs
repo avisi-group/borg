@@ -487,16 +487,6 @@ pub enum StatementKind {
         start: Statement,
         length: Statement,
     },
-    ReadField {
-        composite: Statement,
-        field: usize,
-    },
-    /// Returns the composite with the mutated field
-    MutateField {
-        composite: Statement,
-        field: usize,
-        value: Statement,
-    },
     ReadElement {
         vector: Statement,
         index: Statement,
@@ -679,8 +669,6 @@ impl Statement {
             StatementKind::BitInsert { .. } => ValueClass::Dynamic,
             StatementKind::ReadVariable { .. } => ValueClass::Dynamic,
             StatementKind::WriteVariable { .. } => ValueClass::Dynamic,
-            StatementKind::ReadField { .. } => ValueClass::Dynamic,
-            StatementKind::MutateField { .. } => ValueClass::Dynamic,
             StatementKind::ReadElement { .. } => ValueClass::Dynamic,
             StatementKind::MutateElement { .. } => ValueClass::Dynamic,
             StatementKind::CreateComposite { .. } => ValueClass::Dynamic,
@@ -754,17 +742,6 @@ impl Statement {
             StatementKind::WritePc { .. } => Rc::new(Type::void()),
             StatementKind::BitExtract { value, .. } => value.typ(),
             StatementKind::BitInsert { original_value, .. } => original_value.typ(),
-            StatementKind::ReadField { composite, field } => {
-                let Type::Composite(field_types) = &*composite.typ() else {
-                    panic!("cannot read field of non-composite type")
-                };
-
-                field_types[field].clone()
-            }
-            StatementKind::MutateField { composite, .. } => {
-                // get type of composite and return it
-                composite.typ()
-            }
             StatementKind::ReadElement { vector, .. } => {
                 let Type::Vector { element_type, .. } = &*vector.typ() else {
                     panic!("cannot read field of non-composite type")
@@ -1010,29 +987,7 @@ impl StatementInner {
 
                 self.kind = StatementKind::WriteMemory { offset, value }
             }
-            StatementKind::MutateField {
-                composite,
-                field,
-                value,
-            } => {
-                let composite = if composite == use_of {
-                    with.clone()
-                } else {
-                    composite.clone()
-                };
 
-                let value = if value == use_of {
-                    with.clone()
-                } else {
-                    value.clone()
-                };
-
-                self.kind = StatementKind::MutateField {
-                    composite,
-                    field,
-                    value,
-                };
-            }
             StatementKind::ReadElement { vector, index } => {
                 let vector = if vector == use_of {
                     with.clone()
@@ -1048,15 +1003,7 @@ impl StatementInner {
 
                 self.kind = StatementKind::ReadElement { vector, index };
             }
-            StatementKind::ReadField { composite, field } => {
-                let composite = if composite == use_of {
-                    with.clone()
-                } else {
-                    composite.clone()
-                };
 
-                self.kind = StatementKind::ReadField { composite, field };
-            }
             StatementKind::CreateComposite { typ, fields } => {
                 let fields = fields
                     .iter()

@@ -230,20 +230,6 @@ impl Display for StatementKind {
                 start.name(),
                 length.name()
             ),
-            StatementKind::ReadField { composite, field } => {
-                write!(f, "read-field {}.{}", composite.name(), field)
-            }
-            StatementKind::MutateField {
-                composite,
-                field,
-                value,
-            } => write!(
-                f,
-                "mutate-field {}.{} <= {}",
-                composite.name(),
-                field,
-                value.name()
-            ),
             StatementKind::ReadElement { vector, index } => {
                 write!(f, "read-element {}[{}]", vector.name(), index.name())
             }

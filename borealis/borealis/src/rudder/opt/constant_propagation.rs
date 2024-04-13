@@ -24,11 +24,14 @@ pub fn run(f: Function) -> bool {
         if writes.len() == 1 {
             let StatementKind::WriteVariable {
                 value: value_written,
+                indices,
                 ..
             } = writes.first().unwrap().kind()
             else {
                 panic!("not a write")
             };
+
+            panic!("indices not handled {:?}", indices);
 
             if let StatementKind::Constant { typ, value } = value_written.kind() {
                 trace!("identified candidate symbol: {}", symbol);

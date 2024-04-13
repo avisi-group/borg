@@ -191,15 +191,6 @@ impl StatementUseAnalysis {
                     self.add_use(&start, &stmt);
                     self.add_use(&length, &stmt);
                 }
-                StatementKind::ReadField { composite, .. } => {
-                    self.add_use(&composite, &stmt);
-                }
-                StatementKind::MutateField {
-                    composite, value, ..
-                } => {
-                    self.add_use(&composite, &stmt);
-                    self.add_use(&value, &stmt);
-                }
                 StatementKind::ReadElement { vector, index } => {
                     self.add_use(&vector, &stmt);
                     self.add_use(&index, &stmt);

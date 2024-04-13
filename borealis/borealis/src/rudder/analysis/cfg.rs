@@ -220,7 +220,7 @@ impl FunctionCallGraphPartitioner {
         selph
     }
 
-    fn analyse(&mut self, fcg: FunctionCallGraphAnalysis) {
+    fn analyse(&mut self, _fcg: FunctionCallGraphAnalysis) {
         //
     }
 }

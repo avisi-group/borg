@@ -586,27 +586,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote!(panic!("{:?}", (#(#args),*)))
         }
-        StatementKind::ReadField { composite, field } => {
-            let composite = get_ident(&composite);
-            let field = codegen_member(field);
-            quote!(#composite.#field)
-        }
-        StatementKind::MutateField {
-            composite,
-            field,
-            value,
-        } => {
-            let composite = get_ident(&composite);
-            let field = format_ident!("_{field}");
-            let value = get_ident(&value);
-            quote! {
-                {
-                    let mut local = #composite.clone();
-                    local.#field = #value;
-                    local
-                }
-            }
-        }
         StatementKind::ReadElement { vector, index } => {
             let index_typ = index.typ();
 

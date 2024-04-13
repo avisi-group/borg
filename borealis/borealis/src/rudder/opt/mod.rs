@@ -87,7 +87,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
-            // DEBUNDLER,
+            DEBUNDLER,
             PHI_ANALYSIS,
         ],
     };

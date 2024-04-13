@@ -89,20 +89,20 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>, P: AsRef<Path>>(
         warn!("{msg}");
     }
 
-    // info!("Optimising rudder");
-    // rudder.optimise(rudder::opt::OptLevel::Level3);
+    info!("Optimising rudder");
+    rudder.optimise(rudder::opt::OptLevel::Level3);
 
-    // writeln!(
-    //     &mut create_file("target/ast.opt.rudder").unwrap(),
-    //     "{rudder}"
-    // )
-    // .unwrap();
+    writeln!(
+        &mut create_file("target/ast.opt.rudder").unwrap(),
+        "{rudder}"
+    )
+    .unwrap();
 
-    // info!("Validating rudder again");
-    // let msgs = rudder.validate();
-    // for msg in msgs {
-    //     warn!("{msg}");
-    // }
+    info!("Validating rudder again");
+    let msgs = rudder.validate();
+    for msg in msgs {
+        warn!("{msg}");
+    }
 
     info!("Generating Rust");
 

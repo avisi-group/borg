@@ -41,33 +41,43 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
     let mut changed = false;
     for stmt in block.statements() {
         // todo: ask tom about fields
-        if let StatementKind::WriteVariable { symbol, value, .. } = stmt.kind() {
+        if let StatementKind::WriteVariable {
+            symbol,
+            value,
+            indices,
+        } = stmt.kind()
+        {
             // Ignore global symbols (for now)
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }
 
             trace!("considering variable write to {}", symbol.name());
-            match live_writes.entry(symbol.name()) {
+            match live_writes.entry((symbol.name(), indices.clone())) {
                 Entry::Occupied(mut e) => {
                     trace!(
-                        "already live write to symbol {}, updating live value",
-                        symbol.name()
+                        "already live write to symbol {}:{:?}, updating live value",
+                        symbol.name(),
+                        &indices
                     );
                     e.insert(value.clone());
                 }
                 Entry::Vacant(e) => {
-                    trace!("starting live range for symbol {}", symbol.name());
+                    trace!(
+                        "starting live range for symbol {}:{:?}",
+                        symbol.name(),
+                        &indices
+                    );
                     e.insert(value.clone());
                 }
             }
-        } else if let StatementKind::ReadVariable { symbol, .. } = stmt.kind() {
+        } else if let StatementKind::ReadVariable { symbol, indices } = stmt.kind() {
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }
 
             trace!("considering variable read from {}", symbol.name());
-            let Some(live_value) = live_writes.get(&symbol.name()) else {
+            let Some(live_value) = live_writes.get(&(symbol.name(), indices)) else {
                 trace!("no live range for read of symbol");
                 continue;
             };
