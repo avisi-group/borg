@@ -15,7 +15,9 @@ use {
 };
 
 pub fn write_workspace<P: AsRef<Path>>(workspace: &Workspace, path: P) {
+    log::debug!("building target workspace");
     let target_fs = build_fs(workspace);
+    log::debug!("reading current workspace");
     let current_fs = read_fs(path.as_ref());
 
     log::info!(
@@ -25,6 +27,8 @@ pub fn write_workspace<P: AsRef<Path>>(workspace: &Workspace, path: P) {
     );
 
     write_difference(target_fs, current_fs, path.as_ref());
+
+    log::debug!("done writing workspace");
 }
 
 fn write_difference(
@@ -79,7 +83,10 @@ fn read_fs(path: &Path) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
         .map(|entry| {
             let entry = entry.unwrap();
             let adjusted_path = entry.path().strip_prefix(path).unwrap().to_owned();
-            (adjusted_path, read_to_string(entry.path()).unwrap())
+            (
+                adjusted_path,
+                read_to_string(entry.path()).unwrap_or_default(),
+            )
         })
         .collect();
 

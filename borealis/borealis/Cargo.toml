@@ -26,9 +26,9 @@ dot = "0.1.4"
 itertools = "0.12.1"
 kinded = "0.3.0"
 quote = "1.0.36"
-syn = { version = "2.0.58",  features = ["full", "parsing"] }
-prettyplease = "0.2.17"
-proc-macro2 = "1.0.79"
+syn = { version = "2.0.59",  features = ["full", "parsing"] }
+prettyplease = "0.2.19"
+proc-macro2 = "1.0.80"
 memmap2 = "0.9.4"
 rkyv = {version = "0.7.44", default-features = false, features = ["std", "alloc", "size_64"] }
 parking_lot = "0.12.1"

@@ -28,7 +28,7 @@ rkyv = {version = "0.7.44", default-features = false, features = ["std", "alloc"
 memmap2 = "0.9.4"
 
 [build-dependencies]
-cc = "1.0.92"
+cc = "1.0.94"
 color-eyre = "0.6.3"
 
 [dev-dependencies]
