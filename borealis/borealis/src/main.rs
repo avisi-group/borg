@@ -10,10 +10,10 @@ struct Args {
     #[arg(long)]
     log: Option<String>,
 
-    /// Produce a standalone (no brig traits) Rust source file for testing
-    /// purposes
+    /// Writes all intermediate representations to disk
     #[arg(long)]
-    standalone: bool,
+    dump_ir: bool,
+
     /// Path to Sail model archive
     input: PathBuf,
     /// Path to brig Rust file
@@ -29,7 +29,7 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or("info")).unwrap();
 
-    run(args.input, args.output, args.standalone);
+    run(args.input, args.output, args.dump_ir);
 
     info!("done");
 

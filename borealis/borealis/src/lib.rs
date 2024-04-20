@@ -12,23 +12,26 @@ use {
     log::trace,
     rkyv::Deserialize,
     sailrs::{jib_ast::Definition, types::ListVec},
-    std::{fs::File, path::Path},
+    std::{
+        fs::File,
+        path::{Path, PathBuf},
+    },
 };
 
 pub mod boom;
 pub mod brig;
 pub mod rudder;
 
-pub fn run<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O, standalone: bool) {
-    sail_to_brig(load_model(input).into_iter(), output, standalone);
+pub fn run(input: PathBuf, output: PathBuf, dump_ir: bool) {
+    sail_to_brig(load_model(&input).into_iter(), output, dump_ir);
 }
 
 /// Deserializes an AST from an archive.
 ///
 /// Internally, deserialization is performed on a new thread with a sufficient
 /// stack size to perform the deserialization.
-fn load_model<P: AsRef<Path>>(path: P) -> ListVec<Definition> {
-    let file = File::open(&path).map_err(PathCtx::f(&path)).unwrap();
+fn load_model(path: &Path) -> ListVec<Definition> {
+    let file = File::open(path).map_err(PathCtx::f(path)).unwrap();
     let mmap = unsafe { memmap2::Mmap::map(&file) }.unwrap();
 
     trace!("deserializing");

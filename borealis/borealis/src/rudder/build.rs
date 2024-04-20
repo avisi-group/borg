@@ -79,7 +79,9 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
         ),
     );
 
+    log::warn!("starting build functions");
     build_ctx.build_functions();
+    log::warn!("done build functions");
 
     // insert again to overwrite empty boom generated rudder
     build_ctx

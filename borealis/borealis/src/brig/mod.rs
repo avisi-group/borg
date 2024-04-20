@@ -3,6 +3,7 @@
 use {
     crate::{
         boom::{
+            self,
             passes::{
                 self, cycle_finder::CycleFinder, fold_unconditionals::FoldUnconditionals,
                 make_exception_bool::MakeExceptionBool, remove_const_branch::RemoveConstBranch,
@@ -11,15 +12,17 @@ use {
             Ast,
         },
         brig::{
-            allowlist::apply_fn_allowlist, bundle::codegen_bundle,
-            functions_interpreter::codegen_functions, state::codegen_state,
-            workspace_diff::write_workspace,
+            allowlist::apply_fn_allowlist,
+            bundle::codegen_bundle,
+            functions_interpreter::codegen_functions,
+            state::codegen_state,
+            workspace::{write_workspace, Crate, Workspace},
         },
         rudder::{
             self, analysis::cfg::FunctionCallGraphAnalysis, Context, PrimitiveTypeClass, Type,
         },
     },
-    common::{create_file, intern::InternedString, HashMap, HashSet},
+    common::{create_file, intern::InternedString, HashSet},
     log::{info, warn},
     once_cell::sync::Lazy,
     proc_macro2::{Span, TokenStream},
@@ -29,7 +32,7 @@ use {
     std::{
         hash::{DefaultHasher, Hash, Hasher},
         io::Write,
-        path::Path,
+        path::PathBuf,
         rc::Rc,
     },
     syn::Ident,
@@ -40,24 +43,26 @@ mod bundle;
 mod functions_dbt;
 mod functions_interpreter;
 mod state;
-mod workspace_diff;
+mod workspace;
 
 const ENTRYPOINT: &str = "__DecodeA64";
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>, P: AsRef<Path>>(
+pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
     jib_ast: I,
-    path: P,
-    _standalone: bool,
+    path: PathBuf,
+    dump_ir: bool,
 ) {
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(apply_fn_allowlist(jib_ast));
 
-    // useful for debugging
-    crate::boom::pretty_print::print_ast(
-        &mut create_file("target/ast_raw.boom").unwrap(),
-        ast.clone(),
-    );
+    // // useful for debugging
+    if dump_ir {
+        boom::pretty_print::print_ast(
+            &mut create_file(path.join("ast_raw.boom")).unwrap(),
+            ast.clone(),
+        );
+    }
 
     info!("Running passes on BOOM");
     passes::run_fixed_point(
@@ -71,17 +76,24 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>, P: AsRef<Path>>(
         ],
     );
 
-    // useful for debugging
-    crate::boom::pretty_print::print_ast(
-        &mut create_file("target/ast_processed.boom").unwrap(),
-        ast.clone(),
-    );
+    if dump_ir {
+        boom::pretty_print::print_ast(
+            &mut create_file(path.join("ast_processed.boom")).unwrap(),
+            ast.clone(),
+        );
+    }
 
     info!("Building rudder");
 
     let mut rudder = rudder::build::from_boom(&ast.borrow());
 
-    writeln!(&mut create_file("target/ast.rudder").unwrap(), "{rudder}").unwrap();
+    if dump_ir {
+        writeln!(
+            &mut create_file(path.join("ast.rudder")).unwrap(),
+            "{rudder}"
+        )
+        .unwrap();
+    }
 
     info!("Validating rudder");
     let msgs = rudder.validate();
@@ -92,11 +104,13 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>, P: AsRef<Path>>(
     info!("Optimising rudder");
     rudder.optimise(rudder::opt::OptLevel::Level3);
 
-    writeln!(
-        &mut create_file("target/ast.opt.rudder").unwrap(),
-        "{rudder}"
-    )
-    .unwrap();
+    if dump_ir {
+        writeln!(
+            &mut create_file(path.join("ast.opt.rudder")).unwrap(),
+            "{rudder}"
+        )
+        .unwrap();
+    }
 
     info!("Validating rudder again");
     let msgs = rudder.validate();
@@ -105,8 +119,10 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>, P: AsRef<Path>>(
     }
 
     info!("Generating Rust");
+    let ws = codegen_workspace(&rudder);
 
-    write_workspace(&codegen_workspace(&rudder), path);
+    info!("Writing workspace to {:?}", &path);
+    write_workspace(ws, path);
 }
 
 fn promote_width(width: usize) -> usize {
@@ -445,15 +461,6 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
             )
             .collect(),
     }
-}
-
-struct Workspace {
-    crates: HashMap<InternedString, Crate>,
-}
-
-struct Crate {
-    dependencies: HashSet<InternedString>,
-    contents: TokenStream,
 }
 
 pub fn tokens_to_string(tokens: &TokenStream) -> String {

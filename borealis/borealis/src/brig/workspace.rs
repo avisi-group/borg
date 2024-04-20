@@ -1,10 +1,11 @@
 use {
-    crate::brig::{tokens_to_string, Crate, Workspace},
+    crate::brig::tokens_to_string,
     cargo_util_schemas::manifest::{
         InheritableDependency, InheritableField, PackageName, TomlDependency,
         TomlDetailedDependency, TomlManifest, TomlPackage, TomlWorkspace,
     },
-    common::{HashMap, HashSet},
+    common::{intern::InternedString, HashMap, HashSet},
+    proc_macro2::TokenStream,
     semver::{BuildMetadata, Prerelease, Version},
     std::{
         collections::BTreeMap,
@@ -14,11 +15,30 @@ use {
     walkdir::WalkDir,
 };
 
-pub fn write_workspace<P: AsRef<Path>>(workspace: &Workspace, path: P) {
+// const _: () = {
+//     fn assert_send<T: Send>() {}
+//     fn assert_sync<T: Sync>() {}
+
+//     fn a() {
+//         assert_send::<Crate>();
+//         assert_sync::<Crate>();
+//     }
+// };
+
+pub struct Workspace {
+    pub crates: HashMap<InternedString, Crate>,
+}
+
+pub struct Crate {
+    pub dependencies: HashSet<InternedString>,
+    pub contents: TokenStream,
+}
+
+pub fn write_workspace(workspace: Workspace, path: PathBuf) {
     log::debug!("building target workspace");
     let target_fs = build_fs(workspace);
     log::debug!("reading current workspace");
-    let current_fs = read_fs(path.as_ref());
+    let current_fs = read_fs(&path);
 
     log::info!(
         "writing workspace: {} files, {} folders",
@@ -26,81 +46,12 @@ pub fn write_workspace<P: AsRef<Path>>(workspace: &Workspace, path: P) {
         target_fs.1.len()
     );
 
-    write_difference(target_fs, current_fs, path.as_ref());
+    write_difference(target_fs, current_fs, &path);
 
     log::debug!("done writing workspace");
 }
 
-fn write_difference(
-    (target_files, target_dirs): (HashMap<PathBuf, String>, HashSet<PathBuf>),
-    (mut current_files, mut current_dirs): (HashMap<PathBuf, String>, HashSet<PathBuf>),
-    workspace_path: &Path,
-) {
-    {
-        for path in target_dirs {
-            if !current_dirs.remove(&path) {
-                log::info!("new dir @ {path:?}");
-                fs::create_dir_all(workspace_path.join(path)).unwrap();
-            }
-        }
-
-        for path in current_dirs {
-            log::info!("delete dir @ {path:?}");
-            fs::remove_dir_all(workspace_path.join(path)).unwrap();
-        }
-    }
-
-    {
-        for (path, target_contents) in target_files {
-            if let Some(contents) = current_files.remove(&path) {
-                if *contents != target_contents {
-                    log::info!("diff @ {path:?}");
-                    fs::write(workspace_path.join(path), target_contents).unwrap();
-                }
-            } else {
-                log::info!("new @ {path:?}");
-                fs::write(workspace_path.join(path), target_contents).unwrap();
-            }
-        }
-
-        for (path, _) in current_files {
-            log::info!("delete @ {path:?}");
-            // hide errors if parent dir was already deleted
-            fs::remove_file(workspace_path.join(path)).ok();
-        }
-    }
-}
-
-/// Reads files, their contents, and directories at the supplied path'
-fn read_fs(path: &Path) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
-    if !path.exists() {
-        return Default::default();
-    }
-
-    let files = WalkDir::new(path)
-        .into_iter()
-        .filter(|entry| entry.as_ref().unwrap().file_type().is_file())
-        .map(|entry| {
-            let entry = entry.unwrap();
-            let adjusted_path = entry.path().strip_prefix(path).unwrap().to_owned();
-            (
-                adjusted_path,
-                read_to_string(entry.path()).unwrap_or_default(),
-            )
-        })
-        .collect();
-
-    let dirs = WalkDir::new(path)
-        .into_iter()
-        .filter(|entry| entry.as_ref().unwrap().file_type().is_dir())
-        .map(|entry| entry.unwrap().path().strip_prefix(path).unwrap().to_owned())
-        .filter(|path| path.ends_with("src"))
-        .collect();
-
-    (files, dirs)
-}
-
-fn build_fs(workspace: &Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
+fn build_fs(workspace: Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     let workspace_manifest = (
         PathBuf::from("Cargo.toml"),
         toml::to_string_pretty(&TomlManifest {
@@ -141,7 +92,7 @@ fn build_fs(workspace: &Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf
     let files = workspace
         .crates
         .iter()
-        .flat_map(
+        .map(
             |(
                 name,
                 Crate {
@@ -253,9 +204,10 @@ fn build_fs(workspace: &Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf
                     tokens_to_string(contents),
                 );
 
-                [manifest, source].into_iter()
+                [manifest, source]
             },
         )
+        .flatten()
         .chain([workspace_manifest])
         .collect();
 
@@ -267,4 +219,73 @@ fn build_fs(workspace: &Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf
         .collect();
 
     (files, dirs)
+}
+
+/// Reads files, their contents, and directories at the supplied path'
+fn read_fs(path: &Path) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
+    if !path.exists() {
+        return Default::default();
+    }
+
+    let files = WalkDir::new(path)
+        .into_iter()
+        .filter(|entry| entry.as_ref().unwrap().file_type().is_file())
+        .map(|entry| {
+            let entry = entry.unwrap();
+            let adjusted_path = entry.path().strip_prefix(path).unwrap().to_owned();
+            (
+                adjusted_path,
+                read_to_string(entry.path()).unwrap_or_default(),
+            )
+        })
+        .collect();
+
+    let dirs = WalkDir::new(path)
+        .into_iter()
+        .filter(|entry| entry.as_ref().unwrap().file_type().is_dir())
+        .map(|entry| entry.unwrap().path().strip_prefix(path).unwrap().to_owned())
+        .filter(|path| path.ends_with("src"))
+        .collect();
+
+    (files, dirs)
+}
+
+fn write_difference(
+    (target_files, target_dirs): (HashMap<PathBuf, String>, HashSet<PathBuf>),
+    (mut current_files, mut current_dirs): (HashMap<PathBuf, String>, HashSet<PathBuf>),
+    workspace_path: &Path,
+) {
+    {
+        for path in target_dirs {
+            if !current_dirs.remove(&path) {
+                log::info!("new dir @ {path:?}");
+                fs::create_dir_all(workspace_path.join(path)).unwrap();
+            }
+        }
+
+        for path in current_dirs {
+            log::info!("delete dir @ {path:?}");
+            fs::remove_dir_all(workspace_path.join(path)).unwrap();
+        }
+    }
+
+    {
+        for (path, target_contents) in target_files {
+            if let Some(contents) = current_files.remove(&path) {
+                if *contents != target_contents {
+                    log::info!("diff @ {path:?}");
+                    fs::write(workspace_path.join(path), target_contents).unwrap();
+                }
+            } else {
+                log::info!("new @ {path:?}");
+                fs::write(workspace_path.join(path), target_contents).unwrap();
+            }
+        }
+
+        for (path, _) in current_files {
+            log::info!("delete @ {path:?}");
+            // hide errors if parent dir was already deleted
+            fs::remove_file(workspace_path.join(path)).ok();
+        }
+    }
 }

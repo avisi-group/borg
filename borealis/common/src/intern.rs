@@ -153,7 +153,7 @@ impl<D: Fallible> rkyv::Deserialize<InternedString, D>
     }
 }
 
-/// Initializes the internet with an initial state
+/// Initializes the interner with an initial state
 pub fn init_interner(state: &HashMap<String, u32>) {
     unsafe { INTERNER = Some(bincode::deserialize(&bincode::serialize(state).unwrap()).unwrap()) };
 }
