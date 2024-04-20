@@ -14,10 +14,10 @@ use {
             StatementKind, Type, UnaryOperationKind,
         },
     },
-    common::{identifiable::Id, intern::InternedString, HashMap},
+    common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     log::trace,
     regex::Regex,
-    std::{cell::RefCell, cmp::Ordering, rc::Rc},
+    std::{cmp::Ordering, rc::Rc, sync::Arc},
 };
 
 pub fn from_boom(ast: &boom::Ast) -> Context {
@@ -56,23 +56,23 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
         (
             FunctionKind::Execute,
             rudder::Function {
-                inner: Rc::new(RefCell::new(FunctionInner {
+                inner: Shared::new(FunctionInner {
                     name: *REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
                     return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
                     parameters: REPLICATE_BITS_BOREALIS_INTERNAL
                         .inner
-                        .borrow()
+                        .get()
                         .parameters
                         .clone(),
                     local_variables: HashMap::default(),
                     entry_block: Block::new(),
-                })),
+                }),
             },
             boom::FunctionDefinition {
                 signature: FunctionSignature {
                     name: *REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
-                    parameters: Rc::new(RefCell::new(vec![])),
-                    return_type: Rc::new(RefCell::new(boom::Type::Unit)),
+                    parameters: Shared::new(vec![]),
+                    return_type: Shared::new(boom::Type::Unit),
                 },
                 entry_block: ControlFlowBlock::new(),
             },
@@ -97,16 +97,16 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
 struct BuildContext {
     /// Name of struct maps to the rudder type and a map of field names to field
     /// indices
-    structs: HashMap<InternedString, (Rc<rudder::Type>, HashMap<InternedString, usize>)>,
+    structs: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, usize>)>,
     /// Name of union maps to the rudder type and a map of field names to field
     /// indices
-    unions: HashMap<InternedString, (Rc<rudder::Type>, HashMap<InternedString, usize>)>,
+    unions: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, usize>)>,
     /// Name of enum maps to the rudder type and a map of enum variants to the
     /// integer discriminant of that variant
-    enums: HashMap<InternedString, (Rc<rudder::Type>, HashMap<InternedString, u32>)>,
+    enums: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, u32>)>,
 
     /// Register name to type and offset mapping
-    registers: HashMap<InternedString, (Rc<rudder::Type>, usize)>,
+    registers: HashMap<InternedString, (Arc<rudder::Type>, usize)>,
     next_register_offset: usize,
 
     /// Functions
@@ -114,7 +114,7 @@ struct BuildContext {
 }
 
 impl BuildContext {
-    fn add_register(&mut self, name: InternedString, typ: Rc<Type>) {
+    fn add_register(&mut self, name: InternedString, typ: Arc<Type>) {
         self.registers
             .insert(name, (typ.clone(), self.next_register_offset));
 
@@ -125,7 +125,7 @@ impl BuildContext {
     }
 
     fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Rc::new(Type::Composite(
+        let typ = Arc::new(Type::Composite(
             fields
                 .iter()
                 .map(|boom::NamedType { typ, .. }| self.resolve_type(typ.clone()))
@@ -144,7 +144,7 @@ impl BuildContext {
     }
 
     fn add_union(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Rc::new(Type::Composite(
+        let typ = Arc::new(Type::Composite(
             fields
                 .iter()
                 .map(|boom::NamedType { typ, .. }| self.resolve_type(typ.clone()))
@@ -167,7 +167,7 @@ impl BuildContext {
     }
 
     fn add_enum(&mut self, name: InternedString, variants: &[InternedString]) {
-        let typ = Rc::new(Type::u32());
+        let typ = Arc::new(Type::u32());
 
         let variants = variants
             .iter()
@@ -188,7 +188,7 @@ impl BuildContext {
                 rudder::Function::new(
                     name,
                     self.resolve_type(definition.signature.return_type.clone()),
-                    definition.signature.parameters.borrow().iter().map(
+                    definition.signature.parameters.get().iter().map(
                         |boom::Parameter { typ, name, is_ref }| {
                             assert!(!is_ref, "no reference parameters allowed");
                             (*name, self.resolve_type(typ.clone()))
@@ -210,13 +210,13 @@ impl BuildContext {
             });
     }
 
-    fn resolve_type(&self, typ: Rc<RefCell<boom::Type>>) -> Rc<rudder::Type> {
-        match &*typ.borrow() {
-            boom::Type::Unit => Rc::new(rudder::Type::unit()),
-            boom::Type::String => Rc::new(rudder::Type::u32()), // same as InternedString raw value
-            boom::Type::Bool | boom::Type::Bit => Rc::new(rudder::Type::u1()),
-            boom::Type::Real => Rc::new(rudder::Type::f32()),
-            boom::Type::Float => Rc::new(rudder::Type::f64()),
+    fn resolve_type(&self, typ: Shared<boom::Type>) -> Arc<rudder::Type> {
+        match &*typ.get() {
+            boom::Type::Unit => Arc::new(rudder::Type::unit()),
+            boom::Type::String => Arc::new(rudder::Type::u32()), // same as InternedString raw value
+            boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
+            boom::Type::Real => Arc::new(rudder::Type::f32()),
+            boom::Type::Float => Arc::new(rudder::Type::f64()),
             boom::Type::Int { signed, size } => {
                 let tc = match signed {
                     true => rudder::PrimitiveTypeClass::SignedInteger,
@@ -224,15 +224,15 @@ impl BuildContext {
                 };
 
                 match size {
-                    boom::Size::Static(size) => Rc::new(rudder::Type::new_primitive(tc, *size)),
+                    boom::Size::Static(size) => Arc::new(rudder::Type::new_primitive(tc, *size)),
                     boom::Size::Runtime(_) | boom::Size::Unknown => {
-                        Rc::new(rudder::Type::Bundled {
-                            value: Rc::new(match signed {
+                        Arc::new(rudder::Type::Bundled {
+                            value: Arc::new(match signed {
                                 true => rudder::Type::s64(),
                                 false => rudder::Type::u64(),
                             }),
 
-                            len: Rc::new(rudder::Type::u8()),
+                            len: Arc::new(rudder::Type::u8()),
                         })
                     }
                 }
@@ -246,7 +246,7 @@ impl BuildContext {
                 let element_type = (*self.resolve_type(element_type.clone())).clone();
                 // todo: Brian Campbell said the Sail C backend had functionality to staticize
                 // all bitvector lengths
-                Rc::new(element_type.vectorize(0))
+                Arc::new(element_type.vectorize(0))
             }
             boom::Type::FixedVector {
                 length,
@@ -254,7 +254,7 @@ impl BuildContext {
             } => {
                 let element_type = (*self.resolve_type(element_type.clone())).clone();
 
-                Rc::new(element_type.vectorize(usize::try_from(*length).unwrap()))
+                Arc::new(element_type.vectorize(usize::try_from(*length).unwrap()))
             }
             boom::Type::Reference(inner) => {
                 // todo: this is broken:(
@@ -313,7 +313,7 @@ impl<'ctx> FunctionBuildContext<'ctx> {
             "converting function {:?} from boom to rudder",
             boom_fn.signature.name
         );
-        self.rudder_fn.inner.borrow_mut().entry_block = self.resolve_block(boom_fn.entry_block);
+        self.rudder_fn.inner.get_mut().entry_block = self.resolve_block(boom_fn.entry_block);
     }
 }
 
@@ -358,7 +358,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         // check terminator, insert final rudder statement
         let kind = match boom_block.terminator() {
             boom::control_flow::Terminator::Return(value) => {
-                let value = value.map(|v| self.build_value(Rc::new(RefCell::new(v))));
+                let value = value.map(|v| self.build_value(Shared::new(v)));
 
                 rudder::StatementKind::Return { value }
             }
@@ -368,7 +368,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 target: boom_target,
                 fallthrough: boom_fallthrough,
             } => {
-                let condition = self.build_value(Rc::new(RefCell::new(condition)));
+                let condition = self.build_value(Shared::new(condition));
                 let typ = condition.typ();
 
                 if *typ != Type::u1() {
@@ -407,8 +407,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         self.block
     }
 
-    fn build_statement(&mut self, statement: Rc<RefCell<boom::Statement>>) {
-        match &*statement.borrow() {
+    fn build_statement(&mut self, statement: Shared<boom::Statement>) {
+        match &*statement.get() {
             boom::Statement::TypeDeclaration { name, typ } => {
                 let typ = self.ctx().resolve_type(typ.clone());
                 self.fn_ctx().rudder_fn.add_local_variable(*name, typ);
@@ -446,10 +446,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn build_copy(&mut self, value: Rc<RefCell<boom::Value>>, expression: &boom::Expression) {
+    fn build_copy(&mut self, value: Shared<boom::Value>, expression: &boom::Expression) {
         // ignore copies of undefined
-        if let boom::Value::Literal(lit) = &*value.borrow() {
-            if let boom::Literal::Undefined = *lit.borrow() {
+        if let boom::Value::Literal(lit) = &*value.get() {
+            if let boom::Literal::Undefined = *lit.get() {
                 return;
             }
         }
@@ -461,7 +461,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     fn build_function_call(
         &mut self,
-        arguments: &[Rc<RefCell<boom::Value>>],
+        arguments: &[Shared<boom::Value>],
         name: &InternedString,
         expression: &Option<boom::Expression>,
     ) {
@@ -527,14 +527,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         } else {
             match name.as_ref() {
                 "%i64->%i" | "%i->%i64" => {
-                    Some(self.generate_cast(args[0].clone(), Rc::new(Type::s64())))
+                    Some(self.generate_cast(args[0].clone(), Arc::new(Type::s64())))
                 }
                 // todo: should probably be casts
                 "UInt0" | "SInt0" | "make_the_value" | "size_itself_int" => Some(args[0].clone()),
                 "subrange_bits" => {
                     // end - start + 1
                     let one = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::s64()),
+                        typ: Arc::new(Type::s64()),
                         value: rudder::ConstantValue::SignedInteger(1),
                     });
                     let one = self.generate_cast(one, args[1].typ());
@@ -576,8 +576,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val add_atom : (%i, %i) -> %i
                 "add_atom" => {
-                    let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_signed()));
-                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_signed()));
+                    let lhs = self.generate_cast(args[0].clone(), Arc::new(Type::bundle_signed()));
+                    let rhs = self.generate_cast(args[1].clone(), Arc::new(Type::bundle_signed()));
                     Some(
                         self.statement_builder
                             .build(StatementKind::BinaryOperation {
@@ -590,8 +590,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val add_bits : (%bv, %bv) -> %bv
                 "add_bits" => {
-                    let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
-                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                    let lhs =
+                        self.generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
+                    let rhs =
+                        self.generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
                     Some(
                         self.statement_builder
                             .build(StatementKind::BinaryOperation {
@@ -604,8 +606,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val add_bits_int : (%bv, %i) -> %bv
                 "add_bits_int" => {
-                    let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
-                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                    let lhs =
+                        self.generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
+                    let rhs =
+                        self.generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
                     Some(
                         self.statement_builder
                             .build(StatementKind::BinaryOperation {
@@ -618,8 +622,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val sub_bits_int : (%bv, %i) -> %bv
                 "sub_bits_int" => {
-                    let lhs = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
-                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                    let lhs =
+                        self.generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
+                    let rhs =
+                        self.generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
                     Some(
                         self.statement_builder
                             .build(StatementKind::BinaryOperation {
@@ -712,7 +718,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 // val to_real : (%i) -> %real
-                "to_real" => Some(self.generate_cast(args[0].clone(), Rc::new(Type::f64()))),
+                "to_real" => Some(self.generate_cast(args[0].clone(), Arc::new(Type::f64()))),
 
                 "pow2" => Some(self.statement_builder.build(StatementKind::UnaryOperation {
                     kind: UnaryOperationKind::Power2,
@@ -827,7 +833,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 "bitvector_access" => {
                     let length = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(1),
                     });
                     let bitex = self.statement_builder.build(StatementKind::BitExtract {
@@ -836,7 +842,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length,
                     });
 
-                    Some(self.generate_cast(bitex, Rc::new(Type::u1())))
+                    Some(self.generate_cast(bitex, Arc::new(Type::u1())))
                 }
 
                 "bitvector_length" => {
@@ -853,17 +859,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     //    } else {
                     //         return op & ~(bit << n);
                     //    }
-                    let op = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+                    let op = self.generate_cast(args[0].clone(), Arc::new(Type::u64()));
                     let n = args[1].clone();
                     let bit = self.statement_builder.build(StatementKind::Cast {
                         kind: CastOperationKind::ZeroExtend,
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: args[2].clone(),
                     });
 
                     // 1
                     let one = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(1),
                     });
 
@@ -930,11 +936,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let value = match name.as_ref() {
                         "truncate" => {
                             let one = self.statement_builder.build(StatementKind::Constant {
-                                typ: Rc::new(Type::u64()),
+                                typ: Arc::new(Type::u64()),
                                 value: rudder::ConstantValue::UnsignedInteger(1),
                             });
                             let cast_length =
-                                self.generate_cast(length.clone(), Rc::new(Type::u64()));
+                                self.generate_cast(length.clone(), Arc::new(Type::u64()));
                             let shift =
                                 self.statement_builder.build(StatementKind::ShiftOperation {
                                     kind: ShiftOperationKind::LogicalShiftLeft,
@@ -950,7 +956,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                     });
 
                             let cast_value =
-                                self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+                                self.generate_cast(args[0].clone(), Arc::new(Type::u64()));
                             self.statement_builder
                                 .build(StatementKind::BinaryOperation {
                                     kind: BinaryOperationKind::And,
@@ -964,7 +970,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             let target_length = args[1].clone();
 
                             let sixtyfour = self.statement_builder.build(StatementKind::Constant {
-                                typ: Rc::new(Type::u8()),
+                                typ: Arc::new(Type::u8()),
                                 value: rudder::ConstantValue::UnsignedInteger(64),
                             });
 
@@ -982,7 +988,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                                     });
 
                             let shift_amount_cast =
-                                self.generate_cast(shift_amount, Rc::new(Type::s64()));
+                                self.generate_cast(shift_amount, Arc::new(Type::s64()));
 
                             let shift_amount_bundle =
                                 self.statement_builder.build(StatementKind::Bundle {
@@ -992,9 +998,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                             let value_bundle = self.generate_cast(
                                 value,
-                                Rc::new(Type::Bundled {
-                                    value: Rc::new(Type::s64()),
-                                    len: Rc::new(Type::u8()),
+                                Arc::new(Type::Bundled {
+                                    value: Arc::new(Type::s64()),
+                                    len: Arc::new(Type::u8()),
                                 }),
                             );
 
@@ -1024,8 +1030,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         _ => args[0].clone(),
                     };
 
-                    let value_cast = self.generate_cast(value, Rc::new(Type::u64()));
-                    let length_cast = self.generate_cast(length, Rc::new(Type::u8()));
+                    let value_cast = self.generate_cast(value, Arc::new(Type::u64()));
+                    let length_cast = self.generate_cast(length, Arc::new(Type::u8()));
 
                     let bundle = self.statement_builder.build(StatementKind::Bundle {
                         value: value_cast,
@@ -1038,11 +1044,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sail_zeros" => {
                     let length = args[0].clone();
                     let value = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(0),
                     });
 
-                    let length_cast = self.generate_cast(length, Rc::new(Type::u8()));
+                    let length_cast = self.generate_cast(length, Arc::new(Type::u8()));
 
                     let bundle = self.statement_builder.build(StatementKind::Bundle {
                         value,
@@ -1061,17 +1067,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // assuming GPRs are contiguoous
 
                     // %i argument to unsigned
-                    let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+                    let n = self.generate_cast(args[0].clone(), Arc::new(Type::u64()));
 
                     let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
 
                     let base = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(base),
                     });
 
                     let eight = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(8),
                     });
 
@@ -1101,17 +1107,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // assuming GPRs are contiguoous
 
                     // %i argument to unsigned
-                    let n = self.generate_cast(args[0].clone(), Rc::new(Type::u64()));
+                    let n = self.generate_cast(args[0].clone(), Arc::new(Type::u64()));
 
                     let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
 
                     let base = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(base),
                     });
 
                     let eight = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(8),
                     });
 
@@ -1132,7 +1138,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         });
 
                     Some(self.statement_builder.build(StatementKind::ReadRegister {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         offset,
                     }))
                 }
@@ -1140,12 +1146,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val bitvector_update : (%bv, %i, %bit) -> %bv
                 "bitvector_update" => {
                     let target =
-                        self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+                        self.generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
                     let i = args[1].clone();
-                    let bit = self.generate_cast(args[0].clone(), Rc::new(Type::bundle_unsigned()));
+                    let bit =
+                        self.generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
 
                     let _1 = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u64()),
+                        typ: Arc::new(Type::u64()),
                         value: ConstantValue::UnsignedInteger(1),
                     });
 
@@ -1160,7 +1167,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val append_64 : (%bv, %bv64) -> %bv
                 "append_64" => {
                     log::warn!("append_64 will overflow u64-backed bundle");
-                    let rhs = self.generate_cast(args[1].clone(), Rc::new(Type::bundle_unsigned()));
+                    let rhs =
+                        self.generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
                     Some(self.generate_concat(args[0].clone(), rhs))
                 }
 
@@ -1207,14 +1215,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 "sail_branch_announce" => {
                     Some(self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::unit()),
+                        typ: Arc::new(Type::unit()),
                         value: rudder::ConstantValue::Unit,
                     }))
                 }
 
                 "replicate_bits" => {
                     // // bundle length = bits_length * count
-                    let count = self.generate_cast(args[1].clone(), Rc::new(Type::u64()));
+                    let count = self.generate_cast(args[1].clone(), Arc::new(Type::u64()));
                     Some(self.statement_builder.build(StatementKind::Call {
                         target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
                         args: vec![args[0].clone(), count],
@@ -1238,7 +1246,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
                 "DataMemoryBarrier" => {
                     Some(self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::unit()),
+                        typ: Arc::new(Type::unit()),
                         value: ConstantValue::Unit,
                     }))
                 }
@@ -1285,7 +1293,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let cast = self.generate_cast(source, outer_type);
 
                 let offset = self.statement_builder.build(StatementKind::Constant {
-                    typ: Rc::new(Type::u32()),
+                    typ: Arc::new(Type::u32()),
                     value: rudder::ConstantValue::UnsignedInteger(offset),
                 });
 
@@ -1298,10 +1306,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     /// Last statement returned is the value
-    fn build_value(&mut self, boom_value: Rc<RefCell<boom::Value>>) -> Statement {
+    fn build_value(&mut self, boom_value: Shared<boom::Value>) -> Statement {
         let (base, fields) = value_field_collapse(boom_value.clone());
 
-        let borrow = base.borrow();
+        let borrow = base.get();
 
         match &*borrow {
             boom::Value::Identifier(ident) => {
@@ -1333,7 +1341,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = register_offset + offsets.iter().sum::<usize>();
 
                     let offset = self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u32()),
+                        typ: Arc::new(Type::u32()),
                         value: rudder::ConstantValue::UnsignedInteger(offset),
                     });
 
@@ -1352,7 +1360,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .cloned()
                 {
                     return self.statement_builder.build(StatementKind::Constant {
-                        typ: Rc::new(Type::u32()),
+                        typ: Arc::new(Type::u32()),
                         value: rudder::ConstantValue::UnsignedInteger(value.try_into().unwrap()),
                     });
                 }
@@ -1360,7 +1368,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
             }
 
-            boom::Value::Literal(literal) => self.build_literal(&literal.borrow()),
+            boom::Value::Literal(literal) => self.build_literal(&literal.get()),
             boom::Value::Operation(op) => self.build_operation(op),
             boom::Value::Struct { name, fields } => {
                 let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
@@ -1390,11 +1398,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn build_literal(&mut self, literal: &boom::Literal) -> Statement {
         let kind = match literal {
             boom::Literal::Int(i) => StatementKind::Constant {
-                typ: Rc::new(Type::s64()),
+                typ: Arc::new(Type::s64()),
                 value: rudder::ConstantValue::SignedInteger(i.try_into().unwrap()),
             },
             boom::Literal::Bits(bits) => StatementKind::Constant {
-                typ: Rc::new(Type::new_primitive(
+                typ: Arc::new(Type::new_primitive(
                     rudder::PrimitiveTypeClass::UnsignedInteger,
                     bits.len(),
                 )),
@@ -1403,19 +1411,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ),
             },
             boom::Literal::Bit(bit) => StatementKind::Constant {
-                typ: Rc::new(Type::u1()),
+                typ: Arc::new(Type::u1()),
                 value: rudder::ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
             },
             boom::Literal::Bool(b) => StatementKind::Constant {
-                typ: Rc::new(Type::u1()),
+                typ: Arc::new(Type::u1()),
                 value: rudder::ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
             },
             boom::Literal::String(str) => StatementKind::Constant {
-                typ: Rc::new(Type::u32()),
+                typ: Arc::new(Type::u32()),
                 value: rudder::ConstantValue::UnsignedInteger(str.key().try_into().unwrap()),
             },
             boom::Literal::Unit => StatementKind::Constant {
-                typ: Rc::new(Type::unit()),
+                typ: Arc::new(Type::unit()),
                 value: rudder::ConstantValue::Unit,
             },
             boom::Literal::Reference(_) => todo!(),
@@ -1555,7 +1563,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     // No-op if same type
-    fn generate_cast(&mut self, source: Statement, destination_type: Rc<Type>) -> Statement {
+    fn generate_cast(&mut self, source: Statement, destination_type: Arc<Type>) -> Statement {
         if source.typ() == destination_type {
             return source;
         }
@@ -1702,7 +1710,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         // let source_mask = (1 << (length) - 1);
         let one = self.statement_builder.build(StatementKind::Constant {
-            typ: Rc::new(Type::u64()),
+            typ: Arc::new(Type::u64()),
             value: rudder::ConstantValue::UnsignedInteger(1),
         });
         let one = self.generate_cast(one, source.typ());
@@ -1838,9 +1846,7 @@ fn expression_field_collapse(expression: &boom::Expression) -> Vec<InternedStrin
 /// Function to collapse nested value fields
 ///
 /// Returns the base value and a vec of field accesses
-fn value_field_collapse(
-    value: Rc<RefCell<boom::Value>>,
-) -> (Rc<RefCell<boom::Value>>, Vec<InternedString>) {
+fn value_field_collapse(value: Shared<boom::Value>) -> (Shared<boom::Value>, Vec<InternedString>) {
     let mut fields = vec![];
 
     let mut current_value = value;
@@ -1848,7 +1854,7 @@ fn value_field_collapse(
     loop {
         // get next value and field name out of current value
         // done this way to avoid borrow issues
-        let extract = match &*current_value.borrow() {
+        let extract = match &*current_value.get() {
             boom::Value::Field { value, field_name } => Some((value.clone(), *field_name)),
             _ => None,
         };
@@ -1865,12 +1871,13 @@ fn value_field_collapse(
     }
 }
 
-/// Given a type and array of field accesses, produce a corresponding array of indices to each field access, and the type of the outermost access
+/// Given a type and array of field accesses, produce a corresponding array of
+/// indices to each field access, and the type of the outermost access
 fn fields_to_indices(
-    structs: &HashMap<InternedString, (Rc<Type>, HashMap<InternedString, usize>)>,
-    initial_type: Rc<Type>,
+    structs: &HashMap<InternedString, (Arc<Type>, HashMap<InternedString, usize>)>,
+    initial_type: Arc<Type>,
     fields: &[InternedString],
-) -> (Vec<usize>, Rc<Type>) {
+) -> (Vec<usize>, Arc<Type>) {
     let mut current_type = initial_type;
 
     let mut indices = vec![];
@@ -1879,7 +1886,7 @@ fn fields_to_indices(
         // get the fields of the current struct
         let (_, (struct_typ, fields)) = structs
             .iter()
-            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
+            .find(|(_, (candidate, _))| Arc::ptr_eq(&current_type, candidate))
             .expect("failed to find struct :(");
 
         // get index and push
@@ -1897,10 +1904,10 @@ fn fields_to_indices(
 }
 
 fn fields_to_offsets(
-    structs: &HashMap<InternedString, (Rc<Type>, HashMap<InternedString, usize>)>,
-    initial_type: Rc<Type>,
+    structs: &HashMap<InternedString, (Arc<Type>, HashMap<InternedString, usize>)>,
+    initial_type: Arc<Type>,
     fields: &[InternedString],
-) -> (Vec<usize>, Rc<Type>) {
+) -> (Vec<usize>, Arc<Type>) {
     let mut current_type = initial_type;
 
     let mut offsets = vec![];
@@ -1909,7 +1916,7 @@ fn fields_to_offsets(
         // get the fields of the current struct
         let (_, (struct_typ, fields)) = structs
             .iter()
-            .find(|(_, (candidate, _))| Rc::ptr_eq(&current_type, candidate))
+            .find(|(_, (candidate, _))| Arc::ptr_eq(&current_type, candidate))
             .expect("failed to find struct :(");
 
         // get index and push

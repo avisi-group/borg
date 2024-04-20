@@ -3,9 +3,9 @@ use {
         self,
         control_flow::{ControlFlowBlock, Terminator},
     },
-    common::{identifiable::Id, HashMap},
+    common::{identifiable::Id, shared::Shared, HashMap},
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
-    std::{cell::RefCell, io, rc::Rc},
+    std::io,
 };
 
 pub fn render<W: io::Write>(w: &mut W, block: &ControlFlowBlock) -> io::Result<()> {
@@ -65,7 +65,7 @@ impl Graph {
                     Some(value) => {
                         let value = {
                             let mut buf = Vec::new();
-                            boom::pretty_print::print_value(&mut buf, Rc::new(RefCell::new(value)));
+                            boom::pretty_print::print_value(&mut buf, Shared::new(value));
                             String::from_utf8(buf).unwrap()
                         };
 
@@ -76,7 +76,7 @@ impl Graph {
                 Terminator::Conditional { condition, .. } => {
                     let condition = {
                         let mut buf = Vec::new();
-                        boom::pretty_print::print_value(&mut buf, Rc::new(RefCell::new(condition)));
+                        boom::pretty_print::print_value(&mut buf, Shared::new(condition));
                         String::from_utf8(buf).unwrap()
                     };
 

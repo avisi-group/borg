@@ -276,7 +276,7 @@ impl Display for Statement {
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        for stmt in &(*self.inner).borrow().statements {
+        for stmt in &self.inner.get().statements {
             writeln!(f, "    {}", stmt)?;
         }
 
@@ -288,32 +288,28 @@ impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let cfg = analysis::cfg::ControlFlowGraphAnalysis::new(self);
 
-        self.inner
-            .borrow()
-            .entry_block
-            .iter()
-            .try_for_each(|block| {
-                let preds = cfg
-                    .predecessors_for(&block)
-                    .unwrap()
-                    .iter()
-                    .map(|b| b.name())
-                    .join(", ");
+        self.inner.get().entry_block.iter().try_for_each(|block| {
+            let preds = cfg
+                .predecessors_for(&block)
+                .unwrap()
+                .iter()
+                .map(|b| b.name())
+                .join(", ");
 
-                let succs = cfg
-                    .successors_for(&block)
-                    .unwrap()
-                    .iter()
-                    .map(|b| b.name())
-                    .join(", ");
+            let succs = cfg
+                .successors_for(&block)
+                .unwrap()
+                .iter()
+                .map(|b| b.name())
+                .join(", ");
 
-                writeln!(
-                    f,
-                    "  block {}: preds={{{preds}}}, succs={{{succs}}}",
-                    block.name()
-                )?;
-                write!(f, "{}", block)
-            })
+            writeln!(
+                f,
+                "  block {}: preds={{{preds}}}, succs={{{succs}}}",
+                block.name()
+            )?;
+            write!(f, "{}", block)
+        })
     }
 }
 

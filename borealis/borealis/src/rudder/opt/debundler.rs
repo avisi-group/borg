@@ -6,7 +6,7 @@ use {
     common::HashMap,
     core::panic,
     log::trace,
-    std::rc::Rc,
+    std::sync::Arc,
 };
 
 pub fn run(f: Function) -> bool {
@@ -54,7 +54,7 @@ fn remove_illegal_unbundles(block: &Block) -> bool {
             StatementKind::UnbundleLength { bundle } => {
                 if !bundle.typ().is_bundle() {
                     stmt.replace_kind(StatementKind::Constant {
-                        typ: Rc::new(Type::u8()),
+                        typ: Arc::new(Type::u8()),
                         value: ConstantValue::UnsignedInteger(bundle.typ().width_bits()),
                     });
 
@@ -141,7 +141,7 @@ fn transform_constant_length_bundles(block: &Block) -> bool {
                     // can we replace it with a cast to the correct bit width?
 
                     let value_length = value.typ().width_bits();
-                    let target_type = Rc::new(Type::new_primitive(
+                    let target_type = Arc::new(Type::new_primitive(
                         PrimitiveTypeClass::UnsignedInteger,
                         target_length,
                     ));

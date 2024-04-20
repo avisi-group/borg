@@ -6,10 +6,9 @@ use {
         passes::{any::AnyExt, Pass},
         Ast,
     },
-    common::HashSet,
+    common::{shared::Shared, HashSet},
     log::{debug, trace},
     pretty_assertions::assert_eq,
-    std::{cell::RefCell, rc::Rc},
 };
 
 /// Control flow blocks with only one parent and one child (unconditional jump
@@ -31,8 +30,8 @@ impl Pass for FoldUnconditionals {
 
     fn reset(&mut self) {}
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow()
+    fn run(&mut self, ast: Shared<Ast>) -> bool {
+        ast.get()
             .functions
             .iter()
             .map(|(name, def)| {

@@ -5,14 +5,12 @@ use {
         control_flow::{dot, ControlFlowBlock},
         Expression, Statement, Value,
     },
-    common::{intern::InternedString, HashSet},
+    common::{intern::InternedString, shared::Shared, HashSet},
     itertools::Itertools,
     log::trace,
     std::{
-        cell::RefCell,
         collections::LinkedList,
         io::{self, Write},
-        rc::Rc,
     },
 };
 
@@ -63,7 +61,7 @@ impl ControlFlowBlock {
         self.iter()
             .flat_map(|block| block.statements())
             .filter_map(|statement| {
-                if let Statement::FunctionCall { name, .. } = *statement.borrow() {
+                if let Statement::FunctionCall { name, .. } = *statement.get() {
                     Some(name)
                 } else {
                     None
@@ -72,12 +70,12 @@ impl ControlFlowBlock {
             .collect()
     }
 
-    pub fn get_assignment(&self, ident: InternedString) -> Option<Rc<RefCell<Value>>> {
+    pub fn get_assignment(&self, ident: InternedString) -> Option<Shared<Value>> {
         self.iter()
             .flat_map(|cfb| cfb.statements())
             .filter_map(|statement| {
                 let res = {
-                    let borrow = statement.borrow();
+                    let borrow = statement.get();
                     match &*borrow {
                         Statement::Copy { expression, value } => {
                             Some((expression.clone(), value.clone()))
@@ -104,10 +102,7 @@ impl ControlFlowBlock {
     }
 
     /// Finds the block and index of a statement in a control flow graph
-    pub fn find_statement(
-        &self,
-        target: Rc<RefCell<Statement>>,
-    ) -> Option<(ControlFlowBlock, usize)> {
+    pub fn find_statement(&self, target: Shared<Statement>) -> Option<(ControlFlowBlock, usize)> {
         self.iter()
             .map(|block| (block.clone(), block.statements()))
             .map(|(block, statements)| {
@@ -115,7 +110,7 @@ impl ControlFlowBlock {
                     block,
                     statements
                         .iter()
-                        .position(|statement| Rc::ptr_eq(statement, &target)),
+                        .position(|statement| Shared::ptr_eq(statement, &target)),
                 )
             })
             .filter_map(|(block, index)| index.map(|index| (block, index)))

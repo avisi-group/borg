@@ -11,8 +11,7 @@ use {
         visitor::{Visitor, Walkable},
         Ast, Expression, Literal, Size, Statement, Type, Value,
     },
-    common::{intern::InternedString, HashSet},
-    std::{cell::RefCell, rc::Rc},
+    common::{intern::InternedString, shared::Shared, HashSet},
 };
 
 /// Remove all exception handling logic
@@ -32,13 +31,13 @@ impl Pass for MakeExceptionBool {
 
     fn reset(&mut self) {}
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow().functions.values().for_each(|def| {
+    fn run(&mut self, ast: Shared<Ast>) -> bool {
+        ast.get().functions.values().for_each(|def| {
             {
                 let mut statements = def.entry_block.statements();
 
                 if let Some(stmt) = statements.first() {
-                    if let Statement::TypeDeclaration { name, .. } = &*stmt.borrow() {
+                    if let Statement::TypeDeclaration { name, .. } = &*stmt.get() {
                         if name.as_ref() == "exception" {
                             // skip if already done?
                             return;
@@ -50,10 +49,10 @@ impl Pass for MakeExceptionBool {
                     0,
                     Statement::TypeDeclaration {
                         name: "exception".into(),
-                        typ: Rc::new(RefCell::new(Type::Int {
+                        typ: Shared::new(Type::Int {
                             signed: false,
                             size: Size::Static(1),
-                        })),
+                        }),
                     }
                     .into(),
                 );
@@ -106,16 +105,16 @@ impl Visitor for MakeExceptionBool {
 
 fn statement_filter(
     deleted_exception_vars: &mut HashSet<InternedString>,
-    statement: Rc<RefCell<Statement>>,
-) -> Option<Rc<RefCell<Statement>>> {
+    statement: Shared<Statement>,
+) -> Option<Shared<Statement>> {
     let statement_cloned = statement.clone();
 
-    match &mut *statement.borrow_mut() {
+    match &mut *statement.get_mut() {
         Statement::TypeDeclaration {
             typ,
             name: local_var_name,
         } => {
-            if let Type::Union { name, .. } = *typ.borrow() {
+            if let Type::Union { name, .. } = *typ.get() {
                 if name.as_ref() == "exception" {
                     deleted_exception_vars.insert(*local_var_name);
 
@@ -154,7 +153,7 @@ fn statement_filter(
 
             match ident.as_ref() {
                 "exception" => {
-                    if let Value::Identifier(ident) = &*value.borrow() {
+                    if let Value::Identifier(ident) = &*value.get() {
                         if deleted_exception_vars.contains(ident) {
                             None
                         } else {

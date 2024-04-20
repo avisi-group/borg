@@ -15,7 +15,8 @@ pub fn run(f: Function) -> bool {
     changed
 }
 
-/// Replace vector access on registers and locals with adding to the indices and offset respectively
+/// Replace vector access on registers and locals with adding to the indices and
+/// offset respectively
 fn run_on_block(block: &Block) -> bool {
     for stmt in block.statements() {
         // if we're reading an element of a vec

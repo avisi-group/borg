@@ -4,7 +4,7 @@ use {
         InheritableDependency, InheritableField, PackageName, TomlDependency,
         TomlDetailedDependency, TomlManifest, TomlPackage, TomlWorkspace,
     },
-    common::{intern::InternedString, HashMap, HashSet},
+    common::{intern::InternedString, shared::Shared, HashMap, HashSet},
     proc_macro2::TokenStream,
     semver::{BuildMetadata, Prerelease, Version},
     std::{
@@ -102,106 +102,12 @@ fn build_fs(workspace: Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf>
             )| {
                 let manifest = (
                     PathBuf::from(name.as_ref()).join("Cargo.toml"),
-                    toml::to_string_pretty(&TomlManifest {
-                        cargo_features: None,
-                        package: Some(Box::new(TomlPackage {
-                            edition: Some(InheritableField::Value("2021".to_owned())),
-                            rust_version: None,
-                            name: PackageName::new(name.as_ref().to_owned()).unwrap(),
-                            version: Some(InheritableField::Value(Version {
-                                major: 0,
-                                minor: 0,
-                                patch: 0,
-                                pre: Prerelease::EMPTY,
-                                build: BuildMetadata::EMPTY,
-                            })),
-                            authors: None,
-                            build: None,
-                            metabuild: None,
-                            default_target: None,
-                            forced_target: None,
-                            links: None,
-                            exclude: None,
-                            include: None,
-                            publish: None,
-                            workspace: None,
-                            im_a_teapot: None,
-                            autobins: None,
-                            autoexamples: None,
-                            autotests: None,
-                            autobenches: None,
-                            default_run: None,
-                            description: None,
-                            homepage: None,
-                            documentation: None,
-                            readme: None,
-                            keywords: None,
-                            categories: None,
-                            license: None,
-                            license_file: None,
-                            repository: None,
-                            resolver: None,
-                            metadata: None,
-                            _invalid_cargo_features: None,
-                        })),
-                        project: None,
-                        profile: None,
-                        lib: None,
-                        bin: None,
-                        example: None,
-                        test: None,
-                        bench: None,
-                        dependencies: Some(
-                            dependencies
-                                .iter()
-                                .map(|n| (n, PackageName::new(n.to_string()).unwrap()))
-                                .map(|(n, package_name)| {
-                                    (
-                                        package_name,
-                                        InheritableDependency::Value(TomlDependency::Detailed(
-                                            TomlDetailedDependency {
-                                                version: None,
-                                                registry: None,
-                                                registry_index: None,
-                                                path: Some(format!("../{n}")),
-                                                git: None,
-                                                branch: None,
-                                                tag: None,
-                                                rev: None,
-                                                features: None,
-                                                optional: None,
-                                                default_features: None,
-                                                default_features2: None,
-                                                package: None,
-                                                public: None,
-                                                artifact: None,
-                                                lib: None,
-                                                target: None,
-                                                _unused_keys: BTreeMap::new(),
-                                            },
-                                        )),
-                                    )
-                                })
-                                .collect(),
-                        ),
-                        dev_dependencies: None,
-                        dev_dependencies2: None,
-                        build_dependencies: None,
-                        build_dependencies2: None,
-                        features: None,
-                        target: None,
-                        replace: None,
-                        patch: None,
-                        workspace: None,
-                        badges: None,
-                        lints: None,
-                    })
-                    .unwrap(),
+                    toml::to_string(&create_manifest(name, dependencies)).unwrap(),
                 );
 
                 let source = (
                     PathBuf::from(name.as_ref()).join("src").join("lib.rs"),
-                    tokens_to_string(contents),
+                    tokens_to_string(&contents),
                 );
 
                 [manifest, source]
@@ -287,5 +193,102 @@ fn write_difference(
             // hide errors if parent dir was already deleted
             fs::remove_file(workspace_path.join(path)).ok();
         }
+    }
+}
+
+fn create_manifest(name: &InternedString, dependencies: &HashSet<InternedString>) -> TomlManifest {
+    TomlManifest {
+        cargo_features: None,
+        package: Some(Box::new(TomlPackage {
+            edition: Some(InheritableField::Value("2021".to_owned())),
+            rust_version: None,
+            name: PackageName::new(name.as_ref().to_owned()).unwrap(),
+            version: Some(InheritableField::Value(Version {
+                major: 0,
+                minor: 0,
+                patch: 0,
+                pre: Prerelease::EMPTY,
+                build: BuildMetadata::EMPTY,
+            })),
+            authors: None,
+            build: None,
+            metabuild: None,
+            default_target: None,
+            forced_target: None,
+            links: None,
+            exclude: None,
+            include: None,
+            publish: None,
+            workspace: None,
+            im_a_teapot: None,
+            autobins: None,
+            autoexamples: None,
+            autotests: None,
+            autobenches: None,
+            default_run: None,
+            description: None,
+            homepage: None,
+            documentation: None,
+            readme: None,
+            keywords: None,
+            categories: None,
+            license: None,
+            license_file: None,
+            repository: None,
+            resolver: None,
+            metadata: None,
+            _invalid_cargo_features: None,
+        })),
+        project: None,
+        profile: None,
+        lib: None,
+        bin: None,
+        example: None,
+        test: None,
+        bench: None,
+        dependencies: Some(
+            dependencies
+                .iter()
+                .map(|n| (n, PackageName::new(n.to_string()).unwrap()))
+                .map(|(n, package_name)| {
+                    (
+                        package_name,
+                        InheritableDependency::Value(TomlDependency::Detailed(
+                            TomlDetailedDependency {
+                                version: None,
+                                registry: None,
+                                registry_index: None,
+                                path: Some(format!("../{n}")),
+                                git: None,
+                                branch: None,
+                                tag: None,
+                                rev: None,
+                                features: None,
+                                optional: None,
+                                default_features: None,
+                                default_features2: None,
+                                package: None,
+                                public: None,
+                                artifact: None,
+                                lib: None,
+                                target: None,
+                                _unused_keys: BTreeMap::new(),
+                            },
+                        )),
+                    )
+                })
+                .collect(),
+        ),
+        dev_dependencies: None,
+        dev_dependencies2: None,
+        build_dependencies: None,
+        build_dependencies2: None,
+        features: None,
+        target: None,
+        replace: None,
+        patch: None,
+        workspace: None,
+        badges: None,
+        lints: None,
     }
 }

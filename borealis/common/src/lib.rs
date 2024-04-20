@@ -12,7 +12,7 @@ use {
 
 pub mod identifiable;
 pub mod intern;
-pub mod shared_key;
+pub mod shared;
 
 /// HashMap with non-default hasher
 pub type HashMap<K, V> = std::collections::HashMap<K, V, BuildHasherDefault<XxHash64>>;

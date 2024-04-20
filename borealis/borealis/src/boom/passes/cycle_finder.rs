@@ -2,8 +2,8 @@
 
 use {
     crate::boom::{passes::Pass, Ast},
+    common::shared::Shared,
     log::warn,
-    std::{cell::RefCell, rc::Rc},
 };
 /// Finds cycles in the control flow graph
 #[derive(Debug, Default)]
@@ -23,8 +23,8 @@ impl Pass for CycleFinder {
 
     fn reset(&mut self) {}
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow().functions.iter().for_each(|(name, def)| {
+    fn run(&mut self, ast: Shared<Ast>) -> bool {
+        ast.get().functions.iter().for_each(|(name, def)| {
             if def.entry_block.contains_cycles() {
                 warn!("{name} has cycles");
             }

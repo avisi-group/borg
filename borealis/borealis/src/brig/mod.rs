@@ -33,7 +33,7 @@ use {
         hash::{DefaultHasher, Hash, Hasher},
         io::Write,
         path::PathBuf,
-        rc::Rc,
+        sync::Arc,
     },
     syn::Ident,
 };
@@ -85,7 +85,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
     info!("Building rudder");
 
-    let mut rudder = rudder::build::from_boom(&ast.borrow());
+    let mut rudder = rudder::build::from_boom(&ast.get());
 
     if dump_ir {
         writeln!(
@@ -140,7 +140,7 @@ fn promote_width(width: usize) -> usize {
     }
 }
 
-pub fn codegen_type(typ: Rc<Type>) -> TokenStream {
+pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
     match &*typ {
         Type::Primitive(typ) => {
             if typ.type_class() == PrimitiveTypeClass::UnsignedInteger && typ.width() == 1 {

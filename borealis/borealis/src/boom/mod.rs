@@ -9,11 +9,11 @@ use {
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
     },
-    common::{intern::InternedString, shared_key::SharedKey, HashMap, HashSet},
+    common::{intern::InternedString, shared::Shared, HashMap},
     kinded::Kinded,
     num_bigint::BigInt,
     sailrs::jib_ast,
-    std::{cell::RefCell, fmt::Debug, ops::Add, rc::Rc},
+    std::{fmt::Debug, ops::Add},
 };
 
 pub mod control_flow;
@@ -28,56 +28,20 @@ pub struct Ast {
     /// Sequence of definitions
     pub definitions: Vec<Definition>,
     /// Register types by identifier
-    pub registers: HashMap<InternedString, Rc<RefCell<Type>>>,
+    pub registers: HashMap<InternedString, Shared<Type>>,
     /// Function definitions by identifier
     pub functions: HashMap<InternedString, FunctionDefinition>,
 }
 
 impl Ast {
     /// Converts JIB AST into BOOM AST
-    pub fn from_jib<I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Rc<RefCell<Self>> {
+    pub fn from_jib<I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Shared<Self> {
         let mut emitter = BoomEmitter::new();
         emitter.process(iter);
 
         let ast = emitter.finish();
 
-        Rc::new(RefCell::new(ast))
-    }
-
-    /// Collects all statements in the AST into a HashSet
-    ///
-    /// Used to verify that none have been lost during the passes
-    pub fn statements(&self) -> HashSet<SharedKey<Statement>> {
-        let mut statements = HashSet::default();
-
-        self.definitions.iter().for_each(|def| {
-            if let Definition::Let { body, .. } = def {
-                statements.extend(body.iter().cloned().map(Into::into));
-            }
-        });
-
-        self.functions.values().for_each(
-            |FunctionDefinition {
-                 entry_block: control_flow,
-                 ..
-             }| {
-                let mut visited = HashSet::default();
-                let mut to_visit = vec![control_flow.clone()];
-
-                while let Some(current) = to_visit.pop() {
-                    if visited.contains(&current.id()) {
-                        return;
-                    }
-
-                    visited.insert(current.id());
-                    to_visit.extend(current.terminator().targets());
-
-                    statements.extend(current.statements().into_iter().map(Into::into));
-                }
-            },
-        );
-
-        statements
+        Shared::new(ast)
     }
 }
 
@@ -109,7 +73,7 @@ pub enum Definition {
 
     Let {
         bindings: Vec<NamedType>,
-        body: Vec<Rc<RefCell<Statement>>>,
+        body: Vec<Shared<Statement>>,
     },
 }
 
@@ -164,7 +128,7 @@ impl FunctionDefinition {
             .iter()
             .flat_map(|block| block.statements())
             .filter_map(|statement| {
-                if let Statement::TypeDeclaration { name, typ } = &*statement.borrow() {
+                if let Statement::TypeDeclaration { name, typ } = &*statement.get() {
                     Some((*name, typ.clone()))
                 } else {
                     None
@@ -173,19 +137,19 @@ impl FunctionDefinition {
             .chain(
                 self.signature
                     .parameters
-                    .borrow()
+                    .get()
                     .iter()
                     .map(|Parameter { name, typ, .. }| (*name, typ.clone())),
             )
             .find(|(name, ..)| *name == ident)
-            .map(|(.., typ)| typ.borrow().clone())
+            .map(|(.., typ)| typ.get().clone())
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Parameter {
     pub name: InternedString,
-    pub typ: Rc<RefCell<Type>>,
+    pub typ: Shared<Type>,
     pub is_ref: bool,
 }
 
@@ -199,14 +163,14 @@ impl Walkable for Parameter {
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: InternedString,
-    pub parameters: Rc<RefCell<Vec<Parameter>>>,
-    pub return_type: Rc<RefCell<Type>>,
+    pub parameters: Shared<Vec<Parameter>>,
+    pub return_type: Shared<Type>,
 }
 
 impl Walkable for FunctionSignature {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         self.parameters
-            .borrow()
+            .get()
             .iter()
             .for_each(|Parameter { typ, .. }| visitor.visit_type(typ.clone()));
         visitor.visit_type(self.return_type.clone());
@@ -217,7 +181,7 @@ impl Walkable for FunctionSignature {
 #[derive(Debug, Clone)]
 pub struct NamedType {
     pub name: InternedString,
-    pub typ: Rc<RefCell<Type>>,
+    pub typ: Shared<Type>,
 }
 
 impl Walkable for NamedType {
@@ -230,7 +194,7 @@ impl Walkable for NamedType {
 #[derive(Debug, Clone)]
 pub struct NamedValue {
     pub name: InternedString,
-    pub value: Rc<RefCell<Value>>,
+    pub value: Shared<Value>,
 }
 
 impl Walkable for NamedValue {
@@ -276,19 +240,19 @@ pub enum Type {
     },
 
     List {
-        element_type: Rc<RefCell<Self>>,
+        element_type: Shared<Self>,
     },
 
     Vector {
-        element_type: Rc<RefCell<Self>>,
+        element_type: Shared<Self>,
     },
 
     FixedVector {
         length: isize,
-        element_type: Rc<RefCell<Self>>,
+        element_type: Shared<Self>,
     },
 
-    Reference(Rc<RefCell<Self>>),
+    Reference(Shared<Self>),
 }
 
 impl Type {
@@ -317,16 +281,16 @@ pub enum Size {
     /// Size is known statically at borealis compile time
     Static(usize),
     /// Size is not static but a runtime value
-    Runtime(Rc<RefCell<Value>>),
+    Runtime(Shared<Value>),
     /// Size is unknown (emitted as uint64)
     Unknown,
 }
 
-impl Walkable for Rc<RefCell<Type>> {
+impl Walkable for Shared<Type> {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         use Type::*;
 
-        match &*self.borrow() {
+        match &*self.get() {
             Unit | Bool | String | Real | Float | Constant(_) | Int { .. } | Bit | Enum { .. } => {}
 
             Union { fields, .. } | Struct { fields, .. } => fields
@@ -341,7 +305,7 @@ impl Walkable for Rc<RefCell<Type>> {
     }
 }
 
-impl TryFrom<&Size> for Rc<RefCell<Value>> {
+impl TryFrom<&Size> for Shared<Value> {
     type Error = ();
 
     fn try_from(value: &Size) -> Result<Self, Self::Error> {
@@ -353,7 +317,7 @@ impl TryFrom<&Size> for Rc<RefCell<Value>> {
     }
 }
 
-impl TryFrom<Size> for Rc<RefCell<Value>> {
+impl TryFrom<Size> for Shared<Value> {
     type Error = ();
 
     fn try_from(value: Size) -> Result<Self, Self::Error> {
@@ -383,39 +347,39 @@ impl Add for Size {
 pub enum Statement {
     TypeDeclaration {
         name: InternedString,
-        typ: Rc<RefCell<Type>>,
+        typ: Shared<Type>,
     },
     Copy {
         expression: Expression,
-        value: Rc<RefCell<Value>>,
+        value: Shared<Value>,
     },
     FunctionCall {
         expression: Option<Expression>,
         name: InternedString,
-        arguments: Vec<Rc<RefCell<Value>>>,
+        arguments: Vec<Shared<Value>>,
     },
     Label(InternedString),
     Goto(InternedString),
     Jump {
-        condition: Rc<RefCell<Value>>,
+        condition: Shared<Value>,
         target: InternedString,
     },
     End(InternedString),
     Undefined,
     If {
-        condition: Rc<RefCell<Value>>,
-        if_body: Vec<Rc<RefCell<Statement>>>,
-        else_body: Vec<Rc<RefCell<Statement>>>,
+        condition: Shared<Value>,
+        if_body: Vec<Shared<Statement>>,
+        else_body: Vec<Shared<Statement>>,
     },
     Exit(InternedString),
     Comment(InternedString),
     /// Fatal error, printing the supplied values
-    Panic(Vec<Rc<RefCell<Value>>>),
+    Panic(Vec<Shared<Value>>),
 }
 
-impl From<Statement> for Rc<RefCell<Statement>> {
+impl From<Statement> for Shared<Statement> {
     fn from(value: Statement) -> Self {
-        Rc::new(RefCell::new(value))
+        Shared::new(value)
     }
 }
 
@@ -491,25 +455,25 @@ impl Walkable for Expression {
 #[derive(Debug, Clone)]
 pub enum Value {
     Identifier(InternedString),
-    Literal(Rc<RefCell<Literal>>),
+    Literal(Shared<Literal>),
     Operation(Operation),
     Struct {
         name: InternedString,
         fields: Vec<NamedValue>,
     },
     Field {
-        value: Rc<RefCell<Self>>,
+        value: Shared<Self>,
         field_name: InternedString,
     },
     CtorKind {
-        value: Rc<RefCell<Self>>,
+        value: Shared<Self>,
         identifier: InternedString,
-        types: Vec<Rc<RefCell<Type>>>,
+        types: Vec<Shared<Type>>,
     },
     CtorUnwrap {
-        value: Rc<RefCell<Self>>,
+        value: Shared<Self>,
         identifier: InternedString,
-        types: Vec<Rc<RefCell<Type>>>,
+        types: Vec<Shared<Type>>,
     },
 }
 
@@ -526,7 +490,7 @@ impl Value {
                         if let Statement::Copy {
                             expression: Expression::Identifier(target_identifier),
                             value,
-                        } = &*statement.borrow()
+                        } = &*statement.get()
                         {
                             if identifier == target_identifier {
                                 Some(value.clone())
@@ -544,10 +508,10 @@ impl Value {
                     return None;
                 }
 
-                let value = defs.last().unwrap().borrow();
+                let value = defs.last().unwrap().get();
                 value.evaluate_bool(ctx)
             }
-            Self::Literal(literal) => match &*literal.borrow() {
+            Self::Literal(literal) => match &*literal.get() {
                 Literal::Bool(value) => Some(*value),
                 _ => None,
             },
@@ -561,7 +525,7 @@ impl Value {
     pub fn get_ident(&self) -> Option<InternedString> {
         match self {
             Value::Identifier(ident) => Some(*ident),
-            Value::Operation(Operation::Not(value)) => value.borrow().get_ident(),
+            Value::Operation(Operation::Not(value)) => value.get().get_ident(),
             _ => None,
         }
     }
@@ -585,15 +549,15 @@ impl Walkable for Value {
     }
 }
 
-impl From<Literal> for Rc<RefCell<Value>> {
+impl From<Literal> for Shared<Value> {
     fn from(value: Literal) -> Self {
-        Rc::new(RefCell::new(Value::Literal(Rc::new(RefCell::new(value)))))
+        Shared::new(Value::Literal(Shared::new(value)))
     }
 }
 
-impl From<Operation> for Rc<RefCell<Value>> {
+impl From<Operation> for Shared<Value> {
     fn from(value: Operation) -> Self {
-        Rc::new(RefCell::new(Value::Operation(value)))
+        Shared::new(Value::Operation(value))
     }
 }
 
@@ -610,7 +574,7 @@ pub enum Literal {
     Undefined,
 }
 
-impl Walkable for Rc<RefCell<Literal>> {
+impl Walkable for Literal {
     fn walk<V: Visitor>(&self, _: &mut V) {
         // leaf node
     }
@@ -618,31 +582,31 @@ impl Walkable for Rc<RefCell<Literal>> {
 
 #[derive(Debug, Clone, Kinded)]
 pub enum Operation {
-    Not(Rc<RefCell<Value>>),
-    Complement(Rc<RefCell<Value>>),
+    Not(Shared<Value>),
+    Complement(Shared<Value>),
 
-    Equal(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    NotEqual(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Equal(Shared<Value>, Shared<Value>),
+    NotEqual(Shared<Value>, Shared<Value>),
 
-    LessThan(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    LessThanOrEqual(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    GreaterThan(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    GreaterThanOrEqual(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    LessThan(Shared<Value>, Shared<Value>),
+    LessThanOrEqual(Shared<Value>, Shared<Value>),
+    GreaterThan(Shared<Value>, Shared<Value>),
+    GreaterThanOrEqual(Shared<Value>, Shared<Value>),
 
-    Subtract(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    Add(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    Or(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    Multiply(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    And(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    Xor(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    Divide(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    Subtract(Shared<Value>, Shared<Value>),
+    Add(Shared<Value>, Shared<Value>),
+    Or(Shared<Value>, Shared<Value>),
+    Multiply(Shared<Value>, Shared<Value>),
+    And(Shared<Value>, Shared<Value>),
+    Xor(Shared<Value>, Shared<Value>),
+    Divide(Shared<Value>, Shared<Value>),
 
-    Cast(Rc<RefCell<Value>>, Rc<RefCell<Type>>),
+    Cast(Shared<Value>, Shared<Type>),
 
-    LeftShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    RightShift(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    RotateRight(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
-    RotateLeft(Rc<RefCell<Value>>, Rc<RefCell<Value>>),
+    LeftShift(Shared<Value>, Shared<Value>),
+    RightShift(Shared<Value>, Shared<Value>),
+    RotateRight(Shared<Value>, Shared<Value>),
+    RotateLeft(Shared<Value>, Shared<Value>),
 }
 
 impl Walkable for Operation {

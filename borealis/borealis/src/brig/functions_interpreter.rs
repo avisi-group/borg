@@ -15,7 +15,7 @@ use {
     common::{intern::InternedString, HashSet},
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
-    std::rc::Rc,
+    std::{rc::Rc, sync::Arc},
     syn::Ident,
 };
 
@@ -357,7 +357,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! {
                     ((#ident))
                 }
-            } else if target == Rc::new(Type::u1()) {
+            } else if target == Arc::new(Type::u1()) {
                 // todo: is special casing booleans like this necessary?
                 // todo: this is duplicated in decode
                 quote! {

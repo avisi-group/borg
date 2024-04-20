@@ -6,9 +6,8 @@ use {
         passes::{any::AnyExt, Pass},
         Ast,
     },
-    common::HashSet,
+    common::{shared::Shared, HashSet},
     log::{debug, trace},
-    std::{cell::RefCell, rc::Rc},
 };
 
 /// Branches with a constant condition can be removed
@@ -29,8 +28,8 @@ impl Pass for RemoveConstBranch {
 
     fn reset(&mut self) {}
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow()
+    fn run(&mut self, ast: Shared<Ast>) -> bool {
+        ast.get()
             .functions
             .iter()
             .map(|(name, def)| {

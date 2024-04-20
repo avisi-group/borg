@@ -8,7 +8,7 @@ use {
         FunctionSignature, Literal, NamedType, NamedValue, Operation, Parameter, Statement, Type,
         Value,
     },
-    std::{cell::RefCell, rc::Rc},
+    common::shared::Shared,
 };
 
 /// Visitor trait for interacting with the BOOM AST
@@ -38,7 +38,7 @@ pub trait Visitor: Sized {
         node.walk(self);
     }
 
-    fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
+    fn visit_type(&mut self, node: Shared<Type>) {
         node.walk(self);
     }
 
@@ -46,20 +46,20 @@ pub trait Visitor: Sized {
         node.walk(self);
     }
 
-    fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        node.borrow().walk(self);
+    fn visit_statement(&mut self, node: Shared<Statement>) {
+        node.get().walk(self);
     }
 
     fn visit_expression(&mut self, node: &Expression) {
         node.walk(self);
     }
 
-    fn visit_value(&mut self, node: Rc<RefCell<Value>>) {
-        node.borrow().walk(self);
+    fn visit_value(&mut self, node: Shared<Value>) {
+        node.get().walk(self);
     }
 
-    fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
-        node.walk(self);
+    fn visit_literal(&mut self, node: Shared<Literal>) {
+        node.get().walk(self);
     }
 
     fn visit_operation(&mut self, node: &Operation) {

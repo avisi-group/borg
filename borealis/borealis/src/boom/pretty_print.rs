@@ -8,9 +8,8 @@ use {
         Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
         NamedValue, Operation, Parameter, Size, Statement, Type, Value,
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, shared::Shared},
     std::{
-        cell::RefCell,
         io::Write,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
@@ -20,12 +19,12 @@ use {
 const PADDING: &str = "  ";
 
 /// Pretty-print BOOM AST
-pub fn print_ast<W: Write>(w: &mut W, ast: Rc<RefCell<Ast>>) {
+pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
     let Ast {
         definitions,
         registers,
         functions,
-    } = &*ast.borrow();
+    } = &*ast.get();
 
     let mut visitor = PrettyPrinter::new(w);
 
@@ -45,12 +44,12 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Rc<RefCell<Ast>>) {
 }
 
 /// Pretty-print BOOM statement
-pub fn print_statement<W: Write>(w: &mut W, statement: Rc<RefCell<Statement>>) {
+pub fn print_statement<W: Write>(w: &mut W, statement: Shared<Statement>) {
     let mut visitor = PrettyPrinter::new(w);
     visitor.visit_statement(statement);
 }
 
-pub fn print_value<W: Write>(w: &mut W, value: Rc<RefCell<Value>>) {
+pub fn print_value<W: Write>(w: &mut W, value: Shared<Value>) {
     let mut visitor = PrettyPrinter::new(w);
     visitor.visit_value(value);
 }
@@ -192,7 +191,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                     Terminator::Return(None) => writeln!(self.writer, "        return;").unwrap(),
                     Terminator::Return(Some(value)) => {
                         write!(self.writer, "        return ").unwrap();
-                        self.visit_value(Rc::new(RefCell::new(value)));
+                        self.visit_value(Shared::new(value));
                         writeln!(self.writer, ";").unwrap();
                     }
                     Terminator::Conditional {
@@ -201,7 +200,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                         fallthrough,
                     } => {
                         write!(self.writer, "        if (").unwrap();
-                        self.visit_value(Rc::new(RefCell::new(condition)));
+                        self.visit_value(Shared::new(condition));
                         writeln!(self.writer, ") {{").unwrap();
                         writeln!(self.writer, "            goto {target};").unwrap();
                         writeln!(self.writer, "        }} else {{").unwrap();
@@ -237,7 +236,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     ) {
         self.prindent(format!("fn {}(", name));
 
-        let parameters = parameters.borrow();
+        let parameters = parameters.get();
         let mut parameters = parameters.iter();
         if let Some(param) = parameters.next() {
             self.visit_parameter(param);
@@ -253,8 +252,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         writeln!(self.writer, " {{").unwrap();
     }
 
-    fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        match &*node.borrow() {
+    fn visit_statement(&mut self, node: Shared<Statement>) {
+        match &*node.get() {
             Statement::TypeDeclaration { name, typ } => {
                 self.visit_type(typ.clone());
                 write!(self.writer, " {name};").unwrap();
@@ -324,8 +323,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         write!(self.writer, " {}", node.name).unwrap();
     }
 
-    fn visit_type(&mut self, node: Rc<RefCell<Type>>) {
-        match &*node.borrow() {
+    fn visit_type(&mut self, node: Shared<Type>) {
+        match &*node.get() {
             Type::Unit => write!(self.writer, "()"),
             Type::String => write!(self.writer, "str"),
             Type::Bool => write!(self.writer, "bool"),
@@ -386,11 +385,11 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         .unwrap()
     }
 
-    fn visit_value(&mut self, node: Rc<RefCell<Value>>) {
+    fn visit_value(&mut self, node: Shared<Value>) {
         fn write_uid<W: Write>(
             printer: &mut PrettyPrinter<'_, W>,
             id: InternedString,
-            typs: &[Rc<RefCell<Type>>],
+            typs: &[Shared<Type>],
         ) {
             write!(printer.writer, "{id}").unwrap();
 
@@ -410,7 +409,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             }
         }
 
-        match &*node.borrow() {
+        match &*node.get() {
             Value::Identifier(ident) => write!(self.writer, "{ident}").unwrap(),
             Value::Literal(literal) => self.visit_literal(literal.clone()),
             Value::Operation(op) => self.visit_operation(op),
@@ -480,8 +479,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         }
     }
 
-    fn visit_literal(&mut self, node: Rc<RefCell<Literal>>) {
-        match &*node.borrow() {
+    fn visit_literal(&mut self, node: Shared<Literal>) {
+        match &*node.get() {
             Literal::Int(bi) => write!(self.writer, "{bi}"),
             Literal::Bits(bits) => write!(self.writer, "{}", bits_to_int(bits)),
             Literal::Bit(bit) => write!(self.writer, "{}", bit.value()),
@@ -497,8 +496,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     fn visit_operation(&mut self, node: &Operation) {
         fn emit_op2<W: Write>(
             printer: &mut PrettyPrinter<'_, W>,
-            lhs: &Rc<RefCell<Value>>,
-            rhs: &Rc<RefCell<Value>>,
+            lhs: &Shared<Value>,
+            rhs: &Shared<Value>,
             op: &str,
         ) {
             write!(printer.writer, "(").unwrap();

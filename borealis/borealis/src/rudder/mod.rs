@@ -1,14 +1,17 @@
 use {
-    common::{intern::InternedString, HashMap, HashSet},
+    common::{
+        intern::InternedString,
+        shared::{Shared, Weak},
+        HashMap, HashSet,
+    },
     log::warn,
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
-        cell::RefCell,
         fmt::Debug,
         hash::{Hash, Hasher},
         ops::{Add, Sub},
-        rc::{Rc, Weak},
+        sync::Arc,
     },
 };
 
@@ -47,14 +50,14 @@ impl PrimitiveType {
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(PrimitiveType),
-    Composite(Vec<Rc<Type>>),
+    Composite(Vec<Arc<Type>>),
     Vector {
         element_count: usize,
-        element_type: Rc<Type>,
+        element_type: Arc<Type>,
     },
     Bundled {
-        value: Rc<Type>,
-        len: Rc<Type>,
+        value: Arc<Type>,
+        len: Arc<Type>,
     },
 }
 
@@ -74,7 +77,7 @@ impl Type {
         })
     }
 
-    pub fn new_composite(fields: Vec<Rc<Type>>) -> Self {
+    pub fn new_composite(fields: Vec<Arc<Type>>) -> Self {
         Self::Composite(fields)
     }
 
@@ -94,14 +97,14 @@ impl Type {
 
     pub fn bundle_unsigned() -> Self {
         Self::Bundled {
-            value: Rc::new(Type::u64()),
-            len: Rc::new(Type::u8()),
+            value: Arc::new(Type::u64()),
+            len: Arc::new(Type::u8()),
         }
     }
     pub fn bundle_signed() -> Self {
         Self::Bundled {
-            value: Rc::new(Type::s64()),
-            len: Rc::new(Type::u8()),
+            value: Arc::new(Type::s64()),
+            len: Arc::new(Type::u8()),
         }
     }
 
@@ -151,7 +154,7 @@ impl Type {
     pub fn vectorize(self, element_count: usize) -> Self {
         Self::Vector {
             element_count,
-            element_type: Rc::new(self),
+            element_type: Arc::new(self),
         }
     }
 
@@ -208,7 +211,7 @@ impl Type {
             }),
 
             Self::Bundled { value, len } => Self::Bundled {
-                value: Rc::new(value.as_signed()),
+                value: Arc::new(value.as_signed()),
                 len: len.clone(),
             },
 
@@ -313,7 +316,7 @@ pub enum SymbolKind {
 pub struct Symbol {
     name: InternedString,
     kind: SymbolKind,
-    typ: Rc<Type>,
+    typ: Arc<Type>,
 }
 
 impl Symbol {
@@ -325,7 +328,7 @@ impl Symbol {
         self.kind
     }
 
-    pub fn typ(&self) -> Rc<Type> {
+    pub fn typ(&self) -> Arc<Type> {
         self.typ.clone()
     }
 }
@@ -379,7 +382,7 @@ pub enum ShiftOperationKind {
 #[derive(Debug, Clone)]
 pub enum StatementKind {
     Constant {
-        typ: Rc<Type>,
+        typ: Arc<Type>,
         value: ConstantValue,
     },
 
@@ -387,7 +390,8 @@ pub enum StatementKind {
         symbol: Symbol,
         /// Indices, when not empty, indicate access to fields/elements
         ///
-        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a struct of a vec of structs
+        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a
+        /// struct of a vec of structs
         indices: Vec<usize>,
     },
 
@@ -395,13 +399,14 @@ pub enum StatementKind {
         symbol: Symbol,
         /// Indices, when not empty, indicate access to fields/elements
         ///
-        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a struct of a vec of structs
+        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a
+        /// struct of a vec of structs
         indices: Vec<usize>,
         value: Statement,
     },
 
     ReadRegister {
-        typ: Rc<Type>,
+        typ: Arc<Type>,
         /// offset into register state
         ///
         /// During building, this should just be the `next_register_offset`
@@ -419,7 +424,7 @@ pub enum StatementKind {
     },
 
     ReadMemory {
-        typ: Rc<Type>,
+        typ: Arc<Type>,
         offset: Statement,
     },
     WriteMemory {
@@ -454,7 +459,7 @@ pub enum StatementKind {
     },
     Cast {
         kind: CastOperationKind,
-        typ: Rc<Type>,
+        typ: Arc<Type>,
         value: Statement,
     },
     Jump {
@@ -507,7 +512,7 @@ pub enum StatementKind {
     },
 
     CreateComposite {
-        typ: Rc<Type>,
+        typ: Arc<Type>,
         /// Index of fields should match type
         fields: Vec<Statement>,
     },
@@ -536,7 +541,7 @@ pub enum ValueClass {
 
 #[derive(Debug, Clone)]
 pub struct Statement {
-    inner: Rc<RefCell<StatementInner>>,
+    inner: Shared<StatementInner>,
 }
 
 impl Hash for Statement {
@@ -547,7 +552,7 @@ impl Hash for Statement {
 
 impl PartialEq for Statement {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.inner, &other.inner)
+        Shared::ptr_eq(&self.inner, &other.inner)
     }
 }
 
@@ -562,27 +567,27 @@ pub struct StatementInner {
 
 impl Statement {
     pub fn kind(&self) -> StatementKind {
-        (*self.inner).borrow().kind.clone()
+        self.inner.get().kind.clone()
     }
 
     pub fn replace_kind(&self, kind: StatementKind) {
-        (*self.inner).borrow_mut().replace_kind(kind);
+        self.inner.get_mut().replace_kind(kind);
     }
 
     pub fn replace_use(&self, use_of: Statement, with: Statement) {
-        (*self.inner).borrow_mut().replace_use(use_of, with);
+        self.inner.get_mut().replace_use(use_of, with);
     }
 
     pub fn name(&self) -> InternedString {
-        (*self.inner).borrow().name
+        self.inner.get().name
     }
 
     pub fn parent(&self) -> WeakBlock {
-        (*self.inner).borrow().parent.clone()
+        self.inner.get().parent.clone()
     }
 
     pub fn update_names(&self, name: InternedString) {
-        (*self.inner).borrow_mut().update_names(name);
+        self.inner.get_mut().update_names(name);
     }
 
     pub fn classify(&self) -> ValueClass {
@@ -679,7 +684,7 @@ impl Statement {
         }
     }
 
-    pub fn typ(&self) -> Rc<Type> {
+    pub fn typ(&self) -> Arc<Type> {
         match self.kind() {
             StatementKind::Constant { typ, .. } => typ,
             StatementKind::ReadVariable { symbol, indices } => {
@@ -695,11 +700,11 @@ impl Statement {
 
                 current_type
             }
-            StatementKind::WriteVariable { .. } => Rc::new(Type::void()),
+            StatementKind::WriteVariable { .. } => Arc::new(Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
-            StatementKind::WriteRegister { .. } => Rc::new(Type::unit()),
+            StatementKind::WriteRegister { .. } => Arc::new(Type::unit()),
             StatementKind::ReadMemory { typ, .. } => typ,
-            StatementKind::WriteMemory { .. } => Rc::new(Type::unit()),
+            StatementKind::WriteMemory { .. } => Arc::new(Type::unit()),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
                 ..
@@ -723,23 +728,23 @@ impl Statement {
             | StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareLessThan,
                 ..
-            } => Rc::new(Type::u1()),
+            } => Arc::new(Type::u1()),
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
             StatementKind::UnaryOperation { value, .. } => value.typ(),
             StatementKind::ShiftOperation { value, .. } => value.typ(),
             StatementKind::Call { target, .. } => target.return_type(),
             StatementKind::Cast { typ, .. } => typ,
-            StatementKind::Jump { .. } => Rc::new(Type::void()),
-            StatementKind::Branch { .. } => Rc::new(Type::void()),
+            StatementKind::Jump { .. } => Arc::new(Type::void()),
+            StatementKind::Branch { .. } => Arc::new(Type::void()),
             StatementKind::PhiNode { members } => members
                 .first()
                 .map(|(_, stmt)| stmt.typ())
-                .unwrap_or_else(|| Rc::new(Type::void())),
-            StatementKind::Return { .. } => Rc::new(Type::void()),
+                .unwrap_or_else(|| Arc::new(Type::void())),
+            StatementKind::Return { .. } => Arc::new(Type::void()),
             StatementKind::Select { true_value, .. } => true_value.typ(),
-            StatementKind::Panic(_) => Rc::new(Type::void()),
-            StatementKind::ReadPc => Rc::new(Type::u64()),
-            StatementKind::WritePc { .. } => Rc::new(Type::void()),
+            StatementKind::Panic(_) => Arc::new(Type::void()),
+            StatementKind::ReadPc => Arc::new(Type::u64()),
+            StatementKind::WritePc { .. } => Arc::new(Type::void()),
             StatementKind::BitExtract { value, .. } => value.typ(),
             StatementKind::BitInsert { original_value, .. } => original_value.typ(),
             StatementKind::ReadElement { vector, .. } => {
@@ -754,7 +759,7 @@ impl Statement {
                 vector.typ()
             }
             StatementKind::CreateComposite { typ, .. } => typ,
-            StatementKind::Bundle { value, length } => Rc::new(Type::Bundled {
+            StatementKind::Bundle { value, length } => Arc::new(Type::Bundled {
                 value: value.typ(),
                 len: length.typ(),
             }),
@@ -770,7 +775,7 @@ impl Statement {
                 };
                 len.clone()
             }
-            StatementKind::Assert { .. } => Rc::new(Type::unit()),
+            StatementKind::Assert { .. } => Arc::new(Type::unit()),
         }
     }
 
@@ -1062,11 +1067,11 @@ impl StatementBuilder {
     /// and returns it
     pub fn build(&mut self, kind: StatementKind) -> Statement {
         let statement = Statement {
-            inner: Rc::new(RefCell::new(StatementInner {
+            inner: Shared::new(StatementInner {
                 name: "".into(),
                 kind,
                 parent: self.parent.clone(),
-            })),
+            }),
         };
 
         self.statements.push(statement.clone());
@@ -1082,18 +1087,18 @@ impl StatementBuilder {
 
 #[derive(Clone)]
 pub struct Block {
-    inner: Rc<RefCell<BlockInner>>,
+    inner: Shared<BlockInner>,
 }
 
 impl Debug for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.borrow().name)
+        write!(f, "{}", self.inner.get().name)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct WeakBlock {
-    inner: Weak<RefCell<BlockInner>>,
+    inner: Weak<BlockInner>,
 }
 
 impl WeakBlock {
@@ -1111,37 +1116,37 @@ impl Block {
 
     pub fn weak(&self) -> WeakBlock {
         WeakBlock {
-            inner: Rc::downgrade(&self.inner),
+            inner: self.inner.downgrade(),
         }
     }
 
     pub fn name(&self) -> InternedString {
-        (*self.inner).borrow().name
+        self.inner.get().name
     }
 
     pub fn update_names(&self, name: InternedString) {
-        (*self.inner).borrow_mut().update_names(name);
+        self.inner.get_mut().update_names(name);
     }
 
     pub fn statements(&self) -> Vec<Statement> {
-        self.inner.borrow().statements.clone()
+        self.inner.get().statements.clone()
     }
 
     pub fn terminator_statement(&self) -> Option<Statement> {
-        self.inner.borrow().statements.last().cloned()
+        self.inner.get().statements.last().cloned()
     }
 
     pub fn set_statements<I: Iterator<Item = Statement>>(&self, statements: I) {
-        self.inner.borrow_mut().statements = statements.collect();
+        self.inner.get_mut().statements = statements.collect();
     }
 
     pub fn extend_statements<I: Iterator<Item = Statement>>(&self, stmts: I) {
-        self.inner.borrow_mut().statements.extend(stmts)
+        self.inner.get_mut().statements.extend(stmts)
     }
 
     fn index_of_statement(&self, reference: &Statement) -> usize {
         self.inner
-            .borrow()
+            .get()
             .statements
             .iter()
             .enumerate()
@@ -1152,7 +1157,7 @@ impl Block {
 
     pub fn insert_statement_before(&self, reference: &Statement, new: Statement) {
         let index = self.index_of_statement(reference);
-        self.inner.borrow_mut().statements.insert(index, new);
+        self.inner.get_mut().statements.insert(index, new);
     }
 
     pub fn kill_statement(&self, stmt: &Statement) {
@@ -1160,7 +1165,7 @@ impl Block {
 
         let index = self.index_of_statement(stmt);
 
-        self.inner.borrow_mut().statements.remove(index);
+        self.inner.get_mut().statements.remove(index);
     }
 
     pub fn iter(&self) -> BlockIterator {
@@ -1186,10 +1191,10 @@ impl Block {
 impl Default for Block {
     fn default() -> Self {
         Self {
-            inner: Rc::new(RefCell::new(BlockInner {
+            inner: Shared::new(BlockInner {
                 name: "???".into(),
                 statements: Vec::new(),
-            })),
+            }),
         }
     }
 }
@@ -1202,12 +1207,13 @@ impl Hash for Block {
 
 impl PartialEq for Block {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.inner, &other.inner)
+        Shared::ptr_eq(&self.inner, &other.inner)
     }
 }
 
 impl Eq for Block {}
 
+#[derive(Debug)]
 pub struct BlockInner {
     name: InternedString,
     statements: Vec<Statement>,
@@ -1261,7 +1267,7 @@ impl Iterator for BlockIterator {
 
         // push children to visit
         if let Some(last) = current.statements().last() {
-            self.remaining.extend(match &last.inner.borrow().kind {
+            self.remaining.extend(match &last.inner.get().kind {
                 StatementKind::Jump { target } => vec![target.clone()],
                 StatementKind::Branch {
                     true_target,
@@ -1284,12 +1290,12 @@ impl Iterator for BlockIterator {
 
 #[derive(Clone)]
 pub struct Function {
-    inner: Rc<RefCell<FunctionInner>>,
+    inner: Shared<FunctionInner>,
 }
 
 impl Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.borrow().name)
+        write!(f, "{}", self.inner.get().name)
     }
 }
 
@@ -1302,20 +1308,20 @@ impl ToTokens for Function {
 #[derive(Clone)]
 pub struct FunctionInner {
     name: InternedString,
-    return_type: Rc<Type>,
+    return_type: Arc<Type>,
     parameters: Vec<Symbol>,
     local_variables: HashMap<InternedString, Symbol>,
     entry_block: Block,
 }
 
 impl Function {
-    pub fn new<I: Iterator<Item = (InternedString, Rc<Type>)>>(
+    pub fn new<I: Iterator<Item = (InternedString, Arc<Type>)>>(
         name: InternedString,
-        return_type: Rc<Type>,
+        return_type: Arc<Type>,
         parameters: I,
     ) -> Self {
         let mut celf = Self {
-            inner: Rc::new(RefCell::new(FunctionInner {
+            inner: Shared::new(FunctionInner {
                 name,
                 return_type: return_type.clone(),
                 parameters: parameters
@@ -1327,38 +1333,38 @@ impl Function {
                     .collect(),
                 local_variables: HashMap::default(),
                 entry_block: Block::new(),
-            })),
+            }),
         };
 
         if return_type.is_void() {
             panic!("functions must have a return type (unit not void)");
         }
 
-        celf.add_local_variable("exception".into(), Rc::new(Type::u32()));
+        celf.add_local_variable("exception".into(), Arc::new(Type::u32()));
         celf.add_local_variable("return_value".into(), return_type);
-        celf.add_local_variable("throw".into(), Rc::new(Type::u32()));
+        celf.add_local_variable("throw".into(), Arc::new(Type::u32()));
 
         celf
     }
 
     pub fn name(&self) -> InternedString {
-        self.inner.borrow().name
+        self.inner.get().name
     }
 
     pub fn weight(&self) -> u64 {
         0 //self.inner.borrow().entry_block().iter().
     }
 
-    pub fn signature(&self) -> (Rc<Type>, Vec<Symbol>) {
+    pub fn signature(&self) -> (Arc<Type>, Vec<Symbol>) {
         (
-            self.inner.borrow().return_type.clone(),
-            self.inner.borrow().parameters.clone(),
+            self.inner.get().return_type.clone(),
+            self.inner.get().parameters.clone(),
         )
     }
 
     pub fn update_names(&self) {
         self.inner
-            .borrow()
+            .get()
             .entry_block
             .iter()
             .enumerate()
@@ -1367,8 +1373,8 @@ impl Function {
             });
     }
 
-    pub fn add_local_variable(&mut self, name: InternedString, typ: Rc<Type>) {
-        self.inner.borrow_mut().local_variables.insert(
+    pub fn add_local_variable(&mut self, name: InternedString, typ: Arc<Type>) {
+        self.inner.get_mut().local_variables.insert(
             name,
             Symbol {
                 name,
@@ -1379,40 +1385,32 @@ impl Function {
     }
 
     pub fn get_local_variable(&self, name: InternedString) -> Option<Symbol> {
-        self.inner.borrow().local_variables.get(&name).cloned()
+        self.inner.get().local_variables.get(&name).cloned()
     }
 
     pub fn local_variables(&self) -> Vec<Symbol> {
-        self.inner
-            .borrow()
-            .local_variables
-            .values()
-            .cloned()
-            .collect()
+        self.inner.get().local_variables.values().cloned().collect()
     }
 
     pub fn remove_local_variable(&self, symbol: &Symbol) {
-        self.inner
-            .borrow_mut()
-            .local_variables
-            .remove(&symbol.name());
+        self.inner.get_mut().local_variables.remove(&symbol.name());
     }
 
     pub fn get_parameter(&self, name: InternedString) -> Option<Symbol> {
         self.inner
-            .borrow()
+            .get()
             .parameters
             .iter()
             .find(|sym| sym.name() == name)
             .cloned()
     }
 
-    pub fn return_type(&self) -> Rc<Type> {
-        self.inner.borrow().return_type.clone()
+    pub fn return_type(&self) -> Arc<Type> {
+        self.inner.get().return_type.clone()
     }
 
     pub fn entry_block(&self) -> Block {
-        self.inner.borrow().entry_block.clone()
+        self.inner.get().entry_block.clone()
     }
 }
 
@@ -1426,9 +1424,9 @@ pub enum FunctionKind {
 pub struct Context {
     fns: HashMap<InternedString, (FunctionKind, Function)>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
-    registers: HashMap<InternedString, (Rc<Type>, usize)>,
-    structs: HashSet<Rc<Type>>,
-    unions: HashSet<Rc<Type>>,
+    registers: HashMap<InternedString, (Arc<Type>, usize)>,
+    structs: HashSet<Arc<Type>>,
+    unions: HashSet<Arc<Type>>,
 }
 
 impl Context {
@@ -1461,15 +1459,15 @@ impl Context {
             .collect()
     }
 
-    pub fn get_registers(&self) -> HashMap<InternedString, (Rc<Type>, usize)> {
+    pub fn get_registers(&self) -> HashMap<InternedString, (Arc<Type>, usize)> {
         self.registers.clone()
     }
 
-    pub fn get_structs(&self) -> HashSet<Rc<Type>> {
+    pub fn get_structs(&self) -> HashSet<Arc<Type>> {
         self.structs.clone()
     }
 
-    pub fn get_unions(&self) -> HashSet<Rc<Type>> {
+    pub fn get_unions(&self) -> HashSet<Arc<Type>> {
         self.unions.clone()
     }
 }

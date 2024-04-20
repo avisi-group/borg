@@ -1,5 +1,8 @@
-use crate::rudder::{Context, Function};
-use log::trace;
+use {
+    crate::rudder::{Context, Function},
+    log::trace,
+    rayon::iter::{IntoParallelRefIterator, ParallelIterator},
+};
 
 pub mod branch_simplification;
 pub mod constant_folding;
@@ -96,21 +99,21 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
         ],
     };
 
-    for f in ctx.get_functions() {
+    ctx.get_functions().par_iter().for_each(|(name, function)| {
         let mut changed = true;
 
-        trace!("optimising function {}", f.0);
+        trace!("optimising function {name:?}");
 
         while changed {
             changed = false;
             for pass in &passes {
                 trace!("running pass {}", pass.0);
 
-                f.1.update_names();
-                while pass.1(f.1.clone()) {
+                function.update_names();
+                while pass.1(function.clone()) {
                     changed = true;
                 }
             }
         }
-    }
+    });
 }

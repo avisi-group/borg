@@ -4,13 +4,13 @@ use {
     crate::boom::{
         self, control_flow::build_graph, Bit, FunctionSignature, NamedType, Parameter, Size,
     },
-    common::{intern::InternedString, HashMap},
+    common::{intern::InternedString, shared::Shared, HashMap},
     sailrs::{jib_ast, sail_ast},
-    std::{borrow::Borrow, cell::RefCell, rc::Rc},
+    std::borrow::Borrow,
 };
 
-type Parameters = Vec<Rc<RefCell<boom::Type>>>;
-type Return = Rc<RefCell<boom::Type>>;
+type Parameters = Vec<Shared<boom::Type>>;
+type Return = Shared<boom::Type>;
 
 /// Consumes JIB AST and produces BOOM
 #[derive(Debug, Default)]
@@ -89,7 +89,7 @@ impl BoomEmitter {
                 let (parameter_types, return_type) =
                     self.function_types.remove(&name.as_interned()).unwrap();
 
-                let parameters = Rc::new(RefCell::new(
+                let parameters = Shared::new(
                     arguments
                         .iter()
                         .map(sail_ast::Identifier::as_interned)
@@ -100,7 +100,7 @@ impl BoomEmitter {
                             is_ref: false,
                         })
                         .collect::<Vec<_>>(),
-                ));
+                );
 
                 let name = name.as_interned();
 
@@ -131,8 +131,8 @@ impl BoomEmitter {
     }
 }
 
-fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
-    Rc::new(RefCell::new(match typ.borrow() {
+fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Shared<boom::Type> {
+    Shared::new(match typ.borrow() {
         jib_ast::Type::Lbits => boom::Type::Int {
             signed: false,
             size: Size::Unknown,
@@ -186,17 +186,17 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Rc<RefCell<boom::Type>> {
         | jib_ast::Type::RoundingMode
         | jib_ast::Type::Tup(_)
         | jib_ast::Type::Poly(_) => todo!(),
-    }))
+    })
 }
 
-fn convert_body(instructions: &[jib_ast::Instruction]) -> Vec<Rc<RefCell<boom::Statement>>> {
+fn convert_body(instructions: &[jib_ast::Instruction]) -> Vec<Shared<boom::Statement>> {
     instructions
         .iter()
         .flat_map(|instr| convert_statement(&instr.inner))
         .collect()
 }
 
-fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom::Statement>>> {
+fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::Statement>> {
     if let jib_ast::InstructionAux::Block(instructions) = statement {
         return convert_body(instructions.as_ref());
     }
@@ -259,11 +259,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Rc<RefCell<boom
         jib_ast::InstructionAux::Reinit(_, _, _) => todo!(),
     };
 
-    statements
-        .into_iter()
-        .map(RefCell::new)
-        .map(Rc::new)
-        .collect()
+    statements.into_iter().map(Shared::new).collect()
 }
 
 fn convert_name(name: &jib_ast::Name) -> InternedString {
@@ -293,8 +289,8 @@ fn convert_expression(expression: &jib_ast::Expression) -> Option<boom::Expressi
     }
 }
 
-fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
-    Rc::new(RefCell::new(match value {
+fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
+    Shared::new(match value {
         jib_ast::Value::Id(name, _) => boom::Value::Identifier(convert_name(name)),
         jib_ast::Value::Lit(vl, _) => boom::Value::Literal(convert_literal(vl)),
         jib_ast::Value::Tuple(_, _) => todo!(),
@@ -330,11 +326,9 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
                 jib_ast::Op::ListHead => todo!(),
                 jib_ast::Op::ListTail => todo!(),
                 jib_ast::Op::Eq => todo!(),
-                jib_ast::Op::Neq => {
-                    boom::Operation::Not(Rc::new(RefCell::new(boom::Value::Operation(
-                        boom::Operation::Equal(values[0].clone(), values[1].clone()),
-                    ))))
-                }
+                jib_ast::Op::Neq => boom::Operation::Not(Shared::new(boom::Value::Operation(
+                    boom::Operation::Equal(values[0].clone(), values[1].clone()),
+                ))),
                 jib_ast::Op::Ilt => boom::Operation::LessThan(values[0].clone(), values[1].clone()),
 
                 jib_ast::Op::Ilteq => todo!(),
@@ -370,11 +364,11 @@ fn convert_value(value: &jib_ast::Value) -> Rc<RefCell<boom::Value>> {
             value: (convert_value(value)),
             field_name: ident.as_interned(),
         },
-    }))
+    })
 }
 
-fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
-    Rc::new(RefCell::new(match literal {
+fn convert_literal(literal: &jib_ast::Vl) -> Shared<boom::Literal> {
+    Shared::new(match literal {
         jib_ast::Vl::Bits(bits) => {
             // todo: this may need a `.rev`
             // update 2024-03-21: turns out it does on sail17arm94
@@ -389,7 +383,7 @@ fn convert_literal(literal: &jib_ast::Vl) -> Rc<RefCell<boom::Literal>> {
         jib_ast::Vl::Enum(_) => todo!(),
         jib_ast::Vl::Ref(s) => boom::Literal::Reference(*s),
         jib_ast::Vl::Undefined => boom::Literal::Undefined,
-    }))
+    })
 }
 
 fn convert_bit(bit: &jib_ast::BitU) -> boom::Bit {

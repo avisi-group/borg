@@ -20,7 +20,6 @@ use {
         Ast, Expression, FunctionDefinition, Literal, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, HashSet},
-    std::{cell::RefCell, rc::Rc},
 };
 
 /// Remove all exception handling logic
@@ -40,7 +39,7 @@ impl Pass for RemoveExceptions {
 
     fn reset(&mut self) {}
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
+    fn run(&mut self, ast: Shared<Ast>) -> bool {
         // first pass to remove exceptions
         ast.borrow().functions.values().for_each(|def| {
             {
@@ -58,10 +57,10 @@ impl Pass for RemoveExceptions {
                     0,
                     Statement::TypeDeclaration {
                         name: "exception".into(),
-                        typ: Rc::new(RefCell::new(Type::Int {
+                        typ: Shared::new(Type::Int {
                             signed: false,
                             size: Size::Static(1),
-                        })),
+                        }),
                     }
                     .into(),
                 );
@@ -118,8 +117,8 @@ impl Visitor for RemoveExceptions {
 
 fn statement_filter(
     deleted_exception_vars: &mut HashSet<InternedString>,
-    statement: Rc<RefCell<Statement>>,
-) -> Option<Rc<RefCell<Statement>>> {
+    statement: Shared<Statement>,
+) -> Option<Shared<Statement>> {
     let statement_cloned = statement.clone();
 
     match &mut *statement.borrow_mut() {
@@ -221,7 +220,7 @@ fn raise_exceptions(fn_def: &FunctionDefinition) {
                 let mut statements = block.statements();
                 statements.push(
                     Statement::If {
-                        condition: Rc::new(RefCell::new(condition)),
+                        condition: Shared::new(condition),
                         if_body: vec![Statement::Panic(vec![]).into()],
                         else_body: vec![],
                     }
@@ -235,7 +234,7 @@ fn raise_exceptions(fn_def: &FunctionDefinition) {
                 let mut statements = block.statements();
                 statements.push(
                     Statement::If {
-                        condition: Rc::new(RefCell::new(condition)),
+                        condition: Shared::new(condition),
                         if_body: vec![],
                         else_body: vec![Statement::Panic(vec![]).into()],
                     }

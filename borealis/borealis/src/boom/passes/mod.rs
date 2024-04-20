@@ -7,12 +7,11 @@
 
 use {
     crate::boom::Ast,
+    common::shared::Shared,
     log::info,
     std::{
-        cell::RefCell,
         fs::{create_dir_all, File},
         path::PathBuf,
-        rc::Rc,
     },
 };
 
@@ -29,7 +28,7 @@ pub trait Pass {
     fn name(&self) -> &'static str;
 
     /// Run the pass on the supplied AST, returning whether the AST was changed
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool;
+    fn run(&mut self, ast: Shared<Ast>) -> bool;
 
     /// Resets any state in a pass to it's initial/empty state
     fn reset(&mut self);
@@ -37,7 +36,7 @@ pub trait Pass {
 
 /// Run each pass until it does not mutate the AST, and run the whole sequence
 /// of passes until no pass mutates the AST
-pub fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
+pub fn run_fixed_point(ast: Shared<Ast>, passes: &mut [Box<dyn Pass>]) {
     // ironically, we *do* want to short-circuit here
     // behaviour is "keep running the passes in order until none change"
     loop {
@@ -55,12 +54,12 @@ pub fn run_fixed_point(ast: Rc<RefCell<Ast>>, passes: &mut [Box<dyn Pass>]) {
     }
 }
 
-fn _dump_func_dot(ast: &Rc<RefCell<Ast>>, func: &'static str, filename: Option<&'static str>) {
+fn _dump_func_dot(ast: Shared<Ast>, func: &'static str, filename: Option<&'static str>) {
     let path = PathBuf::from(format!("target/dot/{}.dot", filename.unwrap_or(func)));
 
     create_dir_all(path.parent().unwrap()).unwrap();
 
-    ast.borrow()
+    ast.get()
         .functions
         .get(&func.into())
         .unwrap()

@@ -11,13 +11,13 @@ use {
         visitor::{Visitor, Walkable},
         Ast, Expression, Statement, Type, Value,
     },
-    std::{cell::RefCell, rc::Rc},
+    common::shared::Shared,
 };
 
 /// Resolves assignments to `return` variables.
 pub struct ResolveReturns {
     did_change: bool,
-    return_type: Option<Rc<RefCell<Type>>>,
+    return_type: Option<Shared<Type>>,
 }
 
 impl ResolveReturns {
@@ -40,8 +40,8 @@ impl Pass for ResolveReturns {
         self.return_type = None;
     }
 
-    fn run(&mut self, ast: Rc<RefCell<Ast>>) -> bool {
-        ast.borrow()
+    fn run(&mut self, ast: Shared<Ast>) -> bool {
+        ast.get()
             .functions
             .values()
             .map(|def| {
@@ -49,7 +49,7 @@ impl Pass for ResolveReturns {
 
                 // get return type of function:
                 // if void, there should be no return assigments
-                self.return_type = if let Type::Unit = &*def.signature.return_type.borrow() {
+                self.return_type = if let Type::Unit = &*def.signature.return_type.get() {
                     None
                 } else {
                     Some(def.signature.return_type.clone())
@@ -62,7 +62,7 @@ impl Pass for ResolveReturns {
                     let mut statements = def.entry_block.statements();
 
                     let return_value_exists = statements.iter().any(|statement| {
-                        if let Statement::TypeDeclaration { name, .. } = &*statement.borrow() {
+                        if let Statement::TypeDeclaration { name, .. } = &*statement.get() {
                             if name.as_ref() == "return_value" {
                                 return true;
                             }
@@ -133,8 +133,8 @@ impl Visitor for ResolveReturns {
         block.walk(self);
     }
 
-    fn visit_statement(&mut self, node: Rc<RefCell<Statement>>) {
-        match *node.borrow_mut() {
+    fn visit_statement(&mut self, node: Shared<Statement>) {
+        match *node.get_mut() {
             Statement::Copy {
                 ref mut expression, ..
             }

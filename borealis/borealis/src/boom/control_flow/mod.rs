@@ -14,13 +14,16 @@ use {
         visitor::{Visitor, Walkable},
         Statement, Value,
     },
-    common::{identifiable::Id, intern::InternedString, HashSet},
+    common::{
+        identifiable::Id,
+        intern::InternedString,
+        shared::{Shared, Weak},
+        HashSet,
+    },
     std::{
-        cell::RefCell,
         fmt::{self, Display, Formatter},
         hash::{DefaultHasher, Hash, Hasher},
         ptr,
-        rc::{Rc, Weak},
     },
 };
 
@@ -31,7 +34,7 @@ pub mod util;
 /// Creates a control flow graph from a slice of statements.
 ///
 /// This should be called per BOOM function.
-pub fn build_graph(statements: &[Rc<RefCell<Statement>>]) -> ControlFlowBlock {
+pub fn build_graph(statements: &[Shared<Statement>]) -> ControlFlowBlock {
     ControlFlowGraphBuilder::from_statements(statements)
 }
 
@@ -39,7 +42,7 @@ pub fn build_graph(statements: &[Rc<RefCell<Statement>>]) -> ControlFlowBlock {
 /// terminator
 #[derive(Debug, Clone, Default)]
 pub struct ControlFlowBlock {
-    inner: Rc<RefCell<ControlFlowBlockInner>>,
+    inner: Shared<ControlFlowBlockInner>,
 }
 
 #[derive(Debug, Default)]
@@ -52,14 +55,14 @@ struct ControlFlowBlockInner {
     /// Parents of the current node
     parents: HashSet<ControlFlowBlockWeak>,
     /// Sequence of statements within the block
-    statements: Vec<Rc<RefCell<Statement>>>,
+    statements: Vec<Shared<Statement>>,
     /// Block terminator
     terminator: Terminator,
 }
 
 impl Display for ControlFlowBlock {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self.inner.borrow().label {
+        match self.inner.get().label {
             Some(label) => write!(f, "{label}"),
             None => {
                 let mut state = DefaultHasher::new();
@@ -85,28 +88,28 @@ impl ControlFlowBlock {
     }
 
     pub fn id(&self) -> Id {
-        self.inner.borrow().id
+        self.inner.get().id
     }
 
     /// Creates a new weak pointer to a `ControlFlowBlock`
     pub fn downgrade(&self) -> ControlFlowBlockWeak {
-        ControlFlowBlockWeak(Rc::downgrade(&self.inner))
+        ControlFlowBlockWeak(self.inner.downgrade())
     }
 
     /// Gets the label of a `ControlFlowBlock`
     pub fn label(&self) -> Option<InternedString> {
-        self.inner.borrow().label
+        self.inner.get().label
     }
 
     /// Sets the label of a `ControlFlowBlock`
     pub fn set_label(&self, label: Option<InternedString>) {
-        self.inner.borrow_mut().label = label;
+        self.inner.get_mut().label = label;
     }
 
     /// Gets the parents of this control flow block
     pub fn parents(&self) -> Vec<ControlFlowBlock> {
         self.inner
-            .borrow()
+            .get()
             .parents
             .iter()
             .filter_map(ControlFlowBlockWeak::upgrade)
@@ -115,7 +118,7 @@ impl ControlFlowBlock {
 
     /// Adds a parent to this control flow block
     pub fn add_parent(&self, parent: &Self) {
-        let parents = &mut self.inner.borrow_mut().parents;
+        let parents = &mut self.inner.get_mut().parents;
 
         // remove dropped weak pointers
         parents.retain(|weak| weak.upgrade().is_some());
@@ -126,7 +129,7 @@ impl ControlFlowBlock {
 
     fn remove_parent(&self, parent_to_remove: &Self) {
         let parent_to_remove = parent_to_remove.downgrade();
-        let parents = &mut self.inner.borrow_mut().parents;
+        let parents = &mut self.inner.get_mut().parents;
 
         assert!(parents.contains(&parent_to_remove));
 
@@ -135,7 +138,7 @@ impl ControlFlowBlock {
 
     /// Gets the terminator of this control flow block
     pub fn terminator(&self) -> Terminator {
-        self.inner.borrow().terminator.clone()
+        self.inner.get().terminator.clone()
     }
 
     /// Sets the terminator of this control flow block (and also the weak
@@ -160,17 +163,17 @@ impl ControlFlowBlock {
             Terminator::Unconditional { target } => target.add_parent(self),
         }
 
-        self.inner.borrow_mut().terminator = terminator;
+        self.inner.get_mut().terminator = terminator;
     }
 
     /// Gets the statements of a `ControlFlowBlock`
-    pub fn statements(&self) -> Vec<Rc<RefCell<Statement>>> {
-        self.inner.borrow().statements.clone()
+    pub fn statements(&self) -> Vec<Shared<Statement>> {
+        self.inner.get().statements.clone()
     }
 
     /// Sets the statements of a `ControlFlowBlock`
-    pub fn set_statements(&self, statements: Vec<Rc<RefCell<Statement>>>) {
-        self.inner.borrow_mut().statements = statements;
+    pub fn set_statements(&self, statements: Vec<Shared<Statement>>) {
+        self.inner.get_mut().statements = statements;
     }
 
     pub fn iter(&self) -> ControlFlowBlockIterator {
@@ -180,7 +183,7 @@ impl ControlFlowBlock {
 
 /// Non-owning reference to a `ControlFlowBlock`
 #[derive(Debug)]
-pub struct ControlFlowBlockWeak(Weak<RefCell<ControlFlowBlockInner>>);
+pub struct ControlFlowBlockWeak(Weak<ControlFlowBlockInner>);
 
 impl ControlFlowBlockWeak {
     /// Attempts to upgrade to a strong reference to a `ControlFlowBlock`
@@ -210,7 +213,7 @@ impl Eq for ControlFlowBlockWeak {}
 pub enum Terminator {
     /// Function return with optional value
     Return(Option<Value>),
-    Panic(Vec<Rc<RefCell<Value>>>),
+    Panic(Vec<Shared<Value>>),
     /// If condition evaluates to true, then jump to target, otherwise jump to
     /// fallthrough
     Conditional {
