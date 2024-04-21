@@ -1,11 +1,9 @@
 use {
-    crate::brig::tokens_to_string,
     cargo_util_schemas::manifest::{
         InheritableDependency, InheritableField, PackageName, TomlDependency,
-        TomlDetailedDependency, TomlManifest, TomlPackage, TomlWorkspace,
+        TomlDetailedDependency, TomlManifest, TomlPackage,
     },
-    common::{intern::InternedString, shared::Shared, HashMap, HashSet},
-    proc_macro2::TokenStream,
+    common::{intern::InternedString, HashMap, HashSet},
     semver::{BuildMetadata, Prerelease, Version},
     std::{
         collections::BTreeMap,
@@ -15,28 +13,7 @@ use {
     walkdir::WalkDir,
 };
 
-// const _: () = {
-//     fn assert_send<T: Send>() {}
-//     fn assert_sync<T: Sync>() {}
-
-//     fn a() {
-//         assert_send::<Crate>();
-//         assert_sync::<Crate>();
-//     }
-// };
-
-pub struct Workspace {
-    pub crates: HashMap<InternedString, Crate>,
-}
-
-pub struct Crate {
-    pub dependencies: HashSet<InternedString>,
-    pub contents: TokenStream,
-}
-
-pub fn write_workspace(workspace: Workspace, path: PathBuf) {
-    log::debug!("building target workspace");
-    let target_fs = build_fs(workspace);
+pub fn write_workspace(target_fs: (HashMap<PathBuf, String>, HashSet<PathBuf>), path: PathBuf) {
     log::debug!("reading current workspace");
     let current_fs = read_fs(&path);
 
@@ -49,82 +26,6 @@ pub fn write_workspace(workspace: Workspace, path: PathBuf) {
     write_difference(target_fs, current_fs, &path);
 
     log::debug!("done writing workspace");
-}
-
-fn build_fs(workspace: Workspace) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
-    let workspace_manifest = (
-        PathBuf::from("Cargo.toml"),
-        toml::to_string_pretty(&TomlManifest {
-            cargo_features: None,
-            package: None,
-            project: None,
-            profile: None,
-            lib: None,
-            bin: None,
-            example: None,
-            test: None,
-            bench: None,
-            dependencies: None,
-            dev_dependencies: None,
-            dev_dependencies2: None,
-            build_dependencies: None,
-            build_dependencies2: None,
-            features: None,
-            target: None,
-            replace: None,
-            patch: None,
-            workspace: Some(TomlWorkspace {
-                members: Some(workspace.crates.keys().map(ToString::to_string).collect()),
-                resolver: Some("2".to_owned()),
-                exclude: None,
-                default_members: None,
-                metadata: None,
-                package: None,
-                dependencies: None,
-                lints: None,
-            }),
-            badges: None,
-            lints: None,
-        })
-        .unwrap(),
-    );
-
-    let files = workspace
-        .crates
-        .iter()
-        .map(
-            |(
-                name,
-                Crate {
-                    dependencies,
-                    contents,
-                },
-            )| {
-                let manifest = (
-                    PathBuf::from(name.as_ref()).join("Cargo.toml"),
-                    toml::to_string(&create_manifest(name, dependencies)).unwrap(),
-                );
-
-                let source = (
-                    PathBuf::from(name.as_ref()).join("src").join("lib.rs"),
-                    tokens_to_string(&contents),
-                );
-
-                [manifest, source]
-            },
-        )
-        .flatten()
-        .chain([workspace_manifest])
-        .collect();
-
-    let dirs = workspace
-        .crates
-        .keys()
-        .map(|name| [PathBuf::from(name.as_ref()).join("src")].into_iter())
-        .flatten()
-        .collect();
-
-    (files, dirs)
 }
 
 /// Reads files, their contents, and directories at the supplied path'
@@ -196,7 +97,10 @@ fn write_difference(
     }
 }
 
-fn create_manifest(name: &InternedString, dependencies: &HashSet<InternedString>) -> TomlManifest {
+pub fn create_manifest(
+    name: InternedString,
+    dependencies: &HashSet<InternedString>,
+) -> TomlManifest {
     TomlManifest {
         cargo_features: None,
         package: Some(Box::new(TomlPackage {

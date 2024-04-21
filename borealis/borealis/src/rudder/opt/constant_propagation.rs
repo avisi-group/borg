@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, Statement, StatementKind},
+    crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, StatementKind},
     log::trace,
 };
 

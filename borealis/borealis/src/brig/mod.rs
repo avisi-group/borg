@@ -14,19 +14,24 @@ use {
         brig::{
             allowlist::apply_fn_allowlist,
             bundle::codegen_bundle,
-            functions_interpreter::codegen_functions,
+            functions_interpreter::{
+                codegen_block, codegen_parameters, get_block_fn_ident, get_functions_to_codegen,
+            },
             state::codegen_state,
-            workspace::{write_workspace, Crate, Workspace},
+            workspace::{create_manifest, write_workspace},
         },
         rudder::{
-            self, analysis::cfg::FunctionCallGraphAnalysis, Context, PrimitiveTypeClass, Type,
+            self, analysis::cfg::FunctionCallGraphAnalysis, Context, Function, PrimitiveTypeClass,
+            Symbol, Type,
         },
     },
-    common::{create_file, intern::InternedString, HashSet},
+    cargo_util_schemas::manifest::{TomlManifest, TomlWorkspace},
+    common::{create_file, intern::InternedString, HashMap, HashSet},
     log::{info, warn},
     once_cell::sync::Lazy,
     proc_macro2::{Span, TokenStream},
     quote::{format_ident, quote},
+    rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
     sailrs::jib_ast,
     std::{
@@ -301,37 +306,22 @@ fn codegen_types(rudder: &Context) -> TokenStream {
     }
 }
 
-fn codegen_workspace(rudder: &Context) -> Workspace {
-    // header for each file
-    let header = quote! {
-        #![no_std]
-        #![allow(non_snake_case)]
-        #![allow(unused_assignments)]
-        #![allow(unused_mut)]
-        #![allow(unused_parens)]
-        #![allow(unused_variables)]
-        #![allow(dead_code)]
-        #![allow(unreachable_code)]
-        #![allow(unused_doc_comments)]
-        #![allow(non_upper_case_globals)]
-
-        //! BOREALIS GENERATED FILE DO NOT MODIFY
-    };
-
+fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     // common crate depended on by all containing bundle, tracer, state, and
     // structs/enums/unions
     let common = {
+        let header = codegen_header();
+        let state = codegen_state(rudder);
+        let bundle = codegen_bundle();
         let types = codegen_types(rudder);
 
-        let state = codegen_state(rudder);
-
-        let bundle = codegen_bundle();
-
         (
-            "common".into(),
-            Crate {
-                dependencies: HashSet::default(),
-                contents: quote! {
+            InternedString::from_static("common"),
+            (
+                HashSet::<InternedString>::default(),
+                tokens_to_string(&quote! {
+                    #header
+
                     #state
 
                     #bundle
@@ -351,21 +341,27 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
                         EndOfBlock,
                         UndefinedInstruction
                     }
-                },
-            },
+                }),
+            ),
         )
     };
 
     // one top-level crate containing prelude
     let arch = {
+        let header = codegen_header();
         let entrypoint_ident = codegen_ident(ENTRYPOINT.into());
         (
-            "arch".into(),
-            Crate {
-                dependencies: ["common".into(), entrypoint_ident.to_string().into()]
-                    .into_iter()
-                    .collect(),
-                contents: quote! {
+            InternedString::from_static("arch"),
+            (
+                [
+                    InternedString::from_static("common"),
+                    entrypoint_ident.to_string().into(),
+                ]
+                .into_iter()
+                .collect::<HashSet<_>>(),
+                tokens_to_string(&quote! {
+                        #header
+
                         pub use common::*;
 
                         use #entrypoint_ident::#entrypoint_ident;
@@ -391,19 +387,109 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
                             ExecuteResult::Ok
                         }
 
-                },
-            },
+                }),
+            ),
         )
     };
 
+    rudder.update_names();
     let cfg = FunctionCallGraphAnalysis::new(rudder);
-    // cfg.to_dot(&mut create_file("target/fcg.dot").unwrap())
-    //     .unwrap();
+    let fn_names = get_functions_to_codegen(&rudder, ENTRYPOINT.into());
+    let rudder_fns = rudder.get_functions();
 
-    let functions = codegen_functions(rudder, ENTRYPOINT.into())
-        .into_iter()
-        .map(|(name, contents)| {
-            let mut dependencies = cfg.get_callees_for(&name); // fns.get(&name).unwrap().clone();
+    let crate_names = fn_names
+        .iter()
+        .copied()
+        .chain(
+            ["common", "arch"]
+                .into_iter()
+                .map(InternedString::from_static),
+        )
+        .map(|name| InternedString::from(codegen_ident(name).to_string()));
+
+    let workspace_manifest = (
+        PathBuf::from("Cargo.toml"),
+        toml::to_string_pretty(&TomlManifest {
+            cargo_features: None,
+            package: None,
+            project: None,
+            profile: None,
+            lib: None,
+            bin: None,
+            example: None,
+            test: None,
+            bench: None,
+            dependencies: None,
+            dev_dependencies: None,
+            dev_dependencies2: None,
+            build_dependencies: None,
+            build_dependencies2: None,
+            features: None,
+            target: None,
+            replace: None,
+            patch: None,
+            workspace: Some(TomlWorkspace {
+                members: Some(crate_names.clone().map(|s| s.to_string()).collect()),
+                resolver: Some("2".to_owned()),
+                exclude: None,
+                default_members: None,
+                metadata: None,
+                package: None,
+                dependencies: None,
+                lints: None,
+            }),
+            badges: None,
+            lints: None,
+        })
+        .unwrap(),
+    );
+
+    let dirs = crate_names
+        .map(|name| [PathBuf::from(name.as_ref()).join("src")].into_iter())
+        .flatten()
+        .collect();
+
+    let files = fn_names
+        .into_par_iter()
+        .map(|k| (k, rudder_fns.get(&k).unwrap()))
+        .map(|(name, function)| {
+            let name_ident = codegen_ident(name);
+            let (return_type, parameters) = function.signature();
+
+            let function_parameters = codegen_parameters(&parameters);
+            let return_type = codegen_type(return_type);
+
+            let fn_state = codegen_fn_state(function, parameters);
+
+            let entry_block = get_block_fn_ident(&function.entry_block());
+
+            let block_fns = function
+                .entry_block()
+                .iter()
+                .map(|block| {
+                    let block_name = get_block_fn_ident(&block);
+                    let block_impl = codegen_block(block);
+
+                    quote! {
+                        fn #block_name<T: Tracer>(state: &mut State, tracer: &T, mut fn_state: FunctionState) -> #return_type {
+                            #block_impl
+                        }
+                    }
+                })
+                .collect::<TokenStream>();
+
+            let contents =
+                quote! {
+                    pub fn #name_ident<T: Tracer>(#function_parameters) -> #return_type {
+                        #fn_state
+
+                        return #entry_block(state, tracer, fn_state);
+
+                        #block_fns
+                    }
+                };
+
+            let mut dependencies = cfg.get_callees_for(&name);
             dependencies.push("common".into());
 
             let imports: TokenStream = dependencies
@@ -416,51 +502,89 @@ fn codegen_workspace(rudder: &Context) -> Workspace {
 
             let dependencies = dependencies
                 .into_iter()
-                .map(|name| codegen_ident(name).to_string().into())
-                .collect();
+                .map(|name| InternedString::from(codegen_ident(name).to_string()))
+                .collect::<HashSet<_>>();
+
+            let header = codegen_header();
 
             (
-                codegen_ident(name).to_string().into(),
-                Crate {
+                InternedString::from(codegen_ident(name).to_string()),
+               (
                     dependencies,
-                    contents: quote! {
+                    tokens_to_string(&quote! {
+                        #header
+
                         extern crate alloc;
                         #imports
 
                         #contents
-                    },
-                },
+                    }),
+               )
             )
-        });
+        })
+        .chain([arch, common])
 
-    // create workspace, adding header to each crate contents
-    Workspace {
-        crates: [common, arch]
-            .into_iter()
-            .chain(functions)
-            .map(
-                |(
-                    name,
-                    Crate {
-                        dependencies,
-                        contents,
-                    },
-                )| {
-                    (
-                        name,
-                        Crate {
-                            dependencies,
-                            contents: quote! {
-                                #header
+        .map(|(name, (dependencies, contents))| {
+            let manifest = (
+                PathBuf::from(name.as_ref()).join("Cargo.toml"),
+                toml::to_string(&create_manifest(name, &dependencies)).unwrap(),
+            );
 
-                                #contents
-                            },
-                        },
-                    )
-                },
-            )
-            .collect(),
-    }
+            let source = (
+                PathBuf::from(name.as_ref()).join("src").join("lib.rs"),
+                contents,
+            );
+
+            [manifest, source]
+        })
+        .flatten()
+        .chain([workspace_manifest])
+        .collect();
+
+    (files, dirs)
+}
+
+fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenStream {
+    let fn_state = {
+        let fields = function
+            .local_variables()
+            .iter()
+            .chain(&parameters)
+            .map(|symbol| {
+                let name = codegen_ident(symbol.name());
+                let typ = codegen_type(symbol.typ());
+
+                quote! {
+                    #name: #typ,
+                }
+            })
+            .collect::<TokenStream>();
+
+        // copy from parameters into fn state
+        let parameter_copies = parameters
+            .iter()
+            .map(|symbol| {
+                let name = codegen_ident(symbol.name());
+
+                quote! {
+                    #name,
+                }
+            })
+            .collect::<TokenStream>();
+
+        quote! {
+            #[derive(Default)]
+            struct FunctionState {
+                #fields
+            }
+
+            let fn_state = FunctionState {
+                #parameter_copies
+                ..Default::default()
+            };
+        }
+    };
+    fn_state
 }
 
 pub fn tokens_to_string(tokens: &TokenStream) -> String {
@@ -468,4 +592,21 @@ pub fn tokens_to_string(tokens: &TokenStream) -> String {
     let formatted = prettyplease::unparse(&syntax_tree);
     // fix comments
     formatted.replace("///", "//")
+}
+
+fn codegen_header() -> TokenStream {
+    quote! {
+        #![no_std]
+        #![allow(non_snake_case)]
+        #![allow(unused_assignments)]
+        #![allow(unused_mut)]
+        #![allow(unused_parens)]
+        #![allow(unused_variables)]
+        #![allow(dead_code)]
+        #![allow(unreachable_code)]
+        #![allow(unused_doc_comments)]
+        #![allow(non_upper_case_globals)]
+
+        //! BOREALIS GENERATED FILE
+    }
 }

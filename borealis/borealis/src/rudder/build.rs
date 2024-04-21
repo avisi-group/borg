@@ -17,7 +17,7 @@ use {
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     log::trace,
     regex::Regex,
-    std::{cmp::Ordering, rc::Rc, sync::Arc},
+    std::{cmp::Ordering, sync::Arc},
 };
 
 pub fn from_boom(ast: &boom::Ast) -> Context {
@@ -213,7 +213,8 @@ impl BuildContext {
     fn resolve_type(&self, typ: Shared<boom::Type>) -> Arc<rudder::Type> {
         match &*typ.get() {
             boom::Type::Unit => Arc::new(rudder::Type::unit()),
-            boom::Type::String => Arc::new(rudder::Type::u32()), // same as InternedString raw value
+            boom::Type::String => Arc::new(rudder::Type::u32()), /* same as InternedString raw */
+            // value
             boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
             boom::Type::Real => Arc::new(rudder::Type::f32()),
             boom::Type::Float => Arc::new(rudder::Type::f64()),

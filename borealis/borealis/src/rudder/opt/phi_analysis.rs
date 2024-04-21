@@ -1,9 +1,8 @@
 use {
+    crate::rudder::{analysis::loopy::LoopAnalysis, Block, Function, Statement, StatementKind},
     common::{intern::InternedString, HashMap},
     log::trace,
 };
-
-use crate::rudder::{analysis::loopy::LoopAnalysis, Block, Function, Statement, StatementKind};
 
 pub fn run(f: Function) -> bool {
     let la = LoopAnalysis::new(&f);

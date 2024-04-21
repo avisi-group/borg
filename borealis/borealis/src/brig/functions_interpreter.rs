@@ -15,102 +15,11 @@ use {
     common::{intern::InternedString, HashSet},
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
-    std::{rc::Rc, sync::Arc},
+    std::sync::Arc,
     syn::Ident,
 };
 
-pub fn codegen_functions(
-    rudder: &Context,
-    entrypoint: InternedString,
-) -> Vec<(InternedString, TokenStream)> {
-    rudder.update_names();
-
-    let fn_names = get_functions_to_codegen(&rudder, entrypoint);
-
-    let rudder_fns = rudder.get_functions();
-
-    fn_names
-        .into_iter()
-        .map(|k| (k, rudder_fns.get(&k).unwrap()))
-        .map(|(name, function)| {
-            let name_ident = codegen_ident(name);
-            let (return_type, parameters) = function.signature();
-
-            let function_parameters = codegen_parameters(&parameters);
-            let return_type = codegen_type(return_type);
-
-            let fn_state = {
-                let fields = function
-                    .local_variables()
-                    .iter()
-                    .chain(&parameters)
-                    .map(|symbol| {
-                        let name = codegen_ident(symbol.name());
-                        let typ = codegen_type(symbol.typ());
-
-                        quote! {
-                            #name: #typ,
-                        }
-                    })
-            .collect::<TokenStream>();
-
-            // copy from parameters into fn state
-                let parameter_copies = parameters.iter().map(|symbol| {
-                let name = codegen_ident(symbol.name());
-
-                    quote! {
-                        #name,
-                    }
-                })
-                .collect::<TokenStream>();
-
-                quote! {
-                    #[derive(Default)]
-                    struct FunctionState {
-                        #fields
-                    }
-
-                    let fn_state = FunctionState {
-                        #parameter_copies
-                        ..Default::default()
-                    };
-                }
-            };
-
-            let entry_block = get_block_fn_ident(&function.entry_block());
-
-            let block_fns = function
-                .entry_block()
-                .iter()
-                .map(|block| {
-                    let block_name = get_block_fn_ident(&block);
-                    let block_impl = codegen_block(block);
-
-                    quote! {
-                        fn #block_name<T: Tracer>(state: &mut State, tracer: &T, mut fn_state: FunctionState) -> #return_type {
-                            #block_impl
-                        }
-                    }
-                })
-                .collect::<TokenStream>();
-
-            (
-                name,
-                quote! {
-                    pub fn #name_ident<T: Tracer>(#function_parameters) -> #return_type {
-                        #fn_state
-
-                        return #entry_block(state, tracer, fn_state);
-
-                        #block_fns
-                    }
-                },
-            )
-        })
-        .collect()
-}
-
-fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
+pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
     let parameters = [quote!(state: &mut State), quote!(tracer: &T)]
         .into_iter()
         .chain(parameters.iter().map(|sym| {
@@ -124,7 +33,7 @@ fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
     }
 }
 
-fn codegen_block(block: Block) -> TokenStream {
+pub fn codegen_block(block: Block) -> TokenStream {
     block
         .statements()
         .iter()
@@ -137,7 +46,7 @@ fn get_ident(stmt: &Statement) -> TokenStream {
     format_ident!("{}", stmt.name().to_string()).to_token_stream()
 }
 
-fn get_block_fn_ident(b: &Block) -> Ident {
+pub fn get_block_fn_ident(b: &Block) -> Ident {
     format_ident!("block_{}", b.name().as_ref())
 }
 
@@ -664,7 +573,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     }
 }
 
-fn get_functions_to_codegen(rudder: &Context, entrypoint: InternedString) -> Vec<InternedString> {
+pub fn get_functions_to_codegen(
+    rudder: &Context,
+    entrypoint: InternedString,
+) -> Vec<InternedString> {
     let rudder_fns = rudder.get_functions();
 
     let mut fns = HashSet::default();
