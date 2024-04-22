@@ -4,6 +4,9 @@ name = "standalone"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev]
+opt-level = 1
+
 [profile.release]
 debug = true
 #lto = "fat" small perf bump but increases compile time from 2 mins to 6 mins at time of writing
@@ -11,4 +14,4 @@ debug = true
 [dependencies]
 arch = { path = "../../brig-aarch64/arch" }
 clap = { version = "4.5.4", features = ["derive"] }
-rustix = { version = "0.38.32", features = ["mm"] }
+rustix = { version = "0.38.33", features = ["mm"] }
