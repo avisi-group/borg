@@ -14,6 +14,10 @@ struct Cli {
     /// Enable GDB
     #[arg(long)]
     gdb: bool,
+
+    /// Release profile build of kernel
+    #[arg(short, long)]
+    release: bool,
 }
 
 fn main() {
@@ -22,8 +26,15 @@ fn main() {
     // build kernel
     println!("building kernel");
 
-    let mut cmd = Command::new("cargo")
-        .args(["build", "--message-format=json"])
+    let mut cmd = Command::new("cargo");
+    cmd.arg("build");
+
+    if cli.release {
+        cmd.arg("--release");
+    }
+
+    let mut cmd = cmd
+        .arg("--message-format=json")
         .current_dir("../brig")
         .stdout(Stdio::piped())
         .spawn()
