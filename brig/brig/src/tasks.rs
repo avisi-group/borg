@@ -186,12 +186,12 @@ pub fn create_idle_task() -> Task {
 pub fn register_scheduler() {
     // create new scheduler on current core
     let scheduler = Scheduler::new();
-    crate::arch::Core::this_mut().set(scheduler);
+    crate::arch::CoreStorage::this_mut().set(scheduler);
 
     // register it with task manager
     TASK_MANAGER
         .get()
         .unwrap()
         .lock()
-        .register_scheduler(crate::arch::Core::this_mut().get().unwrap());
+        .register_scheduler(crate::arch::CoreStorage::this_mut().get().unwrap());
 }

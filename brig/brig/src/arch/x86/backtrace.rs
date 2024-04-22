@@ -8,6 +8,8 @@ use {
     x86_64::{PhysAddr, VirtAddr},
 };
 
+const UNKNOWN: &str = "???";
+
 static BACKTRACER: Once<Backtracer> = Once::INIT;
 
 struct Backtracer {
@@ -46,7 +48,7 @@ impl Backtracer {
             ..self.kernel_image_virt_addr + u64::try_from(self.kernel_image_len).unwrap())
             .contains(&pc)
         {
-            return "???";
+            return UNKNOWN;
         }
 
         let pc = pc - self.kernel_image_virt_addr;
@@ -59,7 +61,7 @@ impl Backtracer {
                     .get(usize::try_from(sym.st_name).unwrap())
                     .ok()
             })
-            .unwrap_or("???")
+            .unwrap_or(UNKNOWN)
     }
 }
 
@@ -69,7 +71,8 @@ pub fn init(kernel_load_addr: VirtAddr, kernel_image_address: PhysAddr, kernel_i
 
     // Push null to base pointer to prevent recursing indefinitely when
     // printing backtrace
-    unsafe { asm!("mov rbp, 0") };
+    // TODO: 2024-04-22 enabling this causes a crash
+    // unsafe { asm!("mov rbp, 0") };
 }
 
 #[repr(C)]
@@ -100,7 +103,12 @@ pub fn backtrace() {
             }
         };
 
-        let symbol = rustc_demangle::demangle(BACKTRACER.get().unwrap().lookup_symbol(pc));
+        let symbol = rustc_demangle::demangle(
+            BACKTRACER
+                .get()
+                .map(|bt| bt.lookup_symbol(pc))
+                .unwrap_or(UNKNOWN),
+        );
         log::error!("    {:x} : {}", pc, symbol);
         unsafe { stk = (*stk).rbp };
     }

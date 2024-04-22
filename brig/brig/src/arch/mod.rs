@@ -1,8 +1,14 @@
 use {
-    ::x86::time::rdtscp,
+    ::x86::{
+        msr::{wrmsr, IA32_TSC_AUX},
+        rdpid,
+    },
     alloc::{boxed::Box, collections::BTreeMap},
     bootloader_api::BootInfo,
-    core::any::{Any, TypeId},
+    core::{
+        any::{Any, TypeId},
+        sync::atomic::{AtomicU64, Ordering},
+    },
     log::trace,
     spin::Once,
 };
@@ -14,39 +20,32 @@ pub const PAGE_SIZE: usize = 4096;
 /// Platform initialization, triggers device enumeration and
 /// initialization
 pub fn platform_init(boot_info: &BootInfo) {
+    trace!("initializing platform");
     x86::init(boot_info);
 }
 
 #[derive(Default)]
-pub struct Core {
+pub struct CoreStorage {
     state: BTreeMap<TypeId, Box<dyn Any>>,
 }
 
-static mut CORES: [Once<Core>; 4] = [Once::INIT; 4];
+static mut NEXT_CORE_ID: AtomicU64 = AtomicU64::new(0);
+static mut CORES: [Once<CoreStorage>; 4] = [Once::INIT; 4];
 
-fn get_local_pid() -> u32 {
-    unsafe { rdtscp().1 }
+fn get_local_pid() -> u64 {
+    unsafe { rdpid() }
 }
 
-impl Core {
+impl CoreStorage {
     pub fn init_self() {
+        unsafe { wrmsr(IA32_TSC_AUX, NEXT_CORE_ID.fetch_add(1, Ordering::SeqCst)) };
+
         trace!("initializing core {}", get_local_pid());
-        unsafe {
-            CORES
-                .get(get_local_pid() as usize)
-                .unwrap()
-                .call_once(Core::default)
-        };
+        unsafe { CORES[get_local_pid() as usize].call_once(Self::default) };
     }
 
     pub fn this_mut() -> &'static mut Self {
-        unsafe {
-            CORES
-                .get_mut(get_local_pid() as usize)
-                .unwrap()
-                .get_mut()
-                .unwrap()
-        }
+        unsafe { CORES[get_local_pid() as usize].get_mut().unwrap() }
     }
 
     pub fn set<O: 'static>(&mut self, o: O) {

@@ -6,6 +6,12 @@ edition = "2021"
 [workspace]
 members = ["proc_macro_lib"]
 
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+debug = true
+
 [dependencies]
 proc_macro_lib = { path = "./proc_macro_lib" }
 arch = { path = "../../brig-aarch64/arch" }
@@ -24,11 +30,11 @@ byte-unit = { version = "5.1.4", default-features = false, features = ["byte"] }
 log = { version = "0.4.21", default-features = false }
 elf = { version = "0.7.4", default-features = false }
 rustc-demangle = { version = "0.1.23", default-features = false }
-serde = { version = "1.0.197", default-features = false, features = [
+serde = { version = "1.0.198", default-features = false, features = [
     "derive",
     "alloc",
 ] }
-serde_json = { version = "1.0.115", default-features = false, features = [
+serde_json = { version = "1.0.116", default-features = false, features = [
     "alloc",
 ] }
 phf = { version = "0.11.2", default-features = false, features = ["macros"] }

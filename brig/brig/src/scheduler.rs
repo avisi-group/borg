@@ -1,6 +1,6 @@
 use {
     crate::{
-        arch::Core,
+        arch::CoreStorage,
         devices::lapic::LAPIC,
         tasks::{create_idle_task, Task, TaskControlBlock},
     },
@@ -25,7 +25,7 @@ impl Scheduler {
     }
 
     pub fn get_local_mut() -> &'static mut Self {
-        Core::this_mut().get::<Self>().unwrap()
+        CoreStorage::this_mut().get::<Self>().unwrap()
     }
 
     pub fn add_to_runqueue(&mut self, task: Task) {
@@ -61,24 +61,25 @@ pub fn local_run() -> ! {
     unsafe {
         core::arch::asm!(
             "
-    mov %gs:0, %rsp
-    pop %r15
-	pop %r14
-	pop %r13
-	pop %r12
-	pop %r11
-	pop %r10
-	pop %r9
-	pop %r8
-	pop %rdi
-	pop %rsi
-	pop %rbp
-	pop %rbx
-	pop %rdx
-	pop %rcx
-	pop %rax
-    add $8, %rsp
-    iretq",
+            mov %gs:0, %rsp
+            pop %r15
+            pop %r14
+            pop %r13
+            pop %r12
+            pop %r11
+            pop %r10
+            pop %r9
+            pop %r8
+            pop %rdi
+            pop %rsi
+            pop %rbp
+            pop %rbx
+            pop %rdx
+            pop %rcx
+            pop %rax
+            add $8, %rsp
+            iretq
+            ",
             options(att_syntax, noreturn)
         );
     }

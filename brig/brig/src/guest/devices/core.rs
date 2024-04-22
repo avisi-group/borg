@@ -1,10 +1,12 @@
-use core::arch::x86_64::__rdtscp;
-
-use x86::time::rdtsc;
-
-use crate::{
-    guest::{devices::GuestDevice, memory::IOMemoryHandler},
-    tasks::{create_task, Task},
+use {
+    crate::{
+        guest::{devices::GuestDevice, memory::IOMemoryHandler, KERNEL_LOAD_BIAS},
+        tasks::{create_task, Task},
+    },
+    alloc::rc::Rc,
+    core::fmt::Debug,
+    log::trace,
+    x86::time::rdtsc,
 };
 
 pub trait CoreState {
@@ -44,7 +46,7 @@ impl GuestDevice for GenericCore {
         self.execution_thread.stop();
     }
 
-    fn as_io_handler(self: alloc::rc::Rc<Self>) -> Option<alloc::rc::Rc<dyn IOMemoryHandler>> {
+    fn as_io_handler(self: Rc<Self>) -> Option<Rc<dyn IOMemoryHandler>> {
         None
     }
 }
@@ -60,7 +62,7 @@ impl GenericCore {
 fn execution_thread<S: CoreState, E: ExecutionEngine<S>>() {
     log::trace!("running guest core");
 
-    let mut state = S::new(0x80000000);
+    let mut state = S::new(KERNEL_LOAD_BIAS);
     let mut engine = E::new();
 
     let start_time = unsafe { rdtsc() };
@@ -97,18 +99,19 @@ struct LogTracer;
 
 impl arch::Tracer for LogTracer {
     fn begin(&self, pc: u64) {
-        // log::trace!("begin @ {pc:x}");
+        trace!("[{pc:x}] ");
     }
 
     fn end(&self) {
-        //log::trace!("end");
+        trace!("");
     }
 
-    fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
-        //  log::trace!("read-register {offset:x} = {value:?}");
+    fn read_register<T: Debug>(&self, offset: usize, value: T) {
+        trace!("    R[{offset:x}] -> {value:?}");
     }
-    fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
-        // log::trace!("write-register {offset:x} = {value:?}");
+
+    fn write_register<T: Debug>(&self, offset: usize, value: T) {
+        trace!("    R[{offset:x}] <- {value:?}");
     }
 }
 
@@ -121,9 +124,8 @@ pub struct Interpreter {
 }
 
 impl ExecutionEngine<arch::State> for Interpreter {
-    fn step(&mut self, amount: StepAmount, state: &mut arch::State) -> StepResult {
+    fn step(&mut self, _amount: StepAmount, state: &mut arch::State) -> StepResult {
         let insn_data = fetch(state.pc());
-        // log::trace!("fetch @ {:x} = {:08x}", state.pc(), insn_data);
 
         match arch::decode_execute(insn_data, state, &LogTracer) {
             arch::ExecuteResult::Ok | arch::ExecuteResult::EndOfBlock => {

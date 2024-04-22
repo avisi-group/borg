@@ -24,9 +24,6 @@ pub struct Guest {
     devices: BTreeMap<String, Rc<dyn GuestDevice>>,
 }
 
-unsafe impl Send for Guest {}
-unsafe impl Sync for Guest {}
-
 impl Guest {
     pub fn new() -> Self {
         Self::default()
@@ -51,7 +48,7 @@ impl GuestExecutionContext {
 
 /// Start guest emulation
 pub fn start() {
-    log::trace!("starting guest");
+    log::info!("starting guest");
 
     //check each connected block device for guest config
     let device_manager = SharedDeviceManager::get();
@@ -61,7 +58,7 @@ pub fn start() {
 
     let (config, kernel, dtb) = config::load_from_device(&device).unwrap();
 
-    log::trace!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
+    log::debug!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
 
     unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();
@@ -178,7 +175,7 @@ pub fn start() {
 }
 
 const KERNEL_LOAD_BIAS: usize = 0x80000000;
-const DTB_LOAD_OFFSET: usize = 0x80010000;
+const DTB_LOAD_OFFSET: usize = 0x90000000;
 
 const ARM64_MAGIC: u32 = 0x644d5241;
 
