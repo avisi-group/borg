@@ -1,5 +1,6 @@
 use {
     cargo_metadata::{Artifact, Message},
+    clap::Parser,
     itertools::Itertools,
     std::{
         io::BufReader,
@@ -7,9 +8,18 @@ use {
     },
 };
 
+#[derive(Parser)]
+#[command(version, about)]
+struct Cli {
+    /// Enable GDB
+    #[arg(long)]
+    gdb: bool,
+}
+
 fn main() {
+    let cli = Cli::parse();
+
     // build kernel
-    // cargo b --message-format=json
     println!("building kernel");
 
     let mut cmd = Command::new("cargo")
@@ -68,6 +78,14 @@ fn main() {
         .arg(format!("format=raw,file={}", uefi_path.to_str().unwrap()));
     cmd.arg("-nographic");
     cmd.arg("-enable-kvm");
+    cmd.arg("-no-reboot");
+
+    if cli.gdb {
+        cmd.arg("-gdb");
+        cmd.arg("tcp::1234");
+        cmd.arg("-S"); //  freeze CPU at startup
+    }
+
     cmd.arg("-m");
     cmd.arg("8g");
     cmd.arg("-device");
