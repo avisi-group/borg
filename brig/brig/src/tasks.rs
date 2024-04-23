@@ -6,7 +6,7 @@ use {
     alloc::{
         alloc::{alloc_zeroed, dealloc},
         collections::LinkedList,
-        rc::{Rc, Weak},
+        sync::{Arc, Weak},
     },
     core::{alloc::Layout, mem::size_of},
     spin::{Mutex, Once},
@@ -27,12 +27,12 @@ struct TaskManager {
 
 #[derive(Clone)]
 pub struct Task {
-    inner: Rc<InnerTask>,
+    inner: Arc<InnerTask>,
 }
 
 impl PartialEq for &Task {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.inner, &other.inner)
+        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 
@@ -40,6 +40,10 @@ pub struct InnerTask {
     tcb: TaskControlBlock,
     stack: *mut u8,
 }
+
+// todo: verify stack ptr is safe to send + sync
+unsafe impl Send for InnerTask {}
+unsafe impl Sync for InnerTask {}
 
 impl Drop for InnerTask {
     fn drop(&mut self) {
@@ -52,6 +56,9 @@ pub struct TaskControlBlock {
     pub context: *mut MachineContext,
     pub parent: Weak<InnerTask>,
 }
+
+// todo: verify machine context ptr is safe to send + sync
+unsafe impl Sync for TaskControlBlock {}
 
 impl TaskManager {
     pub fn new() -> Self {
@@ -117,7 +124,7 @@ impl Task {
         context.ss = 0x10;
         context.rbp = 0x0;
 
-        let inner = Rc::new_cyclic(|weak| InnerTask {
+        let inner = Arc::new_cyclic(|weak| InnerTask {
             tcb: TaskControlBlock {
                 context: context as *mut MachineContext,
                 parent: weak.clone(),
@@ -159,9 +166,6 @@ extern "C" fn task_wrapper(cb: extern "C" fn()) {
         x86_64::instructions::hlt();
     }
 }
-
-// safe because TaskManager is kept behind mutex??
-unsafe impl Send for TaskManager {}
 
 pub fn init() {
     TASK_MANAGER.call_once(|| Mutex::new(TaskManager::new()));

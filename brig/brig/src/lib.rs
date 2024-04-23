@@ -32,7 +32,7 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     config.mappings.physical_memory = Some(Mapping::FixedAddress(PHYSICAL_MEMORY_OFFSET.as_u64()));
     config.mappings.dynamic_range_start = Some(HIGH_HALF_CANONICAL_START.as_u64());
     config.mappings.dynamic_range_end = Some(HIGH_HALF_CANONICAL_END.as_u64());
-    config.kernel_stack_size = 0x40_0000;
+    config.kernel_stack_size = 0x1000_0000;
     config
 };
 

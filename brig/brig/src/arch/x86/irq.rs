@@ -80,7 +80,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                 }
             }
         } else {
-            panic!("no region -- this is a real fault");
+            panic!("GUEST PAGE FAULT code {error_code:?} @ {faulting_address:?}: no region -- this is a real fault");
         }
     } else {
         panic!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
