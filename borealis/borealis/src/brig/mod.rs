@@ -6,7 +6,7 @@ use {
             self,
             passes::{
                 self, cycle_finder::CycleFinder, fold_unconditionals::FoldUnconditionals,
-                make_exception_bool::MakeExceptionBool, remove_const_branch::RemoveConstBranch,
+                make_exception_panic::MakeExceptionPanic, remove_const_branch::RemoveConstBranch,
                 resolve_return_assigns::ResolveReturns,
             },
             Ast,
@@ -76,7 +76,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
             ResolveReturns::new_boxed(),
-            MakeExceptionBool::new_boxed(),
+            MakeExceptionPanic::new_boxed(),
             CycleFinder::new_boxed(),
         ],
     );

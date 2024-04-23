@@ -1,10 +1,4 @@
-use {
-    crate::rudder::{
-        BinaryOperationKind, Block, ConstantValue, Function, StatementBuilder, StatementKind, Type,
-    },
-    log::trace,
-    std::rc::Rc,
-};
+use crate::rudder::{Block, Function, StatementKind};
 
 pub fn run(f: Function) -> bool {
     let mut changed = false;
