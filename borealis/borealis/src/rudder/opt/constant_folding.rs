@@ -1,6 +1,9 @@
-use crate::rudder::{
-    BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, Statement,
-    StatementKind,
+use {
+    crate::rudder::{
+        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, PrimitiveType,
+        PrimitiveTypeClass, Statement, StatementKind, Type,
+    },
+    std::sync::Arc,
 };
 
 pub fn run(f: Function) -> bool {
@@ -38,7 +41,7 @@ fn run_on_stmt(stmt: Statement) -> bool {
                 let cv = match kind {
                     BinaryOperationKind::Add => lhs + rhs,
                     BinaryOperationKind::Sub => lhs - rhs,
-                    BinaryOperationKind::Multiply => todo!(),
+                    BinaryOperationKind::Multiply => lhs * rhs,
                     BinaryOperationKind::Divide => todo!(),
                     BinaryOperationKind::Modulo => todo!(),
                     BinaryOperationKind::And => todo!(),
@@ -134,6 +137,7 @@ fn run_on_stmt(stmt: Statement) -> bool {
             value,
         } => {
             if let StatementKind::Constant { value, .. } = value.kind() {
+                let value = cast_integer(value, typ.clone());
                 stmt.replace_kind(StatementKind::Constant { typ, value });
                 true
             } else {
@@ -170,6 +174,8 @@ fn run_on_stmt(stmt: Statement) -> bool {
             value,
         } => {
             if let StatementKind::Constant { value, .. } = value.kind() {
+                let value = cast_integer(value, typ.clone());
+
                 stmt.replace_kind(StatementKind::Constant { typ, value });
                 true
             } else {
@@ -181,5 +187,28 @@ fn run_on_stmt(stmt: Statement) -> bool {
             //trace!("candidate for folding not implemented: {}", stmt);
             false
         }
+    }
+}
+
+fn cast_integer(value: ConstantValue, typ: Arc<Type>) -> ConstantValue {
+    let Type::Primitive(primitive) = &*typ else {
+        panic!("non primitive constant cast?")
+    };
+
+    match (primitive.tc, value) {
+        (PrimitiveTypeClass::SignedInteger, ConstantValue::UnsignedInteger(i)) => {
+            ConstantValue::SignedInteger(isize::try_from(i).unwrap())
+        }
+        (PrimitiveTypeClass::SignedInteger, ConstantValue::SignedInteger(i)) => {
+            ConstantValue::SignedInteger(i)
+        }
+        (PrimitiveTypeClass::UnsignedInteger, ConstantValue::SignedInteger(i)) => {
+            ConstantValue::UnsignedInteger(usize::try_from(i).unwrap())
+        }
+        (PrimitiveTypeClass::UnsignedInteger, ConstantValue::UnsignedInteger(i)) => {
+            ConstantValue::UnsignedInteger(i)
+        }
+
+        _ => todo!(),
     }
 }

@@ -8,9 +8,10 @@ use {
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
+        cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
-        ops::{Add, Sub},
+        ops::{Add, Mul, Sub},
         sync::Arc,
     },
 };
@@ -282,7 +283,7 @@ impl Add for ConstantValue {
             (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
                 ConstantValue::FloatingPoint(l + r)
             }
-            _ => panic!("invalid types for add"),
+            (l, r) => panic!("invalid types for add: {l:?} {r:?}"),
         }
     }
 }
@@ -301,7 +302,26 @@ impl Sub for ConstantValue {
             (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
                 ConstantValue::FloatingPoint(l - r)
             }
-            _ => panic!("invalid types for sub"),
+            (l, r) => panic!("invalid types for add: {l:?} {r:?}"),
+        }
+    }
+}
+
+impl Mul for ConstantValue {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
+                ConstantValue::UnsignedInteger(l * r)
+            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
+                ConstantValue::SignedInteger(l * r)
+            }
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
+                ConstantValue::FloatingPoint(l * r)
+            }
+            (l, r) => panic!("invalid types for add: {l:?} {r:?}"),
         }
     }
 }
@@ -1082,6 +1102,126 @@ impl StatementBuilder {
     /// Consumes a `StatementBuilder` and returns it's statements
     pub fn finish(self) -> Vec<Statement> {
         self.statements
+    }
+
+    // No-op if same type
+    fn generate_cast(&mut self, source: Statement, destination_type: Arc<Type>) -> Statement {
+        if source.typ() == destination_type {
+            return source;
+        }
+
+        match (&*source.typ(), &*destination_type) {
+            // both primitives, do a cast
+            (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
+                // compare widths
+                match source_primitive.width().cmp(&dest_primitive.width()) {
+                    // source is larger than destination
+                    Ordering::Greater => self.build(StatementKind::Cast {
+                        kind: CastOperationKind::Truncate,
+                        typ: destination_type,
+                        value: source,
+                    }),
+
+                    // destination is larger than source
+                    Ordering::Less => {
+                        let kind = match source_primitive.type_class() {
+                            PrimitiveTypeClass::Void => panic!("cannot cast void"),
+                            PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
+                            PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
+                            PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
+                            PrimitiveTypeClass::FloatingPoint => {
+                                panic!("cannot cast floating point")
+                            }
+                        };
+
+                        self.build(StatementKind::Cast {
+                            kind,
+                            typ: destination_type,
+                            value: source,
+                        })
+                    }
+
+                    // equal width
+                    Ordering::Equal => self.build(StatementKind::Cast {
+                        kind: CastOperationKind::Reinterpret,
+                        typ: destination_type,
+                        value: source,
+                    }),
+                }
+            }
+
+            // primitive to bundled, create a bundle with the value and length of the primitive
+            (Type::Primitive(source_primitive), Type::Bundled { value, len }) => {
+                let length = self.build(StatementKind::Constant {
+                    typ: len.clone(),
+                    value: ConstantValue::UnsignedInteger(source_primitive.width()),
+                });
+                let value = self.generate_cast(source, value.clone());
+                self.build(StatementKind::Bundle { value, length })
+            }
+
+            // bundled to primitive, get value and cast
+            (Type::Bundled { .. }, Type::Primitive(_)) => {
+                let value = self.build(StatementKind::UnbundleValue { bundle: source });
+
+                // todo: maybe use len here
+
+                self.generate_cast(value, destination_type)
+            }
+
+            // bundle to bundle
+            (
+                Type::Bundled { .. },
+                Type::Bundled {
+                    value: dest_value_type,
+                    len: dest_len_type,
+                },
+            ) => {
+                let source_value = self.build(StatementKind::UnbundleValue {
+                    bundle: source.clone(),
+                });
+                let source_len = self.build(StatementKind::UnbundleValue { bundle: source });
+
+                let cast_value = self.generate_cast(source_value, dest_value_type.clone());
+                let cast_len = self.generate_cast(source_len, dest_len_type.clone());
+
+                self.build(StatementKind::Bundle {
+                    value: cast_value,
+                    length: cast_len,
+                })
+            }
+
+            (
+                Type::Vector {
+                    element_count: src_count,
+                    element_type: src_type,
+                },
+                Type::Vector {
+                    element_count: dst_count,
+                    element_type: dst_type,
+                },
+            ) => {
+                if src_type != dst_type {
+                    todo!();
+                }
+
+                if *src_count > 0 && *dst_count == 0 {
+                    // casting known to unknown
+                    self.build(StatementKind::Cast {
+                        kind: CastOperationKind::Convert,
+                        typ: destination_type,
+                        value: source,
+                    })
+                } else {
+                    todo!()
+                }
+            }
+
+            (src, dst) => {
+                log::warn!("cannot cast from {src} to {dst}");
+                return source;
+            }
+        }
     }
 }
 

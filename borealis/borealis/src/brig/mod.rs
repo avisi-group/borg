@@ -6,7 +6,8 @@ use {
             self,
             passes::{
                 self, cycle_finder::CycleFinder, fold_unconditionals::FoldUnconditionals,
-                make_exception_panic::MakeExceptionPanic, remove_const_branch::RemoveConstBranch,
+                make_exception_panic::MakeExceptionPanic,
+                monomorphize_vectors::MonomorphizeVectors, remove_const_branch::RemoveConstBranch,
                 resolve_return_assigns::ResolveReturns,
             },
             Ast,
@@ -56,13 +57,13 @@ const ENTRYPOINT: &str = "__DecodeA64";
 pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
     jib_ast: I,
     path: PathBuf,
-    dump_ir: bool,
+    dump_ir: Option<PathBuf>,
 ) {
     info!("Converting JIB to BOOM");
     let ast = Ast::from_jib(apply_fn_allowlist(jib_ast));
 
     // // useful for debugging
-    if dump_ir {
+    if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
             &mut create_file(path.join("ast_raw.boom")).unwrap(),
             ast.clone(),
@@ -77,11 +78,12 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
             RemoveConstBranch::new_boxed(),
             ResolveReturns::new_boxed(),
             MakeExceptionPanic::new_boxed(),
+            MonomorphizeVectors::new_boxed(),
             CycleFinder::new_boxed(),
         ],
     );
 
-    if dump_ir {
+    if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
             &mut create_file(path.join("ast_processed.boom")).unwrap(),
             ast.clone(),
@@ -92,7 +94,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
 
     let mut rudder = rudder::build::from_boom(&ast.get());
 
-    if dump_ir {
+    if let Some(path) = &dump_ir {
         writeln!(
             &mut create_file(path.join("ast.rudder")).unwrap(),
             "{rudder}"
@@ -109,7 +111,7 @@ pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
     info!("Optimising rudder");
     rudder.optimise(rudder::opt::OptLevel::Level3);
 
-    if dump_ir {
+    if let Some(path) = &dump_ir {
         writeln!(
             &mut create_file(path.join("ast.opt.rudder")).unwrap(),
             "{rudder}"
@@ -606,6 +608,7 @@ fn codegen_header() -> TokenStream {
         #![allow(unreachable_code)]
         #![allow(unused_doc_comments)]
         #![allow(non_upper_case_globals)]
+
 
         //! BOREALIS GENERATED FILE
     }

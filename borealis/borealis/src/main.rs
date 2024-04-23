@@ -1,5 +1,9 @@
 use {
-    borealis::run, clap::Parser, color_eyre::eyre::Result, common::init_logger, log::info,
+    borealis::{brig::sail_to_brig, load_model},
+    clap::Parser,
+    color_eyre::eyre::Result,
+    common::init_logger,
+    log::info,
     std::path::PathBuf,
 };
 
@@ -10,9 +14,9 @@ struct Args {
     #[arg(long)]
     log: Option<String>,
 
-    /// Writes all intermediate representations to disk
+    /// Writes all intermediate representations to disk in the specified folder
     #[arg(long)]
-    dump_ir: bool,
+    dump_ir: Option<PathBuf>,
 
     /// Path to Sail model archive
     input: PathBuf,
@@ -29,7 +33,11 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or("info")).unwrap();
 
-    run(args.input, args.output, args.dump_ir);
+    sail_to_brig(
+        load_model(&args.input).into_iter(),
+        args.output,
+        args.dump_ir,
+    );
 
     info!("done");
 
