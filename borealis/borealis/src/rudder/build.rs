@@ -552,7 +552,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length: len,
                     }))
                 }
-                "eq_bits" | "eq_int" | "eq_bool" => {
+                "eq_bits" | "eq_int" | "eq_bool" | "eq_string" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareEqual,
                         lhs: args[0].clone(),
@@ -1189,6 +1189,27 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),
+                "HaveEL" => {
+                    let two = self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::new_primitive(
+                            rudder::PrimitiveTypeClass::UnsignedInteger,
+                            2,
+                        )),
+                        value: ConstantValue::UnsignedInteger(2),
+                    });
+                    Some(self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::CompareLessThan,
+                        lhs: args[0].clone(),
+                        rhs: two,
+                    }))
+                    // el < 2
+                }
+                // ignore
+                "append_str" => Some(args[0].clone()),
+                "print_endline" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(Type::unit()),
+                    value: ConstantValue::Unit,
+                })),
                 _ => None,
             }
         }
@@ -1712,17 +1733,17 @@ fn fields_to_offsets(
 
     fields.iter().for_each(|field| {
         // get the fields of the current struct
-        let (_, (struct_typ, fields)) = structs
+        let (_, (_, fields)) = structs
             .iter()
             .find(|(_, (candidate, _))| Arc::ptr_eq(&current_type, candidate))
             .expect("failed to find struct :(");
 
         // get index and push
         let idx = *fields.get(field).unwrap();
-        offsets.push(struct_typ.byte_offset(idx).unwrap());
+        offsets.push(current_type.byte_offset(idx).unwrap());
 
         // update current struct to point to field
-        let Type::Composite(fields) = &**struct_typ else {
+        let Type::Composite(fields) = &*current_type else {
             panic!("cannot get fields of non-composite")
         };
         current_type = fields[idx].clone();

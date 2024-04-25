@@ -22,6 +22,27 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         })
         .collect::<TokenStream>();
 
+    // generate mapping from offset to name
+    let register_name_map_contents = {
+        let mut offset_names = rudder
+            .get_registers()
+            .into_iter()
+            .map(|(name, (_, offset))| (offset, name))
+            .collect::<Vec<_>>();
+
+        offset_names.sort_by_key(|(offset, _)| *offset);
+
+        offset_names
+            .into_iter()
+            .map(|(offset, name)| {
+                let name = name.as_ref();
+
+                let offset = Literal::isize_suffixed(isize::try_from(offset).unwrap());
+                quote!((#offset, #name),)
+            })
+            .collect::<TokenStream>()
+    };
+
     let registers_len = {
         let (last_register, last_offset) = rudder
             .get_registers()
@@ -37,14 +58,21 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         #[repr(align(8))]
         pub struct State {
             data: [u8; #registers_len],
+            guest_memory_base: usize,
         }
 
         impl State {
             /// Returns the ISA state with initial values and configuration set
-            pub fn init() -> Self {
+            pub fn init(guest_memory_base: usize) -> Self {
                 let mut celf = Self {
-                    data: [0; #registers_len]
+                    data: [0; #registers_len],
+                    guest_memory_base,
                 };
+
+                celf.write_register(REG_EL0, 0u8);
+                celf.write_register(REG_EL1, 1u8);
+                celf.write_register(REG_EL2, 2u8);
+                celf.write_register(REG_EL3, 3u8);
 
                 // set to EL1 on boot
                 celf.write_register(REG_PSTATE, CompositeTypec98939056e929b9c {
@@ -118,8 +146,14 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
             pub fn read_register<T: Copy>(&self, offset: isize) -> T {
                 unsafe { *(self.data.as_ptr().byte_offset(offset) as *const T) }
             }
+
+            pub fn guest_memory_base(&self) -> usize {
+                self.guest_memory_base
+            }
         }
 
         #register_offsets
+
+        pub const REGISTER_NAME_MAP: &[(isize, &str)] = &[#register_name_map_contents];
     }
 }

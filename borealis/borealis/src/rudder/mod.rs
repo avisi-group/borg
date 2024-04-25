@@ -127,11 +127,12 @@ impl Type {
     pub fn width_bits(&self) -> usize {
         match self {
             Self::Composite(xs) => xs.iter().map(|x| x.width_bits()).sum(),
-            Self::Primitive(p) => p.element_width_in_bits,
+            // smallest with is 8 bits
+            Self::Primitive(p) => p.element_width_in_bits.max(8),
             Self::Vector {
                 element_count,
                 element_type,
-            } => element_type.width_bits().max(8) * element_count,
+            } => element_type.width_bits() * element_count,
             Self::Bundled { value, .. } => value.width_bits(),
         }
     }

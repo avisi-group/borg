@@ -44,11 +44,11 @@ fn remove_illegal_unbundles(block: &Block) -> bool {
                     if !sua.is_dead(&stmt) {
                         for use_ in sua.get_uses(&stmt) {
                             use_.replace_use(stmt.clone(), bundle.clone());
-                            changed = true;
                         }
                     }
 
                     block.kill_statement(&stmt);
+                    changed = true;
                 }
             }
             StatementKind::UnbundleLength { bundle } => {

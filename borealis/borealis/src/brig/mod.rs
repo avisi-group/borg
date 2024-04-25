@@ -331,10 +331,10 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                     #types
 
                     pub trait Tracer {
-                        fn begin(&self, pc: u64);
+                        fn begin(&self, instruction: u32, pc: u64);
                         fn end(&self);
-                        fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
-                        fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
+                        fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
+                        fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
                     }
 
                     #[derive(Debug)]
@@ -372,7 +372,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                             // reset SEE
                             state.write_register(REG_SEE, 0u64);
 
-                            tracer.begin(state.read_register::<u64>(REG_U_PC));
+                            tracer.begin(value, state.read_register::<u64>(REG_U_PC));
 
                             #entrypoint_ident(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value);
 

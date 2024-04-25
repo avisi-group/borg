@@ -120,7 +120,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     let value = state.read_register::<#typ>(#offset as isize);
-                    tracer.read_register(#offset as usize, value);
+                    tracer.read_register(#offset as isize, value);
                     value
                 }
             }
@@ -132,7 +132,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     state.write_register::<#typ>(#offset as isize, #value);
-                    tracer.write_register(#offset as usize, #value);
+                    tracer.write_register(#offset as isize, #value);
                 }
             }
         }
@@ -161,10 +161,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote! {
                 match #length {
-                    8 => unsafe { *(#offset as *mut u8) = #value as u8; },
-                    16 => unsafe { *(#offset as *mut u16) = #value as u16; },
-                    32 => unsafe { *(#offset as *mut u32) = #value as u32; },
-                    64 => unsafe { *(#offset as *mut u64) = #value as u64; },
+                    8 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u8) = #value as u8; },
+                    16 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u16) = #value as u16; },
+                    32 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u32) = #value as u32; },
+                    64 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u64) = #value as u64; },
                     _ => panic!("unsupported length")
                 }
             }
