@@ -252,4 +252,13 @@ impl StatementUseAnalysis {
     pub fn get_uses(&self, stmt: &Statement) -> &HashSet<Statement> {
         self.stmt_uses.get(stmt).unwrap()
     }
+
+    pub fn is_used_in_write_var(&self, stmt: &Statement) -> bool {
+        if let Some(uses) = self.stmt_uses.get(stmt) {
+            uses.iter()
+                .any(|u| matches!(u.kind(), StatementKind::WriteVariable { .. }))
+        } else {
+            false
+        }
+    }
 }

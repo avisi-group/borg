@@ -29,6 +29,8 @@ pub fn run(f: Function) -> bool {
                 if return_value != second_last {
                     continue;
                 }
+            } else {
+                continue;
             }
 
             if let StatementKind::Call { target, args, .. } = second_last.kind() {

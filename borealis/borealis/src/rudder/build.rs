@@ -526,8 +526,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.builder
                         .generate_cast(args[0].clone(), Arc::new(Type::s64())),
                 ),
-                // todo: should probably be casts
-                "UInt0" | "SInt0" | "make_the_value" | "size_itself_int" => Some(args[0].clone()),
+
+                "make_the_value" | "size_itself_int" => Some(args[0].clone()),
                 "subrange_bits" => {
                     // end - start + 1
                     let one = self.builder.build(StatementKind::Constant {
@@ -880,6 +880,45 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
+                "UInt0" => {
+                    let value = self.builder.build(StatementKind::UnbundleValue {
+                        bundle: args[0].clone(),
+                    });
+
+                    let length = self.builder.build(StatementKind::UnbundleLength {
+                        bundle: args[0].clone(),
+                    });
+
+                    let value_cast = self.builder.generate_cast(value, Arc::new(Type::u64()));
+                    let length_cast = self.builder.generate_cast(length, Arc::new(Type::u8()));
+
+                    let bundle = self.builder.build(StatementKind::Bundle {
+                        value: value_cast,
+                        length: length_cast,
+                    });
+
+                    Some(bundle)
+                }
+                "SInt0" => {
+                    let value = self.builder.build(StatementKind::UnbundleValue {
+                        bundle: args[0].clone(),
+                    });
+
+                    let length = self.builder.build(StatementKind::UnbundleLength {
+                        bundle: args[0].clone(),
+                    });
+
+                    let value_cast = self.builder.generate_cast(value, Arc::new(Type::s64()));
+                    let length_cast = self.builder.generate_cast(length, Arc::new(Type::u8()));
+
+                    let bundle = self.builder.build(StatementKind::Bundle {
+                        value: value_cast,
+                        length: length_cast,
+                    });
+
+                    Some(bundle)
+                }
+
                 "ZeroExtend0" | "sail_zero_extend" | "truncate" | "SignExtend0"
                 | "sail_sign_extend" => {
                     let length = args[1].clone();
@@ -1206,10 +1245,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
                 // ignore
                 "append_str" => Some(args[0].clone()),
-                "print_endline" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::unit()),
-                    value: ConstantValue::Unit,
-                })),
+                "print_endline" | "AArch64_DC" => {
+                    Some(self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::unit()),
+                        value: ConstantValue::Unit,
+                    }))
+                }
                 _ => None,
             }
         }

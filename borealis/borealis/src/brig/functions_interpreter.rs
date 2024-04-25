@@ -80,7 +80,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             if let Type::Bundled { .. } = &*stmt.typ() {
                 let length = Literal::usize_unsuffixed(typ.width_bits());
-                quote!(Bundle { value: #v, length: #length })
+                quote!(Bundle::new(#v, #length))
             } else {
                 v
             }
@@ -154,7 +154,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
                 Type::Bundled { .. } => {
                     let value = get_ident(&value);
-                    (quote!(#value.length), quote!(#value.value))
+                    (quote!(#value.length()), quote!(#value.value()))
                 }
                 _ => todo!(),
             };
@@ -373,7 +373,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             {
                 let length = if let Type::Bundled { .. } = &*length.typ() {
                     let length = get_ident(&length);
-                    quote!(#length.value as u32)
+                    quote!(#length.value() as u32)
                 } else {
                     let length = get_ident(&length);
                     quote!(#length as u32)
@@ -401,7 +401,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! (
                     (
                         (#value >> #start) &
-                        Bundle { value: ((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #value.length }
+                        Bundle::new(((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), #value.length())
                     )
                 )
             } else {
@@ -434,7 +434,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             {
                 let length = if let Type::Bundled { .. } = &*length.typ() {
                     let length = get_ident(&length);
-                    quote!(#length.value as u32)
+                    quote!(#length.value() as u32)
                 } else {
                     let length = get_ident(&length);
                     quote!(#length as u32)
@@ -468,7 +468,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
                 quote! {
                     {
-                        let mask = !Bundle { value: ((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #original_value.length };
+                        let mask = !Bundle { value: ((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #original_value.length() };
                         (#original_value & mask) | (#insert_value << #start)
                     }
                 }
@@ -502,7 +502,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let index = get_ident(&index);
 
             if let Type::Bundled { .. } = &*index_typ {
-                quote!(#vector[(#index.value) as usize])
+                quote!(#vector[(#index.value()) as usize])
             } else {
                 quote!(#vector[(#index) as usize])
             }
@@ -542,15 +542,15 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Bundle { value, length } => {
             let value = get_ident(&value);
             let length = get_ident(&length);
-            quote!(Bundle { value: #value, length: #length })
+            quote!(Bundle::new(#value, #length))
         }
         StatementKind::UnbundleValue { bundle } => {
             let bundle = get_ident(&bundle);
-            quote!((#bundle.value))
+            quote!((#bundle.value()))
         }
         StatementKind::UnbundleLength { bundle } => {
             let bundle = get_ident(&bundle);
-            quote!((#bundle.length))
+            quote!((#bundle.length()))
         }
         StatementKind::Assert { condition } => {
             let condition = get_ident(&condition);

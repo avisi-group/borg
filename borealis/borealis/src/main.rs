@@ -33,11 +33,9 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or("info")).unwrap();
 
-    sail_to_brig(
-        load_model(&args.input).into_iter(),
-        args.output,
-        args.dump_ir,
-    );
+    let jib = load_model(&args.input);
+
+    sail_to_brig(jib, args.output, args.dump_ir);
 
     info!("done");
 

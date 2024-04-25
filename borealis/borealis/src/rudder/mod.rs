@@ -753,7 +753,13 @@ impl Statement {
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
             StatementKind::UnaryOperation { value, .. } => value.typ(),
             StatementKind::ShiftOperation { value, .. } => value.typ(),
-            StatementKind::Call { target, .. } => target.return_type(),
+            StatementKind::Call { target, tail, .. } => {
+                if !tail {
+                    target.return_type()
+                } else {
+                    Arc::new(Type::void())
+                }
+            }
             StatementKind::Cast { typ, .. } => typ,
             StatementKind::Jump { .. } => Arc::new(Type::void()),
             StatementKind::Branch { .. } => Arc::new(Type::void()),

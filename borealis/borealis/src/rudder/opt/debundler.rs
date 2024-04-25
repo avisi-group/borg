@@ -26,8 +26,17 @@ fn run_on_block(f: &Function, block: &Block) -> bool {
     changed |= do_direct_debundle(block);
     changed |= do_indirect_debundle(f, block);
     changed |= remove_illegal_unbundles(&block);
-    // changed |= transform_constant_length_bundles(&block);
-    // changed |= remove_illegal_unbundles(&block);
+
+    /*println!("XXXXXXX BEFORE");
+    println!("{}", block);
+
+    changed |= transform_constant_length_bundles(&block);
+    changed |= remove_illegal_unbundles(&block);
+
+    if changed {
+        println!("XXXXXXX AFTER");
+        println!("{}", block);
+    }*/
 
     changed
 }
@@ -125,10 +134,9 @@ fn do_direct_debundle(block: &Block) -> bool {
 fn transform_constant_length_bundles(block: &Block) -> bool {
     let mut changed = false;
 
-    for stmt in block.statements() {
-        //
-    }
+    let sua = StatementUseAnalysis::new(&block);
 
+    // Not allowed if stmt used in write var
     for stmt in block.statements() {
         changed |= match stmt.kind() {
             StatementKind::Bundle { value, length } => {
@@ -140,33 +148,42 @@ fn transform_constant_length_bundles(block: &Block) -> bool {
                     // we've got a bundle with a known length here
                     // can we replace it with a cast to the correct bit width?
 
-                    let value_length = value.typ().width_bits();
-                    let target_type = Arc::new(Type::new_primitive(
-                        PrimitiveTypeClass::UnsignedInteger,
-                        target_length,
-                    ));
-
-                    if target_length < value_length {
-                        stmt.replace_kind(StatementKind::Cast {
-                            kind: CastOperationKind::Truncate,
-                            typ: target_type,
-                            value: value.clone(),
-                        });
-                    } else if target_length > value_length {
-                        stmt.replace_kind(StatementKind::Cast {
-                            kind: CastOperationKind::ZeroExtend,
-                            typ: target_type,
-                            value: value.clone(),
-                        });
+                    if sua.is_used_in_write_var(&stmt) {
+                        false
                     } else {
-                        stmt.replace_kind(StatementKind::Cast {
-                            kind: CastOperationKind::Reinterpret,
-                            typ: target_type,
-                            value: value.clone(),
-                        });
-                    }
+                        if value.typ().is_bundle() {
+                            println!("ZZZZ WE'RE ABOUT TO HAVE ISSUES");
+                            println!("{block}");
+                        }
 
-                    true
+                        let value_length = value.typ().width_bits();
+                        let target_type = Arc::new(Type::new_primitive(
+                            PrimitiveTypeClass::UnsignedInteger,
+                            target_length,
+                        ));
+
+                        if target_length < value_length {
+                            stmt.replace_kind(StatementKind::Cast {
+                                kind: CastOperationKind::Truncate,
+                                typ: target_type,
+                                value: value.clone(),
+                            });
+                        } else if target_length > value_length {
+                            stmt.replace_kind(StatementKind::Cast {
+                                kind: CastOperationKind::ZeroExtend,
+                                typ: target_type,
+                                value: value.clone(),
+                            });
+                        } else {
+                            stmt.replace_kind(StatementKind::Cast {
+                                kind: CastOperationKind::Reinterpret,
+                                typ: target_type,
+                                value: value.clone(),
+                            });
+                        }
+
+                        true
+                    }
                 } else {
                     false
                 }

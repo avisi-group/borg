@@ -34,7 +34,7 @@ use {
     quote::{format_ident, quote},
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
-    sailrs::jib_ast,
+    sailrs::{jib_ast, types::ListVec},
     std::{
         hash::{DefaultHasher, Hash, Hasher},
         io::Write,
@@ -54,13 +54,17 @@ mod workspace;
 const ENTRYPOINT: &str = "__DecodeA64";
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig<I: Iterator<Item = jib_ast::Definition>>(
-    jib_ast: I,
+pub fn sail_to_brig(
+    jib_ast: ListVec<jib_ast::Definition>,
     path: PathBuf,
     dump_ir: Option<PathBuf>,
 ) {
+    if let Some(_) = &dump_ir {
+        sailrs::jib_ast::pretty_print::print_ast(jib_ast.iter());
+    }
+
     info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(apply_fn_allowlist(jib_ast));
+    let ast = Ast::from_jib(apply_fn_allowlist(jib_ast.into_iter()));
 
     // // useful for debugging
     if let Some(path) = &dump_ir {
@@ -374,7 +378,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
 
                             tracer.begin(value, state.read_register::<u64>(REG_U_PC));
 
-                            #entrypoint_ident(state, tracer, Bundle { value: state.read_register(REG_U_PC), length: 64 }, value);
+                            #entrypoint_ident(state, tracer, Bundle::new(state.read_register(REG_U_PC), 64), value);
 
                             // increment PC if no branch was taken
                             if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
@@ -396,11 +400,10 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
 
     rudder.update_names();
     let cfg = FunctionCallGraphAnalysis::new(rudder);
-    let fn_names = get_functions_to_codegen(&rudder, ENTRYPOINT.into());
     let rudder_fns = rudder.get_functions();
 
-    let crate_names = fn_names
-        .iter()
+    let crate_names = rudder_fns
+        .keys()
         .copied()
         .chain(
             ["common", "arch"]
@@ -451,9 +454,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
         .flatten()
         .collect();
 
-    let files = fn_names
-        .into_par_iter()
-        .map(|k| (k, rudder_fns.get(&k).unwrap()))
+    let files = rudder_fns.into_par_iter()
         .map(|(name, function)| {
             let name_ident = codegen_ident(name);
             let (return_type, parameters) = function.signature();
@@ -461,7 +462,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
             let function_parameters = codegen_parameters(&parameters);
             let return_type = codegen_type(return_type);
 
-            let fn_state = codegen_fn_state(function, parameters);
+            let fn_state = codegen_fn_state(&function, parameters);
 
             let entry_block = get_block_fn_ident(&function.entry_block());
 
