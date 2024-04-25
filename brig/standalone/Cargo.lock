@@ -1187,7 +1187,6 @@ dependencies = [
  "EL2Enabled",
  "ELUsingAArch32",
  "ExceptionSyndrome",
- "HaveEL",
  "HaveFGTExt",
  "ThisInstrAddr",
  "UsingAArch32",
@@ -1228,13 +1227,6 @@ dependencies = [
 
 [[package]]
 name = "AArch64_ChooseNonExcludedTag"
-version = "0.0.0"
-dependencies = [
- "common",
-]
-
-[[package]]
-name = "AArch64_DC"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -1292,7 +1284,6 @@ dependencies = [
  "ExternalSecureInvasiveDebugEnabled",
  "GetBRBENumRecords",
  "GetNumEventCounters",
- "HaveEL",
  "HaveRME",
  "IsInHost",
  "MPAM3_EL3_read",
@@ -1721,7 +1712,6 @@ dependencies = [
  "EDSCR_read",
  "EL2Enabled",
  "Halted",
- "HaveEL",
  "NVMem_read",
  "X_set",
  "common",
@@ -2288,7 +2278,6 @@ version = "0.0.0"
 dependencies = [
  "ELUsingAArch32",
  "EffectiveTBI",
- "HaveEL",
  "S1TranslationRegime",
  "common",
 ]
@@ -3485,7 +3474,6 @@ version = "0.0.0"
 dependencies = [
  "AArch64_SystemAccessTrap",
  "EL2Enabled",
- "HaveEL",
  "IsFeatureImplemented",
  "X_set",
  "common",
@@ -4259,7 +4247,18 @@ dependencies = [
 name = "DC_CIVAC_SysOpsWrite_aa1291714e4724c8"
 version = "0.0.0"
 dependencies = [
+ "AArch64_SystemAccessTrap",
+ "EL2Enabled",
+ "IsFeatureImplemented",
+ "X_read",
  "common",
+ "u_get_HCR_EL2_Type_E2H",
+ "u_get_HCR_EL2_Type_TGE",
+ "u_get_HCR_EL2_Type_TPCP",
+ "u_get_HFGITR_EL2_Type_DCCIVAC",
+ "u_get_SCR_EL3_Type_FGTEn",
+ "u_get_SCTLR_EL1_Type_UCI",
+ "u_get_SCTLR_EL2_Type_UCI",
 ]
 
 [[package]]
@@ -4350,10 +4349,8 @@ dependencies = [
 name = "DC_IVAC_SysOpsWrite_9a59a62370daa1c9"
 version = "0.0.0"
 dependencies = [
- "AArch64_DC",
  "AArch64_SystemAccessTrap",
  "EL2Enabled",
- "HaveEL",
  "IsFeatureImplemented",
  "X_read",
  "common",
@@ -4414,7 +4411,6 @@ dependencies = [
  "HCR_read",
  "HDCR_read",
  "HaveAArch64",
- "HaveEL",
  "HaveSecureEL2Ext",
  "common",
  "u_get_HCR_EL2_Type_TGE",
@@ -4476,7 +4472,6 @@ dependencies = [
 name = "EL2Enabled"
 version = "0.0.0"
 dependencies = [
- "HaveEL",
  "IsSecureEL2Enabled",
  "SCR_GEN_read",
  "common",
@@ -4539,7 +4534,6 @@ version = "0.0.0"
 dependencies = [
  "HaveAArch32EL",
  "HaveAArch64",
- "HaveEL",
  "HaveSecureEL2Ext",
  "HaveVirtHostExt",
  "common",
@@ -4699,7 +4693,6 @@ version = "0.0.0"
 dependencies = [
  "ELIsInHost",
  "ELUsingAArch32",
- "HaveEL",
  "HavePACExt",
  "HaveVirtHostExt",
  "S1TranslationRegime",
@@ -5190,6 +5183,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "HasArchVersion"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
 name = "Have128BitDescriptorExt"
 version = "0.0.0"
 dependencies = [
@@ -5292,13 +5292,6 @@ dependencies = [
 
 [[package]]
 name = "HaveDOTPExt"
-version = "0.0.0"
-dependencies = [
- "common",
-]
-
-[[package]]
-name = "HaveEL"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -5615,6 +5608,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "HaveStatisticalProfilingv1p2"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
 name = "HaveSysInstr128"
 version = "0.0.0"
 dependencies = [
@@ -5662,7 +5662,6 @@ dependencies = [
 name = "HighestEL"
 version = "0.0.0"
 dependencies = [
- "HaveEL",
  "common",
 ]
 
@@ -6388,6 +6387,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ImpDefBool"
+version = "0.0.0"
+dependencies = [
+ "HasArchVersion",
+ "HaveStatisticalProfilingv1p2",
+ "HighestEL",
+ "common",
+]
+
+[[package]]
 name = "IsFeatureImplemented"
 version = "0.0.0"
 dependencies = [
@@ -6407,7 +6416,6 @@ name = "IsSecureBelowEL3"
 version = "0.0.0"
 dependencies = [
  "HaveAArch64",
- "HaveEL",
  "HaveSecureEL2Ext",
  "SCR_GEN_read",
  "common",
@@ -6420,7 +6428,6 @@ name = "IsSecureEL2Enabled"
 version = "0.0.0"
 dependencies = [
  "ELUsingAArch32",
- "HaveEL",
  "HaveSecureEL2Ext",
  "SecureOnlyImplementation",
  "common",
@@ -6670,6 +6677,8 @@ dependencies = [
 name = "MPAM1_EL1_read"
 version = "0.0.0"
 dependencies = [
+ "Bit",
+ "MPAM3_EL3_read",
  "common",
 ]
 
@@ -6845,7 +6854,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "Mk_CTR_EL0_Type"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
 name = "Mk_SCRType"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
+name = "Mk_SCTLR_EL1_Type"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -8102,7 +8125,6 @@ version = "0.0.0"
 dependencies = [
  "ELIsInHost",
  "ELUsingAArch32",
- "HaveEL",
  "HaveVirtHostExt",
  "common",
  "u_get_SCR_Type_NS",
@@ -8141,7 +8163,6 @@ name = "SCR_GEN_read"
 version = "0.0.0"
 dependencies = [
  "HaveAArch64",
- "HaveEL",
  "Mk_SCRType",
  "common",
 ]
@@ -8187,7 +8208,6 @@ version = "0.0.0"
 dependencies = [
  "AArch64_SystemAccessTrap",
  "EL2Enabled",
- "HaveEL",
  "IsFeatureImplemented",
  "NVMem_read",
  "X_set",
@@ -9052,6 +9072,7 @@ name = "SecureOnlyImplementation"
 version = "0.0.0"
 dependencies = [
  "common",
+ "u__IMPDEF_boolean",
 ]
 
 [[package]]
@@ -9061,7 +9082,6 @@ dependencies = [
  "EL2Enabled",
  "ELUsingAArch32",
  "EffectiveSCR_EL3_NS",
- "HaveEL",
  "HaveRME",
  "HaveSecureEL2Ext",
  "SecureOnlyImplementation",
@@ -38574,6 +38594,7 @@ dependencies = [
 name = "u__IMPDEF_boolean"
 version = "0.0.0"
 dependencies = [
+ "ImpDefBool",
  "common",
 ]
 
@@ -38609,6 +38630,7 @@ dependencies = [
 name = "u__get_CTR_EL0"
 version = "0.0.0"
 dependencies = [
+ "Mk_CTR_EL0_Type",
  "common",
 ]
 
@@ -38623,7 +38645,9 @@ dependencies = [
 name = "u__get_SCTLR_EL1"
 version = "0.0.0"
 dependencies = [
+ "Mk_SCTLR_EL1_Type",
  "common",
+ "u__IMPDEF_boolean",
 ]
 
 [[package]]
@@ -38782,6 +38806,13 @@ dependencies = [
 
 [[package]]
 name = "u_get_HDCR_Type_TDE"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
+name = "u_get_HFGITR_EL2_Type_DCCIVAC"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -38984,6 +39015,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "u_get_SCTLR_EL1_Type_UCI"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
 name = "u_get_SCTLR_EL1_Type_UCT"
 version = "0.0.0"
 dependencies = [
@@ -38999,6 +39037,13 @@ dependencies = [
 
 [[package]]
 name = "u_get_SCTLR_EL2_Type_DZE"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
+name = "u_get_SCTLR_EL2_Type_UCI"
 version = "0.0.0"
 dependencies = [
  "common",

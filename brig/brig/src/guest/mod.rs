@@ -174,8 +174,8 @@ pub fn start() {
     }
 }
 
-const KERNEL_LOAD_BIAS: usize = 0x80000000;
-const DTB_LOAD_OFFSET: usize = 0x90000000;
+const KERNEL_LOAD_BIAS: usize = 0x8000_0000;
+const DTB_LOAD_OFFSET: usize = 0x9000_0000;
 
 const ARM64_MAGIC: u32 = 0x644d5241;
 

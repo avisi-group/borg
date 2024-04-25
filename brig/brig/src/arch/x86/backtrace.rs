@@ -68,11 +68,6 @@ impl Backtracer {
 pub fn init(kernel_load_addr: VirtAddr, kernel_image_address: PhysAddr, kernel_image_len: usize) {
     BACKTRACER
         .call_once(|| Backtracer::new(kernel_load_addr, kernel_image_address, kernel_image_len));
-
-    // Push null to base pointer to prevent recursing indefinitely when
-    // printing backtrace
-    // TODO: 2024-04-22 enabling this causes a crash
-    // unsafe { asm!("mov rbp, 0") };
 }
 
 #[repr(C)]

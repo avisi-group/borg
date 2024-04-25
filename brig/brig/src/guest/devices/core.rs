@@ -87,7 +87,7 @@ impl CoreState for arch::State {
     }
 
     fn new(pc: usize) -> Self {
-        let mut celf = Self::init();
+        let mut celf = Self::init(0);
 
         celf.write_register(arch::REG_U_PC, pc);
 
@@ -98,19 +98,19 @@ impl CoreState for arch::State {
 struct LogTracer;
 
 impl arch::Tracer for LogTracer {
-    fn begin(&self, pc: u64) {
-        trace!("[{pc:x}] ");
+    fn begin(&self, instruction: u32, pc: u64) {
+        trace!("[{instruction:x} @ {pc:x}] ");
     }
 
     fn end(&self) {
         trace!("");
     }
 
-    fn read_register<T: Debug>(&self, offset: usize, value: T) {
+    fn read_register<T: Debug>(&self, offset: isize, value: T) {
         trace!("    R[{offset:x}] -> {value:?}");
     }
 
-    fn write_register<T: Debug>(&self, offset: usize, value: T) {
+    fn write_register<T: Debug>(&self, offset: isize, value: T) {
         trace!("    R[{offset:x}] <- {value:?}");
     }
 }
