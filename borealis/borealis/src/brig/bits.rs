@@ -5,7 +5,7 @@ pub type BitsLength = u16;
 
 pub fn codegen_bits() -> TokenStream {
     quote! {
-            /// Variable length bitvector implementation
+    /// Variable length bitvector implementation
     ///
     /// Operations must zero unused bits before returning
     #[derive(Default, Clone, Copy, Debug)]
@@ -28,7 +28,10 @@ pub fn codegen_bits() -> TokenStream {
         }
 
         fn normalize(self) -> Self {
-            let mask = (1u128 << self.length()) - 1;
+            let mask = 1u128
+                .checked_shl(u32::from(self.length()))
+                .map(|i| i - 1)
+                .unwrap_or(!0);
 
             Self {
                 value: self.value() & mask,
@@ -193,7 +196,7 @@ pub fn codegen_bits() -> TokenStream {
     }
 
     impl core::cmp::Eq for Bits {}
-        }
+    }
 }
 
 // pub fn codegen_int() -> TokenStream {
