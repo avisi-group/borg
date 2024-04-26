@@ -437,7 +437,30 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let condition = get_ident(&condition);
             quote!(assert!(#condition))
         }
-        StatementKind::BitsCast { .. } => quote!(todo!()),
+        StatementKind::BitsCast {
+            kind,
+            typ,
+            value,
+            length,
+        } => {
+            let source_type = value.typ();
+            let target_type = typ;
+            let value_ident = get_ident(&value);
+            let length_ident = get_ident(&length);
+
+            match (&*source_type, &*target_type, kind) {
+                (Type::Bits, Type::Bits, CastOperationKind::ZeroExtend) => {
+                    quote!(#value_ident.zero_extend(#length_ident))
+                }
+                (Type::Bits, Type::Bits, CastOperationKind::SignExtend) => {
+                    quote!(#value_ident.sign_extend(#length_ident))
+                }
+                (Type::Bits, Type::Bits, CastOperationKind::Truncate) => {
+                    quote!(#value_ident.truncate(#length_ident))
+                }
+                _ => todo!(),
+            }
+        }
         StatementKind::SizeOf { value } => {
             let ident = get_ident(&value);
             match &*value.typ() {

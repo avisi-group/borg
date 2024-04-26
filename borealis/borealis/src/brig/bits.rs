@@ -5,7 +5,10 @@ pub type BitsLength = u16;
 
 pub fn codegen_bits() -> TokenStream {
     quote! {
-            #[derive(Default, Clone, Copy, Debug)]
+            /// Variable length bitvector implementation
+    ///
+    /// Operations must zero unused bits before returning
+    #[derive(Default, Clone, Copy, Debug)]
     pub struct Bits {
         value: u128,
         length: u16,
@@ -23,6 +26,47 @@ pub fn codegen_bits() -> TokenStream {
         pub fn length(&self) -> u16 {
             self.length
         }
+
+        fn normalize(self) -> Self {
+            let mask = (1u128 << self.length()) - 1;
+
+            Self {
+                value: self.value() & mask,
+                length: self.length(),
+            }
+        }
+
+        pub fn zero_extend(&self, i: i128) -> Self {
+            let length = u16::try_from(i).unwrap();
+            debug_assert!(length > self.length());
+
+            Self {
+                value: self.value(),
+                length,
+            }
+            .normalize()
+        }
+
+        pub fn sign_extend(&self, i: i128) -> Self {
+            let length = u16::try_from(i).unwrap();
+            debug_assert!(length > self.length());
+
+            let shift_amount = 128 - self.length();
+
+            Self {
+                value: ((self.value() << shift_amount) >> shift_amount),
+                length,
+            }
+            .normalize()
+        }
+
+        pub fn truncate(&self, i: i128) -> Self {
+            Self {
+                value: self.value(),
+                length: u16::try_from(i).unwrap(),
+            }
+            .normalize()
+        }
     }
 
     impl core::ops::Shl<i128> for Bits {
@@ -36,6 +80,7 @@ pub fn codegen_bits() -> TokenStream {
                     .unwrap_or(0),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -50,6 +95,7 @@ pub fn codegen_bits() -> TokenStream {
                     .unwrap_or(0),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -64,6 +110,7 @@ pub fn codegen_bits() -> TokenStream {
                     .unwrap_or(0),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -75,6 +122,7 @@ pub fn codegen_bits() -> TokenStream {
                 value: self.value() & rhs.value(),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -86,6 +134,7 @@ pub fn codegen_bits() -> TokenStream {
                 value: self.value() | rhs.value(),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -97,6 +146,7 @@ pub fn codegen_bits() -> TokenStream {
                 value: self.value() ^ rhs.value(),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -108,6 +158,7 @@ pub fn codegen_bits() -> TokenStream {
                 value: self.value().wrapping_add(rhs.value()),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -119,6 +170,7 @@ pub fn codegen_bits() -> TokenStream {
                 value: self.value().wrapping_sub(rhs.value()),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 
@@ -130,6 +182,7 @@ pub fn codegen_bits() -> TokenStream {
                 value: !self.value(),
                 length: self.length(),
             }
+            .normalize()
         }
     }
 

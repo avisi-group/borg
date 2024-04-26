@@ -177,7 +177,7 @@ impl Display for StatementKind {
                     op,
                     value.name(),
                     typ,
-                    length
+                    length.name()
                 )
             }
             StatementKind::Jump { target } => write!(f, "jump b{}", target.name()),
