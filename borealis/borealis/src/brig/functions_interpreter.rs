@@ -7,12 +7,11 @@ use {
     crate::{
         brig::{bits::BitsLength, codegen_ident, codegen_member, codegen_type},
         rudder::{
-            constant_value::ConstantValue, BinaryOperationKind, Block, CastOperationKind, Context,
-            Function, PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement,
-            StatementKind, Symbol, Type, UnaryOperationKind,
+            constant_value::ConstantValue, BinaryOperationKind, Block, CastOperationKind,
+            PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind,
+            Symbol, Type, UnaryOperationKind,
         },
     },
-    common::{intern::InternedString, HashSet},
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
     std::sync::Arc,

@@ -41,7 +41,14 @@ pub fn codegen_bits() -> TokenStream {
 
         pub fn zero_extend(&self, i: i128) -> Self {
             let length = u16::try_from(i).unwrap();
-            debug_assert!(length > self.length());
+
+            // if length < self.length() {
+            //     panic!(
+            //         "attempting to zero extend from length {} to {}",
+            //         self.length(),
+            //         length
+            //     );
+            // }
 
             Self {
                 value: self.value(),
@@ -52,10 +59,16 @@ pub fn codegen_bits() -> TokenStream {
 
         pub fn sign_extend(&self, i: i128) -> Self {
             let length = u16::try_from(i).unwrap();
-            debug_assert!(length > self.length());
+
+            // if length < self.length() {
+            //     panic!(
+            //         "attempting to sign extend from length {} to {}",
+            //         self.length(),
+            //         length
+            //     );
+            // }
 
             let shift_amount = 128 - self.length();
-
             Self {
                 value: ((self.value() << shift_amount) >> shift_amount),
                 length,

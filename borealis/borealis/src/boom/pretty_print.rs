@@ -493,7 +493,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     fn visit_literal(&mut self, node: Shared<Literal>) {
         match &*node.get() {
             Literal::Int(bi) => write!(self.writer, "{bi}"),
-            Literal::Bits(bits) => write!(self.writer, "{}", bits_to_int(bits)),
+            Literal::Bits(bits) => write!(self.writer, "{:x?}", bits),
             Literal::Bit(bit) => write!(self.writer, "{}", bit.value()),
             Literal::Bool(bool) => write!(self.writer, "{bool}"),
             Literal::String(s) => write!(self.writer, "{s:?}"),

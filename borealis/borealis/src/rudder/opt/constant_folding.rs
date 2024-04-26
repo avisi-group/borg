@@ -136,10 +136,15 @@ fn run_on_stmt(stmt: Statement) -> bool {
             typ,
             value,
         } => {
-            if let StatementKind::Constant { value, .. } = value.kind() {
-                let value = cast_integer(value, typ.clone());
-                stmt.replace_kind(StatementKind::Constant { typ, value });
-                true
+            // watch out! if you cast a constant primitive to an arbitrary bits you lose length information
+            if let Type::Primitive(_) = &*typ {
+                if let StatementKind::Constant { value, .. } = value.kind() {
+                    let value = cast_integer(value, typ.clone());
+                    stmt.replace_kind(StatementKind::Constant { typ, value });
+                    true
+                } else {
+                    false
+                }
             } else {
                 false
             }
@@ -206,23 +211,6 @@ fn cast_integer(value: ConstantValue, typ: Arc<Type>) -> ConstantValue {
                 ConstantValue::UnsignedInteger(i)
             }
             _ => todo!(),
-        },
-        Type::ArbitraryLengthInteger => match value {
-            ConstantValue::UnsignedInteger(i) => {
-                ConstantValue::SignedInteger(isize::try_from(i).unwrap())
-            }
-            ConstantValue::SignedInteger(_) => value,
-            ConstantValue::FloatingPoint(_) | ConstantValue::Unit => {
-                panic!("invalid constant value for arbitrary integer")
-            }
-        },
-        Type::Bits => match value {
-            ConstantValue::UnsignedInteger(_) => value,
-            ConstantValue::SignedInteger(_)
-            | ConstantValue::FloatingPoint(_)
-            | ConstantValue::Unit => {
-                panic!("invalid constant value for bits")
-            }
         },
         _ => panic!("failed to cast {value:x?} to type {typ:?}"),
     }
