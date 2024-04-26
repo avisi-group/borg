@@ -24,7 +24,8 @@ impl Display for Type {
                 element_count,
                 element_type,
             } => write!(f, "[{element_type}; {element_count:?}]"),
-            Type::Bundled { value, len } => write!(f, "bundle({value}, {len})"),
+            Type::Bits => write!(f, "bv"),
+            Type::ArbitraryLengthInteger => write!(f, "i"),
         }
     }
 }
@@ -155,6 +156,30 @@ impl Display for StatementKind {
 
                 write!(f, "cast {} {} -> {}", op, value.name(), typ)
             }
+            StatementKind::BitsCast {
+                kind,
+                typ,
+                value,
+                length,
+            } => {
+                let op = match kind {
+                    CastOperationKind::ZeroExtend => "zx",
+                    CastOperationKind::SignExtend => "sx",
+                    CastOperationKind::Truncate => "trunc",
+                    CastOperationKind::Reinterpret => "reint",
+                    CastOperationKind::Convert => "cvt",
+                    CastOperationKind::Broadcast => "bcast",
+                };
+
+                write!(
+                    f,
+                    "bits-cast {} {} -> {} length {}",
+                    op,
+                    value.name(),
+                    typ,
+                    length
+                )
+            }
             StatementKind::Jump { target } => write!(f, "jump b{}", target.name()),
             StatementKind::Branch {
                 condition,
@@ -252,17 +277,15 @@ impl Display for StatementKind {
                     fields.iter().map(Statement::name).collect::<Vec<_>>()
                 )
             }
-            StatementKind::Bundle { value, length } => {
-                write!(f, "bundle {}, {} ", value.name(), length.name())
-            }
-            StatementKind::UnbundleValue { bundle } => {
-                write!(f, "unbundle-value {}", bundle.name())
-            }
-            StatementKind::UnbundleLength { bundle } => {
-                write!(f, "unbundle-length {}", bundle.name())
+            StatementKind::SizeOf { value } => {
+                write!(f, "size-of {}", value.name())
             }
             StatementKind::Assert { condition } => {
                 write!(f, "assert {}", condition.name())
+            }
+
+            StatementKind::CreateBits { value, length } => {
+                write!(f, "create-bits {} {}", value.name(), length.name())
             }
         }
     }

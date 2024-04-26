@@ -42,7 +42,7 @@ fn run_on_stmt(stmt: Statement) -> bool {
                     BinaryOperationKind::Add => lhs + rhs,
                     BinaryOperationKind::Sub => lhs - rhs,
                     BinaryOperationKind::Multiply => lhs * rhs,
-                    BinaryOperationKind::Divide => todo!(),
+                    BinaryOperationKind::Divide => lhs / rhs,
                     BinaryOperationKind::Modulo => todo!(),
                     BinaryOperationKind::And => todo!(),
                     BinaryOperationKind::Or => todo!(),
@@ -191,24 +191,39 @@ fn run_on_stmt(stmt: Statement) -> bool {
 }
 
 fn cast_integer(value: ConstantValue, typ: Arc<Type>) -> ConstantValue {
-    let Type::Primitive(primitive) = &*typ else {
-        panic!("non primitive constant cast?")
-    };
-
-    match (primitive.tc, value) {
-        (PrimitiveTypeClass::SignedInteger, ConstantValue::UnsignedInteger(i)) => {
-            ConstantValue::SignedInteger(isize::try_from(i).unwrap())
-        }
-        (PrimitiveTypeClass::SignedInteger, ConstantValue::SignedInteger(i)) => {
-            ConstantValue::SignedInteger(i)
-        }
-        (PrimitiveTypeClass::UnsignedInteger, ConstantValue::SignedInteger(i)) => {
-            ConstantValue::UnsignedInteger(usize::try_from(i).unwrap())
-        }
-        (PrimitiveTypeClass::UnsignedInteger, ConstantValue::UnsignedInteger(i)) => {
-            ConstantValue::UnsignedInteger(i)
-        }
-
-        _ => todo!(),
+    match &*typ {
+        Type::Primitive(primitive) => match (primitive.tc, value) {
+            (PrimitiveTypeClass::SignedInteger, ConstantValue::UnsignedInteger(i)) => {
+                ConstantValue::SignedInteger(isize::try_from(i).unwrap())
+            }
+            (PrimitiveTypeClass::SignedInteger, ConstantValue::SignedInteger(i)) => {
+                ConstantValue::SignedInteger(i)
+            }
+            (PrimitiveTypeClass::UnsignedInteger, ConstantValue::SignedInteger(i)) => {
+                ConstantValue::UnsignedInteger(usize::try_from(i).unwrap())
+            }
+            (PrimitiveTypeClass::UnsignedInteger, ConstantValue::UnsignedInteger(i)) => {
+                ConstantValue::UnsignedInteger(i)
+            }
+            _ => todo!(),
+        },
+        Type::ArbitraryLengthInteger => match value {
+            ConstantValue::UnsignedInteger(i) => {
+                ConstantValue::SignedInteger(isize::try_from(i).unwrap())
+            }
+            ConstantValue::SignedInteger(_) => value,
+            ConstantValue::FloatingPoint(_) | ConstantValue::Unit => {
+                panic!("invalid constant value for arbitrary integer")
+            }
+        },
+        Type::Bits => match value {
+            ConstantValue::UnsignedInteger(_) => value,
+            ConstantValue::SignedInteger(_)
+            | ConstantValue::FloatingPoint(_)
+            | ConstantValue::Unit => {
+                panic!("invalid constant value for bits")
+            }
+        },
+        _ => panic!("failed to cast {value:x?} to type {typ:?}"),
     }
 }

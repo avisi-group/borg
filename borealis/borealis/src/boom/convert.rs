@@ -133,21 +133,17 @@ impl BoomEmitter {
 
 fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Shared<boom::Type> {
     Shared::new(match typ.borrow() {
-        jib_ast::Type::Lbits => boom::Type::Int {
-            signed: false,
+        jib_ast::Type::Lbits => boom::Type::Bits {
             size: Size::Unknown,
         },
-        jib_ast::Type::Fbits(i) => boom::Type::Int {
-            signed: false,
+        jib_ast::Type::Fbits(i) => boom::Type::Bits {
             size: Size::Static(usize::try_from(*i).unwrap()),
         },
 
-        jib_ast::Type::Lint => boom::Type::Int {
-            signed: true,
+        jib_ast::Type::Lint => boom::Type::Integer {
             size: Size::Unknown,
         },
-        jib_ast::Type::Fint(i) => boom::Type::Int {
-            signed: true,
+        jib_ast::Type::Fint(i) => boom::Type::Integer {
             size: Size::Static(usize::try_from(*i).unwrap()),
         },
 

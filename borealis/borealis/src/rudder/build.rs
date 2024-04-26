@@ -218,26 +218,6 @@ impl BuildContext {
             boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
             boom::Type::Real => Arc::new(rudder::Type::f32()),
             boom::Type::Float => Arc::new(rudder::Type::f64()),
-            boom::Type::Int { signed, size } => {
-                let tc = match signed {
-                    true => rudder::PrimitiveTypeClass::SignedInteger,
-                    false => rudder::PrimitiveTypeClass::UnsignedInteger,
-                };
-
-                match size {
-                    boom::Size::Static(size) => Arc::new(rudder::Type::new_primitive(tc, *size)),
-                    boom::Size::Runtime(_) | boom::Size::Unknown => {
-                        Arc::new(rudder::Type::Bundled {
-                            value: Arc::new(match signed {
-                                true => rudder::Type::s64(),
-                                false => rudder::Type::u64(),
-                            }),
-
-                            len: Arc::new(rudder::Type::u8()),
-                        })
-                    }
-                }
-            }
             boom::Type::Constant(_) => todo!(),
             boom::Type::Enum { name, .. } => self.enums.get(name).unwrap().0.clone(),
             boom::Type::Union { name, .. } => self.unions.get(name).unwrap().0.clone(),
@@ -261,6 +241,22 @@ impl BuildContext {
                 // todo: this is broken:(
                 self.resolve_type(inner.clone())
             }
+            boom::Type::Integer { size } => match size {
+                boom::Size::Static(size) => Arc::new(rudder::Type::new_primitive(
+                    rudder::PrimitiveTypeClass::SignedInteger,
+                    *size,
+                )),
+                boom::Size::Runtime(_) | boom::Size::Unknown => {
+                    Arc::new(rudder::Type::ArbitraryLengthInteger)
+                }
+            },
+            boom::Type::Bits { size } => match size {
+                boom::Size::Static(size) => Arc::new(rudder::Type::new_primitive(
+                    rudder::PrimitiveTypeClass::UnsignedInteger,
+                    *size,
+                )),
+                boom::Size::Runtime(_) | boom::Size::Unknown => Arc::new(rudder::Type::Bits),
+            },
         }
     }
 
@@ -522,12 +518,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }))
         } else {
             match name.as_ref() {
-                "%i64->%i" | "%i->%i64" => Some(
+                "%i64->%i" => {
+                    // lots of %i64->%i(Int(BigInt(-1))) so disabled this check
+                   // assert_eq!(Type::s64(), *args[0].typ());
+                    Some(
                     self.builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::s64())),
-                ),
+                        .generate_cast(args[0].clone(), Arc::new(Type::ArbitraryLengthInteger)),
+                )},
+
+                "%i->%i64" => {
+                    assert!(matches!(*args[0].typ(), Type::ArbitraryLengthInteger));
+
+                    Some(
+                        self.builder
+                            .generate_cast(args[0].clone(), Arc::new(Type::s64())),
+                    )
+                }
 
                 "make_the_value" | "size_itself_int" => Some(args[0].clone()),
+                // %bv, %i, %i -> %bv
                 "subrange_bits" => {
                     // end - start + 1
                     let one = self.builder.build(StatementKind::Constant {
@@ -568,61 +577,41 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 // val add_atom : (%i, %i) -> %i
-                "add_atom" => {
-                    let lhs = self
-                        .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::bundle_signed()));
-                    let rhs = self
-                        .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::bundle_signed()));
-                    Some(self.builder.build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs,
-                        rhs,
-                    }))
-                }
+                "add_atom" |
+                  // val add_bits : (%bv, %bv) -> %bv
+                "add_bits"
 
-                // val add_bits : (%bv, %bv) -> %bv
-                "add_bits" => {
-                    let lhs = self
-                        .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
-                    let rhs = self
-                        .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
+                => {
+                    assert!(args[0].typ() == args[1].typ());
                     Some(self.builder.build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Add,
-                        lhs,
-                        rhs,
-                    }))
-                }
+                    kind: BinaryOperationKind::Add,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                }))},
 
-                // val add_bits_int : (%bv, %i) -> %bv
-                "add_bits_int" => {
-                    let lhs = self
-                        .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
+
+                  // val add_bits_int : (%bv, %i) -> %bv
+                  "add_bits_int" => {
+
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
+                        .generate_cast(args[1].clone(), Arc::new(Type::Bits));
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Add,
-                        lhs,
+                        lhs: args[0].clone(),
                         rhs,
                     }))
+
                 }
 
                 // val sub_bits_int : (%bv, %i) -> %bv
                 "sub_bits_int" => {
-                    let lhs = self
-                        .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
+                        .generate_cast(args[1].clone(), Arc::new(Type::Bits));
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
-                        lhs,
+                        lhs: args[0].clone(),
                         rhs,
                     }))
                 }
@@ -803,11 +792,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "bitvector_length" => {
-                    assert!(matches!(*args[0].typ(), Type::Bundled { .. }));
+                    assert!(matches!(*args[0].typ(), Type::Bits));
 
-                    Some(self.builder.build(StatementKind::UnbundleLength {
-                        bundle: args[0].clone(),
-                    }))
+                    Some(self.builder.build(StatementKind::SizeOf { value: args[0].clone() }))
                 }
 
                 "update_fbits" => {
@@ -880,165 +867,69 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
+                // %bv -> %i
                 "UInt0" => {
-                    let value = self.builder.build(StatementKind::UnbundleValue {
-                        bundle: args[0].clone(),
-                    });
+                    // just copy bits
 
-                    let length = self.builder.build(StatementKind::UnbundleLength {
-                        bundle: args[0].clone(),
-                    });
-
-                    let value_cast = self.builder.generate_cast(value, Arc::new(Type::u64()));
-                    let length_cast = self.builder.generate_cast(length, Arc::new(Type::u8()));
-
-                    let bundle = self.builder.build(StatementKind::Bundle {
-                        value: value_cast,
-                        length: length_cast,
-                    });
-
-                    Some(bundle)
+                    Some(self.builder.build(StatementKind::Cast { kind: CastOperationKind::ZeroExtend, typ:  Arc::new(Type::ArbitraryLengthInteger), value: args[0].clone()}))
                 }
+                 // %bv -> %i
                 "SInt0" => {
-                    let value = self.builder.build(StatementKind::UnbundleValue {
-                        bundle: args[0].clone(),
-                    });
-
-                    let length = self.builder.build(StatementKind::UnbundleLength {
-                        bundle: args[0].clone(),
-                    });
-
-                    let value_cast = self.builder.generate_cast(value, Arc::new(Type::s64()));
-                    let length_cast = self.builder.generate_cast(length, Arc::new(Type::u8()));
-
-                    let bundle = self.builder.build(StatementKind::Bundle {
-                        value: value_cast,
-                        length: length_cast,
-                    });
-
-                    Some(bundle)
+                    //                     void sail_signed(sail_int *rop, const lbits op)
+                    // {
+                    //   if (op.len == 0) {
+                    //     mpz_set_ui(*rop, 0);
+                    //   } else {
+                    //     mp_bitcnt_t sign_bit = op.len - 1;
+                    //     mpz_set(*rop, *op.bits);
+                    //     if (mpz_tstbit(*op.bits, sign_bit) != 0) {
+                    //       /* If sign bit is unset then we are done,
+                    //          otherwise clear sign_bit and subtract 2**sign_bit */
+                    //       mpz_set_ui(sail_lib_tmp1, 1);
+                    //       mpz_mul_2exp(sail_lib_tmp1, sail_lib_tmp1, sign_bit); /* 2**sign_bit */
+                    //       mpz_combit(*rop, sign_bit); /* clear sign_bit */
+                    //       mpz_sub(*rop, *rop, sail_lib_tmp1);
+                    //     }
+                    //   }
+                    // }
+                    Some(self.builder.build(StatementKind::Cast { kind: CastOperationKind::SignExtend, typ:  Arc::new(Type::ArbitraryLengthInteger), value:  args[0].clone()}))
                 }
 
-                "ZeroExtend0" | "sail_zero_extend" | "truncate" | "SignExtend0"
+
+
+
+
+                 // val ZeroExtend0 : (%bv, %i) -> %bv
+                // val sail_zero_extend : (%bv, %i) -> %bv
+                "ZeroExtend0" | "sail_zero_extend" => {
+                    Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::ZeroExtend, typ: Arc::new(Type::Bits), value: args[0].clone(), length: args[1].clone() }))
+                }
+
+                    // val SignExtend0 : (%bv, %i) -> %bv
+                // val sail_sign_extend : (%bv, %i) -> %bv
+                  "SignExtend0"
                 | "sail_sign_extend" => {
-                    let length = args[1].clone();
-
-                    let value = match name.as_ref() {
-                        "truncate" => {
-                            let one = self.builder.build(StatementKind::Constant {
-                                typ: Arc::new(Type::u64()),
-                                value: rudder::ConstantValue::UnsignedInteger(1),
-                            });
-                            let cast_length = self
-                                .builder
-                                .generate_cast(length.clone(), Arc::new(Type::u64()));
-                            let shift = self.builder.build(StatementKind::ShiftOperation {
-                                kind: ShiftOperationKind::LogicalShiftLeft,
-                                value: one.clone(),
-                                amount: cast_length,
-                            });
-                            let mask = self.builder.build(StatementKind::BinaryOperation {
-                                kind: BinaryOperationKind::Sub,
-                                lhs: shift,
-                                rhs: one,
-                            });
-
-                            let cast_value = self
-                                .builder
-                                .generate_cast(args[0].clone(), Arc::new(Type::u64()));
-                            self.builder.build(StatementKind::BinaryOperation {
-                                kind: BinaryOperationKind::And,
-                                lhs: mask,
-                                rhs: cast_value,
-                            })
-                        }
-                        // todo: move this to codegen
-                        "SignExtend0" | "sail_sign_extend" => {
-                            let value = args[0].clone();
-                            let target_length = args[1].clone();
-
-                            let sixtyfour = self.builder.build(StatementKind::Constant {
-                                typ: Arc::new(Type::u8()),
-                                value: rudder::ConstantValue::UnsignedInteger(64),
-                            });
-
-                            let source_length = self.builder.build(StatementKind::UnbundleLength {
-                                bundle: value.clone(),
-                            });
-
-                            let shift_amount = self.builder.build(StatementKind::BinaryOperation {
-                                kind: BinaryOperationKind::Sub,
-                                lhs: sixtyfour.clone(),
-                                rhs: source_length,
-                            });
-
-                            let shift_amount_cast = self
-                                .builder
-                                .generate_cast(shift_amount, Arc::new(Type::s64()));
-
-                            let shift_amount_bundle = self.builder.build(StatementKind::Bundle {
-                                value: shift_amount_cast,
-                                length: sixtyfour,
-                            });
-
-                            let value_bundle = self.builder.generate_cast(
-                                value,
-                                Arc::new(Type::Bundled {
-                                    value: Arc::new(Type::s64()),
-                                    len: Arc::new(Type::u8()),
-                                }),
-                            );
-
-                            // shift left up to top
-                            let left_shift = self.builder.build(StatementKind::ShiftOperation {
-                                kind: ShiftOperationKind::LogicalShiftLeft,
-                                value: value_bundle,
-                                amount: shift_amount_bundle.clone(),
-                            });
-
-                            // shift right to target length
-                            let right_shift = self.builder.build(StatementKind::ShiftOperation {
-                                kind: ShiftOperationKind::ArithmeticShiftRight,
-                                value: left_shift,
-                                amount: shift_amount_bundle,
-                            });
-
-                            // explicitly no masking to length
-
-                            self.builder.build(StatementKind::Bundle {
-                                value: right_shift,
-                                length: target_length,
-                            })
-                        }
-                        _ => args[0].clone(),
-                    };
-
-                    let value_cast = self.builder.generate_cast(value, Arc::new(Type::u64()));
-                    let length_cast = self.builder.generate_cast(length, Arc::new(Type::u8()));
-
-                    let bundle = self.builder.build(StatementKind::Bundle {
-                        value: value_cast,
-                        length: length_cast,
-                    });
-
-                    Some(bundle)
+                    Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::SignExtend, typ: Arc::new(Type::Bits), value: args[0].clone(), length: args[1].clone() }))
                 }
+
+    // val truncate : (%bv, %i) -> %bv
+    "truncate" => {
+        Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: Arc::new(Type::Bits), value: args[0].clone(), length: args[1].clone() }))
+    }
 
                 "sail_zeros" => {
                     let length = args[0].clone();
-                    let value = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+
+                    let _0 = self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::u8()),
                         value: rudder::ConstantValue::UnsignedInteger(0),
                     });
 
-                    let length_cast = self.builder.generate_cast(length, Arc::new(Type::u8()));
+                    let value = self.builder.generate_cast(_0, Arc::new(Type::Bits));
 
-                    let bundle = self.builder.build(StatementKind::Bundle {
-                        value,
-                        length: length_cast,
-                    });
+                    Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::ZeroExtend, typ: Arc::new(Type::Bits), value, length }))
 
-                    Some(bundle)
+
                 }
 
                 "sail_assert" => Some(self.builder.build(StatementKind::Assert {
@@ -1126,11 +1017,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "bitvector_update" => {
                     let target = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
+                        .generate_cast(args[0].clone(), Arc::new(Type::Bits));
                     let i = args[1].clone();
                     let bit = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::bundle_unsigned()));
+                        .generate_cast(args[0].clone(), Arc::new(Type::Bits));
 
                     let _1 = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
@@ -1143,15 +1034,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         start: i,
                         length: _1,
                     }))
+
                 }
 
                 // val append_64 : (%bv, %bv64) -> %bv
                 "append_64" => {
-                    log::warn!("append_64 will overflow u64-backed bundle");
+
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::bundle_unsigned()));
+                        .generate_cast(args[1].clone(), Arc::new(Type::Bits));
                     Some(self.generate_concat(args[0].clone(), rhs))
+
                 }
 
                 "bitvector_concat" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
@@ -1398,8 +1291,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn build_literal(&mut self, literal: &boom::Literal) -> Statement {
         let kind = match literal {
             boom::Literal::Int(i) => StatementKind::Constant {
-                typ: Arc::new(Type::s64()),
-                value: rudder::ConstantValue::SignedInteger(i.try_into().unwrap()),
+                typ: Arc::new(Type::ArbitraryLengthInteger),
+                value: rudder::ConstantValue::SignedInteger(
+                    i.try_into().unwrap_or_else(|_| panic!("{i:x?}")),
+                ),
             },
             boom::Literal::Bits(bits) => StatementKind::Constant {
                 typ: Arc::new(Type::new_primitive(
@@ -1466,7 +1361,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             Ordering::Equal => CastOperationKind::Reinterpret,
                         }
                     }
-                    Type::Bundled { .. } => todo!(),
+                    Type::Bits | Type::ArbitraryLengthInteger => todo!(),
                 };
 
                 self.builder.build(StatementKind::Cast {
@@ -1639,19 +1534,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     fn generate_concat(&mut self, lhs: Statement, rhs: Statement) -> Statement {
         match (&*lhs.typ(), &*rhs.typ()) {
-            (Type::Bundled { .. }, Type::Bundled { .. }) => {
-                let l_value = self.builder.build(StatementKind::UnbundleValue {
-                    bundle: lhs.clone(),
-                });
-                let l_length = self
+            (Type::Bits, Type::Bits) => {
+                let l_value = self
                     .builder
-                    .build(StatementKind::UnbundleLength { bundle: lhs });
-                let r_value = self.builder.build(StatementKind::UnbundleValue {
-                    bundle: rhs.clone(),
-                });
-                let r_length = self
+                    .generate_cast(lhs.clone(), Arc::new(Type::u128()));
+                let l_length = self.builder.build(StatementKind::SizeOf { value: lhs });
+
+                let r_value = self
                     .builder
-                    .build(StatementKind::UnbundleLength { bundle: rhs });
+                    .generate_cast(rhs.clone(), Arc::new(Type::u128()));
+                let r_length = self.builder.build(StatementKind::SizeOf { value: rhs });
 
                 let shift = self.builder.build(StatementKind::ShiftOperation {
                     kind: ShiftOperationKind::LogicalShiftLeft,
@@ -1672,7 +1564,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // lhs.value << rhs.len | rhs.value
                 // lhs.len + rhs.len
-                self.builder.build(StatementKind::Bundle { value, length })
+                self.builder
+                    .build(StatementKind::CreateBits { value, length })
             }
             _ => todo!(),
         }

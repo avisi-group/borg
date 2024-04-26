@@ -1,7 +1,8 @@
 use {
     crate::rudder::{
-        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, FunctionInner,
-        ShiftOperationKind, Statement, StatementInner, StatementKind, Symbol, SymbolKind, Type,
+        constant_value::ConstantValue, BinaryOperationKind, Block, CastOperationKind, Function,
+        FunctionInner, ShiftOperationKind, Statement, StatementInner, StatementKind, Symbol,
+        SymbolKind, Type,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
     once_cell::sync::Lazy,
@@ -23,10 +24,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     let bits_symbol = Symbol {
         name: "bits".into(),
         kind: SymbolKind::Parameter,
-        typ: Arc::new(Type::Bundled {
-            value: Arc::new(Type::u64()),
-            len: Arc::new(Type::u8()),
-        }),
+        typ: Arc::new(Type::Bits),
     };
     let count_symbol = Symbol {
         name: "count".into(),
@@ -42,10 +40,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     let result_symbol = Symbol {
         name: "result".into(),
         kind: SymbolKind::LocalVariable,
-        typ: Arc::new(Type::Bundled {
-            value: Arc::new(Type::u64()),
-            len: Arc::new(Type::u8()),
-        }),
+        typ: Arc::new(Type::Bits),
     };
 
     let end_block = {
@@ -210,8 +205,8 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     let len = Statement {
         inner: Shared::new(StatementInner {
             name: "s12".into(),
-            kind: StatementKind::UnbundleLength {
-                bundle: read_bits.clone(),
+            kind: StatementKind::SizeOf {
+                value: read_bits.clone(),
             },
             parent: shift_block.weak(),
         }),
@@ -231,7 +226,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             name: "s13".into(),
             kind: StatementKind::Cast {
                 kind: CastOperationKind::ZeroExtend,
-                typ: Arc::new(Type::u64()),
+                typ: Arc::new(Type::u8()),
                 value: len.clone(),
             },
             parent: shift_block.weak(),
@@ -240,9 +235,10 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     let bundle_len = Statement {
         inner: Shared::new(StatementInner {
             name: "s13".into(),
-            kind: StatementKind::Bundle {
-                value: cast_len.clone(),
-                length: _8.clone(),
+            kind: StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: Arc::new(Type::Bits),
+                value: len.clone(),
             },
             parent: shift_block.weak(),
         }),
@@ -365,10 +361,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     Function {
         inner: Shared::new(FunctionInner {
             name: *REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
-            return_type: Arc::new(Type::Bundled {
-                value: Arc::new(Type::u64()),
-                len: Arc::new(Type::u8()),
-            }),
+            return_type: Arc::new(Type::Bits),
             parameters: vec![bits_symbol, count_symbol.clone()],
             local_variables: {
                 let mut locals = HashMap::default();

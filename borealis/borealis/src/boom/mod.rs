@@ -217,8 +217,10 @@ pub enum Type {
     Real,
     Float,
 
-    Int {
-        signed: bool,
+    Integer {
+        size: Size,
+    },
+    Bits {
         size: Size,
     },
 
@@ -258,19 +260,17 @@ pub enum Type {
 impl Type {
     // Gets the size of a type if it is an integer
     pub fn get_size(&self) -> Option<Size> {
-        if let Type::Int { size, .. } = self {
-            Some(size.clone())
-        } else {
-            None
+        match self {
+            Type::Integer { size } | Type::Bits { size } => Some(size.clone()),
+            _ => None,
         }
     }
 
     // Gets a reference to the size of a type if it is an integer
     pub fn get_size_mut(&mut self) -> Option<&mut Size> {
-        if let Type::Int { size, .. } = self {
-            Some(size)
-        } else {
-            None
+        match self {
+            Type::Integer { size } | Type::Bits { size } => Some(size),
+            _ => None,
         }
     }
 }
@@ -291,7 +291,16 @@ impl Walkable for Shared<Type> {
         use Type::*;
 
         match &*self.get() {
-            Unit | Bool | String | Real | Float | Constant(_) | Int { .. } | Bit | Enum { .. } => {}
+            Unit
+            | Bool
+            | String
+            | Real
+            | Float
+            | Constant(_)
+            | Integer { .. }
+            | Bits { .. }
+            | Bit
+            | Enum { .. } => {}
 
             Union { fields, .. } | Struct { fields, .. } => fields
                 .iter()

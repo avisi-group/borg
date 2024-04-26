@@ -5,11 +5,11 @@
 
 use {
     crate::{
-        brig::{codegen_ident, codegen_member, codegen_type},
+        brig::{bits::BitsLength, codegen_ident, codegen_member, codegen_type},
         rudder::{
-            BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
-            PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind,
-            Symbol, Type, UnaryOperationKind,
+            constant_value::ConstantValue, BinaryOperationKind, Block, CastOperationKind, Context,
+            Function, PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement,
+            StatementKind, Symbol, Type, UnaryOperationKind,
         },
     },
     common::{intern::InternedString, HashSet},
@@ -78,9 +78,9 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 ConstantValue::Unit => quote!(()),
             };
 
-            if let Type::Bundled { .. } = &*stmt.typ() {
+            if let Type::Bits = &*stmt.typ() {
                 let length = Literal::usize_unsuffixed(typ.width_bits());
-                quote!(Bundle::new(#v, #length))
+                quote!(Bits::new(#v, #length))
             } else {
                 v
             }
@@ -152,7 +152,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                     let value = get_ident(&value);
                     (quote!(#element_width_in_bits), quote!(#value))
                 }
-                Type::Bundled { .. } => {
+                Type::Bits => {
                     let value = get_ident(&value);
                     (quote!(#value.length()), quote!(#value.value()))
                 }
@@ -175,27 +175,27 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let mut left = get_ident(&lhs);
             let mut right = get_ident(&rhs);
 
-            // hard to decide whether this belongs, but since it's a Rust issue that u1 is
-            // not like other types, casting is a codegen thing
-            match (lhs.typ().width_bits(), rhs.typ().width_bits()) {
-                // both bools, do nothing
-                (1, 1) => (),
-                (1, _) => {
-                    let typ = codegen_type(rhs.typ());
-                    left = quote!(((#left) as #typ));
-                }
-                (_, 1) => {
-                    let typ = codegen_type(lhs.typ());
-                    right = quote!(((#right) as #typ));
-                }
-                // both not bools, do nothing
-                (_, _) => (),
-            }
+            // // hard to decide whether this belongs, but since it's a Rust issue that u1 is
+            // // not like other types, casting is a codegen thing
+            // match (lhs.typ().width_bits(), rhs.typ().width_bits()) {
+            //     // both bools, do nothing
+            //     (1, 1) => (),
+            //     (1, _) => {
+            //         let typ = codegen_type(rhs.typ());
+            //         left = quote!(((#left) as #typ));
+            //     }
+            //     (_, 1) => {
+            //         let typ = codegen_type(lhs.typ());
+            //         right = quote!(((#right) as #typ));
+            //     }
+            //     // both not bools, do nothing
+            //     (_, _) => (),
+            // }
 
             let op = match kind {
                 BinaryOperationKind::CompareEqual => quote! { (#left) == (#right) },
                 BinaryOperationKind::Add => {
-                    quote! { #left.wrapping_add(#right) }
+                    quote! { #left + #right }
                 }
                 BinaryOperationKind::Sub => quote! { (#left) - (#right) },
                 BinaryOperationKind::Multiply => quote! { (#left) * (#right) },
@@ -220,7 +220,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 UnaryOperationKind::Not => quote! {!#value},
                 UnaryOperationKind::Negate => quote! {-#value},
                 UnaryOperationKind::Complement => quote! {!#value},
-                UnaryOperationKind::Power2 => quote! { (#value).pow2() },
+                UnaryOperationKind::Power2 => quote! { (#value).pow(2) },
                 UnaryOperationKind::Absolute => quote! { (#value).abs() },
             }
         }
@@ -256,72 +256,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::Cast { typ, value, kind } => {
-            let source = value.typ();
-            let target = typ;
-            let ident = get_ident(&value);
-
-            if source == target {
-                // todo: check this never happens
-                quote! {
-                    ((#ident))
-                }
-            } else if target == Arc::new(Type::u1()) {
-                // todo: is special casing booleans like this necessary?
-                // todo: this is duplicated in decode
-                quote! {
-                    ((#ident) != 0)
-                }
-            } else if target.is_unknown_length_vector() {
-                quote!(alloc::vec::Vec::from(#ident))
-            } else {
-                match kind {
-                    CastOperationKind::ZeroExtend => {
-                        // safe even if underlying rudder types are smaller than codegen'd rust
-                        // types (u7 -> u13 == u8 -> u16)
-                        let target = codegen_type(target);
-                        quote! {
-                            (#ident as #target)
-                        }
-                    }
-
-                    CastOperationKind::Truncate => {
-                        match (&*source, &*target) {
-                            (Type::Primitive(_), Type::Primitive(_)) => {
-                                assert!(target.width_bits() < source.width_bits());
-
-                                // create mask of length target
-
-                                let mask = Literal::u64_unsuffixed(
-                                    1u64.checked_shl(u32::try_from(target.width_bits()).unwrap())
-                                        .map(|x| x - 1)
-                                        .unwrap_or(!0),
-                                );
-
-                                // cast to target type and apply mask to source
-                                let target = codegen_type(target);
-
-                                quote!(((#ident as #target) & #mask))
-                            }
-                            (Type::Bundled { .. }, Type::Bundled { .. }) => {
-                                panic!("cannot truncate bundles, target length not known by type system")
-                            }
-                            _ => todo!(),
-                        }
-                    }
-
-                    CastOperationKind::SignExtend => todo!(),
-                    CastOperationKind::Reinterpret => {
-                        let target = codegen_type(target);
-                        quote! {
-                            (#ident as #target)
-                        }
-                    }
-                    CastOperationKind::Convert => todo!(),
-                    CastOperationKind::Broadcast => todo!(),
-                }
-            }
-        }
+        StatementKind::Cast { typ, value, kind } => codegen_cast(typ, value, kind),
         StatementKind::Jump { target } => {
             let target = get_block_fn_ident(&target);
             quote! {
@@ -366,12 +301,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             start,
             length,
         } => {
-            if let Type::Bundled {
-                value: bundle_value_type,
-                ..
-            } = &*value.typ()
-            {
-                let length = if let Type::Bundled { .. } = &*length.typ() {
+            if let Type::Bits = &*value.typ() {
+                let length = if let Type::Bits = &*length.typ() {
                     let length = get_ident(&length);
                     quote!(#length.value() as u32)
                 } else {
@@ -382,26 +313,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 let value = get_ident(&value);
                 let start = get_ident(&start);
 
-                let mask_bit = match &**bundle_value_type {
-                    Type::Primitive(PrimitiveType {
-                        tc,
-                        element_width_in_bits,
-                    }) => {
-                        assert!(*element_width_in_bits == 64);
-
-                        match tc {
-                            PrimitiveTypeClass::UnsignedInteger => quote!(1u64),
-                            PrimitiveTypeClass::SignedInteger => quote!(1i64),
-                            _ => panic!("non integer bundle value type"),
-                        }
-                    }
-                    _ => panic!("non primitive bundle value type"),
-                };
-
                 quote! (
                     (
                         (#value >> #start) &
-                        Bundle::new(((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), #value.length())
+                        Bits::new(((1u128).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), #value.length())
                     )
                 )
             } else {
@@ -427,39 +342,13 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             start,
             length,
         } => {
-            if let Type::Bundled {
-                value: bundle_value_type,
-                ..
-            } = &*original_value.typ()
-            {
-                let length = if let Type::Bundled { .. } = &*length.typ() {
+            if let Type::Bits = &*original_value.typ() {
+                let length = if let Type::Bits = &*length.typ() {
                     let length = get_ident(&length);
                     quote!(#length.value() as u32)
                 } else {
                     let length = get_ident(&length);
                     quote!(#length as u32)
-                };
-
-                let mask_bit = match &**bundle_value_type {
-                    Type::Primitive(PrimitiveType {
-                        tc,
-                        element_width_in_bits,
-                    }) => {
-                        assert!(*element_width_in_bits == 64);
-
-                        match tc {
-                            PrimitiveTypeClass::UnsignedInteger => quote!(1u64),
-                            PrimitiveTypeClass::SignedInteger => quote!(1i64),
-                            _ => panic!("non integer bundle value type"),
-                        }
-                    }
-                    t => {
-                        log::error!(
-                            "non primitive bundle value type: {t:?} {:?}",
-                            codegen_type(bundle_value_type.clone()).to_string()
-                        );
-                        quote!(1u64)
-                    }
                 };
 
                 let original_value = get_ident(&original_value);
@@ -468,7 +357,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
                 quote! {
                     {
-                        let mask = !Bundle { value: ((#mask_bit).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), length: #original_value.length() };
+                        let mask = !Bits::new(((1u128).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), #original_value.length());
                         (#original_value & mask) | (#insert_value << #start)
                     }
                 }
@@ -501,7 +390,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let vector = get_ident(&vector);
             let index = get_ident(&index);
 
-            if let Type::Bundled { .. } = &*index_typ {
+            if let Type::Bits = &*index_typ {
                 quote!(#vector[(#index.value()) as usize])
             } else {
                 quote!(#vector[(#index) as usize])
@@ -539,22 +428,28 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             // struct { _0: foo, _1: bar }
         }
-        StatementKind::Bundle { value, length } => {
+        StatementKind::CreateBits { value, length } => {
             let value = get_ident(&value);
             let length = get_ident(&length);
-            quote!(Bundle::new(#value, #length))
-        }
-        StatementKind::UnbundleValue { bundle } => {
-            let bundle = get_ident(&bundle);
-            quote!((#bundle.value()))
-        }
-        StatementKind::UnbundleLength { bundle } => {
-            let bundle = get_ident(&bundle);
-            quote!((#bundle.length()))
+            quote!(Bits::new(#value, #length))
         }
         StatementKind::Assert { condition } => {
             let condition = get_ident(&condition);
             quote!(assert!(#condition))
+        }
+        StatementKind::BitsCast { .. } => quote!(todo!()),
+        StatementKind::SizeOf { value } => {
+            let ident = get_ident(&value);
+            match &*value.typ() {
+                Type::Bits => quote!(#ident.length()),
+                Type::ArbitraryLengthInteger => {
+                    panic!("cannot get size of arbitrary length integer")
+                }
+                _ => {
+                    let length = BitsLength::try_from(value.typ().width_bits()).unwrap();
+                    quote!(#length)
+                }
+            }
         }
     };
 
@@ -573,42 +468,170 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     }
 }
 
-pub fn get_functions_to_codegen(
-    rudder: &Context,
-    entrypoint: InternedString,
-) -> Vec<InternedString> {
-    let rudder_fns = rudder.get_functions();
+fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> TokenStream {
+    let source_type = value.typ();
+    let target_type = typ;
+    let ident = get_ident(&value);
 
-    let mut fns = HashSet::default();
-    let mut todo = vec![entrypoint];
-
-    fn get_calls(f: &Function) -> Vec<InternedString> {
-        f.entry_block()
-            .iter()
-            .flat_map(|b| b.statements().into_iter())
-            .filter_map(|s| {
-                if let StatementKind::Call { target, .. } = s.kind() {
-                    Some(target.name())
-                } else {
-                    None
-                }
-            })
-            .collect()
+    if source_type == target_type {
+        log::warn!(
+            "attemping to cast {:?} into same type ({})",
+            value.name(),
+            target_type
+        );
+        return quote! {
+            ((#ident))
+        };
     }
 
-    while let Some(next) = todo.pop() {
-        if fns.contains(&next) {
-            continue;
+    match (&*source_type, &*target_type, kind) {
+        // need to special case casting to booleans
+        (
+            Type::Primitive(_),
+            Type::Primitive(PrimitiveType {
+                element_width_in_bits: 1,
+                tc: PrimitiveTypeClass::UnsignedInteger,
+            }),
+            _,
+        ) => quote! {
+            ((#ident) != 0)
+        },
+
+        // extract value before testing
+        (
+            Type::Bits,
+            Type::Primitive(PrimitiveType {
+                element_width_in_bits: 1,
+                tc: PrimitiveTypeClass::UnsignedInteger,
+            }),
+            _,
+        ) => quote! {
+            ((#ident.value()) != 0)
+        },
+
+        // safe even if underlying rudder types are smaller than codegen'd rust
+        // types (u7 -> u13 == u8 -> u16)
+        (Type::Primitive(_), Type::Primitive(_), CastOperationKind::ZeroExtend) => {
+            let target = codegen_type(target_type);
+            quote! {
+                (#ident as #target)
+            }
         }
 
-        let Some(f) = rudder_fns.get(&next) else {
-            panic!("function {next:?} called but not found in rudder context");
-        };
+        (Type::Primitive(_), Type::ArbitraryLengthInteger, CastOperationKind::ZeroExtend) => {
+            let target = codegen_type(target_type);
+            quote! {
+                (#target::try_from(#ident).unwrap())
+            }
+        }
 
-        let next_children = get_calls(f);
-        todo.extend(next_children);
-        fns.insert(next);
+        (Type::Primitive(_), Type::Primitive(_), CastOperationKind::Truncate) => {
+            assert!(target_type.width_bits() < source_type.width_bits());
+
+            // create mask of length target
+            let mask = Literal::u64_unsuffixed(
+                1u64.checked_shl(u32::try_from(target_type.width_bits()).unwrap())
+                    .map(|x| x - 1)
+                    .unwrap_or(!0),
+            );
+
+            // cast to target type and apply mask to source
+            let target = codegen_type(target_type);
+
+            quote!(((#ident as #target) & #mask))
+        }
+
+        (Type::Bits, Type::Bits, CastOperationKind::Truncate) => {
+            panic!("cannot truncate bits, target length not known by type system")
+        }
+
+        (Type::Bits, Type::ArbitraryLengthInteger, CastOperationKind::SignExtend) => {
+            // void sail_signed(sail_int *rop, const lbits op)
+            // {
+            //   if (op.len == 0) {
+            //     mpz_set_ui(*rop, 0);
+            //   } else {
+            //     mp_bitcnt_t sign_bit = op.len - 1;
+            //     mpz_set(*rop, *op.bits);
+            //     if (mpz_tstbit(*op.bits, sign_bit) != 0) {
+            //       /* If sign bit is unset then we are done,
+            //          otherwise clear sign_bit and subtract 2**sign_bit */
+            //       mpz_set_ui(sail_lib_tmp1, 1);
+            //       mpz_mul_2exp(sail_lib_tmp1, sail_lib_tmp1, sign_bit); /* 2**sign_bit */
+            //       mpz_combit(*rop, sign_bit); /* clear sign_bit */
+            //       mpz_sub(*rop, *rop, sail_lib_tmp1);
+            //     }
+            //   }
+            // }
+            quote! {
+                {
+                    let sign_bit = #ident.length() - 1;
+                    let mut result = i128::try_from(#ident.value()).unwrap();
+
+                    if ((result >> sign_bit) & 1) == 1 {
+                        // If sign bit is unset then we are done, otherwise clear sign_bit and subtract 2**sign_bit
+                        let cleared_bit = result & !(1 << sign_bit);
+                        result = cleared_bit - (1 << sign_bit)
+                    }
+
+                    result
+                }
+            }
+        }
+
+        (Type::Bits, Type::Primitive(_), CastOperationKind::Reinterpret) => {
+            let target = codegen_type(target_type);
+            quote! {
+                (#ident.value() as #target)
+            }
+        }
+
+        // todo: this should be a truncate??
+        (Type::ArbitraryLengthInteger, Type::Primitive(_), CastOperationKind::Reinterpret) => {
+            let target = codegen_type(target_type);
+            quote! {
+                (#ident as #target)
+            }
+        }
+
+        (Type::Primitive(_), Type::Primitive(_), CastOperationKind::Reinterpret) => {
+            let target = codegen_type(target_type);
+            quote! {
+                (#ident as #target)
+            }
+        }
+
+        (Type::ArbitraryLengthInteger, Type::Bits, CastOperationKind::Convert) => {
+            quote!(Bits::new(#ident as u128, 128))
+        }
+
+        (
+            Type::Bits,
+            Type::ArbitraryLengthInteger,
+            CastOperationKind::Convert | CastOperationKind::ZeroExtend,
+        ) => {
+            let target_type = codegen_type(target_type);
+            quote!(#target_type::try_from(#ident.value()).unwrap())
+        }
+
+        // this type of cast replaces a lot of "create-bits"
+        // todo ask tom about convert vs zeroextend
+        (
+            Type::Primitive(PrimitiveType {
+                element_width_in_bits,
+                ..
+            }),
+            Type::Bits,
+            CastOperationKind::Convert | CastOperationKind::ZeroExtend,
+        ) => {
+            let width = u16::try_from(*element_width_in_bits).unwrap();
+            // todo: maybe this as shouldn't be necessary?
+            quote!(Bits::new(#ident as u128, #width))
+        }
+
+        (src, tgt, knd) => panic!(
+            "failed to generate code for cast of {:?} from {src} to {tgt} of kind {knd:?}",
+            value.name()
+        ),
     }
-
-    fns.into_iter().collect()
 }

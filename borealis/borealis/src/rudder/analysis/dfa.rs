@@ -154,6 +154,10 @@ impl StatementUseAnalysis {
                 StatementKind::Cast { value, .. } => {
                     self.add_use(&value, &stmt);
                 }
+                StatementKind::BitsCast { value, length, .. } => {
+                    self.add_use(&value, &stmt);
+                    self.add_use(&length, &stmt);
+                }
                 StatementKind::Branch { condition, .. } => {
                     self.add_use(&condition, &stmt);
                 }
@@ -212,22 +216,25 @@ impl StatementUseAnalysis {
                         self.add_use(&panic_value, &stmt);
                     }
                 }
-                StatementKind::Bundle { value, length } => {
+                StatementKind::CreateBits { value, length } => {
                     self.add_use(&value, &stmt);
                     self.add_use(&length, &stmt);
-                }
-                StatementKind::UnbundleValue { bundle } => {
-                    self.add_use(&bundle, &stmt);
-                }
-                StatementKind::UnbundleLength { bundle } => {
-                    self.add_use(&bundle, &stmt);
                 }
                 StatementKind::CreateComposite { fields, .. } => {
                     for field in fields {
                         self.add_use(&field, &stmt);
                     }
                 }
-                _ => {}
+                StatementKind::SizeOf { value } => {
+                    self.add_use(&value, &stmt);
+                }
+
+                StatementKind::ReadVariable { symbol, indices } => {}
+                StatementKind::ReadMemory { typ, offset } => {}
+                StatementKind::ReadPc => {}
+                StatementKind::Jump { target } => {}
+                StatementKind::PhiNode { members } => {}
+                StatementKind::Constant { .. } => {}
             }
         }
     }

@@ -88,8 +88,12 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                             Type::Vector {
                                ..
                             } => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use vector type for unsigned integer constant")),
-                            Type::Bundled {.. } => {
-                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bundled type for unsigned integer constant"))
+                            Type::Bits => {
+                                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bits for unsigned integer constant"))
+                                None
+                            },
+                            Type::ArbitraryLengthInteger => {
+                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for unsigned integer constant"))
                             }
                         },
                         ConstantValue::SignedInteger(_) => match &*typ {
@@ -106,8 +110,15 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                             Type::Vector {
                                 ..
                             } => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use vector type for signed integer constant")),
-                            Type::Bundled { .. } => {
-                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bundled type for signed integer constant"))
+                            Type::Bits => {
+                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bits for signed integer constant"))
+                            },
+
+                            Type::ArbitraryLengthInteger => {
+
+                             // this is ok
+                                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for signed integer constant"))
+                                None
                             }
                         }
                         ConstantValue::FloatingPoint(_) => match &*typ {
@@ -124,8 +135,11 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                             Type::Vector {
                              ..
                             } => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use vector type for floating point constant")),
-                            Type::Bundled { .. } => {
-                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bundled type for floating point constant"))
+                            Type::Bits => {
+                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bits for floating point constant"))
+                            },
+                            Type::ArbitraryLengthInteger => {
+                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for floating point constant"))
                             }
                         }
                         ConstantValue::Unit => match &*typ {
@@ -142,8 +156,11 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                             Type::Vector {
                               ..
                             } => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use vector type for unit constant")),
-                            Type::Bundled {..} => {
-                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bundled type for unit constant"))
+                            Type::Bits  => {
+                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bits for unit constant"))
+                            }
+                             Type::ArbitraryLengthInteger => {
+                                Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for unit constant"))
                             }
                         }
                     };

@@ -1,4 +1,5 @@
 use {
+    crate::{brig::bits::BitsValue, rudder::constant_value::ConstantValue},
     common::{
         intern::InternedString,
         shared::{Shared, Weak},
@@ -11,13 +12,13 @@ use {
         cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
-        ops::{Add, Mul, Sub},
         sync::Arc,
     },
 };
 
 pub mod analysis;
 pub mod build;
+pub mod constant_value;
 mod internal_fns;
 pub mod opt;
 mod pretty_print;
@@ -56,10 +57,9 @@ pub enum Type {
         element_count: usize,
         element_type: Arc<Type>,
     },
-    Bundled {
-        value: Arc<Type>,
-        len: Arc<Type>,
-    },
+
+    Bits,
+    ArbitraryLengthInteger,
 }
 
 macro_rules! type_def_helper {
@@ -96,19 +96,6 @@ impl Type {
         })
     }
 
-    pub fn bundle_unsigned() -> Self {
-        Self::Bundled {
-            value: Arc::new(Type::u64()),
-            len: Arc::new(Type::u8()),
-        }
-    }
-    pub fn bundle_signed() -> Self {
-        Self::Bundled {
-            value: Arc::new(Type::s64()),
-            len: Arc::new(Type::u8()),
-        }
-    }
-
     /// Gets the offset in bytes of a field of a composite or an element of a
     /// vector
     pub fn byte_offset(&self, element_field: usize) -> Option<usize> {
@@ -133,7 +120,7 @@ impl Type {
                 element_count,
                 element_type,
             } => element_type.width_bits() * element_count,
-            Self::Bundled { value, .. } => value.width_bits(),
+            Self::Bits | Self::ArbitraryLengthInteger => usize::try_from(BitsValue::BITS).unwrap(),
         }
     }
 
@@ -146,10 +133,12 @@ impl Type {
     type_def_helper!(u16, UnsignedInteger, 16);
     type_def_helper!(u32, UnsignedInteger, 32);
     type_def_helper!(u64, UnsignedInteger, 64);
+    type_def_helper!(u128, UnsignedInteger, 128);
     type_def_helper!(s8, SignedInteger, 8);
     type_def_helper!(s16, SignedInteger, 16);
     type_def_helper!(s32, SignedInteger, 32);
     type_def_helper!(s64, SignedInteger, 64);
+    type_def_helper!(s128, SignedInteger, 128);
     type_def_helper!(f32, FloatingPoint, 32);
     type_def_helper!(f64, FloatingPoint, 64);
 
@@ -178,8 +167,8 @@ impl Type {
         }
     }
 
-    pub fn is_bundle(&self) -> bool {
-        matches!(self, Self::Bundled { .. })
+    pub fn is_bits(&self) -> bool {
+        matches!(self, Self::Bits)
     }
 
     pub fn is_u1(&self) -> bool {
@@ -202,128 +191,8 @@ impl Type {
         )
     }
 
-    pub fn as_signed(&self) -> Self {
-        match &*self {
-            Self::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::UnsignedInteger,
-                element_width_in_bits,
-            }) => Self::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::SignedInteger,
-                element_width_in_bits: *element_width_in_bits,
-            }),
-
-            Self::Bundled { value, len } => Self::Bundled {
-                value: Arc::new(value.as_signed()),
-                len: len.clone(),
-            },
-
-            _ => {
-                panic!("cannot convert to signed: {}", self);
-            }
-        }
-    }
-
     pub fn is_compatible_with(&self, other: &Self) -> bool {
         self == other
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConstantValue {
-    UnsignedInteger(usize),
-    SignedInteger(isize),
-    FloatingPoint(f64),
-    Unit,
-}
-
-impl ConstantValue {
-    pub fn zero(&self) -> bool {
-        match self {
-            ConstantValue::UnsignedInteger(v) => *v == 0,
-            ConstantValue::SignedInteger(v) => *v == 0,
-            ConstantValue::FloatingPoint(v) => *v == 0.,
-            ConstantValue::Unit => false,
-        }
-    }
-
-    pub fn zero_or_unit(&self) -> bool {
-        match self {
-            ConstantValue::UnsignedInteger(v) => *v == 0,
-            ConstantValue::SignedInteger(v) => *v == 0,
-            ConstantValue::FloatingPoint(v) => *v == 0.,
-            ConstantValue::Unit => true,
-        }
-    }
-
-    pub fn is_unsigned(&self) -> bool {
-        match self {
-            ConstantValue::UnsignedInteger(_) => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_signed(&self) -> bool {
-        match self {
-            ConstantValue::SignedInteger(_) => true,
-            _ => false,
-        }
-    }
-}
-
-impl Add for ConstantValue {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
-                ConstantValue::UnsignedInteger(l + r)
-            }
-            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l + r)
-            }
-            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
-                ConstantValue::FloatingPoint(l + r)
-            }
-            (l, r) => panic!("invalid types for add: {l:?} {r:?}"),
-        }
-    }
-}
-
-impl Sub for ConstantValue {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
-                ConstantValue::UnsignedInteger(l - r)
-            }
-            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l - r)
-            }
-            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
-                ConstantValue::FloatingPoint(l - r)
-            }
-            (l, r) => panic!("invalid types for add: {l:?} {r:?}"),
-        }
-    }
-}
-
-impl Mul for ConstantValue {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        match (self, rhs) {
-            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
-                ConstantValue::UnsignedInteger(l * r)
-            }
-            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l * r)
-            }
-            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
-                ConstantValue::FloatingPoint(l * r)
-            }
-            (l, r) => panic!("invalid types for add: {l:?} {r:?}"),
-        }
     }
 }
 
@@ -483,6 +352,12 @@ pub enum StatementKind {
         typ: Arc<Type>,
         value: Statement,
     },
+    BitsCast {
+        kind: CastOperationKind,
+        typ: Arc<Type>,
+        value: Statement,
+        length: Statement,
+    },
     Jump {
         target: Block,
     },
@@ -538,17 +413,15 @@ pub enum StatementKind {
         fields: Vec<Statement>,
     },
 
-    Bundle {
+    CreateBits {
         value: Statement,
         length: Statement,
     },
 
-    UnbundleValue {
-        bundle: Statement,
-    },
-
-    UnbundleLength {
-        bundle: Statement,
+    // creating bits and getting the value done through casting
+    // gets the length when applied to bits
+    SizeOf {
+        value: Statement,
     },
 }
 
@@ -698,10 +571,10 @@ impl Statement {
             StatementKind::ReadElement { .. } => ValueClass::Dynamic,
             StatementKind::MutateElement { .. } => ValueClass::Dynamic,
             StatementKind::CreateComposite { .. } => ValueClass::Dynamic,
-            StatementKind::Bundle { .. } => ValueClass::Dynamic,
-            StatementKind::UnbundleValue { .. } => ValueClass::Dynamic,
-            StatementKind::UnbundleLength { .. } => ValueClass::Dynamic,
+            StatementKind::SizeOf { .. } => ValueClass::Dynamic,
             StatementKind::Assert { .. } => ValueClass::None,
+            StatementKind::BitsCast { .. } => ValueClass::Dynamic,
+            StatementKind::CreateBits { .. } => ValueClass::Dynamic,
         }
     }
 
@@ -760,7 +633,7 @@ impl Statement {
                     Arc::new(Type::void())
                 }
             }
-            StatementKind::Cast { typ, .. } => typ,
+            StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
             StatementKind::Jump { .. } => Arc::new(Type::void()),
             StatementKind::Branch { .. } => Arc::new(Type::void()),
             StatementKind::PhiNode { members } => members
@@ -786,23 +659,9 @@ impl Statement {
                 vector.typ()
             }
             StatementKind::CreateComposite { typ, .. } => typ,
-            StatementKind::Bundle { value, length } => Arc::new(Type::Bundled {
-                value: value.typ(),
-                len: length.typ(),
-            }),
-            StatementKind::UnbundleValue { bundle } => {
-                let Type::Bundled { value, .. } = &*bundle.typ() else {
-                    panic!("cannot unbundle non-bundle");
-                };
-                value.clone()
-            }
-            StatementKind::UnbundleLength { bundle } => {
-                let Type::Bundled { len, .. } = &*bundle.typ() else {
-                    panic!("cannot unbundle non-bundle");
-                };
-                len.clone()
-            }
+            StatementKind::SizeOf { .. } => Arc::new(Type::u16()),
             StatementKind::Assert { .. } => Arc::new(Type::unit()),
+            StatementKind::CreateBits { .. } => Arc::new(Type::Bits),
         }
     }
 
@@ -886,16 +745,7 @@ impl StatementInner {
                     value: with.clone(),
                 };
             }
-            StatementKind::UnbundleValue { .. } => {
-                self.kind = StatementKind::UnbundleValue {
-                    bundle: with.clone(),
-                };
-            }
-            StatementKind::UnbundleLength { .. } => {
-                self.kind = StatementKind::UnbundleLength {
-                    bundle: with.clone(),
-                };
-            }
+
             StatementKind::Cast { kind, typ, .. } => {
                 self.kind = StatementKind::Cast {
                     kind,
@@ -903,6 +753,32 @@ impl StatementInner {
                     value: with.clone(),
                 };
             }
+            StatementKind::BitsCast {
+                kind,
+                typ,
+                value,
+                length,
+            } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                let length = if length == use_of {
+                    with.clone()
+                } else {
+                    length.clone()
+                };
+
+                self.kind = StatementKind::BitsCast {
+                    kind,
+                    typ,
+                    value,
+                    length,
+                };
+            }
+
             StatementKind::Call { target, args, tail } => {
                 let args = args
                     .iter()
@@ -946,21 +822,7 @@ impl StatementInner {
                     length,
                 };
             }
-            StatementKind::Bundle { value, length } => {
-                let value = if value == use_of {
-                    with.clone()
-                } else {
-                    value.clone()
-                };
 
-                let length = if length == use_of {
-                    with.clone()
-                } else {
-                    length.clone()
-                };
-
-                self.kind = StatementKind::Bundle { value, length };
-            }
             StatementKind::Assert { .. } => {
                 self.kind = StatementKind::Assert {
                     condition: with.clone(),
@@ -1069,6 +931,15 @@ impl StatementInner {
                 }
             }
 
+            StatementKind::SizeOf { value } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+                self.kind = StatementKind::SizeOf { value };
+            }
+
             _ => {
                 panic!("use replacement not implemented for {}", self.kind);
             }
@@ -1157,47 +1028,6 @@ impl StatementBuilder {
                 }
             }
 
-            // primitive to bundled, create a bundle with the value and length of the primitive
-            (Type::Primitive(source_primitive), Type::Bundled { value, len }) => {
-                let length = self.build(StatementKind::Constant {
-                    typ: len.clone(),
-                    value: ConstantValue::UnsignedInteger(source_primitive.width()),
-                });
-                let value = self.generate_cast(source, value.clone());
-                self.build(StatementKind::Bundle { value, length })
-            }
-
-            // bundled to primitive, get value and cast
-            (Type::Bundled { .. }, Type::Primitive(_)) => {
-                let value = self.build(StatementKind::UnbundleValue { bundle: source });
-
-                // todo: maybe use len here
-
-                self.generate_cast(value, destination_type)
-            }
-
-            // bundle to bundle
-            (
-                Type::Bundled { .. },
-                Type::Bundled {
-                    value: dest_value_type,
-                    len: dest_len_type,
-                },
-            ) => {
-                let source_value = self.build(StatementKind::UnbundleValue {
-                    bundle: source.clone(),
-                });
-                let source_len = self.build(StatementKind::UnbundleValue { bundle: source });
-
-                let cast_value = self.generate_cast(source_value, dest_value_type.clone());
-                let cast_len = self.generate_cast(source_len, dest_len_type.clone());
-
-                self.build(StatementKind::Bundle {
-                    value: cast_value,
-                    length: cast_len,
-                })
-            }
-
             (
                 Type::Vector {
                     element_count: src_count,
@@ -1224,9 +1054,58 @@ impl StatementBuilder {
                 }
             }
 
+            (
+                Type::Primitive(PrimitiveType {
+                    element_width_in_bits,
+                    ..
+                }),
+                Type::ArbitraryLengthInteger,
+            ) => {
+                assert!(*element_width_in_bits < 128);
+
+                self.build(StatementKind::Cast {
+                    kind: CastOperationKind::ZeroExtend,
+                    typ: destination_type,
+                    value: source,
+                })
+            }
+
+            (
+                Type::Primitive(PrimitiveType {
+                    element_width_in_bits,
+                    ..
+                }),
+                Type::Bits,
+            ) => {
+                assert!(*element_width_in_bits < 128);
+
+                self.build(StatementKind::Cast {
+                    kind: CastOperationKind::ZeroExtend,
+                    typ: destination_type,
+                    value: source,
+                })
+            }
+
+            (Type::ArbitraryLengthInteger, Type::Primitive(_)) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: destination_type,
+                value: source,
+            }),
+
+            (Type::Bits, Type::Primitive(_)) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: destination_type,
+                value: source,
+            }),
+
+            (Type::ArbitraryLengthInteger, Type::Bits) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            }),
+
             (src, dst) => {
-                log::warn!("cannot cast from {src} to {dst}");
-                return source;
+                panic!("cannot cast from {src} to {dst}");
             }
         }
     }

@@ -332,12 +332,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Type::Real => write!(self.writer, "real"),
             Type::Float => write!(self.writer, "float"),
 
-            Type::Int { signed, size } => {
-                match signed {
-                    true => write!(self.writer, "i"),
-                    false => write!(self.writer, "u"),
-                }
-                .unwrap();
+            Type::Integer { size } => {
+                write!(self.writer, "i").unwrap();
 
                 match size {
                     Size::Static(size) => write!(self.writer, "{size}").unwrap(),
@@ -346,7 +342,22 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                         self.visit_value(value.clone());
                         write!(self.writer, ")").unwrap();
                     }
-                    Size::Unknown => write!(self.writer, "???").unwrap(),
+                    Size::Unknown => (),
+                };
+
+                Ok(())
+            }
+
+            Type::Bits { size } => {
+                write!(self.writer, "bv").unwrap();
+                match size {
+                    Size::Static(size) => write!(self.writer, "{size}").unwrap(),
+                    Size::Runtime(value) => {
+                        write!(self.writer, "rt(").unwrap();
+                        self.visit_value(value.clone());
+                        write!(self.writer, ")").unwrap();
+                    }
+                    Size::Unknown => (),
                 };
 
                 Ok(())

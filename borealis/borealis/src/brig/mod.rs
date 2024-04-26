@@ -14,10 +14,8 @@ use {
         },
         brig::{
             allowlist::apply_fn_allowlist,
-            bundle::codegen_bundle,
-            functions_interpreter::{
-                codegen_block, codegen_parameters, get_block_fn_ident, get_functions_to_codegen,
-            },
+            bits::codegen_bits,
+            functions_interpreter::{codegen_block, codegen_parameters, get_block_fn_ident},
             state::codegen_state,
             workspace::{create_manifest, write_workspace},
         },
@@ -45,7 +43,7 @@ use {
 };
 
 mod allowlist;
-mod bundle;
+pub mod bits;
 mod functions_dbt;
 mod functions_interpreter;
 mod state;
@@ -195,11 +193,10 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
                 quote!([#element_type; #count])
             }
         }
-        Type::Bundled { value, len } => {
-            let value_type = codegen_type(value.clone());
-            let len_type = codegen_type(len.clone());
-            quote!(Bundle<#value_type, #len_type>)
+        Type::Bits => {
+            quote!(Bits)
         }
+        Type::ArbitraryLengthInteger => quote!(i128),
     }
 }
 
@@ -318,7 +315,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
     let common = {
         let header = codegen_header();
         let state = codegen_state(rudder);
-        let bundle = codegen_bundle();
+        let bundle = codegen_bits();
         let types = codegen_types(rudder);
 
         (
@@ -378,7 +375,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
 
                             tracer.begin(value, state.read_register::<u64>(REG_U_PC));
 
-                            #entrypoint_ident(state, tracer, Bundle::new(state.read_register(REG_U_PC), 64), value);
+                            #entrypoint_ident(state, tracer, i128::from(state.read_register::<u64>(REG_U_PC)), value);
 
                             // increment PC if no branch was taken
                             if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
