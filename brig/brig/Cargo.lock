@@ -5193,6 +5193,7 @@ dependencies = [
 name = "Have128BitDescriptorExt"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -5273,6 +5274,7 @@ dependencies = [
 name = "HaveCSSC"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -5344,6 +5346,7 @@ dependencies = [
 name = "HaveFeatEBEP"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -5351,6 +5354,7 @@ dependencies = [
 name = "HaveFeatHBC"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -5365,6 +5369,7 @@ dependencies = [
 name = "HaveFeatLS64_ACCDATA"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -5372,6 +5377,7 @@ dependencies = [
 name = "HaveFeatLS64_V"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -5379,6 +5385,7 @@ dependencies = [
 name = "HaveFeatMOPS"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -5400,6 +5407,7 @@ dependencies = [
 name = "HaveFeatXS"
 version = "0.0.0"
 dependencies = [
+ "IsFeatureImplemented",
  "common",
 ]
 
@@ -8009,6 +8017,13 @@ dependencies = [
 
 [[package]]
 name = "POR_EL3_SysRegRead_dd4204e711df2c15"
+version = "0.0.0"
+dependencies = [
+ "common",
+]
+
+[[package]]
+name = "Prefetch"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -24737,7 +24752,6 @@ name = "decode_dmb_aarch64_instrs_system_barriers_dmb"
 version = "0.0.0"
 dependencies = [
  "common",
- "execute_aarch64_instrs_system_barriers_dmb",
 ]
 
 [[package]]
@@ -24754,7 +24768,6 @@ name = "decode_dsb_aarch64_instrs_system_barriers_dsb"
 version = "0.0.0"
 dependencies = [
  "common",
- "execute_aarch64_instrs_system_barriers_dsb",
 ]
 
 [[package]]
@@ -24763,7 +24776,6 @@ version = "0.0.0"
 dependencies = [
  "HaveFeatXS",
  "common",
- "execute_aarch64_instrs_system_barriers_dsb",
 ]
 
 [[package]]
@@ -33831,7 +33843,13 @@ dependencies = [
 name = "execute_aarch64_instrs_memory_literal_general"
 version = "0.0.0"
 dependencies = [
+ "CreateAccDescGPR",
+ "Mem_read",
+ "Prefetch",
+ "SPESampleGeneralPurposeLoadStore",
+ "X_set",
  "common",
+ "integer_subrange",
 ]
 
 [[package]]
@@ -34150,20 +34168,6 @@ dependencies = [
 
 [[package]]
 name = "execute_aarch64_instrs_memory_vector_single_no_wb_ordered"
-version = "0.0.0"
-dependencies = [
- "common",
-]
-
-[[package]]
-name = "execute_aarch64_instrs_system_barriers_dmb"
-version = "0.0.0"
-dependencies = [
- "common",
-]
-
-[[package]]
-name = "execute_aarch64_instrs_system_barriers_dsb"
 version = "0.0.0"
 dependencies = [
  "common",

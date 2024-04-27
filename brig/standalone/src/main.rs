@@ -1,5 +1,5 @@
 use {
-    arch::{decode_execute, ExecuteResult, State, Tracer, REG_CTR_EL0, REG_R0, REG_R1, REG_U_PC},
+    arch::{decode_execute, ExecuteResult, State, Tracer, REG_CTR_EL0, REG_U_PC},
     clap::Parser,
     rustix::mm::{MapFlags, ProtFlags},
     std::{fmt::Debug, fs, path::PathBuf, ptr, time::Instant},
@@ -7,7 +7,7 @@ use {
 
 const GUEST_MEMORY_BASE: usize = 0x10_000;
 const GUEST_MEMORY_SIZE: usize = 12 * 1024 * 1024 * 1024;
-const KERNEL_LOAD_BIAS: usize = 0x8000_0000;
+const KERNEL_LOAD_BIAS: usize = 0x4020_0000;
 
 fn main() {
     let cli = Cli::parse();
@@ -19,18 +19,20 @@ fn main() {
         assert_eq!(0, header.text_offset);
     }
 
+    // offset passed to state will be applied to all memory accesses
     let mut state = State::init(GUEST_MEMORY_BASE);
 
     state.write_register::<u64>(REG_CTR_EL0, 0x0444c004);
+
+    // so PC can be the kernel load bias *not* load bias + guest memory base
     state.write_register(REG_U_PC, KERNEL_LOAD_BIAS);
-    state.write_register::<u64>(REG_R0, 0x823a6040);
-    state.write_register::<u64>(REG_R1, 0x823a6000);
 
     let mut instructions_retired = 0u64;
 
     let mut last_instrs = 0;
     let mut last_time = Instant::now();
 
+    // create guest virtual memory
     let mmap = unsafe {
         rustix::mm::mmap_anonymous(
             GUEST_MEMORY_BASE as *mut _,
@@ -41,6 +43,7 @@ fn main() {
     }
     .unwrap();
 
+    // copy kernel
     unsafe {
         ptr::copy(
             image.as_ptr(),
