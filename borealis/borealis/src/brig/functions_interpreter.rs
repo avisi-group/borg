@@ -651,6 +651,45 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             quote!(Bits::new(#ident as u128, #width))
         }
 
+        (
+            Type::Vector {
+                element_type: source_type,
+                ..
+            },
+            Type::Vector {
+                element_count: 0,
+                element_type: target_type,
+            },
+            CastOperationKind::Convert,
+        ) => {
+            assert_eq!(&*source_type, &*target_type);
+
+            quote!(alloc::vec::Vec::from(#ident))
+        }
+
+        (
+            Type::Vector {
+                element_count: 0,
+                element_type: source_type,
+            },
+            Type::Vector {
+                element_count,
+                element_type: target_type,
+            },
+            CastOperationKind::Convert,
+        ) => {
+            assert_eq!(&*source_type, &*target_type);
+
+            //let element_type = codegen_type(target_type.clone());
+            quote! {
+                {
+                    let mut buf = [Default::default(); #element_count];
+                    buf.copy_from_slice(&#ident);
+                    buf
+                }
+            }
+        }
+
         (src, tgt, knd) => panic!(
             "failed to generate code for cast of {:?} from {src} to {tgt} of kind {knd:?}",
             value.name()

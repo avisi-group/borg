@@ -520,11 +520,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             match name.as_ref() {
                 "%i64->%i" => {
                     // lots of %i64->%i(Int(BigInt(-1))) so disabled this check
-                   // assert_eq!(Type::s64(), *args[0].typ());
+                    // assert_eq!(Type::s64(), *args[0].typ());
                     Some(
-                    self.builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::ArbitraryLengthInteger)),
-                )},
+                        self.builder
+                            .generate_cast(args[0].clone(), Arc::new(Type::ArbitraryLengthInteger)),
+                    )
+                }
 
                 "%i->%i64" => {
                     assert!(matches!(*args[0].typ(), Type::ArbitraryLengthInteger));
@@ -577,22 +578,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 // val add_atom : (%i, %i) -> %i
-                "add_atom" |
-                  // val add_bits : (%bv, %bv) -> %bv
-                "add_bits"
-
-                => {
+                // val add_bits : (%bv, %bv) -> %bv
+                "add_atom" | "add_bits" => {
                     assert!(args[0].typ() == args[1].typ());
                     Some(self.builder.build(StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Add,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                }))},
+                        kind: BinaryOperationKind::Add,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }))
+                }
 
-
-                  // val add_bits_int : (%bv, %i) -> %bv
-                  "add_bits_int" => {
-
+                // val add_bits_int : (%bv, %i) -> %bv
+                "add_bits_int" => {
                     let rhs = self
                         .builder
                         .generate_cast(args[1].clone(), Arc::new(Type::Bits));
@@ -601,7 +598,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         lhs: args[0].clone(),
                         rhs,
                     }))
-
                 }
 
                 // val sub_bits_int : (%bv, %i) -> %bv
@@ -777,6 +773,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
+                "plain_vector_update<B64>" | "plain_vector_update<RPMEVTYPER_EL0_Type>" => {
+                    Some(self.builder.build(StatementKind::MutateElement {
+                        vector: args[0].clone(),
+                        value: args[2].clone(),
+                        index: args[1].clone(),
+                    }))
+                }
+
                 "bitvector_access" => {
                     let length = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
@@ -794,7 +798,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "bitvector_length" => {
                     assert!(matches!(*args[0].typ(), Type::Bits));
 
-                    Some(self.builder.build(StatementKind::SizeOf { value: args[0].clone() }))
+                    Some(self.builder.build(StatementKind::SizeOf {
+                        value: args[0].clone(),
+                    }))
                 }
 
                 "update_fbits" => {
@@ -871,9 +877,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "UInt0" => {
                     // just copy bits
 
-                    Some(self.builder.build(StatementKind::Cast { kind: CastOperationKind::ZeroExtend, typ:  Arc::new(Type::ArbitraryLengthInteger), value: args[0].clone()}))
+                    Some(self.builder.build(StatementKind::Cast {
+                        kind: CastOperationKind::ZeroExtend,
+                        typ: Arc::new(Type::ArbitraryLengthInteger),
+                        value: args[0].clone(),
+                    }))
                 }
-                 // %bv -> %i
+                // %bv -> %i
                 "SInt0" => {
                     //                     void sail_signed(sail_int *rop, const lbits op)
                     // {
@@ -892,30 +902,42 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     //     }
                     //   }
                     // }
-                    Some(self.builder.build(StatementKind::Cast { kind: CastOperationKind::SignExtend, typ:  Arc::new(Type::ArbitraryLengthInteger), value:  args[0].clone()}))
+                    Some(self.builder.build(StatementKind::Cast {
+                        kind: CastOperationKind::SignExtend,
+                        typ: Arc::new(Type::ArbitraryLengthInteger),
+                        value: args[0].clone(),
+                    }))
                 }
 
-
-
-
-
-                 // val ZeroExtend0 : (%bv, %i) -> %bv
+                // val ZeroExtend0 : (%bv, %i) -> %bv
                 // val sail_zero_extend : (%bv, %i) -> %bv
                 "ZeroExtend0" | "sail_zero_extend" => {
-                    Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::ZeroExtend, typ: Arc::new(Type::Bits), value: args[0].clone(), length: args[1].clone() }))
+                    Some(self.builder.build(StatementKind::BitsCast {
+                        kind: CastOperationKind::ZeroExtend,
+                        typ: Arc::new(Type::Bits),
+                        value: args[0].clone(),
+                        length: args[1].clone(),
+                    }))
                 }
 
-                    // val SignExtend0 : (%bv, %i) -> %bv
+                // val SignExtend0 : (%bv, %i) -> %bv
                 // val sail_sign_extend : (%bv, %i) -> %bv
-                  "SignExtend0"
-                | "sail_sign_extend" => {
-                    Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::SignExtend, typ: Arc::new(Type::Bits), value: args[0].clone(), length: args[1].clone() }))
+                "SignExtend0" | "sail_sign_extend" => {
+                    Some(self.builder.build(StatementKind::BitsCast {
+                        kind: CastOperationKind::SignExtend,
+                        typ: Arc::new(Type::Bits),
+                        value: args[0].clone(),
+                        length: args[1].clone(),
+                    }))
                 }
 
-    // val truncate : (%bv, %i) -> %bv
-    "truncate" => {
-        Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: Arc::new(Type::Bits), value: args[0].clone(), length: args[1].clone() }))
-    }
+                // val truncate : (%bv, %i) -> %bv
+                "truncate" => Some(self.builder.build(StatementKind::BitsCast {
+                    kind: CastOperationKind::Truncate,
+                    typ: Arc::new(Type::Bits),
+                    value: args[0].clone(),
+                    length: args[1].clone(),
+                })),
 
                 "sail_zeros" => {
                     let length = args[0].clone();
@@ -927,9 +949,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let value = self.builder.generate_cast(_0, Arc::new(Type::Bits));
 
-                    Some(self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::ZeroExtend, typ: Arc::new(Type::Bits), value, length }))
-
-
+                    Some(self.builder.build(StatementKind::BitsCast {
+                        kind: CastOperationKind::ZeroExtend,
+                        typ: Arc::new(Type::Bits),
+                        value,
+                        length,
+                    }))
                 }
 
                 "sail_assert" => Some(self.builder.build(StatementKind::Assert {
@@ -1034,17 +1059,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         start: i,
                         length: _1,
                     }))
-
                 }
 
                 // val append_64 : (%bv, %bv64) -> %bv
                 "append_64" => {
-
                     let rhs = self
                         .builder
                         .generate_cast(args[1].clone(), Arc::new(Type::Bits));
                     Some(self.generate_concat(args[0].clone(), rhs))
-
                 }
 
                 "bitvector_concat" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
@@ -1143,7 +1165,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // ignore
                 "append_str" => Some(args[0].clone()),
 
-                "print_endline" | "AArch64_DC" | "execute_aarch64_instrs_system_barriers_dmb" | "execute_aarch64_instrs_system_barriers_dsb" => {
+                "print_endline"
+                | "AArch64_DC"
+                | "execute_aarch64_instrs_system_barriers_dmb"
+                | "execute_aarch64_instrs_system_barriers_dsb"
+                | "execute_aarch64_instrs_system_barriers_isb" => {
                     Some(self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::unit()),
                         value: ConstantValue::Unit,

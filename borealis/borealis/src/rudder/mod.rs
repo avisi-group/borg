@@ -940,6 +940,66 @@ impl StatementInner {
                 self.kind = StatementKind::SizeOf { value };
             }
 
+            StatementKind::Select {
+                condition,
+                true_value,
+                false_value,
+            } => {
+                let condition = if condition == use_of {
+                    with.clone()
+                } else {
+                    condition.clone()
+                };
+
+                let true_value = if true_value == use_of {
+                    with.clone()
+                } else {
+                    true_value.clone()
+                };
+
+                let false_value = if false_value == use_of {
+                    with.clone()
+                } else {
+                    false_value.clone()
+                };
+
+                self.kind = StatementKind::Select {
+                    condition,
+                    true_value,
+                    false_value,
+                };
+            }
+
+            StatementKind::MutateElement {
+                vector,
+                value,
+                index,
+            } => {
+                let vector = if vector == use_of {
+                    with.clone()
+                } else {
+                    vector.clone()
+                };
+
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                let index = if index == use_of {
+                    with.clone()
+                } else {
+                    index.clone()
+                };
+
+                self.kind = StatementKind::MutateElement {
+                    vector,
+                    value,
+                    index,
+                };
+            }
+
             _ => {
                 panic!("use replacement not implemented for {}", self.kind);
             }
@@ -1042,15 +1102,25 @@ impl StatementBuilder {
                     todo!();
                 }
 
-                if *src_count > 0 && *dst_count == 0 {
-                    // casting known to unknown
-                    self.build(StatementKind::Cast {
-                        kind: CastOperationKind::Convert,
-                        typ: destination_type,
-                        value: source,
-                    })
-                } else {
-                    todo!()
+                match (src_count, dst_count) {
+                    (0, 0) => panic!("no cast needed, both unknown"),
+                    (_, 0) => {
+                        // casting fixed to unknown
+                        self.build(StatementKind::Cast {
+                            kind: CastOperationKind::Convert,
+                            typ: destination_type,
+                            value: source,
+                        })
+                    }
+                    (0, _) => {
+                        // casting fixed to unknown
+                        self.build(StatementKind::Cast {
+                            kind: CastOperationKind::Convert,
+                            typ: destination_type,
+                            value: source,
+                        })
+                    }
+                    (_, _) => panic!("casting from fixed to fixed"),
                 }
             }
 
