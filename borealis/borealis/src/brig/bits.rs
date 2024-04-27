@@ -5,7 +5,7 @@ pub type BitsLength = u16;
 
 pub fn codegen_bits() -> TokenStream {
     quote! {
-    /// Variable length bitvector implementation
+            /// Variable length bitvector implementation
     ///
     /// Operations must zero unused bits before returning
     #[derive(Default, Clone, Copy, Debug)]
@@ -70,7 +70,7 @@ pub fn codegen_bits() -> TokenStream {
 
             let shift_amount = 128 - self.length();
             Self {
-                value: ((self.value() << shift_amount) >> shift_amount),
+                value: (((self.value() as i128) << shift_amount) >> shift_amount) as u128,
                 length,
             }
             .normalize()
@@ -209,9 +209,22 @@ pub fn codegen_bits() -> TokenStream {
     }
 
     impl core::cmp::Eq for Bits {}
-    }
+
+        }
 }
 
+// #[cfg(test)]
+// mod tests {
+//     use crate::brig::bits::Bits;
+
+//     #[test]
+//     fn sign_extend() {
+//         let bits = Bits::new(0xe57ba1c, 0x1c);
+//         let sign_extend = bits.sign_extend(64);
+//         assert_eq!(sign_extend.length(), 64);
+//         assert_eq!(sign_extend.value(), 0xfffffffffe57ba1c);
+//     }
+// }
 // pub fn codegen_int() -> TokenStream {
 //     quote! {
 //         #[derive(Default, Clone, Copy, Debug)]
