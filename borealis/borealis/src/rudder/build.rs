@@ -1117,10 +1117,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         value: value_in_name,
                     }))
                 }
-                "DataMemoryBarrier" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::unit()),
-                    value: ConstantValue::Unit,
-                })),
+                // "Mem_read" => {
+                //     let address = args[0].clone();
+                //     let _size = args[1].clone();
+                //     let _accdesc = args[2].clone();
+                //     let _value_in_name = args[3].clone();
+
+                //     Some(self.builder.build(StatementKind::ReadMemory { typ: (), offset: address }))
+                // }
                 "HaveEL" => {
                     let two = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::new_primitive(
@@ -1138,7 +1142,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
                 // ignore
                 "append_str" => Some(args[0].clone()),
-                "print_endline" | "AArch64_DC" => {
+
+                "print_endline" | "AArch64_DC" | "execute_aarch64_instrs_system_barriers_dmb" | "execute_aarch64_instrs_system_barriers_dsb" => {
                     Some(self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::unit()),
                         value: ConstantValue::Unit,
