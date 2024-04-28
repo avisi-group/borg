@@ -1,5 +1,5 @@
 use {
-    arch::{decode_execute, ExecuteResult, State, Tracer, REG_CTR_EL0, REG_U_PC},
+    arch::{decode_execute, ExecuteResult, State, Tracer, REG_CTR_EL0, REG_R0, REG_U_PC},
     clap::Parser,
     rustix::mm::{MapFlags, ProtFlags},
     std::{fmt::Debug, fs, path::PathBuf, ptr, time::Instant},
@@ -8,6 +8,9 @@ use {
 const GUEST_MEMORY_BASE: usize = 0x10_000;
 const GUEST_MEMORY_SIZE: usize = 12 * 1024 * 1024 * 1024;
 const KERNEL_LOAD_BIAS: usize = 0x4020_0000;
+const DTB_LOAD_BIAS: usize = 0x4000_0000;
+
+const DTB: &[u8] = include_bytes!("../brig-platform.dtb");
 
 fn main() {
     let cli = Cli::parse();
@@ -18,19 +21,6 @@ fn main() {
     if header.magic == ARM64_MAGIC {
         assert_eq!(0, header.text_offset);
     }
-
-    // offset passed to state will be applied to all memory accesses
-    let mut state = State::init(GUEST_MEMORY_BASE);
-
-    state.write_register::<u64>(REG_CTR_EL0, 0x0444c004);
-
-    // so PC can be the kernel load bias *not* load bias + guest memory base
-    state.write_register(REG_U_PC, KERNEL_LOAD_BIAS);
-
-    let mut instructions_retired = 0u64;
-
-    let mut last_instrs = 0;
-    let mut last_time = Instant::now();
 
     // create guest virtual memory
     let mmap = unsafe {
@@ -51,6 +41,30 @@ fn main() {
             image.len(),
         )
     };
+
+    // copy dtb
+    unsafe {
+        ptr::copy(
+            DTB.as_ptr(),
+            (mmap as *mut u8).offset(DTB_LOAD_BIAS as isize),
+            DTB.len(),
+        )
+    };
+
+    // offset passed to state will be applied to all memory accesses
+    let mut state = State::init(GUEST_MEMORY_BASE);
+
+    state.write_register::<u64>(REG_CTR_EL0, 0x0444c004);
+
+    // so PC can be the kernel load bias *not* load bias + guest memory base
+    state.write_register(REG_U_PC, KERNEL_LOAD_BIAS);
+    // X0 must contain phys address of DTB https://docs.kernel.org/arch/arm64/booting.html
+    state.write_register(REG_R0, DTB_LOAD_BIAS);
+
+    let mut instructions_retired = 0u64;
+
+    let mut last_instrs = 0;
+    let mut last_time = Instant::now();
 
     loop {
         let pc = state.read_register::<u64>(REG_U_PC);
