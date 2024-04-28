@@ -13,8 +13,8 @@ use {
             Ast,
         },
         brig::{
-            allowlist::apply_fn_allowlist,
             bits::codegen_bits,
+            denylist::apply_fn_denylist,
             functions_interpreter::{codegen_block, codegen_parameters, get_block_fn_ident},
             state::codegen_state,
             workspace::{create_manifest, write_workspace},
@@ -42,8 +42,8 @@ use {
     syn::Ident,
 };
 
-mod allowlist;
 pub mod bits;
+mod denylist;
 mod functions_dbt;
 mod functions_interpreter;
 mod state;
@@ -62,7 +62,7 @@ pub fn sail_to_brig(
     }
 
     info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(apply_fn_allowlist(jib_ast.into_iter()));
+    let ast = Ast::from_jib(apply_fn_denylist(jib_ast.into_iter()));
 
     // // useful for debugging
     if let Some(path) = &dump_ir {
@@ -136,8 +136,7 @@ pub fn sail_to_brig(
 
 fn promote_width(width: usize) -> usize {
     match width {
-        0 => 0,
-        1..=8 => 8,
+        0..=8 => 8,
         9..=16 => 16,
         17..=32 => 32,
         33..=64 => 64,
@@ -174,10 +173,16 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
 
             quote!(#rust_type)
         }
-        Type::Composite(t) => {
+        Type::Product(t) => {
             let mut hasher = DefaultHasher::new();
             t.hash(&mut hasher);
-            let hashed = format_ident!("CompositeType{:x}", hasher.finish());
+            let hashed = format_ident!("ProductType{:x}", hasher.finish());
+            quote! { #hashed }
+        }
+        Type::Sum(t) => {
+            let mut hasher = DefaultHasher::new();
+            t.hash(&mut hasher);
+            let hashed = format_ident!("SumType{:x}", hasher.finish());
             quote! { #hashed }
         }
         Type::Vector {
@@ -243,8 +248,8 @@ fn codegen_types(rudder: &Context) -> TokenStream {
         .map(|typ| {
             let ident = codegen_type(typ.clone());
 
-            let Type::Composite(fields) = &*typ else {
-                panic!("struct must be composite type");
+            let Type::Product(fields) = &*typ else {
+                panic!("struct must be product type");
             };
 
             let fields: TokenStream = fields
@@ -273,8 +278,8 @@ fn codegen_types(rudder: &Context) -> TokenStream {
         .map(|typ| {
             let ident = codegen_type(typ.clone());
 
-            let Type::Composite(fields) = &*typ else {
-                panic!("union must be composite type");
+            let Type::Sum(fields) = &*typ else {
+                panic!("union must be sum type");
             };
 
             let variants: TokenStream = fields

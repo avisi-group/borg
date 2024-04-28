@@ -47,12 +47,24 @@ fn run_on_stmt(stmt: Statement) -> bool {
                     BinaryOperationKind::And => todo!(),
                     BinaryOperationKind::Or => todo!(),
                     BinaryOperationKind::Xor => todo!(),
-                    BinaryOperationKind::CompareEqual => todo!(),
-                    BinaryOperationKind::CompareNotEqual => todo!(),
-                    BinaryOperationKind::CompareLessThan => todo!(),
-                    BinaryOperationKind::CompareLessThanOrEqual => todo!(),
-                    BinaryOperationKind::CompareGreaterThan => todo!(),
-                    BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
+                    BinaryOperationKind::CompareEqual => {
+                        ConstantValue::UnsignedInteger((lhs == rhs) as usize)
+                    }
+                    BinaryOperationKind::CompareNotEqual => {
+                        ConstantValue::UnsignedInteger((lhs != rhs) as usize)
+                    }
+                    BinaryOperationKind::CompareLessThan => {
+                        ConstantValue::UnsignedInteger((lhs < rhs) as usize)
+                    }
+                    BinaryOperationKind::CompareLessThanOrEqual => {
+                        ConstantValue::UnsignedInteger((lhs <= rhs) as usize)
+                    }
+                    BinaryOperationKind::CompareGreaterThan => {
+                        ConstantValue::UnsignedInteger((lhs > rhs) as usize)
+                    }
+                    BinaryOperationKind::CompareGreaterThanOrEqual => {
+                        ConstantValue::UnsignedInteger((lhs >= rhs) as usize)
+                    }
                 };
 
                 stmt.replace_kind(StatementKind::Constant {
@@ -136,7 +148,8 @@ fn run_on_stmt(stmt: Statement) -> bool {
             typ,
             value,
         } => {
-            // watch out! if you cast a constant primitive to an arbitrary bits you lose length information
+            // watch out! if you cast a constant primitive to an arbitrary bits you lose
+            // length information
             if let Type::Primitive(_) = &*typ {
                 if let StatementKind::Constant { value, .. } = value.kind() {
                     let value = cast_integer(value, typ.clone());

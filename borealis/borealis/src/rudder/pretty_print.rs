@@ -19,7 +19,8 @@ impl Display for Type {
                 PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width_bits()),
                 PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
             },
-            Type::Composite(_) => write!(f, "struct"),
+            Type::Product(_) => write!(f, "struct"),
+            Type::Sum(_) => write!(f, "enum"),
             Type::Vector {
                 element_count,
                 element_type,
@@ -269,13 +270,20 @@ impl Display for StatementKind {
                 index.name(),
                 value.name()
             ),
-            StatementKind::CreateComposite { typ, fields } => {
+            StatementKind::CreateProduct { typ, fields } => {
                 write!(
                     f,
-                    "create-composite {} = {:?}",
+                    "create-product {} = {:?}",
                     typ,
                     fields.iter().map(Statement::name).collect::<Vec<_>>()
                 )
+            }
+            StatementKind::CreateSum {
+                typ,
+                variant,
+                value,
+            } => {
+                write!(f, "create-sum {} = {}:{:?}", typ, variant, value.name(),)
             }
             StatementKind::SizeOf { value } => {
                 write!(f, "size-of {}", value.name())

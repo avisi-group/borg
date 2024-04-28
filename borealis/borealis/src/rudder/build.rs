@@ -125,7 +125,7 @@ impl BuildContext {
     }
 
     fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Arc::new(Type::Composite(
+        let typ = Arc::new(Type::Product(
             fields
                 .iter()
                 .map(|boom::NamedType { typ, .. }| self.resolve_type(typ.clone()))
@@ -144,7 +144,7 @@ impl BuildContext {
     }
 
     fn add_union(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Arc::new(Type::Composite(
+        let typ = Arc::new(Type::Sum(
             fields
                 .iter()
                 .map(|boom::NamedType { typ, .. }| self.resolve_type(typ.clone()))
@@ -468,6 +468,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         let fn_statement = {
             if let Some(statement) = self.build_specialized_function(*name, &args) {
                 statement
+            } else if let Some(statement) = self.build_union_constructor(*name, &args) {
+                statement
             } else {
                 let target = match self.ctx().functions.get(name).cloned() {
                     Some((_, target, _)) => target,
@@ -507,7 +509,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         name: InternedString,
         args: &[Statement],
     ) -> Option<Statement> {
-        if Regex::new(r"eq_any<([a-zA-Z_]+)%>")
+        if Regex::new(r"eq_any<([0-9a-zA-Z_]+)%>")
             .unwrap()
             .is_match(name.as_ref())
         {
@@ -515,6 +517,23 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 kind: BinaryOperationKind::CompareEqual,
                 lhs: args[0].clone(),
                 rhs: args[1].clone(),
+            }))
+        } else if Regex::new(r"plain_vector_update<([0-9a-zA-Z_]+)>")
+            .unwrap()
+            .is_match(name.as_ref())
+        {
+            Some(self.builder.build(StatementKind::MutateElement {
+                vector: args[0].clone(),
+                value: args[2].clone(),
+                index: args[1].clone(),
+            }))
+        } else if Regex::new(r"plain_vector_access<([0-9a-zA-Z_]+)>")
+            .unwrap()
+            .is_match(name.as_ref())
+        {
+            Some(self.builder.build(StatementKind::ReadElement {
+                vector: args[0].clone(),
+                index: args[1].clone(),
             }))
         } else {
             match name.as_ref() {
@@ -562,6 +581,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length: len,
                     }))
                 }
+
                 "eq_bits" | "eq_int" | "eq_bool" | "eq_string" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareEqual,
@@ -569,7 +589,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: args[1].clone(),
                     }))
                 }
-                "neq_bits" | "neq_any<ESecurityState%>" => {
+
+                "neq_bits" | "neq_any<ESecurityState%>" | "neq_bool" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareNotEqual,
                         lhs: args[0].clone(),
@@ -757,27 +778,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         value: args[0].clone(),
                         start: args[1].clone(),
                         length: args[2].clone(),
-                    }))
-                }
-
-                "plain_vector_access<o>"
-                | "plain_vector_access<RBRBINFType>"
-                | "plain_vector_access<RBRBSRCType>"
-                | "plain_vector_access<RBRBTGTType>"
-                | "plain_vector_access<RERRnFR_ElemType>"
-                | "plain_vector_access<B64>"
-                | "plain_vector_access<RPMEVTYPER_EL0_Type>" => {
-                    Some(self.builder.build(StatementKind::ReadElement {
-                        vector: args[0].clone(),
-                        index: args[1].clone(),
-                    }))
-                }
-
-                "plain_vector_update<B64>" | "plain_vector_update<RPMEVTYPER_EL0_Type>" => {
-                    Some(self.builder.build(StatementKind::MutateElement {
-                        vector: args[0].clone(),
-                        value: args[2].clone(),
-                        index: args[1].clone(),
                     }))
                 }
 
@@ -1108,11 +1108,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(self.generate_set_slice(destination, source, source_length, start))
                 }
 
-                "sail_branch_announce" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::unit()),
-                    value: rudder::ConstantValue::Unit,
-                })),
-
                 "replicate_bits" => {
                     // // bundle length = bits_length * count
                     let count = self
@@ -1165,19 +1160,44 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // ignore
                 "append_str" => Some(args[0].clone()),
 
+                "DecStr" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(rudder::Type::u32()),
+                    value: ConstantValue::UnsignedInteger(0),
+                })),
+
                 "print_endline"
                 | "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"
                 | "execute_aarch64_instrs_system_barriers_dsb"
-                | "execute_aarch64_instrs_system_barriers_isb" => {
-                    Some(self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::unit()),
-                        value: ConstantValue::Unit,
-                    }))
-                }
+                | "execute_aarch64_instrs_system_barriers_isb"
+                | "sail_return_exception"
+                | "sail_branch_announce"
+                | "sail_tlbi" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(Type::unit()),
+                    value: ConstantValue::Unit,
+                })),
                 _ => None,
             }
         }
+    }
+
+    fn build_union_constructor(
+        &mut self,
+        name: InternedString,
+        args: &[Statement],
+    ) -> Option<Statement> {
+        self.ctx()
+            .unions
+            .values()
+            .find(|(_, variants)| variants.contains_key(&name))
+            .map(|(typ, variants)| (typ.clone(), *variants.get(&name).unwrap()))
+            .map(|(typ, variant)| {
+                self.builder.build(StatementKind::CreateSum {
+                    typ,
+                    variant,
+                    value: args[0].clone(),
+                })
+            })
     }
 
     /// Generates rudder for a writing a statement to a boom::Expression
@@ -1306,7 +1326,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     field_statements[*idx] = Some(field_statement);
                 }
 
-                self.builder.build(StatementKind::CreateComposite {
+                self.builder.build(StatementKind::CreateProduct {
                     typ: typ.clone(),
                     fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
                 })
@@ -1382,7 +1402,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let source_type = value.typ();
 
                 let kind = match *source_type {
-                    Type::Composite(_) | Type::Vector { .. } => {
+                    Type::Sum(_) | Type::Product(_) | Type::Vector { .. } => {
                         panic!("cast on non-primitive type")
                     }
                     Type::Primitive(_) => {
@@ -1678,8 +1698,8 @@ fn fields_to_indices(
         indices.push(idx);
 
         // update current struct to point to field
-        let Type::Composite(fields) = &**struct_typ else {
-            panic!("cannot get fields of non-composite")
+        let Type::Product(fields) = &**struct_typ else {
+            panic!("cannot get fields of non-product")
         };
         current_type = fields[idx].clone();
     });
@@ -1708,8 +1728,8 @@ fn fields_to_offsets(
         offsets.push(current_type.byte_offset(idx).unwrap());
 
         // update current struct to point to field
-        let Type::Composite(fields) = &*current_type else {
-            panic!("cannot get fields of non-composite")
+        let Type::Product(fields) = &*current_type else {
+            panic!("cannot get fields of non-product")
         };
         current_type = fields[idx].clone();
     });

@@ -29,8 +29,8 @@ fn run_on_block(block: &Block) -> bool {
 
     //             let index = {
     //                 let index = if index.typ().is_bits() {
-    //                     builder.build(StatementKind::UnbundleValue { bundle: index })
-    //                 } else {
+    //                     builder.build(StatementKind::UnbundleValue { bundle:
+    // index })                 } else {
     //                     index
     //                 };
     //                 builder.generate_cast(index, Arc::new(Type::s64()))
@@ -38,8 +38,8 @@ fn run_on_block(block: &Block) -> bool {
 
     //             let offset = {
     //                 let offset = if offset.typ().is_bits() {
-    //                     builder.build(StatementKind::UnbundleValue { bundle: offset })
-    //                 } else {
+    //                     builder.build(StatementKind::UnbundleValue { bundle:
+    // offset })                 } else {
     //                     offset
     //                 };
     //                 builder.generate_cast(offset, Arc::new(Type::s64()))
@@ -47,7 +47,8 @@ fn run_on_block(block: &Block) -> bool {
 
     //             let typ_width = builder.build(StatementKind::Constant {
     //                 typ: Arc::new(Type::s64()),
-    //                 value: ConstantValue::SignedInteger(element_type.width_bytes() as isize),
+    //                 value:
+    // ConstantValue::SignedInteger(element_type.width_bytes() as isize),
     //             });
 
     //             let index_scaled = builder.build(StatementKind::BinaryOperation {

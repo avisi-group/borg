@@ -174,8 +174,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let mut left = get_ident(&lhs);
             let mut right = get_ident(&rhs);
 
-            // // hard to decide whether this belongs, but since it's a Rust issue that u1 is
-            // // not like other types, casting is a codegen thing
+            // // hard to decide whether this belongs, but since it's a Rust issue that u1
+            // is // not like other types, casting is a codegen thing
             // match (lhs.typ().width_bits(), rhs.typ().width_bits()) {
             //     // both bools, do nothing
             //     (1, 1) => (),
@@ -412,7 +412,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::CreateComposite { typ, fields } => {
+        StatementKind::CreateProduct { typ, fields } => {
+            assert!(matches!(&*typ, Type::Product(_)));
             let typ = codegen_type(typ);
             let fields = fields
                 .iter()
@@ -424,8 +425,18 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 })
                 .collect::<TokenStream>();
             quote!(#typ { #fields })
-
             // struct { _0: foo, _1: bar }
+        }
+        StatementKind::CreateSum {
+            typ,
+            variant,
+            value,
+        } => {
+            assert!(matches!(&*typ, Type::Sum(_)));
+            let typ = codegen_type(typ);
+            let variant = codegen_member(variant);
+            let value = get_ident(&value);
+            quote!(#typ::#variant(#value))
         }
         StatementKind::CreateBits { value, length } => {
             let value = get_ident(&value);

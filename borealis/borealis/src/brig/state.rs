@@ -75,7 +75,7 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
                 celf.write_register(REG_EL3, 3u8);
 
                 // set to EL1 on boot
-                celf.write_register(REG_PSTATE, CompositeTypec98939056e929b9c {
+                celf.write_register(REG_PSTATE, ProductTypec98939056e929b9c {
                     _0: false,
                     _1: false,
                     _2: 0,

@@ -52,7 +52,8 @@ impl PrimitiveType {
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(PrimitiveType),
-    Composite(Vec<Arc<Type>>),
+    Product(Vec<Arc<Type>>),
+    Sum(Vec<Arc<Type>>),
     Vector {
         element_count: usize,
         element_type: Arc<Type>,
@@ -78,8 +79,12 @@ impl Type {
         })
     }
 
-    pub fn new_composite(fields: Vec<Arc<Type>>) -> Self {
-        Self::Composite(fields)
+    pub fn new_product(fields: Vec<Arc<Type>>) -> Self {
+        Self::Product(fields)
+    }
+
+    pub fn new_sum(variants: Vec<Arc<Type>>) -> Self {
+        Self::Sum(variants)
     }
 
     pub fn void() -> Self {
@@ -100,12 +105,13 @@ impl Type {
     /// vector
     pub fn byte_offset(&self, element_field: usize) -> Option<usize> {
         match self {
-            Type::Composite(fields) => Some(
+            Type::Product(fields) => Some(
                 fields
                     .iter()
                     .take(element_field)
                     .fold(0, |acc, typ| acc + typ.width_bytes()),
             ),
+            Type::Sum(_) => Some(0),
             Type::Vector { element_type, .. } => Some(element_field * element_type.width_bytes()),
             _ => None,
         }
@@ -113,7 +119,8 @@ impl Type {
 
     pub fn width_bits(&self) -> usize {
         match self {
-            Self::Composite(xs) => xs.iter().map(|x| x.width_bits()).sum(),
+            Self::Product(xs) => xs.iter().map(|x| x.width_bits()).sum(),
+            Self::Sum(xs) => xs.iter().map(|x| x.width_bits()).max().unwrap(),
             // smallest with is 8 bits
             Self::Primitive(p) => p.element_width_in_bits.max(8),
             Self::Vector {
@@ -407,10 +414,16 @@ pub enum StatementKind {
         condition: Statement,
     },
 
-    CreateComposite {
+    CreateProduct {
         typ: Arc<Type>,
         /// Index of fields should match type
         fields: Vec<Statement>,
+    },
+
+    CreateSum {
+        typ: Arc<Type>,
+        variant: usize,
+        value: Statement,
     },
 
     CreateBits {
@@ -570,11 +583,12 @@ impl Statement {
             StatementKind::WriteVariable { .. } => ValueClass::Dynamic,
             StatementKind::ReadElement { .. } => ValueClass::Dynamic,
             StatementKind::MutateElement { .. } => ValueClass::Dynamic,
-            StatementKind::CreateComposite { .. } => ValueClass::Dynamic,
+            StatementKind::CreateProduct { .. } => ValueClass::Dynamic,
             StatementKind::SizeOf { .. } => ValueClass::Dynamic,
             StatementKind::Assert { .. } => ValueClass::None,
             StatementKind::BitsCast { .. } => ValueClass::Dynamic,
             StatementKind::CreateBits { .. } => ValueClass::Dynamic,
+            StatementKind::CreateSum { .. } => ValueClass::Dynamic,
         }
     }
 
@@ -585,7 +599,7 @@ impl Statement {
                 let mut current_type = symbol.typ();
 
                 for index in indices {
-                    if let Type::Composite(fields) = &*current_type {
+                    if let Type::Product(fields) = &*current_type {
                         current_type = fields[index].clone();
                     } else {
                         panic!("cannot get field of non-composite type")
@@ -658,7 +672,7 @@ impl Statement {
                 // get type of the vector and return it
                 vector.typ()
             }
-            StatementKind::CreateComposite { typ, .. } => typ,
+            StatementKind::CreateProduct { typ, .. } | StatementKind::CreateSum { typ, .. } => typ,
             StatementKind::SizeOf { .. } => Arc::new(Type::u16()),
             StatementKind::Assert { .. } => Arc::new(Type::unit()),
             StatementKind::CreateBits { .. } => Arc::new(Type::Bits),
@@ -898,7 +912,7 @@ impl StatementInner {
                 self.kind = StatementKind::ReadElement { vector, index };
             }
 
-            StatementKind::CreateComposite { typ, fields } => {
+            StatementKind::CreateProduct { typ, fields } => {
                 let fields = fields
                     .iter()
                     .map(|field| {
@@ -910,7 +924,24 @@ impl StatementInner {
                     })
                     .collect();
 
-                self.kind = StatementKind::CreateComposite { typ, fields };
+                self.kind = StatementKind::CreateProduct { typ, fields };
+            }
+            StatementKind::CreateSum {
+                typ,
+                variant,
+                value,
+            } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::CreateSum {
+                    typ,
+                    variant,
+                    value,
+                };
             }
             StatementKind::BitInsert {
                 original_value,
@@ -1147,7 +1178,13 @@ impl StatementBuilder {
                 }),
                 Type::Bits,
             ) => {
-                assert!(*element_width_in_bits < 128);
+                if *element_width_in_bits > 128 {
+                    log::warn!(
+                        "source type in cast {} -> {} exceeds 128 bits",
+                        source.typ(),
+                        destination_type
+                    );
+                }
 
                 self.build(StatementKind::Cast {
                     kind: CastOperationKind::ZeroExtend,

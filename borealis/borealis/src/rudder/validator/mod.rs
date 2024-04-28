@@ -82,7 +82,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                                 PrimitiveTypeClass::SignedInteger => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use signed integer type class for unsigned integer constant")),
                                 PrimitiveTypeClass::FloatingPoint => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use floating point type class for unsigned integer constant"))
                             },
-                            Type::Composite(_) => {
+                            Type::Product(_) | Type::Sum(_) => {
                                 Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use composite type for unsigned integer constant"))
                             }
                             Type::Vector {
@@ -104,7 +104,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                                 PrimitiveTypeClass::SignedInteger => None,
                                 PrimitiveTypeClass::FloatingPoint => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use floating point type class for signed integer constant"))
                             },
-                            Type::Composite(_) => {
+                            Type::Product(_) | Type::Sum(_)=> {
                                 Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use composite type for signed integer constant"))
                             }
                             Type::Vector {
@@ -129,7 +129,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                                 PrimitiveTypeClass::SignedInteger => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use signed integer type class for floating point constant")),
                                 PrimitiveTypeClass::FloatingPoint => None
                             },
-                            Type::Composite(_) => {
+                            Type::Product(_) | Type::Sum(_) => {
                                 Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use composite type for floating point constant"))
                             }
                             Type::Vector {
@@ -150,7 +150,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                                 PrimitiveTypeClass::SignedInteger => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use signed integer type class for unit constant")),
                                 PrimitiveTypeClass::FloatingPoint => Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use floating point type class for unit constant")),
                             },
-                            Type::Composite(_) => {
+                            Type::Product(_) | Type::Sum(_) => {
                                 Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use composite type for unit constant"))
                             }
                             Type::Vector {

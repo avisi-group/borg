@@ -220,10 +220,13 @@ impl StatementUseAnalysis {
                     self.add_use(&value, &stmt);
                     self.add_use(&length, &stmt);
                 }
-                StatementKind::CreateComposite { fields, .. } => {
+                StatementKind::CreateProduct { fields, .. } => {
                     for field in fields {
                         self.add_use(&field, &stmt);
                     }
+                }
+                StatementKind::CreateSum { value, .. } => {
+                    self.add_use(&value, &stmt);
                 }
                 StatementKind::SizeOf { value } => {
                     self.add_use(&value, &stmt);

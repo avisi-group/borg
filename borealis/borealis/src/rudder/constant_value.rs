@@ -1,4 +1,7 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::{
+    cmp::Ordering,
+    ops::{Add, Div, Mul, Sub},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConstantValue {
@@ -114,6 +117,20 @@ impl Div for ConstantValue {
                 ConstantValue::FloatingPoint(l / r)
             }
             (l, r) => panic!("invalid types for div: {l:?} {r:?}"),
+        }
+    }
+}
+
+impl PartialOrd for ConstantValue {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
+                l.partial_cmp(r)
+            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => l.partial_cmp(r),
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => l.partial_cmp(r),
+            (ConstantValue::Unit, ConstantValue::Unit) => Some(Ordering::Equal),
+            _ => None,
         }
     }
 }

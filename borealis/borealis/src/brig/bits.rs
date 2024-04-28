@@ -249,7 +249,8 @@ pub fn codegen_bits() -> TokenStream {
 //             }
 
 //             pub fn wrapping_add(self, rhs: Self) -> Self {
-//                 let (value, overflow) = self.value().overflowing_add(rhs.value());
+//                 let (value, overflow) =
+// self.value().overflowing_add(rhs.value());
 
 //                 Self {
 //                     value,
