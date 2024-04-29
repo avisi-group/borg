@@ -509,7 +509,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         name: InternedString,
         args: &[Statement],
     ) -> Option<Statement> {
-        if Regex::new(r"eq_any<([0-9a-zA-Z_]+)%>")
+        if Regex::new(r"eq_any<([0-9a-zA-Z_%<>]+)>")
             .unwrap()
             .is_match(name.as_ref())
         {
@@ -518,7 +518,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 lhs: args[0].clone(),
                 rhs: args[1].clone(),
             }))
-        } else if Regex::new(r"plain_vector_update<([0-9a-zA-Z_]+)>")
+        } else if Regex::new(r"plain_vector_update<([0-9a-zA-Z_%<>]+)>")
             .unwrap()
             .is_match(name.as_ref())
         {
@@ -527,7 +527,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 value: args[2].clone(),
                 index: args[1].clone(),
             }))
-        } else if Regex::new(r"plain_vector_access<([0-9a-zA-Z_]+)>")
+        } else if Regex::new(r"plain_vector_access<([0-9a-zA-Z_%<>]+)>")
             .unwrap()
             .is_match(name.as_ref())
         {
@@ -582,7 +582,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "eq_bits" | "eq_int" | "eq_bool" | "eq_string" => {
+                "eq_bit" | "eq_bits" | "eq_int" | "eq_bool" | "eq_string" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareEqual,
                         lhs: args[0].clone(),
@@ -640,12 +640,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: args[1].clone(),
                     }))
                 }
+
                 "mult_atom" => Some(self.builder.build(StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::Multiply,
                     lhs: args[0].clone(),
                     rhs: args[1].clone(),
                 })),
-                "tdiv_int" | "ediv_int" | "ediv_nat" => {
+
+                "tdiv_int" | "ediv_int" | "ediv_nat" | "div_real" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Divide,
                         lhs: args[0].clone(),
@@ -1158,7 +1160,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // el < 2
                 }
                 // ignore
-                "append_str" => Some(args[0].clone()),
+                "append_str" | "__monomorphize" => Some(args[0].clone()),
 
                 "DecStr" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(rudder::Type::u32()),
@@ -1172,7 +1174,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "execute_aarch64_instrs_system_barriers_isb"
                 | "sail_return_exception"
                 | "sail_branch_announce"
-                | "sail_tlbi" => Some(self.builder.build(StatementKind::Constant {
+                | "sail_tlbi"
+                | "prerr_bits"
+                | "prerr_int"
+                | "write_tag#" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),
@@ -1334,8 +1339,79 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),
 
-            boom::Value::CtorKind { .. } => todo!(),
-            boom::Value::CtorUnwrap { .. } => todo!(),
+            // return true if `value`` is of the variant `identifier`, else false
+            boom::Value::CtorKind {
+                value, identifier, ..
+            } => {
+                let value = self.build_value(value.clone());
+
+                // get the rudder type and variant index
+                let (typ, variant_index) = self
+                    .ctx()
+                    .unions
+                    .values()
+                    .map(|(typ, variants)| {
+                        variants.iter().map(|(variant_name, variant_idx)| {
+                            (typ.clone(), *variant_name, *variant_idx)
+                        })
+                    })
+                    .flatten()
+                    .find(|(_, variant_name, _)| variant_name == identifier)
+                    .map(|(typ, _, idx)| (typ, idx))
+                    .unwrap();
+
+                assert_eq!(value.typ(), typ);
+
+                self.builder.build(StatementKind::MatchesSum {
+                    value,
+                    variant_index,
+                })
+            }
+            boom::Value::CtorUnwrap {
+                value, identifier, ..
+            } => {
+                let value = self.build_value(value.clone());
+
+                // get the rudder type and variant index
+                let (typ, variant_index) = self
+                    .ctx()
+                    .unions
+                    .values()
+                    .map(|(typ, variants)| {
+                        variants.iter().map(|(variant_name, variant_idx)| {
+                            (typ.clone(), *variant_name, *variant_idx)
+                        })
+                    })
+                    .flatten()
+                    .find(|(_, variant_name, _)| variant_name == identifier)
+                    .map(|(typ, _, idx)| (typ, idx))
+                    .unwrap();
+
+                assert_eq!(value.typ(), typ);
+
+                let unwrap_sum = self.builder.build(StatementKind::UnwrapSum {
+                    value,
+                    variant_index,
+                });
+
+                if !fields.is_empty() {
+                    let (indices, _) =
+                        fields_to_indices(&self.ctx().structs, unwrap_sum.typ(), &fields);
+
+                    let mut last = unwrap_sum;
+
+                    for field in indices {
+                        last = self.builder.build(StatementKind::ExtractField {
+                            value: last,
+                            field_index: field,
+                        })
+                    }
+
+                    last
+                } else {
+                    unwrap_sum
+                }
+            }
         }
     }
 

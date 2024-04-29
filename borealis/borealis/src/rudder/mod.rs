@@ -436,6 +436,24 @@ pub enum StatementKind {
     SizeOf {
         value: Statement,
     },
+
+    /// Tests whether an instance of a sum type is of a given variant
+    MatchesSum {
+        value: Statement,
+        variant_index: usize,
+    },
+
+    /// Extracts the contents of a variant of a sum type
+    UnwrapSum {
+        value: Statement,
+        variant_index: usize,
+    },
+
+    /// Extracts a field of a product type
+    ExtractField {
+        value: Statement,
+        field_index: usize,
+    },
 }
 
 #[derive(Eq, PartialEq)]
@@ -589,6 +607,9 @@ impl Statement {
             StatementKind::BitsCast { .. } => ValueClass::Dynamic,
             StatementKind::CreateBits { .. } => ValueClass::Dynamic,
             StatementKind::CreateSum { .. } => ValueClass::Dynamic,
+            StatementKind::MatchesSum { .. } => ValueClass::Dynamic,
+            StatementKind::UnwrapSum { .. } => ValueClass::Dynamic,
+            StatementKind::ExtractField { .. } => ValueClass::Dynamic,
         }
     }
 
@@ -676,6 +697,24 @@ impl Statement {
             StatementKind::SizeOf { .. } => Arc::new(Type::u16()),
             StatementKind::Assert { .. } => Arc::new(Type::unit()),
             StatementKind::CreateBits { .. } => Arc::new(Type::Bits),
+            StatementKind::MatchesSum { .. } => Arc::new(Type::u1()),
+            StatementKind::UnwrapSum {
+                value,
+                variant_index,
+            } => {
+                let Type::Sum(variants) = &*value.typ() else {
+                    panic!("cannot unwrap non sum type");
+                };
+
+                variants[variant_index].clone()
+            }
+            StatementKind::ExtractField { value, field_index } => {
+                let Type::Product(fields) = &*value.typ() else {
+                    panic!("cannot unwrap non sum type");
+                };
+
+                fields[field_index].clone()
+            }
         }
     }
 
@@ -1212,7 +1251,8 @@ impl StatementBuilder {
             }),
 
             (src, dst) => {
-                panic!("cannot cast from {src} to {dst}");
+                println!("current statements: {:?}", self.statements);
+                panic!("cannot cast {source} from {src} to {dst}");
             }
         }
     }

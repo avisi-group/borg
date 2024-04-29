@@ -295,6 +295,17 @@ impl Display for StatementKind {
             StatementKind::CreateBits { value, length } => {
                 write!(f, "create-bits {} {}", value.name(), length.name())
             }
+            StatementKind::MatchesSum {
+                value,
+                variant_index,
+            } => write!(f, "matches-sum {} {variant_index}", value.name()),
+            StatementKind::UnwrapSum {
+                value,
+                variant_index,
+            } => write!(f, "unwrap-sum {} {variant_index}", value.name()),
+            StatementKind::ExtractField { value, field_index } => {
+                write!(f, "extract-field {}.{field_index}", value.name())
+            }
         }
     }
 }

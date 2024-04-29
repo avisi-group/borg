@@ -484,6 +484,52 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
+        StatementKind::MatchesSum {
+            value,
+            variant_index,
+        } => {
+            // matches!(value, Enum::Variant(_))
+
+            let sum_type = value.typ();
+
+            let Type::Sum(_) = &*sum_type else {
+                unreachable!();
+            };
+
+            let ident = get_ident(&value);
+            let sum_type = codegen_type(sum_type);
+            let variant = codegen_member(variant_index);
+
+            quote! {
+                matches!(#ident, #sum_type::#variant(_))
+            }
+        }
+        StatementKind::UnwrapSum {
+            value,
+            variant_index,
+        } => {
+            let sum_type = value.typ();
+
+            let Type::Sum(_) = &*sum_type else {
+                unreachable!();
+            };
+
+            let ident = get_ident(&value);
+            let sum_type = codegen_type(sum_type);
+            let variant = codegen_member(variant_index);
+
+            quote! {
+                match #ident {
+                    #sum_type::#variant(inner) => inner,
+                    _ => panic!("unwrap sum failed"),
+                }
+            }
+        }
+        StatementKind::ExtractField { value, field_index } => {
+            let ident = get_ident(&value);
+            let field = codegen_member(field_index);
+            quote!(#ident.#field)
+        }
     };
 
     let msg = format!(" {} {stmt}", stmt.classify());
@@ -558,7 +604,11 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             }
         }
 
-        (Type::Primitive(_), Type::Primitive(_), CastOperationKind::Truncate) => {
+        (
+            Type::Primitive(PrimitiveType { tc, .. }),
+            Type::Primitive(_),
+            CastOperationKind::Truncate,
+        ) => {
             assert!(target_type.width_bits() < source_type.width_bits());
 
             // create mask of length target
@@ -571,7 +621,13 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             // cast to target type and apply mask to source
             let target = codegen_type(target_type);
 
-            quote!(((#ident as #target) & #mask))
+            if let PrimitiveTypeClass::FloatingPoint = tc {
+                // no mask needed for floating point casts
+                quote!((#ident as #target))
+            } else {
+                // mask needed in case of truncating in between rust type widths
+                quote!(((#ident as #target) & #mask))
+            }
         }
 
         (Type::Bits, Type::Bits, CastOperationKind::Truncate) => {

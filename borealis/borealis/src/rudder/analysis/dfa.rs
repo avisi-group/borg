@@ -232,6 +232,10 @@ impl StatementUseAnalysis {
                     self.add_use(&value, &stmt);
                 }
 
+                StatementKind::MatchesSum { value, .. } => self.add_use(&value, &stmt),
+                StatementKind::UnwrapSum { value, .. } => self.add_use(&value, &stmt),
+                StatementKind::ExtractField { value, .. } => self.add_use(&value, &stmt),
+
                 StatementKind::ReadVariable { symbol, indices } => {}
                 StatementKind::ReadMemory { typ, offset } => {}
                 StatementKind::ReadPc => {}
