@@ -216,6 +216,8 @@ pub fn codegen_ident(input: InternedString) -> Ident {
 
     if s == "main" {
         return Ident::new("model_main", Span::call_site());
+    } else if s == "break" {
+        return Ident::new("_break", Span::call_site());
     }
 
     let mut buf = String::with_capacity(s.len());
