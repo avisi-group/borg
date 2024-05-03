@@ -5,7 +5,7 @@ use {
             MachineContext,
         },
         guest::memory::AddressSpaceRegionKind,
-        scheduler,
+        qemu_exit, scheduler,
     },
     alloc::{alloc::alloc_zeroed, collections::BTreeSet},
     core::alloc::Layout,
@@ -183,6 +183,11 @@ fn double_fault_exception() {
 }
 
 #[irq_handler(with_code = true)]
-fn gpf_exception() {
-    log::error!("EXCEPTION: GENERAL PROTECTION FAULT");
+fn gpf_exception(machine_context: *mut MachineContext) {
+    log::error!(
+        "EXCEPTION: GENERAL PROTECTION FAULT\nrip = {:x}",
+        unsafe { &*machine_context }.rip
+    );
+
+    crate::qemu_exit();
 }

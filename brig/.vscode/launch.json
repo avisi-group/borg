@@ -23,5 +23,24 @@
             "args": ["-v", "../cmp.bin"],
             "cwd": "${workspaceFolder}/standalone",
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'brig-cli'",
+            "cargo": {
+                "args":[
+                    "+nightly",
+                    "build",
+                    "--bin=brig-cli",
+                    "--package=brig-cli",
+                    "--manifest-path=${workspaceFolder}/brig-cli/Cargo.toml"
+                ],
+                "filter": {
+                    "name": "brig-cli",
+                    "kind": "bin"
+                },
+            },
+            "cwd": "${workspaceFolder}/brig-cli",
+        },
     ]
 }

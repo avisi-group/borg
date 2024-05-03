@@ -81,6 +81,7 @@ fn update_cregs() {
     let mut cr4 = unsafe { cr4() };
 
     cr4 |= Cr4::CR4_ENABLE_FSGSBASE | Cr4::CR4_ENABLE_PSE | Cr4::CR4_ENABLE_GLOBAL_PAGES;
+    cr4 &= !Cr4::CR4_ENABLE_SMEP;
     trace!("cr4={cr4:?}");
 
     unsafe {
@@ -112,7 +113,7 @@ impl Bus<X86SystemBusProbeData> for X86SystemBus {
     }
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 pub struct MachineContext {
     pub r15: u64,
     pub r14: u64,

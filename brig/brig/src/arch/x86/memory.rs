@@ -8,7 +8,7 @@ use {
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
             FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame,
-            Size4KiB, Translate,
+            Size1GiB, Size2MiB, Size4KiB, Translate,
         },
         PhysAddr, VirtAddr,
     },
@@ -26,19 +26,87 @@ static HEAP_ALLOCATOR: LockedHeap<64> = LockedHeap::empty();
 /// Initialize the global heap allocator backed by the usable memory regions
 /// supplied by the bootloader
 pub fn heap_init(memory_regions: &MemoryRegions) {
+    let mut opt = VirtualMemoryArea::current().opt;
+
     // get usable regions from memory map and add to heap allocator
     for region in memory_regions
         .deref()
         .iter()
         .filter(|r| matches!(r.kind, MemoryRegionKind::Usable))
     {
+        let region_virt_start = PhysAddr::new(region.start).to_virt().as_u64();
+        let region_virt_end = PhysAddr::new(region.end).to_virt().as_u64();
+
         unsafe {
             HEAP_ALLOCATOR.lock().add_to_heap(
-                usize::try_from(PhysAddr::new(region.start).to_virt().as_u64()).unwrap(),
-                usize::try_from(PhysAddr::new(region.end).to_virt().as_u64()).unwrap(),
+                usize::try_from(region_virt_start).unwrap(),
+                usize::try_from(region_virt_end).unwrap(),
             )
         };
+
+        let mut current_virt_addr = region_virt_start;
+
+        while current_virt_addr < region_virt_end {
+            let virt_frame_addr = VirtAddr::new(current_virt_addr);
+
+            let res = opt.translate(virt_frame_addr);
+            unsafe {
+                match res {
+                    x86_64::structures::paging::mapper::TranslateResult::Mapped {
+                        frame: x86_64::structures::paging::mapper::MappedFrame::Size4KiB(_),
+                        ..
+                    } => {
+                        opt.update_flags(
+                            Page::<Size4KiB>::from_start_address(
+                                virt_frame_addr.align_down(Size4KiB::SIZE),
+                            )
+                            .unwrap(),
+                            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+                        )
+                        .unwrap()
+                        .ignore();
+
+                        current_virt_addr += Size4KiB::SIZE;
+                    }
+                    x86_64::structures::paging::mapper::TranslateResult::Mapped {
+                        frame: x86_64::structures::paging::mapper::MappedFrame::Size2MiB(_),
+                        ..
+                    } => {
+                        opt.update_flags(
+                            Page::<Size2MiB>::from_start_address(
+                                virt_frame_addr.align_down(Size2MiB::SIZE),
+                            )
+                            .unwrap(),
+                            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+                        )
+                        .unwrap()
+                        .ignore();
+
+                        current_virt_addr += Size2MiB::SIZE;
+                    }
+                    x86_64::structures::paging::mapper::TranslateResult::Mapped {
+                        frame: x86_64::structures::paging::mapper::MappedFrame::Size1GiB(_),
+                        ..
+                    } => {
+                        opt.update_flags(
+                            Page::<Size2MiB>::from_start_address(
+                                virt_frame_addr.align_down(Size1GiB::SIZE),
+                            )
+                            .unwrap(),
+                            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+                        )
+                        .unwrap()
+                        .ignore();
+
+                        current_virt_addr += Size1GiB::SIZE;
+                    }
+                    _ => panic!("heap allocated region not mapped"),
+                }
+            }
+        }
     }
+
+    VirtualMemoryArea::current().invalidate();
 
     log::info!(
         "heap allocator initialized, {:.2} available",

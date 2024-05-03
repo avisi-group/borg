@@ -1,5 +1,5 @@
 [package]
-name = "brig"
+name = "brig-cli"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,3 +9,5 @@ bootloader = { version = "0.11.7", default-features = false, features = ["uefi"]
 cargo_metadata = "0.18.1"
 itertools = "0.12.1"
 clap = { version = "4.5.4", features = ["derive"] }
+color-eyre = "0.6.3"
+tar = "0.4.40"

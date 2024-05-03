@@ -1,6 +1,6 @@
 use {
     ::x86::{
-        msr::{wrmsr, IA32_TSC_AUX},
+        msr::{rdmsr, wrmsr, IA32_TSC_AUX},
         rdpid,
     },
     alloc::{boxed::Box, collections::BTreeMap},
@@ -33,7 +33,8 @@ static mut NEXT_CORE_ID: AtomicU64 = AtomicU64::new(0);
 static mut CORES: [Once<CoreStorage>; 4] = [Once::INIT; 4];
 
 fn get_local_pid() -> u64 {
-    unsafe { rdpid() }
+    //unsafe { rdpid() }
+    unsafe { rdmsr(IA32_TSC_AUX) }
 }
 
 impl CoreStorage {

@@ -1,0 +1,42 @@
+{
+    "boot": {
+        "protocol": "arm64-linux",
+        "kernel": "/kernel",
+        "dt": "/platform.dtb"
+    },
+    "memory": {
+        "as0": {
+            "ram0": {
+                "start": "0x0",
+                "end": "0x8000000"
+            },
+            "ram1": {
+                "start": "0x40000000",
+                "end": "0x100000000"
+            }
+        }
+    },
+    "devices": {
+        "core0": {
+            "kind": "core",
+            "arch": "arm64",
+            "address_space": "as0"
+        },
+        "uart0": {
+            "kind": "pl011",
+            "attach": {
+                "address_space": "as0",
+                "base": "0x08020000"
+            },
+            "host": "serial0"
+        },
+        "blk0": {
+            "kind": "virtio-blk",
+            "attach": {
+                "address_space": "as0",
+                "base": "0x8000000"
+            },
+            "host": "disk00:04.0"
+        }
+    }
+}

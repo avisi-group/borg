@@ -1,9 +1,12 @@
 use {
-    cargo_metadata::{Artifact, Message},
+    cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message},
     clap::Parser,
+    color_eyre::Result,
     itertools::Itertools,
     std::{
-        io::BufReader,
+        fs::File,
+        io::{BufReader, Write},
+        path::{Path, PathBuf},
         process::{Command, Stdio},
     },
 };
@@ -11,31 +14,69 @@ use {
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
-    /// Enable GDB
+    /// Enable QEMU GDB server
     #[arg(long)]
     gdb: bool,
+
+    /// Verbose output
+    #[arg(short, long)]
+    verbose: bool,
 
     /// Release profile build of kernel
     #[arg(short, long)]
     release: bool,
+
+    /// Build only, do not start brig
+    #[arg(long)]
+    build_only: bool,
 }
 
-fn main() {
+fn main() -> Result<()> {
+    color_eyre::install()?;
+
     let cli = Cli::parse();
 
-    // build kernel
-    println!("building kernel");
+    // create TAR file containing guest kernel, plugins, and configuration
+    let guest_tar = build_guest_tar("./guest_data", cli.verbose, false).unwrap(); // PathBuf::from("/t1/cargo_global_target_dir/guest.tar");
+
+    // create an UEFI disk image of kernel
+    let uefi_path = {
+        let kernel_path = build_kernel("../brig", cli.verbose, cli.release).unwrap();
+
+        let uefi_path = kernel_path.parent().unwrap().join("uefi.img");
+        bootloader::UefiBoot::new(&kernel_path)
+            .create_disk_image(&uefi_path)
+            .unwrap();
+
+        println!("built UEFI image @ {uefi_path:?}");
+
+        uefi_path
+    };
+
+    if cli.build_only {
+        return Ok(());
+    }
+
+    // start QEMU with UEFI disk image
+    run_brig(&uefi_path, &guest_tar, cli.gdb);
+
+    Ok(())
+}
+
+fn build_cargo<P: AsRef<Path>>(project_path: P, args: Vec<&str>, verbose: bool) -> Vec<PathBuf> {
+    let project_path = project_path.as_ref();
+    println!("building {}...", project_path.to_str().unwrap());
 
     let mut cmd = Command::new("cargo");
     cmd.arg("build");
 
-    if cli.release {
-        cmd.arg("--release");
-    }
+    args.iter().for_each(|arg| {
+        cmd.arg(arg);
+    });
 
     let mut cmd = cmd
         .arg("--message-format=json")
-        .current_dir("../brig")
+        .current_dir(project_path)
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
@@ -43,21 +84,163 @@ fn main() {
     let stdout = cmd.stdout.as_mut().unwrap();
     let stdout_reader = BufReader::new(stdout);
 
-    let kernel_path = Message::parse_stream(stdout_reader)
+    let artifacts = Message::parse_stream(stdout_reader)
         .map(Result::unwrap)
-        // get executable compiler artifacts
+        .map(|msg| {
+            if verbose {
+                if let Message::CompilerMessage(ref msg) = msg {
+                    if let DiagnosticLevel::Error
+                    | DiagnosticLevel::Ice
+                    | DiagnosticLevel::FailureNote = msg.message.level
+                    {
+                        println!("{msg}");
+                    }
+                }
+            }
+
+            msg
+        })
         .filter_map(|msg| {
-            if let Message::CompilerArtifact(Artifact {
-                executable: Some(path),
-                ..
-            }) = msg
-            {
-                Some(path)
+            if let Message::CompilerArtifact(a) = msg {
+                if let Some(path) = a.executable {
+                    Some(path)
+                } else {
+                    if let Ok(x) = a.target.kind.into_iter().exactly_one() {
+                        if x == "dylib" {
+                            Some(a.filenames.iter().exactly_one().unwrap().clone())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
             } else {
                 None
             }
         })
-        // get *one* executable compiler artifact path
+        .map(|a| a.canonicalize().unwrap())
+        .collect::<Vec<_>>();
+
+    cmd.wait().unwrap();
+
+    println!("build complete.");
+
+    artifacts
+}
+
+fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Result<Vec<PathBuf>> {
+    println!("building plugins...");
+
+    let mut args = Vec::new();
+    if release {
+        args.push("--release");
+    }
+
+    args.push("-Zbuild-std");
+    args.push("--target=plugin-target.json");
+
+    Ok(build_cargo(path, args, verbose))
+}
+
+fn build_guest_tar<P: AsRef<Path>>(
+    guest_data_path: P,
+    verbose: bool,
+    release: bool,
+) -> Result<PathBuf> {
+    const ROOTFS_SIZE: usize = 512 * 1024 * 1024;
+
+    let guest_data_path = guest_data_path.as_ref();
+
+    // build plugins
+    let plugin_artifacts = build_plugins("../plugins", verbose, release).unwrap();
+
+    let target_dir = plugin_artifacts[0]
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+
+    // build device tree blob
+
+    // dtc -I dts -O dtb -o $@ $<
+    let dtb_path = target_dir.join("platform.dtb");
+    let output = Command::new("dtc")
+        .args([
+            "-I",
+            "dts",
+            "-O",
+            "dtb",
+            "-o",
+            dtb_path.to_str().unwrap(),
+            guest_data_path.join("platform.dts").to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    if !output.status.success() {
+        panic!(
+            "failed to create DTB:\n{}\n{}",
+            String::from_utf8(output.stdout).unwrap(),
+            String::from_utf8(output.stderr).unwrap()
+        )
+    }
+
+    // // make rootfs.ext2
+    // let volume = File::create(target_dir.join("rootfs.ext2")).unwrap();
+    // volume.set_len(ROOTFS_SIZE);
+    // assert!(Command::new("mkfs.ext2")
+    //     .arg(volume.path(),)
+    //     .output()
+    //     .unwrap()
+    //     .status
+    //     .success());
+
+    let tar_path = {
+        let tar_path = target_dir.join("guest.tar");
+
+        let mut tar = tar::Builder::new(File::create(&tar_path).unwrap());
+        tar.append_file(
+            "config.json",
+            &mut File::open(guest_data_path.join("config.json")).unwrap(),
+        );
+        tar.append_file(
+            "kernel",
+            &mut File::open(guest_data_path.join("kernel")).unwrap(),
+        );
+        tar.append_file(
+            "platform.dtb",
+            &mut File::open(target_dir.join("platform.dtb")).unwrap(),
+        );
+
+        for path in plugin_artifacts {
+            tar.append_file(
+                PathBuf::from("plugins").join(path.file_name().unwrap()),
+                &mut File::open(&path).unwrap(),
+            );
+        }
+
+        tar.finish().unwrap();
+
+        tar_path
+    };
+
+    Ok(tar_path)
+}
+
+fn build_kernel<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Result<PathBuf> {
+    println!("building kernel...");
+
+    let mut args = Vec::new();
+    if release {
+        args.push("--release");
+    }
+
+    let kernel_path = build_cargo(path, args, verbose)
+        .into_iter()
+        // get compiler artifact
+        // todo: check this is an executable?
         .exactly_one()
         .map_err(|rest| {
             format!(
@@ -65,23 +248,14 @@ fn main() {
                 rest.collect::<Vec<_>>()
             )
         })
-        .unwrap()
-        .canonicalize()
         .unwrap();
-
-    cmd.wait().unwrap();
 
     println!("built kernel @ {kernel_path:?}");
 
-    // create an UEFI disk image
-    let uefi_path = kernel_path.parent().unwrap().join("uefi.img");
-    bootloader::UefiBoot::new(&kernel_path)
-        .create_disk_image(&uefi_path)
-        .unwrap();
+    Ok(kernel_path)
+}
 
-    println!("built UEFI image @ {uefi_path:?}");
-
-    // start QEMU with UEFI disk image
+fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
     println!("starting QEMU");
     let mut cmd = std::process::Command::new("qemu-system-x86_64");
     cmd.arg("-bios").arg(ovmf_prebuilt::ovmf_pure_efi());
@@ -91,7 +265,7 @@ fn main() {
     cmd.arg("-enable-kvm");
     cmd.arg("-no-reboot");
 
-    if cli.gdb {
+    if gdb {
         cmd.arg("-gdb");
         cmd.arg("tcp::1234");
         cmd.arg("-S"); //  freeze CPU at startup
@@ -102,11 +276,14 @@ fn main() {
     cmd.arg("-device");
     cmd.arg("virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4");
     cmd.arg("-drive");
-    cmd.arg("file=../../brig-linux/brig-arm64-virt.tar,if=none,format=raw,id=drive0");
+    cmd.arg(format!(
+        "file={},if=none,format=raw,id=drive0",
+        guest_tar_path.display()
+    ));
     cmd.arg("-device");
     cmd.arg("virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4");
     cmd.arg("-drive");
-    cmd.arg("file=../../brig-linux/rootfs.ext2,if=none,format=raw,id=drive1");
+    cmd.arg("file=../../brig-programs/rootfs.ext2,if=none,format=raw,id=drive1");
     cmd.arg("-M");
     cmd.arg("q35");
     cmd.arg("-cpu");

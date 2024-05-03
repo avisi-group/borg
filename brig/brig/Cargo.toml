@@ -14,7 +14,6 @@ debug = true
 
 [dependencies]
 proc_macro_lib = { path = "./proc_macro_lib" }
-arch = { path = "../../brig-aarch64/arch" }
 
 bootloader_api = "0.11.7"
 x86_64 = "0.15.1"
@@ -46,5 +45,13 @@ fastrand = { version = "2.0.2", default-features = false, features = ["alloc"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 byteorder = { version = "1.5.0", default-features = false }
 concat-idents = "1.1.5"
-iced-x86 = { version = "1.21.0", default-features = false, features = ["decoder", "encoder", "gas", "no_std"] }
+iced-x86 = { version = "1.21.0", default-features = false, features = [
+    "decoder",
+    "encoder",
+    "gas",
+    "no_std",
+] }
+elfloader = "0.16.0"
+xmas-elf = "0.8.0" # must be same as elfloader
+
 # twox-hash = { version = "1.6.3", default-features = false } # not currently needed, but it's a good no_std hash library when it is needed

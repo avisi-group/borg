@@ -1,6 +1,12 @@
-use crate::guest::{devices::GuestDevice, memory::IOMemoryHandler};
+use alloc::rc::Rc;
+
+use crate::guest::{
+    devices::{GuestDevice, GuestDeviceFactory},
+    memory::IOMemoryHandler,
+};
 
 pub struct VirtIOBlock;
+pub struct VirtIOBlockFactory;
 
 impl GuestDevice for VirtIOBlock {
     fn start(&self) {}
@@ -27,5 +33,11 @@ impl IOMemoryHandler for VirtIOBlock {
 impl VirtIOBlock {
     pub fn new() -> Self {
         Self
+    }
+}
+
+impl GuestDeviceFactory for VirtIOBlockFactory {
+    fn create(&self) -> Rc<dyn GuestDevice> {
+        Rc::new(VirtIOBlock::new())
     }
 }

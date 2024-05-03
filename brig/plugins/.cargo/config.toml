@@ -1,0 +1,5 @@
+[build]
+# identical to x86_64-unknown-none except for `"dynamic-linking": true`
+target = "plugin-target.json"
+# ideally force frame pointers only enabled for debug builds
+rustflags = ["-C", "force-frame-pointers=yes"]

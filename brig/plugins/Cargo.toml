@@ -1,0 +1,3 @@
+[workspace]
+resolver = "2"
+members = ["guest/test", "guest/devices/primecell/pl011"]

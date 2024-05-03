@@ -2,7 +2,7 @@ use {
     crate::{
         devices::manager::SharedDeviceManager,
         guest::{
-            devices::{core::Interpreter, GuestDevice},
+            devices::{GuestDevice, GuestDeviceFactory},
             memory::{AddressSpace, AddressSpaceRegion},
         },
     },
@@ -17,6 +17,7 @@ pub mod devices;
 pub mod memory;
 
 static mut GUEST: Once<Guest> = Once::INIT;
+static mut GUEST_DEVICE_FACTORIES: Once<BTreeMap<String, Box<dyn GuestDeviceFactory>>> = Once::INIT;
 
 #[derive(Default)]
 pub struct Guest {
@@ -86,7 +87,7 @@ pub fn start() {
 
     // create devices, including cores
     for (name, device) in config.devices {
-        let dev: Rc<dyn GuestDevice> = match device.kind.as_str() {
+        /*let dev: Rc<dyn GuestDevice> = match device.kind.as_str() {
             "core" => match device
                 .extra
                 .get("arch".into())
@@ -106,8 +107,16 @@ pub fn start() {
             _ => {
                 panic!("unsupported guest device type {}", device.kind);
             }
+        };*/
+
+        let Some(factory) = unsafe { GUEST_DEVICE_FACTORIES.get() }
+            .unwrap()
+            .get(device.kind.as_str())
+        else {
+            panic!("unsupported guest device type {}", device.kind);
         };
 
+        let dev = factory.create();
         guest.devices.insert(name.clone(), dev.clone());
 
         // locate address space for attachment, if any

@@ -7,9 +7,12 @@
 extern crate alloc;
 
 use {
-    crate::arch::x86::{
-        backtrace::backtrace,
-        memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
+    crate::{
+        arch::x86::{
+            backtrace::backtrace,
+            memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
+        },
+        devices::manager::SharedDeviceManager,
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
@@ -21,8 +24,9 @@ mod arch;
 mod dbt;
 mod devices;
 mod fs;
-mod guest;
+pub mod guest;
 mod logger;
+pub mod plugins;
 mod rand;
 mod scheduler;
 mod tasks;
@@ -32,7 +36,7 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     config.mappings.physical_memory = Some(Mapping::FixedAddress(PHYSICAL_MEMORY_OFFSET.as_u64()));
     config.mappings.dynamic_range_start = Some(HIGH_HALF_CANONICAL_START.as_u64());
     config.mappings.dynamic_range_end = Some(HIGH_HALF_CANONICAL_END.as_u64());
-    config.kernel_stack_size = 0x1000_0000;
+    config.kernel_stack_size = 0x10_0000;
     config
 };
 
@@ -61,6 +65,13 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
 }
 
 pub fn continue_start() {
+    let device_manager = SharedDeviceManager::get();
+    let device = device_manager
+        .get_device_by_alias("disk00:03.0")
+        .expect("disk not found");
+
+    plugins::load_all(&device);
+
     guest::start();
 }
 
