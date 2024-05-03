@@ -21,7 +21,7 @@ pub const HIGH_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0xffff_ffff
 pub const PHYSICAL_MEMORY_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8180_0000_0000);
 
 #[global_allocator]
-static HEAP_ALLOCATOR: LockedHeap<64> = LockedHeap::empty();
+pub static HEAP_ALLOCATOR: LockedHeap<64> = LockedHeap::empty();
 
 /// Initialize the global heap allocator backed by the usable memory regions
 /// supplied by the bootloader
@@ -109,7 +109,8 @@ pub fn heap_init(memory_regions: &MemoryRegions) {
     VirtualMemoryArea::current().invalidate();
 
     log::info!(
-        "heap allocator initialized, {:.2} available",
+        "heap allocator initialized @ {:p}, {:.2} available",
+        &HEAP_ALLOCATOR as *const _,
         Byte::from(HEAP_ALLOCATOR.lock().stats_total_bytes())
             .get_appropriate_unit(UnitType::Binary)
     );

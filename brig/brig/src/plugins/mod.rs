@@ -17,17 +17,13 @@ use {
         ElfBinary, ElfLoader, ElfLoaderErr, Entry, Flags, LoadableHeaders, RelocationEntry,
         RelocationType, VAddr,
     },
+    plugins_api::PluginHost,
     x86_64::{
         structures::paging::{Page, PageTableFlags, PhysFrame, Size4KiB},
         VirtAddr,
     },
     xmas_elf::sections::SectionData,
 };
-
-pub trait Plugin: Send + Sync {
-    fn name(&self) -> &'static str;
-    fn superspecificferdianame(&self, a: u32) -> u32;
-}
 
 struct Loader<'binary, 'contents> {
     binary: &'binary ElfBinary<'contents>,
@@ -229,7 +225,9 @@ impl<'binary, 'contents> ElfLoader for Loader<'binary, 'contents> {
 pub fn load_all(device: &SharedDevice) {
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
-    load_one(fs.open("plugins/libtest.so").unwrap());
+    //  load_one(fs.open("plugins/libtest.so").unwrap());
+    load_one(fs.open("plugins/libpl011.so").unwrap());
+    panic!("end of plugin load");
 }
 
 pub fn load_one<'fs>(file: TarFile<'fs>) {
@@ -250,29 +248,30 @@ pub fn load_one<'fs>(file: TarFile<'fs>) {
     let mut loader = Loader::new(&binary, alloc);
     binary.load(&mut loader).expect("Can't load the binary?");
 
-    //panic!("sausage");
-
-    let header = binary.file.find_section_by_name(".plugins").unwrap();
+    let header = binary
+        .file
+        .find_section_by_name(".plugin_entrypoint")
+        .unwrap();
     let translated_header_address = loader.translate_virt_addr(header.address());
 
+    log::info!("translated_header_address: {translated_header_address:x}");
+
     unsafe {
-        let ptr_to_plugin_trait_ptr = translated_header_address.as_ptr::<*const dyn Plugin>();
-        let plugin_trait_ptr = *ptr_to_plugin_trait_ptr;
-        let plugin_trait_ref = &*plugin_trait_ptr;
-
-        let plugin_data_ptr = (*(ptr_to_plugin_trait_ptr as *const u64)) as *const ();
-        let plugin_vtable_ptr =
-            (*(ptr_to_plugin_trait_ptr as *const u64).offset(1)) as *const [u64; 5];
-
-        log::info!("ptr_to_plugin_trait_ptr = {ptr_to_plugin_trait_ptr:p}");
-        log::info!("plugin_trait_ptr = {plugin_trait_ptr:p}",);
-        log::info!("plugin_data_ptr = {plugin_data_ptr:p}",);
-        log::info!("plugin_vtable_ptr = {plugin_vtable_ptr:p}",);
-
-        log::info!("plugin_vtable = {:x?}", *plugin_vtable_ptr);
-
-        log::info!("{:x}", plugin_trait_ref.superspecificferdianame(7));
-        log::info!("{}", plugin_trait_ref.name());
+        let entrypoint =
+            core::mem::transmute::<_, fn(&dyn PluginHost)>(translated_header_address.as_u64());
+        (entrypoint)(&BrigHost);
     }
-    // register here
+}
+
+struct BrigHost;
+
+impl PluginHost for BrigHost {
+    fn print_message(&self, msg: &str) -> usize {
+        log::info!("got message from plugin: {:?}", msg);
+        msg.len()
+    }
+
+    fn allocator(&self) -> &'static dyn core::alloc::GlobalAlloc {
+        &crate::arch::x86::memory::HEAP_ALLOCATOR
+    }
 }

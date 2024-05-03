@@ -7,4 +7,4 @@ edition = "2021"
 crate-type = ["dylib"]
 
 [dependencies]
-brig = { path = "../../../../../brig" }
+plugins_api = { path = "../../../../../plugins_api" }

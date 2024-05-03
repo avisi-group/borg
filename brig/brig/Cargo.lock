@@ -72,6 +72,7 @@ dependencies = [
  "iced-x86",
  "log",
  "phf",
+ "plugins_api",
  "proc_macro_lib",
  "rustc-demangle",
  "serde",
@@ -259,6 +260,10 @@ checksum = "90fcb95eef784c2ac79119d1dd819e162b5da872ce6f3c3abe1e8ca1c082f72b"
 dependencies = [
  "siphasher",
 ]
+
+[[package]]
+name = "plugins_api"
+version = "0.1.0"
 
 [[package]]
 name = "proc-macro2"

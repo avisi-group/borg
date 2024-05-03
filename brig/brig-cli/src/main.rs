@@ -1,7 +1,6 @@
 use {
     cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message},
     clap::Parser,
-    color_eyre::Result,
     itertools::Itertools,
     std::{
         fs::File,
@@ -31,17 +30,17 @@ struct Cli {
     build_only: bool,
 }
 
-fn main() -> Result<()> {
+fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     let cli = Cli::parse();
 
     // create TAR file containing guest kernel, plugins, and configuration
-    let guest_tar = build_guest_tar("./guest_data", cli.verbose, false).unwrap(); // PathBuf::from("/t1/cargo_global_target_dir/guest.tar");
+    let guest_tar = build_guest_tar("./guest_data", cli.verbose, cli.release);
 
     // create an UEFI disk image of kernel
     let uefi_path = {
-        let kernel_path = build_kernel("../brig", cli.verbose, cli.release).unwrap();
+        let kernel_path = build_kernel("../brig", cli.verbose, cli.release);
 
         let uefi_path = kernel_path.parent().unwrap().join("uefi.img");
         bootloader::UefiBoot::new(&kernel_path)
@@ -122,14 +121,14 @@ fn build_cargo<P: AsRef<Path>>(project_path: P, args: Vec<&str>, verbose: bool) 
         .map(|a| a.canonicalize().unwrap())
         .collect::<Vec<_>>();
 
-    cmd.wait().unwrap();
+    assert!(cmd.wait().unwrap().success());
 
     println!("build complete.");
 
     artifacts
 }
 
-fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Result<Vec<PathBuf>> {
+fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Vec<PathBuf> {
     println!("building plugins...");
 
     let mut args = Vec::new();
@@ -140,20 +139,14 @@ fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Resul
     args.push("-Zbuild-std");
     args.push("--target=plugin-target.json");
 
-    Ok(build_cargo(path, args, verbose))
+    build_cargo(path, args, verbose)
 }
 
-fn build_guest_tar<P: AsRef<Path>>(
-    guest_data_path: P,
-    verbose: bool,
-    release: bool,
-) -> Result<PathBuf> {
-    const ROOTFS_SIZE: usize = 512 * 1024 * 1024;
-
+fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, verbose: bool, release: bool) -> PathBuf {
     let guest_data_path = guest_data_path.as_ref();
 
     // build plugins
-    let plugin_artifacts = build_plugins("../plugins", verbose, release).unwrap();
+    let plugin_artifacts = build_plugins("../plugins", verbose, release);
 
     let target_dir = plugin_artifacts[0]
         .parent()
@@ -188,6 +181,7 @@ fn build_guest_tar<P: AsRef<Path>>(
     }
 
     // // make rootfs.ext2
+    // const ROOTFS_SIZE: usize = 512 * 1024 * 1024;
     // let volume = File::create(target_dir.join("rootfs.ext2")).unwrap();
     // volume.set_len(ROOTFS_SIZE);
     // assert!(Command::new("mkfs.ext2")
@@ -204,21 +198,25 @@ fn build_guest_tar<P: AsRef<Path>>(
         tar.append_file(
             "config.json",
             &mut File::open(guest_data_path.join("config.json")).unwrap(),
-        );
+        )
+        .unwrap();
         tar.append_file(
             "kernel",
             &mut File::open(guest_data_path.join("kernel")).unwrap(),
-        );
+        )
+        .unwrap();
         tar.append_file(
             "platform.dtb",
             &mut File::open(target_dir.join("platform.dtb")).unwrap(),
-        );
+        )
+        .unwrap();
 
         for path in plugin_artifacts {
             tar.append_file(
                 PathBuf::from("plugins").join(path.file_name().unwrap()),
                 &mut File::open(&path).unwrap(),
-            );
+            )
+            .unwrap();
         }
 
         tar.finish().unwrap();
@@ -226,10 +224,10 @@ fn build_guest_tar<P: AsRef<Path>>(
         tar_path
     };
 
-    Ok(tar_path)
+    tar_path
 }
 
-fn build_kernel<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Result<PathBuf> {
+fn build_kernel<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> PathBuf {
     println!("building kernel...");
 
     let mut args = Vec::new();
@@ -252,7 +250,7 @@ fn build_kernel<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Result
 
     println!("built kernel @ {kernel_path:?}");
 
-    Ok(kernel_path)
+    kernel_path
 }
 
 fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
