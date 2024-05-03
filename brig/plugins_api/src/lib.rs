@@ -3,8 +3,8 @@
 use core::alloc::GlobalAlloc;
 
 pub trait PluginHost: Send + Sync {
-    /// Prints a message to the console, returning the length of the string (as a test value)
-    fn print_message(&self, msg: &str) -> usize;
+    /// Prints a message to the console
+    fn print_message(&self, msg: &str);
 
     fn allocator(&self) -> &dyn GlobalAlloc;
 }

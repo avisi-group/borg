@@ -1,28 +1,21 @@
 use {
     crate::{
-        arch::x86::memory::VirtualMemoryArea,
         devices::SharedDevice,
         fs::{
             tar::{TarFile, TarFilesystem},
             File, Filesystem,
         },
     },
-    alloc::{
-        alloc::alloc_zeroed, borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String,
-        vec::Vec,
-    },
-    core::{alloc::Layout, default, ops::Range},
+    alloc::{alloc::alloc_zeroed, vec::Vec},
+    core::alloc::Layout,
     elfloader::{
         arch::x86_64::RelocationTypes::{R_AMD64_64, R_AMD64_GLOB_DAT, R_AMD64_RELATIVE},
-        ElfBinary, ElfLoader, ElfLoaderErr, Entry, Flags, LoadableHeaders, RelocationEntry,
+        ElfBinary, ElfLoader, ElfLoaderErr, Flags, LoadableHeaders, RelocationEntry,
         RelocationType, VAddr,
     },
     plugins_api::PluginHost,
-    x86_64::{
-        structures::paging::{Page, PageTableFlags, PhysFrame, Size4KiB},
-        VirtAddr,
-    },
-    xmas_elf::sections::SectionData,
+    x86_64::VirtAddr,
+    xmas_elf::program::Type,
 };
 
 struct Loader<'binary, 'contents> {
@@ -36,28 +29,11 @@ struct Loader<'binary, 'contents> {
 
 impl<'binary, 'contents> Loader<'binary, 'contents> {
     pub fn new(binary: &'binary ElfBinary<'contents>, allocation: *mut u8) -> Self {
+        // load symbol values
         let mut symbol_values = Vec::new();
-
-        // let section_addresses = binary
-        //     .file
-        //     .section_iter()
-        //     .enumerate()
-        //     .map(|(i, s)| (s.address(), (u16::try_from(i).unwrap(), s.size())))
-        //     .collect::<BTreeMap<_, _>>();
-        let symbol_section = binary.file.find_section_by_name(".dynsym").unwrap();
-        let symbol_table = symbol_section.get_data(&binary.file).unwrap();
-        match symbol_table {
-            SectionData::DynSymbolTable64(entries) => {
-                for entry in entries {
-                    symbol_values.push(entry.value());
-                }
-            }
-
-            _ => panic!(),
-        }
-
-        //   let symbol_values = symbol_values.into_iter().map(|(_, value)|
-        // value).collect();
+        binary
+            .for_each_symbol(|s| symbol_values.push(s.value()))
+            .unwrap();
 
         let mut this = Self {
             binary,
@@ -65,6 +41,7 @@ impl<'binary, 'contents> Loader<'binary, 'contents> {
             allocation,
         };
 
+        // need to translate symbol values
         this.symbol_values = this
             .symbol_values
             .iter()
@@ -83,36 +60,7 @@ impl<'binary, 'contents> Loader<'binary, 'contents> {
 
 impl<'binary, 'contents> ElfLoader for Loader<'binary, 'contents> {
     fn allocate(&mut self, _load_headers: LoadableHeaders) -> Result<(), ElfLoaderErr> {
-        // for header in load_headers {
-        //     let aligned_base = VirtAddr::new(header.virtual_addr())
-        //         .align_down(header.align())
-        //         .as_u64();
-
-        //     // add the difference lost between base and aligned base to the size
-        //     // equivalent to aligning mem_size up to the next page size
-        //     let adjusted_size = header.mem_size() + (header.virtual_addr() -
-        // aligned_base);
-
-        //     let layout = Layout::from_size_align(
-        //         usize::try_from(adjusted_size).unwrap(),
-        //         usize::try_from(header.align()).unwrap(),
-        //     )
-        //     .unwrap();
-
-        //     let alloc = VirtAddr::from_ptr(unsafe { alloc_zeroed(layout) });
-
-        //     log::info!(
-        //         "allocate base = {:x} size = {:x} align = {:x} => aligned base {:x}
-        // adjusted size {:x} @ {:x}",         header.virtual_addr(),
-        //         header.mem_size(),
-        //         header.align(),
-        //         aligned_base,
-        //         adjusted_size,
-        //         alloc
-        //     );
-
-        //     self.mapping.insert(aligned_base, (alloc, adjusted_size));
-        // }
+        // todo: asset header resides within already-allocated range
         Ok(())
     }
 
@@ -225,25 +173,27 @@ impl<'binary, 'contents> ElfLoader for Loader<'binary, 'contents> {
 pub fn load_all(device: &SharedDevice) {
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
-    //  load_one(fs.open("plugins/libtest.so").unwrap());
+    load_one(fs.open("plugins/libtest.so").unwrap());
     load_one(fs.open("plugins/libpl011.so").unwrap());
     panic!("end of plugin load");
 }
 
 pub fn load_one<'fs>(file: TarFile<'fs>) {
     let contents = file.read_to_vec().unwrap();
-    let binary = ElfBinary::new(contents.as_slice()).expect("Got proper ELF file");
+    let binary = ElfBinary::new(contents.as_slice()).unwrap();
 
-    let max_size = binary
+    // calculate (aligned) highest virtual address in *loaded* ELF file
+    let highest_virt_addr = binary
         .program_headers()
-        .filter(|header| matches!(header.get_type().unwrap(), xmas_elf::program::Type::Load))
+        .filter(|header| matches!(header.get_type().unwrap(), Type::Load))
         .map(|header| ((header.virtual_addr() + header.mem_size()) + header.align()))
         .max()
         .unwrap();
 
-    let alloc = unsafe { alloc_zeroed(Layout::from_size_align(max_size as usize, 4096).unwrap()) };
+    let alloc =
+        unsafe { alloc_zeroed(Layout::from_size_align(highest_virt_addr as usize, 4096).unwrap()) };
 
-    log::info!("elf backing allocation: {alloc:p} {max_size:x}");
+    log::info!("elf backing allocation: {alloc:p} {highest_virt_addr:x}");
 
     let mut loader = Loader::new(&binary, alloc);
     binary.load(&mut loader).expect("Can't load the binary?");
@@ -266,9 +216,8 @@ pub fn load_one<'fs>(file: TarFile<'fs>) {
 struct BrigHost;
 
 impl PluginHost for BrigHost {
-    fn print_message(&self, msg: &str) -> usize {
-        log::info!("got message from plugin: {:?}", msg);
-        msg.len()
+    fn print_message(&self, msg: &str) {
+        log::info!("got message from plugin: {}", msg);
     }
 
     fn allocator(&self) -> &'static dyn core::alloc::GlobalAlloc {

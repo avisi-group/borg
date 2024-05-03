@@ -105,7 +105,7 @@ fn build_cargo<P: AsRef<Path>>(project_path: P, args: Vec<&str>, verbose: bool) 
                     Some(path)
                 } else {
                     if let Ok(x) = a.target.kind.into_iter().exactly_one() {
-                        if x == "dylib" {
+                        if x == "cdylib" {
                             Some(a.filenames.iter().exactly_one().unwrap().clone())
                         } else {
                             None
@@ -135,9 +135,6 @@ fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Vec<P
     if release {
         args.push("--release");
     }
-
-    args.push("-Zbuild-std");
-    args.push("--target=plugin-target.json");
 
     build_cargo(path, args, verbose)
 }

@@ -2,5 +2,3 @@
 channel = "nightly"
 profile = "default"
 components = ["llvm-tools", "rust-src"]
-# identical to x86_64-unknown-none except for `"dynamic-linking": true`
-targets = ["plugin-target.json"]

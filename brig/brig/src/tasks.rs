@@ -14,7 +14,7 @@ use {
 };
 
 /// Task stack size in bytes
-const STACK_SIZE: usize = PAGE_SIZE * 64;
+const STACK_SIZE: usize = PAGE_SIZE * 16;
 const STACK_ALLOC_LAYOUT: Layout =
     unsafe { Layout::from_size_align_unchecked(STACK_SIZE, PAGE_SIZE) };
 

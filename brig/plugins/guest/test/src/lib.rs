@@ -1,8 +1,12 @@
 #![no_std]
 
-use core::fmt::{self, Write};
-use core::panic::PanicInfo;
-use plugins_api::PluginHost;
+use {
+    core::{
+        fmt::{self, Write},
+        panic::PanicInfo,
+    },
+    plugins_api::PluginHost,
+};
 
 #[no_mangle]
 #[link_section = ".plugin_entrypoint"]
