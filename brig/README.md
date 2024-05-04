@@ -22,7 +22,7 @@ Running
 $ cargo r
 ```
 
-in the `brig-cli` directory will build the kernel, place it inside a bootable UEFI image, then start QEMU with that image.
+in the `brig-cli` directory will build the kernel and plugins, place them inside a bootable UEFI image and guest tarfile, then start QEMU with that image.
 
 The `standalone` directory can be built to run the generated ISA model outside of `brig` as a normal binary.
 

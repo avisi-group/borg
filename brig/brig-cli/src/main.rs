@@ -1,10 +1,10 @@
 use {
-    cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message},
+    cargo_metadata::{diagnostic::DiagnosticLevel, Message},
     clap::Parser,
     itertools::Itertools,
     std::{
         fs::File,
-        io::{BufReader, Write},
+        io::BufReader,
         path::{Path, PathBuf},
         process::{Command, Stdio},
     },
@@ -36,7 +36,7 @@ fn main() -> color_eyre::Result<()> {
     let cli = Cli::parse();
 
     // create TAR file containing guest kernel, plugins, and configuration
-    let guest_tar = build_guest_tar("./guest_data", cli.verbose, cli.release);
+    let guest_tar = build_guest_tar("./guest_data", "../brig", cli.verbose, cli.release);
 
     // create an UEFI disk image of kernel
     let uefi_path = {
@@ -139,12 +139,13 @@ fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Vec<P
     build_cargo(path, args, verbose)
 }
 
-fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, verbose: bool, release: bool) -> PathBuf {
+fn build_guest_tar<P0: AsRef<Path>,P1: AsRef<Path>>(guest_data_path: P0, guest_plugins_path: P1, verbose: bool, release: bool) -> PathBuf {
     let guest_data_path = guest_data_path.as_ref();
 
     // build plugins
-    let plugin_artifacts = build_plugins("../plugins", verbose, release);
+    let plugin_artifacts = build_plugins(guest_plugins_path, verbose, release);
 
+    // bad, stupid, hate it
     let target_dir = plugin_artifacts[0]
         .parent()
         .unwrap()
@@ -202,6 +203,7 @@ fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, verbose: bool, release: b
             &mut File::open(guest_data_path.join("kernel")).unwrap(),
         )
         .unwrap();
+
         tar.append_file(
             "platform.dtb",
             &mut File::open(target_dir.join("platform.dtb")).unwrap(),
@@ -231,6 +233,8 @@ fn build_kernel<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> PathBu
     if release {
         args.push("--release");
     }
+    args.push("--bin");
+    args.push("kernel");
 
     let kernel_path = build_cargo(path, args, verbose)
         .into_iter()

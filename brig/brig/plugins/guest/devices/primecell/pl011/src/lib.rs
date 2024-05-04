@@ -19,7 +19,7 @@ static mut ALLOCATOR: HostAllocator = HostAllocator::new();
 
 #[no_mangle]
 #[link_section = ".plugin_entrypoint"]
-pub extern "C" fn entrypoint(supplied_host: &'static dyn PluginHost) {
+pub extern "Rust" fn entrypoint(supplied_host: &'static dyn PluginHost) {
     unsafe { HOST = Some(supplied_host) };
     unsafe { ALLOCATOR.init(host().allocator()) };
 
@@ -32,6 +32,8 @@ pub extern "C" fn entrypoint(supplied_host: &'static dyn PluginHost) {
     host().print_message(&format!("hello from pl011! {:?}", vec));
 }
 
+/// TODO: move me to plugins_api and create a `bootstrap()` method on host that
+/// initializes it
 struct HostAllocator {
     host: Option<&'static dyn GlobalAlloc>,
 }

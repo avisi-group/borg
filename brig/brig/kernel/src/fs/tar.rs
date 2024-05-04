@@ -18,7 +18,7 @@ impl<'device, B: BlockDevice> TarFilesystem<'device, B> {
         let archive = {
             let mut buf = alloc::vec![0u8; dev.size()];
             dev.read(&mut buf, 0).unwrap();
-            TarArchive::new(buf.into())
+            TarArchive::new(buf.into()).unwrap()
         };
 
         Self { _dev: dev, archive }
@@ -30,7 +30,7 @@ impl<'device, 'fs, B: BlockDevice> Filesystem<'fs, TarFile<'fs>> for TarFilesyst
         let entry = self
             .archive
             .entries()
-            .find(|e| *e.filename() == *(filename.as_ref().trim_start_matches('/')))
+            .find(|e| e.filename().as_str().unwrap() == (filename.as_ref().trim_start_matches('/')))
             .ok_or(Error::NotFound(filename.as_ref().to_owned()))?;
 
         Ok(TarFile { entry })

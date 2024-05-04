@@ -22,8 +22,6 @@ struct Loader<'binary, 'contents> {
     binary: &'binary ElfBinary<'contents>,
 
     symbol_values: Vec<u64>,
-    // address -> (index, size)
-    // section_addresses: BTreeMap<u64, (u16, u64)>,
     allocation: *mut u8,
 }
 
@@ -64,7 +62,7 @@ impl<'binary, 'contents> ElfLoader for Loader<'binary, 'contents> {
         Ok(())
     }
 
-    fn load(&mut self, flags: Flags, base: VAddr, region: &[u8]) -> Result<(), ElfLoaderErr> {
+    fn load(&mut self, _flags: Flags, base: VAddr, region: &[u8]) -> Result<(), ElfLoaderErr> {
         // let Some((&candidate_base, (allocation, size))) = self
         //     .mapping
         //     .upper_bound(core::ops::Bound::Included(&base))

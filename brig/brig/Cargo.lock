@@ -55,41 +55,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a35ba5100c2431e20b924c8103c2cf8adb919ed9880f625e8770c3cb9d1b06aa"
 
 [[package]]
-name = "brig"
-version = "0.1.0"
-dependencies = [
- "acpi",
- "bootloader_api",
- "buddy_system_allocator",
- "byte-unit",
- "byteorder",
- "concat-idents",
- "displaydoc",
- "elf",
- "elfloader",
- "fastrand",
- "hex",
- "iced-x86",
- "log",
- "phf",
- "plugins_api",
- "proc_macro_lib",
- "rustc-demangle",
- "serde",
- "serde_json",
- "spin 0.9.8",
- "tar-no-std",
- "thiserror-core",
- "uart_16550",
- "uuid",
- "virtio-drivers",
- "x2apic",
- "x86",
- "x86_64 0.15.1",
- "xmas-elf",
-]
-
-[[package]]
 name = "buddy_system_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -154,9 +119,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "2.0.2"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "658bd65b1cf4c852a3cc96f18a8ce7b5640f6b703f905c7d74532294c2a63984"
+checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 
 [[package]]
 name = "hex"
@@ -178,6 +143,41 @@ name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49f1f14873335454500d59611f1cf4a4b0f786f9ac11f4312a78e4cf2566695b"
+
+[[package]]
+name = "kernel"
+version = "0.1.0"
+dependencies = [
+ "acpi",
+ "bootloader_api",
+ "buddy_system_allocator",
+ "byte-unit",
+ "byteorder",
+ "concat-idents",
+ "displaydoc",
+ "elf",
+ "elfloader",
+ "fastrand",
+ "hex",
+ "iced-x86",
+ "log",
+ "phf",
+ "plugins_api",
+ "proc_macro_lib",
+ "rustc-demangle",
+ "serde",
+ "serde_json",
+ "spin 0.9.8",
+ "tar-no-std",
+ "thiserror-core",
+ "uart_16550",
+ "uuid",
+ "virtio-drivers",
+ "x2apic",
+ "x86",
+ "x86_64 0.15.1",
+ "xmas-elf",
+]
 
 [[package]]
 name = "lazy_static"
@@ -203,6 +203,12 @@ name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
+
+[[package]]
+name = "memchr"
+version = "2.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
 
 [[package]]
 name = "num-traits"
@@ -259,6 +265,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90fcb95eef784c2ac79119d1dd819e162b5da872ce6f3c3abe1e8ca1c082f72b"
 dependencies = [
  "siphasher",
+]
+
+[[package]]
+name = "pl011"
+version = "0.1.0"
+dependencies = [
+ "plugins_api",
 ]
 
 [[package]]
@@ -352,18 +365,18 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "serde"
-version = "1.0.199"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c9f6e76df036c77cd94996771fb40db98187f096dd0b9af39c6c6e452ba966a"
+checksum = "ddc6f9cc94d67c0e21aaf7eda3a010fd3af78ebf6e096aa6e2e13c79749cce4f"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.199"
+version = "1.0.200"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11bd257a6541e141e42ca6d24ae26f7714887b47e89aa739099104c7e4d3b7fc"
+checksum = "856f046b9400cee3c8c94ed572ecdb752444c24528c035cd35882aad6f492bcb"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -415,13 +428,21 @@ dependencies = [
 
 [[package]]
 name = "tar-no-std"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d87688750eada7aef6d4a0b82979148980c67aca111f62f4bef82827276f3fc5"
+checksum = "8a10ea472e3ec90660a9a36d44475e6c9dac04cb657c39abdb48589e19723041"
 dependencies = [
- "arrayvec",
  "bitflags 2.5.0",
  "log",
+ "memchr",
+ "num-traits",
+]
+
+[[package]]
+name = "test"
+version = "0.1.0"
+dependencies = [
+ "plugins_api",
 ]
 
 [[package]]

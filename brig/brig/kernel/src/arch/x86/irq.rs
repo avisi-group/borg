@@ -5,7 +5,7 @@ use {
             MachineContext,
         },
         guest::memory::AddressSpaceRegionKind,
-        qemu_exit, scheduler,
+        scheduler,
     },
     alloc::{alloc::alloc_zeroed, collections::BTreeSet},
     core::alloc::Layout,
@@ -102,6 +102,7 @@ pub fn init() {
     //    IRQ_MANAGER.get().unwrap().load();
 }
 
+#[derive(Debug)]
 enum IrqError {
     IrqAlreadyReserved,
     NoAvailableIrqs,
@@ -116,7 +117,7 @@ impl IrqManager {
         self.assign_irq(GENERAL_PROTECTION_FAULT_VECTOR, gpf_exception);
 
         // TODO: Pop this out
-        self.reserve_irq(0x20, timer_interrupt);
+        self.reserve_irq(0x20, timer_interrupt).unwrap();
 
         for i in 32..=255 {
             self.avail.insert(i);
