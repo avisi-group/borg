@@ -52533,6 +52533,7 @@ name = "aarch64"
 version = "0.1.0"
 dependencies = [
  "arch",
+ "log",
  "plugins_rt",
 ]
 
@@ -115707,6 +115708,7 @@ dependencies = [
 name = "pl011"
 version = "0.1.0"
 dependencies = [
+ "log",
  "plugins_rt",
 ]
 
@@ -115743,6 +115745,7 @@ version = "0.1.0"
 name = "plugins_rt"
 version = "0.1.0"
 dependencies = [
+ "log",
  "plugins_api",
 ]
 
@@ -116027,6 +116030,7 @@ dependencies = [
 name = "test"
 version = "0.1.0"
 dependencies = [
+ "log",
  "plugins_rt",
 ]
 

@@ -9,3 +9,5 @@ crate-type = ["cdylib"]
 [dependencies]
 plugins_rt.workspace = true
 arch = { path = "../../../../../../../brig-aarch64/arch" }
+
+log = "0.4.21"

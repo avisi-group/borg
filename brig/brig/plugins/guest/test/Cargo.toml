@@ -7,4 +7,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+log = "0.4.21"
 plugins_rt.workspace = true

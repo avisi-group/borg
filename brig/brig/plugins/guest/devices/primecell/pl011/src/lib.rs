@@ -26,5 +26,5 @@ fn entrypoint(host: &'static dyn PluginHost) {
     }
     vec.extend_from_slice(b"test string");
 
-    host::get().print_message(&format!("hello from pl011! {:?}", vec));
+    log::info!("{}", &format!("hello from pl011! {:?}", vec));
 }

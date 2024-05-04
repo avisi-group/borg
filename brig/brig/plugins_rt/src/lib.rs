@@ -2,14 +2,13 @@
 
 //! Brig plugin runtime: allocation, panics, logging
 
+extern crate alloc;
+
 pub use plugins_api as api;
 
-use {
-    api::PluginHost,
-    core::{alloc::GlobalAlloc, panic::PanicInfo},
-};
+use {api::PluginHost, core::panic::PanicInfo};
 
-mod alloc;
+mod allocator;
 pub mod host;
 mod log;
 
@@ -20,8 +19,8 @@ mod log;
 ///     * which allows for `log` macro usage
 pub fn init(host: &'static dyn PluginHost) {
     host::init(host);
-    alloc::init();
-    // log::init
+    allocator::init();
+    log::init();
 }
 
 #[panic_handler]

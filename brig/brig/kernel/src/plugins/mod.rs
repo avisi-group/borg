@@ -5,6 +5,7 @@ use {
             tar::{TarFile, TarFilesystem},
             File, Filesystem,
         },
+        println,
     },
     alloc::{alloc::alloc_zeroed, vec::Vec},
     core::alloc::Layout,
@@ -205,18 +206,13 @@ pub fn load_one<'fs>(file: TarFile<'fs>) {
 
     log::info!("got plugin header for {:?}, starting...", header.name);
     (header.entrypoint)(&BrigHost);
-    // unsafe {
-    //     let entrypoint =
-    //         core::mem::transmute::<_, fn(&dyn
-    // PluginHost)>(translated_header_address.as_u64());     (entrypoint)(&
-    // BrigHost); }
 }
 
 struct BrigHost;
 
 impl PluginHost for BrigHost {
     fn print_message(&self, msg: &str) {
-        log::info!("got message from plugin: {}", msg);
+        log::info!("{}", msg)
     }
 
     fn allocator(&self) -> &'static dyn core::alloc::GlobalAlloc {
