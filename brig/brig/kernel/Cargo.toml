@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-proc_macro_lib = { path = "../proc_macro_lib" }
-plugins_api = { path = "../plugins_api" }
+proc_macro_lib.workspace = true
+plugins_api.workspace = true
 
 bootloader_api = "0.11.7"
 x86_64 = "0.15.1"

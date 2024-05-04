@@ -1,6 +1,7 @@
 [package]
-name = "processing_unit"
+name = "plugins_rt"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+plugins_api.workspace = true

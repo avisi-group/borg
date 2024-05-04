@@ -139,7 +139,16 @@ fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Vec<P
     build_cargo(path, args, verbose)
 }
 
-fn build_guest_tar<P0: AsRef<Path>,P1: AsRef<Path>>(guest_data_path: P0, guest_plugins_path: P1, verbose: bool, release: bool) -> PathBuf {
+fn build_guest_tar<P0: AsRef<Path>, P1: AsRef<Path>>(
+    guest_data_path: P0,
+    guest_plugins_path: P1,
+    verbose: bool,
+    release: bool,
+) -> PathBuf {
+    // todo: rewrite this to process guest_data files in iterator into tar file,
+    // some left alone (plugins dir, config.json), others are converted like
+    // platform.dts,
+
     let guest_data_path = guest_data_path.as_ref();
 
     // build plugins

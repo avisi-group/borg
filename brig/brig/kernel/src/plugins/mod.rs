@@ -13,7 +13,7 @@ use {
         ElfBinary, ElfLoader, ElfLoaderErr, Flags, LoadableHeaders, RelocationEntry,
         RelocationType, VAddr,
     },
-    plugins_api::PluginHost,
+    plugins_api::{PluginHeader, PluginHost},
     x86_64::VirtAddr,
     xmas_elf::program::Type,
 };
@@ -93,7 +93,7 @@ impl<'binary, 'contents> ElfLoader for Loader<'binary, 'contents> {
 
         let alloc_location = unsafe { self.allocation.offset(base as isize) };
 
-        log::info!("copying region to {:p}", alloc_location);
+        //log::trace!("copying region to {:p}", alloc_location);
 
         unsafe { core::ptr::copy(region.as_ptr(), alloc_location, region.len()) }
 
@@ -171,8 +171,11 @@ impl<'binary, 'contents> ElfLoader for Loader<'binary, 'contents> {
 pub fn load_all(device: &SharedDevice) {
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
+
+    // todo: don't hardcode this, load everything in plugins directory
     load_one(fs.open("plugins/libtest.so").unwrap());
     load_one(fs.open("plugins/libpl011.so").unwrap());
+    load_one(fs.open("plugins/libaarch64.so").unwrap());
     panic!("end of plugin load");
 }
 
@@ -191,24 +194,22 @@ pub fn load_one<'fs>(file: TarFile<'fs>) {
     let alloc =
         unsafe { alloc_zeroed(Layout::from_size_align(highest_virt_addr as usize, 4096).unwrap()) };
 
-    log::info!("elf backing allocation: {alloc:p} {highest_virt_addr:x}");
+    // log::debug!("elf backing allocation: {alloc:p} {highest_virt_addr:x}");
 
     let mut loader = Loader::new(&binary, alloc);
     binary.load(&mut loader).expect("Can't load the binary?");
 
-    let header = binary
-        .file
-        .find_section_by_name(".plugin_entrypoint")
-        .unwrap();
+    let header = binary.file.find_section_by_name(".plugin_header").unwrap();
     let translated_header_address = loader.translate_virt_addr(header.address());
+    let header = unsafe { &*translated_header_address.as_ptr::<PluginHeader>() };
 
-    log::info!("translated_header_address: {translated_header_address:x}");
-
-    unsafe {
-        let entrypoint =
-            core::mem::transmute::<_, fn(&dyn PluginHost)>(translated_header_address.as_u64());
-        (entrypoint)(&BrigHost);
-    }
+    log::info!("got plugin header for {:?}, starting...", header.name);
+    (header.entrypoint)(&BrigHost);
+    // unsafe {
+    //     let entrypoint =
+    //         core::mem::transmute::<_, fn(&dyn
+    // PluginHost)>(translated_header_address.as_u64());     (entrypoint)(&
+    // BrigHost); }
 }
 
 struct BrigHost;
