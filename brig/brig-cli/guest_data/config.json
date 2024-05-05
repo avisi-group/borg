@@ -18,8 +18,7 @@
     },
     "devices": {
         "core0": {
-            "kind": "core",
-            "arch": "arm64",
+            "kind": "aarch64",
             "address_space": "as0"
         },
         "uart0": {

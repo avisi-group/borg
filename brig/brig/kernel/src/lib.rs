@@ -1,6 +1,6 @@
 #![no_std]
 #![feature(abi_x86_interrupt)] // needed for interrupts
-#![feature(allocator_api)] // needed for pci config regions
+#![feature(allocator_api)] // needed for pci config regions and alignedallocator
 #![feature(naked_functions)] // for interrupts with glorious purpose
 #![feature(btree_cursors)]
 

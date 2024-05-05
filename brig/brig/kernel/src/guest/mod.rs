@@ -1,14 +1,12 @@
 use {
     crate::{
         devices::manager::SharedDeviceManager,
-        guest::{
-            devices::{GuestDevice, GuestDeviceFactory},
-            memory::{AddressSpace, AddressSpaceRegion},
-        },
+        guest::memory::{AddressSpace, AddressSpaceRegion},
     },
-    alloc::{boxed::Box, collections::BTreeMap, rc::Rc, string::String},
+    alloc::{boxed::Box, collections::BTreeMap, string::String},
     core::ptr,
-    spin::Once,
+    plugins_api::{GuestDevice, GuestDeviceFactory},
+    spin::{Mutex, Once},
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
 
@@ -17,12 +15,13 @@ pub mod devices;
 pub mod memory;
 
 static mut GUEST: Once<Guest> = Once::INIT;
-static mut GUEST_DEVICE_FACTORIES: Once<BTreeMap<String, Box<dyn GuestDeviceFactory>>> = Once::INIT;
+pub static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn GuestDeviceFactory>>> =
+    Mutex::new(BTreeMap::new());
 
 #[derive(Default)]
 pub struct Guest {
     address_spaces: BTreeMap<String, Box<AddressSpace>>,
-    devices: BTreeMap<String, Rc<dyn GuestDevice>>,
+    devices: BTreeMap<String, Box<dyn GuestDevice>>,
 }
 
 impl Guest {
@@ -108,41 +107,45 @@ pub fn start() {
                 panic!("unsupported guest device type {}", device.kind);
             }
         };*/
+        let factories = unsafe { GUEST_DEVICE_FACTORIES.lock() };
 
-        let Some(factory) = unsafe { GUEST_DEVICE_FACTORIES.get() }
-            .unwrap()
-            .get(device.kind.as_str())
-        else {
-            panic!("unsupported guest device type {}", device.kind);
+        let Some(factory) = factories.get(device.kind.as_str()) else {
+            log::warn!("unsupported guest device type {}", device.kind);
+            continue;
         };
 
         let dev = factory.create();
-        guest.devices.insert(name.clone(), dev.clone());
+        guest.devices.insert(name.clone(), dev);
 
         // locate address space for attachment, if any
-        if let Some(attachment) = device.attach {
-            let Some(io_handler) = dev.as_io_handler() else {
-                panic!("attempting to attach non-mmio guest device");
-            };
+        // if let Some(attachment) = device.attach {
+        //     let Some(io_handler) = dev.as_io_handler() else {
+        //         panic!("attempting to attach non-mmio guest device");
+        //     };
 
-            if let Some(addrspace) = guest.address_spaces.get_mut(&attachment.address_space) {
-                let size = 0; // need to get this from device object io trait
-                addrspace.add_region(AddressSpaceRegion::new(
-                    name,
-                    usize::from_str_radix(attachment.base.trim_start_matches("0x"), 16).unwrap(),
-                    size,
-                    memory::AddressSpaceRegionKind::IO(io_handler), /* need to reference device
-                                                                     * object io trait */
-                ));
-            } else {
-                panic!(
-                    "address space {} not configured for attaching device {}",
-                    attachment.address_space, name
-                );
-            }
-        } else if dev.as_io_handler().is_some() {
-            panic!("io device missing address space attachment");
-        }
+        //     if let Some(addrspace) =
+        // guest.address_spaces.get_mut(&attachment.address_space) {
+        //         let size = 0; // need to get this from device object io trait
+        //         addrspace.add_region(AddressSpaceRegion::new(
+        //             name,
+        //
+        // usize::from_str_radix(attachment.base.trim_start_matches("0x"),
+        // 16).unwrap(),             size,
+        //             memory::AddressSpaceRegionKind::IO(io_handler), /* need
+        // to reference device
+        //                                                              * object
+        //                                                                io trait
+        //                                                                */
+        //         ));
+        //     } else {
+        //         panic!(
+        //             "address space {} not configured for attaching device
+        // {}",             attachment.address_space, name
+        //         );
+        //     }
+        // } else if dev.as_io_handler().is_some() {
+        //     panic!("io device missing address space attachment");
+        // }
     }
 
     let temp_exec_ctx = Box::new(GuestExecutionContext {
@@ -158,7 +161,7 @@ pub fn start() {
     // initiate boot protocol
     match config.boot {
         config::BootProtocol::Arm64Linux(_) => {
-            // todo read kernel from TAR
+            // todo: read kernel from TAR here not earlier
 
             // read header from kernel
             let header = unsafe { &*(kernel.as_ptr() as *const Arm64KernelHeader) };
@@ -178,7 +181,7 @@ pub fn start() {
     }
 
     // go go go (start all devices)
-    for device in guest.devices.values() {
+    for device in guest.devices.values_mut() {
         device.start();
     }
 }

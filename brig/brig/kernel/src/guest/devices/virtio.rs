@@ -1,22 +1,22 @@
-use alloc::rc::Rc;
-
-use crate::guest::{
-    devices::{GuestDevice, GuestDeviceFactory},
-    memory::IOMemoryHandler,
+use {
+    alloc::{boxed::Box, rc::Rc},
+    plugins_api::{GuestDevice, GuestDeviceFactory, IOMemoryHandler},
 };
 
 pub struct VirtIOBlock;
 pub struct VirtIOBlockFactory;
 
 impl GuestDevice for VirtIOBlock {
-    fn start(&self) {}
+    fn start(&mut self) {
+        todo!()
+    }
 
-    fn stop(&self) {}
+    fn stop(&mut self) {
+        todo!()
+    }
 
-    fn as_io_handler(
-        self: alloc::rc::Rc<Self>,
-    ) -> Option<alloc::rc::Rc<dyn crate::guest::memory::IOMemoryHandler>> {
-        Some(self.clone())
+    fn as_io_handler(self: Box<Self>) -> Option<Box<dyn IOMemoryHandler>> {
+        todo!()
     }
 }
 
@@ -37,7 +37,7 @@ impl VirtIOBlock {
 }
 
 impl GuestDeviceFactory for VirtIOBlockFactory {
-    fn create(&self) -> Rc<dyn GuestDevice> {
-        Rc::new(VirtIOBlock::new())
+    fn create(&self) -> Box<dyn GuestDevice> {
+        Box::new(VirtIOBlock::new())
     }
 }

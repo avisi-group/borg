@@ -4,10 +4,7 @@ extern crate alloc;
 
 use {
     alloc::{format, vec::Vec},
-    plugins_rt::{
-        api::{PluginHeader, PluginHost},
-        host,
-    },
+    plugins_rt::api::{PluginHeader, PluginHost},
 };
 
 #[no_mangle]

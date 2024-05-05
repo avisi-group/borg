@@ -1,9 +1,14 @@
 use {
-    alloc::alloc::alloc_zeroed,
+    alloc::alloc::{alloc_zeroed, Global},
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
     byte_unit::{Byte, UnitType},
-    core::{alloc::Layout, ops::Deref},
+    core::{
+        alloc::{AllocError, Allocator, Layout},
+        ops::Deref,
+        ptr::NonNull,
+    },
+    plugins_api::IOMemoryHandler,
     x86_64::{
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
@@ -236,5 +241,16 @@ pub trait VirtAddrExt {
 impl VirtAddrExt for VirtAddr {
     fn to_phys(&self) -> PhysAddr {
         PhysAddr::new(self.as_u64() - PHYSICAL_MEMORY_OFFSET.as_u64())
+    }
+}
+
+pub struct AlignedAllocator<const N: usize>;
+
+unsafe impl<const N: usize> Allocator for AlignedAllocator<N> {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        Global.allocate(layout.align_to(N).unwrap())
+    }
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        Global.deallocate(ptr, layout.align_to(N).unwrap())
     }
 }

@@ -1,10 +1,11 @@
 use {
-    alloc::{collections::BTreeMap, rc::Rc, string::String},
+    alloc::{boxed::Box, collections::BTreeMap, string::String},
     core::{
         fmt::Display,
         mem::{size_of, MaybeUninit},
         slice,
     },
+    plugins_api::IOMemoryHandler,
 };
 
 pub struct AddressSpace {
@@ -37,11 +38,6 @@ impl AddressSpace {
     }
 }
 
-pub trait IOMemoryHandler {
-    fn read(&self, offset: usize, buf: &mut [u8]);
-    fn write(&self, offset: usize, buf: &[u8]);
-}
-
 pub trait IoMemoryHandlerExt {
     fn read_fixed<H: IOMemoryHandler, T: Sized>(handler: H, offset: usize) -> T {
         let mut t = MaybeUninit::<T>::uninit();
@@ -54,7 +50,7 @@ pub trait IoMemoryHandlerExt {
 
 pub enum AddressSpaceRegionKind {
     Ram,
-    IO(Rc<dyn IOMemoryHandler>),
+    IO(Box<dyn IOMemoryHandler>),
 }
 
 pub struct AddressSpaceRegion {

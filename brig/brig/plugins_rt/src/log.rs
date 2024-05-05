@@ -1,7 +1,7 @@
 use {
     crate::host,
     alloc::format,
-    log::{Level, LevelFilter, Log},
+    log::{LevelFilter, Log},
 };
 
 struct HostLogger;
