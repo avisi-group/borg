@@ -1,5 +1,5 @@
 use {
-    cargo_metadata::{diagnostic::DiagnosticLevel, Message},
+    cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message},
     clap::Parser,
     itertools::Itertools,
     std::{
@@ -8,6 +8,7 @@ use {
         path::{Path, PathBuf},
         process::{Command, Stdio},
     },
+    walkdir::WalkDir,
 };
 
 #[derive(Parser)]
@@ -35,19 +36,34 @@ fn main() -> color_eyre::Result<()> {
 
     let cli = Cli::parse();
 
+    let artifacts = build_cargo("../brig", cli.release, cli.verbose);
+
     // create TAR file containing guest kernel, plugins, and configuration
-    let guest_tar = build_guest_tar("./guest_data", "../brig", cli.verbose, cli.release);
+    let guest_tar = build_guest_tar("./guest_data", &artifacts);
 
     // create an UEFI disk image of kernel
     let uefi_path = {
-        let kernel_path = build_kernel("../brig", cli.verbose, cli.release);
+        let kernel_path = artifacts
+            .iter()
+            .filter_map(|a| a.executable.as_ref())
+            .filter(|p| matches!(p.file_name(), Some("kernel")))
+            .exactly_one()
+            .unwrap()
+            .canonicalize()
+            .unwrap();
+
+        if cli.verbose {
+            println!("got kernel @ {kernel_path:?}");
+        }
 
         let uefi_path = kernel_path.parent().unwrap().join("uefi.img");
         bootloader::UefiBoot::new(&kernel_path)
             .create_disk_image(&uefi_path)
             .unwrap();
 
-        println!("built UEFI image @ {uefi_path:?}");
+        if cli.verbose {
+            println!("built UEFI image @ {uefi_path:?}");
+        }
 
         uefi_path
     };
@@ -62,30 +78,35 @@ fn main() -> color_eyre::Result<()> {
     Ok(())
 }
 
-fn build_cargo<P: AsRef<Path>>(project_path: P, args: Vec<&str>, verbose: bool) -> Vec<PathBuf> {
-    let project_path = project_path.as_ref();
-    println!("building {}...", project_path.to_str().unwrap());
+/// Builds the cargo project at the supplied path, returning the artifacts
+/// produced
+fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Artifact> {
+    println!(
+        "building cargo project {:?}",
+        path.as_ref().to_str().unwrap()
+    );
 
-    let mut cmd = Command::new("cargo");
-    cmd.arg("build");
+    let mut cmd = {
+        let mut cmd = Command::new("cargo");
+        cmd.arg("build");
 
-    args.iter().for_each(|arg| {
-        cmd.arg(arg);
-    });
+        if release {
+            cmd.arg("--release");
+        }
 
-    let mut cmd = cmd
-        .arg("--message-format=json")
-        .current_dir(project_path)
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap();
+        cmd.arg("--message-format=json")
+            .current_dir(path)
+            .stdout(Stdio::piped());
+        cmd
+    };
 
-    let stdout = cmd.stdout.as_mut().unwrap();
-    let stdout_reader = BufReader::new(stdout);
+    let mut handle = cmd.spawn().unwrap();
 
-    let artifacts = Message::parse_stream(stdout_reader)
+    let stdout = handle.stdout.as_mut().unwrap();
+
+    let artifacts = Message::parse_stream(BufReader::new(stdout))
         .map(Result::unwrap)
-        .map(|msg| {
+        .map(move |msg| {
             if verbose {
                 if let Message::CompilerMessage(ref msg) = msg {
                     if let DiagnosticLevel::Error
@@ -101,61 +122,54 @@ fn build_cargo<P: AsRef<Path>>(project_path: P, args: Vec<&str>, verbose: bool) 
         })
         .filter_map(|msg| {
             if let Message::CompilerArtifact(a) = msg {
-                if let Some(path) = a.executable {
-                    Some(path)
-                } else {
-                    if let Ok(x) = a.target.kind.into_iter().exactly_one() {
-                        if x == "cdylib" {
-                            Some(a.filenames.iter().exactly_one().unwrap().clone())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
+                Some(a)
             } else {
                 None
             }
         })
-        .map(|a| a.canonicalize().unwrap())
-        .collect::<Vec<_>>();
+        .collect();
 
-    assert!(cmd.wait().unwrap().success());
-
-    println!("build complete.");
+    assert!(handle.wait().unwrap().success());
 
     artifacts
 }
 
-fn build_plugins<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> Vec<PathBuf> {
-    println!("building plugins...");
-
-    let mut args = Vec::new();
-    if release {
-        args.push("--release");
-    }
-
-    build_cargo(path, args, verbose)
-}
-
-fn build_guest_tar<P0: AsRef<Path>, P1: AsRef<Path>>(
-    guest_data_path: P0,
-    guest_plugins_path: P1,
-    verbose: bool,
-    release: bool,
-) -> PathBuf {
+/// Build the guest tarfile from the data path and artifacts
+///
+/// Directory structure is recreated in tarfile from data path except:
+///
+/// * `platform.dts` is converted to `platform.dtb`
+/// * `cdylib` artifacts are placed in the `plugins` directory of the tarfile
+///   (in addition to any in the guest data file)
+fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, artifacts: &[Artifact]) -> PathBuf {
     // todo: rewrite this to process guest_data files in iterator into tar file,
     // some left alone (plugins dir, config.json), others are converted like
     // platform.dts,
 
-    let guest_data_path = guest_data_path.as_ref();
+    // // // make rootfs.ext2
+    // // const ROOTFS_SIZE: usize = 512 * 1024 * 1024;
+    // // let volume = File::create(target_dir.join("rootfs.ext2")).unwrap();
+    // // volume.set_len(ROOTFS_SIZE);
+    // // assert!(Command::new("mkfs.ext2")
+    // //     .arg(volume.path(),)
+    // //     .output()
+    // //     .unwrap()
+    // //     .status
+    // //     .success());
 
-    // build plugins
-    let plugin_artifacts = build_plugins(guest_plugins_path, verbose, release);
-
-    // bad, stupid, hate it
-    let target_dir = plugin_artifacts[0]
+    // really need to improve this heuristic
+    let target_dir = artifacts
+        .iter()
+        .find(|a| {
+            matches!(
+                a.executable.as_ref().map(|p| p.file_name()).flatten(),
+                Some("kernel")
+            )
+        })
+        .unwrap()
+        .executable
+        .as_ref()
+        .unwrap()
         .parent()
         .unwrap()
         .parent()
@@ -163,22 +177,65 @@ fn build_guest_tar<P0: AsRef<Path>, P1: AsRef<Path>>(
         .parent()
         .unwrap();
 
-    // build device tree blob
+    let tar_path = target_dir.canonicalize().unwrap().join("guest.tar");
+    let mut tar = tar::Builder::new(File::create(&tar_path).unwrap());
 
-    // dtc -I dts -O dtb -o $@ $<
-    let dtb_path = target_dir.join("platform.dtb");
+    let plugins = artifacts
+        .iter()
+        .filter(|a| a.target.kind == &["cdylib"])
+        .flat_map(|a| a.filenames.iter())
+        .map(|path| path.canonicalize().unwrap())
+        .map(|source| {
+            let dest = PathBuf::from("plugins").join(source.file_name().unwrap());
+            (source, dest)
+        });
+
+    WalkDir::new(&guest_data_path)
+        .into_iter()
+        .map(Result::unwrap)
+        .filter(|entry| entry.path().is_file())
+        .map(
+            |entry| match entry.path().extension().map(|s| s.to_str()).flatten() {
+                Some("dts") => build_dtb(&guest_data_path, entry.path(), &target_dir),
+                _ => (
+                    entry.path().to_owned(),
+                    entry
+                        .path()
+                        .strip_prefix(&guest_data_path)
+                        .unwrap()
+                        .to_owned(),
+                ),
+            },
+        )
+        .chain(plugins)
+        .for_each(|(src, dest)| {
+            tar.append_file(dest, &mut File::open(src).unwrap())
+                .unwrap();
+        });
+
+    tar.finish().unwrap();
+    tar_path
+}
+
+/// dtc -I dts -O dtb -o $@ $<
+fn build_dtb<P0: AsRef<Path>, P1: AsRef<Path>, P2: AsRef<Path>>(
+    guest_data_path: P0,
+    dts: P1,
+    target_dir: P2,
+) -> (PathBuf, PathBuf) {
+    // replace extension of DTS file
+    let dtb_filename = (dts.as_ref().file_stem().unwrap().to_string_lossy() + ".dtb").into_owned();
+
+    // path to the output DTB
+    let dtb_source_path = target_dir.as_ref().join(&dtb_filename);
+
     let output = Command::new("dtc")
-        .args([
-            "-I",
-            "dts",
-            "-O",
-            "dtb",
-            "-o",
-            dtb_path.to_str().unwrap(),
-            guest_data_path.join("platform.dts").to_str().unwrap(),
-        ])
+        .args(["-I", "dts", "-O", "dtb", "-o"])
+        .arg(&dtb_source_path)
+        .arg(dts.as_ref())
         .output()
         .unwrap();
+
     if !output.status.success() {
         panic!(
             "failed to create DTB:\n{}\n{}",
@@ -187,80 +244,15 @@ fn build_guest_tar<P0: AsRef<Path>, P1: AsRef<Path>>(
         )
     }
 
-    // // make rootfs.ext2
-    // const ROOTFS_SIZE: usize = 512 * 1024 * 1024;
-    // let volume = File::create(target_dir.join("rootfs.ext2")).unwrap();
-    // volume.set_len(ROOTFS_SIZE);
-    // assert!(Command::new("mkfs.ext2")
-    //     .arg(volume.path(),)
-    //     .output()
-    //     .unwrap()
-    //     .status
-    //     .success());
+    let dtb_destination_path = dts
+        .as_ref()
+        .parent()
+        .unwrap()
+        .strip_prefix(guest_data_path)
+        .unwrap()
+        .join(dtb_filename);
 
-    let tar_path = {
-        let tar_path = target_dir.join("guest.tar");
-
-        let mut tar = tar::Builder::new(File::create(&tar_path).unwrap());
-        tar.append_file(
-            "config.json",
-            &mut File::open(guest_data_path.join("config.json")).unwrap(),
-        )
-        .unwrap();
-        tar.append_file(
-            "kernel",
-            &mut File::open(guest_data_path.join("kernel")).unwrap(),
-        )
-        .unwrap();
-
-        tar.append_file(
-            "platform.dtb",
-            &mut File::open(target_dir.join("platform.dtb")).unwrap(),
-        )
-        .unwrap();
-
-        for path in plugin_artifacts {
-            tar.append_file(
-                PathBuf::from("plugins").join(path.file_name().unwrap()),
-                &mut File::open(&path).unwrap(),
-            )
-            .unwrap();
-        }
-
-        tar.finish().unwrap();
-
-        tar_path
-    };
-
-    tar_path
-}
-
-fn build_kernel<P: AsRef<Path>>(path: P, verbose: bool, release: bool) -> PathBuf {
-    println!("building kernel...");
-
-    let mut args = Vec::new();
-    if release {
-        args.push("--release");
-    }
-    args.push("--bin");
-    args.push("kernel");
-
-    let kernel_path = build_cargo(path, args, verbose)
-        .into_iter()
-        // get compiler artifact
-        // todo: check this is an executable?
-        .exactly_one()
-        .map_err(|rest| {
-            format!(
-                "did not get exactly one matching compiler artifact: {:?}",
-                rest.collect::<Vec<_>>()
-            )
-        })
-        .unwrap();
-
-    println!("built kernel @ {kernel_path:?}");
-
-    kernel_path
+    (dtb_source_path, dtb_destination_path)
 }
 
 fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
