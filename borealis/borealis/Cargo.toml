@@ -32,7 +32,7 @@ proc-macro2 = "1.0.81"
 memmap2 = "0.9.4"
 rkyv = {version = "0.7.44", default-features = false, features = ["std", "alloc", "size_64"] }
 parking_lot = "0.12.2"
-cargo-util-schemas = "0.2.0"
+cargo-util-schemas = "0.3.0"
 toml = "0.8.12"
 semver = { version = "1.0.22", features = ["serde"] }
 walkdir = "2.5.0"

@@ -267,9 +267,9 @@ checksum = "514de17de45fdb8dc022b1a7975556c53c86f9f0aa5f534b98977b171857c2c9"
 
 [[package]]
 name = "cargo-util-schemas"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e63d2780ac94487eb9f1fea7b0d56300abc9eb488800854ca217f102f5caccca"
+checksum = "475c285966a396a948f69b4947390a16d454de19d0801df374c7618622c6e8fc"
 dependencies = [
  "semver",
  "serde",
@@ -722,8 +722,7 @@ dependencies = [
 [[package]]
 name = "lasso"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4644821e1c3d7a560fe13d842d13f587c07348a1a05d3a797152d41c90c56df2"
+source = "git+https://github.com/lcnr/lasso?rev=87767f5#87767f540cd040764325a53fc790c27e17c69d33"
 dependencies = [
  "dashmap",
  "deepsize",

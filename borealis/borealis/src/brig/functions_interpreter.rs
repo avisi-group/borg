@@ -159,20 +159,40 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             };
 
             quote! {
-                match #length {
-                    8 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u8) = #value as u8; },
-                    16 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u16) = #value as u16; },
-                    32 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u32) = #value as u32; },
-                    64 => unsafe { *((#offset as usize + state.guest_memory_base()) as *mut u64) = #value as u64; },
-                    _ => panic!("unsupported length")
+                {
+                    let address = #offset as usize + state.guest_memory_base();
+
+                    match #length {
+                        8 => {
+                            let value = #value as u8;
+                            tracer.write_memory(address, value);
+                            unsafe { *(address as *mut u8) = value; }
+                        },
+                        16 => {
+                            let value = #value as u16;
+                            tracer.write_memory(address, value);
+                            unsafe { *(address as *mut u16) = value; }
+                        },
+                        32 => {
+                            let value = #value as u32;
+                            tracer.write_memory(address, value);
+                            unsafe { *(address as *mut u32) = value; }
+                        },
+                        64 => {
+                            let value = #value as u64;
+                            tracer.write_memory(address, value);
+                            unsafe { *(address as *mut u64) = value; }
+                        },
+                        _ => panic!("unsupported length")
+                    }
                 }
             }
         }
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            let mut left = get_ident(&lhs);
-            let mut right = get_ident(&rhs);
+            let left = get_ident(&lhs);
+            let right = get_ident(&rhs);
 
             // // hard to decide whether this belongs, but since it's a Rust issue that u1
             // is // not like other types, casting is a codegen thing

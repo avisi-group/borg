@@ -10,6 +10,7 @@ use {
     },
     common::{intern::InternedString, HashSet},
     std::{
+        io::Write,
         rc::Rc,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -18,8 +19,9 @@ use {
 const PADDING: &str = "  ";
 
 /// Pretty-print JIB AST (sequence of definitions)
-pub fn print_ast<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
+pub fn print_ast<'a, W: Write, I: IntoIterator<Item = &'a Definition>>(writer: &mut W, iter: I) {
     let mut visitor = JibPrettyPrinter {
+        writer,
         indent: Rc::new(AtomicUsize::from(0)),
         abstract_functions: HashSet::default(),
     };
@@ -28,23 +30,26 @@ pub fn print_ast<'a, I: IntoIterator<Item = &'a Definition>>(iter: I) {
 }
 
 /// Pretty-print JIB AST
-struct JibPrettyPrinter {
+struct JibPrettyPrinter<W> {
+    writer: W,
     indent: Rc<AtomicUsize>,
     abstract_functions: HashSet<InternedString>,
 }
 
-impl JibPrettyPrinter {
-    fn prindent<T: AsRef<str>>(&self, s: T) {
-        print!(
+impl<W: Write> JibPrettyPrinter<W> {
+    fn prindent<T: AsRef<str>>(&mut self, s: T) {
+        write!(
+            self.writer,
             "{}{}",
             PADDING.repeat(self.indent.load(Ordering::SeqCst)),
             s.as_ref()
-        );
+        )
+        .unwrap();
     }
 
-    fn prindentln<T: AsRef<str>>(&self, s: T) {
+    fn prindentln<T: AsRef<str>>(&mut self, s: T) {
         self.prindent(s);
-        println!();
+        writeln!(self.writer,).unwrap();
     }
 
     fn indent(&self) -> IndentHandle {
@@ -55,21 +60,21 @@ impl JibPrettyPrinter {
     }
 
     fn print_uid(&mut self, id: &Identifier, typs: &[Type]) {
-        print!("{}", id.as_interned());
+        write!(self.writer, "{}", id.as_interned()).unwrap();
 
         if !typs.is_empty() {
-            print!("<");
+            write!(self.writer, "<").unwrap();
 
             let mut typs = typs.iter();
             if let Some(typ) = typs.next() {
                 self.visit_type(typ);
             }
             for typ in typs {
-                print!(", ");
+                write!(self.writer, ", ").unwrap();
                 self.visit_type(typ);
             }
 
-            print!(">");
+            write!(self.writer, ">").unwrap();
         }
     }
 }
@@ -84,7 +89,7 @@ impl Drop for IndentHandle {
     }
 }
 
-impl Visitor for JibPrettyPrinter {
+impl<W: Write> Visitor for JibPrettyPrinter<W> {
     fn visit_definition(&mut self, node: &Definition) {
         match node {
             Definition::Register(id, typ, _) => {
@@ -110,7 +115,7 @@ impl Visitor for JibPrettyPrinter {
                     fields.iter().for_each(|(name, typ)| {
                         self.prindent(format!("{name}: "));
                         self.visit_type(typ);
-                        println!(",");
+                        writeln!(self.writer, ",").unwrap();
                     });
                 }
 
@@ -124,7 +129,7 @@ impl Visitor for JibPrettyPrinter {
                     fields.iter().for_each(|(name, typ)| {
                         self.prindent(format!("{name}: "));
                         self.visit_type(typ);
-                        println!(",");
+                        writeln!(self.writer, ",").unwrap();
                     });
                 }
 
@@ -135,21 +140,21 @@ impl Visitor for JibPrettyPrinter {
 
                 let mut bindings = bindings.iter();
                 if let Some((ident, _)) = bindings.next() {
-                    print!("{}", ident.as_interned());
+                    write!(self.writer, "{}", ident.as_interned()).unwrap();
                 }
                 for (ident, _) in bindings {
-                    print!(", ");
-                    print!("{}", ident.as_interned());
+                    write!(self.writer, ", ").unwrap();
+                    write!(self.writer, "{}", ident.as_interned()).unwrap();
                 }
 
-                println!(") {{");
+                writeln!(self.writer, ") {{").unwrap();
 
                 {
                     let _h = self.indent();
                     instructions.iter().for_each(|i| self.visit_instruction(i));
                 }
 
-                println!("}}");
+                writeln!(self.writer, "}}").unwrap();
             }
             Definition::Val(id, ext, typs, typ) => {
                 let keyword =
@@ -166,27 +171,27 @@ impl Visitor for JibPrettyPrinter {
                     self.visit_type(typ);
                 }
                 for typ in typs {
-                    print!(", ");
+                    write!(self.writer, ", ").unwrap();
                     self.visit_type(typ);
                 }
 
-                print!(") -> ");
+                write!(self.writer, ") -> ").unwrap();
                 self.visit_type(typ);
 
-                println!();
+                writeln!(self.writer,).unwrap();
             }
             Definition::Fundef(name, _, args, body) => {
                 self.prindent(format!("fn {}(", name.as_interned()));
 
                 let mut args = args.iter();
                 if let Some(arg) = args.next() {
-                    print!("{}", arg.as_interned());
+                    write!(self.writer, "{}", arg.as_interned()).unwrap();
                 }
                 for arg in args {
-                    print!(", {}", arg.as_interned());
+                    write!(self.writer, ", {}", arg.as_interned()).unwrap();
                 }
 
-                println!(") {{");
+                writeln!(self.writer, ") {{").unwrap();
 
                 {
                     let _h = self.indent();
@@ -206,7 +211,7 @@ impl Visitor for JibPrettyPrinter {
             }
         }
 
-        println!();
+        writeln!(self.writer,).unwrap();
     }
 
     fn visit_instruction(&mut self, node: &Instruction) {
@@ -224,26 +229,26 @@ impl Visitor for JibPrettyPrinter {
             InstructionAux::Decl(typ, name) => {
                 self.prindent("");
                 self.visit_name(name);
-                print!(": ");
+                write!(self.writer, ": ").unwrap();
                 self.visit_type(typ);
-                println!();
+                writeln!(self.writer,).unwrap();
             }
             InstructionAux::Copy(exp, val) => {
                 self.prindent("");
                 self.visit_expression(exp);
-                print!(" = ");
+                write!(self.writer, " = ").unwrap();
                 self.visit_value(val);
-                println!();
+                writeln!(self.writer,).unwrap();
             }
             InstructionAux::Clear(_, name) => {
                 self.prindent("clear(");
                 self.visit_name(name);
-                println!(")");
+                writeln!(self.writer, ")").unwrap();
             }
             InstructionAux::Funcall(exp, _, (name, _), args) => {
                 self.prindent("");
                 self.visit_expression(exp);
-                print!(" = {}(", name.as_interned());
+                write!(self.writer, " = {}(", name.as_interned()).unwrap();
 
                 // print correct number of commas
                 let mut args = args.iter();
@@ -251,11 +256,11 @@ impl Visitor for JibPrettyPrinter {
                     self.visit_value(arg);
                 }
                 for arg in args {
-                    print!(", ");
+                    write!(self.writer, ", ").unwrap();
                     self.visit_value(arg);
                 }
 
-                println!(")");
+                writeln!(self.writer, ")").unwrap();
             }
             InstructionAux::Goto(label) => {
                 self.prindentln(format!("goto \"{label}\""));
@@ -266,7 +271,7 @@ impl Visitor for JibPrettyPrinter {
             InstructionAux::If(condition, if_body, else_body, _) => {
                 self.prindent("if (");
                 self.visit_value(condition);
-                println!(") {{");
+                writeln!(self.writer, ") {{").unwrap();
 
                 {
                     let _h = self.indent();
@@ -285,23 +290,23 @@ impl Visitor for JibPrettyPrinter {
             InstructionAux::Init(typ, name, value) => {
                 self.prindent("init ");
                 self.visit_type(typ);
-                print!(" ");
+                write!(self.writer, " ").unwrap();
                 self.visit_name(name);
-                print!(" ");
+                write!(self.writer, " ").unwrap();
                 self.visit_value(value);
-                println!();
+                writeln!(self.writer,).unwrap();
             }
             InstructionAux::Jump(value, s) => {
                 self.prindent(format!("jump {} ", s));
                 self.visit_value(value);
-                println!();
+                writeln!(self.writer,).unwrap();
             }
             InstructionAux::Undefined(_) => self.prindentln("undefined"),
             InstructionAux::Exit(s) => self.prindentln(format!("exit({s})")),
             InstructionAux::End(name) => {
                 self.prindent("end(");
                 self.visit_name(name);
-                println!(")");
+                writeln!(self.writer, ")").unwrap();
             }
             InstructionAux::TryBlock(body) => {
                 self.prindentln("try {");
@@ -325,18 +330,18 @@ impl Visitor for JibPrettyPrinter {
     fn visit_value(&mut self, node: &Value) {
         match node {
             Value::Id(name, _) => self.visit_name(name),
-            Value::Lit(val, _) => print!("{val:?}"),
+            Value::Lit(val, _) => write!(self.writer, "{val:?}").unwrap(),
             Value::Call(op, vals) => {
-                print!("{op:?}(");
+                write!(self.writer, "{op:?}(").unwrap();
                 let mut vals = vals.iter();
                 if let Some(val) = vals.next() {
                     self.visit_value(val);
                 }
                 for val in vals {
-                    print!(", ");
+                    write!(self.writer, ", ").unwrap();
                     self.visit_value(val);
                 }
-                print!(")")
+                write!(self.writer, ")").unwrap()
             }
             Value::Tuple(_, _) => todo!(),
             Value::Struct(fields, Type::Struct(ident, _)) => {
@@ -347,7 +352,7 @@ impl Visitor for JibPrettyPrinter {
                     fields.iter().for_each(|(ident, value)| {
                         self.prindent(format!("{}: ", ident.as_interned()));
                         self.visit_value(value);
-                        println!(",");
+                        writeln!(self.writer, ",").unwrap();
                     });
                 }
 
@@ -356,19 +361,19 @@ impl Visitor for JibPrettyPrinter {
             Value::Struct(_, _) => panic!("encountered struct with non-struct type"),
             Value::CtorKind(f, (ctor, unifiers), _) => {
                 self.visit_value(f);
-                print!(" is ");
+                write!(self.writer, " is ").unwrap();
                 self.print_uid(ctor, unifiers.as_ref());
             }
             Value::CtorUnwrap(f, (ctor, unifiers), _) => {
                 self.visit_value(f);
-                print!(" as ");
+                write!(self.writer, " as ").unwrap();
                 self.print_uid(ctor, unifiers.as_ref());
             }
             Value::TupleMember(_, _, _) => todo!(),
             Value::Field(value, ident) => {
                 self.visit_value(value);
-                print!(".");
-                print!("{}", ident.as_interned());
+                write!(self.writer, ".").unwrap();
+                write!(self.writer, "{}", ident.as_interned()).unwrap();
             }
         }
     }
@@ -379,11 +384,11 @@ impl Visitor for JibPrettyPrinter {
             Expression::Rmw(_, _, _) => todo!(),
             Expression::Field(expression, ident) => {
                 self.visit_expression(expression);
-                print!(".");
-                print!("{}", ident.as_interned());
+                write!(self.writer, ".").unwrap();
+                write!(self.writer, "{}", ident.as_interned()).unwrap();
             }
             Expression::Addr(inner) => {
-                print!("*");
+                write!(self.writer, "*").unwrap();
                 self.visit_expression(inner);
             }
             Expression::Tuple(_, _) => todo!(),
@@ -393,67 +398,73 @@ impl Visitor for JibPrettyPrinter {
 
     fn visit_type(&mut self, node: &Type) {
         match node {
-            Type::Lint => print!("%i"),
-            Type::Fint(n) => print!("%i{n}"),
-            Type::Constant(bi) => print!("{}", bi.0),
-            Type::Lbits => print!("%bv"),
-            Type::Sbits(n) => print!("%sbv{n}"),
-            Type::Fbits(n) => print!("%bv{n}"),
-            Type::Unit => print!("%unit"),
-            Type::Bool => print!("%bool"),
-            Type::Bit => print!("%bit"),
-            Type::String => print!("%string"),
-            Type::Real => print!("%real"),
-            Type::Float(n) => print!("%f{n}"),
-            Type::RoundingMode => print!("%rounding_mode"),
+            Type::Lint => write!(self.writer, "%i").unwrap(),
+            Type::Fint(n) => write!(self.writer, "%i{n}").unwrap(),
+            Type::Constant(bi) => write!(self.writer, "{}", bi.0).unwrap(),
+            Type::Lbits => write!(self.writer, "%bv").unwrap(),
+            Type::Sbits(n) => write!(self.writer, "%sbv{n}").unwrap(),
+            Type::Fbits(n) => write!(self.writer, "%bv{n}").unwrap(),
+            Type::Unit => write!(self.writer, "%unit").unwrap(),
+            Type::Bool => write!(self.writer, "%bool").unwrap(),
+            Type::Bit => write!(self.writer, "%bit").unwrap(),
+            Type::String => write!(self.writer, "%string").unwrap(),
+            Type::Real => write!(self.writer, "%real").unwrap(),
+            Type::Float(n) => write!(self.writer, "%f{n}").unwrap(),
+            Type::RoundingMode => write!(self.writer, "%rounding_mode").unwrap(),
             Type::Tup(typs) => {
-                print!("(");
+                write!(self.writer, "(").unwrap();
                 let mut typs = typs.iter();
                 if let Some(typ) = typs.next() {
                     self.visit_type(typ);
                 }
                 for typ in typs {
-                    print!(", ");
+                    write!(self.writer, ", ").unwrap();
                     self.visit_type(typ);
                 }
-                print!(")");
+                write!(self.writer, ")").unwrap();
             }
 
-            Type::Enum(ident, _) => print!("enum {}", ident.as_interned()),
-            Type::Struct(ident, _) => print!("struct {}", ident.as_interned()),
-            Type::Variant(ident, _) => print!("union {}", ident.as_interned()),
+            Type::Enum(ident, _) => write!(self.writer, "enum {}", ident.as_interned()).unwrap(),
+            Type::Struct(ident, _) => {
+                write!(self.writer, "struct {}", ident.as_interned()).unwrap()
+            }
+            Type::Variant(ident, _) => {
+                write!(self.writer, "union {}", ident.as_interned()).unwrap()
+            }
 
             Type::Vector(typ) => {
-                print!("%vec<");
+                write!(self.writer, "%vec<").unwrap();
                 self.visit_type(typ);
-                print!(">");
+                write!(self.writer, ">").unwrap();
             }
             Type::Fvector(n, typ) => {
-                print!("%fvec<{n}, ");
+                write!(self.writer, "%fvec<{n}, ").unwrap();
                 self.visit_type(typ);
-                print!(">");
+                write!(self.writer, ">").unwrap();
             }
             Type::List(inner) => {
-                print!("list<");
+                write!(self.writer, "list<").unwrap();
                 self.visit_type(inner);
-                print!(">");
+                write!(self.writer, ">").unwrap();
             }
             Type::Ref(inner) => {
-                print!("&");
+                write!(self.writer, "&").unwrap();
                 self.visit_type(inner);
             }
-            Type::Poly(kid) => print!("{:?}", kid.inner),
+            Type::Poly(kid) => write!(self.writer, "{:?}", kid.inner).unwrap(),
         }
     }
 
     fn visit_name(&mut self, node: &Name) {
         match node {
             Name::Global(ident, _) | Name::Name(ident, _) => {
-                print!("{}", ident.as_interned())
+                write!(self.writer, "{}", ident.as_interned()).unwrap()
             }
-            Name::HaveException(_) | Name::CurrentException(_) => print!("exception"),
-            Name::ThrowLocation(_) => print!("throw"),
-            Name::Return(_) => print!("return"),
+            Name::HaveException(_) | Name::CurrentException(_) => {
+                write!(self.writer, "exception").unwrap()
+            }
+            Name::ThrowLocation(_) => write!(self.writer, "throw").unwrap(),
+            Name::Return(_) => write!(self.writer, "return").unwrap(),
         }
     }
 }

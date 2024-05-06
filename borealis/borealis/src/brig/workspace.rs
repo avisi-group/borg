@@ -6,7 +6,7 @@ use {
     common::{intern::InternedString, HashMap, HashSet},
     semver::{BuildMetadata, Prerelease, Version},
     std::{
-        collections::BTreeMap,
+        collections::{BTreeMap, BTreeSet},
         fs::{self, read_to_string},
         path::{Path, PathBuf},
     },
@@ -194,5 +194,6 @@ pub fn create_manifest(
         workspace: None,
         badges: None,
         lints: None,
+        _unused_keys: BTreeSet::new(),
     }
 }

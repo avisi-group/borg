@@ -40,8 +40,6 @@ fn main() -> Result<()> {
 
     let (ast, jib) = load_from_config(args.input)?;
 
-    sailrs::jib_ast::pretty_print::print_ast(jib.iter());
-
     trace!(
         "Size: AST {:.2} bytes, JIB {:.2} bytes",
         bytes(ast.deep_size_of()),
@@ -57,7 +55,7 @@ fn main() -> Result<()> {
 
     info!("serializing");
 
-    let mut serializer = AllocSerializer::<0>::default();
+    let mut serializer = AllocSerializer::<16384>::default();
     serializer.serialize_value(&state).unwrap();
     let bytes = serializer.into_serializer().into_inner();
     create_file(&args.output)?.write_all(&bytes)?;

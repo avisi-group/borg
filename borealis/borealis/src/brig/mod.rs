@@ -34,6 +34,8 @@ use {
     regex::Regex,
     sailrs::{jib_ast, types::ListVec},
     std::{
+        collections::BTreeSet,
+        fs::create_dir_all,
         hash::{DefaultHasher, Hash, Hasher},
         io::Write,
         path::PathBuf,
@@ -57,8 +59,15 @@ pub fn sail_to_brig(
     path: PathBuf,
     dump_ir: Option<PathBuf>,
 ) {
-    if let Some(_) = &dump_ir {
-        sailrs::jib_ast::pretty_print::print_ast(jib_ast.iter());
+    if let Some(path) = &dump_ir {
+        create_dir_all(path).unwrap()
+    }
+
+    if let Some(path) = &dump_ir {
+        sailrs::jib_ast::pretty_print::print_ast(
+            &mut create_file(path.join("ast.jib")).unwrap(),
+            jib_ast.iter(),
+        );
     }
 
     info!("Converting JIB to BOOM");
@@ -67,7 +76,7 @@ pub fn sail_to_brig(
     // // useful for debugging
     if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
-            &mut create_file(path.join("ast_raw.boom")).unwrap(),
+            &mut create_file(path.join("ast.boom")).unwrap(),
             ast.clone(),
         );
     }
@@ -87,7 +96,7 @@ pub fn sail_to_brig(
 
     if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
-            &mut create_file(path.join("ast_processed.boom")).unwrap(),
+            &mut create_file(path.join("ast.processed.boom")).unwrap(),
             ast.clone(),
         );
     }
@@ -265,7 +274,7 @@ fn codegen_types(rudder: &Context) -> TokenStream {
                 .collect();
 
             quote! {
-                #[derive(Default, Debug, Clone, Copy)]
+                #[derive(Default, Debug, Clone, Copy, PartialEq)]
                 #[repr(C)]
                 pub struct #ident {
                     #fields
@@ -295,7 +304,7 @@ fn codegen_types(rudder: &Context) -> TokenStream {
                 .collect();
 
             quote! {
-                #[derive(Debug, Clone, Copy)]
+                #[derive(Debug, Clone, Copy, PartialEq)]
                 pub enum #ident {
                     #variants
                 }
@@ -343,6 +352,8 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                         fn end(&self);
                         fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
                         fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
+                        fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
+                        fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
                     }
 
                     #[derive(Debug)]
@@ -449,6 +460,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
             }),
             badges: None,
             lints: None,
+            _unused_keys: BTreeSet::new(),
         })
         .unwrap(),
     );

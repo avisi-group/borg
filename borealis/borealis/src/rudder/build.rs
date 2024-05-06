@@ -366,12 +366,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 fallthrough: boom_fallthrough,
             } => {
                 let condition = self.build_value(Shared::new(condition));
-                let typ = condition.typ();
-
-                if *typ != Type::u1() {
-                    // so far this todo is never hit, but if you do hit it implement it pls
-                    todo!("insert cast from {} to u1", condition.typ());
-                }
+                let condition = self.builder.generate_cast(condition, Arc::new(Type::u1()));
 
                 let rudder_true_target = self.fn_ctx().resolve_block(boom_target);
                 let rudder_false_target = self.fn_ctx().resolve_block(boom_fallthrough);
