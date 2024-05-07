@@ -747,7 +747,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     rhs: args[1].clone(),
                 })),
 
-                "sail_shiftright" | "_shr_int" => {
+                "sail_shiftright" | "_shr_int" | "_shr32" => {
                     Some(self.builder.build(StatementKind::ShiftOperation {
                         kind: ShiftOperationKind::LogicalShiftRight,
                         value: args[0].clone(),
