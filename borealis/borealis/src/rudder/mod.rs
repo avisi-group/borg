@@ -680,7 +680,7 @@ impl Statement {
             StatementKind::Panic(_) => Arc::new(Type::void()),
             StatementKind::ReadPc => Arc::new(Type::u64()),
             StatementKind::WritePc { .. } => Arc::new(Type::void()),
-            StatementKind::BitExtract { value, .. } => value.typ(),
+            StatementKind::BitExtract { value, .. } => value.typ(), // todo: this is a simplification, be more precise
             StatementKind::BitInsert { original_value, .. } => original_value.typ(),
             StatementKind::ReadElement { vector, .. } => {
                 let Type::Vector { element_type, .. } = &*vector.typ() else {

@@ -323,21 +323,18 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             if let Type::Bits = &*value.typ() {
                 let length = if let Type::Bits = &*length.typ() {
                     let length = get_ident(&length);
-                    quote!(#length.value() as u32)
+                    quote!(#length.value())
                 } else {
                     let length = get_ident(&length);
-                    quote!(#length as u32)
+                    quote!(u16::try_from(#length).unwrap())
                 };
 
                 let value = get_ident(&value);
                 let start = get_ident(&start);
 
-                quote! (
-                    (
-                        (#value >> #start) &
-                        Bits::new(((1u128).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), #value.length())
-                    )
-                )
+                quote! {
+                    (Bits::new(((#value) >> (#start)).value(), #length))
+                }
             } else {
                 let typ = codegen_type(value.typ());
 

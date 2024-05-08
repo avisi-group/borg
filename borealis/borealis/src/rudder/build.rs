@@ -1067,11 +1067,24 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "bitvector_concat" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
-                "get_slice_int" => Some(self.builder.build(StatementKind::BitExtract {
-                    value: args[1].clone(),
-                    start: args[2].clone(),
-                    length: args[0].clone(),
-                })),
+                "get_slice_int" => {
+                    let extract = self.builder.build(StatementKind::BitExtract {
+                        value: args[1].clone(),
+                        start: args[2].clone(),
+                        length: args[0].clone(),
+                    });
+
+                    let value = self.builder.generate_cast(extract, Arc::new(Type::u128()));
+
+                    let length = self
+                        .builder
+                        .generate_cast(args[0].clone(), Arc::new(Type::u16()));
+
+                    Some(
+                        self.builder
+                            .build(StatementKind::CreateBits { value, length }),
+                    )
+                }
 
                 "set_slice_bits" => {
                     //val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv

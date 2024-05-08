@@ -16,7 +16,7 @@ pub fn codegen_bits() -> TokenStream {
 
     impl Bits {
         pub fn new(value: u128, length: u16) -> Self {
-            Self { value, length }
+            Self { value, length }.normalize()
         }
 
         pub fn value(&self) -> u128 {

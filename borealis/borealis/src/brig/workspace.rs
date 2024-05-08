@@ -181,6 +181,10 @@ pub fn create_manifest(
                         )),
                     )
                 })
+                .chain([(
+                    PackageName::new("log".to_owned()).unwrap(),
+                    InheritableDependency::Value(TomlDependency::Simple("0.4.21".to_owned())),
+                )])
                 .collect(),
         ),
         dev_dependencies: None,
