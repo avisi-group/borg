@@ -135,7 +135,19 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::ReadMemory { .. } => quote!(todo!("read-mem")),
+        StatementKind::ReadMemory { offset, size } => {
+            // read `size` bytes at `offset`, return a Bits
+            let offset = get_ident(&offset);
+            let size = get_ident(&size);
+
+            quote! {
+                {
+                    let address = #offset as usize + state.guest_memory_base();
+                    let value = unsafe { *(address as *const u128) };
+                    Bits::new(value, #size as u16)
+                }
+            }
+        }
         StatementKind::WriteMemory { offset, value } => {
             let offset = get_ident(&offset);
 

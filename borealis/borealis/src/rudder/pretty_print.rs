@@ -84,8 +84,8 @@ impl Display for StatementKind {
             StatementKind::WriteRegister { offset, value } => {
                 write!(f, "write-reg {} <= {}", offset.name(), value.name())
             }
-            StatementKind::ReadMemory { typ, offset } => {
-                write!(f, "read-mem {}:{}", offset.name(), typ)
+            StatementKind::ReadMemory { offset, size } => {
+                write!(f, "read-mem {}:{}", offset.name(), size.name())
             }
             StatementKind::WriteMemory { offset, value } => {
                 write!(f, "write-mem {} <= {}", offset.name(), value.name())

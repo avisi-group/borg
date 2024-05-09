@@ -128,6 +128,10 @@ impl StatementUseAnalysis {
                 StatementKind::ReadRegister { offset, .. } => {
                     self.add_use(&offset, &stmt);
                 }
+                StatementKind::ReadMemory { offset, size } => {
+                    self.add_use(&offset, &stmt);
+                    self.add_use(&size, &stmt);
+                }
                 StatementKind::WriteMemory { offset, value } => {
                     self.add_use(&offset, &stmt);
                     self.add_use(&value, &stmt);
@@ -237,7 +241,7 @@ impl StatementUseAnalysis {
                 StatementKind::ExtractField { value, .. } => self.add_use(&value, &stmt),
 
                 StatementKind::ReadVariable { symbol, indices } => {}
-                StatementKind::ReadMemory { typ, offset } => {}
+
                 StatementKind::ReadPc => {}
                 StatementKind::Jump { target } => {}
                 StatementKind::PhiNode { members } => {}

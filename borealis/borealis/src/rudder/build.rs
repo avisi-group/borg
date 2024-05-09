@@ -1144,14 +1144,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         value: value_in_name,
                     }))
                 }
-                // "Mem_read" => {
-                //     let address = args[0].clone();
-                //     let _size = args[1].clone();
-                //     let _accdesc = args[2].clone();
-                //     let _value_in_name = args[3].clone();
+                "Mem_read" | "Mem_read_1" | "Mem_read_2" => {
+                    let address = args[0].clone();
+                    let size = args[1].clone();
 
-                //     Some(self.builder.build(StatementKind::ReadMemory { typ: (), offset: address }))
-                // }
+                    Some(self.builder.build(StatementKind::ReadMemory {
+                        offset: address,
+                        size,
+                    }))
+                }
                 "HaveEL" => {
                     let two = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::new_primitive(
@@ -1185,7 +1186,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "sail_tlbi"
                 | "prerr_bits"
                 | "prerr_int"
-                | "write_tag#" => Some(self.builder.build(StatementKind::Constant {
+                | "write_tag#"
+                | "sail_cache_op" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),

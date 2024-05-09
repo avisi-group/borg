@@ -321,8 +321,8 @@ pub enum StatementKind {
     },
 
     ReadMemory {
-        typ: Arc<Type>,
         offset: Statement,
+        size: Statement,
     },
     WriteMemory {
         offset: Statement,
@@ -632,7 +632,7 @@ impl Statement {
             StatementKind::WriteVariable { .. } => Arc::new(Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
             StatementKind::WriteRegister { .. } => Arc::new(Type::unit()),
-            StatementKind::ReadMemory { typ, .. } => typ,
+            StatementKind::ReadMemory { .. } => Arc::new(Type::Bits),
             StatementKind::WriteMemory { .. } => Arc::new(Type::unit()),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
@@ -933,6 +933,21 @@ impl StatementInner {
                 };
 
                 self.kind = StatementKind::WriteMemory { offset, value }
+            }
+            StatementKind::ReadMemory { offset, size } => {
+                let offset = if offset == use_of {
+                    with.clone()
+                } else {
+                    offset.clone()
+                };
+
+                let size = if size == use_of {
+                    with.clone()
+                } else {
+                    size.clone()
+                };
+
+                self.kind = StatementKind::ReadMemory { offset, size }
             }
 
             StatementKind::ReadElement { vector, index } => {
