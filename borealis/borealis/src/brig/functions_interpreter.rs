@@ -684,7 +684,7 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             quote! {
                 {
                     let sign_bit = #ident.length() - 1;
-                    let mut result = i128::try_from(#ident.value()).unwrap();
+                    let mut result = #ident.value() as i128;
 
                     if ((result >> sign_bit) & 1) == 1 {
                         // If sign bit is unset then we are done, otherwise clear sign_bit and subtract 2**sign_bit
@@ -729,7 +729,7 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             CastOperationKind::Convert | CastOperationKind::ZeroExtend,
         ) => {
             let target_type = codegen_type(target_type);
-            quote!(#target_type::try_from(#ident.value()).unwrap())
+            quote!((#ident.value() as #target_type))
         }
 
         // this type of cast replaces a lot of "create-bits"

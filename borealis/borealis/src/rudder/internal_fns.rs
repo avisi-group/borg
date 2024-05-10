@@ -338,10 +338,109 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             }),
         };
 
+        let zero = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::Constant {
+                    typ: Arc::new(Type::u128()),
+                    value: ConstantValue::UnsignedInteger(0),
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
+        let bits = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::ReadVariable {
+                    symbol: bits_symbol.clone(),
+                    indices: vec![],
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
+        let bits_length = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::SizeOf {
+                    value: bits.clone(),
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
+        let read_count_cast = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::Cast {
+                    kind: CastOperationKind::Truncate,
+                    typ: Arc::new(Type::u16()),
+                    value: read_count.clone(),
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
+        let bits_length_cast = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::Cast {
+                    kind: CastOperationKind::Truncate,
+                    typ: Arc::new(Type::u16()),
+                    value: bits_length.clone(),
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
+        let length = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::BinaryOperation {
+                    kind: BinaryOperationKind::Multiply,
+                    lhs: read_count_cast.clone(),
+                    rhs: bits_length_cast.clone(),
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
+        let result_bits = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::CreateBits {
+                    value: zero.clone(),
+                    length: length.clone(),
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
+        let write_result = Statement {
+            inner: Shared::new(StatementInner {
+                name: "".into(),
+                kind: StatementKind::WriteVariable {
+                    symbol: result_symbol.clone(),
+                    value: result_bits.clone(),
+                    indices: vec![],
+                },
+                parent: entry_block.weak(),
+            }),
+        };
+
         entry_block.set_statements(
             [
                 read_count,
                 write_local_count,
+                zero,
+                bits,
+                bits_length,
+                read_count_cast,
+                bits_length_cast,
+                length,
+                result_bits,
+                write_result,
                 Statement {
                     inner: Shared::new(StatementInner {
                         name: "s3".into(),
