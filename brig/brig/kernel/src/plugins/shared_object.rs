@@ -1,5 +1,8 @@
 use {
-    crate::arch::{x86::memory::AlignedAllocator, PAGE_SIZE},
+    crate::arch::{
+        x86::memory::{AlignedAllocator, VirtualMemoryArea},
+        PAGE_SIZE,
+    },
     alloc::{boxed::Box, vec::Vec},
     core::pin::Pin,
     elfloader::{
@@ -8,7 +11,7 @@ use {
         ElfBinary, ElfLoader, ElfLoaderErr, Flags, ProgramHeader, RelocationEntry, RelocationType,
         VAddr,
     },
-    x86_64::VirtAddr,
+    x86_64::{structures::paging::PageTableFlags, VirtAddr},
 };
 
 pub struct SharedObject {
@@ -39,6 +42,14 @@ impl SharedObject {
 
             Self { allocation }
         };
+
+        let range = obj.allocation.as_ptr_range();
+        let virt_range = VirtAddr::from_ptr(range.start)..VirtAddr::from_ptr(range.end);
+
+        VirtualMemoryArea::current().update_flags_range(
+            virt_range,
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE, // removing  "NOEXECUTE" flag
+        );
 
         elf.load(&mut SharedObjectLoader::new(&elf, &mut obj))
             .unwrap();

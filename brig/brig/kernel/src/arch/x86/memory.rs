@@ -5,15 +5,15 @@ use {
     byte_unit::{Byte, UnitType},
     core::{
         alloc::{AllocError, Allocator, Layout},
-        ops::Deref,
+        ops::{Deref, Range},
         ptr::NonNull,
     },
-    plugins_api::IOMemoryHandler,
     x86_64::{
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
+            mapper::{MappedFrame, TranslateResult},
             FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame,
-            Size1GiB, Size2MiB, Size4KiB, Translate,
+            Size4KiB, Translate,
         },
         PhysAddr, VirtAddr,
     },
@@ -31,87 +31,22 @@ pub static HEAP_ALLOCATOR: LockedHeap<64> = LockedHeap::empty();
 /// Initialize the global heap allocator backed by the usable memory regions
 /// supplied by the bootloader
 pub fn heap_init(memory_regions: &MemoryRegions) {
-    let mut opt = VirtualMemoryArea::current().opt;
-
     // get usable regions from memory map and add to heap allocator
     for region in memory_regions
         .deref()
         .iter()
         .filter(|r| matches!(r.kind, MemoryRegionKind::Usable))
     {
-        let region_virt_start = PhysAddr::new(region.start).to_virt().as_u64();
-        let region_virt_end = PhysAddr::new(region.end).to_virt().as_u64();
+        let region_virt_start = PhysAddr::new(region.start).to_virt();
+        let region_virt_end = PhysAddr::new(region.end).to_virt();
 
         unsafe {
             HEAP_ALLOCATOR.lock().add_to_heap(
-                usize::try_from(region_virt_start).unwrap(),
-                usize::try_from(region_virt_end).unwrap(),
+                usize::try_from(region_virt_start.as_u64()).unwrap(),
+                usize::try_from(region_virt_end.as_u64()).unwrap(),
             )
         };
-
-        let mut current_virt_addr = region_virt_start;
-
-        while current_virt_addr < region_virt_end {
-            let virt_frame_addr = VirtAddr::new(current_virt_addr);
-
-            let res = opt.translate(virt_frame_addr);
-            unsafe {
-                match res {
-                    x86_64::structures::paging::mapper::TranslateResult::Mapped {
-                        frame: x86_64::structures::paging::mapper::MappedFrame::Size4KiB(_),
-                        ..
-                    } => {
-                        opt.update_flags(
-                            Page::<Size4KiB>::from_start_address(
-                                virt_frame_addr.align_down(Size4KiB::SIZE),
-                            )
-                            .unwrap(),
-                            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-                        )
-                        .unwrap()
-                        .ignore();
-
-                        current_virt_addr += Size4KiB::SIZE;
-                    }
-                    x86_64::structures::paging::mapper::TranslateResult::Mapped {
-                        frame: x86_64::structures::paging::mapper::MappedFrame::Size2MiB(_),
-                        ..
-                    } => {
-                        opt.update_flags(
-                            Page::<Size2MiB>::from_start_address(
-                                virt_frame_addr.align_down(Size2MiB::SIZE),
-                            )
-                            .unwrap(),
-                            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-                        )
-                        .unwrap()
-                        .ignore();
-
-                        current_virt_addr += Size2MiB::SIZE;
-                    }
-                    x86_64::structures::paging::mapper::TranslateResult::Mapped {
-                        frame: x86_64::structures::paging::mapper::MappedFrame::Size1GiB(_),
-                        ..
-                    } => {
-                        opt.update_flags(
-                            Page::<Size2MiB>::from_start_address(
-                                virt_frame_addr.align_down(Size1GiB::SIZE),
-                            )
-                            .unwrap(),
-                            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-                        )
-                        .unwrap()
-                        .ignore();
-
-                        current_virt_addr += Size1GiB::SIZE;
-                    }
-                    _ => panic!("heap allocated region not mapped"),
-                }
-            }
-        }
     }
-
-    VirtualMemoryArea::current().invalidate();
 
     log::info!(
         "heap allocator initialized @ {:p}, {:.2} available",
@@ -138,15 +73,23 @@ struct HeapStealingFrameAllocator;
 
 unsafe impl FrameAllocator<Size4KiB> for HeapStealingFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame<Size4KiB>> {
-        let new_frame = unsafe { alloc_zeroed(Layout::from_size_align(4096, 4096).unwrap()) };
+        let new_frame = unsafe {
+            alloc_zeroed(
+                Layout::from_size_align(
+                    Size4KiB::SIZE.try_into().unwrap(),
+                    Size4KiB::SIZE.try_into().unwrap(),
+                )
+                .unwrap(),
+            )
+        };
 
         Some(PhysFrame::from_start_address(VirtAddr::from_ptr(new_frame).to_phys()).unwrap())
     }
 }
 
 pub struct VirtualMemoryArea {
-    pml4_base: PhysAddr,
-    opt: OffsetPageTable<'static>,
+    pub pml4_base: PhysAddr,
+    pub opt: OffsetPageTable<'static>,
 }
 
 impl VirtualMemoryArea {
@@ -195,30 +138,51 @@ impl VirtualMemoryArea {
         }
     }
 
-    /*pub fn translate_page<'a, S: PageSize + core::fmt::Debug>(
-        &'a self,
-        page: Page<S>,
-    ) -> Option<PhysFrame<S>>
-    where
-        OffsetPageTable<'a>: Mapper<S>,
-    {
-        let page_table_ref = self.get_pml4_ptr();
-        let page_table = unsafe {
-            OffsetPageTable::new(
-                page_table_ref,
-                VirtAddr::new(PHYSICAL_MEMORY_MAP_OFFSET.as_u64()),
-            )
-        };
-
-        page_table.translate_page(page).ok()
-    }*/
-
     pub fn translate_address(&self, addr: VirtAddr) -> Option<PhysAddr> {
         let r = self.opt.translate_addr(addr);
 
         log::trace!("translating {:x} to {:?}", addr, r);
 
         r
+    }
+
+    /// Updates the flags of the pages mapped to virtual addresses in the
+    /// supplied range
+    pub fn update_flags_range(&mut self, range: Range<VirtAddr>, flags: PageTableFlags) {
+        /// Update the flags of the page at the supplied physical frame address,
+        /// returning the size of that physical frame
+        fn update_flags<S: PageSize>(
+            page_table: &mut OffsetPageTable,
+            phys: PhysFrame<S>,
+            flags: PageTableFlags,
+        ) -> u64
+        where
+            for<'a> OffsetPageTable<'a>: Mapper<S>,
+        {
+            let page = Page::<S>::from_start_address(phys.start_address().to_virt()).unwrap();
+
+            unsafe { page_table.update_flags(page, flags) }
+                .unwrap()
+                .flush();
+
+            S::SIZE
+        }
+
+        let mut current_virt_addr = range.start.as_u64();
+
+        while current_virt_addr < range.end.as_u64() {
+            let virt_frame = VirtAddr::new(current_virt_addr);
+
+            let TranslateResult::Mapped { frame, .. } = self.opt.translate(virt_frame) else {
+                panic!("region not mapped");
+            };
+
+            current_virt_addr += match frame {
+                MappedFrame::Size4KiB(phys) => update_flags(&mut self.opt, phys, flags),
+                MappedFrame::Size2MiB(phys) => update_flags(&mut self.opt, phys, flags),
+                MappedFrame::Size1GiB(phys) => update_flags(&mut self.opt, phys, flags),
+            };
+        }
     }
 }
 

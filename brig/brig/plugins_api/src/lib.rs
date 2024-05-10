@@ -8,8 +8,8 @@
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, rc::Rc},
-    core::alloc::GlobalAlloc,
+    alloc::boxed::Box,
+    core::{alloc::GlobalAlloc, panic::PanicInfo},
 };
 
 /// Header information for the plugin, stored in the `.plugin_header` section
@@ -33,10 +33,15 @@ pub trait PluginHost: Send + Sync {
         name: &'static str,
         guest_device_factory: Box<dyn GuestDeviceFactory>,
     );
+
+    /// Panic from plugin
+    fn panic(&self, info: &PanicInfo);
 }
 
 pub trait GuestDeviceFactory {
     fn create(&self) -> Box<dyn GuestDevice>;
+
+    // todo: create_arch, create_timer, create_serial, etc
 }
 
 pub trait GuestDevice {

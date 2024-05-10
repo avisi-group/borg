@@ -7,5 +7,9 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-log = "0.4.21"
 plugins_rt.workspace = true
+arch = { path = "../../../../../brig-aarch64/arch" }
+AddWithCarry = { path = "../../../../../brig-aarch64/AddWithCarry" }
+DecodeBitMasks = { path = "../../../../../brig-aarch64/DecodeBitMasks" }
+replicate_bits_borealis_internal = { path = "../../../../../brig-aarch64/replicate_bits_borealis_internal" }
+log = "0.4.21"

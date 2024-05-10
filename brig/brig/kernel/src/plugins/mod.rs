@@ -56,6 +56,7 @@ pub fn load_all(device: &SharedDevice) {
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
 
+    log::info!("loading plugins");
     // todo: don't hardcode this, load everything in plugins directory
     [
         "plugins/libtest.so",

@@ -4,13 +4,13 @@
 
 extern crate alloc;
 
-pub use plugins_api as api;
+pub use {crate::host::get as get_host, plugins_api as api};
 
 use {api::PluginHost, core::panic::PanicInfo};
 
 mod allocator;
-pub mod host;
-mod log;
+mod host;
+mod logger;
 
 /// Initializes plugin runtime
 ///
@@ -20,13 +20,11 @@ mod log;
 pub fn init(host: &'static dyn PluginHost) {
     host::init(host);
     allocator::init();
-    log::init();
+    logger::init();
 }
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
-    host::get().print_message("panic!");
-    loop {
-        unsafe { core::arch::asm!("nop") };
-    }
+fn panic(info: &PanicInfo) -> ! {
+    host::get().panic(info);
+    loop {}
 }

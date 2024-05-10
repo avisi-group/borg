@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, rc::Rc},
+    alloc::boxed::Box,
     arch::Tracer,
     core::fmt::Debug,
     log::trace,
@@ -21,7 +21,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     plugins_rt::init(host);
     log::info!("loading aarch64");
 
-    plugins_rt::host::get().register_device("aarch64", Box::new(Aarch64InterpreterFactory));
+    plugins_rt::get_host().register_device("aarch64", Box::new(Aarch64InterpreterFactory));
 }
 
 struct Aarch64InterpreterFactory;
@@ -31,7 +31,7 @@ impl GuestDeviceFactory for Aarch64InterpreterFactory {
     // key-value?
     fn create(&self) -> Box<dyn GuestDevice> {
         const GUEST_MEMORY_BASE: usize = 0;
-        const INITIAL_PC: usize = 0x8000_0000;
+        const INITIAL_PC: usize = 0x4020_0000;
         Box::new(Aarch64Interpreter::new(GUEST_MEMORY_BASE, INITIAL_PC))
     }
 }
@@ -51,6 +51,16 @@ impl Aarch64Interpreter {
 
         state.write_register(arch::REG_U_PC, initial_pc);
 
+        state.write_register(arch::REG_MIDR_EL1, 0x410f_0000u32);
+        state.write_register(arch::REG_CLIDR_EL1, 0x4u32);
+        state.write_register(arch::REG_CCSIDR_EL1, 0x4000u32);
+        state.write_register(arch::REG_MPIDR_EL1, 0x4000_0000u32);
+        state.write_register(arch::REG_DCZID_EL0, 0x11u32);
+        state.write_register(arch::REG_CTR_EL0, 0x0444_c004u32);
+        state.write_register(arch::REG_ID_AA64PFR0_EL1, 0x11u32);
+        state.write_register(arch::REG_ID_AA64DFR0_EL1, 0x1010_1606u32);
+        state.write_register(arch::REG_ID_AA64MMFR0_EL1, 0x0f10_0000u32);
+
         Self {
             instructions_retired: 0,
             state,
@@ -61,16 +71,12 @@ impl Aarch64Interpreter {
 // impl guestdevice for architectureexecutor?
 impl GuestDevice for Aarch64Interpreter {
     fn start(&mut self) {
-        // if engine.instructions_retired() % 100_000 == 0 {
-        //                 let delta_time = unsafe { rdtsc() } - start_time;
-        //                 log::trace!(
-        //                     "{} {} {}",
-        //                     engine.instructions_retired(),
-        //                     delta_time,
-        //                     engine.instructions_retired() / delta_time
-        //                 );
-        //             }
+        let mut instrs_retired: u64 = 0;
         loop {
+            if instrs_retired % 0x10_0000 == 0 {
+                log::trace!("instrs: {instrs_retired:x}");
+            }
+
             let pc = self.state.read_register(arch::REG_U_PC);
             let insn_data = unsafe { fetch_instruction(pc) };
 
@@ -83,6 +89,8 @@ impl GuestDevice for Aarch64Interpreter {
                     panic!("undefined instruction {:08x}", insn_data)
                 }
             }
+
+            instrs_retired += 1;
         }
     }
     fn stop(&mut self) {
@@ -93,11 +101,27 @@ impl GuestDevice for Aarch64Interpreter {
     }
 }
 
+struct NoopTracer;
+
+impl Tracer for NoopTracer {
+    fn begin(&self, instruction: u32, pc: u64) {}
+
+    fn end(&self) {}
+
+    fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {}
+
+    fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {}
+
+    fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {}
+
+    fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {}
+}
+
 struct LogTracer;
 
 impl Tracer for LogTracer {
     fn begin(&self, instruction: u32, pc: u64) {
-        trace!("[{instruction:x} @ {pc:x}] ");
+        trace!("[{pc:x}] {instruction:08x}");
     }
 
     fn end(&self) {
@@ -105,11 +129,37 @@ impl Tracer for LogTracer {
     }
 
     fn read_register<T: Debug>(&self, offset: isize, value: T) {
-        trace!("    R[{offset:x}] -> {value:?}");
+        match arch::REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
+            Ok(idx) => {
+                trace!("    R[{}] -> {value:x?}", arch::REGISTER_NAME_MAP[idx].1)
+            }
+            // we're accessing inside a register
+            Err(idx) => {
+                // get the register and print the offset from the base
+                let (register_offset, name) = arch::REGISTER_NAME_MAP[idx - 1];
+                trace!("    R[{name}:{:x}] -> {value:x?}", offset - register_offset);
+            }
+        }
     }
 
     fn write_register<T: Debug>(&self, offset: isize, value: T) {
-        trace!("    R[{offset:x}] <- {value:?}");
+        match arch::REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
+            Ok(idx) => {
+                trace!("    R[{}] <- {value:x?}", arch::REGISTER_NAME_MAP[idx].1)
+            }
+            Err(idx) => {
+                let (register_offset, name) = arch::REGISTER_NAME_MAP[idx - 1];
+                trace!("    R[{name}:{:x}] <- {value:x?}", offset - register_offset);
+            }
+        }
+    }
+
+    fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
+        trace!("    M[{address:x}] -> {value:?}");
+    }
+
+    fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
+        trace!("    M[{address:x}] <- {value:?}");
     }
 }
 

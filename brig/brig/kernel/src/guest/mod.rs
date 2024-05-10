@@ -156,6 +156,7 @@ pub fn start() {
             .as_mut() as *mut AddressSpace,
     });
 
+    log::debug!("activating guest execution context");
     temp_exec_ctx.activate();
 
     // initiate boot protocol
@@ -181,12 +182,15 @@ pub fn start() {
     }
 
     // go go go (start all devices)
+    log::info!("starting guest");
+    //unsafe { *(0x4020_0000 as *mut [u32; 3]) = [0xd53b0023, 0xd3504c63, 0x0] };
+    // 0xeb01001f, 0x0] };
     for device in guest.devices.values_mut() {
         device.start();
     }
 }
 
-const KERNEL_LOAD_BIAS: usize = 0x8000_0000;
+const KERNEL_LOAD_BIAS: usize = 0x4020_0000;
 const DTB_LOAD_OFFSET: usize = 0x9000_0000;
 
 const ARM64_MAGIC: u32 = 0x644d5241;
