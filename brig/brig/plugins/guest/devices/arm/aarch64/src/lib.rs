@@ -3,8 +3,8 @@
 extern crate alloc;
 
 use {
-    alloc::boxed::Box,
-    arch::Tracer,
+    alloc::{boxed::Box, collections::BTreeMap, string::String},
+    arch::{decode_execute, ExecuteResult, Tracer, REG_U_PC},
     core::fmt::Debug,
     log::trace,
     plugins_rt::api::{GuestDevice, GuestDeviceFactory, IOMemoryHandler, PluginHeader, PluginHost},
@@ -29,10 +29,21 @@ struct Aarch64InterpreterFactory;
 impl GuestDeviceFactory for Aarch64InterpreterFactory {
     // todo: find a way of passing some config to guest device creation: json?
     // key-value?
-    fn create(&self) -> Box<dyn GuestDevice> {
+    fn create(&self, config: BTreeMap<String, String>) -> Box<dyn GuestDevice> {
         const GUEST_MEMORY_BASE: usize = 0;
         const INITIAL_PC: usize = 0x4020_0000;
-        Box::new(Aarch64Interpreter::new(GUEST_MEMORY_BASE, INITIAL_PC))
+
+        let tracer = match config.get("tracer").map(String::as_str) {
+            Some("log") => TracerKind::Log(LogTracer),
+            Some("noop") | None => TracerKind::Noop(NoopTracer),
+            Some(t) => panic!("unknown tracer {t:?}"),
+        };
+
+        Box::new(Aarch64Interpreter::new(
+            GUEST_MEMORY_BASE,
+            INITIAL_PC,
+            tracer,
+        ))
     }
 }
 
@@ -40,13 +51,19 @@ unsafe fn fetch_instruction(pc: usize) -> u32 {
     *(pc as *const u32)
 }
 
+enum TracerKind {
+    Noop(NoopTracer),
+    Log(LogTracer),
+}
+
 struct Aarch64Interpreter {
     instructions_retired: u64,
     state: arch::State,
+    tracer: TracerKind,
 }
 
 impl Aarch64Interpreter {
-    pub fn new(guest_memory_base: usize, initial_pc: usize) -> Self {
+    pub fn new(guest_memory_base: usize, initial_pc: usize, tracer: TracerKind) -> Self {
         let mut state = arch::State::init(guest_memory_base);
 
         state.write_register(arch::REG_U_PC, initial_pc);
@@ -64,6 +81,7 @@ impl Aarch64Interpreter {
         Self {
             instructions_retired: 0,
             state,
+            tracer,
         }
     }
 }
@@ -77,15 +95,23 @@ impl GuestDevice for Aarch64Interpreter {
                 log::trace!("instrs: {instrs_retired:x}");
             }
 
-            let pc = self.state.read_register(arch::REG_U_PC);
+            let pc = self.state.read_register(REG_U_PC);
             let insn_data = unsafe { fetch_instruction(pc) };
 
-            match arch::decode_execute(insn_data, &mut self.state, &LogTracer) {
-                arch::ExecuteResult::Ok | arch::ExecuteResult::EndOfBlock => {
+            // monomorphization goes brrr, only seems to add around 10% to compilation time
+            // but saves recompilation when changing tracer todo expand this
+            // with a "detailed" mode where all statements in all blocks are traced
+            let exec_result = match &self.tracer {
+                TracerKind::Noop(tracer) => decode_execute(insn_data, &mut self.state, tracer),
+                TracerKind::Log(tracer) => decode_execute(insn_data, &mut self.state, tracer),
+            };
+
+            match exec_result {
+                ExecuteResult::Ok | ExecuteResult::EndOfBlock => {
                     self.instructions_retired += 1;
                 }
 
-                arch::ExecuteResult::UndefinedInstruction => {
+                ExecuteResult::UndefinedInstruction => {
                     panic!("undefined instruction {:08x}", insn_data)
                 }
             }
@@ -104,17 +130,17 @@ impl GuestDevice for Aarch64Interpreter {
 struct NoopTracer;
 
 impl Tracer for NoopTracer {
-    fn begin(&self, instruction: u32, pc: u64) {}
+    fn begin(&self, _: u32, _: u64) {}
 
     fn end(&self) {}
 
-    fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {}
+    fn read_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
 
-    fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {}
+    fn write_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
 
-    fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {}
+    fn read_memory<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
-    fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {}
+    fn write_memory<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 }
 
 struct LogTracer;

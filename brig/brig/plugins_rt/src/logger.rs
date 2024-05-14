@@ -1,7 +1,7 @@
 use {
     crate::host,
     alloc::format,
-    log::{LevelFilter, Log},
+    log::{Level, LevelFilter, Log},
 };
 
 struct HostLogger;
@@ -12,13 +12,21 @@ impl Log for HostLogger {
     }
 
     fn log(&self, record: &log::Record) {
-        let target = if !record.target().is_empty() {
-            record.target()
+        // print trace messages completely plainly
+        if record.level() == Level::Trace {
+            host::get().print_message(&format!("{}\n", record.args()), true);
         } else {
-            record.module_path().unwrap_or_default()
-        };
+            let target = if !record.target().is_empty() {
+                record.target()
+            } else {
+                record.module_path().unwrap_or_default()
+            };
 
-        host::get().print_message(&format!("\x1b[0;30m[{}]\x1b[0m {}", target, record.args()));
+            host::get().print_message(
+                &format!("\x1b[0;30m[{}]\x1b[0m {}", target, record.args()),
+                false,
+            );
+        }
     }
 
     fn flush(&self) {}

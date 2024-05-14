@@ -8,7 +8,7 @@
 extern crate alloc;
 
 use {
-    alloc::boxed::Box,
+    alloc::{boxed::Box, collections::BTreeMap, string::String},
     core::{alloc::GlobalAlloc, panic::PanicInfo},
 };
 
@@ -23,7 +23,7 @@ pub struct PluginHeader {
 
 pub trait PluginHost: Send + Sync {
     /// Prints a message to the console
-    fn print_message(&self, msg: &str);
+    fn print_message(&self, msg: &str, bare: bool);
 
     /// Gets a reference to the plugin host's global allocator
     fn allocator(&self) -> &dyn GlobalAlloc;
@@ -39,7 +39,7 @@ pub trait PluginHost: Send + Sync {
 }
 
 pub trait GuestDeviceFactory {
-    fn create(&self) -> Box<dyn GuestDevice>;
+    fn create(&self, config: BTreeMap<String, String>) -> Box<dyn GuestDevice>;
 
     // todo: create_arch, create_timer, create_serial, etc
 }

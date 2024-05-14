@@ -1,5 +1,5 @@
 use {
-    alloc::{boxed::Box, rc::Rc},
+    alloc::{boxed::Box, collections::BTreeMap, string::String},
     plugins_api::{GuestDevice, GuestDeviceFactory, IOMemoryHandler},
 };
 
@@ -37,7 +37,7 @@ impl VirtIOBlock {
 }
 
 impl GuestDeviceFactory for VirtIOBlockFactory {
-    fn create(&self) -> Box<dyn GuestDevice> {
+    fn create(&self, _config: BTreeMap<String, String>) -> Box<dyn GuestDevice> {
         Box::new(VirtIOBlock::new())
     }
 }

@@ -1,5 +1,5 @@
 use {
-    crate::{arch::x86::memory::HEAP_ALLOCATOR, guest::GUEST_DEVICE_FACTORIES},
+    crate::{arch::x86::memory::HEAP_ALLOCATOR, guest::GUEST_DEVICE_FACTORIES, print},
     alloc::{borrow::ToOwned, boxed::Box},
     core::{alloc::GlobalAlloc, panic::PanicInfo},
     plugins_api::PluginHost,
@@ -8,8 +8,12 @@ use {
 pub struct Host;
 
 impl PluginHost for Host {
-    fn print_message(&self, msg: &str) {
-        log::info!("{}", msg)
+    fn print_message(&self, msg: &str, bare: bool) {
+        if bare {
+            print!("{}", msg);
+        } else {
+            log::info!("{}", msg)
+        }
     }
 
     fn allocator(&self) -> &'static dyn GlobalAlloc {
