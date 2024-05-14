@@ -2,7 +2,6 @@
 
 use {
     crate::boom::{
-        bits_to_int,
         control_flow::{ControlFlowBlock, Terminator},
         visitor::Visitor,
         Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,

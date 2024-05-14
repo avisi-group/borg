@@ -1146,11 +1146,23 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
                 "Mem_read" | "Mem_read_1" | "Mem_read_2" => {
                     let address = args[0].clone();
-                    let size = args[1].clone();
+                    let size_bytes = self
+                        .builder
+                        .generate_cast(args[1].clone(), Arc::new(Type::u64()));
+
+                    let _8 = self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::u64()),
+                        value: ConstantValue::UnsignedInteger(8),
+                    });
+                    let size_bits = self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Multiply,
+                        lhs: size_bytes,
+                        rhs: _8,
+                    });
 
                     Some(self.builder.build(StatementKind::ReadMemory {
                         offset: address,
-                        size,
+                        size: size_bits,
                     }))
                 }
                 "HaveEL" => {

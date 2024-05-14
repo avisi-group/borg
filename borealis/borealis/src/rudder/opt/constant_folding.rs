@@ -1,7 +1,7 @@
 use {
     crate::rudder::{
-        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, PrimitiveType,
-        PrimitiveTypeClass, Statement, StatementKind, Type,
+        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Function, PrimitiveTypeClass,
+        Statement, StatementKind, Type,
     },
     std::sync::Arc,
 };
