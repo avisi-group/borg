@@ -1,11 +1,12 @@
 #![no_std]
 
 use {
-    arch::{Bits, ProductType19be375472571c5f, ProductType8ab6ac9d31fae5b9, State, Tracer},
+    arch::{Bits, ProductTyped54bc449dd09e5bd, ProductTypebc91b195b0b2a883, State, Tracer, },
     plugins_rt::api::{PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
     AddWithCarry::AddWithCarry,
     DecodeBitMasks::DecodeBitMasks,
+    u__IMPDEF_integer::u__IMPDEF_integer
 };
 
 #[no_mangle]
@@ -27,6 +28,8 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
     replicate_bits();
     ubfx();
+
+  //impdef();
 }
 
 fn addwithcarry_negative() {
@@ -38,7 +41,7 @@ fn addwithcarry_negative() {
 
     assert_eq!(
         AddWithCarry(&mut state, &tracer, x, y, carry_in),
-        ProductType19be375472571c5f {
+        ProductTyped54bc449dd09e5bd {
             _0: Bits::new(-5i64 as u128, 0x40),
             _1: 0b1000
         }
@@ -54,7 +57,7 @@ fn addwithcarry_zero() {
 
     assert_eq!(
         AddWithCarry(&mut state, &tracer, x, y, carry_in),
-        ProductType19be375472571c5f {
+        ProductTyped54bc449dd09e5bd {
             _0: Bits::new(0x0, 0x40),
             _1: 0b0100
         }
@@ -70,7 +73,7 @@ fn addwithcarry_carry() {
 
     assert_eq!(
         AddWithCarry(&mut state, &tracer, x, y, carry_in),
-        ProductType19be375472571c5f {
+        ProductTyped54bc449dd09e5bd {
             _0: Bits::new(0x0, 0x40),
             _1: 0b0110
         }
@@ -86,7 +89,7 @@ fn addwithcarry_overflow() {
 
     assert_eq!(
         AddWithCarry(&mut state, &tracer, x, y, carry_in),
-        ProductType19be375472571c5f {
+        ProductTyped54bc449dd09e5bd {
             _0: Bits::new(!0x1, 0x40),
             _1: 0b1001
         }
@@ -104,7 +107,7 @@ fn addwithcarry_early_4880_loop() {
 
     assert_eq!(
         AddWithCarry(&mut state, &tracer, x, y, carry_in),
-        ProductType19be375472571c5f {
+        ProductTyped54bc449dd09e5bd {
             _0: Bits::new(0xffffffffffffffe3, 0x40),
             _1: 0b1000
         }
@@ -136,7 +139,7 @@ fn ubfx() {
         let mut state = State::init(0x0);
         // decode bit masks
         assert_eq!(
-            ProductType8ab6ac9d31fae5b9 {
+            ProductTypebc91b195b0b2a883 {
                 _0: Bits::new(0xFFFF00000000000F, 64),
                 _1: Bits::new(0xF, 64)
             },
@@ -168,6 +171,15 @@ fn ubfx() {
         assert_eq!(0x4, state.read_register::<u64>(arch::REG_R3));
     }
 }
+
+// fn impdef() {
+//     let mut state = State::init(0x0);
+
+//     let s_0_0: &'static str = "Maximum Physical Address Size";
+//     // S s_0_1: call __IMPDEF_integer(s_0_0)
+//     let s_0_1: i128 = u__IMPDEF_integer(&mut state, &NoopTracer, s_0_0);
+//     panic!("{:?}", s_0_1);
+// }
 
 struct NoopTracer;
 

@@ -78,6 +78,9 @@ impl Aarch64Interpreter {
         state.write_register(arch::REG_ID_AA64DFR0_EL1, 0x1010_1606u32);
         state.write_register(arch::REG_ID_AA64MMFR0_EL1, 0x0f10_0000u32);
 
+        state.write_register(arch::REG_U__SUPPORTED_PA_SIZE, 56u32);
+        state.write_register(arch::REG_U__SUPPORTED_VA_SIZE, 56u32);
+
         Self {
             instructions_retired: 0,
             state,
