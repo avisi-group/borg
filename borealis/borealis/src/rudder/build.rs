@@ -213,7 +213,7 @@ impl BuildContext {
     fn resolve_type(&self, typ: Shared<boom::Type>) -> Arc<rudder::Type> {
         match &*typ.get() {
             boom::Type::Unit => Arc::new(rudder::Type::unit()),
-            boom::Type::String => Arc::new(rudder::Type::u32()), /* same as InternedString raw */
+            boom::Type::String => Arc::new(rudder::Type::String),
             // value
             boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
             boom::Type::Real => Arc::new(rudder::Type::f32()),
@@ -871,7 +871,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 // %bv -> %i
-                "UInt0" => {
+                "UInt0" | "unsigned" => {
                     // just copy bits
 
                     Some(self.builder.build(StatementKind::Cast {
@@ -1132,39 +1132,39 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 /* ### NON-BUILTIN FUNCTIONS BELOW THIS POINT ### */
                 /* To maintain correctness, borealis must only specialize on actual Sail compiler builtins, specializing other functions means restricting compatibiliy on a specific model, however memory access simply must be overwritten */
-                "Mem_set" => {
-                    // todo: check size is correct, maybe do something with access description
-                    let address = args[0].clone();
-                    let _size = args[1].clone();
-                    let _accdesc = args[2].clone();
-                    let value_in_name = args[3].clone();
+                // "Mem_set" => {
+                //     // todo: check size is correct, maybe do something with access description
+                //     let address = args[0].clone();
+                //     let _size = args[1].clone();
+                //     let _accdesc = args[2].clone();
+                //     let value_in_name = args[3].clone();
 
-                    Some(self.builder.build(StatementKind::WriteMemory {
-                        offset: address,
-                        value: value_in_name,
-                    }))
-                }
-                "Mem_read" | "Mem_read_1" | "Mem_read_2" => {
-                    let address = args[0].clone();
-                    let size_bytes = self
-                        .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::u64()));
+                //     Some(self.builder.build(StatementKind::WriteMemory {
+                //         offset: address,
+                //         value: value_in_name,
+                //     }))
+                // }
+                // "Mem_read" | "Mem_read_1" | "Mem_read_2" => {
+                //     let address = args[0].clone();
+                //     let size_bytes = self
+                //         .builder
+                //         .generate_cast(args[1].clone(), Arc::new(Type::u64()));
 
-                    let _8 = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
-                        value: ConstantValue::UnsignedInteger(8),
-                    });
-                    let size_bits = self.builder.build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::Multiply,
-                        lhs: size_bytes,
-                        rhs: _8,
-                    });
+                //     let _8 = self.builder.build(StatementKind::Constant {
+                //         typ: Arc::new(Type::u64()),
+                //         value: ConstantValue::UnsignedInteger(8),
+                //     });
+                //     let size_bits = self.builder.build(StatementKind::BinaryOperation {
+                //         kind: BinaryOperationKind::Multiply,
+                //         lhs: size_bytes,
+                //         rhs: _8,
+                //     });
 
-                    Some(self.builder.build(StatementKind::ReadMemory {
-                        offset: address,
-                        size: size_bits,
-                    }))
-                }
+                //     Some(self.builder.build(StatementKind::ReadMemory {
+                //         offset: address,
+                //         size: size_bits,
+                //     }))
+                // }
                 "HaveEL" => {
                     let two = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::new_primitive(
@@ -1184,8 +1184,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "append_str" | "__monomorphize" => Some(args[0].clone()),
 
                 "DecStr" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(rudder::Type::u32()),
-                    value: ConstantValue::UnsignedInteger(0),
+                    typ: Arc::new(rudder::Type::String),
+                    value: ConstantValue::String("decstr not implemented".into()),
                 })),
 
                 "print_endline"
@@ -1463,15 +1463,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 value: rudder::ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
             },
             boom::Literal::String(str) => StatementKind::Constant {
-                typ: Arc::new(Type::u32()),
-                value: rudder::ConstantValue::UnsignedInteger(str.key().try_into().unwrap()),
+                typ: Arc::new(Type::String),
+                value: rudder::ConstantValue::String(*str),
             },
             boom::Literal::Unit => StatementKind::Constant {
                 typ: Arc::new(Type::unit()),
                 value: rudder::ConstantValue::Unit,
             },
             boom::Literal::Reference(_) => todo!(),
-            boom::Literal::Undefined => unimplemented!(),
+            boom::Literal::Undefined => StatementKind::Panic(vec![]),
         };
 
         self.builder.build(kind)
@@ -1500,7 +1500,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let source_type = value.typ();
 
                 let kind = match *source_type {
-                    Type::Sum(_) | Type::Product(_) | Type::Vector { .. } => {
+                    Type::Sum(_) | Type::Product(_) | Type::Vector { .. } | Type::String => {
                         panic!("cast on non-primitive type")
                     }
                     Type::Primitive(_) => {

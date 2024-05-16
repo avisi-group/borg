@@ -1,3 +1,4 @@
+use common::intern::InternedString;
 use std::{
     cmp::Ordering,
     ops::{Add, Div, Mul, Sub},
@@ -8,6 +9,7 @@ pub enum ConstantValue {
     UnsignedInteger(usize),
     SignedInteger(isize),
     FloatingPoint(f64),
+    String(InternedString),
     Unit,
 }
 
@@ -17,18 +19,18 @@ impl ConstantValue {
             ConstantValue::UnsignedInteger(v) => *v == 0,
             ConstantValue::SignedInteger(v) => *v == 0,
             ConstantValue::FloatingPoint(v) => *v == 0.,
-            ConstantValue::Unit => false,
+            ConstantValue::Unit | ConstantValue::String(_) => false,
         }
     }
 
-    pub fn zero_or_unit(&self) -> bool {
-        match self {
-            ConstantValue::UnsignedInteger(v) => *v == 0,
-            ConstantValue::SignedInteger(v) => *v == 0,
-            ConstantValue::FloatingPoint(v) => *v == 0.,
-            ConstantValue::Unit => true,
-        }
-    }
+    // pub fn zero_or_unit(&self) -> bool {
+    //     match self {
+    //         ConstantValue::UnsignedInteger(v) => *v == 0,
+    //         ConstantValue::SignedInteger(v) => *v == 0,
+    //         ConstantValue::FloatingPoint(v) => *v == 0.,
+    //         ConstantValue::Unit => true,
+    //     }
+    // }
 
     pub fn is_unsigned(&self) -> bool {
         match self {

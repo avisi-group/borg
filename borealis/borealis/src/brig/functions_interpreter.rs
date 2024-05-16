@@ -75,6 +75,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
 
                 ConstantValue::Unit => quote!(()),
+                ConstantValue::String(str) => {
+                    let string = str.to_string();
+                    quote!(#string)
+                }
             };
 
             if let Type::Bits = &*stmt.typ() {

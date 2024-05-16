@@ -27,6 +27,7 @@ impl Display for Type {
             } => write!(f, "[{element_type}; {element_count:?}]"),
             Type::Bits => write!(f, "bv"),
             Type::ArbitraryLengthInteger => write!(f, "i"),
+            Type::String => write!(f, "str"),
         }
     }
 }
@@ -38,6 +39,7 @@ impl Display for ConstantValue {
             ConstantValue::SignedInteger(v) => write!(f, "{v}s"),
             ConstantValue::FloatingPoint(v) => write!(f, "{v}f"),
             ConstantValue::Unit => write!(f, "()"),
+            ConstantValue::String(str) => write!(f, "{str:?}"),
         }
     }
 }

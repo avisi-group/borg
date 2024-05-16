@@ -59,6 +59,9 @@ pub enum Type {
         element_type: Arc<Type>,
     },
 
+    // ehhhh
+    String,
+
     Bits,
     ArbitraryLengthInteger,
 }
@@ -127,7 +130,10 @@ impl Type {
                 element_count,
                 element_type,
             } => element_type.width_bits() * element_count,
+
             Self::Bits | Self::ArbitraryLengthInteger => usize::try_from(BitsValue::BITS).unwrap(),
+            // probably u32?
+            Self::String => todo!(),
         }
     }
 
@@ -1493,7 +1499,7 @@ impl ToTokens for Function {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FunctionInner {
     name: InternedString,
     return_type: Arc<Type>,
