@@ -1,0 +1,8 @@
+[package]
+name = "aarch64_interpreter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arch = { path = "../../../../../../../brig-aarch64/arch" }
+log = "0.4.21"

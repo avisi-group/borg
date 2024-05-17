@@ -1,0 +1,17 @@
+
+[package]
+name = "standalone"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+debug = true
+#lto = "fat" small perf bump but increases compile time from 2 mins to 6 mins at time of writing
+
+[dependencies]
+aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }
+clap = { version = "4.5.4", features = ["derive"] }
+rustix = { version = "0.38.34", features = ["mm"] }

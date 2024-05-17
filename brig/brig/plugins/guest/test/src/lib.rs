@@ -1,12 +1,12 @@
 #![no_std]
 
 use {
-    arch::{Bits, ProductTyped54bc449dd09e5bd, ProductTypebc91b195b0b2a883, State, Tracer, },
+    arch::{Bits, ProductTypebc91b195b0b2a883, ProductTyped54bc449dd09e5bd, State, Tracer},
     plugins_rt::api::{PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
+    u__IMPDEF_integer::u__IMPDEF_integer,
     AddWithCarry::AddWithCarry,
     DecodeBitMasks::DecodeBitMasks,
-    u__IMPDEF_integer::u__IMPDEF_integer
 };
 
 #[no_mangle]
@@ -29,7 +29,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     replicate_bits();
     ubfx();
 
-  //impdef();
+    //impdef();
 }
 
 fn addwithcarry_negative() {
