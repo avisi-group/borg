@@ -1273,7 +1273,10 @@ impl StatementBuilder {
 
             (src, dst) => {
                 println!("current statements: {:?}", self.statements);
-                panic!("cannot cast {source} from {src} to {dst}");
+                panic!(
+                    "cannot cast {:?} from {src:?} to {dst:?}",
+                    *source.inner.get()
+                );
             }
         }
     }

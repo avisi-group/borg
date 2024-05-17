@@ -1279,7 +1279,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     /// Last statement returned is the value
     fn build_value(&mut self, boom_value: Shared<boom::Value>) -> Statement {
-        let (base, fields) = value_field_collapse(boom_value.clone());
+        let (base, outer_field_accesses) = value_field_collapse(boom_value.clone());
 
         let borrow = base.get();
 
@@ -1288,7 +1288,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // local variable
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
                     let (indices, _) =
-                        fields_to_indices(&self.ctx().structs, symbol.typ(), &fields);
+                        fields_to_indices(&self.ctx().structs, symbol.typ(), &outer_field_accesses);
 
                     return self
                         .builder
@@ -1298,7 +1298,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // parameter
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
                     let (indices, _) =
-                        fields_to_indices(&self.ctx().structs, symbol.typ(), &fields);
+                        fields_to_indices(&self.ctx().structs, symbol.typ(), &outer_field_accesses);
 
                     return self
                         .builder
@@ -1308,7 +1308,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // register
                 if let Some((typ, register_offset)) = self.ctx().registers.get(ident).cloned() {
                     let (offsets, outer_type) =
-                        fields_to_offsets(&self.ctx().structs, typ.clone(), &fields);
+                        fields_to_offsets(&self.ctx().structs, typ.clone(), &outer_field_accesses);
 
                     let offset = register_offset + offsets.iter().sum::<usize>();
 
@@ -1340,8 +1340,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
             }
 
-            boom::Value::Literal(literal) => self.build_literal(&literal.get()),
-            boom::Value::Operation(op) => self.build_operation(op),
+            boom::Value::Literal(literal) => {
+                assert!(outer_field_accesses.is_empty());
+                self.build_literal(&literal.get())
+            }
+            boom::Value::Operation(op) => {
+                assert!(outer_field_accesses.is_empty());
+                self.build_operation(op)
+            }
             boom::Value::Struct { name, fields } => {
                 let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
 
@@ -1353,10 +1359,31 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     field_statements[*idx] = Some(field_statement);
                 }
 
-                self.builder.build(StatementKind::CreateProduct {
+                let product = self.builder.build(StatementKind::CreateProduct {
                     typ: typ.clone(),
                     fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
-                })
+                });
+
+                if !outer_field_accesses.is_empty() {
+                    let (indices, _) = fields_to_indices(
+                        &self.ctx().structs,
+                        product.typ(),
+                        &outer_field_accesses,
+                    );
+
+                    let mut last = product;
+
+                    for field in indices {
+                        last = self.builder.build(StatementKind::ExtractField {
+                            value: last,
+                            field_index: field,
+                        })
+                    }
+
+                    last
+                } else {
+                    product
+                }
             }
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),
@@ -1365,6 +1392,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Value::CtorKind {
                 value, identifier, ..
             } => {
+                assert!(outer_field_accesses.is_empty());
+
                 let value = self.build_value(value.clone());
 
                 // get the rudder type and variant index
@@ -1416,9 +1445,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     variant_index,
                 });
 
-                if !fields.is_empty() {
-                    let (indices, _) =
-                        fields_to_indices(&self.ctx().structs, unwrap_sum.typ(), &fields);
+                if !outer_field_accesses.is_empty() {
+                    let (indices, _) = fields_to_indices(
+                        &self.ctx().structs,
+                        unwrap_sum.typ(),
+                        &outer_field_accesses,
+                    );
 
                     let mut last = unwrap_sum;
 
