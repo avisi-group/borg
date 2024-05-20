@@ -15,3 +15,4 @@ debug = true
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }
 clap = { version = "4.5.4", features = ["derive"] }
 rustix = { version = "0.38.34", features = ["mm"] }
+pretty_env_logger = "0.5.0"

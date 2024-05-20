@@ -2,9 +2,9 @@
 
 use {
     arch::{Bits, ProductTypebc91b195b0b2a883, ProductTyped54bc449dd09e5bd, State, Tracer},
+    core::fmt::Debug,
     plugins_rt::api::{PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
-    u__IMPDEF_integer::u__IMPDEF_integer,
     AddWithCarry::AddWithCarry,
     DecodeBitMasks::DecodeBitMasks,
 };
@@ -29,7 +29,6 @@ fn entrypoint(host: &'static dyn PluginHost) {
     replicate_bits();
     ubfx();
 
-    //impdef();
 }
 
 fn addwithcarry_negative() {
@@ -146,22 +145,7 @@ fn ubfx() {
             DecodeBitMasks(&mut state, &NoopTracer, true, 0x13, 0x10, false, 0x40)
         );
     }
-    // {
-    //     let mut state = State::init(0x0);
-    //     execute_aarch64_instrs_integer_bitfield(
-    //         &mut state,
-    //         &NoopTracer,
-    //         0x3,
-    //         0x40,
-    //         false,
-    //         true,
-    //         0x3,
-    //         0x10,
-    //         0x13,
-    //         Bits::new(0, 0),
-    //         Bits::new(0, 0),
-    //     );
-    // }
+
     {
         let mut state = State::init(0x0);
         state.write_register::<u64>(arch::REG_R3, 0x8444_c004);
@@ -172,29 +156,22 @@ fn ubfx() {
     }
 }
 
-// fn impdef() {
-//     let mut state = State::init(0x0);
 
-//     let s_0_0: &'static str = "Maximum Physical Address Size";
-//     // S s_0_1: call __IMPDEF_integer(s_0_0)
-//     let s_0_1: i128 = u__IMPDEF_integer(&mut state, &NoopTracer, s_0_0);
-//     panic!("{:?}", s_0_1);
-// }
 
 struct NoopTracer;
 
 impl Tracer for NoopTracer {
-    fn begin(&self, instruction: u32, pc: u64) {}
+    fn begin(&self, _: u32, _: u64) {}
 
     fn end(&self) {}
 
-    fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {}
+    fn read_register<T: Debug>(&self, _: isize, _: T) {}
 
-    fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {}
+    fn write_register<T: Debug>(&self, _: isize, _: T) {}
 
-    fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {}
+    fn read_memory<T: Debug>(&self, _: usize, _: T) {}
 
-    fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {}
+    fn write_memory<T: Debug>(&self, _: usize, _: T) {}
 }
 
 struct LogTracer;

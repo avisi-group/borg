@@ -3,9 +3,8 @@
 extern crate alloc;
 
 use {
+    aarch64_interpreter::{Aarch64Interpreter, TracerKind},
     alloc::{boxed::Box, collections::BTreeMap, string::String},
-    core::fmt::Debug,
-    log::trace,
     plugins_rt::api::{GuestDevice, GuestDeviceFactory, IOMemoryHandler, PluginHeader, PluginHost},
 };
 
@@ -34,24 +33,26 @@ impl GuestDeviceFactory for Aarch64InterpreterFactory {
         const DTB_LOAD_ADDRESS: usize = 0x9000_0000;
 
         let tracer = match config.get("tracer").map(String::as_str) {
-            Some("log") => TracerKind::Log(LogTracer),
-            Some("noop") | None => TracerKind::Noop(NoopTracer),
+            Some("log") => TracerKind::Log,
+            Some("noop") | None => TracerKind::Noop,
             Some(t) => panic!("unknown tracer {t:?}"),
         };
 
-        Box::new(Aarch64Interpreter::new(
+        Box::new(Aarch64InterpreterDevice(Aarch64Interpreter::new(
             GUEST_MEMORY_BASE,
             INITIAL_PC,
             DTB_LOAD_ADDRESS,
             tracer,
-        ))
+        )))
     }
 }
 
+struct Aarch64InterpreterDevice(Aarch64Interpreter);
+
 // impl guestdevice for architectureexecutor?
-impl GuestDevice for Aarch64Interpreter {
+impl GuestDevice for Aarch64InterpreterDevice {
     fn start(&mut self) {
-        self.run();
+        self.0.run();
     }
     fn stop(&mut self) {
         todo!()

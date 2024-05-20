@@ -12,10 +12,6 @@ use {
     log::trace,
 };
 
-unsafe fn fetch_instruction(pc: usize) -> u32 {
-    *(pc as *const u32)
-}
-
 pub enum TracerKind {
     Noop,
     Log,
@@ -147,8 +143,8 @@ impl Aarch64Interpreter {
                 log::trace!("instrs: {instrs_retired:x}");
             }
 
-            let pc = self.state.read_register(REG_U_PC);
-            let insn_data = unsafe { fetch_instruction(pc) };
+            let pc = self.state.read_register::<usize>(REG_U_PC);
+            let insn_data = unsafe { *((pc + self.state.guest_memory_base()) as *const u32) };
 
             // monomorphization goes brrr, only seems to add around 10% to compilation time
             // but saves recompilation when changing tracer todo expand this

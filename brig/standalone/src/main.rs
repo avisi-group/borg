@@ -1,8 +1,8 @@
 use {
+    aarch64_interpreter::{Aarch64Interpreter, TracerKind},
     clap::Parser,
     rustix::mm::{MapFlags, ProtFlags},
     std::{fmt::Debug, fs, path::PathBuf, ptr},
-    aarch64_interpreter::{Aarch64Interpreter, TracerKind},
 };
 
 const GUEST_MEMORY_BASE: usize = 0x10_000;
@@ -13,6 +13,7 @@ const DTB_LOAD_BIAS: usize = 0x9000_0000;
 const DTB: &[u8] = include_bytes!("../brig-platform.dtb");
 
 fn main() {
+    pretty_env_logger::init();
     let cli = Cli::parse();
 
     let image = fs::read(cli.path).unwrap();
@@ -51,13 +52,13 @@ fn main() {
         )
     };
 
-    let interpreter = Aarch64Interpreter::new(
+    let mut interpreter = Aarch64Interpreter::new(
         GUEST_MEMORY_BASE,
         KERNEL_LOAD_BIAS,
         DTB_LOAD_BIAS,
         TracerKind::Log,
     );
-    interpreter.start();
+    interpreter.run();
 }
 
 #[derive(Parser)]
