@@ -1,7 +1,9 @@
-use common::intern::InternedString;
-use std::{
-    cmp::Ordering,
-    ops::{Add, Div, Mul, Sub},
+use {
+    common::intern::InternedString,
+    std::{
+        cmp::Ordering,
+        ops::{Add, Div, Mul, Sub},
+    },
 };
 
 #[derive(Debug, Clone, PartialEq)]

@@ -223,7 +223,12 @@ fn cast_integer(value: ConstantValue, typ: Arc<Type>) -> ConstantValue {
             (PrimitiveTypeClass::UnsignedInteger, ConstantValue::UnsignedInteger(i)) => {
                 ConstantValue::UnsignedInteger(i)
             }
-            _ => todo!(),
+            (PrimitiveTypeClass::FloatingPoint, ConstantValue::SignedInteger(s)) => {
+                ConstantValue::FloatingPoint(f64::try_from(i32::try_from(s).unwrap()).unwrap())
+            }
+            (tc, cv) => {
+                panic!("incompatible type class {tc:?} and constant value {cv:?}")
+            }
         },
         _ => panic!("failed to cast {value:x?} to type {typ:?}"),
     }

@@ -535,6 +535,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                         #header
 
                         extern crate alloc;
+                        use micromath::F32Ext;
                         #imports
 
                         #contents
@@ -622,6 +623,7 @@ fn codegen_header() -> TokenStream {
         #![allow(unused_mut)]
         #![allow(unused_parens)]
         #![allow(unused_variables)]
+        #![allow(unused_imports)]
         #![allow(dead_code)]
         #![allow(unreachable_code)]
         #![allow(unused_doc_comments)]

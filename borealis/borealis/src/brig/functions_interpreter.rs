@@ -257,6 +257,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 UnaryOperationKind::Complement => quote! {!#value},
                 UnaryOperationKind::Power2 => quote! { (#value).pow(2) },
                 UnaryOperationKind::Absolute => quote! { (#value).abs() },
+                UnaryOperationKind::Ceil => quote! { (#value).ceil() },
+                UnaryOperationKind::Floor => quote! { (#value).floor() },
             }
         }
         StatementKind::ShiftOperation {
@@ -630,10 +632,23 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             }
         }
 
-        (Type::Primitive(_), Type::ArbitraryLengthInteger, CastOperationKind::ZeroExtend) => {
-            let target = codegen_type(target_type);
-            quote! {
-                (#target::try_from(#ident).unwrap())
+        (Type::Primitive(pt), Type::ArbitraryLengthInteger, CastOperationKind::ZeroExtend) => {
+            match pt.tc {
+                PrimitiveTypeClass::Void | PrimitiveTypeClass::Unit => {
+                    panic!("cannot cast from void or unit")
+                }
+                PrimitiveTypeClass::UnsignedInteger | PrimitiveTypeClass::SignedInteger => {
+                    let target = codegen_type(target_type);
+                    quote! {
+                        (#target::try_from(#ident).unwrap())
+                    }
+                }
+                PrimitiveTypeClass::FloatingPoint => {
+                    let target = codegen_type(target_type);
+                    quote! {
+                        (#ident as #target)
+                    }
+                }
             }
         }
 

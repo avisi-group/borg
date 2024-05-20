@@ -261,6 +261,8 @@ pub enum UnaryOperationKind {
     Complement,
     Power2,
     Absolute,
+    Ceil,
+    Floor,
 }
 
 #[derive(Debug, Clone)]
@@ -686,7 +688,8 @@ impl Statement {
             StatementKind::Panic(_) => Arc::new(Type::void()),
             StatementKind::ReadPc => Arc::new(Type::u64()),
             StatementKind::WritePc { .. } => Arc::new(Type::void()),
-            StatementKind::BitExtract { value, .. } => value.typ(), // todo: this is a simplification, be more precise
+            // todo: this is a simplification, be more precise about lengths?
+            StatementKind::BitExtract { value, .. } => value.typ(),
             StatementKind::BitInsert { original_value, .. } => original_value.typ(),
             StatementKind::ReadElement { vector, .. } => {
                 let Type::Vector { element_type, .. } = &*vector.typ() else {
@@ -1090,10 +1093,85 @@ impl StatementInner {
                     index,
                 };
             }
+            StatementKind::WritePc { value } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
 
-            _ => {
-                panic!("use replacement not implemented for {}", self.kind);
+                self.kind = StatementKind::WritePc { value };
             }
+            StatementKind::Panic(statements) => {
+                self.kind = StatementKind::Panic(
+                    statements
+                        .into_iter()
+                        .map(|stmt| if stmt == use_of { with.clone() } else { stmt })
+                        .collect(),
+                )
+            }
+
+            StatementKind::CreateBits { value, length } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                let length = if length == use_of {
+                    with.clone()
+                } else {
+                    length.clone()
+                };
+
+                self.kind = StatementKind::CreateBits { value, length };
+            }
+            StatementKind::MatchesSum {
+                value,
+                variant_index,
+            } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::MatchesSum {
+                    value,
+                    variant_index,
+                };
+            }
+            StatementKind::UnwrapSum {
+                value,
+                variant_index,
+            } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::UnwrapSum {
+                    value,
+                    variant_index,
+                };
+            }
+            StatementKind::ExtractField { value, field_index } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::ExtractField { value, field_index };
+            }
+
+            StatementKind::Constant { .. } => todo!(),
+            StatementKind::ReadVariable { .. } => todo!(),
+            StatementKind::ReadRegister { .. } => todo!(),
+            StatementKind::ReadPc => todo!(),
+            StatementKind::Jump { .. } => todo!(),
+            StatementKind::PhiNode { .. } => todo!(),
         }
     }
 }

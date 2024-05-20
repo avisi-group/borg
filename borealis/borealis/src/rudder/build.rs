@@ -550,6 +550,23 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     )
                 }
 
+                "%string->%real" => {
+                    let StatementKind::Constant { value, .. } = args[0].kind() else {
+                        panic!();
+                    };
+
+                    let ConstantValue::String(str) = value else {
+                        panic!();
+                    };
+
+                    let f = str.as_ref().parse().unwrap();
+
+                    Some(self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::f32()),
+                        value: ConstantValue::FloatingPoint(f),
+                    }))
+                }
+
                 "make_the_value" | "size_itself_int" => Some(args[0].clone()),
                 // %bv, %i, %i -> %bv
                 "subrange_bits" => {
@@ -577,7 +594,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "eq_bit" | "eq_bits" | "eq_int" | "eq_bool" | "eq_string" => {
+                "eq_bit" | "eq_bits" | "eq_int" | "eq_bool" | "eq_string" | "eq_real" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareEqual,
                         lhs: args[0].clone(),
@@ -595,7 +612,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val add_atom : (%i, %i) -> %i
                 // val add_bits : (%bv, %bv) -> %bv
-                "add_atom" | "add_bits" => {
+                // val add_real : (%real, %real) -> %real
+                "add_atom" | "add_bits" | "add_real" => {
                     assert!(args[0].typ() == args[1].typ());
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Add,
@@ -636,11 +654,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "mult_atom" => Some(self.builder.build(StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Multiply,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                })),
+                "mult_atom" | "mult_real" => {
+                    Some(self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Multiply,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }))
+                }
 
                 "tdiv_int" | "ediv_int" | "ediv_nat" | "div_real" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
@@ -650,11 +670,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "emod_nat" => Some(self.builder.build(StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Modulo,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                })),
+                "emod_nat" | "_builtin_mod_nat" => {
+                    Some(self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Modulo,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }))
+                }
+
                 "negate_atom" => Some(self.builder.build(StatementKind::UnaryOperation {
                     kind: UnaryOperationKind::Negate,
                     value: args[0].clone(),
@@ -697,17 +720,44 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
+                // val ceil : (%real) -> %i
+                "ceil" => {
+                    let ceil = self.builder.build(StatementKind::UnaryOperation {
+                        kind: UnaryOperationKind::Ceil,
+                        value: args[0].clone(),
+                    });
+                    Some(
+                        self.builder
+                            .generate_cast(ceil, Arc::new(Type::ArbitraryLengthInteger)),
+                    )
+                }
+
+                // val floor : (%real) -> %i
+                "floor" => {
+                    let floor = self.builder.build(StatementKind::UnaryOperation {
+                        kind: UnaryOperationKind::Floor,
+                        value: args[0].clone(),
+                    });
+                    Some(
+                        self.builder
+                            .generate_cast(floor, Arc::new(Type::ArbitraryLengthInteger)),
+                    )
+                }
+
                 // val to_real : (%i) -> %real
                 "to_real" => Some(
                     self.builder
                         .generate_cast(args[0].clone(), Arc::new(Type::f64())),
                 ),
 
-                "pow2" => Some(self.builder.build(StatementKind::UnaryOperation {
-                    kind: UnaryOperationKind::Power2,
-                    value: args[0].clone(),
-                })),
-                "lt_int" => Some(self.builder.build(StatementKind::BinaryOperation {
+                "pow2" | "_builtin_pow2" => {
+                    Some(self.builder.build(StatementKind::UnaryOperation {
+                        kind: UnaryOperationKind::Power2,
+                        value: args[0].clone(),
+                    }))
+                }
+
+                "lt_int" | "lt_real" => Some(self.builder.build(StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::CompareLessThan,
                     lhs: args[0].clone(),
                     rhs: args[1].clone(),
@@ -871,7 +921,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 // %bv -> %i
-                "UInt0" | "unsigned" => {
+                "UInt0" | "unsigned" | "_builtin_unsigned" => {
                     // just copy bits
 
                     Some(self.builder.build(StatementKind::Cast {
@@ -1067,6 +1117,22 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "bitvector_concat" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
+
+                // val set_slice_int : (%i, %i, %i, %bv) -> %i
+                "set_slice_int" => {
+                    // const sail_int len, const sail_int n, const sail_int start, const lbits slice
+                    let len = args[0].clone();
+                    let n = args[1].clone();
+                    let start = args[2].clone();
+                    let slice = args[3].clone();
+
+                    // destination[start..] = source[0..source.len()]
+                    // todo: check correctness and write some unit tests for this
+
+                    Some(self.generate_set_slice(n, slice, len, start))
+                }
+
+                //val get_slice_int : (%i, %i, %i) -> %bv
                 "get_slice_int" => {
                     let extract = self.builder.build(StatementKind::BitExtract {
                         value: args[1].clone(),
@@ -1086,8 +1152,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     )
                 }
 
+                // val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv
                 "set_slice_bits" => {
-                    //val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv
                     // len, slen, x, pos, y
                     let _len = args[0].clone();
                     let slen = args[1].clone();
@@ -1640,6 +1706,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     /// Copies source[0..source_length] into dest[start..start + source_length]
+    /// Output statement type should be same as destination
     fn generate_set_slice(
         &mut self,
         destination: Statement,
