@@ -511,6 +511,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
 
             let mut dependencies = cfg.get_callees_for(&name);
             dependencies.push("common".into());
+           let dependencies = dependencies.into_iter().filter(|dep| *dep != name).collect::<Vec<_>>();
 
             let imports: TokenStream = dependencies
                 .iter()

@@ -70,8 +70,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                     quote!(#v)
                 }
                 ConstantValue::FloatingPoint(v) => {
-                    let v = Literal::f64_unsuffixed(v);
-                    quote!(#v)
+                    if v.is_infinite() {
+                        quote!(1.1 / 0.0)
+                    } else {
+                        let v = Literal::f32_unsuffixed(v);
+                        quote!(#v)
+                    }
                 }
 
                 ConstantValue::Unit => quote!(()),
@@ -244,6 +248,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 BinaryOperationKind::CompareLessThanOrEqual => quote! { (#left) <= (#right) },
                 BinaryOperationKind::CompareGreaterThan => quote! { (#left) > (#right) },
                 BinaryOperationKind::CompareGreaterThanOrEqual => quote! { (#left) >= (#right) },
+                BinaryOperationKind::PowI => quote! { (#left).powi(#right) },
             };
 
             quote! { (#op) }
@@ -259,6 +264,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 UnaryOperationKind::Absolute => quote! { (#value).abs() },
                 UnaryOperationKind::Ceil => quote! { (#value).ceil() },
                 UnaryOperationKind::Floor => quote! { (#value).floor() },
+                UnaryOperationKind::SquareRoot => quote! { (#value).sqrt() },
             }
         }
         StatementKind::ShiftOperation {

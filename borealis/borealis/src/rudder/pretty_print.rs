@@ -108,6 +108,7 @@ impl Display for StatementKind {
                     BinaryOperationKind::And => "and",
                     BinaryOperationKind::Or => "or",
                     BinaryOperationKind::Xor => "xor",
+                    BinaryOperationKind::PowI => "powi",
                 };
 
                 write!(f, "{} {} {}", op, lhs.name(), rhs.name())
@@ -121,6 +122,7 @@ impl Display for StatementKind {
                     UnaryOperationKind::Absolute => "abs",
                     UnaryOperationKind::Ceil => "ceil",
                     UnaryOperationKind::Floor => "floor",
+                    UnaryOperationKind::SquareRoot => "sqrt",
                 };
 
                 write!(f, "{} {}", op, value.name())

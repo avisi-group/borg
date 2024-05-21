@@ -47,6 +47,7 @@ fn run_on_stmt(stmt: Statement) -> bool {
                     BinaryOperationKind::And => todo!(),
                     BinaryOperationKind::Or => todo!(),
                     BinaryOperationKind::Xor => todo!(),
+                    BinaryOperationKind::PowI => lhs.powi(rhs),
                     BinaryOperationKind::CompareEqual => {
                         ConstantValue::UnsignedInteger((lhs == rhs) as usize)
                     }
@@ -224,7 +225,7 @@ fn cast_integer(value: ConstantValue, typ: Arc<Type>) -> ConstantValue {
                 ConstantValue::UnsignedInteger(i)
             }
             (PrimitiveTypeClass::FloatingPoint, ConstantValue::SignedInteger(s)) => {
-                ConstantValue::FloatingPoint(f64::try_from(i32::try_from(s).unwrap()).unwrap())
+                ConstantValue::FloatingPoint(f32::try_from(i16::try_from(s).unwrap()).unwrap())
             }
             (tc, cv) => {
                 panic!("incompatible type class {tc:?} and constant value {cv:?}")

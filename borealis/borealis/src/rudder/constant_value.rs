@@ -10,7 +10,7 @@ use {
 pub enum ConstantValue {
     UnsignedInteger(usize),
     SignedInteger(isize),
-    FloatingPoint(f64),
+    FloatingPoint(f32),
     String(InternedString),
     Unit,
 }
@@ -46,6 +46,25 @@ impl ConstantValue {
             ConstantValue::SignedInteger(_) => true,
             _ => false,
         }
+    }
+
+    pub fn powi(&self, i: ConstantValue) -> ConstantValue {
+        let ConstantValue::FloatingPoint(f) = self else {
+            panic!();
+        };
+
+        let ConstantValue::SignedInteger(i) = i else {
+            panic!();
+        };
+
+        let result = f.powi(i32::try_from(i).unwrap());
+
+        // some sail source does actually want infinite/NaNs
+        // if !result.is_finite() {
+        //     panic!("got non-finite result {result} from {f}.powi({i})");
+        // }
+
+        ConstantValue::FloatingPoint(result)
     }
 }
 

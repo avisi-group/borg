@@ -246,6 +246,7 @@ pub enum BinaryOperationKind {
     And,
     Or,
     Xor,
+    PowI,
     CompareEqual,
     CompareNotEqual,
     CompareLessThan,
@@ -263,6 +264,7 @@ pub enum UnaryOperationKind {
     Absolute,
     Ceil,
     Floor,
+    SquareRoot,
 }
 
 #[derive(Debug, Clone)]
@@ -1236,9 +1238,7 @@ impl StatementBuilder {
                             PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
                             PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
                             PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
-                            PrimitiveTypeClass::FloatingPoint => {
-                                panic!("cannot cast floating point")
-                            }
+                            PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
                         };
 
                         self.build(StatementKind::Cast {

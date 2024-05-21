@@ -216,8 +216,7 @@ impl BuildContext {
             boom::Type::String => Arc::new(rudder::Type::String),
             // value
             boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
-            boom::Type::Real => Arc::new(rudder::Type::f32()),
-            boom::Type::Float => Arc::new(rudder::Type::f64()),
+            boom::Type::Real | boom::Type::Float => Arc::new(rudder::Type::f32()),
             boom::Type::Constant(_) => todo!(),
             boom::Type::Enum { name, .. } => self.enums.get(name).unwrap().0.clone(),
             boom::Type::Union { name, .. } => self.unions.get(name).unwrap().0.clone(),
@@ -646,7 +645,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "sub_bits" | "sub_atom" => {
+                "sub_bits" | "sub_atom" | "sub_real" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
                         lhs: args[0].clone(),
@@ -678,14 +677,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "negate_atom" => Some(self.builder.build(StatementKind::UnaryOperation {
-                    kind: UnaryOperationKind::Negate,
-                    value: args[0].clone(),
-                })),
-                "abs_int_atom" => Some(self.builder.build(StatementKind::UnaryOperation {
-                    kind: UnaryOperationKind::Absolute,
-                    value: args[0].clone(),
-                })),
+                "negate_atom" | "neg_real" => {
+                    Some(self.builder.build(StatementKind::UnaryOperation {
+                        kind: UnaryOperationKind::Negate,
+                        value: args[0].clone(),
+                    }))
+                }
+                "abs_int_atom" | "abs_real" => {
+                    Some(self.builder.build(StatementKind::UnaryOperation {
+                        kind: UnaryOperationKind::Absolute,
+                        value: args[0].clone(),
+                    }))
+                }
                 "min_int" => {
                     let true_value = args[0].clone();
                     let false_value = args[1].clone();
@@ -747,7 +750,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val to_real : (%i) -> %real
                 "to_real" => Some(
                     self.builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::f64())),
+                        .generate_cast(args[0].clone(), Arc::new(Type::f32())),
                 ),
 
                 "pow2" | "_builtin_pow2" => {
@@ -756,6 +759,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         value: args[0].clone(),
                     }))
                 }
+
+                // val pow_real : (%real, %i) -> %real
+                "pow_real" => {
+                    // cast args[1] to i32, todo: move this to codegen cause it's a rust thing
+                    let i = self
+                        .builder
+                        .generate_cast(args[1].clone(), Arc::new(Type::s32()));
+
+                    Some(self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::PowI,
+                        lhs: args[0].clone(),
+                        rhs: i,
+                    }))
+                }
+
+                "sqrt" => Some(self.builder.build(StatementKind::UnaryOperation {
+                    kind: UnaryOperationKind::SquareRoot,
+                    value: args[0].clone(),
+                })),
 
                 "lt_int" | "lt_real" => Some(self.builder.build(StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::CompareLessThan,
@@ -767,16 +789,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     lhs: args[0].clone(),
                     rhs: args[1].clone(),
                 })),
-                "gt_int" => Some(self.builder.build(StatementKind::BinaryOperation {
+                "gt_int" | "gt_real" => Some(self.builder.build(StatementKind::BinaryOperation {
                     kind: BinaryOperationKind::CompareGreaterThan,
                     lhs: args[0].clone(),
                     rhs: args[1].clone(),
                 })),
-                "gteq_int" => Some(self.builder.build(StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::CompareGreaterThanOrEqual,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                })),
+                "gteq_int" | "gteq_real" => {
+                    Some(self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::CompareGreaterThanOrEqual,
+                        lhs: args[0].clone(),
+                        rhs: args[1].clone(),
+                    }))
+                }
                 "not_vec" | "not_bool" => Some(self.builder.build(StatementKind::UnaryOperation {
                     kind: rudder::UnaryOperationKind::Not,
                     value: args[0].clone(),
@@ -1254,6 +1278,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     value: ConstantValue::String("decstr not implemented".into()),
                 })),
 
+                "sail_take_exception" => Some(self.builder.build(StatementKind::Panic(vec![]))),
+
                 "print_endline"
                 | "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"
@@ -1265,7 +1291,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "prerr_bits"
                 | "prerr_int"
                 | "write_tag#"
-                | "sail_cache_op" => Some(self.builder.build(StatementKind::Constant {
+                | "sail_cache_op"
+                | "sail_barrier"
+                | "__WakeupRequest" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),
