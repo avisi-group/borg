@@ -1273,15 +1273,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // ignore
                 "append_str" | "__monomorphize" => Some(args[0].clone()),
 
-                "DecStr" => Some(self.builder.build(StatementKind::Constant {
+                "DecStr" | "bits_str" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(rudder::Type::String),
-                    value: ConstantValue::String("decstr not implemented".into()),
+                    value: ConstantValue::String("fix me in build_specialized_function".into()),
                 })),
 
                 "sail_take_exception" => Some(self.builder.build(StatementKind::Panic(vec![]))),
 
-                "print_endline"
-                | "AArch64_DC"
+                "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"
                 | "execute_aarch64_instrs_system_barriers_dsb"
                 | "execute_aarch64_instrs_system_barriers_isb"
@@ -1293,7 +1292,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "write_tag#"
                 | "sail_cache_op"
                 | "sail_barrier"
-                | "__WakeupRequest" => Some(self.builder.build(StatementKind::Constant {
+                | "__WakeupRequest"
+                | "print"
+                | "print_endline" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),
