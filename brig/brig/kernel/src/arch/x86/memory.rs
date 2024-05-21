@@ -141,7 +141,7 @@ impl VirtualMemoryArea {
     pub fn translate_address(&self, addr: VirtAddr) -> Option<PhysAddr> {
         let r = self.opt.translate_addr(addr);
 
-        log::trace!("translating {:x} to {:?}", addr, r);
+        //log::trace!("translating {:x} to {:?}", addr, r);
 
         r
     }

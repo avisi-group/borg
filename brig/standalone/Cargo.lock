@@ -927,6 +927,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "AArch32_FPTrappedException"
+version = "0.0.0"
+dependencies = [
+ "AArch32_GeneralExceptionsToAArch64",
+ "AArch32_TakeUndefInstrException",
+ "AArch64_FPTrappedException",
+ "FPEXC_read",
+ "FPEXC_write",
+ "Mk_FPEXC_Type",
+ "common",
+ "log",
+ "micromath",
+ "u_update_FPEXC_Type_DEX",
+ "u_update_FPEXC_Type_TFV",
+]
+
+[[package]]
 name = "AArch32_FaultSyndrome"
 version = "0.0.0"
 dependencies = [
@@ -946,6 +963,18 @@ dependencies = [
  "micromath",
  "u__IMPDEF_boolean",
  "u__UNKNOWN_bit",
+]
+
+[[package]]
+name = "AArch32_GeneralExceptionsToAArch64"
+version = "0.0.0"
+dependencies = [
+ "EL2Enabled",
+ "ELUsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_HCR_EL2_Type_TGE",
 ]
 
 [[package]]
@@ -2417,6 +2446,33 @@ dependencies = [
  "u_get_SCTLR_Type_EE",
  "u_get_SCTLR_Type_TE",
  "u_update_FPEXC_Type_EN",
+]
+
+[[package]]
+name = "AArch32_TakeUndefInstrException"
+version = "0.0.0"
+dependencies = [
+ "AArch32_TakeUndefInstrException__1",
+ "ExceptionSyndrome",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "AArch32_TakeUndefInstrException__1"
+version = "0.0.0"
+dependencies = [
+ "AArch32_EnterHypMode",
+ "AArch32_EnterMode",
+ "CurrentInstrSet",
+ "EL2Enabled",
+ "HCR_read",
+ "ThisInstrAddr",
+ "common",
+ "log",
+ "micromath",
+ "u_get_HCR_Type_TGE",
 ]
 
 [[package]]
@@ -5446,6 +5502,23 @@ dependencies = [
  "common",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "AArch64_FPTrappedException"
+version = "0.0.0"
+dependencies = [
+ "AArch64_TakeException",
+ "Bit",
+ "EL2Enabled",
+ "ExceptionSyndrome",
+ "ThisInstrAddr",
+ "common",
+ "log",
+ "micromath",
+ "u__IMPDEF_boolean",
+ "u__UNKNOWN_bits",
+ "u_get_HCR_EL2_Type_TGE",
 ]
 
 [[package]]
@@ -13430,7 +13503,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ActionRequired"
+name = "AccessDescriptor_to_Access_kind"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -13439,9 +13512,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "ActionRequired"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__UNKNOWN_boolean",
+]
+
+[[package]]
 name = "ActivePredicateElement"
 version = "0.0.0"
 dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "AddGCSExRecord"
+version = "0.0.0"
+dependencies = [
+ "CreateAccDescGCS",
+ "GetCurrentGCSPointer",
+ "Mem_set",
+ "SetCurrentGCSPointer",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -13630,15 +13727,21 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
 name = "AdvSIMDExpandImm"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "ReservedEncoding",
+ "UsingAArch32",
+ "Zeros",
  "common",
  "log",
  "micromath",
+ "replicate_bits_borealis_internal",
 ]
 
 [[package]]
@@ -13870,6 +13973,7 @@ dependencies = [
 name = "BFAdd"
 version = "0.0.0"
 dependencies = [
+ "BFAdd__1",
  "common",
  "log",
  "micromath",
@@ -13879,6 +13983,26 @@ dependencies = [
 name = "BFAdd_ZA"
 version = "0.0.0"
 dependencies = [
+ "BFAdd__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "BFAdd__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs__1",
+ "FPRoundBF",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -13888,6 +14012,23 @@ dependencies = [
 name = "BFDotAdd"
 version = "0.0.0"
 dependencies = [
+ "BFMulH",
+ "FPAdd_BF16",
+ "FPAdd__1",
+ "FPDot__1",
+ "HaveEBF16",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_EBF",
+]
+
+[[package]]
+name = "BFInfinity"
+version = "0.0.0"
+dependencies = [
+ "Ones",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -13897,6 +14038,10 @@ dependencies = [
 name = "BFMatMulAdd"
 version = "0.0.0"
 dependencies = [
+ "BFDotAdd",
+ "Elem_read",
+ "Elem_set",
+ "FPCR_read",
  "common",
  "log",
  "micromath",
@@ -13906,15 +14051,44 @@ dependencies = [
 name = "BFMax"
 version = "0.0.0"
 dependencies = [
+ "BFMax__1",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "BFMaxNum"
 version = "0.0.0"
 dependencies = [
+ "BFInfinity",
+ "BFMax__1",
+ "FPUnpackBase__1",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "BFMax__1"
+version = "0.0.0"
+dependencies = [
+ "BFZero",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs",
+ "FPRoundBF",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -13924,15 +14098,44 @@ dependencies = [
 name = "BFMin"
 version = "0.0.0"
 dependencies = [
+ "BFMin__1",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "BFMinNum"
 version = "0.0.0"
 dependencies = [
+ "BFInfinity",
+ "BFMin__1",
+ "FPUnpackBase__1",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "BFMin__1"
+version = "0.0.0"
+dependencies = [
+ "BFZero",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs",
+ "FPRoundBF",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -13942,6 +14145,7 @@ dependencies = [
 name = "BFMul"
 version = "0.0.0"
 dependencies = [
+ "BFMul__1",
  "common",
  "log",
  "micromath",
@@ -13951,6 +14155,7 @@ dependencies = [
 name = "BFMulAdd"
 version = "0.0.0"
 dependencies = [
+ "BFMulAdd__1",
  "common",
  "log",
  "micromath",
@@ -13960,15 +14165,21 @@ dependencies = [
 name = "BFMulAddH"
 version = "0.0.0"
 dependencies = [
+ "FPMulAdd__1",
+ "HaveAltFP",
+ "Zeros",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "BFMulAddH_ZA"
 version = "0.0.0"
 dependencies = [
+ "FPMulAdd_ZA",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -13978,6 +14189,63 @@ dependencies = [
 name = "BFMulAdd_ZA"
 version = "0.0.0"
 dependencies = [
+ "BFMulAdd__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "BFMulAdd__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms3",
+ "FPProcessException",
+ "FPProcessNaNs3__1",
+ "FPRoundBF",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "UsingAArch32",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "BFMulH"
+version = "0.0.0"
+dependencies = [
+ "BFRound",
+ "BFUnpack",
+ "FPCR_read",
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPZero",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "BFMul__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs__1",
+ "FPRoundBF",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -13987,6 +14255,7 @@ dependencies = [
 name = "BFNeg"
 version = "0.0.0"
 dependencies = [
+ "BFNeg__1",
  "common",
  "log",
  "micromath",
@@ -13996,7 +14265,25 @@ dependencies = [
 name = "BFNeg__1"
 version = "0.0.0"
 dependencies = [
+ "FPCR_read",
+ "FPUnpackBase__1",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "BFRound"
+version = "0.0.0"
+dependencies = [
+ "FPInfinity",
+ "FPZero",
+ "common",
+ "integer_subrange",
+ "integer_update_subrange",
  "log",
  "micromath",
 ]
@@ -14005,6 +14292,7 @@ dependencies = [
 name = "BFSub"
 version = "0.0.0"
 dependencies = [
+ "BFSub__1",
  "common",
  "log",
  "micromath",
@@ -14014,6 +14302,48 @@ dependencies = [
 name = "BFSub_ZA"
 version = "0.0.0"
 dependencies = [
+ "BFSub__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "BFSub__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs__1",
+ "FPRoundBF",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "BFUnpack"
+version = "0.0.0"
+dependencies = [
+ "IsOnes",
+ "IsZero",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "BFZero"
+version = "0.0.0"
+dependencies = [
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -16842,6 +17172,7 @@ dependencies = [
 name = "BadMode"
 version = "0.0.0"
 dependencies = [
+ "HaveAArch32EL",
  "common",
  "log",
  "micromath",
@@ -16884,33 +17215,42 @@ dependencies = [
 name = "BitDeposit"
 version = "0.0.0"
 dependencies = [
+ "Bit",
+ "Zeros",
  "common",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
 name = "BitExtract"
 version = "0.0.0"
 dependencies = [
+ "Bit",
+ "Zeros",
  "common",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
 name = "BitGroup"
 version = "0.0.0"
 dependencies = [
+ "Bit",
  "common",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
 name = "BitReverse"
 version = "0.0.0"
 dependencies = [
+ "Bit",
  "common",
  "log",
  "micromath",
@@ -19006,6 +19346,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__IMPDEF_boolean",
 ]
 
 [[package]]
@@ -19015,6 +19356,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__IMPDEF_boolean",
 ]
 
 [[package]]
@@ -19126,6 +19468,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "CTI_SignalEvent"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "CTR_EL0_SysRegRead_17103694dd49566e"
 version = "0.0.0"
 dependencies = [
@@ -19169,6 +19520,7 @@ name = "CacheConfigRead"
 version = "0.0.0"
 dependencies = [
  "common",
+ "getCacheID",
  "log",
  "micromath",
 ]
@@ -19191,6 +19543,7 @@ dependencies = [
 name = "CeilPow2"
 version = "0.0.0"
 dependencies = [
+ "FloorPow2",
  "common",
  "log",
  "micromath",
@@ -19226,6 +19579,21 @@ name = "CheckFPEnabled64"
 version = "0.0.0"
 dependencies = [
  "AArch64_CheckFPEnabled",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "CheckGCSExRecord"
+version = "0.0.0"
+dependencies = [
+ "CreateAccDescGCS",
+ "GCSDataCheckException",
+ "GetCurrentGCSPointer",
+ "Mem_read",
+ "SetCurrentGCSPointer",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -19942,6 +20310,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "CreateAccDescGCSSS1"
+version = "0.0.0"
+dependencies = [
+ "NewAccDesc",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "CreateAccDescGPR"
 version = "0.0.0"
 dependencies = [
@@ -20185,12 +20563,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "CurrentNSVL_read"
+name = "CurrentInstrSet"
 version = "0.0.0"
 dependencies = [
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "CurrentNSVL_read"
+version = "0.0.0"
+dependencies = [
+ "EL2Enabled",
+ "ImplementedSVEVectorLength",
+ "IsInHost",
+ "common",
+ "log",
+ "micromath",
+ "u_get_ZCR_EL1_Type_LEN",
+ "u_get_ZCR_EL2_Type_LEN",
+ "u_get_ZCR_EL3_Type_LEN",
 ]
 
 [[package]]
@@ -25506,6 +25900,7 @@ dependencies = [
 name = "DecodeLDFAttr"
 version = "0.0.0"
 dependencies = [
+ "Unreachable",
  "common",
  "log",
  "micromath",
@@ -25545,7 +25940,11 @@ dependencies = [
 name = "DecodePredCount"
 version = "0.0.0"
 dependencies = [
+ "CurrentVL_read",
+ "FloorPow2",
  "common",
+ "fdiv_int",
+ "fmod_int",
  "log",
  "micromath",
 ]
@@ -25572,6 +25971,7 @@ dependencies = [
 name = "DecodeShareability"
 version = "0.0.0"
 dependencies = [
+ "ConstrainUnpredictable",
  "common",
  "log",
  "micromath",
@@ -25588,6 +25988,15 @@ dependencies = [
 
 [[package]]
 name = "DefaultMPAMinfo"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "DiscardTransactionalWrites"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -25744,9 +26153,15 @@ dependencies = [
 name = "ELIsInHost"
 version = "0.0.0"
 dependencies = [
+ "EL2Enabled",
+ "ELUsingAArch32",
+ "HaveVirtHostExt",
+ "Unreachable",
  "common",
  "log",
  "micromath",
+ "u_get_HCR_EL2_Type_E2H",
+ "u_get_HCR_EL2_Type_TGE",
 ]
 
 [[package]]
@@ -26725,9 +27140,17 @@ dependencies = [
 name = "EffectiveMDSELR_EL1_BANK"
 version = "0.0.0"
 dependencies = [
+ "ConstrainUnpredictableBits",
+ "EL2Enabled",
+ "NumBreakpointsImplemented",
+ "NumWatchpointsImplemented",
  "common",
  "log",
  "micromath",
+ "u_get_MDCR_EL2_Type_EBWE",
+ "u_get_MDCR_EL3_Type_EBWE",
+ "u_get_MDSCR_EL1_Type_EMBWE",
+ "u_get_MDSELR_EL1_Type_BANK",
 ]
 
 [[package]]
@@ -26897,6 +27320,10 @@ dependencies = [
 name = "EncodePARAttrs"
 version = "0.0.0"
 dependencies = [
+ "Bit",
+ "HaveMTEExt",
+ "HaveMTEPermExt",
+ "Unreachable",
  "common",
  "log",
  "micromath",
@@ -26929,6 +27356,7 @@ dependencies = [
 name = "EncodeSDFSC"
 version = "0.0.0"
 dependencies = [
+ "Unreachable",
  "common",
  "log",
  "micromath",
@@ -26970,6 +27398,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
@@ -26979,15 +27408,21 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
 name = "ExcVectorBase"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "SCTLR_read__2",
+ "VBAR_read__2",
+ "Zeros",
  "common",
  "log",
  "micromath",
+ "u_get_SCTLR_Type_V",
 ]
 
 [[package]]
@@ -27016,9 +27451,21 @@ dependencies = [
 name = "ExtAbortToA64"
 version = "0.0.0"
 dependencies = [
+ "EL2Enabled",
+ "ELUsingAArch32",
+ "HaveRASExt",
+ "IsDebugException",
+ "IsExternalAbort__1",
+ "IsExternalSyncAbort",
+ "IsSecondStage",
+ "SCR_GEN_read",
  "common",
  "log",
  "micromath",
+ "u_get_HCR_EL2_Type_TEA",
+ "u_get_HCR_EL2_Type_TGE",
+ "u_get_MDCR_EL2_Type_TDE",
+ "u_get_SCRType_EA",
 ]
 
 [[package]]
@@ -27344,15 +27791,36 @@ dependencies = [
 name = "FPAbs"
 version = "0.0.0"
 dependencies = [
+ "FPCR_read",
+ "FPUnpack__1",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPAdd"
 version = "0.0.0"
 dependencies = [
+ "FPAdd__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPAdd_BF16"
+version = "0.0.0"
+dependencies = [
+ "BFRound",
+ "BFUnpack",
+ "FPCR_read",
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27362,6 +27830,25 @@ dependencies = [
 name = "FPAdd_ZA"
 version = "0.0.0"
 dependencies = [
+ "FPAdd__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPAdd__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs__1",
+ "FPRound__2",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27429,6 +27916,9 @@ dependencies = [
 name = "FPCompare"
 version = "0.0.0"
 dependencies = [
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPUnpack",
  "common",
  "log",
  "micromath",
@@ -27438,6 +27928,9 @@ dependencies = [
 name = "FPCompareEQ"
 version = "0.0.0"
 dependencies = [
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPUnpack",
  "common",
  "log",
  "micromath",
@@ -27447,6 +27940,9 @@ dependencies = [
 name = "FPCompareGE"
 version = "0.0.0"
 dependencies = [
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPUnpack",
  "common",
  "log",
  "micromath",
@@ -27456,6 +27952,9 @@ dependencies = [
 name = "FPCompareGT"
 version = "0.0.0"
 dependencies = [
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPUnpack",
  "common",
  "log",
  "micromath",
@@ -27465,6 +27964,9 @@ dependencies = [
 name = "FPCompareNE"
 version = "0.0.0"
 dependencies = [
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPUnpack",
  "common",
  "log",
  "micromath",
@@ -27474,6 +27976,9 @@ dependencies = [
 name = "FPCompareUN"
 version = "0.0.0"
 dependencies = [
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPUnpack",
  "common",
  "log",
  "micromath",
@@ -27483,15 +27988,59 @@ dependencies = [
 name = "FPConvert"
 version = "0.0.0"
 dependencies = [
+ "FPConvertNaN",
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorm",
+ "FPProcessException",
+ "FPRoundCV",
+ "FPUnpackCV",
+ "FPZero",
+ "Ones",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AHP",
+ "u_get_FPCRType_DN",
+]
+
+[[package]]
+name = "FPConvertBF"
+version = "0.0.0"
+dependencies = [
+ "FPConvertNaN",
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessException",
+ "FPRoundBF",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+ "u_get_FPCRType_DN",
 ]
 
 [[package]]
 name = "FPConvertBF__1"
 version = "0.0.0"
 dependencies = [
+ "FPConvertBF",
+ "FPRoundingMode",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPConvertNaN"
+version = "0.0.0"
+dependencies = [
+ "Ones",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -27501,6 +28050,7 @@ dependencies = [
 name = "FPConvertSVE"
 version = "0.0.0"
 dependencies = [
+ "FPConvert",
  "common",
  "log",
  "micromath",
@@ -27510,6 +28060,8 @@ dependencies = [
 name = "FPConvertSVE__1"
 version = "0.0.0"
 dependencies = [
+ "FPConvert",
+ "FPRoundingMode",
  "common",
  "log",
  "micromath",
@@ -27519,6 +28071,8 @@ dependencies = [
 name = "FPConvert__1"
 version = "0.0.0"
 dependencies = [
+ "FPConvert",
+ "FPRoundingMode",
  "common",
  "log",
  "micromath",
@@ -27537,15 +28091,39 @@ dependencies = [
 name = "FPDefaultNaN"
 version = "0.0.0"
 dependencies = [
+ "FPCR_read",
+ "FPDefaultNaN__1",
  "common",
  "log",
  "micromath",
 ]
 
 [[package]]
+name = "FPDefaultNaN__1"
+version = "0.0.0"
+dependencies = [
+ "HaveAltFP",
+ "Ones",
+ "UsingAArch32",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
 name = "FPDiv"
 version = "0.0.0"
 dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs",
+ "FPRound",
+ "FPUnpack",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27555,6 +28133,8 @@ dependencies = [
 name = "FPDotAdd"
 version = "0.0.0"
 dependencies = [
+ "FPAdd__1",
+ "FPDot__1",
  "common",
  "log",
  "micromath",
@@ -27564,9 +28144,29 @@ dependencies = [
 name = "FPDotAdd_ZA"
 version = "0.0.0"
 dependencies = [
+ "FPAdd__1",
+ "FPDot__1",
  "common",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "FPDot__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessException",
+ "FPProcessNaNs4",
+ "FPRound__2",
+ "FPRoundingMode",
+ "FPUnpackBase__1",
+ "FPZero",
+ "common",
+ "log",
+ "micromath",
+ "u__id",
 ]
 
 [[package]]
@@ -27638,7 +28238,18 @@ dependencies = [
 name = "FPExpA"
 version = "0.0.0"
 dependencies = [
+ "FPExpCoefficient_read",
  "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPExpCoefficient_read"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "integer_subrange",
  "log",
  "micromath",
 ]
@@ -27647,6 +28258,8 @@ dependencies = [
 name = "FPInfinity"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -27656,7 +28269,11 @@ dependencies = [
 name = "FPLogB"
 version = "0.0.0"
 dependencies = [
+ "FPProcessDenorm",
+ "FPProcessException",
+ "FPUnpack",
  "common",
+ "integer_subrange",
  "log",
  "micromath",
 ]
@@ -27665,24 +28282,68 @@ dependencies = [
 name = "FPMatMulAdd"
 version = "0.0.0"
 dependencies = [
+ "Elem_read",
+ "Elem_set",
+ "FPAdd",
+ "FPMul",
  "common",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
 name = "FPMax"
 version = "0.0.0"
 dependencies = [
+ "FPMax__1",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPMaxNormal"
+version = "0.0.0"
+dependencies = [
+ "Ones",
+ "common",
+ "log",
+ "micromath",
+ "slice_mask",
+ "u__id",
 ]
 
 [[package]]
 name = "FPMaxNum"
 version = "0.0.0"
 dependencies = [
+ "FPInfinity",
+ "FPMax__1",
+ "FPUnpack",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPMax__1"
+version = "0.0.0"
+dependencies = [
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs",
+ "FPRound__2",
+ "FPRoundingMode",
+ "FPUnpack",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27692,15 +28353,42 @@ dependencies = [
 name = "FPMin"
 version = "0.0.0"
 dependencies = [
+ "FPMin__1",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPMinNum"
 version = "0.0.0"
 dependencies = [
+ "FPInfinity",
+ "FPMin__1",
+ "FPUnpack",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPMin__1"
+version = "0.0.0"
+dependencies = [
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs",
+ "FPRound__2",
+ "FPRoundingMode",
+ "FPUnpack",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27710,6 +28398,14 @@ dependencies = [
 name = "FPMul"
 version = "0.0.0"
 dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs",
+ "FPRound",
+ "FPUnpack",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27719,6 +28415,7 @@ dependencies = [
 name = "FPMulAdd"
 version = "0.0.0"
 dependencies = [
+ "FPMulAdd__1",
  "common",
  "log",
  "micromath",
@@ -27728,6 +28425,7 @@ dependencies = [
 name = "FPMulAddH"
 version = "0.0.0"
 dependencies = [
+ "FPMulAddH__1",
  "common",
  "log",
  "micromath",
@@ -27737,24 +28435,75 @@ dependencies = [
 name = "FPMulAddH_ZA"
 version = "0.0.0"
 dependencies = [
+ "FPMulAddH__1",
  "common",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "FPMulAddH__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorm",
+ "FPProcessException",
+ "FPProcessNaNs3H",
+ "FPRound__2",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPMulAdd_ZA"
 version = "0.0.0"
 dependencies = [
+ "FPMulAdd__1",
  "common",
  "log",
  "micromath",
 ]
 
 [[package]]
+name = "FPMulAdd__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms3",
+ "FPProcessException",
+ "FPProcessNaNs3__1",
+ "FPRound__2",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
 name = "FPMulX"
 version = "0.0.0"
 dependencies = [
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessNaNs",
+ "FPRound",
+ "FPTwo",
+ "FPUnpack",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27764,15 +28513,22 @@ dependencies = [
 name = "FPNeg"
 version = "0.0.0"
 dependencies = [
+ "FPCR_read",
+ "FPUnpack__1",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPOne"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -27782,6 +28538,8 @@ dependencies = [
 name = "FPOnePointFive"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -27791,27 +28549,187 @@ dependencies = [
 name = "FPPointFive"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "Zeros",
  "common",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "FPProcessDenorm"
+version = "0.0.0"
+dependencies = [
+ "FPProcessException",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "neq_int",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPProcessDenorms"
+version = "0.0.0"
+dependencies = [
+ "FPProcessException",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "neq_int",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPProcessDenorms3"
+version = "0.0.0"
+dependencies = [
+ "FPProcessException",
+ "HaveAltFP",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "neq_int",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPProcessException"
+version = "0.0.0"
+dependencies = [
+ "AArch32_FPTrappedException",
+ "AArch64_FPTrappedException",
+ "Bit",
+ "FPSCR_read__1",
+ "FPSCR_write",
+ "GetAccumulatedFPExceptions",
+ "HaveSME",
+ "IsASEInstruction",
+ "IsFullA64Enabled",
+ "Mk_FPSCR_Type",
+ "SetAccumulatedFPExceptions",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u__IMPDEF_boolean",
+]
+
+[[package]]
+name = "FPProcessNaN"
+version = "0.0.0"
+dependencies = [
+ "FPProcessNaN__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPProcessNaN__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPProcessException",
+ "common",
+ "log",
+ "micromath",
+ "u__id",
+ "u_get_FPCRType_DN",
+]
+
+[[package]]
+name = "FPProcessNaNs"
+version = "0.0.0"
+dependencies = [
+ "FPProcessNaNs__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPProcessNaNs3H"
+version = "0.0.0"
+dependencies = [
+ "FPConvertNaN",
+ "FPProcessNaN__1",
+ "HaveAltFP",
+ "UsingAArch32",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPProcessNaNs3__1"
+version = "0.0.0"
+dependencies = [
+ "FPProcessNaN__1",
+ "HaveAltFP",
+ "UsingAArch32",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPProcessNaNs4"
+version = "0.0.0"
+dependencies = [
+ "FPConvertNaN",
+ "FPProcessNaN__1",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+ "u__id",
 ]
 
 [[package]]
 name = "FPProcessNaNs__1"
 version = "0.0.0"
 dependencies = [
+ "FPProcessNaN__1",
+ "HaveAltFP",
+ "UsingAArch32",
+ "Zeros",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPRSqrtEstimate"
 version = "0.0.0"
 dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessException",
+ "FPProcessNaN__1",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "HaveFeatRPRES",
+ "RecipSqrtEstimate",
+ "UsingAArch32",
  "common",
+ "fdiv_int",
+ "integer_access",
+ "integer_subrange",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
@@ -27838,9 +28756,28 @@ dependencies = [
 name = "FPRecipEstimate"
 version = "0.0.0"
 dependencies = [
+ "FPInfinity",
+ "FPMaxNormal",
+ "FPProcessException",
+ "FPProcessNaN__1",
+ "FPRoundingMode",
+ "FPSCR_read__1",
+ "FPSCR_write",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "HaveFeatRPRES",
+ "RecipEstimate",
+ "UsingAArch32",
  "common",
+ "integer_subrange",
  "log",
  "micromath",
+ "neq_int",
+ "u_get_FPCRType_AH",
+ "u_get_FPCRType_FZ",
+ "u_get_FPCRType_FZ16",
+ "u_update_FPSCR_Type_UFC",
 ]
 
 [[package]]
@@ -27867,6 +28804,78 @@ dependencies = [
 name = "FPRecpX"
 version = "0.0.0"
 dependencies = [
+ "FPProcessNaN__1",
+ "FPUnpack__1",
+ "HaveAltFP",
+ "IsZero",
+ "Ones",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+ "u__id",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPRound"
+version = "0.0.0"
+dependencies = [
+ "FPRound__1",
+ "FPRoundingMode",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPRoundBF"
+version = "0.0.0"
+dependencies = [
+ "FPRoundBase__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPRoundBase__1"
+version = "0.0.0"
+dependencies = [
+ "FPInfinity",
+ "FPMaxNormal",
+ "FPProcessException",
+ "FPSCR_read__1",
+ "FPSCR_write",
+ "FPZero",
+ "HaveAltFP",
+ "InStreamingMode",
+ "IsFullA64Enabled",
+ "Ones",
+ "UsingAArch32",
+ "Zeros",
+ "common",
+ "fdiv_int",
+ "integer_access",
+ "integer_subrange",
+ "integer_update_subrange",
+ "log",
+ "micromath",
+ "neq_int",
+ "u__id",
+ "u_get_FPCRType_AH",
+ "u_get_FPCRType_AHP",
+ "u_get_FPCRType_FZ",
+ "u_get_FPCRType_FZ16",
+ "u_get_FPCRType_UFE",
+ "u_update_FPSCR_Type_UFC",
+]
+
+[[package]]
+name = "FPRoundCV"
+version = "0.0.0"
+dependencies = [
+ "FPRoundBase__1",
  "common",
  "log",
  "micromath",
@@ -27876,15 +28885,45 @@ dependencies = [
 name = "FPRoundInt"
 version = "0.0.0"
 dependencies = [
+ "FPInfinity",
+ "FPProcessException",
+ "FPProcessNaN",
+ "FPRound__1",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "UsingAArch32",
  "common",
+ "integer_access",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPRoundIntN"
 version = "0.0.0"
 dependencies = [
+ "FPProcessException",
+ "FPRound__1",
+ "FPUnpack__1",
+ "FPZero",
+ "HaveAltFP",
+ "UsingAArch32",
+ "Zeros",
+ "common",
+ "integer_access",
+ "integer_subrange",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+]
+
+[[package]]
+name = "FPRound__1"
+version = "0.0.0"
+dependencies = [
+ "FPRound__2",
  "common",
  "log",
  "micromath",
@@ -27894,6 +28933,7 @@ dependencies = [
 name = "FPRound__2"
 version = "0.0.0"
 dependencies = [
+ "FPRoundBase__1",
  "common",
  "log",
  "micromath",
@@ -27903,9 +28943,11 @@ dependencies = [
 name = "FPRoundingMode"
 version = "0.0.0"
 dependencies = [
+ "FPDecodeRounding",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_RMode",
 ]
 
 [[package]]
@@ -27922,6 +28964,7 @@ dependencies = [
 name = "FPSCR_write"
 version = "0.0.0"
 dependencies = [
+ "Bit",
  "common",
  "log",
  "micromath",
@@ -27977,6 +29020,13 @@ dependencies = [
 name = "FPScale"
 version = "0.0.0"
 dependencies = [
+ "FPInfinity",
+ "FPProcessDenorm",
+ "FPProcessNaN",
+ "FPRound",
+ "FPUnpack",
+ "FPZero",
+ "GetOptimizedScale",
  "common",
  "log",
  "micromath",
@@ -27986,6 +29036,14 @@ dependencies = [
 name = "FPSqrt"
 version = "0.0.0"
 dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorm",
+ "FPProcessException",
+ "FPProcessNaN",
+ "FPRound",
+ "FPUnpack",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -27995,6 +29053,7 @@ dependencies = [
 name = "FPSub"
 version = "0.0.0"
 dependencies = [
+ "FPSub__1",
  "common",
  "log",
  "micromath",
@@ -28004,6 +29063,25 @@ dependencies = [
 name = "FPSub_ZA"
 version = "0.0.0"
 dependencies = [
+ "FPSub__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPSub__1"
+version = "0.0.0"
+dependencies = [
+ "FPDefaultNaN__1",
+ "FPInfinity",
+ "FPProcessDenorms",
+ "FPProcessException",
+ "FPProcessNaNs__1",
+ "FPRound__2",
+ "FPRoundingMode",
+ "FPUnpack__1",
+ "FPZero",
  "common",
  "log",
  "micromath",
@@ -28013,25 +29091,52 @@ dependencies = [
 name = "FPToFixed"
 version = "0.0.0"
 dependencies = [
+ "FPProcessException",
+ "FPUnpack__1",
+ "HaveAltFP",
+ "SatQ",
+ "UsingAArch32",
  "common",
+ "integer_access",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPToFixedJS"
 version = "0.0.0"
 dependencies = [
+ "FPProcessException",
+ "FPUnpack__1",
+ "HaveAltFP",
+ "IsZero",
+ "UsingAArch32",
  "common",
+ "integer_subrange",
  "log",
  "micromath",
+ "u_get_FPCRType_AH",
 ]
 
 [[package]]
 name = "FPTrigMAdd"
 version = "0.0.0"
 dependencies = [
+ "FPAbs",
+ "FPMulAdd",
+ "FPTrigMAddCoefficient_read",
  "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPTrigMAddCoefficient_read"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "integer_subrange",
  "log",
  "micromath",
 ]
@@ -28040,6 +29145,9 @@ dependencies = [
 name = "FPTrigSMul"
 version = "0.0.0"
 dependencies = [
+ "Bit",
+ "FPMul",
+ "FPUnpack__1",
  "common",
  "log",
  "micromath",
@@ -28049,6 +29157,8 @@ dependencies = [
 name = "FPTrigSSel"
 version = "0.0.0"
 dependencies = [
+ "FPNeg",
+ "FPOne",
  "common",
  "log",
  "micromath",
@@ -28058,6 +29168,57 @@ dependencies = [
 name = "FPTwo"
 version = "0.0.0"
 dependencies = [
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPUnpack"
+version = "0.0.0"
+dependencies = [
+ "FPUnpackBase",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPUnpackBase"
+version = "0.0.0"
+dependencies = [
+ "FPUnpackBase__1",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FPUnpackBase__1"
+version = "0.0.0"
+dependencies = [
+ "FPProcessException",
+ "HaveAltFP",
+ "IsOnes",
+ "IsZero",
+ "UsingAArch32",
+ "Zeros",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCRType_AH",
+ "u_get_FPCRType_AHP",
+ "u_get_FPCRType_FIZ",
+ "u_get_FPCRType_FZ",
+ "u_get_FPCRType_FZ16",
+]
+
+[[package]]
+name = "FPUnpackCV"
+version = "0.0.0"
+dependencies = [
+ "FPUnpackBase",
  "common",
  "log",
  "micromath",
@@ -28067,6 +29228,7 @@ dependencies = [
 name = "FPUnpack__1"
 version = "0.0.0"
 dependencies = [
+ "FPUnpackBase",
  "common",
  "log",
  "micromath",
@@ -28076,6 +29238,7 @@ dependencies = [
 name = "FPZero"
 version = "0.0.0"
 dependencies = [
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -28085,6 +29248,8 @@ dependencies = [
 name = "FailTransaction"
 version = "0.0.0"
 dependencies = [
+ "FailTransaction__1",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -28094,6 +29259,17 @@ dependencies = [
 name = "FailTransaction__1"
 version = "0.0.0"
 dependencies = [
+ "Bit",
+ "BranchRecordAllowed",
+ "BranchTo",
+ "ClearExclusiveLocal",
+ "DiscardTransactionalWrites",
+ "EndOfInstruction",
+ "HaveBRBExt",
+ "ProcessorID",
+ "RestoreTransactionCheckpoint",
+ "X_set",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -28106,6 +29282,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
@@ -28129,7 +29306,27 @@ dependencies = [
 name = "FilterBranchRecord"
 version = "0.0.0"
 dependencies = [
+ "Unreachable",
  "common",
+ "log",
+ "micromath",
+ "u_get_BRBFCR_EL1_Type_CONDDIR",
+ "u_get_BRBFCR_EL1_Type_DIRCALL",
+ "u_get_BRBFCR_EL1_Type_DIRECT",
+ "u_get_BRBFCR_EL1_Type_EnI",
+ "u_get_BRBFCR_EL1_Type_INDCALL",
+ "u_get_BRBFCR_EL1_Type_INDIRECT",
+ "u_get_BRBFCR_EL1_Type_RTN",
+]
+
+[[package]]
+name = "FirstActive"
+version = "0.0.0"
+dependencies = [
+ "ActivePredicateElement",
+ "PredicateElement",
+ "common",
+ "fdiv_int",
  "log",
  "micromath",
 ]
@@ -28145,6 +29342,18 @@ dependencies = [
 
 [[package]]
 name = "FixedToFP"
+version = "0.0.0"
+dependencies = [
+ "FPRound__1",
+ "FPZero",
+ "asl_Int",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "FloorPow2"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -28456,6 +29665,13 @@ dependencies = [
 name = "GCSPOPCX"
 version = "0.0.0"
 dependencies = [
+ "CheckGCSExRecord",
+ "ELR_read__1",
+ "EndOfInstruction",
+ "GCSEnabled",
+ "GetCurrentEXLOCKEN",
+ "SPSR_read",
+ "X_read",
  "common",
  "log",
  "micromath",
@@ -28483,6 +29699,13 @@ dependencies = [
 name = "GCSPOPM"
 version = "0.0.0"
 dependencies = [
+ "CreateAccDescGCS",
+ "EndOfInstruction",
+ "GCSDataCheckException",
+ "GCSEnabled",
+ "GetCurrentGCSPointer",
+ "Mem_read",
+ "SetCurrentGCSPointer",
  "common",
  "log",
  "micromath",
@@ -28503,6 +29726,14 @@ dependencies = [
 name = "GCSPOPX"
 version = "0.0.0"
 dependencies = [
+ "CreateAccDescGCS",
+ "EndOfInstruction",
+ "GCSDataCheckException",
+ "GCSEnabled",
+ "GetCurrentGCSPointer",
+ "Mem_read",
+ "SetCurrentGCSPointer",
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -28729,6 +29960,9 @@ dependencies = [
 name = "GCSPUSHM"
 version = "0.0.0"
 dependencies = [
+ "AddGCSRecord",
+ "EndOfInstruction",
+ "GCSEnabled",
  "common",
  "log",
  "micromath",
@@ -28759,6 +29993,12 @@ dependencies = [
 name = "GCSPUSHX"
 version = "0.0.0"
 dependencies = [
+ "AddGCSExRecord",
+ "ELR_read__1",
+ "EndOfInstruction",
+ "GCSEnabled",
+ "SPSR_read",
+ "X_read",
  "common",
  "log",
  "micromath",
@@ -28800,6 +30040,13 @@ dependencies = [
 name = "GCSSS1"
 version = "0.0.0"
 dependencies = [
+ "CreateAccDescGCSSS1",
+ "EndOfInstruction",
+ "GCSDataCheckException",
+ "GCSEnabled",
+ "GetCurrentGCSPointer",
+ "MemAtomic",
+ "SetCurrentGCSPointer",
  "common",
  "log",
  "micromath",
@@ -28820,6 +30067,15 @@ dependencies = [
 name = "GCSSS2"
 version = "0.0.0"
 dependencies = [
+ "CreateAccDescGCS",
+ "EndOfInstruction",
+ "GCSDataCheckException",
+ "GCSEnabled",
+ "GCSSynchronizationBarrier",
+ "GetCurrentGCSPointer",
+ "Mem_read",
+ "Mem_set",
+ "SetCurrentGCSPointer",
  "common",
  "log",
  "micromath",
@@ -29043,6 +30299,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_GPTTLBLine",
 ]
 
 [[package]]
@@ -29121,6 +30378,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "GetAccumulatedFPExceptions"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__UNKNOWN_bits",
+]
+
+[[package]]
 name = "GetBRBENumRecords"
 version = "0.0.0"
 dependencies = [
@@ -29164,6 +30431,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_bits",
 ]
 
 [[package]]
@@ -29174,6 +30442,15 @@ dependencies = [
  "log",
  "micromath",
  "u__IMPDEF_integer",
+]
+
+[[package]]
+name = "GetOptimizedScale"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
 ]
 
 [[package]]
@@ -29204,6 +30481,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_FaultRecord",
 ]
 
 [[package]]
@@ -30112,6 +31390,7 @@ dependencies = [
 name = "Halt"
 version = "0.0.0"
 dependencies = [
+ "Halt__1",
  "common",
  "log",
  "micromath",
@@ -30134,9 +31413,39 @@ dependencies = [
 name = "Halt__1"
 version = "0.0.0"
 dependencies = [
+ "CTI_SignalEvent",
+ "ConstrainUnpredictableBool",
+ "CurrentSecurityState",
+ "DLR_write",
+ "DSPSR2_write",
+ "DSPSR_write",
+ "EDSCR_read",
+ "EDSCR_write",
+ "EndOfInstruction",
+ "ExternalRootInvasiveDebugEnabled",
+ "ExternalSecureInvasiveDebugEnabled",
+ "FailTransaction",
+ "GetPSRFromPSTATE",
+ "HaveBTIExt",
+ "HaveRME",
+ "HaveTME",
+ "Havev8p9Debug",
+ "Mk_DSPSR2_Type",
+ "Mk_DSPSR_EL0_Type",
+ "Mk_DSPSR_Type",
+ "StopInstructionPrefetchAndEnableITR",
+ "ThisInstrAddr",
+ "UpdateEDSCRFields",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_bits",
+ "u_update_EDSCR_Type_ITE",
+ "u_update_EDSCR_Type_ITO",
+ "u_update_EDSCR_Type_MA",
+ "u_update_EDSCR_Type_SDD",
+ "u_update_EDSCR_Type_STATUS",
 ]
 
 [[package]]
@@ -30594,6 +31903,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "HaveEBF16"
+version = "0.0.0"
+dependencies = [
+ "IsFeatureImplemented",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "HaveEnhancedPAC"
 version = "0.0.0"
 dependencies = [
@@ -30824,6 +32143,16 @@ dependencies = [
 
 [[package]]
 name = "HaveFeatNMI"
+version = "0.0.0"
+dependencies = [
+ "IsFeatureImplemented",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "HaveFeatRPRES"
 version = "0.0.0"
 dependencies = [
  "IsFeatureImplemented",
@@ -34621,6 +35950,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__IMPDEF_boolean",
 ]
 
 [[package]]
@@ -36253,9 +37583,27 @@ dependencies = [
 name = "ImplementedSMEVectorLength"
 version = "0.0.0"
 dependencies = [
+ "Align_int",
+ "IsPow2",
+ "MaxImplementedSVL",
+ "SupportedPowerTwoSVL",
  "common",
  "log",
  "micromath",
+ "u__id",
+]
+
+[[package]]
+name = "ImplementedSVEVectorLength"
+version = "0.0.0"
+dependencies = [
+ "Align_int",
+ "IsPow2",
+ "MaxImplementedVL",
+ "common",
+ "log",
+ "micromath",
+ "u__id",
 ]
 
 [[package]]
@@ -36333,6 +37681,16 @@ dependencies = [
  "u_get_HCR_EL2_Type_VF",
  "u_get_HCR_EL2_Type_VI",
  "u_get_HCR_EL2_Type_VSE",
+]
+
+[[package]]
+name = "IsASEInstruction"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
@@ -36438,6 +37796,7 @@ name = "IsEven"
 version = "0.0.0"
 dependencies = [
  "common",
+ "fmod_int",
  "log",
  "micromath",
 ]
@@ -36485,6 +37844,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
@@ -36624,6 +37984,7 @@ dependencies = [
 name = "IsInHost"
 version = "0.0.0"
 dependencies = [
+ "ELIsInHost",
  "common",
  "log",
  "micromath",
@@ -36633,9 +37994,14 @@ dependencies = [
 name = "IsMerging"
 version = "0.0.0"
 dependencies = [
+ "HaveAltFP",
+ "HaveSME",
+ "IsFullA64Enabled",
+ "UsingAArch32",
  "common",
  "log",
  "micromath",
+ "u_get_FPCRType_NEP",
 ]
 
 [[package]]
@@ -36671,6 +38037,17 @@ dependencies = [
 name = "IsPhysicalSErrorPending"
 version = "0.0.0"
 dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "IsPow2"
+version = "0.0.0"
+dependencies = [
+ "CeilPow2",
+ "FloorPow2",
  "common",
  "log",
  "micromath",
@@ -36788,6 +38165,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
@@ -37165,12 +38543,14 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
 name = "LookUpRIndex"
 version = "0.0.0"
 dependencies = [
+ "RBankSelect",
  "common",
  "log",
  "micromath",
@@ -38932,6 +40312,9 @@ dependencies = [
 name = "MatMulAdd"
 version = "0.0.0"
 dependencies = [
+ "Elem_read",
+ "Elem_set",
+ "asl_Int",
  "common",
  "log",
  "micromath",
@@ -38944,10 +40327,20 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__IMPDEF_integer",
 ]
 
 [[package]]
 name = "MaxImplementedSVL"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "MaxImplementedVL"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -43792,6 +45185,18 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__IMPDEF_boolean",
+]
+
+[[package]]
+name = "NoneActive"
+version = "0.0.0"
+dependencies = [
+ "ActivePredicateElement",
+ "common",
+ "fdiv_int",
+ "log",
+ "micromath",
 ]
 
 [[package]]
@@ -44310,6 +45715,7 @@ dependencies = [
 name = "PC_read__1"
 version = "0.0.0"
 dependencies = [
+ "R_read",
  "common",
  "log",
  "micromath",
@@ -51379,6 +52785,7 @@ dependencies = [
 name = "Poly32Mod2"
 version = "0.0.0"
 dependencies = [
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -51388,6 +52795,7 @@ dependencies = [
 name = "PolynomialMult"
 version = "0.0.0"
 dependencies = [
+ "Zeros",
  "common",
  "log",
  "micromath",
@@ -51407,6 +52815,9 @@ dependencies = [
 name = "PredTest"
 version = "0.0.0"
 dependencies = [
+ "FirstActive",
+ "LastActive",
+ "NoneActive",
  "common",
  "log",
  "micromath",
@@ -51517,6 +52928,15 @@ name = "Q_set"
 version = "0.0.0"
 dependencies = [
  "V_set",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "RBankSelect"
+version = "0.0.0"
+dependencies = [
  "common",
  "log",
  "micromath",
@@ -51905,6 +53325,7 @@ dependencies = [
 name = "ROL"
 version = "0.0.0"
 dependencies = [
+ "ROR",
  "common",
  "log",
  "micromath",
@@ -51965,6 +53386,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "R_read"
+version = "0.0.0"
+dependencies = [
+ "CurrentInstrSet",
+ "Rmode_read",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "R_set"
 version = "0.0.0"
 dependencies = [
@@ -51975,30 +53407,69 @@ dependencies = [
 ]
 
 [[package]]
-name = "Reduce"
+name = "RecipEstimate"
 version = "0.0.0"
 dependencies = [
  "common",
+ "fdiv_int",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "RecipSqrtEstimate"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "fdiv_int",
+ "integer_access",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "Reduce"
+version = "0.0.0"
+dependencies = [
+ "HaveAltFP",
+ "Reduce__1",
+ "UsingAArch32",
+ "common",
+ "log",
+ "micromath",
+ "u_get_FPCR_Type_AH",
 ]
 
 [[package]]
 name = "ReducePredicated"
 version = "0.0.0"
 dependencies = [
+ "ActivePredicateElement",
+ "CeilPow2",
+ "Elem_read",
+ "Elem_set",
+ "Reduce",
  "common",
+ "fdiv_int",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
 name = "Reduce__1"
 version = "0.0.0"
 dependencies = [
+ "FPAdd",
+ "FPCR_read",
+ "FPMaxNum",
+ "FPMax__1",
+ "FPMinNum",
+ "FPMin__1",
  "common",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
@@ -52008,6 +53479,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
@@ -52102,6 +53574,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ReservedEncoding"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "ResetControlRegisters"
 version = "0.0.0"
 dependencies = [
@@ -52162,6 +53643,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "RestoreTransactionCheckpoint"
+version = "0.0.0"
+dependencies = [
+ "CurrentVL_read",
+ "RestoreTransactionCheckpointParameterised",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "RestoreTransactionCheckpointParameterised"
+version = "0.0.0"
+dependencies = [
+ "FFR_set",
+ "HaveGCS",
+ "IsFPEnabled",
+ "IsSVEEnabled",
+ "Mk_FPCR_Type",
+ "Mk_FPSR_Type",
+ "Mk_GCSPR_EL0_Type",
+ "Mk_GCSPR_EL1_Type",
+ "Mk_GCSPR_EL2_Type",
+ "Mk_GCSPR_EL3_Type",
+ "Mk_ICC_PMR_EL1_Type",
+ "P_set",
+ "SP_set",
+ "V_set",
+ "X_set",
+ "Z_set",
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "RestoredITBits"
 version = "0.0.0"
 dependencies = [
@@ -52180,7 +53697,24 @@ dependencies = [
 name = "Reverse"
 version = "0.0.0"
 dependencies = [
+ "Elem_read",
+ "Elem_set",
  "common",
+ "fdiv_int",
+ "log",
+ "micromath",
+ "u__id",
+]
+
+[[package]]
+name = "Rmode_read"
+version = "0.0.0"
+dependencies = [
+ "BadMode",
+ "CurrentSecurityState",
+ "LookUpRIndex",
+ "common",
+ "get_R",
  "log",
  "micromath",
 ]
@@ -52351,9 +53885,12 @@ dependencies = [
 name = "S2DecodeCacheability"
 version = "0.0.0"
 dependencies = [
+ "ConstrainUnpredictable",
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_bits",
+ "u__UNKNOWN_boolean",
 ]
 
 [[package]]
@@ -53297,6 +54834,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__IMPDEF_boolean",
 ]
 
 [[package]]
@@ -53306,6 +54844,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "u__IMPDEF_boolean",
 ]
 
 [[package]]
@@ -59252,18 +60791,24 @@ dependencies = [
 name = "Sat"
 version = "0.0.0"
 dependencies = [
+ "SignedSat",
+ "UnsignedSat",
  "common",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
 name = "SatQ"
 version = "0.0.0"
 dependencies = [
+ "SignedSatQ",
+ "UnsignedSatQ",
  "common",
  "log",
  "micromath",
+ "u__id",
 ]
 
 [[package]]
@@ -59340,6 +60885,15 @@ dependencies = [
 
 [[package]]
 name = "SendEventLocal"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "SetAccumulatedFPExceptions"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -59518,6 +61072,7 @@ dependencies = [
 name = "SignedSat"
 version = "0.0.0"
 dependencies = [
+ "SignedSatQ",
  "common",
  "log",
  "micromath",
@@ -59528,6 +61083,7 @@ name = "SignedSatQ"
 version = "0.0.0"
 dependencies = [
  "common",
+ "integer_subrange",
  "log",
  "micromath",
 ]
@@ -59614,6 +61170,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "StopInstructionPrefetchAndEnableITR"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "StoreOnlyTagCheckingEnabled"
 version = "0.0.0"
 dependencies = [
@@ -59642,6 +61207,15 @@ dependencies = [
  "replicate_bits_borealis_internal",
  "subrange_subrange_concat",
  "u__id",
+]
+
+[[package]]
+name = "SupportedPowerTwoSVL"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
 ]
 
 [[package]]
@@ -66837,7 +68411,11 @@ dependencies = [
 name = "UnsignedRSqrtEstimate"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "RecipSqrtEstimate",
+ "Zeros",
  "common",
+ "integer_subrange",
  "log",
  "micromath",
 ]
@@ -66846,7 +68424,11 @@ dependencies = [
 name = "UnsignedRecipEstimate"
 version = "0.0.0"
 dependencies = [
+ "Ones",
+ "RecipEstimate",
+ "Zeros",
  "common",
+ "integer_subrange",
  "log",
  "micromath",
 ]
@@ -66855,6 +68437,7 @@ dependencies = [
 name = "UnsignedSat"
 version = "0.0.0"
 dependencies = [
+ "UnsignedSatQ",
  "common",
  "log",
  "micromath",
@@ -66865,6 +68448,7 @@ name = "UnsignedSatQ"
 version = "0.0.0"
 dependencies = [
  "common",
+ "integer_subrange",
  "log",
  "micromath",
 ]
@@ -67281,6 +68865,9 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "place_subrange",
+ "replicate_bits_borealis_internal",
+ "u__id",
 ]
 
 [[package]]
@@ -141148,6 +142735,7 @@ name = "fmod_int"
 version = "0.0.0"
 dependencies = [
  "common",
+ "fdiv_int",
  "log",
  "micromath",
 ]
@@ -141194,9 +142782,22 @@ dependencies = [
 name = "genRandomNum"
 version = "0.0.0"
 dependencies = [
+ "SHA256hash",
+ "common",
+ "integer_subrange",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "getCacheID"
+version = "0.0.0"
+dependencies = [
  "common",
  "log",
  "micromath",
+ "u__UNKNOWN_bits",
+ "u__id",
 ]
 
 [[package]]
@@ -141372,6 +142973,15 @@ dependencies = [
 
 [[package]]
 name = "integer_subrange"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "integer_update_subrange"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -141578,6 +143188,7 @@ dependencies = [
 name = "read_request"
 version = "0.0.0"
 dependencies = [
+ "AccessDescriptor_to_Access_kind",
  "common",
  "log",
  "micromath",
@@ -141714,6 +143325,7 @@ dependencies = [
  "common",
  "log",
  "micromath",
+ "write_gpr_bits",
 ]
 
 [[package]]
@@ -144911,6 +146523,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "u__UNKNOWN_FaultRecord"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "u__UNKNOWN_FullAddress"
 version = "0.0.0"
 dependencies = [
@@ -144921,6 +146542,15 @@ dependencies = [
 
 [[package]]
 name = "u__UNKNOWN_GPTEntry"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u__UNKNOWN_GPTTLBLine"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -148397,6 +150027,60 @@ dependencies = [
 ]
 
 [[package]]
+name = "u_get_BRBFCR_EL1_Type_CONDDIR"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_BRBFCR_EL1_Type_DIRCALL"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_BRBFCR_EL1_Type_DIRECT"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_BRBFCR_EL1_Type_EnI"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_BRBFCR_EL1_Type_INDCALL"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_BRBFCR_EL1_Type_INDIRECT"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "u_get_BRBFCR_EL1_Type_LASTFAILED"
 version = "0.0.0"
 dependencies = [
@@ -148407,6 +150091,15 @@ dependencies = [
 
 [[package]]
 name = "u_get_BRBFCR_EL1_Type_PAUSED"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_BRBFCR_EL1_Type_RTN"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -149253,6 +150946,96 @@ dependencies = [
 
 [[package]]
 name = "u_get_FPCRType_AH"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_AHP"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_DN"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_EBF"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_FIZ"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_FZ"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_FZ16"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_NEP"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_RMode"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCRType_UFE"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_FPCR_Type_AH"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -157397,6 +159180,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "u_get_SCTLR_Type_V"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "u_get_SCTLR_Type_WXN"
 version = "0.0.0"
 dependencies = [
@@ -159413,6 +161205,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "u_get_ZCR_EL1_Type_LEN"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_ZCR_EL2_Type_LEN"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_get_ZCR_EL3_Type_LEN"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "u_shl_int_general"
 version = "0.0.0"
 dependencies = [
@@ -159917,6 +161736,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "u_update_EDSCR_Type_ITE"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_update_EDSCR_Type_ITO"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "u_update_EDSCR_Type_MA"
 version = "0.0.0"
 dependencies = [
@@ -160025,6 +161862,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "u_update_FPEXC_Type_DEX"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
 name = "u_update_FPEXC_Type_EN"
 version = "0.0.0"
 dependencies = [
@@ -160071,6 +161917,15 @@ dependencies = [
 
 [[package]]
 name = "u_update_FPEXC_Type_VV"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u_update_FPSCR_Type_UFC"
 version = "0.0.0"
 dependencies = [
  "common",
@@ -163570,6 +165425,15 @@ checksum = "bec47e5bfd1bff0eeaf6d8b485cc1074891a197ab4225d504cb7a1ab88b02bf0"
 
 [[package]]
 name = "write_gpr"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "write_gpr_bits"
 version = "0.0.0"
 dependencies = [
  "common",

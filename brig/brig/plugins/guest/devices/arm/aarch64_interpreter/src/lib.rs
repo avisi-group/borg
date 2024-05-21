@@ -2,7 +2,7 @@
 
 use {
     arch::{
-        decode_execute, ExecuteResult, ProductTypec98939056e929b9c, Tracer, REG_CCSIDR_EL1,
+        decode_execute, ExecuteResult, ProductTypec98939056e929b9c, State, Tracer, REG_CCSIDR_EL1,
         REG_CLIDR_EL1, REG_CTR_EL0, REG_DCZID_EL0, REG_EL0, REG_EL1, REG_EL2, REG_EL3,
         REG_FEATUREIMPL, REG_ID_AA64DFR0_EL1, REG_ID_AA64MMFR0_EL1, REG_ID_AA64PFR0_EL1,
         REG_MIDR_EL1, REG_MPIDR_EL1, REG_PSTATE, REG_R0, REG_U_PC, REG_U__SUPPORTED_PA_SIZE,
@@ -15,6 +15,105 @@ use {
 pub enum TracerKind {
     Noop,
     Log,
+}
+
+pub fn init_state(state: &mut State, initial_pc: u64, dtb_phys_address: u64) {
+    state.write_register(REG_U_PC, initial_pc);
+
+    // X0 must contain phys address of DTB https://docs.kernel.org/arch/arm64/booting.html
+    // probably doesn't belong here as aarch64 guest shouldn't be linux
+    // specific
+    state.write_register(REG_R0, dtb_phys_address);
+
+    state.write_register(REG_MIDR_EL1, 0x410f_0000u32);
+    state.write_register(REG_CLIDR_EL1, 0x4u32);
+    state.write_register(REG_CCSIDR_EL1, 0x4000u32);
+    state.write_register(REG_MPIDR_EL1, 0x4000_0000u32);
+    state.write_register(REG_DCZID_EL0, 0x11u32);
+    state.write_register(REG_CTR_EL0, 0x0444_c004u32);
+    state.write_register(REG_ID_AA64PFR0_EL1, 0x11u32);
+    state.write_register(REG_ID_AA64DFR0_EL1, 0x1010_1606u32);
+    state.write_register(REG_ID_AA64MMFR0_EL1, 0x0f10_0000u32);
+
+    state.write_register(REG_U__SUPPORTED_PA_SIZE, 56u32);
+    state.write_register(REG_U__SUPPORTED_VA_SIZE, 56u32);
+
+    state.write_register(REG_EL0, 0u8);
+    state.write_register(REG_EL1, 1u8);
+    state.write_register(REG_EL2, 2u8);
+    state.write_register(REG_EL3, 3u8);
+
+    // set to EL1 on boot
+    state.write_register(
+        REG_PSTATE,
+        ProductTypec98939056e929b9c {
+            _0: false,
+            _1: false,
+            _2: 0,
+            _3: false,
+            _4: false,
+            _5: false,
+            _6: false,
+            _7: 1,
+            _8: false,
+            _9: false,
+            _10: 0,
+            _11: false,
+            _12: false,
+            _13: 0,
+            _14: false,
+            _15: 0,
+            _16: false,
+            _17: false,
+            _18: false,
+            _19: false,
+            _20: false,
+            _21: false,
+            _22: false,
+            _23: false,
+            _24: false,
+            _25: false,
+            _26: false,
+            _27: false,
+            _28: false,
+            _29: false,
+            _30: false,
+            _31: false,
+        },
+    );
+
+    let mut features = [true; 259];
+
+    // register FEAT_AA32EL1_IMPLEMENTED : bool = false
+    // register FEAT_AA32EL2_IMPLEMENTED : bool = false
+    // register FEAT_AA32EL3_IMPLEMENTED : bool = false
+    features[1] = false;
+    features[2] = false;
+    features[3] = false;
+
+    // register FEAT_ETMv4_IMPLEMENTED : bool = false
+    features[19] = false;
+
+    // FEAT_CONSTPACFIELD_IMPLEMENTED
+    features[87] = false;
+
+    // register FEAT_EPAC_IMPLEMENTED : bool = false
+    features[88] = false;
+
+    // register FEAT_PACIMP_IMPLEMENTED : bool = false
+    features[95] = false;
+
+    // register FEAT_PACQARMA3_IMPLEMENTED : bool = false
+    features[96] = false;
+
+    // we don't want statistical profiling
+    features[99] = false;
+    features[164] = false;
+    features[177] = false;
+    features[216] = false;
+
+    // magic Tom values
+    state.write_register(REG_FEATUREIMPL, features);
 }
 
 pub struct Aarch64Interpreter {
@@ -32,102 +131,11 @@ impl Aarch64Interpreter {
     ) -> Self {
         let mut state = arch::State::init(guest_memory_base);
 
-        state.write_register(REG_U_PC, initial_pc);
-
-        // X0 must contain phys address of DTB https://docs.kernel.org/arch/arm64/booting.html
-        // probably doesn't belong here as aarch64 guest shouldn't be linux
-        // specific
-        state.write_register(REG_R0, dtb_phys_address);
-
-        state.write_register(REG_MIDR_EL1, 0x410f_0000u32);
-        state.write_register(REG_CLIDR_EL1, 0x4u32);
-        state.write_register(REG_CCSIDR_EL1, 0x4000u32);
-        state.write_register(REG_MPIDR_EL1, 0x4000_0000u32);
-        state.write_register(REG_DCZID_EL0, 0x11u32);
-        state.write_register(REG_CTR_EL0, 0x0444_c004u32);
-        state.write_register(REG_ID_AA64PFR0_EL1, 0x11u32);
-        state.write_register(REG_ID_AA64DFR0_EL1, 0x1010_1606u32);
-        state.write_register(REG_ID_AA64MMFR0_EL1, 0x0f10_0000u32);
-
-        state.write_register(REG_U__SUPPORTED_PA_SIZE, 56u32);
-        state.write_register(REG_U__SUPPORTED_VA_SIZE, 56u32);
-
-        state.write_register(REG_EL0, 0u8);
-        state.write_register(REG_EL1, 1u8);
-        state.write_register(REG_EL2, 2u8);
-        state.write_register(REG_EL3, 3u8);
-
-        // set to EL1 on boot
-        state.write_register(
-            REG_PSTATE,
-            ProductTypec98939056e929b9c {
-                _0: false,
-                _1: false,
-                _2: 0,
-                _3: false,
-                _4: false,
-                _5: false,
-                _6: false,
-                _7: 1,
-                _8: false,
-                _9: false,
-                _10: 0,
-                _11: false,
-                _12: false,
-                _13: 0,
-                _14: false,
-                _15: 0,
-                _16: false,
-                _17: false,
-                _18: false,
-                _19: false,
-                _20: false,
-                _21: false,
-                _22: false,
-                _23: false,
-                _24: false,
-                _25: false,
-                _26: false,
-                _27: false,
-                _28: false,
-                _29: false,
-                _30: false,
-                _31: false,
-            },
+        init_state(
+            &mut state,
+            u64::try_from(initial_pc).unwrap(),
+            u64::try_from(dtb_phys_address).unwrap(),
         );
-
-        let mut features = [true; 259];
-
-        // register FEAT_AA32EL1_IMPLEMENTED : bool = false
-        // register FEAT_AA32EL2_IMPLEMENTED : bool = false
-        // register FEAT_AA32EL3_IMPLEMENTED : bool = false
-        features[1] = false;
-        features[2] = false;
-        features[3] = false;
-
-        // register FEAT_ETMv4_IMPLEMENTED : bool = false
-        features[19] = false;
-
-        // FEAT_CONSTPACFIELD_IMPLEMENTED
-        features[87] = false;
-
-        // register FEAT_EPAC_IMPLEMENTED : bool = false
-        features[88] = false;
-
-        // register FEAT_PACIMP_IMPLEMENTED : bool = false
-        features[95] = false;
-
-        // register FEAT_PACQARMA3_IMPLEMENTED : bool = false
-        features[96] = false;
-
-        // we don't want statistical profiling
-        features[99] = false;
-        features[164] = false;
-        features[177] = false;
-        features[216] = false;
-
-        // magic Tom values
-        state.write_register(REG_FEATUREIMPL, features);
 
         Self {
             instructions_retired: 0,

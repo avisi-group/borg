@@ -1,6 +1,7 @@
 #![no_std]
 
 use {
+    aarch64_interpreter::init_state,
     arch::{Bits, ProductTypebc91b195b0b2a883, ProductTyped54bc449dd09e5bd, State, Tracer},
     core::fmt::Debug,
     plugins_rt::api::{PluginHeader, PluginHost},
@@ -29,6 +30,9 @@ fn entrypoint(host: &'static dyn PluginHost) {
     replicate_bits();
     ubfx();
 
+    fibonacci();
+
+    log::info!("tests passed");
 }
 
 fn addwithcarry_negative() {
@@ -151,12 +155,52 @@ fn ubfx() {
         state.write_register::<u64>(arch::REG_R3, 0x8444_c004);
 
         // ubfx x3, x3, #16, #4
-        arch::decode_execute(0xd3504c63, &mut state, &LogTracer);
+        arch::decode_execute(0xd3504c63, &mut state, &NoopTracer);
         assert_eq!(0x4, state.read_register::<u64>(arch::REG_R3));
     }
 }
 
+fn fibonacci() {
+    let mut state = State::init(0x0);
 
+    init_state(&mut state, 0x0, 0x0);
+
+    let program = [
+        // <_start>
+        0xd2800000, // mov     x0, #0x0 (#0)
+        0xd2800021, // mov     x1, #0x1 (#1)
+        0xd2800002, // mov     x2, #0x0 (#0)
+        0xd2800003, // mov     x3, #0x0 (#0)
+        0xd2800144, // mov     x4, #0xa (#10)
+        // <loop>
+        0xeb04007f, // cmp     x3, x4
+        0x540000c0, // b.eq    400104 <done>  // b.none
+        0x8b010002, // add     x2, x0, x1
+        0xaa0103e0, // mov     x0, x1
+        0xaa0203e1, // mov     x1, x2
+        0x91000463, // add     x3, x3, #0x1
+        0x17fffffa, // b       4000e8 <loop>
+        // <done>
+        0xaa0203e0, // mov     x0, x2
+        0x52800ba8, // mov     w8, #0x5d (#93)
+        0xd4000001, // svc     #0x0
+    ];
+
+    loop {
+        let pc = state.read_register::<usize>(arch::REG_U_PC);
+
+        // exit before the svc
+        if pc == 0x38 {
+            break;
+        }
+
+        let instr = program[pc / 4];
+        arch::decode_execute(instr, &mut state, &NoopTracer);
+    }
+
+    assert_eq!(89, state.read_register::<u64>(arch::REG_R0));
+    assert_eq!(10, state.read_register::<u64>(arch::REG_R3));
+}
 
 struct NoopTracer;
 

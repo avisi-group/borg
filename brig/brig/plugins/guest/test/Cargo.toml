@@ -13,4 +13,6 @@ AddWithCarry = { path = "../../../../../brig-aarch64/AddWithCarry" }
 DecodeBitMasks = { path = "../../../../../brig-aarch64/DecodeBitMasks" }
 replicate_bits_borealis_internal = { path = "../../../../../brig-aarch64/replicate_bits_borealis_internal" }
 u__IMPDEF_integer = { path = "../../../../../brig-aarch64/u__IMPDEF_integer" }
+aarch64_interpreter = { path = "../devices/arm/aarch64_interpreter"}
+
 log = "0.4.21"

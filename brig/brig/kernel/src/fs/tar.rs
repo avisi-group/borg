@@ -17,7 +17,16 @@ impl<'device, B: BlockDevice> TarFilesystem<'device, B> {
         // read entire file into memory and create tar archive
         let archive = {
             let mut buf = alloc::vec![0u8; dev.size()];
-            dev.read(&mut buf, 0).unwrap();
+
+            // workaround for https://github.com/rcore-os/virtio-drivers/issues/135
+
+            // 1GiB chunks
+            const G: usize = 1024 * 1024 * 1024;
+            buf.chunks_mut(G).enumerate().for_each(|(i, chunk)| {
+                let block_index = (i * G) / dev.block_size();
+                dev.read(chunk, block_index).unwrap();
+            });
+
             TarArchive::new(buf.into()).unwrap()
         };
 
