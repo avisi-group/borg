@@ -157093,10 +157093,12 @@ dependencies = [
  "IsPow2",
  "aarch64_interpreter",
  "arch",
+ "borealis_register_init",
  "log",
  "plugins_rt",
  "replicate_bits_borealis_internal",
  "u__IMPDEF_integer",
+ "u__InitSystem",
 ]
 
 [[package]]

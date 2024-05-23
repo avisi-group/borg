@@ -1,13 +1,17 @@
 #![no_std]
 
 use {
-    aarch64_interpreter::set_initial_state,
     arch::{Bits, ProductTypebc91b195b0b2a883, ProductTyped54bc449dd09e5bd, State, Tracer},
+    borealis_register_init::borealis_register_init,
     core::fmt::Debug,
     plugins_rt::api::{PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
+    u__InitSystem::u__InitSystem,
     AddWithCarry::AddWithCarry,
-    DecodeBitMasks::DecodeBitMasks,IsPow2::IsPow2,FloorPow2::FloorPow2, CeilPow2::CeilPow2
+    CeilPow2::CeilPow2,
+    DecodeBitMasks::DecodeBitMasks,
+    FloorPow2::FloorPow2,
+    IsPow2::IsPow2,
 };
 
 #[no_mangle]
@@ -164,8 +168,9 @@ fn ubfx() {
 
 fn fibonacci() {
     let mut state = State::init(0x0);
-
-    set_initial_state(&mut state);
+    borealis_register_init(&mut state, &LogTracer);
+    // hacky, run sail function that goes before the main loop :/
+    u__InitSystem(&mut state, &LogTracer, ());
 
     let program = [
         // <_start>
