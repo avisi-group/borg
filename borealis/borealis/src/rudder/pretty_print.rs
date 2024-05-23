@@ -54,31 +54,18 @@ impl Display for StatementKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match &self {
             StatementKind::Constant { typ, value } => write!(f, "const #{} : {}", value, typ),
-            StatementKind::ReadVariable { symbol, indices } => {
-                if indices.is_empty() {
-                    write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
-                } else {
-                    write!(f, "read-var {}", symbol.name())?;
-                    for index in indices {
-                        write!(f, ".{}", index)?;
-                    }
-                    write!(f, ":{}", symbol.typ())
-                }
+            StatementKind::ReadVariable { symbol } => {
+                write!(f, "read-var {}:{}", symbol.name(), symbol.typ())
             }
-            StatementKind::WriteVariable {
-                symbol,
-                indices,
-                value,
-            } => {
-                if indices.is_empty() {
-                    write!(f, "write-var {} <= {}", symbol.name(), value.name())
-                } else {
-                    write!(f, "write-var {}", symbol.name())?;
-                    for index in indices {
-                        write!(f, ".{}", index)?;
-                    }
-                    write!(f, " <= {}", value.name())
-                }
+            StatementKind::WriteVariable { symbol, value } => {
+                write!(
+                    f,
+                    "write-var {}:{} <= {}:{}",
+                    symbol.name(),
+                    symbol.typ(),
+                    value.name(),
+                    value.typ()
+                )
             }
             StatementKind::ReadRegister { typ, offset } => {
                 write!(f, "read-reg {}:{}", offset.name(), typ)
@@ -312,13 +299,32 @@ impl Display for StatementKind {
             StatementKind::ExtractField { value, field_index } => {
                 write!(f, "extract-field {}.{field_index}", value.name())
             }
+            StatementKind::UpdateField {
+                original_value,
+                field_index,
+                field_value,
+            } => {
+                write!(
+                    f,
+                    "update-field {}.{field_index} <- {}",
+                    original_value.name(),
+                    field_value.name()
+                )
+            }
         }
     }
 }
 
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{}: {}", self.name(), self.kind())
+        let vc = match self.classify() {
+            ValueClass::None => "-",
+            ValueClass::Constant => "C",
+            ValueClass::Static => "S",
+            ValueClass::Dynamic => "D",
+        };
+
+        write!(f, "[{}] {}: {}", vc, self.name(), self.kind())
     }
 }
 

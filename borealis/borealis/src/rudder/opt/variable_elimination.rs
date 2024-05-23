@@ -44,7 +44,8 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
         if let StatementKind::WriteVariable {
             symbol,
             value,
-            indices,
+            ..
+// ignoring indices
         } = stmt.kind()
         {
             // Ignore global symbols (for now)
@@ -53,31 +54,31 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
             }
 
             trace!("considering variable write to {}", symbol.name());
-            match live_writes.entry((symbol.name(), indices.clone())) {
+            match live_writes.entry((symbol.name())) {
                 Entry::Occupied(mut e) => {
                     trace!(
-                        "already live write to symbol {}:{:?}, updating live value",
+                        "already live write to symbol {}, updating live value",
                         symbol.name(),
-                        &indices
+
                     );
                     e.insert(value.clone());
                 }
                 Entry::Vacant(e) => {
                     trace!(
-                        "starting live range for symbol {}:{:?}",
+                        "starting live range for symbol {}",
                         symbol.name(),
-                        &indices
+
                     );
                     e.insert(value.clone());
                 }
             }
-        } else if let StatementKind::ReadVariable { symbol, indices } = stmt.kind() {
+        } else if let StatementKind::ReadVariable { symbol,.. } = stmt.kind() {
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }
 
             trace!("considering variable read from {}", symbol.name());
-            let Some(live_value) = live_writes.get(&(symbol.name(), indices)) else {
+            let Some(live_value) = live_writes.get(&(symbol.name())) else {
                 trace!("no live range for read of symbol");
                 continue;
             };

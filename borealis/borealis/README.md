@@ -14,3 +14,7 @@
 * [opam](https://opam.ocaml.org)
 * [Dune](https://dune.build)
 * [`sail` opam package](https://opam.ocaml.org/packages/sail/)
+
+## Usage
+
+$ cargo r --bin borealis -- --dump-ir ./target ../arm-v9.4-a_d43f3f4c.rkyv ~/Documents/Sync/brig-aarch64

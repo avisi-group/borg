@@ -12,6 +12,7 @@ use {
     common::{intern::InternedString, shared::Shared, HashMap},
     kinded::Kinded,
     num_bigint::BigInt,
+    rayon::iter::IntoParallelIterator,
     sailrs::jib_ast,
     std::{fmt::Debug, ops::Add},
 };
@@ -28,7 +29,7 @@ pub struct Ast {
     /// Sequence of definitions
     pub definitions: Vec<Definition>,
     /// Register types by identifier
-    pub registers: HashMap<InternedString, Shared<Type>>,
+    pub registers: HashMap<InternedString, (Shared<Type>, ControlFlowBlock)>,
     /// Function definitions by identifier
     pub functions: HashMap<InternedString, FunctionDefinition>,
 }
@@ -73,7 +74,7 @@ pub enum Definition {
 
     Let {
         bindings: Vec<NamedType>,
-        body: Vec<Shared<Statement>>,
+        body: ControlFlowBlock,
     },
 }
 
@@ -93,8 +94,7 @@ impl Walkable for Definition {
                     .iter()
                     .for_each(|named_type| visitor.visit_named_type(named_type));
 
-                body.iter()
-                    .for_each(|statement| visitor.visit_statement(statement.clone()));
+                visitor.visit_control_flow_block(body);
             }
         }
     }

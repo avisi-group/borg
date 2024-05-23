@@ -92,34 +92,16 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 v
             }
         }
-        StatementKind::ReadVariable { symbol, indices } => {
+        StatementKind::ReadVariable { symbol } => {
             let var = codegen_ident(symbol.name());
 
-            let indices = indices
-                .iter()
-                .copied()
-                .map(codegen_member)
-                .map(|field| quote!(.#field))
-                .collect::<TokenStream>();
-
-            quote! {fn_state.#var #indices}
+            quote! {fn_state.#var }
         }
-        StatementKind::WriteVariable {
-            symbol,
-            indices,
-            value,
-        } => {
+        StatementKind::WriteVariable { symbol, value } => {
             let var = codegen_ident(symbol.name());
-
-            let indices = indices
-                .iter()
-                .copied()
-                .map(codegen_member)
-                .map(|field| quote!(.#field))
-                .collect::<TokenStream>();
 
             let value = get_ident(&value);
-            quote! {fn_state.#var #indices = #value}
+            quote! {fn_state.#var = #value}
         }
         StatementKind::ReadRegister { typ, offset } => {
             let offset = get_ident(&offset);
@@ -397,8 +379,9 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
                 quote! {
                     {
-                        let mask = !Bits::new(((1u128).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)), #original_value.length());
-                        (#original_value & mask) | (#insert_value << #start)
+                        let insert_value_new_length = Bits::new(#insert_value.value(), #original_value.length());
+                        let mask = !Bits::new(((1u128).checked_shl(#length).map(|x| x - 1).unwrap_or(!0)) << #start, #original_value.length() );
+                        (#original_value & mask) | (insert_value_new_length << #start)
                     }
                 }
             } else {
@@ -570,6 +553,22 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let ident = get_ident(&value);
             let field = codegen_member(field_index);
             quote!(#ident.#field)
+        }
+        StatementKind::UpdateField {
+            original_value,
+            field_index,
+            field_value,
+        } => {
+            let ident = get_ident(&original_value);
+            let value = get_ident(&field_value);
+            let field = codegen_member(field_index);
+            quote! {
+                {
+                    let mut local = #ident;
+                    local.#field = #value;
+                    local
+                }
+            }
         }
     };
 

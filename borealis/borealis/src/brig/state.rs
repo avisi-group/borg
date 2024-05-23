@@ -1,5 +1,8 @@
 use {
-    crate::{brig::codegen_ident, rudder::Context},
+    crate::{
+        brig::codegen_ident,
+        rudder::{Context, RegisterDescriptor},
+    },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
 };
@@ -10,7 +13,7 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
     let register_offsets = rudder
         .get_registers()
         .into_iter()
-        .map(|(name, (_, offset))| {
+        .map(|(name, RegisterDescriptor { offset, .. })| {
             let name = format_ident!(
                 "REG_{}",
                 codegen_ident(name.as_ref().into())
@@ -27,7 +30,7 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         let mut offset_names = rudder
             .get_registers()
             .into_iter()
-            .map(|(name, (_, offset))| (offset, name))
+            .map(|(name, RegisterDescriptor { offset, .. })| (offset, name))
             .collect::<Vec<_>>();
 
         offset_names.sort_by_key(|(offset, _)| *offset);
@@ -43,15 +46,14 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
             .collect::<TokenStream>()
     };
 
-    let registers_len = {
-        let (last_register, last_offset) = rudder
-            .get_registers()
-            .into_values()
-            .max_by_key(|(typ, offset)| offset + typ.width_bytes())
-            .unwrap();
+    let registers_len = rudder
+        .get_registers()
+        .into_values()
+        .map(|RegisterDescriptor { typ, offset, .. }| offset + typ.width_bytes())
+        .max()
+        .unwrap();
 
-        last_offset + last_register.width_bytes()
-    };
+    // let register_inits = rudder.get_registers()
 
     quote! {
         // todo check this is necessary
@@ -69,15 +71,21 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
                     guest_memory_base,
                 };
 
+                // initial assignments here
+
                 celf
             }
 
             pub fn write_register<T>(&mut self, offset: isize, value: T) {
-                unsafe { *(self.data.as_ptr().byte_offset(offset) as *mut T) = value };
+                let data_ptr = self.data.as_ptr();
+                let offset_ptr = unsafe { data_ptr.byte_offset(offset) };
+                unsafe { *(offset_ptr as *mut T) = value };
             }
 
             pub fn read_register<T: Copy>(&self, offset: isize) -> T {
-                unsafe { *(self.data.as_ptr().byte_offset(offset) as *const T) }
+                let data_ptr = self.data.as_ptr();
+                let offset_ptr = unsafe { data_ptr.byte_offset(offset) };
+                unsafe { *(offset_ptr as *const T) }
             }
 
             pub fn guest_memory_base(&self) -> usize {

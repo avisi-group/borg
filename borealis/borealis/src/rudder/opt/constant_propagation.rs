@@ -1,5 +1,9 @@
 use {
-    crate::rudder::{analysis::dfa::SymbolUseAnalysis, Function, StatementKind},
+    crate::rudder::{
+        analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
+        Block, Function, StatementKind,
+    },
+    common::HashMap,
     log::trace,
 };
 
@@ -24,7 +28,6 @@ pub fn run(f: Function) -> bool {
         if writes.len() == 1 {
             let StatementKind::WriteVariable {
                 value: value_written,
-                indices: write_indices,
                 ..
             } = writes.first().unwrap().kind()
             else {
@@ -38,23 +41,48 @@ pub fn run(f: Function) -> bool {
                 // replace all reads, in all blocks, with the constant
                 if sua.symbol_has_reads(&symbol) {
                     for read in sua.get_symbol_reads(&symbol) {
-                        let StatementKind::ReadVariable {
-                            indices: read_indices,
-                            ..
-                        } = read.kind()
-                        else {
+                        let StatementKind::ReadVariable { .. } = read.kind() else {
                             panic!("not a read");
                         };
 
-                        if write_indices == read_indices {
-                            read.replace_kind(StatementKind::Constant {
-                                typ: typ.clone(),
-                                value: value.clone(),
-                            });
+                        read.replace_kind(StatementKind::Constant {
+                            typ: typ.clone(),
+                            value: value.clone(),
+                        });
 
-                            changed = true;
-                        }
+                        changed = true;
                     }
+                }
+            }
+        }
+    }
+
+    for block in f.entry_block().iter() {
+        changed |= simplify_block_local_writes(block);
+    }
+
+    changed
+}
+
+fn simplify_block_local_writes(block: Block) -> bool {
+    let mut changed = false;
+
+    let mut most_recent_writes = HashMap::default();
+
+    let sua = StatementUseAnalysis::new(&block);
+
+    for stmt in block.statements() {
+        if let StatementKind::WriteVariable { symbol, value } = stmt.kind() {
+            most_recent_writes.insert(symbol.name(), value);
+        } else if let StatementKind::ReadVariable { symbol } = stmt.kind() {
+            if let Some(most_recent_write) = most_recent_writes.get(&symbol.name) {
+                if sua.has_uses(&stmt) {
+                    let uses_of_read_variable = sua.get_uses(&stmt);
+                    for stmt_use in uses_of_read_variable {
+                        stmt_use.replace_use(stmt.clone(), most_recent_write.clone());
+                    }
+
+                    changed |= true;
                 }
             }
         }

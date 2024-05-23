@@ -34,7 +34,10 @@ pub fn run(f: Function) -> bool {
 
                 changed = true;
             } else if true_target == false_target {
-                panic!("found redundant branch statement!!!");
+                terminator.replace_kind(StatementKind::Jump {
+                    target: true_target,
+                });
+                changed = true;
             }
         }
     }

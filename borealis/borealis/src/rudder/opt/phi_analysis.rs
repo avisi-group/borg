@@ -19,10 +19,7 @@ pub fn run(f: Function) -> bool {
 
     for block in f.entry_block().iter() {
         for stmt in block.statements() {
-            if let StatementKind::WriteVariable {
-                symbol, indices, ..
-            } = stmt.kind()
-            {
+            if let StatementKind::WriteVariable { symbol, .. } = stmt.kind() {
                 live_outs
                     .entry(block.clone())
                     .and_modify(|e| {

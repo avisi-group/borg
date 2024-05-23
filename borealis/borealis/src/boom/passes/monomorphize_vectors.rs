@@ -63,7 +63,7 @@ fn monomorphize_vectors(ast: Shared<Ast>, entry_block: ControlFlowBlock) -> bool
                             if let Some(reg_type) = ast.get().registers.get(source) {
                                 // assert element_types are the same
                                 // replace original type with that type
-                                *original_type.get_mut() = reg_type.get().clone();
+                                *original_type.get_mut() = reg_type.0.get().clone();
                             }
                         }
                     }

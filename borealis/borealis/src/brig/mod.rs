@@ -45,20 +45,27 @@ use {
 };
 
 pub mod bits;
+mod codegen;
 mod denylist;
-mod functions_dbt;
 mod functions_interpreter;
 mod state;
 mod workspace;
 
 const ENTRYPOINT: &str = "__DecodeA64";
 
+pub enum GenerationMode {
+    CodeGen,
+    CodeGenWithIr(PathBuf),
+    IrOnly(PathBuf),
+}
+
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig(
-    jib_ast: ListVec<jib_ast::Definition>,
-    path: PathBuf,
-    dump_ir: Option<PathBuf>,
-) {
+pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: GenerationMode) {
+    let dump_ir = match &mode {
+        GenerationMode::CodeGen => None,
+        GenerationMode::CodeGenWithIr(p) | GenerationMode::IrOnly(p) => Some(p),
+    };
+
     if let Some(path) = &dump_ir {
         create_dir_all(path).unwrap()
     }
@@ -136,11 +143,16 @@ pub fn sail_to_brig(
         warn!("{msg}");
     }
 
-    info!("Generating Rust");
-    let ws = codegen_workspace(&rudder);
+    if matches!(
+        &mode,
+        GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
+    ) {
+        info!("Generating Rust");
+        let ws = codegen_workspace(&rudder);
 
-    info!("Writing workspace to {:?}", &path);
-    write_workspace(ws, path);
+        info!("Writing workspace to {:?}", &path);
+        write_workspace(ws, path);
+    }
 }
 
 fn promote_width(width: usize) -> usize {

@@ -1,3 +1,4 @@
+use rayon::iter::ParallelIterator;
 use sailrs::{
     jib_ast::{self, Definition, Instruction, InstructionAux, Type, Value, Vl},
     sail_ast::Location,
@@ -26,6 +27,7 @@ pub fn apply_fn_denylist<I: Iterator<Item = jib_ast::Definition>>(
 }
 
 const DENYLIST: &[&'static str] = &[
+    "integer_update_subrange",
     "ExecuteA64", // unknown ident `exn`
     "ExecuteA32",
     "ExecuteT32__1", // unknown ident `exn`
@@ -35,6 +37,7 @@ const DENYLIST: &[&'static str] = &[
     "__TopLevel",
     "sail_mem_read",
     "sail_mem_write",
+    "read_request",
     "write_request",
     "take_exception",
     "gic_readonly",
@@ -44,7 +47,6 @@ const DENYLIST: &[&'static str] = &[
     "PhysMemTagRead",
     "__EndCycle",
     "__ListConfig",
-    "__Reset",
     "PendSErrorInterrupt",
     "step_model",
     "main",

@@ -92,9 +92,15 @@ impl Drop for IndentHandle {
 impl<W: Write> Visitor for JibPrettyPrinter<W> {
     fn visit_definition(&mut self, node: &Definition) {
         match node {
-            Definition::Register(id, typ, _) => {
+            Definition::Register(id, typ, init) => {
                 self.prindent(format!("register {} : ", id.as_interned()));
                 self.visit_type(typ);
+                write!(self.writer, " = {{").unwrap();
+                {
+                    let _h = self.indent();
+                    init.iter().for_each(|i| self.visit_instruction(i));
+                }
+                self.prindentln("}");
             }
             Definition::Type(TypeDefinition::Enum(id, ids)) => {
                 self.prindentln(format!("enum {} {{", id.as_interned()));

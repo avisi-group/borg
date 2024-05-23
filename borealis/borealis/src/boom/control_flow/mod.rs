@@ -10,7 +10,6 @@
 
 use {
     crate::boom::{
-        control_flow::builder::ControlFlowGraphBuilder,
         visitor::{Visitor, Walkable},
         Statement, Value,
     },
@@ -27,16 +26,9 @@ use {
     },
 };
 
-mod builder;
+pub mod builder;
 pub mod dot;
 pub mod util;
-
-/// Creates a control flow graph from a slice of statements.
-///
-/// This should be called per BOOM function.
-pub fn build_graph(statements: &[Shared<Statement>]) -> ControlFlowBlock {
-    ControlFlowGraphBuilder::from_statements(statements)
-}
 
 /// Node in a control flow graph, contains a basic block of statements and a
 /// terminator

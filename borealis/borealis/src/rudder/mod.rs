@@ -295,20 +295,10 @@ pub enum StatementKind {
 
     ReadVariable {
         symbol: Symbol,
-        /// Indices, when not empty, indicate access to fields/elements
-        ///
-        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a
-        /// struct of a vec of structs
-        indices: Vec<usize>,
     },
 
     WriteVariable {
         symbol: Symbol,
-        /// Indices, when not empty, indicate access to fields/elements
-        ///
-        /// [1,4,2] => 1st field of the 4th element of the 2nd field for a
-        /// struct of a vec of structs
-        indices: Vec<usize>,
         value: Statement,
     },
 
@@ -464,6 +454,13 @@ pub enum StatementKind {
         value: Statement,
         field_index: usize,
     },
+
+    /// Returns the original value with updated field
+    UpdateField {
+        original_value: Statement,
+        field_index: usize,
+        field_value: Statement,
+    },
 }
 
 #[derive(Eq, PartialEq)]
@@ -596,6 +593,9 @@ impl Statement {
                     true_value.classify(),
                     false_value.classify(),
                 ) {
+                    (ValueClass::Constant, ValueClass::Constant, ValueClass::Constant) => {
+                        ValueClass::Constant
+                    }
                     (ValueClass::Static, ValueClass::Static, ValueClass::Static) => {
                         ValueClass::Static
                     }
@@ -620,25 +620,14 @@ impl Statement {
             StatementKind::MatchesSum { .. } => ValueClass::Dynamic,
             StatementKind::UnwrapSum { .. } => ValueClass::Dynamic,
             StatementKind::ExtractField { .. } => ValueClass::Dynamic,
+            StatementKind::UpdateField { .. } => ValueClass::Dynamic,
         }
     }
 
     pub fn typ(&self) -> Arc<Type> {
         match self.kind() {
             StatementKind::Constant { typ, .. } => typ,
-            StatementKind::ReadVariable { symbol, indices } => {
-                let mut current_type = symbol.typ();
-
-                for index in indices {
-                    if let Type::Product(fields) = &*current_type {
-                        current_type = fields[index].clone();
-                    } else {
-                        panic!("cannot get field of non-composite type")
-                    }
-                }
-
-                current_type
-            }
+            StatementKind::ReadVariable { symbol } => symbol.typ(),
             StatementKind::WriteVariable { .. } => Arc::new(Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
             StatementKind::WriteRegister { .. } => Arc::new(Type::unit()),
@@ -726,6 +715,7 @@ impl Statement {
 
                 fields[field_index].clone()
             }
+            StatementKind::UpdateField { original_value, .. } => original_value.typ(),
         }
     }
 
@@ -777,12 +767,10 @@ impl StatementInner {
                     false_target: false_target,
                 };
             }
-            StatementKind::WriteVariable {
-                symbol, indices, ..
-            } => {
+            StatementKind::WriteVariable { symbol, .. } => {
                 self.kind = StatementKind::WriteVariable {
                     symbol,
-                    indices,
+
                     value: with.clone(),
                 };
             }
@@ -1174,6 +1162,27 @@ impl StatementInner {
             StatementKind::ReadPc => todo!(),
             StatementKind::Jump { .. } => todo!(),
             StatementKind::PhiNode { .. } => todo!(),
+            StatementKind::UpdateField {
+                original_value,
+                field_index,
+                field_value,
+            } => {
+                let original_value = if original_value == use_of {
+                    with.clone()
+                } else {
+                    original_value.clone()
+                };
+                let field_value = if field_value == use_of {
+                    with.clone()
+                } else {
+                    field_value.clone()
+                };
+                self.kind = StatementKind::UpdateField {
+                    original_value,
+                    field_index,
+                    field_value,
+                };
+            }
         }
     }
 }
@@ -1435,6 +1444,10 @@ impl Block {
         self.inner.get_mut().statements.insert(index, new);
     }
 
+    pub fn append_statement(&self, new: Statement) {
+        self.inner.get_mut().statements.push(new);
+    }
+
     pub fn kill_statement(&self, stmt: &Statement) {
         //assert!(Rc::ptr_eq()
 
@@ -1460,6 +1473,10 @@ impl Block {
             | StatementKind::Call { tail: true, .. } => vec![],
             _ => panic!("invalid terminator for block"),
         }
+    }
+
+    pub fn size(&self) -> usize {
+        self.statements().len()
     }
 }
 
@@ -1699,9 +1716,15 @@ pub enum FunctionKind {
 pub struct Context {
     fns: HashMap<InternedString, (FunctionKind, Function)>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
-    registers: HashMap<InternedString, (Arc<Type>, usize)>,
+    registers: HashMap<InternedString, RegisterDescriptor>,
     structs: HashSet<Arc<Type>>,
     unions: HashSet<Arc<Type>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct RegisterDescriptor {
+    pub typ: Arc<Type>,
+    pub offset: usize,
 }
 
 impl Context {
@@ -1734,7 +1757,7 @@ impl Context {
             .collect()
     }
 
-    pub fn get_registers(&self) -> HashMap<InternedString, (Arc<Type>, usize)> {
+    pub fn get_registers(&self) -> HashMap<InternedString, RegisterDescriptor> {
         self.registers.clone()
     }
 

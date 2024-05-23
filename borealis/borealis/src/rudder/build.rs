@@ -10,8 +10,8 @@ use {
                 REPLICATE_BITS_BOREALIS_INTERNAL, REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
             },
             BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
-            FunctionInner, FunctionKind, ShiftOperationKind, Statement, StatementBuilder,
-            StatementKind, Type, UnaryOperationKind,
+            FunctionInner, FunctionKind, RegisterDescriptor, ShiftOperationKind, Statement,
+            StatementBuilder, StatementKind, Type, UnaryOperationKind,
         },
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
@@ -23,27 +23,87 @@ use {
 pub fn from_boom(ast: &boom::Ast) -> Context {
     let mut build_ctx = BuildContext::default();
 
+    let mut register_init_blocks = HashMap::default();
+
     // DEFINITION ORDER DEPENDANT!!!
     ast.definitions.iter().for_each(|def| match def {
         boom::Definition::Enum { name, variants } => build_ctx.add_enum(*name, variants),
         boom::Definition::Union { name, fields } => build_ctx.add_union(*name, fields),
         boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
-        boom::Definition::Let { bindings, .. } => {
+        boom::Definition::Let { bindings, body } => {
             //todo handle body as like a setup fn or something?
             assert_eq!(1, bindings.len());
             let NamedType { name, typ } = &bindings[0];
 
             let typ = build_ctx.resolve_type(typ.clone());
+
+            register_init_blocks.insert(name, body.clone());
+
             build_ctx.add_register(*name, typ);
         }
         // todo
         boom::Definition::Pragma { .. } => (),
     });
 
-    ast.registers.iter().for_each(|(name, typ)| {
+    ast.registers.iter().for_each(|(name, (typ, init))| {
         let typ = build_ctx.resolve_type(typ.clone());
-        build_ctx.add_register(*name, typ)
+
+        register_init_blocks.insert(name, init.clone());
+
+        build_ctx.add_register(*name, typ);
     });
+
+    {
+        let mut register_init_names = vec![];
+        register_init_blocks
+            .into_iter()
+            .filter(|(name, ..)| name.as_ref() != "GPRs")
+            .map(|(name, entry_block)| {
+                let name = format!("{name}_initialize").into();
+                (
+                    name,
+                    boom::FunctionDefinition {
+                        signature: boom::FunctionSignature {
+                            name,
+                            parameters: Shared::new(vec![]),
+                            return_type: Shared::new(boom::Type::Unit),
+                        },
+                        entry_block,
+                    },
+                )
+            })
+            .for_each(|(name, fn_def)| {
+                build_ctx.add_function(name, &fn_def);
+                register_init_names.push(name);
+            });
+
+        build_ctx.add_function(
+            "borealis_register_init".into(),
+            &boom::FunctionDefinition {
+                signature: boom::FunctionSignature {
+                    name: "borealis_register_init".into(),
+                    parameters: Shared::new(vec![]),
+                    return_type: Shared::new(boom::Type::Unit),
+                },
+                entry_block: {
+                    let b = ControlFlowBlock::new();
+                    b.set_statements(
+                        register_init_names
+                            .into_iter()
+                            .map(|name| {
+                                Shared::new(boom::Statement::FunctionCall {
+                                    expression: None,
+                                    name,
+                                    arguments: vec![],
+                                })
+                            })
+                            .collect(),
+                    );
+                    b
+                },
+            },
+        );
+    }
 
     // need all functions with signatures before building
     ast.functions
@@ -106,7 +166,7 @@ struct BuildContext {
     enums: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, u32>)>,
 
     /// Register name to type and offset mapping
-    registers: HashMap<InternedString, (Arc<rudder::Type>, usize)>,
+    registers: HashMap<InternedString, RegisterDescriptor>,
     next_register_offset: usize,
 
     /// Functions
@@ -115,8 +175,13 @@ struct BuildContext {
 
 impl BuildContext {
     fn add_register(&mut self, name: InternedString, typ: Arc<Type>) {
-        self.registers
-            .insert(name, (typ.clone(), self.next_register_offset));
+        self.registers.insert(
+            name,
+            RegisterDescriptor {
+                typ: typ.clone(),
+                offset: self.next_register_offset,
+            },
+        );
 
         log::debug!("adding register {name} @ {:x}", self.next_register_offset);
 
@@ -420,7 +485,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | boom::Statement::End(_)
             | boom::Statement::Undefined
             | boom::Statement::If { .. } => {
-                unreachable!("no control flow should exist at this point in compilation!")
+                panic!("no control flow should exist at this point in compilation!\n{statement:?}")
             }
             boom::Statement::Exit(_) | boom::Statement::Comment(_) => (),
             boom::Statement::Panic(values) => {
@@ -753,10 +818,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .generate_cast(args[0].clone(), Arc::new(Type::f32())),
                 ),
 
+                // val pow2 : (%i) -> %i
+                // val _builtin_pow2 : (%i) -> %i
                 "pow2" | "_builtin_pow2" => {
-                    Some(self.builder.build(StatementKind::UnaryOperation {
-                        kind: UnaryOperationKind::Power2,
-                        value: args[0].clone(),
+                    // WRONG!! pow2(n) is 2^n not n^2
+                    // Some(self.builder.build(StatementKind::UnaryOperation {
+                    //     kind: UnaryOperationKind::Power2,
+                    //     value: args[0].clone(),
+                    // }))
+
+                    // hopefully correct
+                    // 1 << args[0]
+                    let _1 = self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::ArbitraryLengthInteger),
+                        value: ConstantValue::SignedInteger(1),
+                    });
+                    Some(self.builder.build(StatementKind::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: _1,
+                        amount: args[0].clone(),
                     }))
                 }
 
@@ -1041,7 +1121,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .builder
                         .generate_cast(args[0].clone(), Arc::new(Type::u64()));
 
-                    let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
+                    let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
 
                     let base = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
@@ -1079,7 +1159,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .builder
                         .generate_cast(args[0].clone(), Arc::new(Type::u64()));
 
-                    let base = self.ctx().registers.get(&"R0".into()).unwrap().1;
+                    let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
 
                     let base = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
@@ -1196,13 +1276,24 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let start = args[2].clone();
                     let source = args[3].clone();
 
-                    // copy source[0..(end - start + 1)] into dest[start..(end + 1)]
-
-                    // let length = end - start
-                    let source_length = self.builder.build(StatementKind::BinaryOperation {
+                    let sum = self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
                         lhs: end,
                         rhs: start.clone(),
+                    });
+
+                    let _1 = {
+                        let _u1 = self.builder.build(StatementKind::Constant {
+                            typ: Arc::new(Type::u64()),
+                            value: ConstantValue::UnsignedInteger(1),
+                        });
+                        self.builder.generate_cast(_u1, sum.typ())
+                    };
+
+                    let source_length = self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Add,
+                        lhs: sum,
+                        rhs: _1,
                     });
 
                     Some(self.generate_set_slice(destination, source, source_length, start))
@@ -1255,21 +1346,21 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 //         size: size_bits,
                 //     }))
                 // }
-                "HaveEL" => {
-                    let two = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::new_primitive(
-                            rudder::PrimitiveTypeClass::UnsignedInteger,
-                            2,
-                        )),
-                        value: ConstantValue::UnsignedInteger(2),
-                    });
-                    Some(self.builder.build(StatementKind::BinaryOperation {
-                        kind: BinaryOperationKind::CompareLessThan,
-                        lhs: args[0].clone(),
-                        rhs: two,
-                    }))
-                    // el < 2
-                }
+                // "HaveEL" => {
+                //     let two = self.builder.build(StatementKind::Constant {
+                //         typ: Arc::new(Type::new_primitive(
+                //             rudder::PrimitiveTypeClass::UnsignedInteger,
+                //             2,
+                //         )),
+                //         value: ConstantValue::UnsignedInteger(2),
+                //     });
+                //     Some(self.builder.build(StatementKind::BinaryOperation {
+                //         kind: BinaryOperationKind::CompareLessThan,
+                //         lhs: args[0].clone(),
+                //         rhs: two,
+                //     }))
+                //     // el < 2
+                // }
                 // ignore
                 "append_str" | "__monomorphize" => Some(args[0].clone()),
 
@@ -1289,7 +1380,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "sail_tlbi"
                 | "prerr_bits"
                 | "prerr_int"
-                | "write_tag#"
                 | "sail_cache_op"
                 | "sail_barrier"
                 | "__WakeupRequest"
@@ -1336,16 +1426,77 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let cast = self.builder.generate_cast(source, outer_type);
 
-                self.builder.build(StatementKind::WriteVariable {
-                    symbol,
-                    indices,
-                    value: cast,
-                });
+                let value = if !indices.is_empty() {
+                    // indices [1, 4, 2]
+                    // var read
+                    // read 1 of var
+                    // read 4 of 1
+                    // read 2 of 4
+                    // write cast to 2
+                    // modify field 4
+                    // modify field 1
+                    // var write
+
+                    let initial_read = self.builder.build(StatementKind::ReadVariable {
+                        symbol: symbol.clone(),
+                    });
+
+                    let mut stack = vec![initial_read];
+
+                    for field_index in indices[..indices.len() - 1].iter().copied() {
+                        let value = stack.last().unwrap().clone();
+
+                        let Type::Product(fields) = &*value.typ() else {
+                            // todo: maybe vectors in future?
+                            panic!("cannot extract field of non-product");
+                        };
+                        assert!(field_index <= (fields.len() - 1));
+
+                        let ex = self
+                            .builder
+                            .build(StatementKind::ExtractField { value, field_index });
+                        stack.push(ex);
+                    }
+
+                    // stack [initial_read, ex1, ex4]
+                    assert_eq!(1 + (indices.len() - 1), stack.len());
+
+                    let mut last = cast;
+
+                    for field_index in indices[..indices.len()].iter().rev().copied() {
+                        let original_value = stack.pop().unwrap();
+
+                        let Type::Product(fields) = &*original_value.typ() else {
+                            // todo: maybe vectors in future?
+                            panic!("cannot update field of non-product");
+                        };
+                        assert!(field_index <= (fields.len() - 1));
+
+                        last = self.builder.build(StatementKind::UpdateField {
+                            original_value,
+                            field_index,
+                            field_value: last,
+                        });
+                    }
+
+                    // leaving an empty stack
+                    assert_eq!(0, stack.len());
+
+                    last
+                } else {
+                    cast
+                };
+
+                self.builder
+                    .build(StatementKind::WriteVariable { symbol, value });
             }
             None => {
                 //register lookup
-                let Some((register_type, register_offset)) =
-                    self.ctx().registers.get(root).cloned()
+                let Some(RegisterDescriptor {
+                    typ: register_type,
+                    offset: register_offset,
+                    ..
+                }) = self.ctx().registers.get(root).cloned()
                 else {
                     panic!("wtf is {root}");
                 };
@@ -1385,9 +1536,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let (indices, _) =
                         fields_to_indices(&self.ctx().structs, symbol.typ(), &outer_field_accesses);
 
-                    return self
-                        .builder
-                        .build(StatementKind::ReadVariable { symbol, indices });
+                    let read_var = self.builder.build(StatementKind::ReadVariable { symbol });
+
+                    let mut last = read_var;
+
+                    for field_index in indices {
+                        last = self.builder.build(StatementKind::ExtractField {
+                            value: last,
+                            field_index,
+                        })
+                    }
+
+                    return last;
                 }
 
                 // parameter
@@ -1395,13 +1555,27 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let (indices, _) =
                         fields_to_indices(&self.ctx().structs, symbol.typ(), &outer_field_accesses);
 
-                    return self
-                        .builder
-                        .build(StatementKind::ReadVariable { symbol, indices });
+                    let read_var = self.builder.build(StatementKind::ReadVariable { symbol });
+
+                    let mut last = read_var;
+
+                    for field_index in indices {
+                        last = self.builder.build(StatementKind::ExtractField {
+                            value: last,
+                            field_index,
+                        })
+                    }
+
+                    return last;
                 }
 
                 // register
-                if let Some((typ, register_offset)) = self.ctx().registers.get(ident).cloned() {
+                if let Some(RegisterDescriptor {
+                    typ,
+                    offset: register_offset,
+                    ..
+                }) = self.ctx().registers.get(ident).cloned()
+                {
                     let (offsets, outer_type) =
                         fields_to_offsets(&self.ctx().structs, typ.clone(), &outer_field_accesses);
 
@@ -1743,73 +1917,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         source_length: Statement,
         destination_start_offset: Statement,
     ) -> Statement {
-        // // let length = end - start
-        // let length = self
-        //     .statement_builder
-        //     .build(StatementKind::BinaryOperation {
-        //         kind: BinaryOperationKind::Sub,
-        //         lhs: end,
-        //         rhs: start.clone(),
-        //     });
-
-        // let source_mask = (1 << (length) - 1);
-        let one = self.builder.build(StatementKind::Constant {
-            typ: Arc::new(Type::u64()),
-            value: rudder::ConstantValue::UnsignedInteger(1),
-        });
-        let one = self.builder.generate_cast(one, source.typ());
-        let shifted = self.builder.build(StatementKind::ShiftOperation {
-            kind: ShiftOperationKind::LogicalShiftLeft,
-            value: one.clone(),
-            amount: source_length,
-        });
-        let source_mask = self.builder.build(StatementKind::BinaryOperation {
-            kind: BinaryOperationKind::Sub,
-            lhs: shifted,
-            rhs: one,
-        });
-
-        // let masked_source = source & source_mask
-        let masked_source = self.builder.build(StatementKind::BinaryOperation {
-            kind: BinaryOperationKind::And,
-            lhs: source,
-            rhs: source_mask.clone(),
-        });
-
-        // let source = masked_source << start
-        let source = self.builder.build(StatementKind::ShiftOperation {
-            kind: ShiftOperationKind::LogicalShiftLeft,
-            value: masked_source,
-            amount: destination_start_offset.clone(),
-        });
-
-        // let dest_mask = ~(source_mask << start)
-        let shifted_source_mask = self.builder.build(StatementKind::ShiftOperation {
-            kind: ShiftOperationKind::LogicalShiftLeft,
-            value: source_mask,
-            amount: destination_start_offset,
-        });
-        let destination_mask = self.builder.build(StatementKind::UnaryOperation {
-            kind: rudder::UnaryOperationKind::Complement,
-            value: shifted_source_mask,
-        });
-
-        // let dest = dest & dest_mask
-        let destination = self.builder.build(StatementKind::BinaryOperation {
-            kind: BinaryOperationKind::And,
-            lhs: destination,
-            rhs: destination_mask,
-        });
-
-        // let result = source | dest
-        self.builder.build(StatementKind::BinaryOperation {
-            kind: BinaryOperationKind::Or,
-            lhs: destination,
-            rhs: source,
+        self.builder.build(StatementKind::BitInsert {
+            original_value: destination,
+            insert_value: source,
+            start: destination_start_offset,
+            length: source_length,
         })
     }
 
     fn generate_concat(&mut self, lhs: Statement, rhs: Statement) -> Statement {
+        // todo: (zero extend original value || create new bits with runtime length) then bitinsert
         match (&*lhs.typ(), &*rhs.typ()) {
             (Type::Bits, Type::Bits) => {
                 let l_value = self

@@ -1,5 +1,8 @@
 use {
-    borealis::{brig::sail_to_brig, load_model},
+    borealis::{
+        brig::{sail_to_brig, GenerationMode},
+        load_model,
+    },
     clap::Parser,
     color_eyre::eyre::Result,
     common::init_logger,
@@ -18,6 +21,10 @@ struct Args {
     #[arg(long)]
     dump_ir: Option<PathBuf>,
 
+    /// Only generate IR - don't do codegen
+    #[arg(long)]
+    ir_only: bool,
+
     /// Path to Sail model archive
     input: PathBuf,
     /// Path to brig Rust file
@@ -35,7 +42,17 @@ fn main() -> Result<()> {
 
     let jib = load_model(&args.input);
 
-    sail_to_brig(jib, args.output, args.dump_ir);
+    let mode = if let Some(ir_path) = args.dump_ir {
+        if args.ir_only {
+            GenerationMode::IrOnly(ir_path)
+        } else {
+            GenerationMode::CodeGenWithIr(ir_path)
+        }
+    } else {
+        GenerationMode::CodeGen
+    };
+
+    sail_to_brig(jib, args.output, mode);
 
     info!("done");
 

@@ -31,10 +31,15 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         .iter()
         .for_each(|def| visitor.visit_definition(def));
 
-    registers.iter().for_each(|(name, typ)| {
+    registers.iter().for_each(|(name, (typ, init))| {
         write!(visitor.writer, "register {name}: ").unwrap();
         visitor.visit_type(typ.clone());
-        writeln!(visitor.writer).unwrap();
+        writeln!(visitor.writer, " = {{").unwrap();
+        {
+            let _h = visitor.indent();
+            visitor.print_control_flow_graph(init.clone());
+        }
+        writeln!(visitor.writer, "}}").unwrap();
     });
 
     functions
@@ -90,6 +95,53 @@ impl<'writer, W: Write> PrettyPrinter<'writer, W> {
         IndentHandle {
             indent: self.indent.clone(),
         }
+    }
+
+    fn print_control_flow_graph(&mut self, entry_block: ControlFlowBlock) {
+        entry_block.iter().for_each(|b| {
+            writeln!(self.writer, "    {}:", b).unwrap();
+            {
+                b.statements().iter().for_each(|stmt| {
+                    write!(self.writer, "        ").unwrap();
+                    self.visit_statement(stmt.clone());
+                    writeln!(self.writer).unwrap();
+                });
+
+                match b.terminator() {
+                    Terminator::Return(None) => writeln!(self.writer, "        return;").unwrap(),
+                    Terminator::Return(Some(value)) => {
+                        write!(self.writer, "        return ").unwrap();
+                        self.visit_value(Shared::new(value));
+                        writeln!(self.writer, ";").unwrap();
+                    }
+                    Terminator::Conditional {
+                        condition,
+                        target,
+                        fallthrough,
+                    } => {
+                        write!(self.writer, "        if (").unwrap();
+                        self.visit_value(Shared::new(condition));
+                        writeln!(self.writer, ") {{").unwrap();
+                        writeln!(self.writer, "            goto {target};").unwrap();
+                        writeln!(self.writer, "        }} else {{").unwrap();
+                        writeln!(self.writer, "            goto {fallthrough};").unwrap();
+                        writeln!(self.writer, "        }}").unwrap();
+                    }
+                    Terminator::Unconditional { target } => {
+                        writeln!(self.writer, "        goto {target};").unwrap();
+                    }
+                    Terminator::Panic(values) => {
+                        write!(self.writer, "        panic ").unwrap();
+                        for value in values {
+                            self.visit_value(value);
+                            writeln!(self.writer, ", ").unwrap();
+                        }
+                        writeln!(self.writer, ";").unwrap();
+                    }
+                }
+            }
+            writeln!(self.writer).unwrap();
+        });
     }
 }
 
@@ -165,8 +217,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
                 {
                     let _h = self.indent();
-                    body.iter()
-                        .for_each(|statement| self.visit_statement(statement.clone()));
+                    self.print_control_flow_graph(body.clone());
                 }
 
                 writeln!(self.writer, "}}").unwrap();
@@ -177,50 +228,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     fn visit_function_definition(&mut self, node: &FunctionDefinition) {
         self.visit_function_signature(&node.signature);
 
-        node.entry_block.iter().for_each(|b| {
-            writeln!(self.writer, "    {}:", b).unwrap();
-            {
-                b.statements().iter().for_each(|stmt| {
-                    write!(self.writer, "        ").unwrap();
-                    self.visit_statement(stmt.clone());
-                    writeln!(self.writer).unwrap();
-                });
-
-                match b.terminator() {
-                    Terminator::Return(None) => writeln!(self.writer, "        return;").unwrap(),
-                    Terminator::Return(Some(value)) => {
-                        write!(self.writer, "        return ").unwrap();
-                        self.visit_value(Shared::new(value));
-                        writeln!(self.writer, ";").unwrap();
-                    }
-                    Terminator::Conditional {
-                        condition,
-                        target,
-                        fallthrough,
-                    } => {
-                        write!(self.writer, "        if (").unwrap();
-                        self.visit_value(Shared::new(condition));
-                        writeln!(self.writer, ") {{").unwrap();
-                        writeln!(self.writer, "            goto {target};").unwrap();
-                        writeln!(self.writer, "        }} else {{").unwrap();
-                        writeln!(self.writer, "            goto {fallthrough};").unwrap();
-                        writeln!(self.writer, "        }}").unwrap();
-                    }
-                    Terminator::Unconditional { target } => {
-                        writeln!(self.writer, "        goto {target};").unwrap();
-                    }
-                    Terminator::Panic(values) => {
-                        write!(self.writer, "        panic ").unwrap();
-                        for value in values {
-                            self.visit_value(value);
-                            writeln!(self.writer, ", ").unwrap();
-                        }
-                        writeln!(self.writer, ";").unwrap();
-                    }
-                }
-            }
-            writeln!(self.writer).unwrap();
-        });
+        self.print_control_flow_graph(node.entry_block.clone());
 
         writeln!(self.writer, "}}").unwrap();
     }

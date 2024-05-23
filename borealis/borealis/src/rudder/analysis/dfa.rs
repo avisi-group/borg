@@ -239,9 +239,16 @@ impl StatementUseAnalysis {
                 StatementKind::MatchesSum { value, .. } => self.add_use(&value, &stmt),
                 StatementKind::UnwrapSum { value, .. } => self.add_use(&value, &stmt),
                 StatementKind::ExtractField { value, .. } => self.add_use(&value, &stmt),
+                StatementKind::UpdateField {
+                    original_value,
+                    field_value,
+                    ..
+                } => {
+                    self.add_use(&original_value, &stmt);
+                    self.add_use(&field_value, &stmt);
+                }
 
-                StatementKind::ReadVariable { symbol, indices } => {}
-
+                StatementKind::ReadVariable { symbol } => {}
                 StatementKind::ReadPc => {}
                 StatementKind::Jump { target } => {}
                 StatementKind::PhiNode { members } => {}
@@ -265,6 +272,10 @@ impl StatementUseAnalysis {
 
     pub fn is_dead(&self, stmt: &Statement) -> bool {
         !stmt.has_side_effects() && self.stmt_uses.get(stmt).is_none()
+    }
+
+    pub fn has_uses(&self, stmt: &Statement) -> bool {
+        self.stmt_uses.get(stmt).is_some()
     }
 
     pub fn get_uses(&self, stmt: &Statement) -> &HashSet<Statement> {

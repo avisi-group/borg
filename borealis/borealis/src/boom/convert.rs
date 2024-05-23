@@ -1,10 +1,13 @@
 //! JIB to BOOM conversion
 
+use rayon::iter::ParallelIterator;
 use {
     crate::boom::{
-        self, control_flow::build_graph, Bit, FunctionSignature, NamedType, Parameter, Size,
+        self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionSignature, NamedType,
+        Parameter, Size,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
+    rayon::iter::IntoParallelIterator,
     sailrs::{jib_ast, sail_ast},
     std::borrow::Borrow,
 };
@@ -29,9 +32,10 @@ impl BoomEmitter {
     }
 
     /// Process a sequence of JIB definitions
+    /// IntoParallelIterator
     pub fn process<I: IntoIterator<Item = jib_ast::Definition>>(&mut self, definitions: I) {
         definitions
-            .into_iter()
+            .into_iter() //.into_par_iter
             .for_each(|def| self.process_definition(&def));
     }
 
@@ -42,10 +46,18 @@ impl BoomEmitter {
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
         match definition {
-            jib_ast::Definition::Register(ident, typ, _) => {
-                self.ast
-                    .registers
-                    .insert(ident.as_interned(), convert_type(typ));
+            jib_ast::Definition::Register(ident, typ, body) => {
+                self.ast.registers.insert(
+                    ident.as_interned(),
+                    (
+                        convert_type(typ),
+                        //  allow unknown terminators for registers
+                        ControlFlowGraphBuilder::from_statements(
+                            &convert_body(body.as_ref()),
+                            true,
+                        ),
+                    ),
+                );
             }
             jib_ast::Definition::Type(type_def) => {
                 let def = match type_def {
@@ -73,7 +85,11 @@ impl BoomEmitter {
                             typ: convert_type(typ),
                         })
                         .collect(),
-                    body: convert_body(body.as_ref()),
+                    //  allow unknown terminators for letbinds
+                    body: ControlFlowGraphBuilder::from_statements(
+                        &convert_body(body.as_ref()),
+                        true,
+                    ),
                 });
             }
             jib_ast::Definition::Val(id, _, parameters, out) => {
@@ -107,7 +123,8 @@ impl BoomEmitter {
                 let body = convert_body(body.as_ref());
 
                 //debug!("building new control flow graph for {name}");
-                let control_flow = build_graph(&body);
+                // do not allow unknown terminators for regular functions
+                let control_flow = ControlFlowGraphBuilder::from_statements(&body, false);
 
                 self.ast.functions.insert(
                     name,

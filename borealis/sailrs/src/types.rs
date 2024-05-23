@@ -4,6 +4,7 @@ use {
     common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
+    rayon::{iter::IntoParallelIterator, vec::IntoIter},
     std::{collections::LinkedList, ffi::OsStr, fmt::Display, path::PathBuf, slice, vec},
 };
 
@@ -119,6 +120,15 @@ impl<T> IntoIterator for ListVec<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+impl<T: Send> IntoParallelIterator for ListVec<T> {
+    type Item = T;
+    type Iter = IntoIter<T>;
+
+    fn into_par_iter(self) -> Self::Iter {
+        self.0.into_par_iter()
     }
 }
 
