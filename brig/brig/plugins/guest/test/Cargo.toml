@@ -13,6 +13,8 @@ AddWithCarry = { path = "../../../../../brig-aarch64/AddWithCarry" }
 DecodeBitMasks = { path = "../../../../../brig-aarch64/DecodeBitMasks" }
 replicate_bits_borealis_internal = { path = "../../../../../brig-aarch64/replicate_bits_borealis_internal" }
 u__IMPDEF_integer = { path = "../../../../../brig-aarch64/u__IMPDEF_integer" }
+IsPow2 = {path = "../../../../../brig-aarch64/IsPow2"}
+FloorPow2 = {path = "../../../../../brig-aarch64/FloorPow2"}
+CeilPow2 = {path = "../../../../../brig-aarch64/CeilPow2"}
 aarch64_interpreter = { path = "../devices/arm/aarch64_interpreter"}
-
 log = "0.4.21"

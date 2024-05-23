@@ -20,8 +20,11 @@
                     "kind": "bin"
                 }
             },
-            "args": ["-v", "../cmp.bin"],
+            "args": ["../brig-cli/guest_data/kernel"],
             "cwd": "${workspaceFolder}/standalone",
+            "env": {
+                "RUST_LOG": "trace",
+            }
         },
         {
             "type": "lldb",

@@ -1,13 +1,13 @@
 #![no_std]
 
 use {
-    aarch64_interpreter::init_state,
+    aarch64_interpreter::set_initial_state,
     arch::{Bits, ProductTypebc91b195b0b2a883, ProductTyped54bc449dd09e5bd, State, Tracer},
     core::fmt::Debug,
     plugins_rt::api::{PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
     AddWithCarry::AddWithCarry,
-    DecodeBitMasks::DecodeBitMasks,
+    DecodeBitMasks::DecodeBitMasks,IsPow2::IsPow2,FloorPow2::FloorPow2, CeilPow2::CeilPow2
 };
 
 #[no_mangle]
@@ -31,6 +31,8 @@ fn entrypoint(host: &'static dyn PluginHost) {
     ubfx();
 
     fibonacci();
+
+    ispow2();
 
     log::info!("tests passed");
 }
@@ -163,7 +165,7 @@ fn ubfx() {
 fn fibonacci() {
     let mut state = State::init(0x0);
 
-    init_state(&mut state, 0x0, 0x0);
+    set_initial_state(&mut state);
 
     let program = [
         // <_start>
@@ -200,6 +202,16 @@ fn fibonacci() {
 
     assert_eq!(89, state.read_register::<u64>(arch::REG_R0));
     assert_eq!(10, state.read_register::<u64>(arch::REG_R3));
+}
+
+fn ispow2() {
+    let mut state = State::init(0x0);
+    let x = 2048i128;
+    assert_eq!(
+        FloorPow2(&mut state, &LogTracer, x),
+        CeilPow2(&mut state, &LogTracer, x)
+    );
+    assert!(IsPow2(&mut state, &LogTracer, x));
 }
 
 struct NoopTracer;
