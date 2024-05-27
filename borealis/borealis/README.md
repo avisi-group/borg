@@ -17,4 +17,4 @@
 
 ## Usage
 
-$ cargo r --bin borealis -- --dump-ir ./target ../arm-v9.4-a_d43f3f4c.rkyv ~/Documents/Sync/brig-aarch64
+$ cargo r --bin borealis -- --dump-ir ./target ../arm-v9.4-a_d43f3f4c.rkyv ../aarch64

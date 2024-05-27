@@ -1,6 +1,7 @@
 *.rkyv
 aarch64
 brig-programs
+ir
 
 **/.DS_Store
 **/target
