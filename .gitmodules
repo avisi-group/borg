@@ -1,0 +1,3 @@
+[submodule "borealis/data/sail-arm"]
+    path = borealis/data/sail-arm
+    url = https://github.com/rems-project/sail-arm.git

@@ -1,3 +1,0 @@
-[submodule "data/sail-arm"]
-	path = data/sail-arm
-	url = https://github.com/rems-project/sail-arm.git
