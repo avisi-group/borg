@@ -14,6 +14,8 @@ use {
     IsPow2::IsPow2,
 };
 
+const TRACER: &NoopTracer = &NoopTracer;
+
 #[no_mangle]
 #[link_section = ".plugin_header"]
 pub static PLUGIN_HEADER: PluginHeader = PluginHeader {
@@ -43,13 +45,13 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
 fn addwithcarry_negative() {
     let mut state = State::init(0x0);
-    let tracer = NoopTracer;
+
     let x = Bits::new(0x0, 0x40);
     let y = Bits::new(-5i128 as u128, 0x40);
     let carry_in = false;
 
     assert_eq!(
-        AddWithCarry(&mut state, &tracer, x, y, carry_in),
+        AddWithCarry(&mut state, TRACER, x, y, carry_in),
         ProductTyped54bc449dd09e5bd {
             _0: Bits::new(-5i64 as u128, 0x40),
             _1: 0b1000
@@ -59,13 +61,12 @@ fn addwithcarry_negative() {
 
 fn addwithcarry_zero() {
     let mut state = State::init(0x0);
-    let tracer = NoopTracer;
     let x = Bits::new(0x0, 0x40);
     let y = Bits::new(0x0, 0x40);
     let carry_in = false;
 
     assert_eq!(
-        AddWithCarry(&mut state, &tracer, x, y, carry_in),
+        AddWithCarry(&mut state, TRACER, x, y, carry_in),
         ProductTyped54bc449dd09e5bd {
             _0: Bits::new(0x0, 0x40),
             _1: 0b0100
@@ -75,13 +76,13 @@ fn addwithcarry_zero() {
 
 fn addwithcarry_carry() {
     let mut state = State::init(0x0);
-    let tracer = NoopTracer;
+
     let x = Bits::new(u64::MAX as u128, 0x40);
     let y = Bits::new(0x1, 0x40);
     let carry_in = false;
 
     assert_eq!(
-        AddWithCarry(&mut state, &tracer, x, y, carry_in),
+        AddWithCarry(&mut state, TRACER, x, y, carry_in),
         ProductTyped54bc449dd09e5bd {
             _0: Bits::new(0x0, 0x40),
             _1: 0b0110
@@ -91,13 +92,13 @@ fn addwithcarry_carry() {
 
 fn addwithcarry_overflow() {
     let mut state = State::init(0x0);
-    let tracer = NoopTracer;
+
     let x = Bits::new(u64::MAX as u128 / 2, 0x40);
     let y = Bits::new(u64::MAX as u128 / 2, 0x40);
     let carry_in = false;
 
     assert_eq!(
-        AddWithCarry(&mut state, &tracer, x, y, carry_in),
+        AddWithCarry(&mut state, TRACER, x, y, carry_in),
         ProductTyped54bc449dd09e5bd {
             _0: Bits::new(!0x1, 0x40),
             _1: 0b1001
@@ -109,13 +110,13 @@ fn addwithcarry_overflow() {
 /// instruction
 fn addwithcarry_early_4880_loop() {
     let mut state = State::init(0x0);
-    let tracer = NoopTracer;
+
     let x = Bits::new(0x425a6004, 0x40);
     let y = Bits::new(!0x425a6020, 0x40);
     let carry_in = false;
 
     assert_eq!(
-        AddWithCarry(&mut state, &tracer, x, y, carry_in),
+        AddWithCarry(&mut state, TRACER, x, y, carry_in),
         ProductTyped54bc449dd09e5bd {
             _0: Bits::new(0xffffffffffffffe3, 0x40),
             _1: 0b1000
@@ -127,19 +128,19 @@ fn replicate_bits() {
     let mut state = State::init(0x0);
     assert_eq!(
         Bits::new(0xffff_ffff, 32),
-        replicate_bits_borealis_internal(&mut state, &NoopTracer, Bits::new(0xff, 8), 4)
+        replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0xff, 8), 4)
     );
     assert_eq!(
         Bits::new(0xaa, 8),
-        replicate_bits_borealis_internal(&mut state, &NoopTracer, Bits::new(0xaa, 8), 1)
+        replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0xaa, 8), 1)
     );
     assert_eq!(
         Bits::new(0xaaaa, 16),
-        replicate_bits_borealis_internal(&mut state, &NoopTracer, Bits::new(0xaa, 8), 2)
+        replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0xaa, 8), 2)
     );
     assert_eq!(
         Bits::new(0xffff_ffff, 32),
-        replicate_bits_borealis_internal(&mut state, &NoopTracer, Bits::new(0x1, 1), 32)
+        replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0x1, 1), 32)
     );
 }
 
@@ -152,7 +153,7 @@ fn ubfx() {
                 _0: Bits::new(0xFFFF00000000000F, 64),
                 _1: Bits::new(0xF, 64)
             },
-            DecodeBitMasks(&mut state, &NoopTracer, true, 0x13, 0x10, false, 0x40)
+            DecodeBitMasks(&mut state, TRACER, true, 0x13, 0x10, false, 0x40)
         );
     }
 
@@ -161,16 +162,16 @@ fn ubfx() {
         state.write_register::<u64>(arch::REG_R3, 0x8444_c004);
 
         // ubfx x3, x3, #16, #4
-        arch::decode_execute(0xd3504c63, &mut state, &NoopTracer);
+        arch::decode_execute(0xd3504c63, &mut state, TRACER);
         assert_eq!(0x4, state.read_register::<u64>(arch::REG_R3));
     }
 }
 
 fn fibonacci() {
     let mut state = State::init(0x0);
-    borealis_register_init(&mut state, &LogTracer);
+    borealis_register_init(&mut state, TRACER);
     // hacky, run sail function that goes before the main loop :/
-    u__InitSystem(&mut state, &LogTracer, ());
+    u__InitSystem(&mut state, TRACER, ());
 
     let program = [
         // <_start>
@@ -202,7 +203,7 @@ fn fibonacci() {
         }
 
         let instr = program[pc / 4];
-        arch::decode_execute(instr, &mut state, &NoopTracer);
+        arch::decode_execute(instr, &mut state, TRACER);
     }
 
     assert_eq!(89, state.read_register::<u64>(arch::REG_R0));
@@ -213,10 +214,10 @@ fn ispow2() {
     let mut state = State::init(0x0);
     let x = 2048i128;
     assert_eq!(
-        FloorPow2(&mut state, &LogTracer, x),
-        CeilPow2(&mut state, &LogTracer, x)
+        FloorPow2(&mut state, TRACER, x),
+        CeilPow2(&mut state, TRACER, x)
     );
-    assert!(IsPow2(&mut state, &LogTracer, x));
+    assert!(IsPow2(&mut state, TRACER, x));
 }
 
 struct NoopTracer;
