@@ -1,0 +1,7 @@
+*.rkyv
+aarch64
+brig-programs
+
+**/.DS_Store
+**/target
+**/_build

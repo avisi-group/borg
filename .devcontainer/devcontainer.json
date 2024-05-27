@@ -1,0 +1,32 @@
+{
+	"name": "Borg Dockerfile",
+	"build": {
+		"context": "..",
+		// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
+		"dockerfile": "Dockerfile"
+	},
+	"features": {
+		"ghcr.io/devcontainers-contrib/features/syncthing:1": {},
+		"ghcr.io/devcontainers-contrib/features/tailscale:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"rust-lang.rust-analyzer",
+				"redhat.vscode-xml",
+				"ocamllabs.ocaml-platform",
+				"webfreak.debug",
+				"yzhang.markdown-all-in-one",
+				"ms-vscode.hexeditor",
+				"tamasfe.even-better-toml",
+				"serayuzgur.crates",
+				"vadimcn.vscode-lldb"
+			]
+		}
+	}
+
+	// disabled due to permission error, need to add `:z` somewhere
+	// "mounts": [
+	// 	"source=/home/fm208/.cargo/target,target=/usr/local/cargo/target,type=bind,consistency=cached"
+	// ]
+}
