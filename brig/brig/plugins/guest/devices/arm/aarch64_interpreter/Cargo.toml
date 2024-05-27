@@ -1,0 +1,11 @@
+[package]
+name = "aarch64_interpreter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arch = { path = "../../../../../../../aarch64/arch" }
+u__InitSystem = { path = "../../../../../../../aarch64/u__InitSystem" }
+borealis_register_init = { path = "../../../../../../../aarch64/borealis_register_init" }
+
+log = "0.4.21"

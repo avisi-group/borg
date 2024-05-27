@@ -1,0 +1,14 @@
+[package]
+name = "proc_macro_lib"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "proc_macro_lib"
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+syn = { version = "2.0.60", features = ["extra-traits"] }
+quote = "1.0.36"
+proc-macro2 = "1.0.81"

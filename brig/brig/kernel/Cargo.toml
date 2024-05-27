@@ -1,0 +1,48 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+proc_macro_lib.workspace = true
+plugins_api.workspace = true
+
+bootloader_api = "0.11.7"
+x86_64 = "0.15.1"
+x86 = "0.52.0"
+x2apic = "0.4.3"
+uart_16550 = "0.3.0"
+acpi = "5.0.0"
+virtio-drivers = { version = "0.7.2", features = ["alloc"] }
+
+spin = "0.9.8"
+buddy_system_allocator = "0.9.1"
+byte-unit = { version = "5.1.4", default-features = false, features = ["byte"] }
+log = { version = "0.4.21", default-features = false }
+elf = { version = "0.7.4", default-features = false }
+rustc-demangle = { version = "0.1.23", default-features = false }
+serde = { version = "1.0.200", default-features = false, features = [
+    "derive",
+    "alloc",
+] }
+serde_json = { version = "1.0.116", default-features = false, features = [
+    "alloc",
+] }
+phf = { version = "0.11.2", default-features = false, features = ["macros"] }
+tar-no-std = { version = "0.3.1", features = ["alloc"] }
+thiserror-core = { version = "1.0.50", default-features = false }
+displaydoc = { version = "0.2.4", default-features = false }
+uuid = { version = "1.8.0", default-features = false }
+fastrand = { version = "2.1.0", default-features = false, features = ["alloc"] }
+hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
+byteorder = { version = "1.5.0", default-features = false }
+concat-idents = "1.1.5"
+iced-x86 = { version = "1.21.0", default-features = false, features = [
+    "decoder",
+    "encoder",
+    "gas",
+    "no_std",
+] }
+elfloader = { git = "https://github.com/avisi-group/rust-elfloader", rev = "c7e6230" }
+
+# twox-hash = { version = "1.6.3", default-features = false } # not currently needed, but it's a good no_std hash library when it is needed

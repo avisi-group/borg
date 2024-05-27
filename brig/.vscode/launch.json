@@ -1,0 +1,49 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'standalone'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=standalone",
+                    "--package=standalone",
+                    "--manifest-path=${workspaceFolder}/standalone/Cargo.toml"
+                ],
+                "filter": {
+                    "name": "standalone",
+                    "kind": "bin"
+                }
+            },
+            "args": ["../brig-cli/guest_data/kernel"],
+            "cwd": "${workspaceFolder}/standalone",
+            "env": {
+                "RUST_LOG": "trace",
+            }
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'brig-cli'",
+            "cargo": {
+                "args":[
+                    "+nightly",
+                    "build",
+                    "--bin=brig-cli",
+                    "--package=brig-cli",
+                    "--manifest-path=${workspaceFolder}/brig-cli/Cargo.toml"
+                ],
+                "filter": {
+                    "name": "brig-cli",
+                    "kind": "bin"
+                },
+            },
+            "cwd": "${workspaceFolder}/brig-cli",
+        },
+    ]
+}

@@ -1,0 +1,12 @@
+[package]
+name = "aarch64"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+plugins_rt.workspace = true
+aarch64_interpreter = { path = "../aarch64_interpreter" }
+log = "0.4.21"
