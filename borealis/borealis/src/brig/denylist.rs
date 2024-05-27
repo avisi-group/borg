@@ -32,22 +32,16 @@ const DENYLIST: &[&'static str] = &[
     "ExecuteA32",
     "ExecuteT32__1", // unknown ident `exn`
     "__TryDecodeExecute",
-    "__DecodeExecute",
+    "__DecodeExecute", // borealis/src/rudder/build.rs:1683 left: Primitive(PrimitiveType { tc: UnsignedInteger, element_width_in_bits: 32 })  right: Sum([Primitive(PrimitiveType { tc: Unit, element_width_in_bits: 0 }), Primitive(PrimitiveType { tc: Unit, element_width_in_bits: 0 }), String, Primitive(PrimitiveType { tc: Unit, element_width_in_bits: 0 }), Primitive(PrimitiveType { tc: UnsignedInteger, element_width_in_bits: 1 }), String, Primitive(PrimitiveType { tc: Unit, element_width_in_bits: 0 }), Primitive(PrimitiveType { tc: Unit, element_width_in_bits: 0 })])
     "__InstructionExecute", // unknown ident `exn`
     "__TopLevel",
     "sail_mem_read",
     "sail_mem_write",
     "read_request",
     "write_request",
-    "take_exception",
-    "gic_readonly",
-    "__ReadUART",
-    "__WriteUART",
+    "__WriteUART", // unknown function putchar
     "PhysMemTagWrite",
     "PhysMemTagRead",
-    "__EndCycle",
-    "__ListConfig",
-    "PendSErrorInterrupt",
     "step_model",
     "main",
 ];
