@@ -5,9 +5,9 @@
 		// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
 		"dockerfile": "Dockerfile"
 	},
+	"runArgs": ["--security-opt", "label=disable", "--device=/dev/net/tun", "--ulimit", "stack=1073741824"],
 	"features": {
-		"ghcr.io/devcontainers-contrib/features/syncthing:1": {},
-		"ghcr.io/devcontainers-contrib/features/tailscale:1": {}
+		"ghcr.io/tailscale/codespace/tailscale": {}
 	},
 	"customizations": {
 		"vscode": {
@@ -23,10 +23,13 @@
 				"vadimcn.vscode-lldb"
 			]
 		}
-	}
+	},
 
-	// disabled due to permission error, need to add `:z` somewhere
-	// "mounts": [
-	// 	"source=/home/fm208/.cargo/target,target=/usr/local/cargo/target,type=bind,consistency=cached"
-	// ]
+	// disabled due to permission error, need to add `:z` somewhere, maybe not with --security-opt label=disable as above
+	"mounts": [
+		// cargo target dir shared with non-container builds, and persisted across containers
+		"source=${localEnv:HOME}/.cargo/target,target=/usr/local/cargo/target,type=bind,consistency=cached",
+		// SSH directory shared for git auth
+		"source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+	]
 }

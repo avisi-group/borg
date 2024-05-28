@@ -13,15 +13,15 @@
                     "build",
                     "--bin=standalone",
                     "--package=standalone",
-                    "--manifest-path=${workspaceFolder}/standalone/Cargo.toml"
+                    "--manifest-path=${workspaceFolder}/brig/standalone/Cargo.toml"
                 ],
                 "filter": {
                     "name": "standalone",
                     "kind": "bin"
                 }
             },
-            "args": ["../brig-cli/guest_data/kernel"],
-            "cwd": "${workspaceFolder}/standalone",
+            "args": ["${workspaceFolder}/brig/brig-cli/guest_data/kernel"],
+            "cwd": "${workspaceFolder}/brig/standalone",
             "env": {
                 "RUST_LOG": "trace",
             }

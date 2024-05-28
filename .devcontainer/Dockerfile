@@ -1,7 +1,10 @@
 FROM rust:latest
 
+RUN curl -s https://syncthing.net/release-key.txt | apt-key add -
+RUN echo "deb https://apt.syncthing.net/ syncthing release" | tee /etc/apt/sources.list.d/syncthing.list
+
 RUN apt-get update
-RUN apt-get install -y build-essential device-tree-compiler opam mold fish neovim
+RUN apt-get install -y build-essential device-tree-compiler opam mold fish neovim syncthing
 
 RUN opam init --disable-sandboxing --bare -y
 RUN opam switch create 4.14.1+options --packages ocaml-variants.4.14.1+options,ocaml-option-flambda
