@@ -7,7 +7,7 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'standalone'",
+            "name": "brig standalone",
             "cargo": {
                 "args": [
                     "build",
@@ -29,21 +29,21 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'brig-cli'",
+            "name": "borealis",
             "cargo": {
                 "args":[
-                    "+nightly",
                     "build",
-                    "--bin=brig-cli",
-                    "--package=brig-cli",
-                    "--manifest-path=${workspaceFolder}/brig-cli/Cargo.toml"
+                    "--bin=borealis",
+                    "--package=borealis",
+                    "--manifest-path=${workspaceFolder}/borealis/Cargo.toml"
                 ],
                 "filter": {
-                    "name": "brig-cli",
+                    "name": "borealis",
                     "kind": "bin"
                 },
             },
-            "cwd": "${workspaceFolder}/brig-cli",
+            "args": ["--dump-ir","/workspaces/ir","${workspaceFolder}/arm-v9.4-a_d43f3f4c.rkyv", "${workspaceFolder}/aarch64"],
+            "cwd": "${workspaceFolder}/borealis",
         },
     ]
 }
