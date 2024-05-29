@@ -288,25 +288,23 @@ impl Display for StatementKind {
             StatementKind::CreateBits { value, length } => {
                 write!(f, "create-bits {} {}", value.name(), length.name())
             }
-            StatementKind::MatchesSum {
-                value,
-                variant_index,
-            } => write!(f, "matches-sum {} {variant_index}", value.name()),
-            StatementKind::UnwrapSum {
-                value,
-                variant_index,
-            } => write!(f, "unwrap-sum {} {variant_index}", value.name()),
-            StatementKind::ExtractField { value, field_index } => {
-                write!(f, "extract-field {}.{field_index}", value.name())
+            StatementKind::MatchesSum { value, variant } => {
+                write!(f, "matches-sum {} {variant}", value.name())
+            }
+            StatementKind::UnwrapSum { value, variant } => {
+                write!(f, "unwrap-sum {} {variant}", value.name())
+            }
+            StatementKind::ExtractField { value, field } => {
+                write!(f, "extract-field {}.{field}", value.name())
             }
             StatementKind::UpdateField {
                 original_value,
-                field_index,
+                field,
                 field_value,
             } => {
                 write!(
                     f,
-                    "update-field {}.{field_index} <- {}",
+                    "update-field {}.{field} <- {}",
                     original_value.name(),
                     field_value.name()
                 )

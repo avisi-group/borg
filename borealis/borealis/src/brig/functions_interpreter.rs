@@ -5,7 +5,7 @@
 
 use {
     crate::{
-        brig::{bits::BitsLength, codegen_ident, codegen_member, codegen_type},
+        brig::{bits::BitsLength, codegen_ident, codegen_type},
         rudder::{
             constant_value::ConstantValue, BinaryOperationKind, Block, CastOperationKind,
             PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind,
@@ -437,19 +437,24 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::CreateProduct { typ, fields } => {
-            assert!(matches!(&*typ, Type::Product(_)));
-            let typ = codegen_type(typ);
+            let Type::Product(field_types) = &*typ else {
+                panic!()
+            };
+
             let fields = fields
                 .iter()
                 .enumerate()
                 .map(|(index, statement)| {
-                    let field_name = codegen_member(index);
+                    let (name, typ) = &field_types[index];
+                    assert_eq!(*typ, statement.typ());
+                    let field_name = codegen_ident(*name);
                     let value = get_ident(statement);
                     quote!(#field_name: #value,)
                 })
                 .collect::<TokenStream>();
+
+            let typ = codegen_type(typ);
             quote!(#typ { #fields })
-            // struct { _0: foo, _1: bar }
         }
         StatementKind::CreateSum {
             typ,
@@ -458,7 +463,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         } => {
             assert!(matches!(&*typ, Type::Sum(_)));
             let typ = codegen_type(typ);
-            let variant = codegen_member(variant);
+            let variant = codegen_ident(variant);
             let value = get_ident(&value);
             quote!(#typ::#variant(#value))
         }
@@ -508,10 +513,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::MatchesSum {
-            value,
-            variant_index,
-        } => {
+        StatementKind::MatchesSum { value, variant } => {
             // matches!(value, Enum::Variant(_))
 
             let sum_type = value.typ();
@@ -522,16 +524,13 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             let ident = get_ident(&value);
             let sum_type = codegen_type(sum_type);
-            let variant = codegen_member(variant_index);
+            let variant = codegen_ident(variant);
 
             quote! {
                 matches!(#ident, #sum_type::#variant(_))
             }
         }
-        StatementKind::UnwrapSum {
-            value,
-            variant_index,
-        } => {
+        StatementKind::UnwrapSum { value, variant } => {
             let sum_type = value.typ();
 
             let Type::Sum(_) = &*sum_type else {
@@ -540,7 +539,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             let ident = get_ident(&value);
             let sum_type = codegen_type(sum_type);
-            let variant = codegen_member(variant_index);
+            let variant = codegen_ident(variant);
 
             quote! {
                 match #ident {
@@ -549,19 +548,19 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::ExtractField { value, field_index } => {
+        StatementKind::ExtractField { value, field } => {
             let ident = get_ident(&value);
-            let field = codegen_member(field_index);
+            let field = codegen_ident(field);
             quote!(#ident.#field)
         }
         StatementKind::UpdateField {
             original_value,
-            field_index,
+            field,
             field_value,
         } => {
             let ident = get_ident(&original_value);
             let value = get_ident(&field_value);
-            let field = codegen_member(field_index);
+            let field = codegen_ident(field);
             quote! {
                 {
                     let mut local = #ident;

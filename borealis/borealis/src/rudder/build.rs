@@ -193,7 +193,7 @@ impl BuildContext {
         let typ = Arc::new(Type::Product(
             fields
                 .iter()
-                .map(|boom::NamedType { typ, .. }| self.resolve_type(typ.clone()))
+                .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
                 .collect(),
         ));
 
@@ -212,7 +212,7 @@ impl BuildContext {
         let typ = Arc::new(Type::Sum(
             fields
                 .iter()
-                .map(|boom::NamedType { typ, .. }| self.resolve_type(typ.clone()))
+                .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
                 .collect(),
         ));
 
@@ -568,7 +568,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         name: InternedString,
         args: &[Statement],
     ) -> Option<Statement> {
-        if Regex::new(r"eq_any<([0-9a-zA-Z_%<>]+)>")
+        if Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$")
             .unwrap()
             .is_match(name.as_ref())
         {
@@ -577,7 +577,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 lhs: args[0].clone(),
                 rhs: args[1].clone(),
             }))
-        } else if Regex::new(r"plain_vector_update<([0-9a-zA-Z_%<>]+)>")
+        } else if Regex::new(r"^plain_vector_update<([0-9a-zA-Z_%<>]+)>$")
             .unwrap()
             .is_match(name.as_ref())
         {
@@ -586,7 +586,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 value: args[2].clone(),
                 index: args[1].clone(),
             }))
-        } else if Regex::new(r"plain_vector_access<([0-9a-zA-Z_%<>]+)>")
+        } else if Regex::new(r"^plain_vector_access<([0-9a-zA-Z_%<>]+)>$")
             .unwrap()
             .is_match(name.as_ref())
         {
@@ -666,7 +666,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "neq_bits" | "neq_any<ESecurityState%>" | "neq_bool" => {
+                "neq_bits" | "neq_any<ESecurityState%>" | "neq_any<EFault%>" | "neq_bool" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareNotEqual,
                         lhs: args[0].clone(),
@@ -1325,27 +1325,63 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 //         value: value_in_name,
                 //     }))
                 // }
-                // "Mem_read" | "Mem_read_1" | "Mem_read_2" => {
-                //     let address = args[0].clone();
-                //     let size_bytes = self
-                //         .builder
-                //         .generate_cast(args[1].clone(), Arc::new(Type::u64()));
+                "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+                | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+                | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
+                    let _request = args[0].clone();
+                    let _addrsize = args[1].clone();
+                    let phys_addr = args[2].clone();
+                    let n = args[3].clone();
 
-                //     let _8 = self.builder.build(StatementKind::Constant {
-                //         typ: Arc::new(Type::u64()),
-                //         value: ConstantValue::UnsignedInteger(8),
-                //     });
-                //     let size_bits = self.builder.build(StatementKind::BinaryOperation {
-                //         kind: BinaryOperationKind::Multiply,
-                //         lhs: size_bytes,
-                //         rhs: _8,
-                //     });
+                    let size_bytes = self.builder.generate_cast(n, Arc::new(Type::u64()));
 
-                //     Some(self.builder.build(StatementKind::ReadMemory {
-                //         offset: address,
-                //         size: size_bits,
-                //     }))
-                // }
+                    let _8 = self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::u64()),
+                        value: ConstantValue::UnsignedInteger(8),
+                    });
+                    let size_bits = self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Multiply,
+                        lhs: size_bytes,
+                        rhs: _8,
+                    });
+
+                    let offset = self.builder.generate_cast(phys_addr, Arc::new(Type::u64()));
+
+                    Some(self.builder.build(StatementKind::ReadMemory {
+                        offset,
+                        size: size_bits,
+                    }))
+                }
+
+                "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" |"write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
+                    let _request = args[0].clone();
+                    let _addrsize = args[1].clone();
+                    let phys_addr = args[2].clone();
+                    let n = args[3].clone();
+                    let data = args[4].clone();
+
+                    let size_bytes = self.builder.generate_cast(n, Arc::new(Type::u64()));
+
+                    let _8 = self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(Type::u64()),
+                        value: ConstantValue::UnsignedInteger(8),
+                    });
+                    let size_bits = self.builder.build(StatementKind::BinaryOperation {
+                        kind: BinaryOperationKind::Multiply,
+                        lhs: size_bytes,
+                        rhs: _8,
+                    });
+
+                    let size_bits_cast =  self.builder.generate_cast(size_bits, Arc::new(Type::ArbitraryLengthInteger));
+
+                   let value= self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: Arc::new(Type::Bits), value: data, length:size_bits_cast });
+                   let offset = self.builder.generate_cast(phys_addr, Arc::new(Type::u64()));
+
+                    self.builder.build(StatementKind::WriteMemory { offset, value });
+
+                    // return value also appears to be always ignored
+                    Some(self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u1()), value: ConstantValue::UnsignedInteger(0) }))
+                }
                 // "HaveEL" => {
                 //     let two = self.builder.build(StatementKind::Constant {
                 //         typ: Arc::new(Type::new_primitive(
@@ -1363,6 +1399,20 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // }
                 // ignore
                 "append_str" | "__monomorphize" => Some(args[0].clone()),
+
+                // result of sail_mem_read always appears to ignore the value returned by `read_tag#` (underscore in Ok((value, _))):
+                // match sail_mem_read(read_request(accdesc, translation_info, size, desc.vaddress, desc.paddress.address)) {
+                //     Ok((value, _)) => (CreatePhysMemRetStatus(Fault_None), value),
+                //     Err(statuscode) => (CreatePhysMemRetStatus(statuscode), sail_zeros(8 * size))
+                //   }
+                "read_tag#" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(rudder::Type::u1()),
+                    value: ConstantValue::UnsignedInteger(0),
+                })),
+                "write_tag#" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(rudder::Type::unit()),
+                    value: ConstantValue::Unit,
+                })),
 
                 "DecStr" | "bits_str" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(rudder::Type::String),
@@ -1406,7 +1456,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .map(|(typ, variant)| {
                 self.builder.build(StatementKind::CreateSum {
                     typ,
-                    variant,
+                    variant: name,
                     value: args[0].clone(),
                 })
             })
@@ -1426,15 +1476,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let cast = self.builder.generate_cast(source, outer_type);
 
-                let value = if !indices.is_empty() {
-                    // indices [1, 4, 2]
+                let value = if !fields.is_empty() {
+                    // fields [foo, bar, baz]
                     // var read
-                    // read 1 of var
-                    // read 4 of 1
-                    // read 2 of 4
-                    // write cast to 2
-                    // modify field 4
-                    // modify field 1
+                    // read foo of var
+                    // read bar of foo
+                    // read baz of bar
+                    // write cast to baz
+                    // modify field bar
+                    // modify field foo
                     // var write
 
                     let initial_read = self.builder.build(StatementKind::ReadVariable {
@@ -1443,18 +1493,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let mut stack = vec![initial_read];
 
-                    for field_index in indices[..indices.len() - 1].iter().copied() {
+                    for field in fields[..indices.len() - 1].iter().copied() {
                         let value = stack.last().unwrap().clone();
 
-                        let Type::Product(fields) = &*value.typ() else {
-                            // todo: maybe vectors in future?
-                            panic!("cannot extract field of non-product");
-                        };
-                        assert!(field_index <= (fields.len() - 1));
+                        // let Type::Product(fields) = &*value.typ() else {
+                        //     // todo: maybe vectors in future?
+                        //     panic!("cannot extract field of non-product");
+                        // };
+                        // assert!(field_index <= (fields.len() - 1));
 
                         let ex = self
                             .builder
-                            .build(StatementKind::ExtractField { value, field_index });
+                            .build(StatementKind::ExtractField { value, field });
                         stack.push(ex);
                     }
 
@@ -1463,18 +1513,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let mut last = cast;
 
-                    for field_index in indices[..indices.len()].iter().rev().copied() {
+                    for field in fields[..indices.len()].iter().rev().copied() {
                         let original_value = stack.pop().unwrap();
 
-                        let Type::Product(fields) = &*original_value.typ() else {
-                            // todo: maybe vectors in future?
-                            panic!("cannot update field of non-product");
-                        };
-                        assert!(field_index <= (fields.len() - 1));
+                        // let Type::Product(fields) = &*original_value.typ() else {
+                        //     // todo: maybe vectors in future?
+                        //     panic!("cannot update field of non-product");
+                        // };
+                        // assert!(field_index <= (fields.len() - 1));
 
                         last = self.builder.build(StatementKind::UpdateField {
                             original_value,
-                            field_index,
+                            field,
                             field_value: last,
                         });
                     }
@@ -1540,11 +1590,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let mut last = read_var;
 
-                    for field_index in indices {
-                        last = self.builder.build(StatementKind::ExtractField {
-                            value: last,
-                            field_index,
-                        })
+                    for field in outer_field_accesses {
+                        last = self
+                            .builder
+                            .build(StatementKind::ExtractField { value: last, field })
                     }
 
                     return last;
@@ -1559,11 +1608,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let mut last = read_var;
 
-                    for field_index in indices {
-                        last = self.builder.build(StatementKind::ExtractField {
-                            value: last,
-                            field_index,
-                        })
+                    for field in outer_field_accesses {
+                        last = self
+                            .builder
+                            .build(StatementKind::ExtractField { value: last, field })
                     }
 
                     return last;
@@ -1619,13 +1667,21 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
             boom::Value::Struct { name, fields } => {
                 let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
+                let Type::Product(field_types) = &*typ else {
+                    panic!();
+                };
 
                 let mut field_statements = vec![None; fields.len()];
 
                 for NamedValue { name, value } in fields {
                     let field_statement = self.build_value(value.clone());
-                    let idx = field_name_index_map.get(name).unwrap();
-                    field_statements[*idx] = Some(field_statement);
+                    let idx = *field_name_index_map.get(name).unwrap();
+
+                    let field_statement_cast = self
+                        .builder
+                        .generate_cast(field_statement, field_types[idx].1.clone());
+
+                    field_statements[idx] = Some(field_statement_cast);
                 }
 
                 let product = self.builder.build(StatementKind::CreateProduct {
@@ -1642,11 +1698,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let mut last = product;
 
-                    for field in indices {
-                        last = self.builder.build(StatementKind::ExtractField {
-                            value: last,
-                            field_index: field,
-                        })
+                    for field in outer_field_accesses {
+                        last = self
+                            .builder
+                            .build(StatementKind::ExtractField { value: last, field })
                     }
 
                     last
@@ -1657,7 +1712,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),
 
-            // return true if `value`` is of the variant `identifier`, else false
+            // return false if `value`` is of the variant `identifier`, else true
             boom::Value::CtorKind {
                 value, identifier, ..
             } => {
@@ -1682,9 +1737,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 assert_eq!(value.typ(), typ);
 
-                self.builder.build(StatementKind::MatchesSum {
+                // todo: investigate this further
+                let matches = self.builder.build(StatementKind::MatchesSum {
                     value,
-                    variant_index,
+                    variant: *identifier,
+                });
+                self.builder.build(StatementKind::UnaryOperation {
+                    kind: UnaryOperationKind::Not,
+                    value: matches,
                 })
             }
             boom::Value::CtorUnwrap {
@@ -1693,7 +1753,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let value = self.build_value(value.clone());
 
                 // get the rudder type and variant index
-                let (typ, variant_index) = self
+                let typ = self
                     .ctx()
                     .unions
                     .values()
@@ -1707,11 +1767,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .map(|(typ, _, idx)| (typ, idx))
                     .unwrap();
 
-                assert_eq!(value.typ(), typ);
+                assert_eq!(value.typ(), typ.0);
 
                 let unwrap_sum = self.builder.build(StatementKind::UnwrapSum {
                     value,
-                    variant_index,
+                    variant: *identifier,
                 });
 
                 if !outer_field_accesses.is_empty() {
@@ -1723,11 +1783,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let mut last = unwrap_sum;
 
-                    for field in indices {
-                        last = self.builder.build(StatementKind::ExtractField {
-                            value: last,
-                            field_index: field,
-                        })
+                    for field in outer_field_accesses {
+                        last = self
+                            .builder
+                            .build(StatementKind::ExtractField { value: last, field })
                     }
 
                     last
@@ -2044,7 +2103,7 @@ fn fields_to_indices(
         let Type::Product(fields) = &**struct_typ else {
             panic!("cannot get fields of non-product")
         };
-        current_type = fields[idx].clone();
+        current_type = fields[idx].1.clone();
     });
 
     (indices, current_type)
@@ -2074,7 +2133,7 @@ fn fields_to_offsets(
         let Type::Product(fields) = &*current_type else {
             panic!("cannot get fields of non-product")
         };
-        current_type = fields[idx].clone();
+        current_type = fields[idx].1.clone();
     });
 
     (offsets, current_type)

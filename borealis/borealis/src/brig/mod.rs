@@ -227,10 +227,6 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
     }
 }
 
-fn codegen_member(idx: usize) -> Ident {
-    Ident::new(&format!("_{idx}"), Span::call_site())
-}
-
 pub fn codegen_ident(input: InternedString) -> Ident {
     static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
 
@@ -278,9 +274,8 @@ fn codegen_types(rudder: &Context) -> TokenStream {
 
             let fields: TokenStream = fields
                 .iter()
-                .enumerate()
-                .map(|(i, typ)| {
-                    let name = codegen_member(i);
+                .map(|(name, typ)| {
+                    let name = codegen_ident(*name);
                     let typ = codegen_type(typ.clone());
                     quote!(pub #name: #typ,)
                 })
@@ -308,13 +303,14 @@ fn codegen_types(rudder: &Context) -> TokenStream {
 
             let variants: TokenStream = fields
                 .iter()
-                .enumerate()
-                .map(|(i, typ)| {
-                    let name = codegen_member(i);
+                .map(|(name, typ)| {
+                    let name = codegen_ident(*name);
                     let typ = codegen_type(typ.clone());
                     quote!(#name(#typ),)
                 })
                 .collect();
+
+            let first_field = codegen_ident(fields.iter().next().unwrap().0);
 
             quote! {
                 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -324,7 +320,7 @@ fn codegen_types(rudder: &Context) -> TokenStream {
 
                 impl Default for #ident {
                     fn default() -> Self {
-                        Self::_0(Default::default())
+                        Self::#first_field(Default::default())
                     }
                 }
             }

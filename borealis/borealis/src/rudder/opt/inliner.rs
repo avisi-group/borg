@@ -198,33 +198,27 @@ fn clone_statement(
         StatementKind::SizeOf { value } => builder.build(StatementKind::SizeOf {
             value: mapping.get(&value).unwrap().clone(),
         }),
-        StatementKind::MatchesSum {
-            value,
-            variant_index,
-        } => builder.build(StatementKind::MatchesSum {
+        StatementKind::MatchesSum { value, variant } => builder.build(StatementKind::MatchesSum {
             value: mapping.get(&value).unwrap().clone(),
-            variant_index,
+            variant,
         }),
-        StatementKind::UnwrapSum {
-            value,
-            variant_index,
-        } => builder.build(StatementKind::UnwrapSum {
+        StatementKind::UnwrapSum { value, variant } => builder.build(StatementKind::UnwrapSum {
             value: mapping.get(&value).unwrap().clone(),
-            variant_index,
+            variant,
         }),
-        StatementKind::ExtractField { value, field_index } => {
+        StatementKind::ExtractField { value, field } => {
             builder.build(StatementKind::ExtractField {
                 value: mapping.get(&value).unwrap().clone(),
-                field_index,
+                field,
             })
         }
         StatementKind::UpdateField {
             original_value,
-            field_index,
+            field,
             field_value,
         } => builder.build(StatementKind::UpdateField {
             original_value: mapping.get(&original_value).unwrap().clone(),
-            field_index,
+            field,
             field_value: mapping.get(&field_value).unwrap().clone(),
         }),
     }

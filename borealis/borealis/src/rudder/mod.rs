@@ -52,8 +52,8 @@ impl PrimitiveType {
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(PrimitiveType),
-    Product(Vec<Arc<Type>>),
-    Sum(Vec<Arc<Type>>),
+    Product(Vec<(InternedString, Arc<Type>)>),
+    Sum(Vec<(InternedString, Arc<Type>)>),
     Vector {
         element_count: usize,
         element_type: Arc<Type>,
@@ -82,11 +82,11 @@ impl Type {
         })
     }
 
-    pub fn new_product(fields: Vec<Arc<Type>>) -> Self {
+    pub fn new_product(fields: Vec<(InternedString, Arc<Type>)>) -> Self {
         Self::Product(fields)
     }
 
-    pub fn new_sum(variants: Vec<Arc<Type>>) -> Self {
+    pub fn new_sum(variants: Vec<(InternedString, Arc<Type>)>) -> Self {
         Self::Sum(variants)
     }
 
@@ -112,7 +112,7 @@ impl Type {
                 fields
                     .iter()
                     .take(element_field)
-                    .fold(0, |acc, typ| acc + typ.width_bytes()),
+                    .fold(0, |acc, (_, typ)| acc + typ.width_bytes()),
             ),
             Type::Sum(_) => Some(0),
             Type::Vector { element_type, .. } => Some(element_field * element_type.width_bytes()),
@@ -122,8 +122,8 @@ impl Type {
 
     pub fn width_bits(&self) -> usize {
         match self {
-            Self::Product(xs) => xs.iter().map(|x| x.width_bits()).sum(),
-            Self::Sum(xs) => xs.iter().map(|x| x.width_bits()).max().unwrap(),
+            Self::Product(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).sum(),
+            Self::Sum(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).max().unwrap(),
             // smallest with is 8 bits
             Self::Primitive(p) => p.element_width_in_bits.max(8),
             Self::Vector {
@@ -422,7 +422,7 @@ pub enum StatementKind {
 
     CreateSum {
         typ: Arc<Type>,
-        variant: usize,
+        variant: InternedString,
         value: Statement,
     },
 
@@ -440,25 +440,25 @@ pub enum StatementKind {
     /// Tests whether an instance of a sum type is of a given variant
     MatchesSum {
         value: Statement,
-        variant_index: usize,
+        variant: InternedString,
     },
 
     /// Extracts the contents of a variant of a sum type
     UnwrapSum {
         value: Statement,
-        variant_index: usize,
+        variant: InternedString,
     },
 
     /// Extracts a field of a product type
     ExtractField {
         value: Statement,
-        field_index: usize,
+        field: InternedString,
     },
 
     /// Returns the original value with updated field
     UpdateField {
         original_value: Statement,
-        field_index: usize,
+        field: InternedString,
         field_value: Statement,
     },
 }
@@ -577,7 +577,9 @@ impl Statement {
                 ValueClass::Constant => ValueClass::Constant,
                 ValueClass::Static => ValueClass::Static,
                 ValueClass::Dynamic => ValueClass::Dynamic,
-                _ => panic!("cannot classify cast operation {} in {}", value, self),
+                ValueClass::None => {
+                    panic!("cannot classify cast operation {:?} in {:?}", value, self)
+                }
             },
             StatementKind::Jump { .. } => ValueClass::None,
             StatementKind::Branch { .. } => ValueClass::None,
@@ -602,7 +604,7 @@ impl Statement {
                     _ => ValueClass::Dynamic,
                 }
             }
-            StatementKind::Panic(_) => ValueClass::None,
+            StatementKind::Panic(_) => ValueClass::Static,
             StatementKind::ReadPc => ValueClass::Dynamic,
             StatementKind::WritePc { .. } => ValueClass::None,
             StatementKind::BitExtract { .. } => ValueClass::Dynamic,
@@ -698,22 +700,29 @@ impl Statement {
             StatementKind::Assert { .. } => Arc::new(Type::unit()),
             StatementKind::CreateBits { .. } => Arc::new(Type::Bits),
             StatementKind::MatchesSum { .. } => Arc::new(Type::u1()),
-            StatementKind::UnwrapSum {
-                value,
-                variant_index,
-            } => {
+            StatementKind::UnwrapSum { value, variant } => {
                 let Type::Sum(variants) = &*value.typ() else {
                     panic!("cannot unwrap non sum type");
                 };
 
-                variants[variant_index].clone()
+                variants
+                    .iter()
+                    .find(|(name, _)| *name == variant)
+                    .unwrap()
+                    .1
+                    .clone()
             }
-            StatementKind::ExtractField { value, field_index } => {
+            StatementKind::ExtractField { value, field } => {
                 let Type::Product(fields) = &*value.typ() else {
                     panic!("cannot unwrap non sum type");
                 };
 
-                fields[field_index].clone()
+                fields
+                    .iter()
+                    .find(|(name, _)| *name == field)
+                    .unwrap()
+                    .1
+                    .clone()
             }
             StatementKind::UpdateField { original_value, .. } => original_value.typ(),
         }
@@ -1116,44 +1125,32 @@ impl StatementInner {
 
                 self.kind = StatementKind::CreateBits { value, length };
             }
-            StatementKind::MatchesSum {
-                value,
-                variant_index,
-            } => {
+            StatementKind::MatchesSum { value, variant } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
                     value.clone()
                 };
 
-                self.kind = StatementKind::MatchesSum {
-                    value,
-                    variant_index,
-                };
+                self.kind = StatementKind::MatchesSum { value, variant };
             }
-            StatementKind::UnwrapSum {
-                value,
-                variant_index,
-            } => {
+            StatementKind::UnwrapSum { value, variant } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
                     value.clone()
                 };
 
-                self.kind = StatementKind::UnwrapSum {
-                    value,
-                    variant_index,
-                };
+                self.kind = StatementKind::UnwrapSum { value, variant };
             }
-            StatementKind::ExtractField { value, field_index } => {
+            StatementKind::ExtractField { value, field } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
                     value.clone()
                 };
 
-                self.kind = StatementKind::ExtractField { value, field_index };
+                self.kind = StatementKind::ExtractField { value, field };
             }
 
             StatementKind::Constant { .. } => todo!(),
@@ -1164,7 +1161,7 @@ impl StatementInner {
             StatementKind::PhiNode { .. } => todo!(),
             StatementKind::UpdateField {
                 original_value,
-                field_index,
+                field,
                 field_value,
             } => {
                 let original_value = if original_value == use_of {
@@ -1179,7 +1176,7 @@ impl StatementInner {
                 };
                 self.kind = StatementKind::UpdateField {
                     original_value,
-                    field_index,
+                    field,
                     field_value,
                 };
             }
