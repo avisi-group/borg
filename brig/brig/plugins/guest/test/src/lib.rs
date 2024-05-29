@@ -1,7 +1,7 @@
 #![no_std]
 
 use {
-    arch::{Bits, ProductTypebc91b195b0b2a883, ProductTyped54bc449dd09e5bd, State, Tracer},
+    arch::{Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer},
     borealis_register_init::borealis_register_init,
     core::fmt::Debug,
     plugins_rt::api::{PluginHeader, PluginHost},
@@ -52,9 +52,9 @@ fn addwithcarry_negative() {
 
     assert_eq!(
         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-        ProductTyped54bc449dd09e5bd {
-            _0: Bits::new(-5i64 as u128, 0x40),
-            _1: 0b1000
+        ProductType188a1c3bf231c64b {
+            tuple__pcnt_bv__pcnt_bv40: Bits::new(-5i64 as u128, 0x40),
+            tuple__pcnt_bv__pcnt_bv41: 0b1000
         }
     );
 }
@@ -67,9 +67,9 @@ fn addwithcarry_zero() {
 
     assert_eq!(
         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-        ProductTyped54bc449dd09e5bd {
-            _0: Bits::new(0x0, 0x40),
-            _1: 0b0100
+        ProductType188a1c3bf231c64b {
+            tuple__pcnt_bv__pcnt_bv40: Bits::new(0x0, 0x40),
+            tuple__pcnt_bv__pcnt_bv41: 0b0100
         }
     );
 }
@@ -83,9 +83,9 @@ fn addwithcarry_carry() {
 
     assert_eq!(
         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-        ProductTyped54bc449dd09e5bd {
-            _0: Bits::new(0x0, 0x40),
-            _1: 0b0110
+        ProductType188a1c3bf231c64b {
+            tuple__pcnt_bv__pcnt_bv40: Bits::new(0x0, 0x40),
+            tuple__pcnt_bv__pcnt_bv41: 0b0110
         }
     );
 }
@@ -99,9 +99,9 @@ fn addwithcarry_overflow() {
 
     assert_eq!(
         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-        ProductTyped54bc449dd09e5bd {
-            _0: Bits::new(!0x1, 0x40),
-            _1: 0b1001
+        ProductType188a1c3bf231c64b {
+            tuple__pcnt_bv__pcnt_bv40: Bits::new(!0x1, 0x40),
+            tuple__pcnt_bv__pcnt_bv41: 0b1001
         }
     );
 }
@@ -117,9 +117,9 @@ fn addwithcarry_early_4880_loop() {
 
     assert_eq!(
         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-        ProductTyped54bc449dd09e5bd {
-            _0: Bits::new(0xffffffffffffffe3, 0x40),
-            _1: 0b1000
+        ProductType188a1c3bf231c64b {
+            tuple__pcnt_bv__pcnt_bv40: Bits::new(0xffffffffffffffe3, 0x40),
+            tuple__pcnt_bv__pcnt_bv41: 0b1000
         }
     );
 }
@@ -149,9 +149,9 @@ fn ubfx() {
         let mut state = State::init(0x0);
         // decode bit masks
         assert_eq!(
-            ProductTypebc91b195b0b2a883 {
-                _0: Bits::new(0xFFFF00000000000F, 64),
-                _1: Bits::new(0xF, 64)
+            ProductTypea79c7f841a890648 {
+                tuple__pcnt_bv__pcnt_bv0: Bits::new(0xFFFF00000000000F, 64),
+                tuple__pcnt_bv__pcnt_bv1: Bits::new(0xF, 64)
             },
             DecodeBitMasks(&mut state, TRACER, true, 0x13, 0x10, false, 0x40)
         );
