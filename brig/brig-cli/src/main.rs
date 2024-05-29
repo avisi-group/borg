@@ -26,15 +26,23 @@ struct Cli {
     #[arg(short, long)]
     release: bool,
 
-    /// Build only, do not start brig
+    /// Do not run QEMU and start brig
     #[arg(long)]
-    build_only: bool,
+    no_run: bool,
+
+    /// Do not build brig, use existing UEFI image and guest data
+    #[arg(long)]
+    no_build: bool,
 }
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     let cli = Cli::parse();
+
+    if cli.no_build {
+        todo!("use existing artifacts somehow, useful for building on one machine and running on another");
+    }
 
     let artifacts = build_cargo("../brig", cli.release, cli.verbose);
 
@@ -68,7 +76,7 @@ fn main() -> color_eyre::Result<()> {
         uefi_path
     };
 
-    if cli.build_only {
+    if cli.no_run {
         return Ok(());
     }
 
@@ -280,10 +288,10 @@ fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
         "file={},if=none,format=raw,id=drive0",
         guest_tar_path.display()
     ));
-    cmd.arg("-device");
-    cmd.arg("virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4");
-    cmd.arg("-drive");
-    cmd.arg("file=../../brig-programs/rootfs.ext2,if=none,format=raw,id=drive1");
+    // cmd.arg("-device");
+    // cmd.arg("virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4");
+    // cmd.arg("-drive");
+    // cmd.arg("file=../../brig-programs/rootfs.ext2,if=none,format=raw,id=drive1");
     cmd.arg("-M");
     cmd.arg("q35");
     cmd.arg("-cpu");
