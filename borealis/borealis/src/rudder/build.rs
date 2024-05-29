@@ -1452,8 +1452,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .unions
             .values()
             .find(|(_, variants)| variants.contains_key(&name))
-            .map(|(typ, variants)| (typ.clone(), *variants.get(&name).unwrap()))
-            .map(|(typ, variant)| {
+            .map(|(typ, _)| typ)
+            .cloned()
+            .map(|typ| {
                 self.builder.build(StatementKind::CreateSum {
                     typ,
                     variant: name,
@@ -1583,9 +1584,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Value::Identifier(ident) => {
                 // local variable
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                    let (indices, _) =
-                        fields_to_indices(&self.ctx().structs, symbol.typ(), &outer_field_accesses);
-
                     let read_var = self.builder.build(StatementKind::ReadVariable { symbol });
 
                     let mut last = read_var;
@@ -1601,9 +1599,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // parameter
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
-                    let (indices, _) =
-                        fields_to_indices(&self.ctx().structs, symbol.typ(), &outer_field_accesses);
-
                     let read_var = self.builder.build(StatementKind::ReadVariable { symbol });
 
                     let mut last = read_var;
@@ -1690,12 +1685,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 });
 
                 if !outer_field_accesses.is_empty() {
-                    let (indices, _) = fields_to_indices(
-                        &self.ctx().structs,
-                        product.typ(),
-                        &outer_field_accesses,
-                    );
-
                     let mut last = product;
 
                     for field in outer_field_accesses {
@@ -1720,19 +1709,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let value = self.build_value(value.clone());
 
-                // get the rudder type and variant index
-                let (typ, variant_index) = self
+                // get the rudder type
+                let typ = self
                     .ctx()
                     .unions
                     .values()
-                    .map(|(typ, variants)| {
-                        variants.iter().map(|(variant_name, variant_idx)| {
-                            (typ.clone(), *variant_name, *variant_idx)
-                        })
-                    })
-                    .flatten()
-                    .find(|(_, variant_name, _)| variant_name == identifier)
-                    .map(|(typ, _, idx)| (typ, idx))
+                    .find(|(_, variants)| variants.contains_key(identifier))
+                    .map(|(typ, _)| typ)
+                    .cloned()
                     .unwrap();
 
                 assert_eq!(value.typ(), typ);
@@ -1752,22 +1736,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             } => {
                 let value = self.build_value(value.clone());
 
-                // get the rudder type and variant index
+                // get the rudder type
                 let typ = self
                     .ctx()
                     .unions
                     .values()
-                    .map(|(typ, variants)| {
-                        variants.iter().map(|(variant_name, variant_idx)| {
-                            (typ.clone(), *variant_name, *variant_idx)
-                        })
-                    })
-                    .flatten()
-                    .find(|(_, variant_name, _)| variant_name == identifier)
-                    .map(|(typ, _, idx)| (typ, idx))
+                    .find(|(_, variants)| variants.contains_key(identifier))
+                    .map(|(typ, _)| typ)
+                    .cloned()
                     .unwrap();
 
-                assert_eq!(value.typ(), typ.0);
+                assert_eq!(value.typ(), typ);
 
                 let unwrap_sum = self.builder.build(StatementKind::UnwrapSum {
                     value,
@@ -1775,12 +1754,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 });
 
                 if !outer_field_accesses.is_empty() {
-                    let (indices, _) = fields_to_indices(
-                        &self.ctx().structs,
-                        unwrap_sum.typ(),
-                        &outer_field_accesses,
-                    );
-
                     let mut last = unwrap_sum;
 
                     for field in outer_field_accesses {
