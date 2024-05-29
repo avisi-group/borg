@@ -25,7 +25,7 @@ use {
         },
     },
     cargo_util_schemas::manifest::{TomlManifest, TomlWorkspace},
-    common::{create_file, intern::InternedString, HashMap, HashSet},
+    common::{create_file_buffered, intern::InternedString, HashMap, HashSet},
     log::{info, warn},
     once_cell::sync::Lazy,
     proc_macro2::{Span, TokenStream},
@@ -72,7 +72,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     if let Some(path) = &dump_ir {
         sailrs::jib_ast::pretty_print::print_ast(
-            &mut create_file(path.join("ast.jib")).unwrap(),
+            &mut create_file_buffered(path.join("ast.jib")).unwrap(),
             jib_ast.iter(),
         );
     }
@@ -83,7 +83,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     // // useful for debugging
     if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
-            &mut create_file(path.join("ast.boom")).unwrap(),
+            &mut create_file_buffered(path.join("ast.boom")).unwrap(),
             ast.clone(),
         );
     }
@@ -103,7 +103,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
-            &mut create_file(path.join("ast.processed.boom")).unwrap(),
+            &mut create_file_buffered(path.join("ast.processed.boom")).unwrap(),
             ast.clone(),
         );
     }
@@ -114,7 +114,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     if let Some(path) = &dump_ir {
         writeln!(
-            &mut create_file(path.join("ast.rudder")).unwrap(),
+            &mut create_file_buffered(path.join("ast.rudder")).unwrap(),
             "{rudder}"
         )
         .unwrap();
@@ -131,7 +131,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     if let Some(path) = &dump_ir {
         writeln!(
-            &mut create_file(path.join("ast.opt.rudder")).unwrap(),
+            &mut create_file_buffered(path.join("ast.opt.rudder")).unwrap(),
             "{rudder}"
         )
         .unwrap();

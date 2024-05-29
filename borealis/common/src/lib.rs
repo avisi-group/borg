@@ -6,7 +6,7 @@ use {
     byte_unit::{AdjustedByte, Byte},
     color_eyre::{eyre::WrapErr, Result},
     errctx::PathCtx,
-    std::{fs::File, hash::BuildHasherDefault, path::Path},
+    std::{fs::File, hash::BuildHasherDefault, io::BufWriter, path::Path},
     twox_hash::XxHash64,
 };
 
@@ -37,12 +37,13 @@ pub fn init_logger(filters: &str) -> Result<()> {
 ///
 /// If the file at the supplied path already exists it will
 /// be overwritten.
-pub fn create_file<P: AsRef<Path>>(path: P) -> Result<File> {
+pub fn create_file_buffered<P: AsRef<Path>>(path: P) -> Result<BufWriter<File>> {
     File::options()
         .write(true) // we want to write to the file...
         .create(true) // ...creating if it does not exist..
         .truncate(true) // ...and truncate before writing
         .open(path.as_ref())
+        .map(BufWriter::new)
         .map_err(PathCtx::f(path))
         .wrap_err("Failed to write to file")
 }

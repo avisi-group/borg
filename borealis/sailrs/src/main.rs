@@ -2,7 +2,7 @@ use {
     clap::Parser,
     color_eyre::Result,
     common::{
-        bytes, create_file, init_logger,
+        bytes, create_file_buffered, init_logger,
         intern::{get_interner_state, init_interner, interner},
         HashMap,
     },
@@ -58,7 +58,7 @@ fn main() -> Result<()> {
     let mut serializer = AllocSerializer::<16384>::default();
     serializer.serialize_value(&state).unwrap();
     let bytes = serializer.into_serializer().into_inner();
-    create_file(&args.output)?.write_all(&bytes)?;
+    create_file_buffered(&args.output)?.write_all(&bytes)?;
 
     info!("done");
 
