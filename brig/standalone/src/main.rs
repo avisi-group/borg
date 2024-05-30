@@ -10,20 +10,23 @@ const GUEST_MEMORY_SIZE: usize = 12 * 1024 * 1024 * 1024;
 const KERNEL_LOAD_BIAS: usize = 0x4020_0000;
 const DTB_LOAD_BIAS: usize = 0x9000_0000;
 
-const DTB: &[u8] = include_bytes!("../brig-platform.dtb");
+const DTB: &[u8] = include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/sail.dtb");
+const BOOTLOADER: &[u8] =
+    include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/bootloader.bin");
+const IMAGE: &[u8] = include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/Image");
 
 fn main() {
     pretty_env_logger::init();
-    let cli = Cli::parse();
+    // let cli = Cli::parse();
 
-    let image = fs::read(cli.path).unwrap();
+    // let image = fs::read(cli.path).unwrap();
 
-    let header = unsafe { &*(image.as_ptr() as *const Arm64KernelHeader) };
-    if header.magic == ARM64_MAGIC {
-        assert_eq!(0, header.text_offset);
-    }
+    // let header = unsafe { &*(image.as_ptr() as *const Arm64KernelHeader) };
+    // if header.magic == ARM64_MAGIC {
+    //     assert_eq!(0, header.text_offset);
+    // }
 
-    // create guest virtual memory
+    // create guest virtual memory?
     let mmap = unsafe {
         rustix::mm::mmap_anonymous(
             GUEST_MEMORY_BASE as *mut _,
@@ -33,13 +36,30 @@ fn main() {
         )
     }
     .unwrap();
+    let high = unsafe {
+        rustix::mm::mmap_anonymous(
+            0x7fc0_0780_0000 as *mut _,
+            GUEST_MEMORY_SIZE,
+            ProtFlags::READ | ProtFlags::WRITE,
+            MapFlags::FIXED | MapFlags::PRIVATE,
+        )
+    };
+
+    // copy bootloader
+    unsafe {
+        ptr::copy(
+            BOOTLOADER.as_ptr(),
+            (mmap as *mut u8).offset(0x80000000 as isize),
+            BOOTLOADER.len(),
+        )
+    };
 
     // copy kernel
     unsafe {
         ptr::copy(
-            image.as_ptr(),
-            (mmap as *mut u8).offset(KERNEL_LOAD_BIAS as isize),
-            image.len(),
+            IMAGE.as_ptr(),
+            (mmap as *mut u8).offset(0x82080000 as isize),
+            IMAGE.len(),
         )
     };
 
@@ -47,17 +67,13 @@ fn main() {
     unsafe {
         ptr::copy(
             DTB.as_ptr(),
-            (mmap as *mut u8).offset(DTB_LOAD_BIAS as isize),
+            (mmap as *mut u8).offset(0x81000000 as isize),
             DTB.len(),
         )
     };
 
-    let mut interpreter = Aarch64Interpreter::new(
-        GUEST_MEMORY_BASE,
-        KERNEL_LOAD_BIAS,
-        DTB_LOAD_BIAS,
-        TracerKind::Log,
-    );
+    let mut interpreter =
+        Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x80000000, 0x81000000, TracerKind::Noop);
     interpreter.run();
 }
 

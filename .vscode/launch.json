@@ -20,7 +20,7 @@
                     "kind": "bin"
                 }
             },
-            "args": ["${workspaceFolder}/brig/brig-cli/guest_data/kernel"],
+            "args": [],
             "cwd": "${workspaceFolder}/brig/standalone",
             "env": {
                 "RUST_LOG": "trace",

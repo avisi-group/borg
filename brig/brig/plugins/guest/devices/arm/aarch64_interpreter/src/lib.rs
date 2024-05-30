@@ -51,13 +51,15 @@ impl Aarch64Interpreter {
 
     pub fn run(&mut self) {
         loop {
-            if self.instructions_retired % 0x10_0000 == 0 {
-                log::trace!("instrs: {:x}", self.instructions_retired);
-            }
+            // if self.instructions_retired % 0x10_0000 == 0 {
+            //     log::trace!("instrs: {:x}", self.instructions_retired);
+            // }
 
             let pc = self.state.read_register::<u64>(REG_U_PC);
             let insn_data =
-                unsafe { *((pc + self.state.guest_memory_base() as u64) as *const u32) };
+                unsafe { *(((pc + self.state.guest_memory_base() as u64) & 0x7fff_ffff_ffff) as *const u32) };
+
+            trace!("{} {pc:x}", self.instructions_retired);
 
             // monomorphization goes brrr, only seems to add around 10% to compilation time
             // but saves recompilation when changing tracer

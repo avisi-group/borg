@@ -1420,7 +1420,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     value: ConstantValue::SignedInteger(0),
                 })),
 
-                "sail_take_exception" => Some(self.builder.build(StatementKind::Panic(vec![]))),
 
                 "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"
@@ -1435,7 +1434,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "sail_barrier"
                 | "__WakeupRequest"
                 | "print"
-                | "print_endline" | "check_cycle_count" => Some(self.builder.build(StatementKind::Constant {
+                | "print_endline" | "check_cycle_count"  | "sail_take_exception"=> Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),

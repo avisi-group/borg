@@ -132,7 +132,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote! {
                 {
-                    let address = #offset as usize + state.guest_memory_base();
+                    // todo: ask tom about this, mask off any high bits?
+                    let address = (#offset as usize + state.guest_memory_base()) & 0x7fff_ffff_ffff;
                     let value = unsafe { *(address as *const u128) };
                     Bits::new(value, #size as u16)
                 }
@@ -162,7 +163,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote! {
                 {
-                    let address = #offset as usize + state.guest_memory_base();
+                    // todo: ask tom about this, mask off any high bits?
+                    let address = (#offset as usize + state.guest_memory_base()) & 0x7fff_ffff_ffff;
 
                     match #length {
                         8 => {
@@ -185,7 +187,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                             tracer.write_memory(address, value);
                             unsafe { *(address as *mut u64) = value; }
                         },
-                        _ => panic!("unsupported length")
+                        128 => {
+                            let value = #value as u128;
+                            tracer.write_memory(address, value);
+                            unsafe { *(address as *mut u128) = value; }
+                        }
+                        l => panic!("unsupported length {l:#x}")
                     }
                 }
             }
