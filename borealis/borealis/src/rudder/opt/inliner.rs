@@ -225,7 +225,8 @@ fn clone_statement(
 }
 
 fn inline_target_block(source_block: Block) -> bool {
-    // if a block ends in a jump statement, and the target block is "small", inline it.
+    // if a block ends in a jump statement, and the target block is "small", inline
+    // it.
     let terminator = source_block.terminator_statement().unwrap();
 
     let StatementKind::Jump {

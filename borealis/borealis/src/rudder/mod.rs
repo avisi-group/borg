@@ -132,8 +132,8 @@ impl Type {
             } => element_type.width_bits() * element_count,
 
             Self::Bits | Self::ArbitraryLengthInteger => usize::try_from(BitsValue::BITS).unwrap(),
-            // probably u32?
-            Self::String => todo!(),
+            // width of internedstring
+            Self::String => 32,
         }
     }
 
@@ -1629,9 +1629,7 @@ impl Function {
             panic!("functions must have a return type (unit not void)");
         }
 
-        celf.add_local_variable("exception".into(), Arc::new(Type::u32()));
         celf.add_local_variable("return_value".into(), return_type);
-        celf.add_local_variable("throw".into(), Arc::new(Type::u32()));
 
         celf
     }

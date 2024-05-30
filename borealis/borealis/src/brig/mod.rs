@@ -5,10 +5,9 @@ use {
         boom::{
             self,
             passes::{
-                self, cycle_finder::CycleFinder, fold_unconditionals::FoldUnconditionals,
-                make_exception_panic::MakeExceptionPanic,
-                monomorphize_vectors::MonomorphizeVectors, remove_const_branch::RemoveConstBranch,
-                resolve_return_assigns::ResolveReturns,
+                self, cycle_finder::CycleFinder, fix_exceptions::FixExceptions,
+                fold_unconditionals::FoldUnconditionals, monomorphize_vectors::MonomorphizeVectors,
+                remove_const_branch::RemoveConstBranch, resolve_return_assigns::ResolveReturns,
             },
             Ast,
         },
@@ -50,8 +49,6 @@ mod denylist;
 mod functions_interpreter;
 mod state;
 mod workspace;
-
-const ENTRYPOINT: &str = "__DecodeA64";
 
 pub enum GenerationMode {
     CodeGen,
@@ -95,7 +92,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
             ResolveReturns::new_boxed(),
-            MakeExceptionPanic::new_boxed(),
+            FixExceptions::new_boxed(),
             MonomorphizeVectors::new_boxed(),
             CycleFinder::new_boxed(),
         ],
@@ -376,52 +373,6 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
         )
     };
 
-    // one top-level crate containing prelude
-    let arch = {
-        let header = codegen_header();
-        let entrypoint_ident = codegen_ident(ENTRYPOINT.into());
-        (
-            InternedString::from_static("arch"),
-            (
-                [
-                    InternedString::from_static("common"),
-                    entrypoint_ident.to_string().into(),
-                ]
-                .into_iter()
-                .collect::<HashSet<_>>(),
-                tokens_to_string(&quote! {
-                        #header
-
-                        pub use common::*;
-
-                        use #entrypoint_ident::#entrypoint_ident;
-
-                        pub fn decode_execute<T: Tracer>(value: u32, state: &mut State, tracer: &T) -> ExecuteResult {
-                            // reset SEE
-                            state.write_register(REG_SEE, 0u64);
-
-                            tracer.begin(value, state.read_register::<u64>(REG_U_PC));
-
-                            #entrypoint_ident(state, tracer, i128::from(state.read_register::<u64>(REG_U_PC)), value);
-
-                            // increment PC if no branch was taken
-                            if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
-                                let pc = state.read_register::<u64>(REG_U_PC);
-                                state.write_register(REG_U_PC, pc + 4);
-                            }
-
-                            state.write_register(REG_U__BRANCHTAKEN, false);
-
-                            tracer.end();
-
-                            ExecuteResult::Ok
-                        }
-
-                }),
-            ),
-        )
-    };
-
     rudder.update_names();
     let cfg = FunctionCallGraphAnalysis::new(rudder);
     let rudder_fns = rudder.get_functions();
@@ -429,11 +380,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
     let crate_names = rudder_fns
         .keys()
         .copied()
-        .chain(
-            ["common", "arch"]
-                .into_iter()
-                .map(InternedString::from_static),
-        )
+        .chain(["common"].into_iter().map(InternedString::from_static))
         .map(|name| InternedString::from(codegen_ident(name).to_string()));
 
     let workspace_manifest = (
@@ -552,7 +499,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                )
             )
         })
-        .chain([arch, common])
+        .chain([common])
 
         .map(|(name, (dependencies, contents))| {
             let manifest = (
@@ -637,6 +584,7 @@ fn codegen_header() -> TokenStream {
         #![allow(unreachable_code)]
         #![allow(unused_doc_comments)]
         #![allow(non_upper_case_globals)]
+        #![allow(non_camel_case_types)]
 
 
         //! BOREALIS GENERATED FILE

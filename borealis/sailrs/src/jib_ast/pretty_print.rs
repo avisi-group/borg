@@ -466,9 +466,8 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
             Name::Global(ident, _) | Name::Name(ident, _) => {
                 write!(self.writer, "{}", ident.as_interned()).unwrap()
             }
-            Name::HaveException(_) | Name::CurrentException(_) => {
-                write!(self.writer, "exception").unwrap()
-            }
+            Name::HaveException(_) => write!(self.writer, "have-exception").unwrap(),
+            Name::CurrentException(_) => write!(self.writer, "have-exception").unwrap(),
             Name::ThrowLocation(_) => write!(self.writer, "throw").unwrap(),
             Name::Return(_) => write!(self.writer, "return").unwrap(),
         }

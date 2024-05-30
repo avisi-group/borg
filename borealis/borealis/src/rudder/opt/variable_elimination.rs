@@ -40,14 +40,7 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
 
     let mut changed = false;
     for stmt in block.statements() {
-        // todo: ask tom about fields
-        if let StatementKind::WriteVariable {
-            symbol,
-            value,
-            ..
-// ignoring indices
-        } = stmt.kind()
-        {
+        if let StatementKind::WriteVariable { symbol, value } = stmt.kind() {
             // Ignore global symbols (for now)
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
                 continue;
@@ -59,20 +52,15 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
                     trace!(
                         "already live write to symbol {}, updating live value",
                         symbol.name(),
-
                     );
                     e.insert(value.clone());
                 }
                 Entry::Vacant(e) => {
-                    trace!(
-                        "starting live range for symbol {}",
-                        symbol.name(),
-
-                    );
+                    trace!("starting live range for symbol {}", symbol.name(),);
                     e.insert(value.clone());
                 }
             }
-        } else if let StatementKind::ReadVariable { symbol,.. } = stmt.kind() {
+        } else if let StatementKind::ReadVariable { symbol } = stmt.kind() {
             if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }

@@ -1,13 +1,12 @@
 //! JIB to BOOM conversion
 
-use rayon::iter::ParallelIterator;
 use {
     crate::boom::{
         self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionSignature, NamedType,
         Parameter, Size,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
-    rayon::iter::IntoParallelIterator,
+    rayon::iter::{IntoParallelIterator, ParallelIterator},
     sailrs::{jib_ast, sail_ast},
     std::borrow::Borrow,
 };
@@ -210,7 +209,7 @@ fn convert_body(instructions: &[jib_ast::Instruction]) -> Vec<Shared<boom::State
 }
 
 fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::Statement>> {
-    if let jib_ast::InstructionAux::Block(instructions) = statement {
+    if let jib_ast::InstructionAux::Block(instructions) | jib_ast::InstructionAux::TryBlock(instructions) = statement {
         return convert_body(instructions.as_ref());
     }
 
@@ -260,12 +259,12 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
             }]
         }
 
-        jib_ast::InstructionAux::TryBlock(_) => vec![],
+
         jib_ast::InstructionAux::Throw(value) => {
             vec![boom::Statement::Panic(vec![convert_value(value)])]
         }
         jib_ast::InstructionAux::Comment(s) => vec![boom::Statement::Comment(*s)],
-        jib_ast::InstructionAux::Block(..) => unimplemented!(),
+        jib_ast::InstructionAux::TryBlock(_) | jib_ast::InstructionAux::Block(_) => unreachable!(),
         jib_ast::InstructionAux::Raw(_) => todo!(),
         jib_ast::InstructionAux::Return(_) => todo!(),
         jib_ast::InstructionAux::Reset(_, _) => todo!(),
@@ -278,9 +277,8 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
 fn convert_name(name: &jib_ast::Name) -> InternedString {
     match name {
         jib_ast::Name::Name(ident, _) | jib_ast::Name::Global(ident, _) => ident.as_interned(),
-        jib_ast::Name::HaveException(_) | jib_ast::Name::CurrentException(_) => {
-            InternedString::from_static("exception")
-        }
+        jib_ast::Name::HaveException(_) => InternedString::from_static("have_exception"),
+        jib_ast::Name::CurrentException(_) => InternedString::from_static("current_exception"),
         jib_ast::Name::ThrowLocation(_) => InternedString::from_static("throw"),
         jib_ast::Name::Return(_) => InternedString::from_static("return"),
     }

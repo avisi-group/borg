@@ -1313,18 +1313,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 /* ### NON-BUILTIN FUNCTIONS BELOW THIS POINT ### */
                 /* To maintain correctness, borealis must only specialize on actual Sail compiler builtins, specializing other functions means restricting compatibiliy on a specific model, however memory access simply must be overwritten */
-                // "Mem_set" => {
-                //     // todo: check size is correct, maybe do something with access description
-                //     let address = args[0].clone();
-                //     let _size = args[1].clone();
-                //     let _accdesc = args[2].clone();
-                //     let value_in_name = args[3].clone();
-
-                //     Some(self.builder.build(StatementKind::WriteMemory {
-                //         offset: address,
-                //         value: value_in_name,
-                //     }))
-                // }
                 "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
                 | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
                 | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
@@ -1353,7 +1341,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" |"write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
+                "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" |
+                "write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
                     let _request = args[0].clone();
                     let _addrsize = args[1].clone();
                     let phys_addr = args[2].clone();
@@ -1397,8 +1386,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 //     }))
                 //     // el < 2
                 // }
+
+
                 // ignore
-                "append_str" | "__monomorphize" => Some(args[0].clone()),
+                "append_str" | "__monomorphize" | "concat_str"  => Some(args[0].clone()),
 
                 // result of sail_mem_read always appears to ignore the value returned by `read_tag#` (underscore in Ok((value, _))):
                 // match sail_mem_read(read_request(accdesc, translation_info, size, desc.vaddress, desc.paddress.address)) {
@@ -1414,9 +1405,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     value: ConstantValue::Unit,
                 })),
 
-                "DecStr" | "bits_str" => Some(self.builder.build(StatementKind::Constant {
+                "DecStr" | "bits_str" | "HexStr"  => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(rudder::Type::String),
                     value: ConstantValue::String("fix me in build_specialized_function".into()),
+                })),
+
+                "__GetVerbosity" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(rudder::Type::u64()),
+                    value: ConstantValue::UnsignedInteger(0),
+                })),
+
+                "get_cycle_count" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(rudder::Type::ArbitraryLengthInteger),
+                    value: ConstantValue::SignedInteger(0),
                 })),
 
                 "sail_take_exception" => Some(self.builder.build(StatementKind::Panic(vec![]))),
@@ -1434,7 +1435,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "sail_barrier"
                 | "__WakeupRequest"
                 | "print"
-                | "print_endline" => Some(self.builder.build(StatementKind::Constant {
+                | "print_endline" | "check_cycle_count" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),
@@ -1958,7 +1959,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     fn generate_concat(&mut self, lhs: Statement, rhs: Statement) -> Statement {
-        // todo: (zero extend original value || create new bits with runtime length) then bitinsert
+        // todo: (zero extend original value || create new bits with runtime length)
+        // then bitinsert
         match (&*lhs.typ(), &*rhs.typ()) {
             (Type::Bits, Type::Bits) => {
                 let l_value = self

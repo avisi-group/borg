@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-arch = { path = "../../../../../../../aarch64/arch" }
+common = { path = "../../../../../../../aarch64/common" }
 u__InitSystem = { path = "../../../../../../../aarch64/u__InitSystem" }
 borealis_register_init = { path = "../../../../../../../aarch64/borealis_register_init" }
-
+step_model = { path = "../../../../../../../aarch64/step_model"}
 log = "0.4.21"
