@@ -2,16 +2,23 @@
 
 use {
     borealis_register_init::borealis_register_init,
-    common::{State, Tracer, REGISTER_NAME_MAP, REG_R0, REG_U_PC},
+    common::{
+        ProductTypee2f620c8eb69267c, State, Tracer, REGISTER_NAME_MAP, REG_PSTATE, REG_R0, REG_U_PC,
+    },
     core::fmt::Debug,
     log::trace,
     step_model::step_model,
+    u__FetchInstr::u__FetchInstr,
     u__InitSystem::u__InitSystem,
+    u__SetConfig::u__SetConfig,
+    ThisInstrAddr::ThisInstrAddr,
 };
 
 pub enum TracerKind {
     Noop,
     Log,
+    Sail,
+    Qemu,
 }
 
 pub struct Aarch64Interpreter {
@@ -30,17 +37,22 @@ impl Aarch64Interpreter {
         let mut state = State::init(guest_memory_base);
 
         // sets initial register and letbind state (generated from sail model)
-        borealis_register_init(&mut state, &LogTracer);
+        borealis_register_init(&mut state, &NoopTracer);
 
         // actual ARM model function called in elfmain to initialize system
-        u__InitSystem(&mut state, &LogTracer, ());
+        u__InitSystem(&mut state, &NoopTracer, ());
+
+        // from boot.sh command line args to `armv9` binary
+        u__SetConfig(&mut state, &NoopTracer, "cpu.cpu0.RVBAR", 0x8000_0000);
+        u__SetConfig(&mut state, &NoopTracer, "cpu.has_tlb", 0x0);
 
         state.write_register(REG_U_PC, initial_pc);
 
         // X0 must contain phys address of DTB https://docs.kernel.org/arch/arm64/booting.html
         // probably doesn't belong here as aarch64 guest shouldn't be linux
         // specific
-        state.write_register(REG_R0, dtb_phys_address);
+        // state.write_register(REG_R0, dtb_phys_address);
+        // 2024-06-01 this is done by the bootloader so not needed here
 
         Self {
             instructions_retired: 0,
@@ -51,15 +63,11 @@ impl Aarch64Interpreter {
 
     pub fn run(&mut self) {
         loop {
-            // if self.instructions_retired % 0x10_0000 == 0 {
-            //     log::trace!("instrs: {:x}", self.instructions_retired);
-            // }
+            let pc =
+                u64::try_from(ThisInstrAddr(&mut self.state, &NoopTracer, 64).value()).unwrap();
 
-            let pc = self.state.read_register::<u64>(REG_U_PC);
-            let insn_data =
-                unsafe { *(((pc + self.state.guest_memory_base() as u64) & 0x7fff_ffff_ffff) as *const u32) };
-
-            trace!("{} {pc:x}", self.instructions_retired);
+            let insn_data = u__FetchInstr(&mut self.state, &NoopTracer, pc)
+                .tuple__pcnt_enum_z__InstrEnc__pcnt_bv321;
 
             // monomorphization goes brrr, only seems to add around 10% to compilation time
             // but saves recompilation when changing tracer
@@ -78,6 +86,30 @@ impl Aarch64Interpreter {
                     tracer.begin(insn_data, pc);
                     step_model(&mut self.state, tracer, ());
                     tracer.end();
+                }
+                TracerKind::Sail => {
+                    let nzcv = {
+                        let pstate = self
+                            .state
+                            .read_register::<ProductTypee2f620c8eb69267c>(REG_PSTATE);
+
+                        (pstate.N as u8) << 3
+                            | (pstate.Z as u8) << 2
+                            | (pstate.C as u8) << 1
+                            | (pstate.V as u8) << 0
+                    };
+
+                    trace!(
+                        "[Sail] {} PC={:#x} NZCV={:#x}",
+                        self.instructions_retired + 1,
+                        pc,
+                        nzcv,
+                    );
+
+                    step_model(&mut self.state, &NoopTracer, ());
+                }
+                TracerKind::Qemu => {
+                    unimplemented!("QEMU-style tracing output not supported")
                 }
             };
 

@@ -27,6 +27,8 @@ eval (opam env 2> /dev/null)' > ~/.config/fish/config.fish
 RUN echo '[build]\n\
 target-dir = "/usr/local/cargo/target"' > /usr/local/cargo/config.toml
 
+RUN cargo install dua-cli bottom
+
 RUN git config --global user.email "fm208@st-andrews.ac.uk"
 RUN git config --global user.name "Ferdia McKeogh"
 

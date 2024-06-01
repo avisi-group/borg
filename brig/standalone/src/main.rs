@@ -5,18 +5,18 @@ use {
     std::{fmt::Debug, fs, path::PathBuf, ptr},
 };
 
-const GUEST_MEMORY_BASE: usize = 0x10_000;
+const GUEST_MEMORY_BASE: usize = 0x1_0000;
 const GUEST_MEMORY_SIZE: usize = 12 * 1024 * 1024 * 1024;
-const KERNEL_LOAD_BIAS: usize = 0x4020_0000;
-const DTB_LOAD_BIAS: usize = 0x9000_0000;
 
 const DTB: &[u8] = include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/sail.dtb");
 const BOOTLOADER: &[u8] =
     include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/bootloader.bin");
 const IMAGE: &[u8] = include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/Image");
 
+mod logger;
+
 fn main() {
-    pretty_env_logger::init();
+    logger::init();
     // let cli = Cli::parse();
 
     // let image = fs::read(cli.path).unwrap();
@@ -45,21 +45,14 @@ fn main() {
         )
     };
 
+    // -b 0x80000000,bootloader.bin -b 0x81000000,sail.dtb -b 0x82080000,Image
+
     // copy bootloader
     unsafe {
         ptr::copy(
             BOOTLOADER.as_ptr(),
-            (mmap as *mut u8).offset(0x80000000 as isize),
+            (mmap as *mut u8).offset(0x8000_0000 as isize),
             BOOTLOADER.len(),
-        )
-    };
-
-    // copy kernel
-    unsafe {
-        ptr::copy(
-            IMAGE.as_ptr(),
-            (mmap as *mut u8).offset(0x82080000 as isize),
-            IMAGE.len(),
         )
     };
 
@@ -67,13 +60,22 @@ fn main() {
     unsafe {
         ptr::copy(
             DTB.as_ptr(),
-            (mmap as *mut u8).offset(0x81000000 as isize),
+            (mmap as *mut u8).offset(0x8100_0000 as isize),
             DTB.len(),
         )
     };
 
+    // copy kernel
+    unsafe {
+        ptr::copy(
+            IMAGE.as_ptr(),
+            (mmap as *mut u8).offset(0x8208_0000 as isize),
+            IMAGE.len(),
+        )
+    };
+
     let mut interpreter =
-        Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x80000000, 0x81000000, TracerKind::Noop);
+        Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, 0x0, TracerKind::Sail);
     interpreter.run();
 }
 

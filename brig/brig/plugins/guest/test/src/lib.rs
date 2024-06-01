@@ -1,11 +1,16 @@
 #![no_std]
 
 use {
-    arch::{Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer},
     borealis_register_init::borealis_register_init,
+    common::{
+        Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer,
+        REGISTER_NAME_MAP, REG_R0, REG_R3, REG_U_PC,
+    },
     core::fmt::Debug,
+    execute_aarch64_instrs_integer_arithmetic_rev::execute_aarch64_instrs_integer_arithmetic_rev,
     plugins_rt::api::{PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
+    u__DecodeA64::u__DecodeA64,
     u__InitSystem::u__InitSystem,
     AddWithCarry::AddWithCarry,
     CeilPow2::CeilPow2,
@@ -34,13 +39,16 @@ fn entrypoint(host: &'static dyn PluginHost) {
     addwithcarry_early_4880_loop();
 
     replicate_bits();
-    ubfx();
+//    ubfx();
 
-    fibonacci();
+   // fibonacci();
 
     ispow2();
 
+   // rev_d00dfeed();
+
     log::info!("tests passed");
+    panic!();
 }
 
 fn addwithcarry_negative() {
@@ -159,11 +167,11 @@ fn ubfx() {
 
     {
         let mut state = State::init(0x0);
-        state.write_register::<u64>(arch::REG_R3, 0x8444_c004);
+        state.write_register::<u64>(REG_R3, 0x8444_c004);
 
         // ubfx x3, x3, #16, #4
-        arch::decode_execute(0xd3504c63, &mut state, TRACER);
-        assert_eq!(0x4, state.read_register::<u64>(arch::REG_R3));
+        u__DecodeA64(&mut state, TRACER,0, 0xd3504c63);
+        assert_eq!(0x4, state.read_register::<u64>(REG_R3));
     }
 }
 
@@ -195,7 +203,7 @@ fn fibonacci() {
     ];
 
     loop {
-        let pc = state.read_register::<usize>(arch::REG_U_PC);
+        let pc = state.read_register::<usize>(REG_U_PC);
 
         // exit before the svc
         if pc == 0x38 {
@@ -203,11 +211,18 @@ fn fibonacci() {
         }
 
         let instr = program[pc / 4];
-        arch::decode_execute(instr, &mut state, TRACER);
+        u__DecodeA64(&mut state, TRACER,pc as i128, instr);
     }
 
-    assert_eq!(89, state.read_register::<u64>(arch::REG_R0));
-    assert_eq!(10, state.read_register::<u64>(arch::REG_R3));
+    assert_eq!(89, state.read_register::<u64>(REG_R0));
+    assert_eq!(10, state.read_register::<u64>(REG_R3));
+}
+
+fn rev_d00dfeed() {
+    let mut state = State::init(0x0);
+    state.write_register::<u64>(REG_R3, 0xedfe0dd0);
+    execute_aarch64_instrs_integer_arithmetic_rev(&mut state, TRACER, 32, 3, 32, 3);
+    assert_eq!(0xd00dfeed, state.read_register::<u64>(REG_R3));
 }
 
 fn ispow2() {
@@ -248,26 +263,26 @@ impl Tracer for LogTracer {
     }
 
     fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {
-        match arch::REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
+        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
-                log::trace!("    R[{}] -> {value:x?}", arch::REGISTER_NAME_MAP[idx].1)
+                log::trace!("    R[{}] -> {value:x?}", REGISTER_NAME_MAP[idx].1)
             }
             // we're accessing inside a register
             Err(idx) => {
                 // get the register and print the offset from the base
-                let (register_offset, name) = arch::REGISTER_NAME_MAP[idx - 1];
+                let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
                 log::trace!("    R[{name}:{:x}] -> {value:x?}", offset - register_offset);
             }
         }
     }
 
     fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {
-        match arch::REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
+        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
-                log::trace!("    R[{}] <- {value:x?}", arch::REGISTER_NAME_MAP[idx].1)
+                log::trace!("    R[{}] <- {value:x?}", REGISTER_NAME_MAP[idx].1)
             }
             Err(idx) => {
-                let (register_offset, name) = arch::REGISTER_NAME_MAP[idx - 1];
+                let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
                 log::trace!("    R[{name}:{:x}] <- {value:x?}", offset - register_offset);
             }
         }

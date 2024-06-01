@@ -113968,11 +113968,14 @@ dependencies = [
 name = "aarch64_interpreter"
 version = "0.1.0"
 dependencies = [
- "arch",
+ "ThisInstrAddr",
  "borealis_register_init",
+ "common",
  "log",
  "step_model",
+ "u__FetchInstr",
  "u__InitSystem",
+ "u__SetConfig",
 ]
 
 [[package]]
@@ -113983,16 +113986,6 @@ checksum = "e248409195304021f61b39ba2628f62a45a3abf6119669d44b3399d60eabe4c3"
 dependencies = [
  "bit_field",
  "log",
-]
-
-[[package]]
-name = "arch"
-version = "0.0.0"
-dependencies = [
- "common",
- "log",
- "micromath",
- "u__DecodeA64",
 ]
 
 [[package]]
@@ -157923,6 +157916,27 @@ version = "0.0.0"
 dependencies = [
  "common",
  "execute_aarch64_instrs_integer_arithmetic_mul_uniform_add_sub",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "decode_max_smeveclen"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "neq_int",
+]
+
+[[package]]
+name = "decode_max_sveveclen"
+version = "0.0.0"
+dependencies = [
+ "FloorPow2",
+ "IsPow2",
+ "common",
  "log",
  "micromath",
 ]
@@ -209953,11 +209967,13 @@ dependencies = [
  "FloorPow2",
  "IsPow2",
  "aarch64_interpreter",
- "arch",
  "borealis_register_init",
+ "common",
+ "execute_aarch64_instrs_integer_arithmetic_rev",
  "log",
  "plugins_rt",
  "replicate_bits_borealis_internal",
+ "u__DecodeA64",
  "u__IMPDEF_integer",
  "u__InitSystem",
 ]
@@ -212403,6 +212419,149 @@ dependencies = [
  "common",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "u__ConfigureV81"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+]
+
+[[package]]
+name = "u__ConfigureV82"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV81",
+]
+
+[[package]]
+name = "u__ConfigureV83"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV82",
+]
+
+[[package]]
+name = "u__ConfigureV84"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV83",
+]
+
+[[package]]
+name = "u__ConfigureV85"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV84",
+]
+
+[[package]]
+name = "u__ConfigureV86"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV85",
+]
+
+[[package]]
+name = "u__ConfigureV87"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV86",
+]
+
+[[package]]
+name = "u__ConfigureV88"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV87",
+]
+
+[[package]]
+name = "u__ConfigureV89"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV88",
+]
+
+[[package]]
+name = "u__ConfigureV90"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV85",
+]
+
+[[package]]
+name = "u__ConfigureV91"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV86",
+ "u__ConfigureV90",
+]
+
+[[package]]
+name = "u__ConfigureV92"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV87",
+ "u__ConfigureV91",
+]
+
+[[package]]
+name = "u__ConfigureV93"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV88",
+ "u__ConfigureV92",
+]
+
+[[package]]
+name = "u__ConfigureV94"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "log",
+ "micromath",
+ "u__ConfigureV89",
+ "u__ConfigureV93",
 ]
 
 [[package]]
@@ -216962,6 +217121,35 @@ dependencies = [
  "common",
  "log",
  "micromath",
+]
+
+[[package]]
+name = "u__SetConfig"
+version = "0.0.0"
+dependencies = [
+ "common",
+ "decode_max_smeveclen",
+ "decode_max_sveveclen",
+ "fdiv_int",
+ "integer_access",
+ "integer_subrange",
+ "log",
+ "micromath",
+ "neq_int",
+ "u__ConfigureV81",
+ "u__ConfigureV82",
+ "u__ConfigureV83",
+ "u__ConfigureV84",
+ "u__ConfigureV85",
+ "u__ConfigureV86",
+ "u__ConfigureV87",
+ "u__ConfigureV88",
+ "u__ConfigureV89",
+ "u__ConfigureV90",
+ "u__ConfigureV91",
+ "u__ConfigureV92",
+ "u__ConfigureV93",
+ "u__ConfigureV94",
 ]
 
 [[package]]
