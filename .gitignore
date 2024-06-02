@@ -1,4 +1,5 @@
 *.rkyv
+*.trace
 aarch64
 brig-programs
 ir

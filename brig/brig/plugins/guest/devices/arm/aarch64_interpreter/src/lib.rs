@@ -3,7 +3,7 @@
 use {
     borealis_register_init::borealis_register_init,
     common::{
-        ProductTypee2f620c8eb69267c, State, Tracer, REGISTER_NAME_MAP, REG_PSTATE, REG_R0, REG_U_PC,
+        ProductTypee2f620c8eb69267c, State, Tracer, REGISTER_NAME_MAP, REG_PSTATE,  REG_U_PC,
     },
     core::fmt::Debug,
     log::trace,
@@ -31,7 +31,6 @@ impl Aarch64Interpreter {
     pub fn new(
         guest_memory_base: usize,
         initial_pc: usize,
-        dtb_phys_address: usize,
         tracer: TracerKind,
     ) -> Self {
         let mut state = State::init(guest_memory_base);
@@ -68,6 +67,14 @@ impl Aarch64Interpreter {
 
             let insn_data = u__FetchInstr(&mut self.state, &NoopTracer, pc)
                 .tuple__pcnt_enum_z__InstrEnc__pcnt_bv321;
+
+            // if self.instructions_retired > 58692 {
+            //     self.tracer = TracerKind::Log;
+            // }
+
+            // if self.instructions_retired > 58700 {
+            //     panic!();
+            // }
 
             // monomorphization goes brrr, only seems to add around 10% to compilation time
             // but saves recompilation when changing tracer

@@ -75,7 +75,7 @@ fn main() {
     };
 
     let mut interpreter =
-        Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, 0x0, TracerKind::Sail);
+        Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000,  TracerKind::Sail);
     interpreter.run();
 }
 

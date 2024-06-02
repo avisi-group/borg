@@ -8,10 +8,14 @@ pub fn codegen_bits() -> TokenStream {
         /// Variable length bitvector implementation
         ///
         /// Operations must zero unused bits before returning
-        #[derive(Default, Clone, Copy, Debug)]
+        #[derive(Clone, Copy, Debug)]
         pub struct Bits {
             value: u128,
             length: u16,
+        }
+
+        impl Default for Bits {
+            fn default() -> Self { Self::new(0, 128) }
         }
 
         impl Bits {

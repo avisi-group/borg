@@ -30,7 +30,6 @@ impl GuestDeviceFactory for Aarch64InterpreterFactory {
     fn create(&self, config: BTreeMap<String, String>) -> Box<dyn GuestDevice> {
         const GUEST_MEMORY_BASE: usize = 0;
         const INITIAL_PC: usize = 0x4020_0000;
-        const DTB_LOAD_ADDRESS: usize = 0x9000_0000;
 
         let tracer = match config.get("tracer").map(String::as_str) {
             Some("log") => TracerKind::Log,
@@ -41,7 +40,6 @@ impl GuestDeviceFactory for Aarch64InterpreterFactory {
         Box::new(Aarch64InterpreterDevice(Aarch64Interpreter::new(
             GUEST_MEMORY_BASE,
             INITIAL_PC,
-            DTB_LOAD_ADDRESS,
             tracer,
         )))
     }

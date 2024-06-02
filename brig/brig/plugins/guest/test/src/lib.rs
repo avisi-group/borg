@@ -4,7 +4,7 @@ use {
     borealis_register_init::borealis_register_init,
     common::{
         Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer,
-        REGISTER_NAME_MAP, REG_R0, REG_R3, REG_U_PC,
+        REGISTER_NAME_MAP, REG_R0, REG_R3, REG_SEE, REG_U_PC, REG_U__BRANCHTAKEN,
     },
     core::fmt::Debug,
     execute_aarch64_instrs_integer_arithmetic_rev::execute_aarch64_instrs_integer_arithmetic_rev,
@@ -39,13 +39,13 @@ fn entrypoint(host: &'static dyn PluginHost) {
     addwithcarry_early_4880_loop();
 
     replicate_bits();
-//    ubfx();
+    ubfx();
 
-   // fibonacci();
+    fibonacci();
 
     ispow2();
 
-   // rev_d00dfeed();
+    rev_d00dfeed();
 
     log::info!("tests passed");
     panic!();
@@ -170,7 +170,7 @@ fn ubfx() {
         state.write_register::<u64>(REG_R3, 0x8444_c004);
 
         // ubfx x3, x3, #16, #4
-        u__DecodeA64(&mut state, TRACER,0, 0xd3504c63);
+        u__DecodeA64(&mut state, TRACER, 0, 0xd3504c63);
         assert_eq!(0x4, state.read_register::<u64>(REG_R3));
     }
 }
@@ -202,16 +202,25 @@ fn fibonacci() {
         0xd4000001, // svc     #0x0
     ];
 
-    loop {
-        let pc = state.read_register::<usize>(REG_U_PC);
+    // bounded just in case
+    for _ in 0..100 {
+        state.write_register(REG_SEE, 0u64);
+        state.write_register(REG_U__BRANCHTAKEN, false);
+        let pc = state.read_register::<u64>(REG_U_PC);
 
         // exit before the svc
         if pc == 0x38 {
             break;
         }
 
-        let instr = program[pc / 4];
-        u__DecodeA64(&mut state, TRACER,pc as i128, instr);
+        let instr = program[pc as usize / 4];
+        u__DecodeA64(&mut state, TRACER, pc as i128, instr);
+
+        // increment PC if no branch was taken
+        if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
+            let pc = state.read_register::<u64>(REG_U_PC);
+            state.write_register(REG_U_PC, pc + 4);
+        }
     }
 
     assert_eq!(89, state.read_register::<u64>(REG_R0));
