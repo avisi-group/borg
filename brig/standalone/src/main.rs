@@ -2,7 +2,7 @@ use {
     aarch64_interpreter::{Aarch64Interpreter, TracerKind},
     clap::Parser,
     rustix::mm::{MapFlags, ProtFlags},
-    std::{fmt::Debug, fs, path::PathBuf, ptr},
+    std::{fmt::Debug, path::PathBuf, ptr},
 };
 
 const GUEST_MEMORY_BASE: usize = 0x1_0000;
@@ -74,8 +74,7 @@ fn main() {
         )
     };
 
-    let mut interpreter =
-        Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000,  TracerKind::Sail);
+    let mut interpreter = Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, TracerKind::Sail);
     interpreter.run();
 }
 

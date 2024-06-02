@@ -1,4 +1,4 @@
-use log::{Level, LevelFilter, Log};
+use log::{LevelFilter, Log};
 
 struct Logger;
 
