@@ -68,13 +68,13 @@ impl Aarch64Interpreter {
             let insn_data = u__FetchInstr(&mut self.state, &NoopTracer, pc)
                 .tuple__pcnt_enum_z__InstrEnc__pcnt_bv321;
 
-            // if self.instructions_retired > 58692 {
-            //     self.tracer = TracerKind::Log;
-            // }
+            if self.instructions_retired > 58695 {
+                self.tracer = TracerKind::Log;
+            }
 
-            // if self.instructions_retired > 58700 {
-            //     panic!();
-            // }
+            if self.instructions_retired > 58700 {
+                panic!();
+            }
 
             // monomorphization goes brrr, only seems to add around 10% to compilation time
             // but saves recompilation when changing tracer
@@ -113,7 +113,7 @@ impl Aarch64Interpreter {
                         nzcv,
                     );
 
-                    step_model(&mut self.state, &NoopTracer, ());
+                    step_model(&mut self.state, &SailTracer, ());
                 }
                 TracerKind::Qemu => {
                     unimplemented!("QEMU-style tracing output not supported")
@@ -184,5 +184,25 @@ impl Tracer for LogTracer {
 
     fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
         trace!("    M[{address:x}] <- {value:?}");
+    }
+}
+
+struct SailTracer;
+
+impl Tracer for SailTracer {
+    fn begin(&self, _: u32, _: u64) {}
+
+    fn end(&self) {}
+
+    fn read_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
+
+    fn write_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
+
+    fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
+        trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);
+    }
+
+    fn write_memory<T: core::fmt::Debug>(&self,  address: usize, value: T) {
+        trace!("[Sail] mem {:016x?} <- {:016x?}", address, value);
     }
 }

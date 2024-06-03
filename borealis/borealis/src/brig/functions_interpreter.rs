@@ -132,9 +132,23 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote! {
                 {
-                    // todo: ask tom about this, mask off any high bits?
-                    let address = (#offset as usize + state.guest_memory_base()) & 0x7fff_ffff_ffff;
-                    let value = unsafe { *(address as *const u128) };
+
+                    let guest_physical_address = #offset as usize;
+
+                    let mut value = 0u128;
+                    for i in (0..#size as usize / 8).rev() {
+                        let byte_address = guest_physical_address + i;
+
+                        // todo: ask tom about this, mask off any high bits?
+                        let host_address = (byte_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
+
+                        let byte = unsafe { *(host_address as *const u8) };
+                        tracer.read_memory(byte_address, byte);
+
+                        value <<= 8;
+                        value |= u128::from(byte);
+                    }
+
                     Bits::new(value, #size as u16)
                 }
             }
@@ -163,36 +177,17 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote! {
                 {
-                    // todo: ask tom about this, mask off any high bits?
-                    let address = (#offset as usize + state.guest_memory_base()) & 0x7fff_ffff_ffff;
+                    let guest_physical_address = #offset as usize;
 
-                    match #length {
-                        8 => {
-                            let value = #value as u8;
-                            tracer.write_memory(address, value);
-                            unsafe { *(address as *mut u8) = value; }
-                        },
-                        16 => {
-                            let value = #value as u16;
-                            tracer.write_memory(address, value);
-                            unsafe { *(address as *mut u16) = value; }
-                        },
-                        32 => {
-                            let value = #value as u32;
-                            tracer.write_memory(address, value);
-                            unsafe { *(address as *mut u32) = value; }
-                        },
-                        64 => {
-                            let value = #value as u64;
-                            tracer.write_memory(address, value);
-                            unsafe { *(address as *mut u64) = value; }
-                        },
-                        128 => {
-                            let value = #value as u128;
-                            tracer.write_memory(address, value);
-                            unsafe { *(address as *mut u128) = value; }
-                        }
-                        l => panic!("unsupported length {l:#x}")
+                    let data = #value.to_ne_bytes();
+                    for i in 0..#length as usize / 8 {
+                        let byte_address = guest_physical_address + i;
+
+                        let host_address = (byte_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
+
+                        unsafe { *(host_address as *mut u8) = data[i]; };
+
+                        tracer.write_memory(byte_address, data[i]);
                     }
                 }
             }

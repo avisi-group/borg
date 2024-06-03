@@ -1,8 +1,8 @@
 use log::{LevelFilter, Log};
 
-struct Logger;
+struct PrintlnLogger;
 
-impl Log for Logger {
+impl Log for PrintlnLogger {
     fn enabled(&self, _: &log::Metadata) -> bool {
         true
     }
@@ -16,6 +16,6 @@ impl Log for Logger {
 }
 
 pub(crate) fn init() {
-    log::set_logger(&Logger).expect("Failed to set logger");
+    log::set_logger(&PrintlnLogger).expect("Failed to set logger");
     log::set_max_level(LevelFilter::Trace);
 }

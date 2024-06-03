@@ -27,7 +27,7 @@ fn main() {
     // }
 
     // create guest virtual memory?
-    let mmap = unsafe {
+    let _mmap = unsafe {
         rustix::mm::mmap_anonymous(
             GUEST_MEMORY_BASE as *mut _,
             GUEST_MEMORY_SIZE,
@@ -36,7 +36,7 @@ fn main() {
         )
     }
     .unwrap();
-    let high = unsafe {
+    let _high = unsafe {
         rustix::mm::mmap_anonymous(
             0x7fc0_0780_0000 as *mut _,
             GUEST_MEMORY_SIZE,
@@ -48,31 +48,13 @@ fn main() {
     // -b 0x80000000,bootloader.bin -b 0x81000000,sail.dtb -b 0x82080000,Image
 
     // copy bootloader
-    unsafe {
-        ptr::copy(
-            BOOTLOADER.as_ptr(),
-            (mmap as *mut u8).offset(0x8000_0000 as isize),
-            BOOTLOADER.len(),
-        )
-    };
+    write_ram(BOOTLOADER, 0x8000_0000);
 
     // copy dtb
-    unsafe {
-        ptr::copy(
-            DTB.as_ptr(),
-            (mmap as *mut u8).offset(0x8100_0000 as isize),
-            DTB.len(),
-        )
-    };
+    write_ram(DTB, 0x8100_0000);
 
     // copy kernel
-    unsafe {
-        ptr::copy(
-            IMAGE.as_ptr(),
-            (mmap as *mut u8).offset(0x8208_0000 as isize),
-            IMAGE.len(),
-        )
-    };
+    write_ram(IMAGE, 0x8208_0000);
 
     let mut interpreter = Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, TracerKind::Sail);
     interpreter.run();
@@ -106,4 +88,12 @@ struct Arm64KernelHeader {
     res4: u64,
     magic: u32,
     res5: u32,
+}
+
+fn write_ram(data: &[u8], guest_address: usize) {
+    for (i, byte) in data.iter().enumerate() {
+        let byte_address = guest_address + i;
+        unsafe { *((GUEST_MEMORY_BASE + byte_address) as *mut u8) = *byte };
+        println!("[Sail] mem {byte_address:016x} <- {byte:016x}");
+    }
 }

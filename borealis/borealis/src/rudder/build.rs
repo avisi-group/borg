@@ -1363,33 +1363,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let size_bits_cast =  self.builder.generate_cast(size_bits, Arc::new(Type::ArbitraryLengthInteger));
 
-                   let value= self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: Arc::new(Type::Bits), value: data, length:size_bits_cast });
-                   let offset = self.builder.generate_cast(phys_addr, Arc::new(Type::u64()));
+                    let value = self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: Arc::new(Type::Bits), value: data, length:size_bits_cast });
+                    let offset = self.builder.generate_cast(phys_addr, Arc::new(Type::u64()));
 
                     self.builder.build(StatementKind::WriteMemory { offset, value });
 
                     // return value also appears to be always ignored
                     Some(self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u1()), value: ConstantValue::UnsignedInteger(0) }))
                 }
-                // "HaveEL" => {
-                //     let two = self.builder.build(StatementKind::Constant {
-                //         typ: Arc::new(Type::new_primitive(
-                //             rudder::PrimitiveTypeClass::UnsignedInteger,
-                //             2,
-                //         )),
-                //         value: ConstantValue::UnsignedInteger(2),
-                //     });
-                //     Some(self.builder.build(StatementKind::BinaryOperation {
-                //         kind: BinaryOperationKind::CompareLessThan,
-                //         lhs: args[0].clone(),
-                //         rhs: two,
-                //     }))
-                //     // el < 2
-                // }
-
 
                 // ignore
-                "append_str" | "__monomorphize" | "concat_str"  => Some(args[0].clone()),
+                "append_str" | "__monomorphize" | "concat_str" => Some(args[0].clone()),
 
                 // result of sail_mem_read always appears to ignore the value returned by `read_tag#` (underscore in Ok((value, _))):
                 // match sail_mem_read(read_request(accdesc, translation_info, size, desc.vaddress, desc.paddress.address)) {
@@ -1398,17 +1382,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 //   }
                 "read_tag#" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(rudder::Type::u1()),
-                    value: ConstantValue::UnsignedInteger(0),
+                    value: ConstantValue::UnsignedInteger(1),
                 })),
-                "write_tag#" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(rudder::Type::unit()),
-                    value: ConstantValue::Unit,
-                })),
+                "write_tag#" => Some(self.builder.build(StatementKind::Panic(vec![]))),
 
-                "DecStr" | "bits_str" | "HexStr"  => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(rudder::Type::String),
-                    value: ConstantValue::String("fix me in build_specialized_function".into()),
-                })),
+                "DecStr" | "bits_str" | "HexStr" => {
+                    Some(self.builder.build(StatementKind::Constant {
+                        typ: Arc::new(rudder::Type::String),
+                        value: ConstantValue::String("fix me in build_specialized_function".into()),
+                    }))
+                }
 
                 "__GetVerbosity" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(rudder::Type::u64()),
@@ -1419,7 +1402,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     typ: Arc::new(rudder::Type::ArbitraryLengthInteger),
                     value: ConstantValue::SignedInteger(0),
                 })),
-
 
                 "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"
@@ -1434,7 +1416,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "sail_barrier"
                 | "__WakeupRequest"
                 | "print"
-                | "print_endline" | "check_cycle_count"  | "sail_take_exception"=> Some(self.builder.build(StatementKind::Constant {
+                | "print_endline"
+                | "check_cycle_count"
+                | "sail_take_exception" => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::unit()),
                     value: ConstantValue::Unit,
                 })),
