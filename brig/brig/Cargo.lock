@@ -209971,6 +209971,7 @@ dependencies = [
  "common",
  "execute_aarch64_instrs_integer_arithmetic_rev",
  "log",
+ "place_slice_signed",
  "plugins_rt",
  "replicate_bits_borealis_internal",
  "u__DecodeA64",

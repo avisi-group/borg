@@ -8,6 +8,7 @@ use {
     },
     core::fmt::Debug,
     execute_aarch64_instrs_integer_arithmetic_rev::execute_aarch64_instrs_integer_arithmetic_rev,
+    place_slice_signed::place_slice_signed,
     plugins_rt::api::{PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
     u__DecodeA64::u__DecodeA64,
@@ -46,6 +47,38 @@ fn entrypoint(host: &'static dyn PluginHost) {
     ispow2();
 
     rev_d00dfeed();
+
+    {
+        let mut state = State::init(0x0);
+
+        let x = Bits::new(0xffffffc0082b3cd0, 64);
+        let y = Bits::new(0xffffffffffffffd8, 64);
+        let carry_in = false;
+
+        assert_eq!(
+            AddWithCarry(&mut state, &NoopTracer, x, y, carry_in),
+            ProductType188a1c3bf231c64b {
+                tuple__pcnt_bv__pcnt_bv40: Bits::new(0xffffffc0082b3ca8, 0x40),
+                tuple__pcnt_bv__pcnt_bv41: 0b1010
+            }
+        );
+    }
+
+    {
+        let mut state = State::init(0x0);
+        assert_eq!(
+            Bits::new(0xffffffffffffffd8, 64),
+            place_slice_signed(
+                &mut state,
+                &NoopTracer,
+                64,
+                Bits::new(0xffffffd8, 64),
+                0,
+                32,
+                0,
+            )
+        );
+    }
 
     log::info!("tests passed");
     panic!();

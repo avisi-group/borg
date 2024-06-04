@@ -19,6 +19,7 @@ borealis_register_init = { path = "../../../../../aarch64/borealis_register_init
 u__InitSystem = { path = "../../../../../aarch64/u__InitSystem" }
 execute_aarch64_instrs_integer_arithmetic_rev = { path = "../../../../../aarch64/execute_aarch64_instrs_integer_arithmetic_rev"}
 u__DecodeA64 = {path = "../../../../../aarch64/u__DecodeA64"}
+place_slice_signed = {path = "../../../../../aarch64/place_slice_signed"}
 common = {path = "../../../../../aarch64/common"}
 aarch64_interpreter = { path = "../devices/arm/aarch64_interpreter" }
 

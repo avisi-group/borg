@@ -1,6 +1,8 @@
 use {
     aarch64_interpreter::{Aarch64Interpreter, TracerKind},
     clap::Parser,
+    // common::{Bits, State, Tracer},
+    // place_slice_signed::place_slice_signed,
     rustix::mm::{MapFlags, ProtFlags},
     std::{fmt::Debug, path::PathBuf, ptr},
 };
@@ -97,3 +99,19 @@ fn write_ram(data: &[u8], guest_address: usize) {
         println!("[Sail] mem {byte_address:016x} <- {byte:016x}");
     }
 }
+
+// struct NoopTracer;
+
+// impl Tracer for NoopTracer {
+//     fn begin(&self, _: u32, _: u64) {}
+
+//     fn end(&self) {}
+
+//     fn read_register<T: Debug>(&self, _: isize, _: T) {}
+
+//     fn write_register<T: Debug>(&self, _: isize, _: T) {}
+
+//     fn read_memory<T: Debug>(&self, _: usize, _: T) {}
+
+//     fn write_memory<T: Debug>(&self, _: usize, _: T) {}
+// }

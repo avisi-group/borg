@@ -2,9 +2,7 @@
 
 use {
     borealis_register_init::borealis_register_init,
-    common::{
-        ProductTypee2f620c8eb69267c, State, Tracer, REGISTER_NAME_MAP, REG_PSTATE,  REG_U_PC,
-    },
+    common::{ProductTypee2f620c8eb69267c, State, Tracer, REGISTER_NAME_MAP, REG_PSTATE, REG_U_PC},
     core::fmt::Debug,
     log::trace,
     step_model::step_model,
@@ -28,11 +26,7 @@ pub struct Aarch64Interpreter {
 }
 
 impl Aarch64Interpreter {
-    pub fn new(
-        guest_memory_base: usize,
-        initial_pc: usize,
-        tracer: TracerKind,
-    ) -> Self {
+    pub fn new(guest_memory_base: usize, initial_pc: usize, tracer: TracerKind) -> Self {
         let mut state = State::init(guest_memory_base);
 
         // sets initial register and letbind state (generated from sail model)
@@ -68,13 +62,6 @@ impl Aarch64Interpreter {
             let insn_data = u__FetchInstr(&mut self.state, &NoopTracer, pc)
                 .tuple__pcnt_enum_z__InstrEnc__pcnt_bv321;
 
-            if self.instructions_retired > 58695 {
-                self.tracer = TracerKind::Log;
-            }
-
-            if self.instructions_retired > 58700 {
-                panic!();
-            }
 
             // monomorphization goes brrr, only seems to add around 10% to compilation time
             // but saves recompilation when changing tracer
@@ -202,7 +189,7 @@ impl Tracer for SailTracer {
         trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);
     }
 
-    fn write_memory<T: core::fmt::Debug>(&self,  address: usize, value: T) {
+    fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
         trace!("[Sail] mem {:016x?} <- {:016x?}", address, value);
     }
 }

@@ -256,15 +256,20 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             value,
             amount,
         } => {
-            let value = get_ident(&value);
+            let ident = get_ident(&value);
             let amount = get_ident(&amount);
 
             match kind {
-                ShiftOperationKind::LogicalShiftLeft => quote! {#value << #amount},
-                ShiftOperationKind::LogicalShiftRight => quote! {#value >> #amount},
-                ShiftOperationKind::ArithmeticShiftRight => {
-                    quote! {#value >> #amount}
-                }
+                ShiftOperationKind::LogicalShiftLeft => quote! {#ident << #amount},
+                ShiftOperationKind::LogicalShiftRight => quote! {#ident >> #amount},
+                ShiftOperationKind::ArithmeticShiftRight => match &*value.typ() {
+                    Type::Bits => {
+                        quote! {
+                            #ident.arithmetic_shift_right(#amount)
+                        }
+                    }
+                    typ => unimplemented!("{typ:?}"),
+                },
                 ShiftOperationKind::RotateRight => todo!(),
                 ShiftOperationKind::RotateLeft => todo!(),
             }

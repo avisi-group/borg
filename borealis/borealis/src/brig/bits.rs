@@ -15,7 +15,9 @@ pub fn codegen_bits() -> TokenStream {
         }
 
         impl Default for Bits {
-            fn default() -> Self { Self::new(0, 128) }
+            fn default() -> Self {
+                Self::new(0, 128)
+            }
         }
 
         impl Bits {
@@ -102,16 +104,35 @@ pub fn codegen_bits() -> TokenStream {
                 }
 
                 // mask off all bits except the ones we are about to insert
-                let insert_mask = 1u128.checked_shl(u32::from(insert.length())).map(|x| x - 1).unwrap_or(!0);
+                let insert_mask = 1u128
+                    .checked_shl(u32::from(insert.length()))
+                    .map(|x| x - 1)
+                    .unwrap_or(!0);
                 let mask = !(insert_mask << start);
 
                 // mask and insert
                 let result_value = (self.value() & mask) | shifted;
 
                 // todo: increase if we've inserted higher bits?
-                let result_length = core::cmp::max(self.length(), insert.length() + u16::try_from(start).unwrap());
+                let result_length = core::cmp::max(
+                    self.length(),
+                    insert.length() + u16::try_from(start).unwrap(),
+                );
 
                 Self::new(result_value, result_length)
+            }
+
+            pub fn arithmetic_shift_right(&self, amount: i128) -> Self {
+                let length = self.length();
+                let value = self.value();
+
+                let signed_value = value as i128;
+
+                let sign_extended = (signed_value << (128 - length)) >> (128 - length);
+
+                let shifted = sign_extended >> amount;
+
+                Bits::new(shifted as u128, length)
             }
         }
 
@@ -239,8 +260,6 @@ pub fn codegen_bits() -> TokenStream {
         }
 
         impl core::cmp::Eq for Bits {}
-
-
     }
 }
 
@@ -255,40 +274,12 @@ pub fn codegen_bits() -> TokenStream {
 //         assert_eq!(sign_extend.length(), 64);
 //         assert_eq!(sign_extend.value(), 0xfffffffffe57ba1c);
 //     }
-// }
-// pub fn codegen_int() -> TokenStream {
-//     quote! {
-//         #[derive(Default, Clone, Copy, Debug)]
-//         pub struct Int {
-//             value: i128,
-//         }
 
-//         impl Bits {
-//             pub fn new(value: u128, length: u16) -> Self {
-//                 Self {
-//                     value,
-//                     length,
-//                 }
-//             }
-
-//             pub fn value(&self) -> u128 {
-//                 self.value
-//             }
-
-//             pub fn length(&self) -> u16 {
-//                 self.length
-//             }
-
-//             pub fn wrapping_add(self, rhs: Self) -> Self {
-//                 let (value, overflow) =
-// self.value().overflowing_add(rhs.value());
-
-//                 Self {
-//                     value,
-//                     length: self.length(),
-//                     overflow: self.overflow || rhs.overflow || overflow,
-//                 }
-//             }
-//         }
+//     #[test]
+//     fn arithmetic_shift_right() {
+//         let bits = Bits::new(0xffff_ffd8 << 32, 0x40);
+//         let shift = bits.arithmetic_shift_right(32);
+//         assert_eq!(shift.length(), 64);
+//         assert_eq!(shift.value(), 0xffff_ffff_ffff_ffd8);
 //     }
 // }
