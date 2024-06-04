@@ -1403,6 +1403,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     value: ConstantValue::SignedInteger(0),
                 })),
 
+                // val putchar : (%i) -> %unit
+                "putchar" =>Some(self.builder.build(StatementKind::PrintChar(args[0].clone()))),
+
                 "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"
                 | "execute_aarch64_instrs_system_barriers_dsb"

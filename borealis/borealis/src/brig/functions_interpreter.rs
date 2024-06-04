@@ -410,6 +410,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote!(panic!("{:?}", (#(#args),*)))
         }
+        StatementKind::PrintChar(c) => {
+            let c = get_ident(&c);
+            quote!(log::error!("{}", (#c as u8) as char))
+        }
         StatementKind::ReadElement { vector, index } => {
             let index_typ = index.typ();
 

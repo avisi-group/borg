@@ -171,6 +171,11 @@ fn clone_statement(
 
             builder.build(StatementKind::Panic(stmts))
         }
+        StatementKind::PrintChar(c) => {
+            let c = mapping.get(&c).unwrap().clone();
+
+            builder.build(StatementKind::PrintChar(c))
+        }
         StatementKind::Assert { condition } => builder.build(StatementKind::Assert {
             condition: mapping.get(&condition).unwrap().clone(),
         }),

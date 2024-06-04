@@ -8,8 +8,10 @@ impl Log for PrintlnLogger {
     }
 
     fn log(&self, record: &log::Record) {
-        // print trace messages completely plainly
-        println!("{}", record.args());
+        match record.level() {
+            log::Level::Error => eprint!("{}", record.args()),
+            _ =>  println!("{}", record.args()),
+        }
     }
 
     fn flush(&self) {}

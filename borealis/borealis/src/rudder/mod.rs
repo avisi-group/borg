@@ -410,6 +410,9 @@ pub enum StatementKind {
     /// purposes
     Panic(Vec<Statement>),
 
+    /// Prints a character
+    PrintChar(Statement),
+
     Assert {
         condition: Statement,
     },
@@ -605,6 +608,7 @@ impl Statement {
                 }
             }
             StatementKind::Panic(_) => ValueClass::Static,
+            StatementKind::PrintChar(_) => ValueClass::Static,
             StatementKind::ReadPc => ValueClass::Dynamic,
             StatementKind::WritePc { .. } => ValueClass::None,
             StatementKind::BitExtract { .. } => ValueClass::Dynamic,
@@ -679,6 +683,7 @@ impl Statement {
             StatementKind::Return { .. } => Arc::new(Type::void()),
             StatementKind::Select { true_value, .. } => true_value.typ(),
             StatementKind::Panic(_) => Arc::new(Type::void()),
+            StatementKind::PrintChar(_) => Arc::new(Type::unit()),
             StatementKind::ReadPc => Arc::new(Type::u64()),
             StatementKind::WritePc { .. } => Arc::new(Type::void()),
             // todo: this is a simplification, be more precise about lengths?
@@ -743,6 +748,8 @@ impl Statement {
             StatementKind::Branch { .. } => true,
             StatementKind::Return { .. } => true,
             StatementKind::Panic(_) => true,
+            StatementKind::PrintChar(_) => true,
+
             StatementKind::Assert { .. } => true,
             _ => false,
         }
@@ -1151,6 +1158,12 @@ impl StatementInner {
                 };
 
                 self.kind = StatementKind::ExtractField { value, field };
+            }
+
+            StatementKind::PrintChar(c) => {
+                let c = if c == use_of { with.clone() } else { c.clone() };
+
+                self.kind = StatementKind::PrintChar(c);
             }
 
             StatementKind::Constant { .. } => todo!(),

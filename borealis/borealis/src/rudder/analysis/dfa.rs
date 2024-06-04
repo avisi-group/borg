@@ -220,6 +220,9 @@ impl StatementUseAnalysis {
                         self.add_use(&panic_value, &stmt);
                     }
                 }
+                StatementKind::PrintChar(c) => {
+                    self.add_use(&c, &stmt);
+                }
                 StatementKind::CreateBits { value, length } => {
                     self.add_use(&value, &stmt);
                     self.add_use(&length, &stmt);

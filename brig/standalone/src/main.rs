@@ -58,7 +58,7 @@ fn main() {
     // copy kernel
     write_ram(IMAGE, 0x8208_0000);
 
-    let mut interpreter = Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, TracerKind::Sail);
+    let mut interpreter = Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, TracerKind::Noop);
     interpreter.run();
 }
 
@@ -93,11 +93,12 @@ struct Arm64KernelHeader {
 }
 
 fn write_ram(data: &[u8], guest_address: usize) {
-    for (i, byte) in data.iter().enumerate() {
-        let byte_address = guest_address + i;
-        unsafe { *((GUEST_MEMORY_BASE + byte_address) as *mut u8) = *byte };
-        println!("[Sail] mem {byte_address:016x} <- {byte:016x}");
-    }
+    // for (i, byte) in data.iter().enumerate() {
+    //     let byte_address = guest_address + i;
+    //     unsafe { *((GUEST_MEMORY_BASE + byte_address) as *mut u8) = *byte };
+    //   //  println!("[Sail] mem {byte_address:016x} <- {byte:016x}");
+    // }
+    unsafe { core::ptr::copy(data.as_ptr(), (GUEST_MEMORY_BASE + guest_address) as *mut u8, data.len()) };
 }
 
 // struct NoopTracer;

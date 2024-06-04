@@ -223,6 +223,9 @@ impl Display for StatementKind {
                     statements.iter().map(Statement::name).join(" ")
                 )
             }
+            StatementKind::PrintChar(c) => {
+                write!(f, "put-char {}", c.name(),)
+            }
             StatementKind::ReadPc => write!(f, "read-pc"),
             StatementKind::WritePc { value } => write!(f, "write-pc {}", value.name()),
             StatementKind::BitExtract {
