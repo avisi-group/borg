@@ -108,8 +108,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let typ = codegen_type(typ);
             quote! {
                 {
-                    let value = state.read_register::<#typ>(#offset as isize);
-                    tracer.read_register(#offset as isize, value);
+                    let value = state.read_register::<#typ>(#offset as usize);
+                    tracer.read_register(#offset as usize, value);
                     value
                 }
             }
@@ -120,8 +120,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let value = get_ident(&value);
             quote! {
                 {
-                    state.write_register::<#typ>(#offset as isize, #value);
-                    tracer.write_register(#offset as isize, #value);
+                    state.write_register::<#typ>(#offset as usize, #value);
+                    tracer.write_register(#offset as usize, #value);
                 }
             }
         }

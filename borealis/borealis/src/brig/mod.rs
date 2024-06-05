@@ -284,6 +284,23 @@ fn codegen_types(rudder: &Context) -> TokenStream {
                 pub struct #ident {
                     #fields
                 }
+
+                impl ToBytes for #ident {
+                    fn to_bytes(&self) -> impl AsRef<[u8]> {
+                        unsafe {
+                            ::core::slice::from_raw_parts(
+                                (self as *const #ident) as *const u8,
+                                ::core::mem::size_of::<#ident>(),
+                            )
+                        }
+                    }
+                }
+
+                impl FromBytes for #ident {
+                    fn from_bytes(bytes: &[u8]) -> Self {
+                       unsafe { core::ptr::read_unaligned(bytes.as_ptr().cast()) }
+                    }
+                }
             }
         })
         .collect();
@@ -318,6 +335,23 @@ fn codegen_types(rudder: &Context) -> TokenStream {
                 impl Default for #ident {
                     fn default() -> Self {
                         Self::#first_field(Default::default())
+                    }
+                }
+
+                impl ToBytes for #ident {
+                    fn to_bytes(&self) -> impl AsRef<[u8]> {
+                        unsafe {
+                            ::core::slice::from_raw_parts(
+                                (self as *const #ident) as *const u8,
+                                ::core::mem::size_of::<#ident>(),
+                            )
+                        }
+                    }
+                }
+
+                impl FromBytes for #ident {
+                    fn from_bytes(bytes: &[u8]) -> Self {
+                       unsafe { core::ptr::read_unaligned(bytes.as_ptr().cast()) }
                     }
                 }
             }
@@ -356,8 +390,8 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                     pub trait Tracer {
                         fn begin(&self, instruction: u32, pc: u64);
                         fn end(&self);
-                        fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
-                        fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
+                        fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
+                        fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
                         fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
                         fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
                     }

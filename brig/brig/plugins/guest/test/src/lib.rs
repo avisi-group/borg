@@ -49,7 +49,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     rev_d00dfeed();
 
     {
-        let mut state = State::init(0x0);
+        let mut state = State::new(0x0);
 
         let x = Bits::new(0xffffffc0082b3cd0, 64);
         let y = Bits::new(0xffffffffffffffd8, 64);
@@ -65,7 +65,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     }
 
     {
-        let mut state = State::init(0x0);
+        let mut state = State::new(0x0);
         assert_eq!(
             Bits::new(0xffffffffffffffd8, 64),
             place_slice_signed(
@@ -85,7 +85,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
 }
 
 fn addwithcarry_negative() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
 
     let x = Bits::new(0x0, 0x40);
     let y = Bits::new(-5i128 as u128, 0x40);
@@ -101,7 +101,7 @@ fn addwithcarry_negative() {
 }
 
 fn addwithcarry_zero() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
     let x = Bits::new(0x0, 0x40);
     let y = Bits::new(0x0, 0x40);
     let carry_in = false;
@@ -116,7 +116,7 @@ fn addwithcarry_zero() {
 }
 
 fn addwithcarry_carry() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
 
     let x = Bits::new(u64::MAX as u128, 0x40);
     let y = Bits::new(0x1, 0x40);
@@ -132,7 +132,7 @@ fn addwithcarry_carry() {
 }
 
 fn addwithcarry_overflow() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
 
     let x = Bits::new(u64::MAX as u128 / 2, 0x40);
     let y = Bits::new(u64::MAX as u128 / 2, 0x40);
@@ -150,7 +150,7 @@ fn addwithcarry_overflow() {
 /// Testing the flags of the `0x0000000040234888:  eb01001f      cmp x0, x1`
 /// instruction
 fn addwithcarry_early_4880_loop() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
 
     let x = Bits::new(0x425a6004, 0x40);
     let y = Bits::new(!0x425a6020, 0x40);
@@ -166,7 +166,7 @@ fn addwithcarry_early_4880_loop() {
 }
 
 fn replicate_bits() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
     assert_eq!(
         Bits::new(0xffff_ffff, 32),
         replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0xff, 8), 4)
@@ -187,7 +187,7 @@ fn replicate_bits() {
 
 fn ubfx() {
     {
-        let mut state = State::init(0x0);
+        let mut state = State::new(0x0);
         // decode bit masks
         assert_eq!(
             ProductTypea79c7f841a890648 {
@@ -199,7 +199,7 @@ fn ubfx() {
     }
 
     {
-        let mut state = State::init(0x0);
+        let mut state = State::new(0x0);
         state.write_register::<u64>(REG_R3, 0x8444_c004);
 
         // ubfx x3, x3, #16, #4
@@ -209,7 +209,7 @@ fn ubfx() {
 }
 
 fn fibonacci() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
     borealis_register_init(&mut state, TRACER);
     // hacky, run sail function that goes before the main loop :/
     u__InitSystem(&mut state, TRACER, ());
@@ -261,14 +261,14 @@ fn fibonacci() {
 }
 
 fn rev_d00dfeed() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
     state.write_register::<u64>(REG_R3, 0xedfe0dd0);
     execute_aarch64_instrs_integer_arithmetic_rev(&mut state, TRACER, 32, 3, 32, 3);
     assert_eq!(0xd00dfeed, state.read_register::<u64>(REG_R3));
 }
 
 fn ispow2() {
-    let mut state = State::init(0x0);
+    let mut state = State::new(0x0);
     let x = 2048i128;
     assert_eq!(
         FloorPow2(&mut state, TRACER, x),
@@ -284,9 +284,9 @@ impl Tracer for NoopTracer {
 
     fn end(&self) {}
 
-    fn read_register<T: Debug>(&self, _: isize, _: T) {}
+    fn read_register<T: Debug>(&self, _: usize, _: T) {}
 
-    fn write_register<T: Debug>(&self, _: isize, _: T) {}
+    fn write_register<T: Debug>(&self, _: usize, _: T) {}
 
     fn read_memory<T: Debug>(&self, _: usize, _: T) {}
 
@@ -304,7 +304,7 @@ impl Tracer for LogTracer {
         log::trace!("");
     }
 
-    fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {
+    fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
         match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
                 log::trace!("    R[{}] -> {value:x?}", REGISTER_NAME_MAP[idx].1)
@@ -318,7 +318,7 @@ impl Tracer for LogTracer {
         }
     }
 
-    fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T) {
+    fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
         match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
                 log::trace!("    R[{}] <- {value:x?}", REGISTER_NAME_MAP[idx].1)
