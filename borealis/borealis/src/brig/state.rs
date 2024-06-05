@@ -20,8 +20,7 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
                     .to_string()
                     .to_ascii_uppercase()
             );
-            let offset = Literal::usize_unsuffixed(offset);
-            quote!(pub const #name: isize = #offset;)
+            quote!(pub const #name: usize = #offset;)
         })
         .collect::<TokenStream>();
 
@@ -40,7 +39,6 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
             .map(|(offset, name)| {
                 let name = name.as_ref();
 
-                let offset = Literal::isize_suffixed(isize::try_from(offset).unwrap());
                 quote!((#offset, #name),)
             })
             .collect::<TokenStream>()
@@ -65,27 +63,23 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
 
         impl State {
             /// Returns the ISA state with initial values and configuration set
-            pub fn init(guest_memory_base: usize) -> Self {
-                let mut celf = Self {
+            pub fn new(guest_memory_base: usize) -> Self {
+                Self {
                     data: [0; #registers_len],
                     guest_memory_base,
-                };
-
-                // initial assignments here
-
-                celf
+                }
             }
 
-            pub fn write_register<T>(&mut self, offset: isize, value: T) {
-                let data_ptr = self.data.as_ptr();
-                let offset_ptr = unsafe { data_ptr.byte_offset(offset) };
-                unsafe { *(offset_ptr as *mut T) = value };
+            pub fn write_register<T>(&mut self, offset: usize, value: T) {
+                let start = offset;
+                let end = start + core::mem::size_of::<T>();
+                unsafe { core::ptr::write_unaligned(self.data[start..end].as_mut_ptr().cast(), value) };
             }
 
-            pub fn read_register<T: Copy>(&self, offset: isize) -> T {
-                let data_ptr = self.data.as_ptr();
-                let offset_ptr = unsafe { data_ptr.byte_offset(offset) };
-                unsafe { *(offset_ptr as *const T) }
+            pub fn read_register<T>(&self, offset: usize) -> T {
+                let start = offset;
+                let end = start + core::mem::size_of::<T>();
+                unsafe { core::ptr::read_unaligned(self.data[start..end].as_ptr().cast()) }
             }
 
             pub fn guest_memory_base(&self) -> usize {
@@ -95,6 +89,6 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
 
         #register_offsets
 
-        pub const REGISTER_NAME_MAP: &[(isize, &str)] = &[#register_name_map_contents];
+        pub const REGISTER_NAME_MAP: &[(usize, &str)] = &[#register_name_map_contents];
     }
 }

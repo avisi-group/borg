@@ -6,7 +6,7 @@ edition = "2021"
 
 [profile.release]
 debug = true
-#lto = "fat" small perf bump but increases compile time from 2 mins to 6 mins at time of writing
+opt-level = 3
 
 [dependencies]
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }

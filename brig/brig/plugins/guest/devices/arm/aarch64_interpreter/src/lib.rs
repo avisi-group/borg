@@ -27,7 +27,7 @@ pub struct Aarch64Interpreter {
 
 impl Aarch64Interpreter {
     pub fn new(guest_memory_base: usize, initial_pc: usize, tracer: TracerKind) -> Self {
-        let mut state = State::init(guest_memory_base);
+        let mut state = State::new(guest_memory_base);
 
         // sets initial register and letbind state (generated from sail model)
         borealis_register_init(&mut state, &NoopTracer);
@@ -119,9 +119,9 @@ impl Tracer for NoopTracer {
 
     fn end(&self) {}
 
-    fn read_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
+    fn read_register<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
-    fn write_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
+    fn write_register<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
     fn read_memory<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
@@ -139,7 +139,7 @@ impl Tracer for LogTracer {
         trace!("");
     }
 
-    fn read_register<T: Debug>(&self, offset: isize, value: T) {
+    fn read_register<T: Debug>(&self, offset: usize, value: T) {
         match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
                 trace!("    R[{}] -> {value:x?}", REGISTER_NAME_MAP[idx].1)
@@ -153,7 +153,7 @@ impl Tracer for LogTracer {
         }
     }
 
-    fn write_register<T: Debug>(&self, offset: isize, value: T) {
+    fn write_register<T: Debug>(&self, offset: usize, value: T) {
         match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
                 trace!("    R[{}] <- {value:x?}", REGISTER_NAME_MAP[idx].1)
@@ -181,9 +181,9 @@ impl Tracer for SailTracer {
 
     fn end(&self) {}
 
-    fn read_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
+    fn read_register<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
-    fn write_register<T: core::fmt::Debug>(&self, _: isize, _: T) {}
+    fn write_register<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
     fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
         trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);

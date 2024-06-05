@@ -356,8 +356,8 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                     pub trait Tracer {
                         fn begin(&self, instruction: u32, pc: u64);
                         fn end(&self);
-                        fn read_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
-                        fn write_register<T: core::fmt::Debug>(&self, offset: isize, value: T);
+                        fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
+                        fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
                         fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
                         fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
                     }
