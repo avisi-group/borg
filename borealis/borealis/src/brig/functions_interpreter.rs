@@ -73,7 +73,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                     if v.is_infinite() {
                         quote!(1.1 / 0.0)
                     } else {
-                        let v = Literal::f32_unsuffixed(v);
+                        let v = Literal::f64_unsuffixed(v);
                         quote!(#v)
                     }
                 }
@@ -82,6 +82,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 ConstantValue::String(str) => {
                     let string = str.to_string();
                     quote!(#string)
+                }
+                ConstantValue::Rational(r) => {
+                    let numer = *r.numer();
+                    let denom = *r.denom();
+                    quote!(num_rational::Ratio::<i128>::new(#numer, #denom))
                 }
             };
 
@@ -132,24 +137,24 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote! {
                 {
-
                     let guest_physical_address = #offset as usize;
+                    let host_address = (guest_physical_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
 
                     let mut value = 0u128;
-                    for i in (0..#size as usize / 8).rev() {
-                        let byte_address = guest_physical_address + i;
 
-                        // todo: ask tom about this, mask off any high bits?
-                        let host_address = (byte_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
-
-                        let byte = unsafe { *(host_address as *const u8) };
-                        tracer.read_memory(byte_address, byte);
-
-                        value <<= 8;
-                        value |= u128::from(byte);
+                    unsafe {
+                        core::ptr::copy(
+                            host_address as *const u8,
+                            (&mut value as *mut u128) as *mut u8,
+                            #size as usize / 8
+                        )
                     }
 
-                    Bits::new(value, #size as u16)
+                    let bits = Bits::new(value, #size as u16);
+
+                    tracer.read_memory(host_address, bits);
+
+                    bits
                 }
             }
         }
@@ -160,17 +165,29 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             // emit match on this length to create mut pointer
 
-            let (length, value) = match &*value.typ() {
-                Type::Primitive(PrimitiveType {
-                    element_width_in_bits,
-                    ..
-                }) => {
+            let write = match &*value.typ() {
+                Type::Primitive(PrimitiveType { .. }) => {
                     let value = get_ident(&value);
-                    (quote!(#element_width_in_bits), quote!(#value))
+                    quote! {
+                        unsafe { *(host_address as *mut _) = #value; };
+                        tracer.write_memory(host_address, #value);
+                    }
                 }
                 Type::Bits => {
                     let value = get_ident(&value);
-                    (quote!(#value.length()), quote!(#value.value()))
+                    quote! {
+                        unsafe {
+                            core::ptr::copy(
+                                // source is the u128 inner value
+                                (&#value.value() as *const u128) as *const u8,
+                                // destination is the target host address
+                                host_address as *mut u8,
+                                // copy the right number of bytes (length is bits)
+                                #value.length() as usize / 8
+                            )
+                        };
+                        tracer.write_memory(host_address, #value);
+                    }
                 }
                 _ => todo!(),
             };
@@ -178,17 +195,9 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     let guest_physical_address = #offset as usize;
+                    let host_address = (guest_physical_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
 
-                    let data = #value.to_ne_bytes();
-                    for i in 0..#length as usize / 8 {
-                        let byte_address = guest_physical_address + i;
-
-                        let host_address = (byte_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
-
-                        unsafe { *(host_address as *mut u8) = data[i]; };
-
-                        tracer.write_memory(byte_address, data[i]);
-                    }
+                    #write
                 }
             }
         }
@@ -813,6 +822,18 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
                     buf.copy_from_slice(&#ident);
                     buf
                 }
+            }
+        }
+
+        (Type::Rational, Type::ArbitraryLengthInteger, CastOperationKind::Convert) => {
+            quote! {
+                #ident.to_integer()
+            }
+        }
+
+        (Type::ArbitraryLengthInteger, Type::Rational, CastOperationKind::Convert) => {
+            quote! {
+                num_rational::Ratio::<i128>::from_integer(#ident)
             }
         }
 

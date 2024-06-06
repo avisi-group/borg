@@ -114,7 +114,7 @@ pub fn start() {
             continue;
         };
 
-        let dev = factory.create([("tracer".into(), "log".into())].into());
+        let dev = factory.create([("tracer".into(), "noop".into())].into());
         guest.devices.insert(name.clone(), dev);
 
         // locate address space for attachment, if any

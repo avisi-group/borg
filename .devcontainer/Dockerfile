@@ -18,7 +18,7 @@ set -x EDITOR vi\n\
 set -x RUST_MIN_STACK 1073741824\n\
 alias cargo="mold -run cargo"\n\
 # PATH\n\
-set PATH $HOME/.cargo/bin $PATH\n\
+set PATH /usr/local/cargo/bin $PATH\n\
 set PATH $HOME/.local/bin $PATH\n\
 # opam configuration\n\
 source /root/.opam/opam-init/init.fish > /dev/null 2> /dev/null; or true\n\

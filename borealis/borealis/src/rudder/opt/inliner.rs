@@ -1,6 +1,7 @@
-use common::HashMap;
-
-use crate::rudder::{Block, Function, Statement, StatementBuilder, StatementKind, Type};
+use {
+    crate::rudder::{Block, Function, Statement, StatementBuilder, StatementKind, Type},
+    common::HashMap,
+};
 
 const INLINE_SIZE_THRESHOLD: usize = 5;
 

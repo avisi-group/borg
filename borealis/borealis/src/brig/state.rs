@@ -3,7 +3,7 @@ use {
         brig::codegen_ident,
         rudder::{Context, RegisterDescriptor},
     },
-    proc_macro2::{Literal, TokenStream},
+    proc_macro2::TokenStream,
     quote::{format_ident, quote},
 };
 

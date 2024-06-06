@@ -16,6 +16,8 @@ use {
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     log::trace,
+    num_rational::Ratio,
+    num_traits::cast::FromPrimitive,
     regex::Regex,
     std::{cmp::Ordering, sync::Arc},
 };
@@ -281,7 +283,8 @@ impl BuildContext {
             boom::Type::String => Arc::new(rudder::Type::String),
             // value
             boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
-            boom::Type::Real | boom::Type::Float => Arc::new(rudder::Type::f32()),
+            boom::Type::Float => Arc::new(rudder::Type::f64()),
+            boom::Type::Real => Arc::new(rudder::Type::Rational),
             boom::Type::Constant(_) => todo!(),
             boom::Type::Enum { name, .. } => self.enums.get(name).unwrap().0.clone(),
             boom::Type::Union { name, .. } => self.unions.get(name).unwrap().0.clone(),
@@ -623,11 +626,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         panic!();
                     };
 
-                    let f = str.as_ref().parse().unwrap();
+                    let r = Ratio::<i128>::from_f64(str.as_ref().parse().unwrap()).unwrap();
 
                     Some(self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::f32()),
-                        value: ConstantValue::FloatingPoint(f),
+                        typ: Arc::new(Type::Rational),
+                        value: ConstantValue::Rational(r),
                     }))
                 }
 
@@ -815,7 +818,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val to_real : (%i) -> %real
                 "to_real" => Some(
                     self.builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::f32())),
+                        .generate_cast(args[0].clone(), Arc::new(Type::Rational)),
                 ),
 
                 // val pow2 : (%i) -> %i
@@ -1830,7 +1833,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             Ordering::Equal => CastOperationKind::Reinterpret,
                         }
                     }
-                    Type::Bits | Type::ArbitraryLengthInteger => todo!(),
+                    Type::Bits | Type::ArbitraryLengthInteger | Type::Rational => todo!(),
                 };
 
                 self.builder.build(StatementKind::Cast {

@@ -7,6 +7,7 @@ edition = "2021"
 [profile.release]
 debug = true
 opt-level = 3
+incremental = true
 
 [dependencies]
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }
@@ -15,5 +16,5 @@ rustix = { version = "0.38.34", features = ["mm"] }
 log = "0.4.21"
 
 # common = { path = "../../aarch64/common" }
-# AddWithCarry = { path = "../../aarch64/AddWithCarry" }
-# place_slice_signed = { path = "../../aarch64/place_slice_signed" }
+# u__DecodeA64_DataProcReg = { path = "../../aarch64/u__DecodeA64_DataProcReg" }
+# # place_slice_signed = { path = "../../aarch64/place_slice_signed" }

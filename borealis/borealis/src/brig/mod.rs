@@ -219,6 +219,9 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
         Type::Bits => {
             quote!(Bits)
         }
+        Type::Rational => {
+            quote!(num_rational::Ratio<i128>)
+        }
         Type::ArbitraryLengthInteger => quote!(i128),
         Type::String => quote!(&'static str),
     }
@@ -362,6 +365,26 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                         fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
                     }
 
+                    pub trait RatioExt {
+                        fn powi(&self, i: i32) -> Self;
+                        fn sqrt(&self) -> Self;
+                        fn abs(&self) -> Self;
+                    }
+
+                 impl RatioExt for num_rational::Ratio<i128> {
+                        fn powi(&self, i: i32) -> Self {
+                            self.pow(i)
+                        }
+                        fn sqrt(&self) -> Self {
+                            todo!();
+                        }
+                       fn abs(&self) -> Self {
+                            let n = *self.numer();
+                            let d = *self.denom();
+                            Self::new(n.abs(), d)
+                        }
+                    }
+
                     #[derive(Debug)]
                     pub enum ExecuteResult {
                         Ok,
@@ -491,7 +514,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                         #header
 
                         extern crate alloc;
-                        use micromath::F32Ext;
+
                         #imports
 
                         #contents

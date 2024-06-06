@@ -209,7 +209,9 @@ fn convert_body(instructions: &[jib_ast::Instruction]) -> Vec<Shared<boom::State
 }
 
 fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::Statement>> {
-    if let jib_ast::InstructionAux::Block(instructions) | jib_ast::InstructionAux::TryBlock(instructions) = statement {
+    if let jib_ast::InstructionAux::Block(instructions)
+    | jib_ast::InstructionAux::TryBlock(instructions) = statement
+    {
         return convert_body(instructions.as_ref());
     }
 
@@ -258,7 +260,6 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
                 else_body: convert_body(else_body.as_ref()),
             }]
         }
-
 
         jib_ast::InstructionAux::Throw(value) => {
             vec![boom::Statement::Panic(vec![convert_value(value)])]

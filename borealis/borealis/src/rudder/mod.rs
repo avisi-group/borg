@@ -64,6 +64,7 @@ pub enum Type {
 
     Bits,
     ArbitraryLengthInteger,
+    Rational,
 }
 
 macro_rules! type_def_helper {
@@ -134,6 +135,7 @@ impl Type {
             Self::Bits | Self::ArbitraryLengthInteger => usize::try_from(BitsValue::BITS).unwrap(),
             // width of internedstring
             Self::String => 32,
+            Self::Rational => todo!(),
         }
     }
 
@@ -1363,6 +1365,17 @@ impl StatementBuilder {
             }),
 
             (Type::ArbitraryLengthInteger, Type::Bits) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            }),
+
+            (Type::ArbitraryLengthInteger, Type::Rational) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            }),
+            (Type::Rational, Type::ArbitraryLengthInteger) => self.build(StatementKind::Cast {
                 kind: CastOperationKind::Convert,
                 typ: destination_type,
                 value: source,

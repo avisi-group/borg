@@ -4,7 +4,7 @@ use {
     borealis_register_init::borealis_register_init,
     common::{
         Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer,
-        REGISTER_NAME_MAP, REG_R0, REG_R3, REG_SEE, REG_U_PC, REG_U__BRANCHTAKEN,
+        REGISTER_NAME_MAP, REG_R0, REG_R3, REG_SEE, REG_U_PC, REG_U__BRANCHTAKEN,REG_R1, REG_R19,
     },
     core::fmt::Debug,
     execute_aarch64_instrs_integer_arithmetic_rev::execute_aarch64_instrs_integer_arithmetic_rev,
@@ -78,6 +78,24 @@ fn entrypoint(host: &'static dyn PluginHost) {
                 0,
             )
         );
+    }
+
+{
+        let x = 0xffffff8008bfffffu64;
+        let y = 0x200000u64;
+        let mut state = State::new(0x0);
+        state.write_register(REG_R19, x);
+        state.write_register(REG_R1, y);
+
+        // div
+        u__DecodeA64_DataProcReg::u__DecodeA64_DataProcReg(
+            &mut state,
+            TRACER,
+            0x0,
+            0x9ac10a73,
+        );
+
+        assert_eq!(x / y, state.read_register(REG_R19));
     }
 
     log::info!("tests passed");

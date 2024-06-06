@@ -28,6 +28,7 @@ impl Display for Type {
             Type::Bits => write!(f, "bv"),
             Type::ArbitraryLengthInteger => write!(f, "i"),
             Type::String => write!(f, "str"),
+            Type::Rational => write!(f, "rational"),
         }
     }
 }
@@ -40,6 +41,7 @@ impl Display for ConstantValue {
             ConstantValue::FloatingPoint(v) => write!(f, "{v}f"),
             ConstantValue::Unit => write!(f, "()"),
             ConstantValue::String(str) => write!(f, "{str:?}"),
+            ConstantValue::Rational(r) => write!(f, "{r:?}"),
         }
     }
 }

@@ -1,14 +1,12 @@
 use {
     aarch64_interpreter::{Aarch64Interpreter, TracerKind},
     clap::Parser,
-    // common::{Bits, State, Tracer},
-    // place_slice_signed::place_slice_signed,
     rustix::mm::{MapFlags, ProtFlags},
-    std::{fmt::Debug, path::PathBuf, ptr},
+    std::{fmt::Debug, path::PathBuf},
 };
 
 const GUEST_MEMORY_BASE: usize = 0x1_0000;
-const GUEST_MEMORY_SIZE: usize = 12 * 1024 * 1024 * 1024;
+const GUEST_MEMORY_ALLOC_SIZE: usize = 12 * 1024 * 1024 * 1024;
 
 const DTB: &[u8] = include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/sail.dtb");
 const BOOTLOADER: &[u8] =
@@ -29,19 +27,28 @@ fn main() {
     // }
 
     // create guest virtual memory?
-    let _mmap = unsafe {
+    let _mmap0 = unsafe {
         rustix::mm::mmap_anonymous(
             GUEST_MEMORY_BASE as *mut _,
-            GUEST_MEMORY_SIZE,
+            GUEST_MEMORY_ALLOC_SIZE,
             ProtFlags::READ | ProtFlags::WRITE,
             MapFlags::FIXED | MapFlags::PRIVATE,
         )
     }
     .unwrap();
-    let _high = unsafe {
+    let _mmap1 = unsafe {
+        rustix::mm::mmap_anonymous(
+            0x40_7a00_0000 as *mut _,
+            GUEST_MEMORY_ALLOC_SIZE,
+            ProtFlags::READ | ProtFlags::WRITE,
+            MapFlags::FIXED | MapFlags::PRIVATE,
+        )
+    }
+    .unwrap();
+    let _mmap2 = unsafe {
         rustix::mm::mmap_anonymous(
             0x7fc0_0780_0000 as *mut _,
-            GUEST_MEMORY_SIZE,
+            GUEST_MEMORY_ALLOC_SIZE,
             ProtFlags::READ | ProtFlags::WRITE,
             MapFlags::FIXED | MapFlags::PRIVATE,
         )
@@ -58,7 +65,7 @@ fn main() {
         write_ram(IMAGE, 0x8208_0000);
     }
 
-    let mut interpreter = Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, TracerKind::Noop);
+    let mut interpreter = Aarch64Interpreter::new(GUEST_MEMORY_BASE, 0x8000_0000, TracerKind::Sail);
     interpreter.run();
 }
 
@@ -99,19 +106,3 @@ unsafe fn write_ram(data: &[u8], guest_address: usize) {
         data.len(),
     );
 }
-
-// struct NoopTracer;
-
-// impl Tracer for NoopTracer {
-//     fn begin(&self, _: u32, _: u64) {}
-
-//     fn end(&self) {}
-
-//     fn read_register<T: Debug>(&self, _: usize, _: T) {}
-
-//     fn write_register<T: Debug>(&self, _: usize, _: T) {}
-
-//     fn read_memory<T: Debug>(&self, _: usize, _: T) {}
-
-//     fn write_memory<T: Debug>(&self, _: usize, _: T) {}
-// }

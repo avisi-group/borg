@@ -1,5 +1,7 @@
 use {
     common::intern::InternedString,
+    num_rational::Ratio,
+    num_traits::CheckedMul,
     std::{
         cmp::Ordering,
         ops::{Add, Div, Mul, Sub},
@@ -10,7 +12,8 @@ use {
 pub enum ConstantValue {
     UnsignedInteger(usize),
     SignedInteger(isize),
-    FloatingPoint(f32),
+    FloatingPoint(f64),
+    Rational(Ratio<i128>),
     String(InternedString),
     Unit,
 }
@@ -21,6 +24,7 @@ impl ConstantValue {
             ConstantValue::UnsignedInteger(v) => *v == 0,
             ConstantValue::SignedInteger(v) => *v == 0,
             ConstantValue::FloatingPoint(v) => *v == 0.,
+            ConstantValue::Rational(r) => *r == (Ratio::<i128>::ZERO),
             ConstantValue::Unit | ConstantValue::String(_) => false,
         }
     }
@@ -49,22 +53,36 @@ impl ConstantValue {
     }
 
     pub fn powi(&self, i: ConstantValue) -> ConstantValue {
-        let ConstantValue::FloatingPoint(f) = self else {
-            panic!();
-        };
-
         let ConstantValue::SignedInteger(i) = i else {
             panic!();
         };
 
-        let result = f.powi(i32::try_from(i).unwrap());
+        match self {
+            ConstantValue::FloatingPoint(f) => {
+                let result = f.powi(i32::try_from(i).unwrap());
 
-        // some sail source does actually want infinite/NaNs
-        // if !result.is_finite() {
-        //     panic!("got non-finite result {result} from {f}.powi({i})");
-        // }
+                // some sail source does actually want infinite/NaNs
+                // if !result.is_finite() {
+                //     panic!("got non-finite result {result} from {f}.powi({i})");
+                // }
 
-        ConstantValue::FloatingPoint(result)
+                ConstantValue::FloatingPoint(result)
+            }
+            ConstantValue::Rational(r) => {
+                let mut acc = *r;
+                for _ in 0..i {
+                    match acc.checked_mul(r) {
+                        Some(res) => acc = res,
+                        None => {
+                            acc = Ratio::<i128>::from_integer(i128::MAX);
+                            break;
+                        }
+                    }
+                }
+                ConstantValue::Rational(acc)
+            }
+            _ => todo!(),
+        }
     }
 }
 
