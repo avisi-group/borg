@@ -95,7 +95,8 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                             Type::ArbitraryLengthInteger => {
                                 Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for unsigned integer constant"))
                             }
-                            Type::String| Type::Rational => todo!(),
+                            Type::String| Type::Rational |Type::Any=> todo!(),
+
                         },
                         ConstantValue::SignedInteger(_) => match &*typ {
                             Type::Primitive(p) => match p.tc {
@@ -121,7 +122,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                                 //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for signed integer constant"))
                                 None
                             }
-                            Type::String | Type::Rational=> todo!(),
+                            Type::String | Type::Rational | Type::Any=> todo!(),
                         }
                         ConstantValue::FloatingPoint(_) => match &*typ {
                             Type::Primitive(p) => match p.tc {
@@ -143,7 +144,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                             Type::ArbitraryLengthInteger => {
                                 Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for floating point constant"))
                             }
-                            Type::String | Type::Rational=> todo!(),
+                            Type::String | Type::Rational|    Type::Any=> todo!(),
                         }
                         ConstantValue::Unit => match &*typ {
                             Type::Primitive(p) => match p.tc {
@@ -165,7 +166,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
                              Type::ArbitraryLengthInteger => {
                                 Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for unit constant"))
                             }
-                            Type::String | Type::Rational => todo!(),
+                            Type::String | Type::Rational | Type::Any=> todo!(),
                         }
                         ConstantValue::String(_) => {
                             assert!(matches!(&*typ, Type::String));

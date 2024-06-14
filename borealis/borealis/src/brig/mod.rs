@@ -224,6 +224,8 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
         }
         Type::ArbitraryLengthInteger => quote!(i128),
         Type::String => quote!(&'static str),
+        // maybe this should be `core::Any`?
+        Type::Any => quote!(_),
     }
 }
 

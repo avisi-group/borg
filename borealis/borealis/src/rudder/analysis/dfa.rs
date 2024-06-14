@@ -251,11 +251,12 @@ impl StatementUseAnalysis {
                     self.add_use(&field_value, &stmt);
                 }
 
-                StatementKind::ReadVariable { symbol } => {}
-                StatementKind::ReadPc => {}
-                StatementKind::Jump { target } => {}
-                StatementKind::PhiNode { members } => {}
-                StatementKind::Constant { .. } => {}
+                StatementKind::ReadVariable { .. }
+                | StatementKind::ReadPc
+                | StatementKind::Jump { .. }
+                | StatementKind::PhiNode { .. }
+                | StatementKind::Constant { .. }
+                | StatementKind::Undefined => {}
             }
         }
     }

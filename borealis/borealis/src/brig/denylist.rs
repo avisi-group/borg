@@ -28,8 +28,4 @@ pub fn apply_fn_denylist<I: Iterator<Item = jib_ast::Definition>>(
     })
 }
 
-const DENYLIST: &[&'static str] = &[
-    "integer_update_subrange",
-    "PhysMemTagWrite",
-    "PhysMemTagRead",
-];
+const DENYLIST: &[&'static str] = &["integer_update_subrange"];

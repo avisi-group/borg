@@ -227,6 +227,7 @@ fn clone_statement(
             field,
             field_value: mapping.get(&field_value).unwrap().clone(),
         }),
+        StatementKind::Undefined => builder.build(StatementKind::Undefined),
     }
 }
 

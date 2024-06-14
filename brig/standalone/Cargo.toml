@@ -4,17 +4,13 @@ name = "standalone"
 version = "0.1.0"
 edition = "2021"
 
-[profile.release]
+[profile.dev]
 debug = true
-opt-level = 3
+opt-level = 2
 incremental = true
+codegen-units = 1024
 
 [dependencies]
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }
-clap = { version = "4.5.4", features = ["derive"] }
 rustix = { version = "0.38.34", features = ["mm"] }
 log = "0.4.21"
-
-# common = { path = "../../aarch64/common" }
-# u__DecodeA64_DataProcReg = { path = "../../aarch64/u__DecodeA64_DataProcReg" }
-# # place_slice_signed = { path = "../../aarch64/place_slice_signed" }

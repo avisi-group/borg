@@ -44,6 +44,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
             build_ctx.add_register(*name, typ);
         }
         // todo
+        // contains KV pairs, "mangled" and "tuplestruct" as keys and type names as values
         boom::Definition::Pragma { .. } => (),
     });
 
@@ -504,13 +505,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     fn build_copy(&mut self, value: Shared<boom::Value>, expression: &boom::Expression) {
-        // ignore copies of undefined
-        if let boom::Value::Literal(lit) = &*value.get() {
-            if let boom::Literal::Undefined = *lit.get() {
-                return;
-            }
-        }
-
         let source = self.build_value(value.clone());
 
         self.build_expression_write(expression, source);
@@ -1794,7 +1788,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 value: rudder::ConstantValue::Unit,
             },
             boom::Literal::Reference(_) => todo!(),
-            boom::Literal::Undefined => StatementKind::Panic(vec![]),
+            boom::Literal::Undefined => StatementKind::Undefined,
         };
 
         self.builder.build(kind)
@@ -1834,6 +1828,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         }
                     }
                     Type::Bits | Type::ArbitraryLengthInteger | Type::Rational => todo!(),
+                    Type::Any => todo!(),
                 };
 
                 self.builder.build(StatementKind::Cast {

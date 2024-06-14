@@ -14,7 +14,6 @@
                     "--bin=standalone",
                     "--package=standalone",
                     "--manifest-path=${workspaceFolder}/brig/standalone/Cargo.toml",
-                   // "--release"
                 ],
                 "filter": {
                     "name": "standalone",

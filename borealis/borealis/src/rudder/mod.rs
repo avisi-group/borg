@@ -65,6 +65,9 @@ pub enum Type {
     Bits,
     ArbitraryLengthInteger,
     Rational,
+
+    // Any type, used for undefineds
+    Any,
 }
 
 macro_rules! type_def_helper {
@@ -136,6 +139,7 @@ impl Type {
             // width of internedstring
             Self::String => 32,
             Self::Rational => todo!(),
+            Self::Any => todo!(),
         }
     }
 
@@ -412,7 +416,12 @@ pub enum StatementKind {
     /// purposes
     Panic(Vec<Statement>),
 
+    /// `Default::default()`, or uninitialized, or ???
+    Undefined,
+
     /// Prints a character
+    ///
+    /// REMOVE ME ONCE SERIAL PORT DRIVER EXISTS IN BRIG
     PrintChar(Statement),
 
     Assert {
@@ -629,6 +638,7 @@ impl Statement {
             StatementKind::UnwrapSum { .. } => ValueClass::Dynamic,
             StatementKind::ExtractField { .. } => ValueClass::Dynamic,
             StatementKind::UpdateField { .. } => ValueClass::Dynamic,
+            StatementKind::Undefined => ValueClass::Constant,
         }
     }
 
@@ -732,6 +742,7 @@ impl Statement {
                     .clone()
             }
             StatementKind::UpdateField { original_value, .. } => original_value.typ(),
+            StatementKind::Undefined => Arc::new(Type::Any),
         }
     }
 
@@ -1168,12 +1179,6 @@ impl StatementInner {
                 self.kind = StatementKind::PrintChar(c);
             }
 
-            StatementKind::Constant { .. } => todo!(),
-            StatementKind::ReadVariable { .. } => todo!(),
-            StatementKind::ReadRegister { .. } => todo!(),
-            StatementKind::ReadPc => todo!(),
-            StatementKind::Jump { .. } => todo!(),
-            StatementKind::PhiNode { .. } => todo!(),
             StatementKind::UpdateField {
                 original_value,
                 field,
@@ -1195,6 +1200,14 @@ impl StatementInner {
                     field_value,
                 };
             }
+
+            StatementKind::Constant { .. } => todo!(),
+            StatementKind::ReadVariable { .. } => todo!(),
+            StatementKind::ReadRegister { .. } => todo!(),
+            StatementKind::ReadPc => todo!(),
+            StatementKind::Jump { .. } => todo!(),
+            StatementKind::PhiNode { .. } => todo!(),
+            StatementKind::Undefined => todo!(),
         }
     }
 }
@@ -1376,6 +1389,13 @@ impl StatementBuilder {
                 value: source,
             }),
             (Type::Rational, Type::ArbitraryLengthInteger) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            }),
+
+            // allow casting any to anything
+            (Type::Any, _) => self.build(StatementKind::Cast {
                 kind: CastOperationKind::Convert,
                 typ: destination_type,
                 value: source,

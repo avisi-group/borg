@@ -62,11 +62,11 @@ impl Aarch64Interpreter {
             let insn_data = u__FetchInstr(&mut self.state, &NoopTracer, pc)
                 .tuple__pcnt_enum_z__InstrEnc__pcnt_bv321;
 
-            // if self.instructions_retired > 566369 {
+            // if self.instructions_retired == 130700 {
             //     self.tracer_kind = TracerKind::Log;
             // }
 
-            // if self.instructions_retired > 566380 {
+            // if self.instructions_retired == 130702 {
             //     panic!();
             // }
 
@@ -192,11 +192,11 @@ impl Tracer for SailTracer {
 
     fn write_register<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
-    fn read_memory<T: core::fmt::Debug>(&self, _address: usize, _value: T) {
-        // trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);
+    fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
+        trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);
     }
 
-    fn write_memory<T: core::fmt::Debug>(&self, _address: usize, _value: T) {
-        // trace!("[Sail] mem {:016x?} <- {:016x?}", address, value);
+    fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
+        trace!("[Sail] mem {:016x?} <- {:016x?}", address, value);
     }
 }

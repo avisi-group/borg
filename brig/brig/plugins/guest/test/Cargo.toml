@@ -8,6 +8,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 plugins_rt.workspace = true
+log = "0.4.21"
+
 AddWithCarry = { path = "../../../../../aarch64/AddWithCarry" }
 DecodeBitMasks = { path = "../../../../../aarch64/DecodeBitMasks" }
 replicate_bits_borealis_internal = { path = "../../../../../aarch64/replicate_bits_borealis_internal" }
@@ -23,5 +25,3 @@ place_slice_signed = {path = "../../../../../aarch64/place_slice_signed"}
 u__DecodeA64_DataProcReg = {path = "../../../../../aarch64/u__DecodeA64_DataProcReg"}
 common = {path = "../../../../../aarch64/common"}
 aarch64_interpreter = { path = "../devices/arm/aarch64_interpreter" }
-
-log = "0.4.21"

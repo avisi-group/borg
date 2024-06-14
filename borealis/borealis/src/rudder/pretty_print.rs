@@ -29,6 +29,7 @@ impl Display for Type {
             Type::ArbitraryLengthInteger => write!(f, "i"),
             Type::String => write!(f, "str"),
             Type::Rational => write!(f, "rational"),
+            Type::Any => write!(f, "any"),
         }
     }
 }
@@ -225,6 +226,7 @@ impl Display for StatementKind {
                     statements.iter().map(Statement::name).join(" ")
                 )
             }
+            StatementKind::Undefined => write!(f, "undefined",),
             StatementKind::PrintChar(c) => {
                 write!(f, "put-char {}", c.name(),)
             }
