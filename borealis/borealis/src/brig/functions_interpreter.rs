@@ -139,7 +139,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             // quote! {
             //     {
             //         let guest_physical_address = #offset as usize;
-            //         let host_address = (guest_physical_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
+            //         let host_address = (guest_physical_address + state.guest_memory_base());
 
             //         let mut value = 0u128;
 
@@ -173,8 +173,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                         for i in (0..#size as usize / 8).rev() {
                             let byte_address = guest_physical_address + i;
 
-                            // todo: ask tom about this, mask off any high bits?
-                            let host_address = (byte_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
+                            let host_address = (byte_address + state.guest_memory_base());
 
                             let byte = unsafe { *(host_address as *const u8) };
                             tracer.read_memory(byte_address, byte);
@@ -226,7 +225,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             // quote! {
             //     {
             //         let guest_physical_address = #offset as usize;
-            //         let host_address = (guest_physical_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
+            //         let host_address = (guest_physical_address + state.guest_memory_base()) ;
 
             //         #write
             //     }
@@ -263,7 +262,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                         for i in 0..#length as usize / 8 {
                             let byte_address = guest_physical_address + i;
 
-                            let host_address = (byte_address + state.guest_memory_base()) & 0x7fff_ffff_ffff;
+                            let host_address = (byte_address + state.guest_memory_base());
 
                             unsafe { *(host_address as *mut u8) = data[i]; };
 

@@ -193,10 +193,10 @@ impl Tracer for SailTracer {
     fn write_register<T: core::fmt::Debug>(&self, _: usize, _: T) {}
 
     fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
-        trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);
+        //  trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);
     }
 
     fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
-        trace!("[Sail] mem {:016x?} <- {:016x?}", address, value);
+        //  trace!("[Sail] mem {:016x?} <- {:016x?}", address, value);
     }
 }

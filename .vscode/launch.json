@@ -22,9 +22,6 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}/brig/standalone",
-            "env": {
-                "RUST_LOG": "trace",
-            }
         },
         {
             "type": "lldb",
