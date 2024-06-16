@@ -299,13 +299,13 @@ impl Tracer for NoopTracer {
 
     fn end(&self) {}
 
-    fn read_register<T: Debug>(&self, _: usize, _: T) {}
+    fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
 
-    fn write_register<T: Debug>(&self, _: usize, _: T) {}
+    fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
 
-    fn read_memory<T: Debug>(&self, _: usize, _: T) {}
+    fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
 
-    fn write_memory<T: Debug>(&self, _: usize, _: T) {}
+    fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
 }
 
 struct LogTracer;
@@ -319,7 +319,7 @@ impl Tracer for LogTracer {
         log::trace!("");
     }
 
-    fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
+    fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
         match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
                 log::trace!("    R[{}] -> {value:x?}", REGISTER_NAME_MAP[idx].1)
@@ -333,7 +333,7 @@ impl Tracer for LogTracer {
         }
     }
 
-    fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T) {
+    fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
         match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
             Ok(idx) => {
                 log::trace!("    R[{}] <- {value:x?}", REGISTER_NAME_MAP[idx].1)
@@ -345,11 +345,11 @@ impl Tracer for LogTracer {
         }
     }
 
-    fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
+    fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
         log::trace!("    M[{address:x}] -> {value:?}");
     }
 
-    fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T) {
+    fn write_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
         log::trace!("    M[{address:x}] <- {value:?}");
     }
 }

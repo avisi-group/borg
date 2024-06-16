@@ -361,10 +361,10 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                     pub trait Tracer {
                         fn begin(&self, instruction: u32, pc: u64);
                         fn end(&self);
-                        fn read_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
-                        fn write_register<T: core::fmt::Debug>(&self, offset: usize, value: T);
-                        fn read_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
-                        fn write_memory<T: core::fmt::Debug>(&self, address: usize, value: T);
+                        fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug);
+                        fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug);
+                        fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug);
+                        fn write_memory(&self, address: usize, value: &dyn core::fmt::Debug);
                     }
 
                     pub trait RatioExt {
@@ -471,7 +471,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                     let block_impl = codegen_block(block);
 
                     quote! {
-                        fn #block_name<T: Tracer>(state: &mut State, tracer: &T, mut fn_state: FunctionState) -> #return_type {
+                        fn #block_name(state: &mut State, tracer: &dyn Tracer, mut fn_state: FunctionState) -> #return_type {
                             #block_impl
                         }
                     }
@@ -480,7 +480,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
 
             let contents =
                 quote! {
-                    pub fn #name_ident<T: Tracer>(#function_parameters) -> #return_type {
+                    pub fn #name_ident(#function_parameters) -> #return_type {
                         #fn_state
 
                         return #entry_block(state, tracer, fn_state);

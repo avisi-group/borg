@@ -19,7 +19,7 @@ use {
 };
 
 pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
-    let parameters = [quote!(state: &mut State), quote!(tracer: &T)]
+    let parameters = [quote!(state: &mut State), quote!(tracer: &dyn Tracer)]
         .into_iter()
         .chain(parameters.iter().map(|sym| {
             let name = codegen_ident(sym.name());
@@ -114,7 +114,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     let value = state.read_register::<#typ>(#offset as usize);
-                    tracer.read_register(#offset as usize, value);
+                    tracer.read_register(#offset as usize, &value);
                     value
                 }
             }
@@ -126,7 +126,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! {
                 {
                     state.write_register::<#typ>(#offset as usize, #value);
-                    tracer.write_register(#offset as usize, #value);
+                    tracer.write_register(#offset as usize, &#value);
                 }
             }
         }
@@ -176,7 +176,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                             let host_address = (byte_address + state.guest_memory_base());
 
                             let byte = unsafe { *(host_address as *const u8) };
-                            tracer.read_memory(byte_address, byte);
+                            tracer.read_memory(byte_address, &byte);
 
                             value <<= 8;
                             value |= u128::from(byte);
@@ -266,7 +266,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
                             unsafe { *(host_address as *mut u8) = data[i]; };
 
-                            tracer.write_memory(byte_address, data[i]);
+                            tracer.write_memory(byte_address, &data[i]);
                         }
                     }
                 }
