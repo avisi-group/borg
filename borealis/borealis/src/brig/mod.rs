@@ -471,6 +471,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
                     let block_impl = codegen_block(block);
 
                     quote! {
+                        // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
                         fn #block_name(state: &mut State, tracer: &dyn Tracer, mut fn_state: FunctionState) -> #return_type {
                             #block_impl
                         }
@@ -480,6 +481,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
 
             let contents =
                 quote! {
+                    #[inline(never)]
                     pub fn #name_ident(#function_parameters) -> #return_type {
                         #fn_state
 
