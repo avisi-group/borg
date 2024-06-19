@@ -62,11 +62,11 @@ impl Aarch64Interpreter {
             let insn_data = u__FetchInstr(&mut self.state, &NoopTracer, pc)
                 .tuple__pcnt_enum_z__InstrEnc__pcnt_bv321;
 
-            // if self.instructions_retired == 130700 {
+            // if self.instructions_retired == 3854400 {
             //     self.tracer_kind = TracerKind::Log;
             // }
 
-            // if self.instructions_retired == 130702 {
+            // if self.instructions_retired == 2000 {
             //     panic!();
             // }
 
@@ -105,6 +105,132 @@ impl Aarch64Interpreter {
                         self.instructions_retired + 1,
                         pc,
                         nzcv,
+                    );
+
+                    // print all registers
+                    trace!(
+                        "R00 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R0)
+                    );
+                    trace!(
+                        "R01 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R1)
+                    );
+                    trace!(
+                        "R02 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R2)
+                    );
+                    trace!(
+                        "R03 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R3)
+                    );
+                    trace!(
+                        "R04 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R4)
+                    );
+                    trace!(
+                        "R05 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R5)
+                    );
+                    trace!(
+                        "R06 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R6)
+                    );
+                    trace!(
+                        "R07 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R7)
+                    );
+                    trace!(
+                        "R08 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R8)
+                    );
+                    trace!(
+                        "R09 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R9)
+                    );
+                    trace!(
+                        "R10 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R10)
+                    );
+                    trace!(
+                        "R11 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R11)
+                    );
+                    trace!(
+                        "R12 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R12)
+                    );
+                    trace!(
+                        "R13 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R13)
+                    );
+                    trace!(
+                        "R14 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R14)
+                    );
+                    trace!(
+                        "R15 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R15)
+                    );
+                    trace!(
+                        "R16 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R16)
+                    );
+                    trace!(
+                        "R17 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R17)
+                    );
+                    trace!(
+                        "R18 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R18)
+                    );
+                    trace!(
+                        "R19 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R19)
+                    );
+                    trace!(
+                        "R20 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R20)
+                    );
+                    trace!(
+                        "R21 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R21)
+                    );
+                    trace!(
+                        "R22 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R22)
+                    );
+                    trace!(
+                        "R23 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R23)
+                    );
+                    trace!(
+                        "R24 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R24)
+                    );
+                    trace!(
+                        "R25 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R25)
+                    );
+                    trace!(
+                        "R26 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R26)
+                    );
+                    trace!(
+                        "R27 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R27)
+                    );
+                    trace!(
+                        "R28 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R28)
+                    );
+                    trace!(
+                        "R29 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R29)
+                    );
+                    trace!(
+                        "R30 = {:016x}",
+                        self.state.read_register::<u64>(common::REG_R30)
                     );
 
                     step_model(&mut self.state, &SailTracer, ());

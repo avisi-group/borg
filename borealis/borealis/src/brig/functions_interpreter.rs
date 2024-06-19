@@ -139,7 +139,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             // quote! {
             //     {
             //         let guest_physical_address = #offset as usize;
-            //         let host_address = (guest_physical_address + state.guest_memory_base());
+            //         let host_address = (guest_physical_address +
+            // state.guest_memory_base());
 
             //         let mut value = 0u128;
 
@@ -225,7 +226,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             // quote! {
             //     {
             //         let guest_physical_address = #offset as usize;
-            //         let host_address = (guest_physical_address + state.guest_memory_base()) ;
+            //         let host_address = (guest_physical_address +
+            // state.guest_memory_base()) ;
 
             //         #write
             //     }
@@ -909,7 +911,8 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             }
         }
 
-        // Any can be cast to anything, but already has its type elided so we can just emit the identifier and let rust sort out the type
+        // Any can be cast to anything, but already has its type elided so we can just emit the
+        // identifier and let rust sort out the type
         (Type::Any, _, _) => {
             quote! {
                 (#ident)

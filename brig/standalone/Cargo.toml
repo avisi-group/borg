@@ -4,7 +4,7 @@ name = "standalone"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev]
+[profile.release]
 debug = true
 opt-level = 2
 incremental = true
@@ -13,3 +13,6 @@ incremental = true
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }
 rustix = { version = "0.38.34", features = ["mm"] }
 log = "0.4.21"
+
+common = { path = "../../aarch64/common" }
+u__DecodeA64 = { path = "../../aarch64/u__DecodeA64" }

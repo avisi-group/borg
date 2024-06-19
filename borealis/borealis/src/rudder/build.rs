@@ -1194,7 +1194,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let i = args[1].clone();
                     let bit = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::Bits));
+                        .generate_cast(args[2].clone(), Arc::new(Type::Bits));
 
                     let _1 = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
