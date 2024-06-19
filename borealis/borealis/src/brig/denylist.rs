@@ -1,10 +1,7 @@
-use {
-    rayon::iter::ParallelIterator,
-    sailrs::{
-        jib_ast::{self, Definition, Instruction, InstructionAux, Type, Value, Vl},
-        sail_ast::Location,
-        types::ListVec,
-    },
+use sailrs::{
+    jib_ast::{self, Definition, Instruction, InstructionAux, Type, Value, Vl},
+    sail_ast::Location,
+    types::ListVec,
 };
 
 pub fn apply_fn_denylist<I: Iterator<Item = jib_ast::Definition>>(

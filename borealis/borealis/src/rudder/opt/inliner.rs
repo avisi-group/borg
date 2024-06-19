@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{Block, Function, Statement, StatementBuilder, StatementKind, Type},
+    crate::rudder::{Block, Function, Statement, StatementBuilder, StatementKind},
     common::HashMap,
 };
 
@@ -115,7 +115,7 @@ fn clone_statement(
             true_target,
             false_target,
         }),
-        StatementKind::PhiNode { members } => todo!(),
+        StatementKind::PhiNode { .. } => todo!(),
         StatementKind::Return { value: Some(value) } => builder.build(StatementKind::Return {
             value: Some(mapping.get(&value).unwrap().clone()),
         }),

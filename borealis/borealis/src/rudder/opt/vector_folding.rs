@@ -1,9 +1,4 @@
-use {
-    crate::rudder::{
-        BinaryOperationKind, Block, ConstantValue, Function, StatementBuilder, StatementKind, Type,
-    },
-    std::sync::Arc,
-};
+use crate::rudder::{Block, Function};
 
 pub fn run(f: Function) -> bool {
     let mut changed = false;
@@ -16,7 +11,7 @@ pub fn run(f: Function) -> bool {
 
 /// Replace vector access on registers and locals with adding to the indices and
 /// offset respectively
-fn run_on_block(block: &Block) -> bool {
+fn run_on_block(_block: &Block) -> bool {
     // for stmt in block.statements() {
     //     // if we're reading an element of a vec
     //     // see if index is constant (check if the bundle is constant)

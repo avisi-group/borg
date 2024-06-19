@@ -64,11 +64,11 @@ impl SymbolUseAnalysis {
         self.symbol_blocks
             .entry(symbol.name())
             .and_modify(|u| {
-                u.insert(stmt.parent().upgrade());
+                u.insert(stmt.parent_block().upgrade());
             })
             .or_insert({
                 let mut h = HashSet::default();
-                h.insert(stmt.parent().upgrade());
+                h.insert(stmt.parent_block().upgrade());
 
                 h
             });

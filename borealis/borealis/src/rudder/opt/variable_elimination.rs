@@ -47,7 +47,7 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
             }
 
             trace!("considering variable write to {}", symbol.name());
-            match live_writes.entry((symbol.name())) {
+            match live_writes.entry(symbol.name()) {
                 Entry::Occupied(mut e) => {
                     trace!(
                         "already live write to symbol {}, updating live value",

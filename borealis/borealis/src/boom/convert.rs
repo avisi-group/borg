@@ -6,7 +6,6 @@ use {
         Parameter, Size,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
-    rayon::iter::{IntoParallelIterator, ParallelIterator},
     sailrs::{jib_ast, sail_ast},
     std::borrow::Borrow,
 };

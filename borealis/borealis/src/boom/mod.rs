@@ -12,7 +12,6 @@ use {
     common::{intern::InternedString, shared::Shared, HashMap},
     kinded::Kinded,
     num_bigint::BigInt,
-    rayon::iter::IntoParallelIterator,
     sailrs::jib_ast,
     std::{fmt::Debug, ops::Add},
 };

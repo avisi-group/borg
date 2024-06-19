@@ -1,9 +1,8 @@
 use {
-    super::{analysis, ValueClass},
     crate::rudder::{
-        BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
-        FunctionKind, PrimitiveTypeClass, Statement, StatementKind, Symbol, Type,
-        UnaryOperationKind,
+        analysis::cfg::ControlFlowGraphAnalysis, value_class::ValueClass, BinaryOperationKind,
+        Block, CastOperationKind, ConstantValue, Context, Function, FunctionKind,
+        PrimitiveTypeClass, Statement, StatementKind, Symbol, Type, UnaryOperationKind,
     },
     itertools::Itertools,
     std::fmt::{Display, Formatter, Result},
@@ -345,7 +344,7 @@ impl Display for Block {
 
 impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let cfg = analysis::cfg::ControlFlowGraphAnalysis::new(self);
+        let cfg = ControlFlowGraphAnalysis::new(self);
 
         self.inner.get().entry_block.iter().try_for_each(|block| {
             let preds = cfg

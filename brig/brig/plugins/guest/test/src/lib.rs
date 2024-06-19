@@ -288,7 +288,104 @@ fn entrypoint(host: &'static dyn PluginHost) {
         );
     }
 
-    panic!();
+    {
+        use {
+            common::{State, Tracer, REG_R0, REG_R2},
+            u__DecodeA64::u__DecodeA64,
+        };
+
+        struct NoopTracer;
+
+        impl Tracer for NoopTracer {
+            fn begin(&self, _: u32, _: u64) {}
+            fn end(&self) {}
+            fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+        }
+
+        let mut state = State::new(0x0);
+        state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
+        state.write_register::<u64>(REG_R2, 0xffff_ffff_ffff_ffc0);
+
+        //   //  let pstate = ProductTypee2f620c8eb69267c::default();
+
+        //     state.write_register::<u64>(REG_PSTATE, pstate);
+
+        //cmp     x2, x0
+        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0xeb00005f);
+
+        //  csel    x2, x2, x0, ls  // ls = plast
+        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0x9a809042);
+
+        // assert x2
+        assert_eq!(state.read_register::<u64>(REG_R2), 0xffff_ffff_ffff_ff00);
+    }
+
+    {
+        use {
+            common::{State, Tracer, REG_R0, REG_R2},
+            u__DecodeA64::u__DecodeA64,
+        };
+
+        struct NoopTracer;
+
+        impl Tracer for NoopTracer {
+            fn begin(&self, _: u32, _: u64) {}
+            fn end(&self) {}
+            fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+        }
+
+        let mut state = State::new(0x0);
+        state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
+        state.write_register::<u64>(REG_R2, 0x0fff_ffff_ffff_ffc0);
+
+        //   //  let pstate = ProductTypee2f620c8eb69267c::default();
+
+        //     state.write_register::<u64>(REG_PSTATE, pstate);
+
+        //cmp     x2, x0
+        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0xeb00005f);
+
+        //  csel    x2, x2, x0, ls  // ls = plast
+        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0x9a809042);
+
+        // assert x2
+        assert_eq!(state.read_register::<u64>(REG_R2), 0x0fff_ffff_ffff_ffc0);
+    }
+
+    {
+        use {
+            common::{State, Tracer, REG_R0, REG_R2},
+            u__DecodeA64::u__DecodeA64,
+        };
+
+        struct NoopTracer;
+
+        impl Tracer for NoopTracer {
+            fn begin(&self, _: u32, _: u64) {}
+            fn end(&self) {}
+            fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+            fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+        }
+
+        let mut state = State::new(0x0);
+        state.write_register::<u64>(REG_R0, 0x0000000000000001);
+
+        // rbit x0
+        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0xdac00000);
+
+        // assert bits are reversed
+        assert_eq!(state.read_register::<u64>(REG_R0), 0x8000000000000000);
+    }
+
+    //  panic!();
     log::info!("all tests passed");
 }
 

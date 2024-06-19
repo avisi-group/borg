@@ -23,6 +23,7 @@ mod internal_fns;
 pub mod opt;
 mod pretty_print;
 pub mod validator;
+mod value_class;
 
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]
 pub enum PrimitiveTypeClass {
@@ -477,14 +478,6 @@ pub enum StatementKind {
     },
 }
 
-#[derive(Eq, PartialEq)]
-pub enum ValueClass {
-    None,
-    Constant,
-    Static,
-    Dynamic,
-}
-
 #[derive(Debug, Clone)]
 pub struct Statement {
     inner: Shared<StatementInner>,
@@ -528,7 +521,7 @@ impl Statement {
         self.inner.get().name
     }
 
-    pub fn parent(&self) -> WeakBlock {
+    pub fn parent_block(&self) -> WeakBlock {
         self.inner.get().parent.clone()
     }
 
@@ -536,109 +529,89 @@ impl Statement {
         self.inner.get_mut().update_names(name);
     }
 
-    pub fn classify(&self) -> ValueClass {
-        match self.kind() {
-            StatementKind::Constant { .. } => ValueClass::Constant,
-            StatementKind::ReadRegister { .. } => ValueClass::Dynamic,
-            StatementKind::WriteRegister { .. } => ValueClass::None,
-            StatementKind::ReadMemory { .. } => ValueClass::Dynamic,
-            StatementKind::WriteMemory { .. } => ValueClass::None,
-            StatementKind::BinaryOperation { lhs, rhs, .. } => {
-                match (lhs.classify(), rhs.classify()) {
-                    (ValueClass::Constant, ValueClass::Constant) => ValueClass::Constant,
-                    (ValueClass::Constant, ValueClass::Static) => ValueClass::Static,
-                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Static, ValueClass::Constant) => ValueClass::Static,
-                    (ValueClass::Static, ValueClass::Static) => ValueClass::Static,
-                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Constant) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Static) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    _ => panic!("cannot classify binary operation"),
-                }
-            }
-            StatementKind::UnaryOperation { value, .. } => match value.classify() {
-                ValueClass::Constant => ValueClass::Constant,
-                ValueClass::Static => ValueClass::Static,
-                ValueClass::Dynamic => ValueClass::Dynamic,
-                _ => panic!("cannot classify unary operation"),
-            },
-            StatementKind::ShiftOperation { value, amount, .. } => {
-                match (value.classify(), amount.classify()) {
-                    (ValueClass::Constant, ValueClass::Constant) => ValueClass::Constant,
-                    (ValueClass::Constant, ValueClass::Static) => ValueClass::Static,
-                    (ValueClass::Static, ValueClass::Constant) => ValueClass::Static,
-                    (ValueClass::Dynamic, ValueClass::Constant) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Static) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    _ => panic!("cannot classify shift operation"),
-                }
-            }
-            StatementKind::Call { args, .. } => {
-                if args.iter().any(|a| a.classify() == ValueClass::None) {
-                    panic!("illegal arguments to function call");
-                }
+    pub fn child_statements(&self) -> Vec<Statement> {
+        match &self.kind() {
+            StatementKind::Constant { .. }
+            | StatementKind::Jump { .. }
+            | StatementKind::ReadRegister { .. }
+            | StatementKind::WriteRegister { .. }
+            | StatementKind::ReadMemory { .. }
+            | StatementKind::WriteMemory { .. }
+            | StatementKind::Branch { .. }
+            | StatementKind::PhiNode { .. }
+            | StatementKind::Return { .. }
+            | StatementKind::Panic(_)
+            | StatementKind::PrintChar(_)
+            | StatementKind::ReadPc
+            | StatementKind::WritePc { .. }
+            | StatementKind::ReadVariable { .. }
+            | StatementKind::WriteVariable { .. }
+            | StatementKind::Undefined => vec![],
 
-                if args.iter().any(|a| a.classify() == ValueClass::Dynamic) {
-                    ValueClass::Dynamic
-                } else {
-                    ValueClass::Static
-                }
+            StatementKind::BinaryOperation { lhs, rhs, .. } => {
+                [lhs, rhs].into_iter().cloned().collect()
             }
-            StatementKind::Cast { value, .. } => match value.classify() {
-                ValueClass::Constant => ValueClass::Constant,
-                ValueClass::Static => ValueClass::Static,
-                ValueClass::Dynamic => ValueClass::Dynamic,
-                ValueClass::None => {
-                    panic!("cannot classify cast operation {:?} in {:?}", value, self)
-                }
-            },
-            StatementKind::Jump { .. } => ValueClass::None,
-            StatementKind::Branch { .. } => ValueClass::None,
-            StatementKind::PhiNode { .. } => todo!(),
-            StatementKind::Return { .. } => ValueClass::None,
+            StatementKind::UnaryOperation { value, .. } => vec![value.clone()],
+            StatementKind::ShiftOperation { value, amount, .. } => {
+                [value, amount].into_iter().cloned().collect()
+            }
+            StatementKind::Call { args, .. } => args.clone(),
+            StatementKind::Cast { value, .. } => vec![value.clone()],
             StatementKind::Select {
                 condition,
                 true_value,
                 false_value,
-            } => {
-                match (
-                    condition.classify(),
-                    true_value.classify(),
-                    false_value.classify(),
-                ) {
-                    (ValueClass::Constant, ValueClass::Constant, ValueClass::Constant) => {
-                        ValueClass::Constant
-                    }
-                    (ValueClass::Static, ValueClass::Static, ValueClass::Static) => {
-                        ValueClass::Static
-                    }
-                    _ => ValueClass::Dynamic,
-                }
+            } => [condition, true_value, false_value]
+                .into_iter()
+                .cloned()
+                .collect(),
+
+            StatementKind::BitExtract {
+                value,
+                start,
+                length,
+            } => [value, start, length].into_iter().cloned().collect(),
+
+            StatementKind::BitInsert {
+                original_value,
+                insert_value,
+                start,
+                length,
+            } => [original_value, insert_value, start, length]
+                .into_iter()
+                .cloned()
+                .collect(),
+
+            // complicated! todo: be more precise here
+            StatementKind::ReadElement { vector, index } => {
+                [vector, index].into_iter().cloned().collect()
             }
-            StatementKind::Panic(_) => ValueClass::Static,
-            StatementKind::PrintChar(_) => ValueClass::Static,
-            StatementKind::ReadPc => ValueClass::Dynamic,
-            StatementKind::WritePc { .. } => ValueClass::None,
-            StatementKind::BitExtract { .. } => ValueClass::Dynamic,
-            StatementKind::BitInsert { .. } => ValueClass::Dynamic,
-            StatementKind::ReadVariable { .. } => ValueClass::Dynamic,
-            StatementKind::WriteVariable { .. } => ValueClass::Dynamic,
-            StatementKind::ReadElement { .. } => ValueClass::Dynamic,
-            StatementKind::MutateElement { .. } => ValueClass::Dynamic,
-            StatementKind::CreateProduct { .. } => ValueClass::Dynamic,
-            StatementKind::SizeOf { .. } => ValueClass::Dynamic,
-            StatementKind::Assert { .. } => ValueClass::None,
-            StatementKind::BitsCast { .. } => ValueClass::Dynamic,
-            StatementKind::CreateBits { .. } => ValueClass::Dynamic,
-            StatementKind::CreateSum { .. } => ValueClass::Dynamic,
-            StatementKind::MatchesSum { .. } => ValueClass::Dynamic,
-            StatementKind::UnwrapSum { .. } => ValueClass::Dynamic,
-            StatementKind::ExtractField { .. } => ValueClass::Dynamic,
-            StatementKind::UpdateField { .. } => ValueClass::Dynamic,
-            StatementKind::Undefined => ValueClass::Constant,
+            StatementKind::MutateElement {
+                vector,
+                value,
+                index,
+            } => [value, vector, index].into_iter().cloned().collect(),
+            StatementKind::CreateProduct { fields, .. } => fields.clone(),
+
+            StatementKind::Assert { condition } => vec![condition.clone()],
+            StatementKind::BitsCast { value, length, .. } => {
+                [value, length].into_iter().cloned().collect()
+            }
+            StatementKind::CreateBits { value, length } => {
+                [value, length].into_iter().cloned().collect()
+            }
+
+            StatementKind::SizeOf { value }
+            | StatementKind::CreateSum { value, .. }
+            | StatementKind::MatchesSum { value, .. }
+            | StatementKind::UnwrapSum { value, .. }
+            | StatementKind::ExtractField { value, .. } => vec![value.clone()],
+
+            StatementKind::UpdateField {
+                original_value,
+                field_value,
+                ..
+            } => [original_value, field_value].into_iter().cloned().collect(),
         }
     }
 

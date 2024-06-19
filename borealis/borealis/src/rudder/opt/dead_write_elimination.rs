@@ -15,7 +15,7 @@ pub fn run(f: crate::rudder::Function) -> bool {
             }
 
             for write in dfa.get_symbol_writes(&sym) {
-                write.parent().upgrade().kill_statement(write);
+                write.parent_block().upgrade().kill_statement(write);
                 changed |= true;
             }
         }
