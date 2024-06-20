@@ -1,6 +1,10 @@
-use crate::rudder::{Statement, StatementKind};
+use {
+    crate::rudder::{Statement, StatementKind},
+    std::{borrow::Borrow, cmp::max},
+};
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+// ordering derives are in discriminant order!
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum ValueClass {
     None,
     Constant,
@@ -11,107 +15,38 @@ pub enum ValueClass {
 impl Statement {
     pub fn classify(&self) -> ValueClass {
         match self.kind() {
-            StatementKind::Constant { .. } => ValueClass::Constant,
-            StatementKind::ReadRegister { .. } => ValueClass::Dynamic,
-            StatementKind::WriteRegister { .. } => ValueClass::None,
-            StatementKind::ReadMemory { .. } => ValueClass::Dynamic,
-            StatementKind::WriteMemory { .. } => ValueClass::None,
-            StatementKind::BinaryOperation { lhs, rhs, .. } => {
-                match (lhs.classify(), rhs.classify()) {
-                    (ValueClass::Constant, ValueClass::Constant) => ValueClass::Constant,
-                    (ValueClass::Constant, ValueClass::Static) => ValueClass::Static,
-                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Static, ValueClass::Constant) => ValueClass::Static,
-                    (ValueClass::Static, ValueClass::Static) => ValueClass::Static,
-                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Constant) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Static) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    _ => panic!("cannot classify binary operation"),
-                }
-            }
-            StatementKind::UnaryOperation { value, .. } => match value.classify() {
-                ValueClass::Constant => ValueClass::Constant,
-                ValueClass::Static => ValueClass::Static,
-                ValueClass::Dynamic => ValueClass::Dynamic,
-                _ => panic!("cannot classify unary operation"),
-            },
-            StatementKind::ShiftOperation { value, amount, .. } => {
-                match (value.classify(), amount.classify()) {
-                    (ValueClass::Constant, ValueClass::Constant) => ValueClass::Constant,
-                    (ValueClass::Constant, ValueClass::Static) => ValueClass::Static,
-                    (ValueClass::Static, ValueClass::Constant) => ValueClass::Static,
-                    (ValueClass::Dynamic, ValueClass::Constant) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Static) => ValueClass::Dynamic,
-                    (ValueClass::Dynamic, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Constant, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    (ValueClass::Static, ValueClass::Dynamic) => ValueClass::Dynamic,
-                    _ => panic!("cannot classify shift operation"),
-                }
-            }
-            StatementKind::Call { args, .. } => {
-                if args.iter().any(|a| a.classify() == ValueClass::None) {
-                    panic!("illegal arguments to function call");
-                }
+            StatementKind::Constant { .. } | StatementKind::Undefined => ValueClass::Constant,
 
-                if args.iter().any(|a| a.classify() == ValueClass::Dynamic) {
-                    ValueClass::Dynamic
-                } else {
-                    ValueClass::Static
-                }
+            // read value is dynamic
+            StatementKind::ReadRegister { .. }
+            | StatementKind::ReadMemory { .. }
+            | StatementKind::ReadPc => ValueClass::Dynamic,
+
+            // complicated! todo: be more precise here
+            StatementKind::ReadVariable { .. } | StatementKind::WriteVariable { .. } => {
+                ValueClass::Dynamic
             }
-            StatementKind::Cast { value, .. } => match value.classify() {
-                ValueClass::Constant => ValueClass::Constant,
-                ValueClass::Static => ValueClass::Static,
-                ValueClass::Dynamic => ValueClass::Dynamic,
-                ValueClass::None => {
-                    panic!("cannot classify cast operation {:?} in {:?}", value, self)
-                }
-            },
-            StatementKind::Jump { .. } => ValueClass::None,
-            StatementKind::Branch { .. } => ValueClass::None,
+
+            StatementKind::WriteRegister { .. }
+            | StatementKind::WriteMemory { .. }
+            | StatementKind::Jump { .. }
+            | StatementKind::Branch { .. }
+            | StatementKind::Return { .. }
+            | StatementKind::WritePc { .. } => ValueClass::None,
+
             StatementKind::PhiNode { .. } => todo!(),
-            StatementKind::Return { .. } => ValueClass::None,
-            StatementKind::Select {
-                condition,
-                true_value,
-                false_value,
-            } => {
-                match (
-                    condition.classify(),
-                    true_value.classify(),
-                    false_value.classify(),
-                ) {
-                    (ValueClass::Constant, ValueClass::Constant, ValueClass::Constant) => {
-                        ValueClass::Constant
-                    }
-                    (ValueClass::Static, ValueClass::Static, ValueClass::Static) => {
-                        ValueClass::Static
-                    }
-                    _ => ValueClass::Dynamic,
-                }
-            }
+
+            // todo: fix panic when this is correctly changed to valueclass::none
             StatementKind::Panic(_) => ValueClass::Static,
+
+            // todo: remove me when driver is implemented
             StatementKind::PrintChar(_) => ValueClass::Static,
-            StatementKind::ReadPc => ValueClass::Dynamic,
-            StatementKind::WritePc { .. } => ValueClass::None,
-            StatementKind::BitExtract { .. } => ValueClass::Dynamic,
-            StatementKind::BitInsert { .. } => ValueClass::Dynamic,
-            StatementKind::ReadVariable { .. } => ValueClass::Dynamic,
-            StatementKind::WriteVariable { .. } => ValueClass::Dynamic,
-            StatementKind::ReadElement { .. } => ValueClass::Dynamic,
-            StatementKind::MutateElement { .. } => ValueClass::Dynamic,
-            StatementKind::CreateProduct { .. } => ValueClass::Dynamic,
-            StatementKind::SizeOf { .. } => ValueClass::Dynamic,
-            StatementKind::Assert { .. } => ValueClass::None,
-            StatementKind::BitsCast { .. } => ValueClass::Dynamic,
+
+            // classify fails to terminate when optimizing rudder when enabled
             StatementKind::CreateBits { .. } => ValueClass::Dynamic,
-            StatementKind::CreateSum { .. } => ValueClass::Dynamic,
-            StatementKind::MatchesSum { .. } => ValueClass::Dynamic,
-            StatementKind::UnwrapSum { .. } => ValueClass::Dynamic,
-            StatementKind::ExtractField { .. } => ValueClass::Dynamic,
-            StatementKind::UpdateField { .. } => ValueClass::Dynamic,
-            StatementKind::Undefined => ValueClass::Constant,
+
+            //     StatementKind::CreateSum { .. } => ValueClass::Dynamic,
+            _ => classify(self.child_statements()),
         }
         // // map of statements to their value class
         // let mut classes = HashMap::default();
@@ -125,17 +60,17 @@ impl Statement {
         //     }
 
         //     let class = match self.kind() {
-        //         StatementKind::Constant { .. } | StatementKind::Undefined => {
-        //             Some(ValueClass::Constant)
+        //         StatementKind::Constant { .. } | StatementKind::Undefined =>
+        // {             Some(ValueClass::Constant)
         //         }
 
         //         StatementKind::ReadRegister { .. }
         //         | StatementKind::ReadMemory { .. }
         //         | StatementKind::ReadPc => Some(ValueClass::Dynamic),
         //         // complicated! todo: be more precise here
-        //         StatementKind::ReadVariable { .. } | StatementKind::WriteVariable { .. } => {
-        //             Some(ValueClass::Dynamic)
-        //         }
+        //         StatementKind::ReadVariable { .. } |
+        // StatementKind::WriteVariable { .. } => {
+        // Some(ValueClass::Dynamic)         }
 
         //         StatementKind::WriteRegister { .. }
         //         | StatementKind::WriteMemory { .. }
@@ -146,9 +81,10 @@ impl Statement {
 
         //         StatementKind::PhiNode { .. } => todo!(),
 
-        //         // todo: fix panic when this is correctly changed to valueclass::none
-        //         StatementKind::Panic(_) => Some(ValueClass::Static),
-        //         StatementKind::PrintChar(_) => Some(ValueClass::Static),
+        //         // todo: fix panic when this is correctly changed to
+        // valueclass::none         StatementKind::Panic(_) =>
+        // Some(ValueClass::Static),         StatementKind::PrintChar(_)
+        // => Some(ValueClass::Static),
 
         //         _ => None,
         //     };
@@ -164,7 +100,8 @@ impl Statement {
         //     }
         // }
 
-        // let value_classes = classes.values().cloned().collect::<HashSet<_>>();
+        // let value_classes =
+        // classes.values().cloned().collect::<HashSet<_>>();
 
         // if value_classes.contains(&ValueClass::Dynamic) {
         //     ValueClass::Dynamic
@@ -173,5 +110,74 @@ impl Statement {
         // } else {
         //     ValueClass::Constant
         // }
+    }
+}
+
+fn classify<I: IntoIterator<Item = S>, S: Borrow<Statement>>(iter: I) -> ValueClass {
+    max_class(iter.into_iter().map(|s| s.borrow().classify()))
+}
+
+///
+fn max_class<I: IntoIterator<Item = ValueClass>>(iter: I) -> ValueClass {
+    let mut highest_class = ValueClass::None;
+
+    for class in iter {
+        match class {
+            // any dynamic means it must be dynamic so can bail early
+            ValueClass::Dynamic => return ValueClass::Dynamic,
+            c => highest_class = max(c, highest_class),
+        }
+    }
+
+    highest_class
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::rudder::value_class::{max_class, ValueClass};
+
+    #[test]
+    fn max_class_dynamic_early() {
+        struct Iter {
+            state: u8,
+        };
+        impl Iterator for Iter {
+            type Item = ValueClass;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let class = match self.state {
+                    0 => ValueClass::Static,
+                    1 => ValueClass::Dynamic,
+                    _ => panic!("if classify returns early this will never be hit"),
+                };
+
+                self.state += 1;
+
+                Some(class)
+            }
+        }
+
+        assert_eq!(ValueClass::Dynamic, max_class(Iter { state: 0 }));
+    }
+
+    #[test]
+    fn max_class_static() {
+        assert_eq!(
+            ValueClass::Static,
+            max_class([ValueClass::None, ValueClass::Static, ValueClass::Constant])
+        );
+    }
+
+    #[test]
+    fn max_class_constant() {
+        assert_eq!(
+            ValueClass::Constant,
+            max_class([
+                ValueClass::None,
+                ValueClass::Constant,
+                ValueClass::Constant,
+                ValueClass::None
+            ])
+        );
     }
 }
