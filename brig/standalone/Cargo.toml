@@ -8,6 +8,9 @@ edition = "2021"
 debug = true
 opt-level = 2
 incremental = true
+codegen-units = 256
+debug-assertions = true
+overflow-checks = true
 
 [dependencies]
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }

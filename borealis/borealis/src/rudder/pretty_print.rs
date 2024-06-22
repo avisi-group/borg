@@ -1,8 +1,11 @@
 use {
     crate::rudder::{
-        analysis::cfg::ControlFlowGraphAnalysis, value_class::ValueClass, BinaryOperationKind,
-        Block, CastOperationKind, ConstantValue, Context, Function, FunctionKind,
-        PrimitiveTypeClass, Statement, StatementKind, Symbol, Type, UnaryOperationKind,
+        analysis::cfg::ControlFlowGraphAnalysis,
+        statement::{
+            value_class::ValueClass, BinaryOperationKind, CastOperationKind, ShiftOperationKind,
+            Statement, StatementKind, UnaryOperationKind,
+        },
+        Block, ConstantValue, Context, Function, FunctionKind, PrimitiveTypeClass, Symbol, Type,
     },
     itertools::Itertools,
     std::fmt::{Display, Formatter, Result},
@@ -122,11 +125,11 @@ impl Display for StatementKind {
                 amount,
             } => {
                 let op = match kind {
-                    super::ShiftOperationKind::LogicalShiftLeft => "lsl",
-                    super::ShiftOperationKind::LogicalShiftRight => "lsr",
-                    super::ShiftOperationKind::ArithmeticShiftRight => "asr",
-                    super::ShiftOperationKind::RotateRight => "ror",
-                    super::ShiftOperationKind::RotateLeft => "rol",
+                    ShiftOperationKind::LogicalShiftLeft => "lsl",
+                    ShiftOperationKind::LogicalShiftRight => "lsr",
+                    ShiftOperationKind::ArithmeticShiftRight => "asr",
+                    ShiftOperationKind::RotateRight => "ror",
+                    ShiftOperationKind::RotateLeft => "rol",
                 };
 
                 write!(f, "{} {} {}", op, value.name(), amount.name())
@@ -321,7 +324,7 @@ impl Display for StatementKind {
 
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let vc = match self.classify() {
+        let vc = match self.class() {
             ValueClass::None => "-",
             ValueClass::Constant => "C",
             ValueClass::Static => "S",

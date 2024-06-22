@@ -9,9 +9,12 @@ use {
             internal_fns::{
                 REPLICATE_BITS_BOREALIS_INTERNAL, REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
             },
-            BinaryOperationKind, Block, CastOperationKind, ConstantValue, Context, Function,
-            FunctionInner, FunctionKind, RegisterDescriptor, ShiftOperationKind, Statement,
-            StatementBuilder, StatementKind, Type, UnaryOperationKind,
+            statement::{
+                BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementBuilder,
+                StatementKind, UnaryOperationKind,
+            },
+            Block, ConstantValue, Context, Function, FunctionInner, FunctionKind,
+            RegisterDescriptor, Statement, Type,
         },
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
@@ -879,7 +882,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
                 "not_vec" | "not_bool" => Some(self.builder.build(StatementKind::UnaryOperation {
-                    kind: rudder::UnaryOperationKind::Not,
+                    kind: UnaryOperationKind::Not,
                     value: args[0].clone(),
                 })),
                 "and_vec" => Some(self.builder.build(StatementKind::BinaryOperation {
@@ -1003,7 +1006,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     // ~(bit << n)
                     let inverse = self.builder.build(StatementKind::UnaryOperation {
-                        kind: rudder::UnaryOperationKind::Complement,
+                        kind: UnaryOperationKind::Complement,
                         value: shift,
                     });
 
@@ -1799,14 +1802,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Operation::Not(value) => {
                 let value = self.build_value(value.clone());
                 self.builder.build(StatementKind::UnaryOperation {
-                    kind: rudder::UnaryOperationKind::Not,
+                    kind: UnaryOperationKind::Not,
                     value,
                 })
             }
             boom::Operation::Complement(value) => {
                 let value = self.build_value(value.clone());
                 self.builder.build(StatementKind::UnaryOperation {
-                    kind: rudder::UnaryOperationKind::Complement,
+                    kind: UnaryOperationKind::Complement,
                     value,
                 })
             }

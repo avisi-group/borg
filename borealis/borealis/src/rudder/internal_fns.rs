@@ -1,8 +1,9 @@
+use crate::rudder::statement::StatementBuilder;
 use {
     crate::rudder::{
-        constant_value::ConstantValue, BinaryOperationKind, Block, CastOperationKind, Function,
-        FunctionInner, ShiftOperationKind, Statement, StatementInner, StatementKind, Symbol,
-        SymbolKind, Type,
+        constant_value::ConstantValue,
+        statement::{BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementKind},
+        Block, Function, FunctionInner, Symbol, SymbolKind, Type,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
     once_cell::sync::Lazy,
@@ -45,32 +46,17 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
     let end_block = {
         let end_block = Block::new();
+        let mut builder = StatementBuilder::new(end_block.weak());
 
-        let read_result = Statement {
-            inner: Shared::new(StatementInner {
-                name: "s0".into(),
-                kind: StatementKind::ReadVariable {
-                    symbol: result_symbol.clone(),
-                },
-                parent: end_block.weak(),
-            }),
-        };
+        let read_result = builder.build(StatementKind::ReadVariable {
+            symbol: result_symbol.clone(),
+        });
 
-        end_block.set_statements(
-            [
-                read_result.clone(),
-                Statement {
-                    inner: Shared::new(StatementInner {
-                        name: "s1".into(),
-                        kind: StatementKind::Return {
-                            value: Some(read_result),
-                        },
-                        parent: end_block.weak(),
-                    }),
-                },
-            ]
-            .into_iter(),
-        );
+        builder.build(StatementKind::Return {
+            value: Some(read_result),
+        });
+
+        end_block.set_statements(builder.finish().into_iter());
 
         end_block
     };
@@ -80,368 +66,175 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     let shift_block = Block::new();
 
     // check block if local_count == 0
+    {
+        let mut check_builder = StatementBuilder::new(check_block.weak());
+        let _0 = check_builder.build(StatementKind::Constant {
+            typ: Arc::new(Type::u64()),
+            value: ConstantValue::UnsignedInteger(0),
+        });
 
-    let _0 = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s2".into(),
-            kind: StatementKind::Constant {
-                typ: Arc::new(Type::u64()),
-                value: ConstantValue::UnsignedInteger(0),
-            },
-            parent: check_block.weak(),
-        }),
-    };
+        let read_count = check_builder.build(StatementKind::ReadVariable {
+            symbol: local_count_symbol.clone(),
+        });
 
-    let read_count = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s3".into(),
-            kind: StatementKind::ReadVariable {
-                symbol: local_count_symbol.clone(),
-            },
-            parent: check_block.weak(),
-        }),
-    };
-    let count_is_0 = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s4".into(),
-            kind: StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::CompareEqual,
-                lhs: read_count.clone(),
-                rhs: _0.clone(),
-            },
-            parent: check_block.weak(),
-        }),
-    };
+        let count_is_zero = check_builder.build(StatementKind::BinaryOperation {
+            kind: BinaryOperationKind::CompareEqual,
+            lhs: read_count.clone(),
+            rhs: _0.clone(),
+        });
 
-    check_block.set_statements(
-        [
-            _0,
-            read_count,
-            count_is_0.clone(),
-            Statement {
-                inner: Shared::new(StatementInner {
-                    name: "s5".into(),
-                    kind: StatementKind::Branch {
-                        condition: count_is_0,
-                        true_target: end_block.clone(),
-                        false_target: shift_block.clone(),
-                    },
-                    parent: check_block.weak(),
-                }),
-            },
-        ]
-        .into_iter(),
-    );
+        check_builder.build(StatementKind::Branch {
+            condition: count_is_zero,
+            true_target: end_block,
+            false_target: shift_block.clone(),
+        });
+
+        check_block.set_statements(check_builder.finish().into_iter());
+    }
 
     // decrement count
-    let read_count = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s6".into(),
-            kind: StatementKind::ReadVariable {
-                symbol: local_count_symbol.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
-    let _1 = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s7".into(),
-            kind: StatementKind::Constant {
-                typ: Arc::new(Type::u64()),
-                value: ConstantValue::UnsignedInteger(1),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
-    let decrement = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s8".into(),
-            kind: StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::Sub,
-                lhs: read_count.clone(),
-                rhs: _1.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
-    let write_count = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s9".into(),
-            kind: StatementKind::WriteVariable {
-                symbol: local_count_symbol.clone(),
-                value: decrement.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
+    {
+        let mut shift_builder = StatementBuilder::new(shift_block.weak());
+        let read_count = shift_builder.build(StatementKind::ReadVariable {
+            symbol: local_count_symbol.clone(),
+        });
 
-    // read result and bits variables
-    let read_result = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s10".into(),
-            kind: StatementKind::ReadVariable {
-                symbol: result_symbol.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
-    let read_bits = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s11".into(),
-            kind: StatementKind::ReadVariable {
-                symbol: bits_symbol.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
+        let _1 = shift_builder.build(StatementKind::Constant {
+            typ: Arc::new(Type::u64()),
+            value: ConstantValue::UnsignedInteger(1),
+        });
 
-    // get the length of bits, then cast from u8 to bundle
-    let len = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s12".into(),
-            kind: StatementKind::SizeOf {
-                value: read_bits.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
-    let _8 = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s12.5".into(),
-            kind: StatementKind::Constant {
-                typ: Arc::new(Type::u8()),
-                value: ConstantValue::UnsignedInteger(8),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
-    let cast_len = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s13".into(),
-            kind: StatementKind::Cast {
-                kind: CastOperationKind::ZeroExtend,
-                typ: Arc::new(Type::u8()),
-                value: len.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
-    let bundle_len = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s13".into(),
-            kind: StatementKind::Cast {
-                kind: CastOperationKind::Convert,
-                typ: Arc::new(Type::Bits),
-                value: len.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
+        let decrement = shift_builder.build(StatementKind::BinaryOperation {
+            kind: BinaryOperationKind::Sub,
+            lhs: read_count.clone(),
+            rhs: _1.clone(),
+        });
 
-    // shift result
-    let shift_result = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s14".into(),
-            kind: StatementKind::ShiftOperation {
-                kind: ShiftOperationKind::LogicalShiftLeft,
-                value: read_result.clone(),
-                amount: bundle_len.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
+        shift_builder.build(StatementKind::WriteVariable {
+            symbol: local_count_symbol.clone(),
+            value: decrement.clone(),
+        });
 
-    // or result with bits
-    let or_result = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s15".into(),
-            kind: StatementKind::BinaryOperation {
-                kind: BinaryOperationKind::Or,
-                lhs: shift_result.clone(),
-                rhs: read_bits.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
+        // read result and bits variables
+        let read_result = shift_builder.build(StatementKind::ReadVariable {
+            symbol: result_symbol.clone(),
+        });
 
-    let write_result = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s16".into(),
-            kind: StatementKind::WriteVariable {
-                symbol: result_symbol.clone(),
-                value: or_result.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
+        let read_bits = shift_builder.build(StatementKind::ReadVariable {
+            symbol: bits_symbol.clone(),
+        });
 
-    let jump = Statement {
-        inner: Shared::new(StatementInner {
-            name: "s17".into(),
-            kind: StatementKind::Jump {
-                target: check_block.clone(),
-            },
-            parent: shift_block.weak(),
-        }),
-    };
+        // get the length of bits, then cast from u8 to bundle
+        let len = shift_builder.build(StatementKind::SizeOf {
+            value: read_bits.clone(),
+        });
 
-    shift_block.set_statements(
-        [
-            read_count,
-            _1,
-            decrement,
-            write_count,
-            read_result,
-            read_bits,
-            _8,
-            len,
-            cast_len,
-            bundle_len,
-            shift_result,
-            or_result,
-            write_result,
-            jump,
-        ]
-        .into_iter(),
-    );
+        let _8 = shift_builder.build(StatementKind::Constant {
+            typ: Arc::new(Type::u8()),
+            value: ConstantValue::UnsignedInteger(8),
+        });
+
+        let cast_len = shift_builder.build(StatementKind::Cast {
+            kind: CastOperationKind::ZeroExtend,
+            typ: Arc::new(Type::u8()),
+            value: len.clone(),
+        });
+
+        let bundle_len = shift_builder.build(StatementKind::Cast {
+            kind: CastOperationKind::Convert,
+            typ: Arc::new(Type::Bits),
+            value: cast_len.clone(),
+        });
+
+        // shift result
+        let shift_result = shift_builder.build(StatementKind::ShiftOperation {
+            kind: ShiftOperationKind::LogicalShiftLeft,
+            value: read_result.clone(),
+            amount: bundle_len.clone(),
+        });
+
+        // or result with bits
+        let or_result = shift_builder.build(StatementKind::BinaryOperation {
+            kind: BinaryOperationKind::Or,
+            lhs: shift_result.clone(),
+            rhs: read_bits.clone(),
+        });
+
+        // write result
+        shift_builder.build(StatementKind::WriteVariable {
+            symbol: result_symbol.clone(),
+            value: or_result.clone(),
+        });
+
+        // jump
+        shift_builder.build(StatementKind::Jump {
+            target: check_block.clone(),
+        });
+
+        shift_block.set_statements(shift_builder.finish().into_iter());
+    }
 
     let entry_block = {
         let entry_block = Block::new();
+        let mut entry_builder = StatementBuilder::new(entry_block.weak());
         // copy count to count_local
         // jump to check block
-        let read_count = Statement {
-            inner: Shared::new(StatementInner {
-                name: "s3".into(),
-                kind: StatementKind::ReadVariable {
-                    symbol: count_symbol.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
-        let write_local_count = Statement {
-            inner: Shared::new(StatementInner {
-                name: "s3".into(),
-                kind: StatementKind::WriteVariable {
-                    symbol: local_count_symbol.clone(),
-                    value: read_count.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let read_count = entry_builder.build(StatementKind::ReadVariable {
+            symbol: count_symbol.clone(),
+        });
 
-        let zero = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::Constant {
-                    typ: Arc::new(Type::u128()),
-                    value: ConstantValue::UnsignedInteger(0),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        entry_builder.build(StatementKind::WriteVariable {
+            symbol: local_count_symbol.clone(),
+            value: read_count.clone(),
+        });
 
-        let bits = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::ReadVariable {
-                    symbol: bits_symbol.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let zero = entry_builder.build(StatementKind::Constant {
+            typ: Arc::new(Type::u128()),
+            value: ConstantValue::UnsignedInteger(0),
+        });
 
-        let bits_length = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::SizeOf {
-                    value: bits.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let bits = entry_builder.build(StatementKind::ReadVariable {
+            symbol: bits_symbol.clone(),
+        });
 
-        let read_count_cast = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::Cast {
-                    kind: CastOperationKind::Truncate,
-                    typ: Arc::new(Type::u16()),
-                    value: read_count.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let bits_length = entry_builder.build(StatementKind::SizeOf {
+            value: bits.clone(),
+        });
 
-        let bits_length_cast = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::Cast {
-                    kind: CastOperationKind::Truncate,
-                    typ: Arc::new(Type::u16()),
-                    value: bits_length.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let read_count_cast = entry_builder.build(StatementKind::Cast {
+            kind: CastOperationKind::Truncate,
+            typ: Arc::new(Type::u16()),
+            value: read_count.clone(),
+        });
 
-        let length = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::BinaryOperation {
-                    kind: BinaryOperationKind::Multiply,
-                    lhs: read_count_cast.clone(),
-                    rhs: bits_length_cast.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let bits_length_cast = entry_builder.build(StatementKind::Cast {
+            kind: CastOperationKind::Truncate,
+            typ: Arc::new(Type::u16()),
+            value: bits_length.clone(),
+        });
 
-        let result_bits = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::CreateBits {
-                    value: zero.clone(),
-                    length: length.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let length = entry_builder.build(StatementKind::BinaryOperation {
+            kind: BinaryOperationKind::Multiply,
+            lhs: read_count_cast.clone(),
+            rhs: bits_length_cast.clone(),
+        });
 
-        let write_result = Statement {
-            inner: Shared::new(StatementInner {
-                name: "".into(),
-                kind: StatementKind::WriteVariable {
-                    symbol: result_symbol.clone(),
-                    value: result_bits.clone(),
-                },
-                parent: entry_block.weak(),
-            }),
-        };
+        let result_bits = entry_builder.build(StatementKind::CreateBits {
+            value: zero.clone(),
+            length: length.clone(),
+        });
 
-        entry_block.set_statements(
-            [
-                read_count,
-                write_local_count,
-                zero,
-                bits,
-                bits_length,
-                read_count_cast,
-                bits_length_cast,
-                length,
-                result_bits,
-                write_result,
-                Statement {
-                    inner: Shared::new(StatementInner {
-                        name: "s3".into(),
-                        kind: StatementKind::Jump {
-                            target: check_block.clone(),
-                        },
-                        parent: entry_block.weak(),
-                    }),
-                },
-            ]
-            .into_iter(),
-        );
+        // write result
+        entry_builder.build(StatementKind::WriteVariable {
+            symbol: result_symbol.clone(),
+            value: result_bits.clone(),
+        });
+
+        entry_builder.build(StatementKind::Jump {
+            target: check_block.clone(),
+        });
+
+        entry_block.set_statements(entry_builder.finish().into_iter());
 
         entry_block
     };

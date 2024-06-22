@@ -14,6 +14,7 @@
                     "--bin=standalone",
                     "--package=standalone",
                     "--manifest-path=${workspaceFolder}/brig/standalone/Cargo.toml",
+                    "--release",
                 ],
                 "filter": {
                     "name": "standalone",
@@ -41,6 +42,9 @@
             },
             "args": ["--dump-ir","/workspaces/ir","${workspaceFolder}/arm-v9.4-a_d43f3f4c.rkyv", "${workspaceFolder}/aarch64"],
             "cwd": "${workspaceFolder}/borealis",
+            "env": {
+                "RAYON_NUM_THREADS": "4"
+            }
         },
     ]
 }

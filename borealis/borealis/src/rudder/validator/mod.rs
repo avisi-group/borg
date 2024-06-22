@@ -1,6 +1,6 @@
 use {
     super::{Block, Function, Statement},
-    crate::rudder::{ConstantValue, Context, PrimitiveTypeClass, StatementKind, Type},
+    crate::rudder::{statement::StatementKind, ConstantValue, Context, PrimitiveTypeClass, Type},
     std::fmt::Display,
 };
 

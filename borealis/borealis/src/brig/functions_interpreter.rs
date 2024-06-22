@@ -7,9 +7,12 @@ use {
     crate::{
         brig::{bits::BitsLength, codegen_ident, codegen_type},
         rudder::{
-            constant_value::ConstantValue, BinaryOperationKind, Block, CastOperationKind,
-            PrimitiveType, PrimitiveTypeClass, ShiftOperationKind, Statement, StatementKind,
-            Symbol, Type, UnaryOperationKind,
+            constant_value::ConstantValue,
+            statement::{
+                BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
+                StatementKind, UnaryOperationKind,
+            },
+            Block, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
     },
     proc_macro2::{Literal, TokenStream},
@@ -661,7 +664,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Undefined => quote!(Default::default()),
     };
 
-    let msg = format!(" {} {stmt}", stmt.classify());
+    let msg = format!(" {} {stmt}", stmt.class());
     if stmt.has_value() {
         let typ = codegen_type(stmt.typ());
         quote! {

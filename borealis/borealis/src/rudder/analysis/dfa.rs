@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{Block, Function, Statement, StatementKind, Symbol},
+    crate::rudder::{statement::StatementKind, Block, Function, Statement, Symbol},
     common::{intern::InternedString, HashMap, HashSet},
 };
 

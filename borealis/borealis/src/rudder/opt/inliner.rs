@@ -1,5 +1,8 @@
 use {
-    crate::rudder::{Block, Function, Statement, StatementBuilder, StatementKind},
+    crate::rudder::{
+        statement::{Statement, StatementBuilder, StatementKind},
+        Block, Function,
+    },
     common::HashMap,
 };
 

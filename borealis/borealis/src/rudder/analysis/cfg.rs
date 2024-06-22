@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{Block, Context, Function, StatementKind},
+    crate::rudder::{statement::StatementKind, Block, Context, Function},
     common::{intern::InternedString, HashMap, HashSet},
     dot::{GraphWalk, Labeller},
     log::trace,
