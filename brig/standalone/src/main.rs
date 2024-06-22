@@ -35,10 +35,22 @@ fn main() {
         )
     }
     .unwrap();
+
+    //??
     let _mmap1 = unsafe {
         rustix::mm::mmap_anonymous(
             0x13000000 as *mut _,
             0x10_0000,
+            ProtFlags::READ | ProtFlags::WRITE,
+            MapFlags::FIXED | MapFlags::PRIVATE,
+        )
+    }
+    .unwrap();
+
+    let _gic = unsafe {
+        rustix::mm::mmap_anonymous(
+            0x2c00_0000 as *mut _,
+            0x1_0000,
             ProtFlags::READ | ProtFlags::WRITE,
             MapFlags::FIXED | MapFlags::PRIVATE,
         )
