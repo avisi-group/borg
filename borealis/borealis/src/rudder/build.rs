@@ -1,3 +1,4 @@
+use rayon::iter::ParallelIterator;
 use {
     crate::{
         boom::{
@@ -21,6 +22,7 @@ use {
     log::trace,
     num_rational::Ratio,
     num_traits::cast::FromPrimitive,
+    rayon::iter::IntoParallelIterator,
     regex::Regex,
     std::{cmp::Ordering, sync::Arc},
 };
@@ -274,7 +276,7 @@ impl BuildContext {
     fn build_functions(&mut self) {
         self.functions
             .clone()
-            .into_iter()
+            .into_par_iter()
             .for_each(|(name, (_kind, rudder_fn, boom_fn))| {
                 log::debug!("building function {name:?}");
                 FunctionBuildContext::new(self, rudder_fn.clone()).build_fn(boom_fn.clone());
@@ -347,13 +349,13 @@ impl BuildContext {
 }
 
 struct FunctionBuildContext<'ctx> {
-    build_context: &'ctx mut BuildContext,
+    build_context: &'ctx BuildContext,
     rudder_fn: Function,
     blocks: HashMap<Id, rudder::Block>,
 }
 
 impl<'ctx> FunctionBuildContext<'ctx> {
-    pub fn new(build_context: &'ctx mut BuildContext, rudder_fn: Function) -> Self {
+    pub fn new(build_context: &'ctx BuildContext, rudder_fn: Function) -> Self {
         Self {
             build_context,
             rudder_fn,
@@ -402,7 +404,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn ctx(&mut self) -> &mut BuildContext {
+    fn ctx(&mut self) -> &BuildContext {
         self.function_build_context.build_context
     }
 

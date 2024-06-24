@@ -136,146 +136,137 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         // read `size` bytes at `offset`, return a Bits
         StatementKind::ReadMemory { offset, size } => {
             // OPTIMIZED VERSION:
-            // let offset = get_ident(&offset);
-            // let size = get_ident(&size);
+            let offset = get_ident(&offset);
+            let size = get_ident(&size);
 
-            // quote! {
-            //     {
-            //         let guest_physical_address = #offset as usize;
-            //         let host_address = (guest_physical_address +
-            // state.guest_memory_base());
+            quote! {
+                {
+                    let guest_physical_address = #offset as usize;
 
-            //         let mut value = 0u128;
+                    let mut value = 0u128;
 
-            //         unsafe {
-            //             core::ptr::copy(
-            //                 host_address as *const u8,
-            //                 (&mut value as *mut u128) as *mut u8,
-            //                 #size as usize / 8
-            //             )
-            //         }
-
-            //         let bits = Bits::new(value, #size as u16);
-
-            //         tracer.read_memory(host_address, bits);
-
-            //         bits
-            //     }
-            // }
-
-            // TRACING VERSION:
-            {
-                let offset = get_ident(&offset);
-                let size = get_ident(&size);
-
-                quote! {
-                    {
-
-                        let guest_physical_address = #offset as usize;
-
-                        let mut value = 0u128;
-                        for i in (0..#size as usize / 8).rev() {
-                            let byte_address = guest_physical_address + i;
-
-                            let host_address = (byte_address + state.guest_memory_base());
-
-                            let byte = unsafe { *(host_address as *const u8) };
-                            tracer.read_memory(byte_address, &byte);
-
-                            value <<= 8;
-                            value |= u128::from(byte);
-                        }
-
-                        Bits::new(value, #size as u16)
+                    unsafe {
+                        core::ptr::copy(
+                            guest_physical_address as *const u8,
+                            (&mut value as *mut u128) as *mut u8,
+                            #size as usize / 8
+                        )
                     }
+
+                    Bits::new(value, #size as u16)
                 }
             }
+
+            // TRACING VERSION:
+            // {
+            //     let offset = get_ident(&offset);
+            //     let size = get_ident(&size);
+
+            //     quote! {
+            //         {
+
+            //             let guest_physical_address = #offset as usize;
+
+            //             let mut value = 0u128;
+            //             for i in (0..#size as usize / 8).rev() {
+            //                 let byte_address = guest_physical_address + i;
+
+            //                 let host_address = (byte_address + state.guest_memory_base());
+
+            //                 let byte = unsafe { *(host_address as *const u8) };
+            //                 tracer.read_memory(byte_address, &byte);
+
+            //                 value <<= 8;
+            //                 value |= u128::from(byte);
+            //             }
+
+            //             Bits::new(value, #size as u16)
+            //         }
+            //     }
+            // }
         }
         StatementKind::WriteMemory { offset, value } => {
             // OPTIMIZED VERSION:
-            // let offset = get_ident(&offset);
+            let offset = get_ident(&offset);
 
-            // // find size of value, either bundle.length or in type
+            // find size of value, either bundle.length or in type
 
-            // // emit match on this length to create mut pointer
+            // emit match on this length to create mut pointer
 
-            // let write = match &*value.typ() {
-            //     Type::Primitive(PrimitiveType { .. }) => {
-            //         let value = get_ident(&value);
-            //         quote! {
-            //             unsafe { *(host_address as *mut _) = #value; };
-            //             tracer.write_memory(host_address, #value);
-            //         }
-            //     }
-            //     Type::Bits => {
-            //         let value = get_ident(&value);
-            //         quote! {
-            //             unsafe {
-            //                 core::ptr::copy(
-            //                     // source is the u128 inner value
-            //                     (&#value.value() as *const u128) as *const u8,
-            //                     // destination is the target host address
-            //                     host_address as *mut u8,
-            //                     // copy the right number of bytes (length is bits)
-            //                     #value.length() as usize / 8
-            //                 )
-            //             };
-            //             tracer.write_memory(host_address, #value);
-            //         }
-            //     }
-            //     _ => todo!(),
-            // };
-
-            // quote! {
-            //     {
-            //         let guest_physical_address = #offset as usize;
-            //         let host_address = (guest_physical_address +
-            // state.guest_memory_base()) ;
-
-            //         #write
-            //     }
-            // }
-
-            // TRACING VERSION:
-            {
-                let offset = get_ident(&offset);
-
-                // find size of value, either bundle.length or in type
-
-                // emit match on this length to create mut pointer
-
-                let (length, value) = match &*value.typ() {
-                    Type::Primitive(PrimitiveType {
-                        element_width_in_bits,
-                        ..
-                    }) => {
-                        let value = get_ident(&value);
-                        (quote!(#element_width_in_bits), quote!(#value))
-                    }
-                    Type::Bits => {
-                        let value = get_ident(&value);
-                        (quote!(#value.length()), quote!(#value.value()))
-                    }
-                    _ => todo!(),
-                };
-
-                quote! {
-                    {
-                        let guest_physical_address = #offset as usize;
-
-                        let data = #value.to_ne_bytes();
-                        for i in 0..#length as usize / 8 {
-                            let byte_address = guest_physical_address + i;
-
-                            let host_address = (byte_address + state.guest_memory_base());
-
-                            unsafe { *(host_address as *mut u8) = data[i]; };
-
-                            tracer.write_memory(byte_address, &data[i]);
-                        }
+            let write = match &*value.typ() {
+                Type::Primitive(PrimitiveType { .. }) => {
+                    let value = get_ident(&value);
+                    quote! {
+                        unsafe { *(guest_physical_address as *mut _) = #value; };
+                       // tracer.write_memory(guest_physical_address, #value);
                     }
                 }
+                Type::Bits => {
+                    let value = get_ident(&value);
+                    quote! {
+                        unsafe {
+                            core::ptr::copy(
+                                // source is the u128 inner value
+                                (&#value.value() as *const u128) as *const u8,
+                                // destination is the target host address
+                                guest_physical_address as *mut u8,
+                                // copy the right number of bytes (length is bits)
+                                #value.length() as usize / 8
+                            )
+                        };
+                        //tracer.write_memory(guest_physical_address, #value);
+                    }
+                }
+                _ => todo!(),
+            };
+
+            quote! {
+                {
+                    let guest_physical_address = #offset as usize;
+                    #write
+                }
             }
+
+            // TRACING VERSION:
+            // {
+            //     let offset = get_ident(&offset);
+
+            //     // find size of value, either bundle.length or in type
+
+            //     // emit match on this length to create mut pointer
+
+            //     let (length, value) = match &*value.typ() {
+            //         Type::Primitive(PrimitiveType {
+            //             element_width_in_bits,
+            //             ..
+            //         }) => {
+            //             let value = get_ident(&value);
+            //             (quote!(#element_width_in_bits), quote!(#value))
+            //         }
+            //         Type::Bits => {
+            //             let value = get_ident(&value);
+            //             (quote!(#value.length()), quote!(#value.value()))
+            //         }
+            //         _ => todo!(),
+            //     };
+
+            //     quote! {
+            //         {
+            //             let guest_physical_address = #offset as usize;
+
+            //             let data = #value.to_ne_bytes();
+            //             for i in 0..#length as usize / 8 {
+            //                 let byte_address = guest_physical_address + i;
+
+            //                 let host_address = (byte_address + state.guest_memory_base());
+
+            //                 unsafe { *(host_address as *mut u8) = data[i]; };
+
+            //                 tracer.write_memory(byte_address, &data[i]);
+            //             }
+            //         }
+            //     }
+            // }
         }
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),

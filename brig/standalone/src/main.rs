@@ -3,10 +3,10 @@ use {
     rustix::mm::{MapFlags, ProtFlags},
 };
 
-const DTB: &[u8] = include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/sail.dtb");
+const DTB: &[u8] = include_bytes!("../../../borealis/data/sail-arm/arm-v9.4-a/sail.dtb");
 const BOOTLOADER: &[u8] =
-    include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/bootloader.bin");
-const IMAGE: &[u8] = include_bytes!("/workspaces/borg/borealis/data/sail-arm/arm-v9.4-a/Image");
+    include_bytes!("../../../borealis/data/sail-arm/arm-v9.4-a/bootloader.bin");
+const IMAGE: &[u8] = include_bytes!("../../../borealis/data/sail-arm/arm-v9.4-a/Image");
 
 mod logger;
 
@@ -73,23 +73,19 @@ fn main() {
         0x0,
         // initial PC is 0x8000_0000
         0x8000_0000,
-        TracerKind::Sail,
+        TracerKind::Noop,
     );
     interpreter.run();
 }
 
 unsafe fn write_ram(data: &[u8], guest_address: usize) {
     // speedy version
-    // core::ptr::copy(
-    //     data.as_ptr(),
-    //     (GUEST_MEMORY_BASE + guest_address) as *mut u8,
-    //     data.len(),
-    // );
+    core::ptr::copy(data.as_ptr(), guest_address as *mut u8, data.len());
 
-    // tracing version
-    for (i, byte) in data.iter().enumerate() {
-        let byte_address = guest_address + i;
-        unsafe { *((byte_address) as *mut u8) = *byte };
-        //  println!("[Sail] mem {byte_address:016x} <- {byte:016x}");
-    }
+    // // tracing version
+    // for (i, byte) in data.iter().enumerate() {
+    //     let byte_address = guest_address + i;
+    //     unsafe { *((byte_address) as *mut u8) = *byte };
+    //     //  println!("[Sail] mem {byte_address:016x} <- {byte:016x}");
+    // }
 }

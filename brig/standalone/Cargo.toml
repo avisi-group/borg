@@ -6,7 +6,7 @@ edition = "2021"
 
 [profile.release]
 debug = true
-opt-level = 2
+opt-level = 3
 incremental = true
 codegen-units = 256
 debug-assertions = true
