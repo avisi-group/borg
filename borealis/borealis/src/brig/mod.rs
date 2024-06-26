@@ -481,7 +481,7 @@ fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<Pat
 
             let contents =
                 quote! {
-                    #[inline(never)]
+                    #[inline(never)] // disabling increases compile time, perf impact not measured
                     pub fn #name_ident(#function_parameters) -> #return_type {
                         #fn_state
 

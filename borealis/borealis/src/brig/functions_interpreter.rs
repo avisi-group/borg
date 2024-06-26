@@ -171,10 +171,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             //             for i in (0..#size as usize / 8).rev() {
             //                 let byte_address = guest_physical_address + i;
 
-            //                 let host_address = (byte_address + state.guest_memory_base());
+            //                 let host_address = (byte_address +
+            // state.guest_memory_base());
 
-            //                 let byte = unsafe { *(host_address as *const u8) };
-            //                 tracer.read_memory(byte_address, &byte);
+            //                 let byte = unsafe { *(host_address as *const u8)
+            // };                 tracer.read_memory(byte_address,
+            // &byte);
 
             //                 value <<= 8;
             //                 value |= u128::from(byte);
@@ -258,7 +260,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             //             for i in 0..#length as usize / 8 {
             //                 let byte_address = guest_physical_address + i;
 
-            //                 let host_address = (byte_address + state.guest_memory_base());
+            //                 let host_address = (byte_address +
+            // state.guest_memory_base());
 
             //                 unsafe { *(host_address as *mut u8) = data[i]; };
 

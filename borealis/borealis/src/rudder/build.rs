@@ -1,4 +1,3 @@
-use rayon::iter::ParallelIterator;
 use {
     crate::{
         boom::{
@@ -15,14 +14,14 @@ use {
                 StatementKind, UnaryOperationKind,
             },
             Block, ConstantValue, Context, Function, FunctionInner, FunctionKind,
-            RegisterDescriptor, Statement, Type,
+            PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
         },
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     log::trace,
     num_rational::Ratio,
     num_traits::cast::FromPrimitive,
-    rayon::iter::IntoParallelIterator,
+    rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
     std::{cmp::Ordering, sync::Arc},
 };
@@ -1400,9 +1399,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     value: ConstantValue::UnsignedInteger(0),
                 })),
 
-                "get_cycle_count" => Some(self.builder.build(StatementKind::Constant {
+                "get_cycle_count"  => Some(self.builder.build(StatementKind::Constant {
                     typ: Arc::new(rudder::Type::ArbitraryLengthInteger),
                     value: ConstantValue::SignedInteger(0),
+                })),
+
+                // requires u256 internally :(
+                "SHA256hash" => Some(self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(rudder::Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
+                    value: ConstantValue::UnsignedInteger(0),
                 })),
 
                 // val putchar : (%i) -> %unit

@@ -1,8 +1,10 @@
-use crate::rudder::statement::StatementBuilder;
 use {
     crate::rudder::{
         constant_value::ConstantValue,
-        statement::{BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementKind},
+        statement::{
+            BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementBuilder,
+            StatementKind,
+        },
         Block, Function, FunctionInner, Symbol, SymbolKind, Type,
     },
     common::{intern::InternedString, shared::Shared, HashMap},

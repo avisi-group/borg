@@ -3,10 +3,7 @@ use {
         brig::bits::BitsValue,
         rudder::{
             constant_value::ConstantValue,
-            statement::{
-
-                Statement, StatementKind,
-            },
+            statement::{Statement, StatementKind},
         },
     },
     common::{
@@ -18,7 +15,6 @@ use {
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
-
         fmt::Debug,
         hash::{Hash, Hasher},
         sync::Arc,
