@@ -169,9 +169,14 @@ pub enum StatementKind {
         length: Statement,
     },
     BitInsert {
-        original_value: Statement,
-        insert_value: Statement,
+        /// Target data that `length` bits of `source` will be inserted into at
+        /// position `start`
+        target: Statement,
+        /// Source bits that will be inserted into target
+        source: Statement,
+        /// Offset into `target` that `source` will be inserted
         start: Statement,
+        /// Length of `source` that will be inserted
         length: Statement,
     },
     ReadElement {
@@ -295,8 +300,8 @@ impl StatementKind {
             } => [value, start, length].into_iter().cloned().collect(),
 
             StatementKind::BitInsert {
-                original_value,
-                insert_value,
+                target: original_value,
+                source: insert_value,
                 start,
                 length,
             } => [original_value, insert_value, start, length]
@@ -457,7 +462,10 @@ impl Statement {
             StatementKind::WritePc { .. } => Arc::new(Type::void()),
             // todo: this is a simplification, be more precise about lengths?
             StatementKind::BitExtract { value, .. } => value.typ(),
-            StatementKind::BitInsert { original_value, .. } => original_value.typ(),
+            StatementKind::BitInsert {
+                target: original_value,
+                ..
+            } => original_value.typ(),
             StatementKind::ReadElement { vector, .. } => {
                 let Type::Vector { element_type, .. } = &*vector.typ() else {
                     panic!("cannot read field of non-composite type")
@@ -786,8 +794,8 @@ impl StatementInner {
                 };
             }
             StatementKind::BitInsert {
-                original_value,
-                insert_value,
+                target: original_value,
+                source: insert_value,
                 start,
                 length,
             } => {
@@ -797,8 +805,8 @@ impl StatementInner {
                     .collect::<Vec<_>>();
 
                 self.kind = StatementKind::BitInsert {
-                    original_value: stmts[0].clone(),
-                    insert_value: stmts[1].clone(),
+                    target: stmts[0].clone(),
+                    source: stmts[1].clone(),
                     start: stmts[2].clone(),
                     length: stmts[3].clone(),
                 }

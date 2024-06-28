@@ -5,7 +5,7 @@
 
 use {
     crate::{
-        brig::{bits::BitsLength, codegen_ident, codegen_type},
+        codegen::{bits::BitsLength, codegen_ident, codegen_type},
         rudder::{
             constant_value::ConstantValue,
             statement::{
@@ -445,8 +445,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::BitInsert {
-            original_value,
-            insert_value,
+            target: original_value,
+            source: insert_value,
             start,
             length,
         } => {
@@ -470,7 +470,15 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 let typ = codegen_type(original_value.typ());
 
                 let original_value = get_ident(&original_value);
-                let insert_value = get_ident(&insert_value);
+
+                let insert_value = if let Type::Bits = &*insert_value.typ() {
+                    let insert_value = get_ident(&insert_value);
+                    quote!((#insert_value.value() as i128))
+                } else {
+                    let insert_value = get_ident(&insert_value);
+                    quote!((#insert_value as i128))
+                };
+
                 let start = get_ident(&start);
                 let length = get_ident(&length);
 

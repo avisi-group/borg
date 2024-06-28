@@ -1,6 +1,6 @@
 use {
     crate::{
-        brig::codegen_ident,
+        codegen::codegen_ident,
         rudder::{Context, RegisterDescriptor},
     },
     proc_macro2::TokenStream,

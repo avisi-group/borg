@@ -1,6 +1,6 @@
 use {
     crate::{
-        brig::bits::BitsValue,
+        codegen::bits::BitsValue,
         rudder::{
             constant_value::ConstantValue,
             statement::{Statement, StatementKind},

@@ -11,9 +11,8 @@ use {
             },
             Ast,
         },
-        brig::{
+        codegen::{
             bits::codegen_bits,
-            denylist::apply_fn_denylist,
             functions_interpreter::{codegen_block, codegen_parameters, get_block_fn_ident},
             state::codegen_state,
             workspace::{create_manifest, write_workspace},
@@ -44,8 +43,6 @@ use {
 };
 
 pub mod bits;
-mod codegen;
-mod denylist;
 mod functions_interpreter;
 mod state;
 mod workspace;
@@ -75,7 +72,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(apply_fn_denylist(jib_ast.into_iter()));
+    let ast = Ast::from_jib(jib_ast.into_iter());
 
     // // useful for debugging
     if let Some(path) = &dump_ir {

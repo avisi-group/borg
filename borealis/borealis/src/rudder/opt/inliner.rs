@@ -144,13 +144,13 @@ fn clone_statement(
             length: mapping.get(&length).unwrap().clone(),
         }),
         StatementKind::BitInsert {
-            original_value,
-            insert_value,
+            target,
+            source,
             start,
             length,
         } => builder.build(StatementKind::BitInsert {
-            original_value: mapping.get(&original_value).unwrap().clone(),
-            insert_value: mapping.get(&insert_value).unwrap().clone(),
+            target: mapping.get(&target).unwrap().clone(),
+            source: mapping.get(&source).unwrap().clone(),
             start: mapping.get(&start).unwrap().clone(),
             length: mapping.get(&length).unwrap().clone(),
         }),

@@ -1,6 +1,6 @@
 use {
     borealis::{
-        brig::{sail_to_brig, GenerationMode},
+        codegen::{sail_to_brig, GenerationMode},
         load_model,
     },
     clap::Parser,

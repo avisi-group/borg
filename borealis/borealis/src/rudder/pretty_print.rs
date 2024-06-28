@@ -246,8 +246,8 @@ impl Display for StatementKind {
                 length.name()
             ),
             StatementKind::BitInsert {
-                original_value,
-                insert_value,
+                target: original_value,
+                source: insert_value,
                 start,
                 length,
             } => write!(

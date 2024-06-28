@@ -189,13 +189,13 @@ impl StatementUseAnalysis {
                     self.add_use(&length, &stmt);
                 }
                 StatementKind::BitInsert {
-                    original_value,
-                    insert_value,
+                    target,
+                    source,
                     start,
                     length,
                 } => {
-                    self.add_use(&original_value, &stmt);
-                    self.add_use(&insert_value, &stmt);
+                    self.add_use(&target, &stmt);
+                    self.add_use(&source, &stmt);
                     self.add_use(&start, &stmt);
                     self.add_use(&length, &stmt);
                 }

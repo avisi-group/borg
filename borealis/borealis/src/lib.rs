@@ -15,7 +15,7 @@ use {
 };
 
 pub mod boom;
-pub mod brig;
+pub mod codegen;
 pub mod rudder;
 
 /// Deserializes an AST from an archive.

@@ -182,7 +182,7 @@ impl<'ast> GraphWalk<'ast, NodeId, EdgeId> for FunctionCallGraphAnalysis {
         self.fn_callees
             .keys()
             .cloned()
-            .map(|n| crate::brig::codegen_ident(n).to_string().into())
+            .map(|n| crate::codegen::codegen_ident(n).to_string().into())
             .collect::<Vec<InternedString>>()
             .into()
     }

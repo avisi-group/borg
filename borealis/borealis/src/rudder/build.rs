@@ -1206,8 +1206,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     });
 
                     Some(self.builder.build(StatementKind::BitInsert {
-                        original_value: target,
-                        insert_value: bit,
+                        target,
+                        source: bit,
                         start: i,
                         length: _1,
                     }))
@@ -1229,12 +1229,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let len = args[0].clone();
                     let n = args[1].clone();
                     let start = args[2].clone();
+
+                    // cast the slice from a %bv to a i128 for the i128 version of bit-insert
                     let slice = args[3].clone();
 
                     // destination[start..] = source[0..source.len()]
                     // todo: check correctness and write some unit tests for this
 
-                    Some(self.generate_set_slice(n, slice, len, start))
+                    Some( self.builder.build(StatementKind::BitInsert {
+                        target: n,
+                        source: slice,
+                        start: start,
+                        length: len,
+                    }))
                 }
 
                 //val get_slice_int : (%i, %i, %i) -> %bv
@@ -1267,8 +1274,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let source = args[4].clone();
 
                     // destination[start..] = source[0..source.len()]
-
-                    Some(self.generate_set_slice(destination, source, slen, start))
+                    Some( self.builder.build(StatementKind::BitInsert {
+                        target: destination,
+                        source: source,
+                        start: start,
+                        length: slen,
+                    }))
                 }
 
                 "update_subrange_bits" => {
@@ -1297,7 +1308,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: _1,
                     });
 
-                    Some(self.generate_set_slice(destination, source, source_length, start))
+
+                    Some( self.builder.build(StatementKind::BitInsert {
+                        target: destination,
+                        source: source,
+                        start: start,
+                        length: source_length,
+                    }))
                 }
 
                 "replicate_bits" => {
@@ -1933,23 +1950,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 })
             }
         }
-    }
-
-    /// Copies source[0..source_length] into dest[start..start + source_length]
-    /// Output statement type should be same as destination
-    fn generate_set_slice(
-        &mut self,
-        destination: Statement,
-        source: Statement,
-        source_length: Statement,
-        destination_start_offset: Statement,
-    ) -> Statement {
-        self.builder.build(StatementKind::BitInsert {
-            original_value: destination,
-            insert_value: source,
-            start: destination_start_offset,
-            length: source_length,
-        })
     }
 
     fn generate_concat(&mut self, lhs: Statement, rhs: Statement) -> Statement {
