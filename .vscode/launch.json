@@ -40,7 +40,7 @@
                     "kind": "bin"
                 },
             },
-            "args": ["--dump-ir","/workspaces/ir","${workspaceFolder}/arm-v9.4-a_d43f3f4c.rkyv", "${workspaceFolder}/aarch64"],
+            "args": ["--dump-ir","${workspaceFolder}/ir","${workspaceFolder}/arm-v9.4-a_d43f3f4c.rkyv", "${workspaceFolder}/aarch64"],
             "cwd": "${workspaceFolder}/borealis",
             "env": {
                 "RAYON_NUM_THREADS": "4"

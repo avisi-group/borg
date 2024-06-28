@@ -35,6 +35,10 @@ pub mod interpreter;
 pub mod state;
 pub mod workspace;
 
+// Rust source that will be emitted, but included here for compile checking +
+// testing
+mod include;
+
 fn promote_width(width: usize) -> usize {
     match width {
         0..=8 => 8,

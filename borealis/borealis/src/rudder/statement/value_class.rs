@@ -62,7 +62,7 @@ fn max_class<I: IntoIterator<Item = ValueClass>>(iter: I) -> ValueClass {
 
 #[cfg(test)]
 mod tests {
-    use crate::rudder::value_class::{max_class, ValueClass};
+    use crate::rudder::statement::value_class::{max_class, ValueClass};
 
     #[test]
     fn max_class_dynamic_early() {
