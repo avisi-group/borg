@@ -2,40 +2,28 @@
 
 use {
     crate::{
-        boom::{
-            self,
-            passes::{
-                self, cycle_finder::CycleFinder, fix_exceptions::FixExceptions,
-                fold_unconditionals::FoldUnconditionals, monomorphize_vectors::MonomorphizeVectors,
-                remove_const_branch::RemoveConstBranch, resolve_return_assigns::ResolveReturns,
-            },
-            Ast,
-        },
         codegen::{
             bits::codegen_bits,
-            functions_interpreter::{codegen_block, codegen_parameters, get_block_fn_ident},
+            interpreter::{codegen_block, codegen_parameters, get_block_fn_ident},
             state::codegen_state,
-            workspace::{create_manifest, write_workspace},
+            workspace::create_manifest,
         },
         rudder::{
-            self, analysis::cfg::FunctionCallGraphAnalysis, Context, Function, PrimitiveTypeClass,
+            analysis::cfg::FunctionCallGraphAnalysis, Context, Function, PrimitiveTypeClass,
             Symbol, Type,
         },
     },
     cargo_util_schemas::manifest::{TomlManifest, TomlWorkspace},
-    common::{create_file_buffered, intern::InternedString, HashMap, HashSet},
-    log::{info, warn},
+    common::{intern::InternedString, HashMap, HashSet},
+    log::warn,
     once_cell::sync::Lazy,
     proc_macro2::{Span, TokenStream},
     quote::{format_ident, quote},
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
-    sailrs::{jib_ast, types::ListVec},
     std::{
         collections::BTreeSet,
-        fs::create_dir_all,
         hash::{DefaultHasher, Hash, Hasher},
-        io::Write,
         path::PathBuf,
         sync::Arc,
     },
@@ -43,111 +31,9 @@ use {
 };
 
 pub mod bits;
-mod functions_interpreter;
-mod state;
-mod workspace;
-
-pub enum GenerationMode {
-    CodeGen,
-    CodeGenWithIr(PathBuf),
-    IrOnly(PathBuf),
-}
-
-/// Compiles a Sail model to a Brig module
-pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: GenerationMode) {
-    let dump_ir = match &mode {
-        GenerationMode::CodeGen => None,
-        GenerationMode::CodeGenWithIr(p) | GenerationMode::IrOnly(p) => Some(p),
-    };
-
-    if let Some(path) = &dump_ir {
-        create_dir_all(path).unwrap()
-    }
-
-    if let Some(path) = &dump_ir {
-        sailrs::jib_ast::pretty_print::print_ast(
-            &mut create_file_buffered(path.join("ast.jib")).unwrap(),
-            jib_ast.iter(),
-        );
-    }
-
-    info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(jib_ast.into_iter());
-
-    // // useful for debugging
-    if let Some(path) = &dump_ir {
-        boom::pretty_print::print_ast(
-            &mut create_file_buffered(path.join("ast.boom")).unwrap(),
-            ast.clone(),
-        );
-    }
-
-    info!("Running passes on BOOM");
-    passes::run_fixed_point(
-        ast.clone(),
-        &mut [
-            FoldUnconditionals::new_boxed(),
-            RemoveConstBranch::new_boxed(),
-            ResolveReturns::new_boxed(),
-            FixExceptions::new_boxed(),
-            MonomorphizeVectors::new_boxed(),
-            CycleFinder::new_boxed(),
-        ],
-    );
-
-    if let Some(path) = &dump_ir {
-        boom::pretty_print::print_ast(
-            &mut create_file_buffered(path.join("ast.processed.boom")).unwrap(),
-            ast.clone(),
-        );
-    }
-
-    info!("Building rudder");
-
-    let mut rudder = rudder::build::from_boom(&ast.get());
-
-    if let Some(path) = &dump_ir {
-        writeln!(
-            &mut create_file_buffered(path.join("ast.rudder")).unwrap(),
-            "{rudder}"
-        )
-        .unwrap();
-    }
-
-    info!("Validating rudder");
-    let msgs = rudder.validate();
-    for msg in msgs {
-        warn!("{msg}");
-    }
-
-    info!("Optimising rudder");
-    rudder.optimise(rudder::opt::OptLevel::Level3);
-
-    if let Some(path) = &dump_ir {
-        writeln!(
-            &mut create_file_buffered(path.join("ast.opt.rudder")).unwrap(),
-            "{rudder}"
-        )
-        .unwrap();
-    }
-
-    info!("Validating rudder again");
-    let msgs = rudder.validate();
-    for msg in msgs {
-        warn!("{msg}");
-    }
-
-    if matches!(
-        &mode,
-        GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
-    ) {
-        info!("Generating Rust");
-        let ws = codegen_workspace(&rudder);
-
-        info!("Writing workspace to {:?}", &path);
-        write_workspace(ws, path);
-    }
-}
+pub mod interpreter;
+pub mod state;
+pub mod workspace;
 
 fn promote_width(width: usize) -> usize {
     match width {
@@ -333,7 +219,7 @@ fn codegen_types(rudder: &Context) -> TokenStream {
     }
 }
 
-fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
+pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     // common crate depended on by all containing bundle, tracer, state, and
     // structs/enums/unions
     let common = {

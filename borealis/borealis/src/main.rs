@@ -1,8 +1,5 @@
 use {
-    borealis::{
-        codegen::{sail_to_brig, GenerationMode},
-        load_model,
-    },
+    borealis::{load_model, sail_to_brig, GenerationMode},
     clap::Parser,
     color_eyre::eyre::Result,
     common::init_logger,
