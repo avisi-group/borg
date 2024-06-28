@@ -1,5 +1,18 @@
-#![allow(dead_code)]
+use {proc_macro2::TokenStream, quote::ToTokens, std::fs};
+
+#[allow(dead_code)]
 mod bits;
+#[allow(dead_code)]
+mod util;
+
+pub fn get(filename: &str) -> TokenStream {
+    let mut path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/codegen/include/").to_owned();
+    path.push_str(filename);
+
+    syn::parse_file(&fs::read_to_string(path).unwrap())
+        .unwrap()
+        .into_token_stream()
+}
 
 // tests not in the module itself because we don't want them emitted
 #[cfg(test)]

@@ -3,7 +3,6 @@
 use {
     crate::{
         codegen::{
-            bits::codegen_bits,
             interpreter::{codegen_block, codegen_parameters, get_block_fn_ident},
             state::codegen_state,
             workspace::create_manifest,
@@ -229,8 +228,9 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
     let common = {
         let header = codegen_header();
         let state = codegen_state(rudder);
-        let bundle = codegen_bits();
         let types = codegen_types(rudder);
+        let bits = include::get("bits.rs");
+        let util = include::get("util.rs");
 
         (
             InternedString::from_static("common"),
@@ -241,45 +241,11 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
 
                     #state
 
-                    #bundle
-
                     #types
 
-                    pub trait Tracer {
-                        fn begin(&self, instruction: u32, pc: u64);
-                        fn end(&self);
-                        fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug);
-                        fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug);
-                        fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug);
-                        fn write_memory(&self, address: usize, value: &dyn core::fmt::Debug);
-                    }
+                    #bits
 
-                    pub trait RatioExt {
-                        fn powi(&self, i: i32) -> Self;
-                        fn sqrt(&self) -> Self;
-                        fn abs(&self) -> Self;
-                    }
-
-                 impl RatioExt for num_rational::Ratio<i128> {
-                        fn powi(&self, i: i32) -> Self {
-                            self.pow(i)
-                        }
-                        fn sqrt(&self) -> Self {
-                            todo!();
-                        }
-                       fn abs(&self) -> Self {
-                            let n = *self.numer();
-                            let d = *self.denom();
-                            Self::new(n.abs(), d)
-                        }
-                    }
-
-                    #[derive(Debug)]
-                    pub enum ExecuteResult {
-                        Ok,
-                        EndOfBlock,
-                        UndefinedInstruction
-                    }
+                    #util
                 }),
             ),
         )

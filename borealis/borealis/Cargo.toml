@@ -37,6 +37,6 @@ toml = "0.8.13"
 semver = { version = "1.0.23", features = ["serde"] }
 walkdir = "2.5.0"
 rayon = "1.10.0"
-dashmap = { version = "5.5.3", features = ["rayon"] }
+dashmap = { version = "6.0.1", features = ["rayon"] }
 num-rational = { version = "0.4.2", default-features = false }
 num-traits = { version = "0.2.19", default-features = false, features = ["i128"] }
