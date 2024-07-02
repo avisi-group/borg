@@ -3,8 +3,8 @@ use {
         devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
     },
-    alloc::{collections::BTreeMap, string::String, vec::Vec},
-    serde::Deserialize,
+    alloc::{collections::BTreeMap, format, string::String, vec::Vec},
+    serde::{de::Error as _, Deserialize, Deserializer},
     thiserror_core as thiserror,
 };
 
@@ -28,53 +28,39 @@ impl From<serde_json::Error> for ConfigLoadError {
     }
 }
 
-/// Load guest configuration, kernel image, and platform dtb from the config tar
+/// Load guest configuration from the config tar
 /// image
-pub fn load_from_device(
-    device: &SharedDevice,
-) -> Result<(Config, Vec<u8>, Vec<u8>), ConfigLoadError> {
+pub fn load_from_device(device: &SharedDevice) -> Result<Config, ConfigLoadError> {
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
 
-    let config: Config = { serde_json::from_slice(&fs.open("/config.json")?.read_to_vec()?)? };
-
-    let (kernel_path, dtb_path) = match config.boot {
-        BootProtocol::Arm64Linux(Arm64LinuxBootProtocol { ref kernel, ref dt }) => (kernel, dt),
-    };
-
-    let kernel_entry = fs.open(kernel_path)?.read_to_vec()?;
-    let dtb_entry = fs.open(dtb_path)?.read_to_vec()?;
-
-    Ok((config, kernel_entry, dtb_entry))
+    Ok(serde_json::from_slice(
+        &fs.open("/config.json")?.read_to_vec()?,
+    )?)
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub boot: BootProtocol,
     pub memory: BTreeMap<String, AddressSpace>,
+    pub load: Vec<Load>,
     pub devices: BTreeMap<String, Device>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "protocol")]
-pub enum BootProtocol {
-    #[serde(rename = "arm64-linux")]
-    Arm64Linux(Arm64LinuxBootProtocol),
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Arm64LinuxBootProtocol {
-    pub kernel: String,
-    pub dt: String,
-}
-
-//#[derive(Debug, Deserialize)]
 pub type AddressSpace = BTreeMap<String, Memory>;
 
 #[derive(Debug, Deserialize)]
 pub struct Memory {
-    pub start: String,
-    pub end: String,
+    #[serde(deserialize_with = "hex_address")]
+    pub start: u64,
+    #[serde(deserialize_with = "hex_address")]
+    pub end: u64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Load {
+    pub path: String,
+    #[serde(deserialize_with = "hex_address")]
+    pub address: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -88,5 +74,20 @@ pub struct Device {
 #[derive(Debug, Deserialize)]
 pub struct DeviceAttachment {
     pub address_space: String,
-    pub base: String,
+    #[serde(deserialize_with = "hex_address")]
+    pub base: u64,
+}
+
+/// Function to be passed in `deserialize_with` serde attribute for parsing JSON
+/// strings containing hex memory addresses into u64s.
+fn hex_address<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+    let s = String::deserialize(deserializer)?;
+    // remove any underscores
+    let s = s.replace('_', "");
+    // remove prefix
+    let s = s.trim_start_matches("0x");
+
+    Ok(u64::from_str_radix(s, 16).map_err(|e| {
+        D::Error::custom(format!("Failed to parse u64 from hex string {s:?}: {e:?}"))
+    })?)
 }

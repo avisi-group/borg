@@ -21,11 +21,11 @@ impl GuestDevice for VirtIOBlock {
 }
 
 impl IOMemoryHandler for VirtIOBlock {
-    fn read(&self, _offset: usize, _buf: &mut [u8]) {
+    fn read(&self, _offset: u64, _buf: &mut [u8]) {
         todo!()
     }
 
-    fn write(&self, _offset: usize, _buf: &[u8]) {
+    fn write(&self, _offset: u64, _buf: &[u8]) {
         todo!()
     }
 }

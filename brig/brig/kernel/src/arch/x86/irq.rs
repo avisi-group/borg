@@ -56,7 +56,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         let exec_ctx = crate::guest::GuestExecutionContext::current();
         let addrspace = unsafe { &*exec_ctx.current_address_space };
 
-        if let Some(rgn) = addrspace.find_region(faulting_address.as_u64() as usize) {
+        if let Some(rgn) = addrspace.find_region(faulting_address.as_u64()) {
             //log::trace!("located region {}", rgn);
 
             match rgn.kind() {

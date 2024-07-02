@@ -1,41 +1,42 @@
 {
-    "boot": {
-        "protocol": "arm64-linux",
-        "kernel": "/kernel",
-        "dt": "/platform.dtb"
-    },
     "memory": {
         "as0": {
             "ram0": {
-                "start": "0x0",
-                "end": "0x8000000"
+                "start": "0x8000_0000",
+                "end": "0x8900_0000"
             },
             "ram1": {
-                "start": "0x40000000",
-                "end": "0x100000000"
+                "start": "0xdead_b000",
+                "end": "0xdead_c000"
+            },
+            "ram2": {
+                "start": "0x1300_0000",
+                "end": "0x1310_0000"
+            },
+            "ram3": {
+                "start": "0x2c00_0000",
+                "end": "0x2c01_0000"
             }
         }
     },
+    "load": [
+        {
+            "path": "/bootloader.bin",
+            "address": "0x8000_0000"
+        },
+        {
+            "path": "/sail.dtb",
+            "address": "0x8100_0000"
+        },
+        {
+            "path": "/Image",
+            "address": "0x8208_0000"
+        }
+    ],
     "devices": {
         "core0": {
             "kind": "aarch64",
             "address_space": "as0"
-        },
-        "uart0": {
-            "kind": "pl011",
-            "attach": {
-                "address_space": "as0",
-                "base": "0x08020000"
-            },
-            "host": "serial0"
-        },
-        "blk0": {
-            "kind": "virtio-blk",
-            "attach": {
-                "address_space": "as0",
-                "base": "0x8000000"
-            },
-            "host": "disk00:04.0"
         }
     }
 }

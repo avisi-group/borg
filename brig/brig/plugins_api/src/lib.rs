@@ -51,8 +51,8 @@ pub trait GuestDevice {
 }
 
 pub trait IOMemoryHandler {
-    fn read(&self, offset: usize, buf: &mut [u8]);
-    fn write(&self, offset: usize, buf: &[u8]);
+    fn read(&self, offset: u64, buf: &mut [u8]);
+    fn write(&self, offset: u64, buf: &[u8]);
 }
 
 // /// Factor of ArchitectureExecutors, used to create new instances of an

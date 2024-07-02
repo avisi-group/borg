@@ -9,7 +9,7 @@ use {
 };
 
 pub struct AddressSpace {
-    regions: BTreeMap<usize, AddressSpaceRegion>,
+    regions: BTreeMap<u64, AddressSpaceRegion>,
 }
 
 impl AddressSpace {
@@ -24,7 +24,7 @@ impl AddressSpace {
         self.regions.insert(region.base, region);
     }
 
-    pub fn find_region(&self, address: usize) -> Option<&AddressSpaceRegion> {
+    pub fn find_region(&self, address: u64) -> Option<&AddressSpaceRegion> {
         let candidate = self
             .regions
             .upper_bound(core::ops::Bound::Included(&address))
@@ -39,7 +39,7 @@ impl AddressSpace {
 }
 
 pub trait IoMemoryHandlerExt {
-    fn read_fixed<H: IOMemoryHandler, T: Sized>(handler: H, offset: usize) -> T {
+    fn read_fixed<H: IOMemoryHandler, T: Sized>(handler: H, offset: u64) -> T {
         let mut t = MaybeUninit::<T>::uninit();
         let buf = unsafe { slice::from_raw_parts_mut(t.as_mut_ptr() as *mut u8, size_of::<T>()) };
         handler.read(offset, buf);
@@ -55,8 +55,8 @@ pub enum AddressSpaceRegionKind {
 
 pub struct AddressSpaceRegion {
     name: String,
-    base: usize,
-    size: usize,
+    base: u64,
+    size: u64,
     kind: AddressSpaceRegionKind,
 }
 
@@ -77,7 +77,7 @@ impl Display for AddressSpaceRegion {
 }
 
 impl AddressSpaceRegion {
-    pub fn new(name: String, base: usize, size: usize, kind: AddressSpaceRegionKind) -> Self {
+    pub fn new(name: String, base: u64, size: u64, kind: AddressSpaceRegionKind) -> Self {
         Self {
             name,
             base,

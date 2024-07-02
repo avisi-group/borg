@@ -1,6 +1,7 @@
 use {
     crate::{
         devices::manager::SharedDeviceManager,
+        fs::{tar::TarFilesystem, File, Filesystem},
         guest::memory::{AddressSpace, AddressSpaceRegion},
     },
     alloc::{boxed::Box, collections::BTreeMap, string::String},
@@ -56,9 +57,9 @@ pub fn start() {
         .get_device_by_alias("disk00:03.0")
         .expect("disk not found");
 
-    let (config, kernel, dtb) = config::load_from_device(&device).unwrap();
+    let config = config::load_from_device(&device).unwrap();
 
-    log::debug!("kernel len: {:#x}, got config: {:#?}", kernel.len(), config);
+    log::debug!("got config: {:#?}", config);
 
     unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();
@@ -67,16 +68,11 @@ pub fn start() {
     for (name, regions) in config.memory {
         let mut addrspace = AddressSpace::new();
 
-        for (name, region) in regions {
-            let (start, end) = (
-                usize::from_str_radix(region.start.trim_start_matches("0x"), 16).unwrap(),
-                usize::from_str_radix(region.end.trim_start_matches("0x"), 16).unwrap(),
-            );
-
+        for (name, (region)) in regions {
             addrspace.add_region(AddressSpaceRegion::new(
                 name,
-                start,
-                end - start,
+                region.start,
+                region.end - region.start,
                 memory::AddressSpaceRegionKind::Ram,
             ));
         }
@@ -159,53 +155,24 @@ pub fn start() {
     log::debug!("activating guest execution context");
     temp_exec_ctx.activate();
 
-    // initiate boot protocol
-    match config.boot {
-        config::BootProtocol::Arm64Linux(_) => {
-            // todo: read kernel from TAR here not earlier
+    {
+        let mut device = device.lock();
+        let mut fs = TarFilesystem::mount(device.as_block());
 
-            // read header from kernel
-            let header = unsafe { &*(kernel.as_ptr() as *const Arm64KernelHeader) };
-            assert_eq!(ARM64_MAGIC, header.magic);
+        for load in config.load {
+            let data = fs.open(load.path).unwrap().read_to_vec().unwrap();
+            let pointer = load.address as *mut u8;
 
-            // load kernel and dtb into guest physical memory
             unsafe {
-                ptr::copy(
-                    kernel.as_ptr(),
-                    (usize::try_from(header.text_offset).unwrap() + KERNEL_LOAD_BIAS) as *mut u8,
-                    kernel.len(),
-                );
-
-                ptr::copy(dtb.as_ptr(), (DTB_LOAD_OFFSET) as *mut u8, dtb.len());
+                ptr::copy(data.as_ptr(), pointer, data.len());
             }
         }
     }
 
     // go go go (start all devices)
     log::info!("starting guest");
-    //unsafe { *(0x4020_0000 as *mut [u32; 3]) = [0xd53b0023, 0xd3504c63, 0x0] };
-    // 0xeb01001f, 0x0] };
+
     for device in guest.devices.values_mut() {
         device.start();
     }
-}
-
-const KERNEL_LOAD_BIAS: usize = 0x4020_0000;
-const DTB_LOAD_OFFSET: usize = 0x9000_0000;
-
-const ARM64_MAGIC: u32 = 0x644d5241;
-
-#[derive(Debug)]
-#[repr(C)]
-struct Arm64KernelHeader {
-    code0: u32,
-    code1: u32,
-    text_offset: u64,
-    image_size: u64,
-    flags: u64,
-    res2: u64,
-    res3: u64,
-    res4: u64,
-    magic: u32,
-    res5: u32,
 }
