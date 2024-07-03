@@ -26,8 +26,8 @@ pub struct Aarch64Interpreter {
 }
 
 impl Aarch64Interpreter {
-    pub fn new(guest_memory_base: usize, initial_pc: usize, tracer_kind: TracerKind) -> Self {
-        let mut state = State::new(guest_memory_base);
+    pub fn new(initial_pc: u64, tracer_kind: TracerKind) -> Self {
+        let mut state = State::new();
 
         // sets initial register and letbind state (generated from sail model)
         borealis_register_init(&mut state, &NoopTracer);

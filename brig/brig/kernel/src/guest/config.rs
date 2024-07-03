@@ -4,6 +4,7 @@ use {
         fs::{tar::TarFilesystem, File, Filesystem},
     },
     alloc::{collections::BTreeMap, format, string::String, vec::Vec},
+    plugins_api::parse_hex_prefix,
     serde::{de::Error as _, Deserialize, Deserializer},
     thiserror_core as thiserror,
 };
@@ -82,12 +83,8 @@ pub struct DeviceAttachment {
 /// strings containing hex memory addresses into u64s.
 fn hex_address<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
     let s = String::deserialize(deserializer)?;
-    // remove any underscores
-    let s = s.replace('_', "");
-    // remove prefix
-    let s = s.trim_start_matches("0x");
 
-    Ok(u64::from_str_radix(s, 16).map_err(|e| {
+    Ok(parse_hex_prefix(&s).map_err(|e| {
         D::Error::custom(format!("Failed to parse u64 from hex string {s:?}: {e:?}"))
     })?)
 }

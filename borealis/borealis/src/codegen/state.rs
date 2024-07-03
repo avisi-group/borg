@@ -58,15 +58,15 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         #[repr(align(8))]
         pub struct State {
             data: [u8; #registers_len],
-            guest_memory_base: usize,
+
         }
 
         impl State {
             /// Returns the ISA state with initial values and configuration set
-            pub fn new(guest_memory_base: usize) -> Self {
+            pub fn new() -> Self {
                 Self {
                     data: [0; #registers_len],
-                    guest_memory_base,
+
                 }
             }
 
@@ -80,10 +80,6 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
                 let start = offset;
                 let end = start + core::mem::size_of::<T>();
                 unsafe { core::ptr::read_unaligned(self.data[start..end].as_ptr().cast()) }
-            }
-
-            pub fn guest_memory_base(&self) -> usize {
-                self.guest_memory_base
             }
         }
 

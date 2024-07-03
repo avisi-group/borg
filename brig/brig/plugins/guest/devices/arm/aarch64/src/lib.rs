@@ -5,7 +5,10 @@ extern crate alloc;
 use {
     aarch64_interpreter::{Aarch64Interpreter, TracerKind},
     alloc::{boxed::Box, collections::BTreeMap, string::String},
-    plugins_rt::api::{GuestDevice, GuestDeviceFactory, IOMemoryHandler, PluginHeader, PluginHost},
+    plugins_rt::api::{
+        parse_hex_prefix, GuestDevice, GuestDeviceFactory, IOMemoryHandler, PluginHeader,
+        PluginHost,
+    },
 };
 
 #[no_mangle]
@@ -28,19 +31,20 @@ impl GuestDeviceFactory for Aarch64InterpreterFactory {
     // todo: find a way of passing some config to guest device creation: json?
     // key-value?
     fn create(&self, config: BTreeMap<String, String>) -> Box<dyn GuestDevice> {
-        const GUEST_MEMORY_BASE: usize = 0;
-        const INITIAL_PC: usize = 0x8000_0000;
-
         let tracer = match config.get("tracer").map(String::as_str) {
             Some("log") => TracerKind::Log,
             Some("noop") | None => TracerKind::Noop,
             Some(t) => panic!("unknown tracer {t:?}"),
         };
 
+        let initial_pc = config
+            .get("initial_pc")
+            .map(parse_hex_prefix)
+            .unwrap()
+            .unwrap();
+
         Box::new(Aarch64InterpreterDevice(Aarch64Interpreter::new(
-            GUEST_MEMORY_BASE,
-            INITIAL_PC,
-            tracer,
+            initial_pc, tracer,
         )))
     }
 }

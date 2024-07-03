@@ -4,7 +4,7 @@ use {
         fs::{tar::TarFilesystem, File, Filesystem},
         guest::memory::{AddressSpace, AddressSpaceRegion},
     },
-    alloc::{boxed::Box, collections::BTreeMap, string::String},
+    alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String},
     core::ptr,
     plugins_api::{GuestDevice, GuestDeviceFactory},
     spin::{Mutex, Once},
@@ -82,27 +82,6 @@ pub fn start() {
 
     // create devices, including cores
     for (name, device) in config.devices {
-        /*let dev: Rc<dyn GuestDevice> = match device.kind.as_str() {
-            "core" => match device
-                .extra
-                .get("arch".into())
-                .expect("missing arch definition")
-                .as_str()
-            {
-                "arm64" => Rc::new(self::devices::core::GenericCore::new::<
-                    arch::State,
-                    Interpreter,
-                >()),
-                _ => {
-                    panic!("unsupported core arch")
-                }
-            },
-            "pl011" => Rc::new(self::devices::pl011::PL011::new()),
-            "virtio-blk" => Rc::new(self::devices::virtio::VirtIOBlock::new()),
-            _ => {
-                panic!("unsupported guest device type {}", device.kind);
-            }
-        };*/
         let factories = unsafe { GUEST_DEVICE_FACTORIES.lock() };
 
         let Some(factory) = factories.get(device.kind.as_str()) else {
@@ -110,7 +89,13 @@ pub fn start() {
             continue;
         };
 
-        let dev = factory.create([("tracer".into(), "noop".into())].into());
+        let dev = factory.create(
+            [("tracer", "noop")]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .chain(device.extra.into_iter())
+                .collect(),
+        );
         guest.devices.insert(name.clone(), dev);
 
         // locate address space for attachment, if any
@@ -160,8 +145,10 @@ pub fn start() {
         let mut fs = TarFilesystem::mount(device.as_block());
 
         for load in config.load {
-            let data = fs.open(load.path).unwrap().read_to_vec().unwrap();
+            let data = fs.open(&load.path).unwrap().read_to_vec().unwrap();
             let pointer = load.address as *mut u8;
+
+            log::info!("loading {:?} @ {:p}", load.path, pointer);
 
             unsafe {
                 ptr::copy(data.as_ptr(), pointer, data.len());

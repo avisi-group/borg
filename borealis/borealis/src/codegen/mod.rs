@@ -466,7 +466,6 @@ fn codegen_header() -> TokenStream {
         #![allow(non_upper_case_globals)]
         #![allow(non_camel_case_types)]
 
-
         //! BOREALIS GENERATED FILE
     }
 }
