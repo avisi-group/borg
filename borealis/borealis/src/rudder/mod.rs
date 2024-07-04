@@ -575,6 +575,10 @@ impl Function {
         self.inner.get().return_type.clone()
     }
 
+    pub fn parameters(&self) -> Vec<Symbol> {
+        self.inner.get().parameters.clone()
+    }
+
     pub fn entry_block(&self) -> Block {
         self.inner.get().entry_block.clone()
     }
