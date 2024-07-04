@@ -5,7 +5,7 @@
 
 use {
     crate::{
-        codegen::{bits::BitsLength, codegen_ident, codegen_type},
+        codegen::{codegen_ident, codegen_type},
         rudder::{
             constant_value::ConstantValue,
             statement::{
@@ -602,7 +602,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                     panic!("cannot get size of arbitrary length integer")
                 }
                 _ => {
-                    let length = BitsLength::try_from(value.typ().width_bits()).unwrap();
+                    // we represent all bitvector lengths as `u16`s
+                    let length = u16::try_from(value.typ().width_bits()).unwrap();
                     quote!(#length)
                 }
             }

@@ -3,6 +3,8 @@ use {proc_macro2::TokenStream, quote::ToTokens, std::fs};
 #[allow(dead_code)]
 mod bits;
 #[allow(dead_code)]
+mod dbt;
+#[allow(dead_code)]
 mod util;
 
 pub fn get(filename: &str) -> TokenStream {

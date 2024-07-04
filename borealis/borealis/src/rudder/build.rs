@@ -1236,10 +1236,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // destination[start..] = source[0..source.len()]
                     // todo: check correctness and write some unit tests for this
 
-                    Some( self.builder.build(StatementKind::BitInsert {
+                    Some(self.builder.build(StatementKind::BitInsert {
                         target: n,
                         source: slice,
-                        start: start,
+                        start,
                         length: len,
                     }))
                 }

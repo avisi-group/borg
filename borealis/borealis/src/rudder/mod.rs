@@ -1,10 +1,7 @@
 use {
-    crate::{
-        codegen::bits::BitsValue,
-        rudder::{
-            constant_value::ConstantValue,
-            statement::{Statement, StatementKind},
-        },
+    crate::rudder::{
+        constant_value::ConstantValue,
+        statement::{Statement, StatementKind},
     },
     common::{
         intern::InternedString,
@@ -141,7 +138,7 @@ impl Type {
                 element_type,
             } => element_type.width_bits() * element_count,
 
-            Self::Bits | Self::ArbitraryLengthInteger => usize::try_from(BitsValue::BITS).unwrap(),
+            Self::Bits | Self::ArbitraryLengthInteger => usize::try_from(u128::BITS).unwrap(),
             // width of internedstring
             Self::String => 32,
             Self::Rational => todo!(),

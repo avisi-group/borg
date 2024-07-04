@@ -38,7 +38,6 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
             .into_iter()
             .map(|(offset, name)| {
                 let name = name.as_ref();
-
                 quote!((#offset, #name),)
             })
             .collect::<TokenStream>()
@@ -51,14 +50,10 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         .max()
         .unwrap();
 
-    // let register_inits = rudder.get_registers()
-
     quote! {
-        // todo check this is necessary
         #[repr(align(8))]
         pub struct State {
             data: [u8; #registers_len],
-
         }
 
         impl State {
@@ -66,7 +61,6 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
             pub fn new() -> Self {
                 Self {
                     data: [0; #registers_len],
-
                 }
             }
 
@@ -85,6 +79,39 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
 
         #register_offsets
 
-        pub const REGISTER_NAME_MAP: &[(usize, &str)] = &[#register_name_map_contents];
+        pub struct RegisterOffset {
+            /// Name of the register
+            pub name: &'static str,
+            /// Offset in bytes inside the register
+            pub offset: usize
+        }
+
+        pub fn lookup_register_by_offset(offset: usize) -> Option<RegisterOffset> {
+            const REGISTER_NAME_MAP: &[(usize, &str)] = &[#register_name_map_contents];
+
+            if offset > core::mem::size_of::<State>() {
+                return None;
+            }
+
+            Some(match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
+                // found start of register
+                Ok(idx) => {
+                    RegisterOffset {
+                        name: REGISTER_NAME_MAP[idx].1,
+                        offset: 0,
+                    }
+                }
+                // we're accessing inside a register
+                Err(idx) => {
+                    // get the register and print the offset from the base
+                    let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
+
+                    RegisterOffset {
+                        name,
+                        offset: offset - register_offset,
+                    }
+                }
+            })
+        }
     }
 }

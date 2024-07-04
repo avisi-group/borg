@@ -29,7 +29,6 @@ use {
     syn::Ident,
 };
 
-pub mod bits;
 pub mod interpreter;
 pub mod state;
 pub mod workspace;

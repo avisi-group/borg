@@ -3,8 +3,8 @@
 use {
     borealis_register_init::borealis_register_init,
     common::{
-        Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer,
-        REGISTER_NAME_MAP, REG_R0, REG_R1, REG_R19, REG_R3, REG_SEE, REG_U_PC, REG_U__BRANCHTAKEN,
+        Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer, REG_R0,
+        REG_R1, REG_R19, REG_R2, REG_R3, REG_SEE, REG_U_PC, REG_U__BRANCHTAKEN,
     },
     core::fmt::Debug,
     execute_aarch64_instrs_integer_arithmetic_rev::execute_aarch64_instrs_integer_arithmetic_rev,
@@ -20,7 +20,7 @@ use {
     IsPow2::IsPow2,
 };
 
-const TRACER: &NoopTracer = &NoopTracer;
+const TRACER: &NoneTracer = &NoneTracer;
 
 #[no_mangle]
 #[link_section = ".plugin_header"]
@@ -289,22 +289,6 @@ fn entrypoint(host: &'static dyn PluginHost) {
     }
 
     {
-        use {
-            common::{State, Tracer, REG_R0, REG_R2},
-            u__DecodeA64::u__DecodeA64,
-        };
-
-        struct NoopTracer;
-
-        impl Tracer for NoopTracer {
-            fn begin(&self, _: u32, _: u64) {}
-            fn end(&self) {}
-            fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
-        }
-
         let mut state = State::new();
         state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
         state.write_register::<u64>(REG_R2, 0xffff_ffff_ffff_ffc0);
@@ -314,32 +298,16 @@ fn entrypoint(host: &'static dyn PluginHost) {
         //     state.write_register::<u64>(REG_PSTATE, pstate);
 
         //cmp     x2, x0
-        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0xeb00005f);
+        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0xeb00005f);
 
         //  csel    x2, x2, x0, ls  // ls = plast
-        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0x9a809042);
+        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0x9a809042);
 
         // assert x2
         assert_eq!(state.read_register::<u64>(REG_R2), 0xffff_ffff_ffff_ff00);
     }
 
     {
-        use {
-            common::{State, Tracer, REG_R0, REG_R2},
-            u__DecodeA64::u__DecodeA64,
-        };
-
-        struct NoopTracer;
-
-        impl Tracer for NoopTracer {
-            fn begin(&self, _: u32, _: u64) {}
-            fn end(&self) {}
-            fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
-        }
-
         let mut state = State::new();
         state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
         state.write_register::<u64>(REG_R2, 0x0fff_ffff_ffff_ffc0);
@@ -349,37 +317,21 @@ fn entrypoint(host: &'static dyn PluginHost) {
         //     state.write_register::<u64>(REG_PSTATE, pstate);
 
         //cmp     x2, x0
-        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0xeb00005f);
+        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0xeb00005f);
 
         //  csel    x2, x2, x0, ls  // ls = plast
-        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0x9a809042);
+        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0x9a809042);
 
         // assert x2
         assert_eq!(state.read_register::<u64>(REG_R2), 0x0fff_ffff_ffff_ffc0);
     }
 
     {
-        use {
-            common::{State, Tracer, REG_R0, REG_R2},
-            u__DecodeA64::u__DecodeA64,
-        };
-
-        struct NoopTracer;
-
-        impl Tracer for NoopTracer {
-            fn begin(&self, _: u32, _: u64) {}
-            fn end(&self) {}
-            fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
-            fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
-        }
-
         let mut state = State::new();
         state.write_register::<u64>(REG_R0, 0x0000000000000001);
 
         // rbit x0
-        u__DecodeA64(&mut state, &NoopTracer, 0x0 as i128, 0xdac00000);
+        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0xdac00000);
 
         // assert bits are reversed
         assert_eq!(state.read_register::<u64>(REG_R0), 0x8000000000000000);
@@ -389,9 +341,9 @@ fn entrypoint(host: &'static dyn PluginHost) {
     log::info!("all tests passed");
 }
 
-struct NoopTracer;
+struct NoneTracer;
 
-impl Tracer for NoopTracer {
+impl Tracer for NoneTracer {
     fn begin(&self, _: u32, _: u64) {}
 
     fn end(&self) {}
@@ -403,50 +355,4 @@ impl Tracer for NoopTracer {
     fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
 
     fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
-}
-
-struct LogTracer;
-
-impl Tracer for LogTracer {
-    fn begin(&self, instruction: u32, pc: u64) {
-        log::trace!("[{pc:x}] {instruction:08x}");
-    }
-
-    fn end(&self) {
-        log::trace!("");
-    }
-
-    fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
-        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
-            Ok(idx) => {
-                log::trace!("    R[{}] -> {value:x?}", REGISTER_NAME_MAP[idx].1)
-            }
-            // we're accessing inside a register
-            Err(idx) => {
-                // get the register and print the offset from the base
-                let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
-                log::trace!("    R[{name}:{:x}] -> {value:x?}", offset - register_offset);
-            }
-        }
-    }
-
-    fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
-        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
-            Ok(idx) => {
-                log::trace!("    R[{}] <- {value:x?}", REGISTER_NAME_MAP[idx].1)
-            }
-            Err(idx) => {
-                let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
-                log::trace!("    R[{name}:{:x}] <- {value:x?}", offset - register_offset);
-            }
-        }
-    }
-
-    fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
-        log::trace!("    M[{address:x}] -> {value:?}");
-    }
-
-    fn write_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
-        log::trace!("    M[{address:x}] <- {value:?}");
-    }
 }

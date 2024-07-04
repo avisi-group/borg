@@ -2,7 +2,9 @@
 
 use {
     borealis_register_init::borealis_register_init,
-    common::{ProductTypee2f620c8eb69267c, State, Tracer, REGISTER_NAME_MAP, REG_PSTATE, REG_U_PC},
+    common::{
+        lookup_register_by_offset, ProductTypee2f620c8eb69267c, State, Tracer, REG_PSTATE, REG_U_PC,
+    },
     core::fmt::Debug,
     log::trace,
     step_model::step_model,
@@ -268,29 +270,13 @@ impl Tracer for LogTracer {
     }
 
     fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
-        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
-            Ok(idx) => {
-                trace!("    R[{}] -> {value:x?}", REGISTER_NAME_MAP[idx].1)
-            }
-            // we're accessing inside a register
-            Err(idx) => {
-                // get the register and print the offset from the base
-                let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
-                trace!("    R[{name}:{:x}] -> {value:x?}", offset - register_offset);
-            }
-        }
+        let reg = lookup_register_by_offset(offset).unwrap();
+        trace!("    R[{}:{:x}] -> {value:x?}", reg.name, reg.offset);
     }
 
     fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
-        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
-            Ok(idx) => {
-                trace!("    R[{}] <- {value:x?}", REGISTER_NAME_MAP[idx].1)
-            }
-            Err(idx) => {
-                let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
-                trace!("    R[{name}:{:x}] <- {value:x?}", offset - register_offset);
-            }
-        }
+        let reg = lookup_register_by_offset(offset).unwrap();
+        trace!("    R[{}:{:x}] <- {value:x?}", reg.name, reg.offset);
     }
 
     fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
