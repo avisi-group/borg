@@ -75,15 +75,15 @@ impl SymbolUseAnalysis {
     }
 
     pub fn is_symbol_dead(&self, symbol: &Symbol) -> bool {
-        self.symbol_blocks.get(&symbol.name()).is_none()
+        !self.symbol_blocks.contains_key(&symbol.name())
     }
 
     pub fn symbol_has_reads(&self, symbol: &Symbol) -> bool {
-        self.symbol_reads.get(&symbol.name()).is_some()
+        self.symbol_reads.contains_key(&symbol.name())
     }
 
     pub fn symbol_has_writes(&self, symbol: &Symbol) -> bool {
-        self.symbol_writes.get(&symbol.name()).is_some()
+        self.symbol_writes.contains_key(&symbol.name())
     }
 
     pub fn get_symbol_writes(&self, symbol: &Symbol) -> &Vec<Statement> {
@@ -275,11 +275,11 @@ impl StatementUseAnalysis {
     }
 
     pub fn is_dead(&self, stmt: &Statement) -> bool {
-        !stmt.has_side_effects() && self.stmt_uses.get(stmt).is_none()
+        !stmt.has_side_effects() && !self.has_uses(stmt)
     }
 
     pub fn has_uses(&self, stmt: &Statement) -> bool {
-        self.stmt_uses.get(stmt).is_some()
+        self.stmt_uses.contains_key(stmt)
     }
 
     pub fn get_uses(&self, stmt: &Statement) -> &HashSet<Statement> {

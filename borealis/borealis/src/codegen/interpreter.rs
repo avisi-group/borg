@@ -877,7 +877,7 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             },
             CastOperationKind::Convert,
         ) => {
-            assert_eq!(&*source_type, &*target_type);
+            assert_eq!(&**source_type, &**target_type);
 
             quote!(alloc::vec::Vec::from(#ident))
         }
@@ -893,7 +893,7 @@ fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> To
             },
             CastOperationKind::Convert,
         ) => {
-            assert_eq!(&*source_type, &*target_type);
+            assert_eq!(&**source_type, &**target_type);
 
             //let element_type = codegen_type(target_type.clone());
             quote! {

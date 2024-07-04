@@ -12,9 +12,6 @@ use {
     std::sync::Arc,
 };
 
-pub const REPLICATE_BITS_BOREALIS_INTERNAL_NAME: Lazy<InternedString> =
-    Lazy::new(|| InternedString::from_static("replicate_bits_borealis_internal"));
-
 pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     // // bits << (bits.len() * 0) | bits << (bits.len() * 1) | bits << (bits.len()
     // * 2) ...
@@ -243,7 +240,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
     Function {
         inner: Shared::new(FunctionInner {
-            name: *REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
+            name: InternedString::from_static("replicate_bits_borealis_internal"),
             return_type: Arc::new(Type::Bits),
             parameters: vec![bits_symbol, count_symbol.clone()],
             local_variables: {

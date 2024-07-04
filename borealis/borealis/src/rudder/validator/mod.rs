@@ -194,7 +194,7 @@ fn check_operand_types(ctx: &Context) -> Vec<ValidationMessage> {
         for b in f.entry_block().iter() {
             for s in b.statements() {
                 if let StatementKind::BinaryOperation { lhs, rhs, .. } = s.kind() {
-                    if !lhs.typ().is_compatible_with(&*rhs.typ()) {
+                    if !lhs.typ().is_compatible_with(&rhs.typ()) {
                         messages.push(ValidationMessage::stmt_err(
                             &f,
                             &b,

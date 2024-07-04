@@ -299,8 +299,7 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
     );
 
     let dirs = crate_names
-        .map(|name| [PathBuf::from(name.as_ref()).join("src")].into_iter())
-        .flatten()
+        .flat_map(|name| [PathBuf::from(name.as_ref()).join("src")].into_iter())
         .collect();
 
     let files = rudder_fns.into_par_iter()

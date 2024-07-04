@@ -39,17 +39,11 @@ impl ConstantValue {
     // }
 
     pub fn is_unsigned(&self) -> bool {
-        match self {
-            ConstantValue::UnsignedInteger(_) => true,
-            _ => false,
-        }
+        matches!(self, ConstantValue::UnsignedInteger(_))
     }
 
     pub fn is_signed(&self) -> bool {
-        match self {
-            ConstantValue::SignedInteger(_) => true,
-            _ => false,
-        }
+        matches!(self, ConstantValue::SignedInteger(_))
     }
 
     pub fn powi(&self, i: ConstantValue) -> ConstantValue {

@@ -6,15 +6,13 @@ use {
         },
         rudder::{
             self,
-            internal_fns::{
-                REPLICATE_BITS_BOREALIS_INTERNAL, REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
-            },
+            internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
             statement::{
                 BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementBuilder,
                 StatementKind, UnaryOperationKind,
             },
-            Block, ConstantValue, Context, Function, FunctionInner, FunctionKind,
-            PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
+            ConstantValue, Context, Function, FunctionKind, PrimitiveTypeClass, RegisterDescriptor,
+            Statement, Type,
         },
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
@@ -118,26 +116,15 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
         .for_each(|(name, definition)| build_ctx.add_function(*name, definition));
 
     // insert replicate bits signature
+
     build_ctx.functions.insert(
-        *REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
+        REPLICATE_BITS_BOREALIS_INTERNAL.name(),
         (
             FunctionKind::Execute,
-            rudder::Function {
-                inner: Shared::new(FunctionInner {
-                    name: *REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
-                    return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
-                    parameters: REPLICATE_BITS_BOREALIS_INTERNAL
-                        .inner
-                        .get()
-                        .parameters
-                        .clone(),
-                    local_variables: HashMap::default(),
-                    entry_block: Block::new(),
-                }),
-            },
+            REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
             boom::FunctionDefinition {
                 signature: FunctionSignature {
-                    name: *REPLICATE_BITS_BOREALIS_INTERNAL_NAME,
+                    name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                     parameters: Shared::new(vec![]),
                     return_type: Shared::new(boom::Type::Unit),
                 },
@@ -153,7 +140,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
     // insert again to overwrite empty boom generated rudder
     build_ctx
         .functions
-        .get_mut(&REPLICATE_BITS_BOREALIS_INTERNAL_NAME)
+        .get_mut(&REPLICATE_BITS_BOREALIS_INTERNAL.name())
         .unwrap()
         .1 = REPLICATE_BITS_BOREALIS_INTERNAL.clone();
 
@@ -830,13 +817,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     // hopefully correct
                     // 1 << args[0]
-                    let _1 = self.builder.build(StatementKind::Constant {
+                    let const_1 = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::ArbitraryLengthInteger),
                         value: ConstantValue::SignedInteger(1),
                     });
                     Some(self.builder.build(StatementKind::ShiftOperation {
                         kind: ShiftOperationKind::LogicalShiftLeft,
-                        value: _1,
+                        value: const_1,
                         amount: args[0].clone(),
                     }))
                 }
@@ -1094,12 +1081,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sail_zeros" => {
                     let length = args[0].clone();
 
-                    let _0 = self.builder.build(StatementKind::Constant {
+                    let const_0 = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u8()),
                         value: rudder::ConstantValue::UnsignedInteger(0),
                     });
 
-                    let value = self.builder.generate_cast(_0, Arc::new(Type::Bits));
+                    let value = self.builder.generate_cast(const_0, Arc::new(Type::Bits));
 
                     Some(self.builder.build(StatementKind::BitsCast {
                         kind: CastOperationKind::ZeroExtend,
@@ -1200,7 +1187,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .builder
                         .generate_cast(args[2].clone(), Arc::new(Type::Bits));
 
-                    let _1 = self.builder.build(StatementKind::Constant {
+                    let const_1 = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
                         value: ConstantValue::UnsignedInteger(1),
                     });
@@ -1209,7 +1196,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         target,
                         source: bit,
                         start: i,
-                        length: _1,
+                        length: const_1,
                     }))
                 }
 
@@ -1276,8 +1263,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // destination[start..] = source[0..source.len()]
                     Some( self.builder.build(StatementKind::BitInsert {
                         target: destination,
-                        source: source,
-                        start: start,
+                        source,
+                        start,
                         length: slen,
                     }))
                 }
@@ -1294,7 +1281,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: start.clone(),
                     });
 
-                    let _1 = {
+                    let const_1 = {
                         let _u1 = self.builder.build(StatementKind::Constant {
                             typ: Arc::new(Type::u64()),
                             value: ConstantValue::UnsignedInteger(1),
@@ -1305,14 +1292,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let source_length = self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Add,
                         lhs: sum,
-                        rhs: _1,
+                        rhs: const_1,
                     });
 
 
                     Some( self.builder.build(StatementKind::BitInsert {
                         target: destination,
-                        source: source,
-                        start: start,
+                        source,
+                        start,
                         length: source_length,
                     }))
                 }
@@ -1341,14 +1328,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let size_bytes = self.builder.generate_cast(n, Arc::new(Type::u64()));
 
-                    let _8 = self.builder.build(StatementKind::Constant {
+                    let const_8 = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
                         value: ConstantValue::UnsignedInteger(8),
                     });
                     let size_bits = self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Multiply,
                         lhs: size_bytes,
-                        rhs: _8,
+                        rhs: const_8,
                     });
 
                     let offset = self.builder.generate_cast(phys_addr, Arc::new(Type::u64()));
@@ -1369,14 +1356,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let size_bytes = self.builder.generate_cast(n, Arc::new(Type::u64()));
 
-                    let _8 = self.builder.build(StatementKind::Constant {
+                    let const_8 = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
                         value: ConstantValue::UnsignedInteger(8),
                     });
                     let size_bits = self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Multiply,
                         lhs: size_bytes,
-                        rhs: _8,
+                        rhs: const_8,
                     });
 
                     let size_bits_cast =  self.builder.generate_cast(size_bits, Arc::new(Type::ArbitraryLengthInteger));
@@ -2011,7 +1998,7 @@ fn expression_field_collapse(expression: &boom::Expression) -> Vec<InternedStrin
             }
             boom::Expression::Field { expression, field } => {
                 result.push(*field);
-                current_expression = &expression;
+                current_expression = expression;
             }
             boom::Expression::Address(_) => panic!("addresses not supported"),
         }

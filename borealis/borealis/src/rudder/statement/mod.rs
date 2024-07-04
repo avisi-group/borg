@@ -516,21 +516,20 @@ impl Statement {
     }
 
     pub fn has_side_effects(&self) -> bool {
-        match self.kind() {
-            StatementKind::WriteVariable { .. } => true,
-            StatementKind::WriteRegister { .. } => true,
-            StatementKind::WriteMemory { .. } => true,
-            StatementKind::WritePc { .. } => true,
-            StatementKind::Call { .. } => true,
-            StatementKind::Jump { .. } => true,
-            StatementKind::Branch { .. } => true,
-            StatementKind::Return { .. } => true,
-            StatementKind::Panic(_) => true,
-            StatementKind::PrintChar(_) => true,
-
-            StatementKind::Assert { .. } => true,
-            _ => false,
-        }
+        matches!(
+            self.kind(),
+            StatementKind::WriteVariable { .. }
+                | StatementKind::WriteRegister { .. }
+                | StatementKind::WriteMemory { .. }
+                | StatementKind::WritePc { .. }
+                | StatementKind::Call { .. }
+                | StatementKind::Jump { .. }
+                | StatementKind::Branch { .. }
+                | StatementKind::Return { .. }
+                | StatementKind::Panic(_)
+                | StatementKind::PrintChar(_)
+                | StatementKind::Assert { .. }
+        )
     }
 }
 
@@ -598,7 +597,7 @@ impl StatementInner {
             StatementKind::Cast { kind, typ, .. } => {
                 self.kind = StatementKind::Cast {
                     kind,
-                    typ: typ,
+                    typ,
                     value: with.clone(),
                 };
             }

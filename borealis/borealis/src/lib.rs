@@ -90,7 +90,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(jib_ast.into_iter());
+    let ast = Ast::from_jib(jib_ast);
 
     // // useful for debugging
     if let Some(path) = &dump_ir {

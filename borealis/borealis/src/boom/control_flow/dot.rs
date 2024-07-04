@@ -105,7 +105,7 @@ impl Graph {
             self.edge_labels.insert(id, child.1);
         }
 
-        self.nodes.push(id.clone());
+        self.nodes.push(id);
         self.node_labels.insert(id, node_label);
 
         for child in children {
@@ -148,10 +148,10 @@ impl<'ast> GraphWalk<'ast, NodeId, EdgeId> for Graph {
     }
 
     fn source(&'ast self, edge: &EdgeId) -> NodeId {
-        edge.0.clone()
+        edge.0
     }
 
     fn target(&'ast self, edge: &EdgeId) -> NodeId {
-        edge.1.clone()
+        edge.1
     }
 }

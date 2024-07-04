@@ -45,7 +45,6 @@ pub fn classify_kind(kind: &StatementKind) -> ValueClass {
     }
 }
 
-///
 fn max_class<I: IntoIterator<Item = ValueClass>>(iter: I) -> ValueClass {
     let mut highest_class = ValueClass::None;
 
