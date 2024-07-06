@@ -381,7 +381,7 @@ fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
 fn convert_literal(literal: &jib_ast::Vl) -> Shared<boom::Literal> {
     Shared::new(match literal {
         jib_ast::Vl::Bits(bits) => {
-            // todo: this may need a `.rev`
+            // this may need a `.rev`
             // update 2024-03-21: turns out it does on sail17arm94
             boom::Literal::Bits(bits.iter().rev().map(convert_bit).collect())
         }

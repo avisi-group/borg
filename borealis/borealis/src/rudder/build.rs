@@ -35,7 +35,6 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
         boom::Definition::Union { name, fields } => build_ctx.add_union(*name, fields),
         boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
         boom::Definition::Let { bindings, body } => {
-            //todo handle body as like a setup fn or something?
             assert_eq!(1, bindings.len());
             let NamedType { name, typ } = &bindings[0];
 
@@ -45,8 +44,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
 
             build_ctx.add_register(*name, typ);
         }
-        // todo
-        // contains KV pairs, "mangled" and "tuplestruct" as keys and type names as values
+        // todo contains KV pairs, "mangled" and "tuplestruct" as keys and type names as values
         boom::Definition::Pragma { .. } => (),
     });
 

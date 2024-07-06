@@ -69,11 +69,9 @@ fn main() {
     }
 
     let mut interpreter = Aarch64Interpreter::new(
-        // do not add offset to memory accesses
-        0x0,
         // initial PC is 0x8000_0000
         0x8000_0000,
-        TracerKind::Noop,
+        TracerKind::Log,
     );
     interpreter.run();
 }
