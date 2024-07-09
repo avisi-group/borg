@@ -15,7 +15,7 @@ overflow-checks = true
 [dependencies]
 aarch64_interpreter = { path = "../brig/plugins/guest/devices/arm/aarch64_interpreter" }
 rustix = { version = "0.38.34", features = ["mm"] }
-log = "0.4.21"
+log = "0.4.22"
 
 # common = { path = "../../aarch64/common" }
 # u__DecodeA64 = { path = "../../aarch64/u__DecodeA64" }

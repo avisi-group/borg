@@ -11,4 +11,4 @@ borealis_register_init = { path = "../../../../../../../aarch64/borealis_registe
 step_model = { path = "../../../../../../../aarch64/step_model"}
 ThisInstrAddr = { path = "../../../../../../../aarch64/ThisInstrAddr" }
 u__FetchInstr = { path = "../../../../../../../aarch64/u__FetchInstr" }
-log = "0.4.21"
+log = "0.4.22"

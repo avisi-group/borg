@@ -9,4 +9,4 @@ crate-type = ["cdylib"]
 [dependencies]
 plugins_rt.workspace = true
 aarch64_interpreter = { path = "../aarch64_interpreter" }
-log = "0.4.21"
+log = "0.4.22"
