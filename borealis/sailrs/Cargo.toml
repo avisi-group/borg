@@ -13,7 +13,7 @@ ocaml = { version = "1.0.0-beta.5", features = ["no-panic-hook"] }
 once_cell = "1.19.0"
 parking_lot = "0.12.3"
 displaydoc = "0.2.5"
-thiserror = "1.0.61"
+thiserror = "1.0.63"
 errctx = "1.0.0"
 log = "0.4.22"
 serde = { version = "1.0.204", features = ["derive"] }
@@ -29,7 +29,7 @@ memmap2 = "0.9.4"
 rayon = "1.10.0"
 
 [build-dependencies]
-cc = "1.1.0"
+cc = "1.1.6"
 color-eyre = "0.6.3"
 
 [dev-dependencies]
