@@ -196,11 +196,11 @@ impl Instruction {
                 match self.operand_tuple2() {
                     (
                         Operand {
-                            kind: OperandKind::Register(Register::PhysicalRegister(src)),
+                            kind: OperandKind::Register(Register::PhysicalRegister(_src)),
                             width_in_bits: w,
                         },
                         Operand {
-                            kind: OperandKind::Register(Register::PhysicalRegister(dst)),
+                            kind: OperandKind::Register(Register::PhysicalRegister(_dst)),
                             width_in_bits: w2,
                         },
                     ) => {

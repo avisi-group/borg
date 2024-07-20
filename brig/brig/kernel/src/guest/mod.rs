@@ -68,7 +68,7 @@ pub fn start() {
     for (name, regions) in config.memory {
         let mut addrspace = AddressSpace::new();
 
-        for (name, (region)) in regions {
+        for (name, region) in regions {
             addrspace.add_region(AddressSpaceRegion::new(
                 name,
                 region.start,

@@ -23,9 +23,9 @@ impl X86LoweringContext {
         //
     }
 
-    fn lower_action(&mut self, block: &Block, action: &Action) {
+    fn lower_action(&mut self, _block: &Block, action: &Action) {
         match action {
-            Action::WriteRegister { index, value } => {
+            Action::WriteRegister { _index, value } => {
                 let src = self.value_to_operand(value);
                 //let dst = match (*index).borrow().kind() {};
 
@@ -38,12 +38,8 @@ impl X86LoweringContext {
                     ),
                 ));
             }
-            Action::Jump { target } => todo!(),
-            Action::Branch {
-                condition,
-                true_target,
-                false_target,
-            } => todo!(),
+            Action::Jump { .. } => todo!(),
+            Action::Branch { .. } => todo!(),
             Action::Leave => todo!(),
         }
     }

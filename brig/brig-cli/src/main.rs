@@ -170,7 +170,7 @@ fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, artifacts: &[Artifact]) -
         .iter()
         .find(|a| {
             matches!(
-                a.executable.as_ref().map(|p| p.file_name()).flatten(),
+                a.executable.as_ref().and_then(|p| p.file_name()),
                 Some("kernel")
             )
         })
@@ -190,7 +190,7 @@ fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, artifacts: &[Artifact]) -
 
     let plugins = artifacts
         .iter()
-        .filter(|a| a.target.kind == &["cdylib"])
+        .filter(|a| a.target.kind == ["cdylib"])
         .flat_map(|a| a.filenames.iter())
         .map(|path| path.canonicalize().unwrap())
         .map(|source| {
@@ -203,8 +203,8 @@ fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, artifacts: &[Artifact]) -
         .map(Result::unwrap)
         .filter(|entry| entry.path().is_file())
         .map(
-            |entry| match entry.path().extension().map(|s| s.to_str()).flatten() {
-                Some("dts") => build_dtb(&guest_data_path, entry.path(), &target_dir),
+            |entry| match entry.path().extension().and_then(|s| s.to_str()) {
+                Some("dts") => build_dtb(&guest_data_path, entry.path(), target_dir),
                 _ => (
                     entry.path().to_owned(),
                     entry

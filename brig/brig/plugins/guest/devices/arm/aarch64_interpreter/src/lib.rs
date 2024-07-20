@@ -99,7 +99,7 @@ impl Aarch64Interpreter {
                         (pstate.N as u8) << 3
                             | (pstate.Z as u8) << 2
                             | (pstate.C as u8) << 1
-                            | (pstate.V as u8) << 0
+                            | (pstate.V as u8)
                     };
 
                     trace!(
@@ -250,12 +250,12 @@ impl Aarch64Interpreter {
 struct NoopTracer;
 
 impl Tracer for NoopTracer {
-    fn begin(&self, instruction: u32, pc: u64) {}
+    fn begin(&self, _: u32, _: u64) {}
     fn end(&self) {}
-    fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug) {}
-    fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug) {}
-    fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug) {}
-    fn write_memory(&self, address: usize, value: &dyn core::fmt::Debug) {}
+    fn read_register(&self, _: usize, _: &dyn Debug) {}
+    fn write_register(&self, _: usize, _: &dyn Debug) {}
+    fn read_memory(&self, _: usize, _: &dyn Debug) {}
+    fn write_memory(&self, _: usize, _: &dyn Debug) {}
 }
 
 struct LogTracer;
@@ -269,21 +269,21 @@ impl Tracer for LogTracer {
         trace!("");
     }
 
-    fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
+    fn read_register(&self, offset: usize, value: &dyn Debug) {
         let reg = lookup_register_by_offset(offset).unwrap();
         trace!("    R[{}:{:x}] -> {value:x?}", reg.name, reg.offset);
     }
 
-    fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug) {
+    fn write_register(&self, offset: usize, value: &dyn Debug) {
         let reg = lookup_register_by_offset(offset).unwrap();
         trace!("    R[{}:{:x}] <- {value:x?}", reg.name, reg.offset);
     }
 
-    fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
+    fn read_memory(&self, address: usize, value: &dyn Debug) {
         trace!("    M[{address:x}] -> {value:?}");
     }
 
-    fn write_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
+    fn write_memory(&self, address: usize, value: &dyn Debug) {
         trace!("    M[{address:x}] <- {value:?}");
     }
 }
@@ -291,14 +291,16 @@ impl Tracer for LogTracer {
 struct SailTracer;
 
 impl Tracer for SailTracer {
-    fn begin(&self, instruction: u32, pc: u64) {}
+    fn begin(&self, _: u32, _: u64) {}
     fn end(&self) {}
-    fn read_register(&self, offset: usize, value: &dyn core::fmt::Debug) {}
-    fn write_register(&self, offset: usize, value: &dyn core::fmt::Debug) {}
-    fn read_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
-        //  trace!("[Sail] mem {:016x?} -> {:016x?}", address, value);
+    fn read_register(&self, _: usize, _: &dyn Debug) {}
+    fn write_register(&self, _: usize, _: &dyn Debug) {}
+    fn read_memory(&self, _address: usize, _value: &dyn Debug) {
+        // uncomment for mem tracing
+        //  trace!("[Sail] mem {:016x?} -> {:016x?}", _address, _value);
     }
-    fn write_memory(&self, address: usize, value: &dyn core::fmt::Debug) {
-        //  trace!("[Sail] mem {:016x?} <- {:016x?}", address, value);
+    fn write_memory(&self, _address: usize, _value: &dyn Debug) {
+        // uncomment for mem tracing
+        //  trace!("[Sail] mem {:016x?} <- {:016x?}", _address, _value);
     }
 }

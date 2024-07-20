@@ -103,8 +103,8 @@ fn entrypoint(host: &'static dyn PluginHost) {
         );
     }
 
-    /// Testing the flags of the `0x0000000040234888:  eb01001f      cmp x0, x1`
-    /// instruction
+    // Testing the flags of the `0x0000000040234888:  eb01001f      cmp x0, x1`
+    // instruction
     // #[test_case]
     // fn addwithcarry_early_4880_loop()
     {
@@ -229,7 +229,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
             }
 
             let instr = program[pc as usize / 4];
-            u__DecodeA64(&mut state, TRACER, pc as i128, instr);
+            u__DecodeA64(&mut state, TRACER, pc, instr);
 
             // increment PC if no branch was taken
             if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
@@ -298,10 +298,10 @@ fn entrypoint(host: &'static dyn PluginHost) {
         //     state.write_register::<u64>(REG_PSTATE, pstate);
 
         //cmp     x2, x0
-        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0xeb00005f);
+        u__DecodeA64(&mut state, TRACER, 0x0, 0xeb00005f);
 
         //  csel    x2, x2, x0, ls  // ls = plast
-        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0x9a809042);
+        u__DecodeA64(&mut state, TRACER, 0x0, 0x9a809042);
 
         // assert x2
         assert_eq!(state.read_register::<u64>(REG_R2), 0xffff_ffff_ffff_ff00);
@@ -317,10 +317,10 @@ fn entrypoint(host: &'static dyn PluginHost) {
         //     state.write_register::<u64>(REG_PSTATE, pstate);
 
         //cmp     x2, x0
-        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0xeb00005f);
+        u__DecodeA64(&mut state, TRACER, 0x0, 0xeb00005f);
 
         //  csel    x2, x2, x0, ls  // ls = plast
-        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0x9a809042);
+        u__DecodeA64(&mut state, TRACER, 0x0, 0x9a809042);
 
         // assert x2
         assert_eq!(state.read_register::<u64>(REG_R2), 0x0fff_ffff_ffff_ffc0);
@@ -331,7 +331,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
         state.write_register::<u64>(REG_R0, 0x0000000000000001);
 
         // rbit x0
-        u__DecodeA64(&mut state, TRACER, 0x0 as i128, 0xdac00000);
+        u__DecodeA64(&mut state, TRACER, 0x0, 0xdac00000);
 
         // assert bits are reversed
         assert_eq!(state.read_register::<u64>(REG_R0), 0x8000000000000000);
@@ -348,11 +348,11 @@ impl Tracer for NoneTracer {
 
     fn end(&self) {}
 
-    fn read_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+    fn read_register(&self, _: usize, _: &dyn Debug) {}
 
-    fn write_register(&self, _: usize, _: &dyn core::fmt::Debug) {}
+    fn write_register(&self, _: usize, _: &dyn Debug) {}
 
-    fn read_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+    fn read_memory(&self, _: usize, _: &dyn Debug) {}
 
-    fn write_memory(&self, _: usize, _: &dyn core::fmt::Debug) {}
+    fn write_memory(&self, _: usize, _: &dyn Debug) {}
 }
