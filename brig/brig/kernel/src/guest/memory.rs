@@ -1,11 +1,11 @@
 use {
-    alloc::{boxed::Box, collections::BTreeMap, string::String},
+    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::{
         fmt::Display,
         mem::{size_of, MaybeUninit},
         slice,
     },
-    plugins_api::IOMemoryHandler,
+    plugins_api::GuestDevice,
 };
 
 pub struct AddressSpace {
@@ -38,11 +38,11 @@ impl AddressSpace {
     }
 }
 
-pub trait IoMemoryHandlerExt {
-    fn read_fixed<H: IOMemoryHandler, T: Sized>(handler: H, offset: u64) -> T {
+pub trait IoMemoryHandler {
+    fn read_fixed<G: GuestDevice, T: Sized>(device: G, offset: u64) -> T {
         let mut t = MaybeUninit::<T>::uninit();
         let buf = unsafe { slice::from_raw_parts_mut(t.as_mut_ptr() as *mut u8, size_of::<T>()) };
-        handler.read(offset, buf);
+        device.read(offset, buf);
 
         unsafe { t.assume_init() }
     }
@@ -50,20 +50,24 @@ pub trait IoMemoryHandlerExt {
 
 pub enum AddressSpaceRegionKind {
     Ram,
-    IO(Box<dyn IOMemoryHandler>),
+    IO(Arc<dyn GuestDevice>),
 }
 
+impl core::fmt::Debug for AddressSpaceRegionKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Ram => write!(f, "ram"),
+            Self::IO(_) => write!(f, "io"),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct AddressSpaceRegion {
     name: String,
     base: u64,
     size: u64,
     kind: AddressSpaceRegionKind,
-}
-
-impl AddressSpaceRegion {
-    pub fn kind(&self) -> &AddressSpaceRegionKind {
-        &self.kind
-    }
 }
 
 impl Display for AddressSpaceRegion {
@@ -84,5 +88,21 @@ impl AddressSpaceRegion {
             size,
             kind,
         }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn kind(&self) -> &AddressSpaceRegionKind {
+        &self.kind
+    }
+
+    pub fn base(&self) -> u64 {
+        self.base
+    }
+
+    pub fn size(&self) -> u64 {
+        self.size
     }
 }

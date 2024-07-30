@@ -8,7 +8,7 @@
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, collections::BTreeMap, string::String},
+    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::{alloc::GlobalAlloc, num::ParseIntError, panic::PanicInfo},
 };
 
@@ -39,52 +39,36 @@ pub trait PluginHost: Send + Sync {
 }
 
 pub trait GuestDeviceFactory {
-    fn create(&self, config: BTreeMap<String, String>) -> Box<dyn GuestDevice>;
+    fn create(
+        &self,
+        config: BTreeMap<String, String>,
+        interpreter_host: Box<dyn InterpreterHost>,
+    ) -> Arc<dyn GuestDevice>;
 
     // todo: create_arch, create_timer, create_serial, etc
 }
 
 pub trait GuestDevice {
-    fn start(&mut self);
-    fn stop(&mut self);
-    fn as_io_handler(self: Box<Self>) -> Option<Box<dyn IOMemoryHandler>>;
+    fn start(&self);
+    fn stop(&self);
+
+    /// Size of the device's IO memory address space in bytes
+    /// (I.E. the maximum valid sum of `offset` and `value.len()` in the `read`
+    /// and `write` methods)
+    fn address_space_size(&self) -> u64;
+
+    /// Read `value.len()` bytes from the device starting at `offset`
+    fn read(&self, offset: u64, value: &mut [u8]);
+
+    /// Write `value` bytes into the device starting at `offset`
+    fn write(&self, offset: u64, value: &[u8]);
 }
 
-pub trait IOMemoryHandler {
-    fn read(&self, offset: u64, buf: &mut [u8]);
-    fn write(&self, offset: u64, buf: &[u8]);
+/// Todo make this more general? or more specific? or roll it into PluginHost
+pub trait InterpreterHost {
+    fn read_memory(&self, address: u64, data: &mut [u8]);
+    fn write_memory(&self, address: u64, data: &[u8]);
 }
-
-// /// Factor of ArchitectureExecutors, used to create new instances of an
-// /// `ArchitectureExecutor`.
-// pub trait ArchitectureExecutorFactory: Send + Sync {
-//     fn new(&self, guest_memory_base: usize, initial_pc: usize) -> Box<dyn
-// ArchitectureExecutor>; }
-
-// pub trait ArchitectureExecutor {
-//     // can't have generic methods on dyn traits
-//     // fn write_register<T>(&mut self, offset: isize, value: T);
-//     // fn read_register<T: Copy>(&self, offset: isize) -> T;
-
-//     fn get_pc(&self) -> usize;
-
-//     fn guest_memory_base(&self) -> usize;
-
-//     fn step(&mut self, amount: StepAmount) -> StepResult;
-
-//     fn instructions_retired(&self) -> u64;
-// }
-
-// pub enum StepAmount {
-//     Instruction,
-//     BasicBlock,
-//     Continuous,
-// }
-
-// pub enum StepResult {
-//     Ok,
-//     Halt,
-// }
 
 /// Parses `0x`-prefixed, underscore separated hexadecimal values (like a memory
 /// address)

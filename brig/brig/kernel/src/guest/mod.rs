@@ -2,11 +2,11 @@ use {
     crate::{
         devices::manager::SharedDeviceManager,
         fs::{tar::TarFilesystem, File, Filesystem},
-        guest::memory::{AddressSpace, AddressSpaceRegion},
+        guest::memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
     },
-    alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String},
+    alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::ptr,
-    plugins_api::{GuestDevice, GuestDeviceFactory},
+    plugins_api::{GuestDevice, GuestDeviceFactory, InterpreterHost},
     spin::{Mutex, Once},
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
@@ -16,13 +16,14 @@ pub mod devices;
 pub mod memory;
 
 static mut GUEST: Once<Guest> = Once::INIT;
+
 pub static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn GuestDeviceFactory>>> =
     Mutex::new(BTreeMap::new());
 
 #[derive(Default)]
 pub struct Guest {
     address_spaces: BTreeMap<String, Box<AddressSpace>>,
-    devices: BTreeMap<String, Box<dyn GuestDevice>>,
+    devices: BTreeMap<String, Arc<dyn GuestDevice>>,
 }
 
 impl Guest {
@@ -81,60 +82,49 @@ pub fn start() {
     }
 
     // create devices, including cores
-    for (name, device) in config.devices {
+    for (name, device_config) in config.devices {
         let factories = unsafe { GUEST_DEVICE_FACTORIES.lock() };
 
-        let Some(factory) = factories.get(device.kind.as_str()) else {
-            log::warn!("unsupported guest device type {}", device.kind);
+        let Some(factory) = factories.get(device_config.kind.as_str()) else {
+            log::warn!("unsupported guest device type {}", device_config.kind);
             continue;
         };
 
-        let dev = factory.create(
+        let interpreter_host = Box::new(DummyInterpreterHost {
+            address_space: &(**guest.address_spaces.get("as0").unwrap()) as *const _,
+        });
+
+        let device = factory.create(
             [("tracer", "noop")]
                 .into_iter()
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                .chain(device.extra.into_iter())
+                .chain(device_config.extra.into_iter())
                 .collect(),
+            interpreter_host,
         );
-        guest.devices.insert(name.clone(), dev);
+        guest.devices.insert(name.clone(), device.clone());
 
         // locate address space for attachment, if any
-        // if let Some(attachment) = device.attach {
-        //     let Some(io_handler) = dev.as_io_handler() else {
-        //         panic!("attempting to attach non-mmio guest device");
-        //     };
-
-        //     if let Some(addrspace) =
-        // guest.address_spaces.get_mut(&attachment.address_space) {
-        //         let size = 0; // need to get this from device object io trait
-        //         addrspace.add_region(AddressSpaceRegion::new(
-        //             name,
-        //
-        // usize::from_str_radix(attachment.base.trim_start_matches("0x"),
-        // 16).unwrap(),             size,
-        //             memory::AddressSpaceRegionKind::IO(io_handler), /* need
-        // to reference device
-        //                                                              * object
-        //                                                                io trait
-        //                                                                */
-        //         ));
-        //     } else {
-        //         panic!(
-        //             "address space {} not configured for attaching device
-        // {}",             attachment.address_space, name
-        //         );
-        //     }
-        // } else if dev.as_io_handler().is_some() {
-        //     panic!("io device missing address space attachment");
-        // }
+        if let Some(attachment) = device_config.attach {
+            if let Some(addrspace) = guest.address_spaces.get_mut(&attachment.address_space) {
+                addrspace.add_region(AddressSpaceRegion::new(
+                    name,
+                    attachment.base,
+                    device.address_space_size(),
+                    memory::AddressSpaceRegionKind::IO(device.clone()),
+                ));
+            } else {
+                panic!(
+                    "address space {} not configured for attaching device {}",
+                    attachment.address_space, name
+                );
+            }
+        }
     }
 
     let temp_exec_ctx = Box::new(GuestExecutionContext {
-        current_address_space: guest
-            .address_spaces
-            .get_mut(&String::from("as0"))
-            .unwrap()
-            .as_mut() as *mut AddressSpace,
+        current_address_space: guest.address_spaces.get_mut("as0").unwrap().as_mut()
+            as *mut AddressSpace,
     });
 
     log::debug!("activating guest execution context");
@@ -161,5 +151,42 @@ pub fn start() {
 
     for device in guest.devices.values_mut() {
         device.start();
+    }
+}
+
+struct DummyInterpreterHost {
+    address_space: *const AddressSpace,
+}
+
+impl InterpreterHost for DummyInterpreterHost {
+    fn read_memory(&self, address: u64, data: &mut [u8]) {
+        let region = unsafe { &*self.address_space }
+            .find_region(address)
+            .unwrap();
+
+        match region.kind() {
+            // just read bytes
+            AddressSpaceRegionKind::Ram => unsafe {
+                ptr::copy(address as *const u8, data.as_mut_ptr(), data.len())
+            },
+            // or forward the request on to the IO handler
+            AddressSpaceRegionKind::IO(device) => device.read(address - region.base(), data),
+        }
+    }
+
+    fn write_memory(&self, address: u64, data: &[u8]) {
+        // lookup address in address space
+        let region = unsafe { &*self.address_space }
+            .find_region(address)
+            .unwrap();
+
+        match region.kind() {
+            // just write bytes
+            AddressSpaceRegionKind::Ram => unsafe {
+                ptr::copy(data.as_ptr(), address as *mut u8, data.len())
+            },
+            // or forward the request on to the IO handler
+            AddressSpaceRegionKind::IO(device) => device.write(address - region.base(), data),
+        }
     }
 }

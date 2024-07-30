@@ -4,11 +4,12 @@ extern crate alloc;
 
 use {
     aarch64_interpreter::{Aarch64Interpreter, TracerKind},
-    alloc::{boxed::Box, collections::BTreeMap, string::String},
+    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     plugins_rt::api::{
-        parse_hex_prefix, GuestDevice, GuestDeviceFactory, IOMemoryHandler, PluginHeader,
+        parse_hex_prefix, GuestDevice, GuestDeviceFactory, InterpreterHost, PluginHeader,
         PluginHost,
     },
+    spin::Mutex,
 };
 
 #[no_mangle]
@@ -30,7 +31,11 @@ struct Aarch64InterpreterFactory;
 impl GuestDeviceFactory for Aarch64InterpreterFactory {
     // todo: find a way of passing some config to guest device creation: json?
     // key-value?
-    fn create(&self, config: BTreeMap<String, String>) -> Box<dyn GuestDevice> {
+    fn create(
+        &self,
+        config: BTreeMap<String, String>,
+        interpreter_host: Box<dyn InterpreterHost>,
+    ) -> Arc<dyn GuestDevice> {
         let tracer = match config.get("tracer").map(String::as_str) {
             Some("log") => TracerKind::Log,
             Some("noop") | None => TracerKind::Noop,
@@ -43,23 +48,31 @@ impl GuestDeviceFactory for Aarch64InterpreterFactory {
             .unwrap()
             .unwrap();
 
-        Box::new(Aarch64InterpreterDevice(Aarch64Interpreter::new(
-            initial_pc, tracer,
+        Arc::new(Aarch64InterpreterDevice(Mutex::new(
+            Aarch64Interpreter::new(initial_pc, tracer, interpreter_host),
         )))
     }
 }
 
-struct Aarch64InterpreterDevice(Aarch64Interpreter);
+struct Aarch64InterpreterDevice(Mutex<Aarch64Interpreter>);
 
 // impl guestdevice for architectureexecutor?
 impl GuestDevice for Aarch64InterpreterDevice {
-    fn start(&mut self) {
-        self.0.run();
+    fn start(&self) {
+        self.0.lock().run();
     }
-    fn stop(&mut self) {
+    fn stop(&self) {
         todo!()
     }
-    fn as_io_handler(self: Box<Self>) -> Option<Box<dyn IOMemoryHandler>> {
-        None
+
+    fn address_space_size(&self) -> u64 {
+        0x0
+    }
+
+    fn read(&self, _: u64, _: &mut [u8]) {
+        panic!("cannot read aarch64 interpreter")
+    }
+    fn write(&self, _: u64, _: &[u8]) {
+        panic!("cannot write aarch64 interpreter")
     }
 }

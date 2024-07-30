@@ -54,13 +54,15 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         #[repr(align(8))]
         pub struct State {
             data: [u8; #registers_len],
+            interpreter_host: alloc::boxed::Box<dyn plugins_api::InterpreterHost>,
         }
 
         impl State {
             /// Returns the ISA state with initial values and configuration set
-            pub fn new() -> Self {
+            pub fn new(interpreter_host: alloc::boxed::Box<dyn plugins_api::InterpreterHost>) -> Self {
                 Self {
                     data: [0; #registers_len],
+                    interpreter_host,
                 }
             }
 
@@ -74,6 +76,14 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
                 let start = offset;
                 let end = start + core::mem::size_of::<T>();
                 unsafe { core::ptr::read_unaligned(self.data[start..end].as_ptr().cast()) }
+            }
+
+            pub fn write_memory(&self, address: u64, data: &[u8]) {
+                self.interpreter_host.write_memory(address, data);
+            }
+
+            pub fn read_memory(&self, address: u64, data: &mut [u8]) {
+                self.interpreter_host.read_memory(address, data);
             }
         }
 

@@ -3,8 +3,8 @@
 extern crate alloc;
 
 use {
-    alloc::{format, vec::Vec},
-    plugins_rt::api::{PluginHeader, PluginHost},
+    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
+    plugins_rt::api::{GuestDevice, GuestDeviceFactory, InterpreterHost, PluginHeader, PluginHost},
 };
 
 #[no_mangle]
@@ -17,11 +17,46 @@ pub static PLUGIN_HEADER: PluginHeader = PluginHeader {
 fn entrypoint(host: &'static dyn PluginHost) {
     plugins_rt::init(host);
 
-    let mut vec = Vec::new();
-    for i in 0..32 {
-        vec.push(i);
-    }
-    vec.extend_from_slice(b"test string");
+    host.register_device("pl011", Box::new(Pl011Factory));
 
-    log::info!("{}", &format!("hello from pl011! {:?}", vec));
+    log::info!("registered pl011 factory");
+}
+
+struct Pl011Factory;
+
+impl GuestDeviceFactory for Pl011Factory {
+    fn create(
+        &self,
+        _config: BTreeMap<String, String>,
+        _interpreter_host: Box<dyn InterpreterHost>,
+    ) -> Arc<dyn GuestDevice> {
+        Arc::new(Pl011)
+    }
+}
+
+struct Pl011;
+
+impl GuestDevice for Pl011 {
+    fn start(&self) {}
+    fn stop(&self) {}
+
+    fn address_space_size(&self) -> u64 {
+        0x1000
+    }
+
+    /// Read `value.len()` bytes from the device starting at `offset`
+    fn read(&self, offset: u64, value: &mut [u8]) {
+        // return all zeros for now
+        value.fill(0);
+    }
+
+    /// Write `value` bytes into the device starting at `offset`
+    fn write(&self, offset: u64, value: &[u8]) {
+        match (offset, value) {
+            (0x0000, [c]) => log::trace!("{}", *c as char),
+
+            // todo: https://developer.arm.com/documentation/ddi0183/g/programmers-model/summary-of-registers
+            _ => (),
+        }
+    }
 }

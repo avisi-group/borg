@@ -1,10 +1,9 @@
-use core::borrow::Borrow;
-
-use alloc::collections::LinkedList;
-
-use self::encoder::{Instruction, Operand, PhysicalRegister, Register};
-
-use super::emitter::{Action, Block, LoweringContext, Value};
+use {
+    self::encoder::{Instruction, Operand, PhysicalRegister, Register},
+    super::emitter::{Action, Block, LoweringContext, Value},
+    alloc::collections::LinkedList,
+    core::borrow::Borrow,
+};
 
 mod encoder;
 
@@ -19,13 +18,11 @@ impl X86LoweringContext {
         }
     }
 
-    fn allocate(&mut self) {
-        //
-    }
+    fn allocate(&mut self) {}
 
     fn lower_action(&mut self, _block: &Block, action: &Action) {
         match action {
-            Action::WriteRegister { _index, value } => {
+            Action::WriteRegister { index, value } => {
                 let src = self.value_to_operand(value);
                 //let dst = match (*index).borrow().kind() {};
 

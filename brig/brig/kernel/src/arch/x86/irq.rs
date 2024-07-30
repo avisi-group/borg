@@ -76,11 +76,11 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                     );
                 }
                 _ => {
-                    panic!("cannot alloc non-ram");
+                    panic!("cannot alloc non-ram @ {faulting_address:x?}");
                 }
             }
         } else {
-            panic!("GUEST PAGE FAULT code {error_code:?} @ {faulting_address:?}: no region -- this is a real fault");
+            panic!("GUEST PAGE FAULT code {error_code:?} @ {faulting_address:x?}: no region -- this is a real fault");
         }
     } else {
         panic!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");

@@ -235,7 +235,7 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
             InternedString::from_static("common"),
             (
                 HashSet::<InternedString>::default(),
-                tokens_to_string(&quote! {
+                render(&quote! {
                     #header
 
                     #state
@@ -344,7 +344,7 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
 
             let mut dependencies = cfg.get_callees_for(&name);
             dependencies.push("common".into());
-           let dependencies = dependencies.into_iter().filter(|dep| *dep != name).collect::<Vec<_>>();
+            let dependencies = dependencies.into_iter().filter(|dep| *dep != name).collect::<Vec<_>>();
 
             let imports: TokenStream = dependencies
                 .iter()
@@ -365,10 +365,8 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
                 InternedString::from(codegen_ident(name).to_string()),
                (
                     dependencies,
-                    tokens_to_string(&quote! {
+                    render(&quote! {
                         #header
-
-                        extern crate alloc;
 
                         #imports
 
@@ -442,16 +440,18 @@ fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenStream
     fn_state
 }
 
-pub fn tokens_to_string(tokens: &TokenStream) -> String {
+pub fn render(tokens: &TokenStream) -> String {
     let syntax_tree = syn::parse_file(&tokens.to_string()).unwrap();
     let formatted = prettyplease::unparse(&syntax_tree);
     // fix comments
     formatted.replace("///", "//")
 }
 
+/// Header for all generated Rust files
 fn codegen_header() -> TokenStream {
     quote! {
         #![no_std]
+
         #![allow(non_snake_case)]
         #![allow(unused_assignments)]
         #![allow(unused_mut)]
@@ -465,5 +465,7 @@ fn codegen_header() -> TokenStream {
         #![allow(non_camel_case_types)]
 
         //! BOREALIS GENERATED FILE
+
+        extern crate alloc;
     }
 }

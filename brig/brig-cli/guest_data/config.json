@@ -38,6 +38,13 @@
             "kind": "aarch64",
             "address_space": "as0",
             "initial_pc": "0x8000_0000"
+        },
+        "serial": {
+            "kind": "pl011",
+            "attach": {
+                "address_space": "as0",
+                "base": "0x3a00_0000"
+            }
         }
     }
 }

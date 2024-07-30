@@ -12,3 +12,7 @@ opt-level = 1
 
 [profile.release]
 debug = true
+incremental = true
+codegen-units = 256
+debug-assertions = true
+overflow-checks = true

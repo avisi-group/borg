@@ -1,12 +1,16 @@
 #![no_std]
 
+extern crate alloc;
+
 use {
+    alloc::{boxed::Box, sync::Arc},
     borealis_register_init::borealis_register_init,
     common::{
         lookup_register_by_offset, ProductTypee2f620c8eb69267c, State, Tracer, REG_PSTATE, REG_U_PC,
     },
     core::fmt::Debug,
     log::trace,
+    plugins_rt::api::InterpreterHost,
     step_model::step_model,
     u__FetchInstr::u__FetchInstr,
     u__InitSystem::u__InitSystem,
@@ -28,8 +32,12 @@ pub struct Aarch64Interpreter {
 }
 
 impl Aarch64Interpreter {
-    pub fn new(initial_pc: u64, tracer_kind: TracerKind) -> Self {
-        let mut state = State::new();
+    pub fn new(
+        initial_pc: u64,
+        tracer_kind: TracerKind,
+        interpreter_host: Box<dyn InterpreterHost>,
+    ) -> Self {
+        let mut state = State::new(interpreter_host);
 
         // sets initial register and letbind state (generated from sail model)
         borealis_register_init(&mut state, &NoopTracer);

@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 plugins_rt.workspace = true
 aarch64_interpreter = { path = "../aarch64_interpreter" }
 log = "0.4.22"
+spin = "0.9.8"
