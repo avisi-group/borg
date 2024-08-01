@@ -51,18 +51,20 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         .unwrap();
 
     quote! {
+        const REGISTER_NAME_MAP: &[(usize, &str)] = &[#register_name_map_contents];
+
         #[repr(align(8))]
         pub struct State {
             data: [u8; #registers_len],
-            interpreter_host: alloc::boxed::Box<dyn plugins_api::InterpreterHost>,
+            guest_environment: alloc::boxed::Box<dyn plugins_api::guest::Environment>,
         }
 
         impl State {
             /// Returns the ISA state with initial values and configuration set
-            pub fn new(interpreter_host: alloc::boxed::Box<dyn plugins_api::InterpreterHost>) -> Self {
+            pub fn new(guest_environment: alloc::boxed::Box<dyn plugins_api::guest::Environment>) -> Self {
                 Self {
                     data: [0; #registers_len],
-                    interpreter_host,
+                    guest_environment,
                 }
             }
 
@@ -79,11 +81,30 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
             }
 
             pub fn write_memory(&self, address: u64, data: &[u8]) {
-                self.interpreter_host.write_memory(address, data);
+                self.guest_environment.write_memory(address, data);
             }
 
             pub fn read_memory(&self, address: u64, data: &mut [u8]) {
-                self.interpreter_host.read_memory(address, data);
+                self.guest_environment.read_memory(address, data);
+            }
+        }
+
+        impl core::fmt::Debug for State {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                writeln!(f, "State {{")?;
+                for window in REGISTER_NAME_MAP.windows(2) {
+
+                    let (offset, name) = window[0];
+                    let (next_offset, _) = window[1];
+
+                    write!(f, "{name}: 0x")?;
+
+                    for byte_idx in 0..(next_offset - offset) {
+                        write!(f, "{:x}", self.read_register::<u8>(offset + byte_idx))?;
+                    }
+                    writeln!(f)?;
+                }
+                writeln!(f, "}}")
             }
         }
 
@@ -97,8 +118,6 @@ pub fn codegen_state(rudder: &Context) -> TokenStream {
         }
 
         pub fn lookup_register_by_offset(offset: usize) -> Option<RegisterOffset> {
-            const REGISTER_NAME_MAP: &[(usize, &str)] = &[#register_name_map_contents];
-
             if offset > core::mem::size_of::<State>() {
                 return None;
             }

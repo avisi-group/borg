@@ -10,7 +10,7 @@ use {
     },
     core::fmt::Debug,
     log::trace,
-    plugins_rt::api::InterpreterHost,
+    plugins_rt::api::guest::Environment,
     step_model::step_model,
     u__FetchInstr::u__FetchInstr,
     u__InitSystem::u__InitSystem,
@@ -18,6 +18,7 @@ use {
     ThisInstrAddr::ThisInstrAddr,
 };
 
+#[derive(Debug)]
 pub enum TracerKind {
     Noop,
     Log,
@@ -25,6 +26,7 @@ pub enum TracerKind {
     Qemu,
 }
 
+#[derive(Debug)]
 pub struct Aarch64Interpreter {
     instructions_retired: u64,
     state: State,
@@ -35,9 +37,9 @@ impl Aarch64Interpreter {
     pub fn new(
         initial_pc: u64,
         tracer_kind: TracerKind,
-        interpreter_host: Box<dyn InterpreterHost>,
+        environment: Box<dyn Environment>,
     ) -> Self {
-        let mut state = State::new(interpreter_host);
+        let mut state = State::new(environment);
 
         // sets initial register and letbind state (generated from sail model)
         borealis_register_init(&mut state, &NoopTracer);

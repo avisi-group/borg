@@ -6,8 +6,9 @@ use {
     aarch64_interpreter::{Aarch64Interpreter, TracerKind},
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     plugins_rt::api::{
-        parse_hex_prefix, GuestDevice, GuestDeviceFactory, InterpreterHost, PluginHeader,
-        PluginHost,
+        guest::{Device, DeviceFactory, Environment},
+        util::parse_hex_prefix,
+        PluginHeader, PluginHost,
     },
     spin::Mutex,
 };
@@ -28,14 +29,14 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
 struct Aarch64InterpreterFactory;
 
-impl GuestDeviceFactory for Aarch64InterpreterFactory {
+impl DeviceFactory for Aarch64InterpreterFactory {
     // todo: find a way of passing some config to guest device creation: json?
     // key-value?
     fn create(
         &self,
         config: BTreeMap<String, String>,
-        interpreter_host: Box<dyn InterpreterHost>,
-    ) -> Arc<dyn GuestDevice> {
+        environment: Box<dyn Environment>,
+    ) -> Arc<dyn Device> {
         let tracer = match config.get("tracer").map(String::as_str) {
             Some("log") => TracerKind::Log,
             Some("noop") | None => TracerKind::Noop,
@@ -49,15 +50,15 @@ impl GuestDeviceFactory for Aarch64InterpreterFactory {
             .unwrap();
 
         Arc::new(Aarch64InterpreterDevice(Mutex::new(
-            Aarch64Interpreter::new(initial_pc, tracer, interpreter_host),
+            Aarch64Interpreter::new(initial_pc, tracer, environment),
         )))
     }
 }
 
+#[derive(Debug)]
 struct Aarch64InterpreterDevice(Mutex<Aarch64Interpreter>);
 
-// impl guestdevice for architectureexecutor?
-impl GuestDevice for Aarch64InterpreterDevice {
+impl Device for Aarch64InterpreterDevice {
     fn start(&self) {
         self.0.lock().run();
     }

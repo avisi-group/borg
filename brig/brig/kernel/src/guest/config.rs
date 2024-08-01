@@ -4,7 +4,7 @@ use {
         fs::{tar::TarFilesystem, File, Filesystem},
     },
     alloc::{collections::BTreeMap, format, string::String, vec::Vec},
-    plugins_api::parse_hex_prefix,
+    plugins_api::util::parse_hex_prefix,
     serde::{de::Error as _, Deserialize, Deserializer},
     thiserror_core as thiserror,
 };

@@ -1,12 +1,14 @@
 use {
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
-    plugins_api::{GuestDevice, GuestDeviceFactory, InterpreterHost},
+    plugins_api::guest::{Device, DeviceFactory, Environment},
 };
 
+#[derive(Debug)]
 pub struct VirtIOBlock;
+
 pub struct VirtIOBlockFactory;
 
-impl GuestDevice for VirtIOBlock {
+impl Device for VirtIOBlock {
     fn start(&self) {
         todo!()
     }
@@ -34,12 +36,12 @@ impl VirtIOBlock {
     }
 }
 
-impl GuestDeviceFactory for VirtIOBlockFactory {
+impl DeviceFactory for VirtIOBlockFactory {
     fn create(
         &self,
         _config: BTreeMap<String, String>,
-        _host: Box<dyn InterpreterHost>,
-    ) -> Arc<dyn GuestDevice> {
+        _env: Box<dyn Environment>,
+    ) -> Arc<dyn Device> {
         Arc::new(VirtIOBlock::new())
     }
 }

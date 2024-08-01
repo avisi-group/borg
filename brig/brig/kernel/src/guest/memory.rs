@@ -5,7 +5,7 @@ use {
         mem::{size_of, MaybeUninit},
         slice,
     },
-    plugins_api::GuestDevice,
+    plugins_api::guest::Device,
 };
 
 pub struct AddressSpace {
@@ -39,7 +39,7 @@ impl AddressSpace {
 }
 
 pub trait IoMemoryHandler {
-    fn read_fixed<G: GuestDevice, T: Sized>(device: G, offset: u64) -> T {
+    fn read_fixed<G: Device, T: Sized>(device: G, offset: u64) -> T {
         let mut t = MaybeUninit::<T>::uninit();
         let buf = unsafe { slice::from_raw_parts_mut(t.as_mut_ptr() as *mut u8, size_of::<T>()) };
         device.read(offset, buf);
@@ -50,7 +50,7 @@ pub trait IoMemoryHandler {
 
 pub enum AddressSpaceRegionKind {
     Ram,
-    IO(Arc<dyn GuestDevice>),
+    IO(Arc<dyn Device>),
 }
 
 impl core::fmt::Debug for AddressSpaceRegionKind {

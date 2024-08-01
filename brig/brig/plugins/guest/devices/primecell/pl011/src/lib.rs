@@ -4,7 +4,10 @@ extern crate alloc;
 
 use {
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
-    plugins_rt::api::{GuestDevice, GuestDeviceFactory, InterpreterHost, PluginHeader, PluginHost},
+    plugins_rt::api::{
+        guest::{Device, DeviceFactory, Environment},
+        PluginHeader, PluginHost,
+    },
 };
 
 #[no_mangle]
@@ -24,19 +27,20 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
 struct Pl011Factory;
 
-impl GuestDeviceFactory for Pl011Factory {
+impl DeviceFactory for Pl011Factory {
     fn create(
         &self,
         _config: BTreeMap<String, String>,
-        _interpreter_host: Box<dyn InterpreterHost>,
-    ) -> Arc<dyn GuestDevice> {
+        _guest_environment: Box<dyn Environment>,
+    ) -> Arc<dyn Device> {
         Arc::new(Pl011)
     }
 }
 
+#[derive(Debug)]
 struct Pl011;
 
-impl GuestDevice for Pl011 {
+impl Device for Pl011 {
     fn start(&self) {}
     fn stop(&self) {}
 

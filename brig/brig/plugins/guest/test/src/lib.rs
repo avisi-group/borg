@@ -12,7 +12,7 @@ use {
     core::fmt::Debug,
     execute_aarch64_instrs_integer_arithmetic_rev::execute_aarch64_instrs_integer_arithmetic_rev,
     place_slice_signed::place_slice_signed,
-    plugins_rt::api::{InterpreterHost, PluginHeader, PluginHost},
+    plugins_rt::api::{guest::Environment, PluginHeader, PluginHost},
     replicate_bits_borealis_internal::replicate_bits_borealis_internal,
     u__DecodeA64::u__DecodeA64,
     u__InitSystem::u__InitSystem,
@@ -39,7 +39,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn addwithcarry_negative()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
 
         let x = Bits::new(0x0, 0x40);
         let y = Bits::new(-5i128 as u128, 0x40);
@@ -57,7 +57,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn addwithcarry_zero()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         let x = Bits::new(0x0, 0x40);
         let y = Bits::new(0x0, 0x40);
         let carry_in = false;
@@ -74,7 +74,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn addwithcarry_carry()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
 
         let x = Bits::new(u64::MAX as u128, 0x40);
         let y = Bits::new(0x1, 0x40);
@@ -92,7 +92,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn addwithcarry_overflow()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
 
         let x = Bits::new(u64::MAX as u128 / 2, 0x40);
         let y = Bits::new(u64::MAX as u128 / 2, 0x40);
@@ -112,7 +112,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn addwithcarry_early_4880_loop()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
 
         let x = Bits::new(0x425a6004, 0x40);
         let y = Bits::new(!0x425a6020, 0x40);
@@ -130,7 +130,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn addwithcarry_linux_regression()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
 
         let x = Bits::new(0xffffffc0082b3cd0, 64);
         let y = Bits::new(0xffffffffffffffd8, 64);
@@ -148,7 +148,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn replicate_bits()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         assert_eq!(
             Bits::new(0xffff_ffff, 32),
             replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0xff, 8), 4)
@@ -171,7 +171,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // fn ubfx()
     {
         {
-            let mut state = State::new(Box::new(NoneHost));
+            let mut state = State::new(Box::new(NoneEnv));
             // decode bit masks
             assert_eq!(
                 ProductTypea79c7f841a890648 {
@@ -183,7 +183,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
         }
 
         {
-            let mut state = State::new(Box::new(NoneHost));
+            let mut state = State::new(Box::new(NoneEnv));
             state.write_register::<u64>(REG_R3, 0x8444_c004);
 
             // ubfx x3, x3, #16, #4
@@ -195,7 +195,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn fibonacci()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         borealis_register_init(&mut state, TRACER);
         // hacky, run sail function that goes before the main loop :/
         u__InitSystem(&mut state, TRACER, ());
@@ -249,7 +249,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn rev_d00dfeed()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         state.write_register::<u64>(REG_R3, 0xedfe0dd0);
         execute_aarch64_instrs_integer_arithmetic_rev(&mut state, TRACER, 32, 3, 32, 3);
         assert_eq!(0xd00dfeed, state.read_register::<u64>(REG_R3));
@@ -258,7 +258,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn ispow2()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         let x = 2048i128;
         assert_eq!(
             FloorPow2(&mut state, TRACER, x),
@@ -272,7 +272,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     {
         let x = 0xffffff8008bfffffu64;
         let y = 0x200000u64;
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         state.write_register(REG_R19, x);
         state.write_register(REG_R1, y);
 
@@ -285,7 +285,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     // #[test_case]
     // fn place_slice()
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         assert_eq!(
             Bits::new(0xffffffffffffffd8, 64),
             place_slice_signed(&mut state, TRACER, 64, Bits::new(0xffffffd8, 64), 0, 32, 0,)
@@ -293,7 +293,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     }
 
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
         state.write_register::<u64>(REG_R2, 0xffff_ffff_ffff_ffc0);
 
@@ -312,7 +312,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     }
 
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
         state.write_register::<u64>(REG_R2, 0x0fff_ffff_ffff_ffc0);
 
@@ -331,7 +331,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     }
 
     {
-        let mut state = State::new(Box::new(NoneHost));
+        let mut state = State::new(Box::new(NoneEnv));
         state.write_register::<u64>(REG_R0, 0x0000000000000001);
 
         // rbit x0
@@ -361,9 +361,9 @@ impl Tracer for NoneTracer {
     fn write_memory(&self, _: usize, _: &dyn Debug) {}
 }
 
-struct NoneHost;
+struct NoneEnv;
 
-impl InterpreterHost for NoneHost {
+impl Environment for NoneEnv {
     fn read_memory(&self, _: u64, _: &mut [u8]) {}
 
     fn write_memory(&self, _: u64, _: &[u8]) {}

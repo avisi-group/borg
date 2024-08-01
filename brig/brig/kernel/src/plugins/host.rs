@@ -23,7 +23,7 @@ impl PluginHost for Host {
     fn register_device(
         &self,
         name: &'static str,
-        guest_device_factory: Box<dyn plugins_api::GuestDeviceFactory>,
+        guest_device_factory: Box<dyn plugins_api::guest::DeviceFactory>,
     ) {
         unsafe { GUEST_DEVICE_FACTORIES.lock() }.insert(name.to_owned(), guest_device_factory);
     }

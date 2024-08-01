@@ -6,7 +6,7 @@ use {
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::ptr,
-    plugins_api::{GuestDevice, GuestDeviceFactory, InterpreterHost},
+    plugins_api::guest,
     spin::{Mutex, Once},
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
@@ -17,13 +17,13 @@ pub mod memory;
 
 static mut GUEST: Once<Guest> = Once::INIT;
 
-pub static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn GuestDeviceFactory>>> =
+pub static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn guest::DeviceFactory>>> =
     Mutex::new(BTreeMap::new());
 
 #[derive(Default)]
 pub struct Guest {
     address_spaces: BTreeMap<String, Box<AddressSpace>>,
-    devices: BTreeMap<String, Arc<dyn GuestDevice>>,
+    devices: BTreeMap<String, Arc<dyn guest::Device>>,
 }
 
 impl Guest {
@@ -90,7 +90,7 @@ pub fn start() {
             continue;
         };
 
-        let interpreter_host = Box::new(DummyInterpreterHost {
+        let guest_environment = Box::new(BrigGuestEnvironment {
             address_space: &(**guest.address_spaces.get("as0").unwrap()) as *const _,
         });
 
@@ -100,7 +100,7 @@ pub fn start() {
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
                 .chain(device_config.extra.into_iter())
                 .collect(),
-            interpreter_host,
+            guest_environment,
         );
         guest.devices.insert(name.clone(), device.clone());
 
@@ -154,11 +154,11 @@ pub fn start() {
     }
 }
 
-struct DummyInterpreterHost {
+struct BrigGuestEnvironment {
     address_space: *const AddressSpace,
 }
 
-impl InterpreterHost for DummyInterpreterHost {
+impl guest::Environment for BrigGuestEnvironment {
     fn read_memory(&self, address: u64, data: &mut [u8]) {
         let region = unsafe { &*self.address_space }
             .find_region(address)
