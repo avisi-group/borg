@@ -241,8 +241,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     Function {
         inner: Shared::new(FunctionInner {
             name: InternedString::from_static("replicate_bits_borealis_internal"),
-            return_type: Arc::new(Type::Bits),
-            parameters: vec![bits_symbol, count_symbol.clone()],
+
             local_variables: {
                 let mut locals = HashMap::default();
                 locals.insert(result_symbol.name(), result_symbol);
@@ -251,5 +250,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             },
             entry_block,
         }),
+        return_type: Arc::new(Type::Bits),
+        parameters: vec![bits_symbol, count_symbol.clone()],
     }
 });

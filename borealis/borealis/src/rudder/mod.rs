@@ -459,6 +459,9 @@ impl Iterator for BlockIterator {
 #[derive(Clone)]
 pub struct Function {
     inner: Shared<FunctionInner>,
+    // return type and parameters are read only, so do not need to exist behind a `Shared`
+    return_type: Arc<Type>,
+    parameters: Vec<Symbol>,
 }
 
 impl Debug for Function {
@@ -476,8 +479,6 @@ impl ToTokens for Function {
 #[derive(Clone, Debug)]
 pub struct FunctionInner {
     name: InternedString,
-    return_type: Arc<Type>,
-    parameters: Vec<Symbol>,
     local_variables: HashMap<InternedString, Symbol>,
     entry_block: Block,
 }
@@ -491,17 +492,18 @@ impl Function {
         let mut celf = Self {
             inner: Shared::new(FunctionInner {
                 name,
-                return_type: return_type.clone(),
-                parameters: parameters
-                    .map(|(name, typ)| Symbol {
-                        name,
-                        kind: SymbolKind::Parameter,
-                        typ,
-                    })
-                    .collect(),
+
                 local_variables: HashMap::default(),
                 entry_block: Block::new(),
             }),
+            return_type: return_type.clone(),
+            parameters: parameters
+                .map(|(name, typ)| Symbol {
+                    name,
+                    kind: SymbolKind::Parameter,
+                    typ,
+                })
+                .collect(),
         };
 
         if return_type.is_void() {
@@ -522,10 +524,7 @@ impl Function {
     }
 
     pub fn signature(&self) -> (Arc<Type>, Vec<Symbol>) {
-        (
-            self.inner.get().return_type.clone(),
-            self.inner.get().parameters.clone(),
-        )
+        (self.return_type.clone(), self.parameters.clone())
     }
 
     pub fn update_names(&self) {
@@ -563,20 +562,18 @@ impl Function {
     }
 
     pub fn get_parameter(&self, name: InternedString) -> Option<Symbol> {
-        self.inner
-            .get()
-            .parameters
+        self.parameters
             .iter()
             .find(|sym| sym.name() == name)
             .cloned()
     }
 
     pub fn return_type(&self) -> Arc<Type> {
-        self.inner.get().return_type.clone()
+        self.return_type.clone()
     }
 
     pub fn parameters(&self) -> Vec<Symbol> {
-        self.inner.get().parameters.clone()
+        self.parameters.clone()
     }
 
     pub fn entry_block(&self) -> Block {

@@ -123,11 +123,11 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
             rudder::Function {
                 inner: Shared::new(FunctionInner {
                     name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-                    return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
-                    parameters: REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
                     local_variables: HashMap::default(),
                     entry_block: Block::new(),
                 }),
+                return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
+                parameters: REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
             },
             boom::FunctionDefinition {
                 signature: FunctionSignature {
