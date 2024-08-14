@@ -38,9 +38,6 @@ pub fn classify_kind(kind: &StatementKind) -> ValueClass {
         // todo: fix panic when this is correctly changed to valueclass::none
         StatementKind::Panic(_) => ValueClass::Static,
 
-        // todo: remove me when driver is implemented
-        StatementKind::PrintChar(_) => ValueClass::Static,
-
         _ => max_class(kind.children().into_iter().map(|s| s.borrow().class())),
     }
 }
@@ -67,7 +64,7 @@ mod tests {
     fn max_class_dynamic_early() {
         struct Iter {
             state: u8,
-        };
+        }
         impl Iterator for Iter {
             type Item = ValueClass;
 

@@ -21,8 +21,8 @@ impl Display for Type {
                 PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width_bits()),
                 PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
             },
-            Type::Product(_) => write!(f, "struct"),
-            Type::Sum(_) => write!(f, "enum"),
+            Type::Struct(_) => write!(f, "struct"),
+            Type::Enum(_) => write!(f, "enum"),
             Type::Vector {
                 element_count,
                 element_type,
@@ -229,9 +229,7 @@ impl Display for StatementKind {
                 )
             }
             StatementKind::Undefined => write!(f, "undefined",),
-            StatementKind::PrintChar(c) => {
-                write!(f, "put-char {}", c.name(),)
-            }
+
             StatementKind::ReadPc => write!(f, "read-pc"),
             StatementKind::WritePc { value } => write!(f, "write-pc {}", value.name()),
             StatementKind::BitExtract {
@@ -272,7 +270,7 @@ impl Display for StatementKind {
                 index.name(),
                 value.name()
             ),
-            StatementKind::CreateProduct { typ, fields } => {
+            StatementKind::CreateStruct { typ, fields } => {
                 write!(
                     f,
                     "create-product {} = {:?}",
@@ -280,7 +278,7 @@ impl Display for StatementKind {
                     fields.iter().map(Statement::name).collect::<Vec<_>>()
                 )
             }
-            StatementKind::CreateSum {
+            StatementKind::CreateEnum {
                 typ,
                 variant,
                 value,
@@ -297,10 +295,10 @@ impl Display for StatementKind {
             StatementKind::CreateBits { value, length } => {
                 write!(f, "create-bits {} {}", value.name(), length.name())
             }
-            StatementKind::MatchesSum { value, variant } => {
+            StatementKind::MatchesEnum { value, variant } => {
                 write!(f, "matches-sum {} {variant}", value.name())
             }
-            StatementKind::UnwrapSum { value, variant } => {
+            StatementKind::UnwrapEnum { value, variant } => {
                 write!(f, "unwrap-sum {} {variant}", value.name())
             }
             StatementKind::ExtractField { value, field } => {

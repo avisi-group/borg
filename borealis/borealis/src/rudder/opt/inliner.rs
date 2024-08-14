@@ -175,27 +175,23 @@ fn clone_statement(
 
             builder.build(StatementKind::Panic(stmts))
         }
-        StatementKind::PrintChar(c) => {
-            let c = mapping.get(&c).unwrap().clone();
 
-            builder.build(StatementKind::PrintChar(c))
-        }
         StatementKind::Assert { condition } => builder.build(StatementKind::Assert {
             condition: mapping.get(&condition).unwrap().clone(),
         }),
-        StatementKind::CreateProduct { typ, fields } => {
+        StatementKind::CreateStruct { typ, fields } => {
             let fields = fields
                 .iter()
                 .map(|stmt| mapping.get(stmt).unwrap().clone())
                 .collect();
 
-            builder.build(StatementKind::CreateProduct { typ, fields })
+            builder.build(StatementKind::CreateStruct { typ, fields })
         }
-        StatementKind::CreateSum {
+        StatementKind::CreateEnum {
             typ,
             variant,
             value,
-        } => builder.build(StatementKind::CreateSum {
+        } => builder.build(StatementKind::CreateEnum {
             typ,
             variant,
             value: mapping.get(&value).unwrap().clone(),
@@ -207,11 +203,13 @@ fn clone_statement(
         StatementKind::SizeOf { value } => builder.build(StatementKind::SizeOf {
             value: mapping.get(&value).unwrap().clone(),
         }),
-        StatementKind::MatchesSum { value, variant } => builder.build(StatementKind::MatchesSum {
-            value: mapping.get(&value).unwrap().clone(),
-            variant,
-        }),
-        StatementKind::UnwrapSum { value, variant } => builder.build(StatementKind::UnwrapSum {
+        StatementKind::MatchesEnum { value, variant } => {
+            builder.build(StatementKind::MatchesEnum {
+                value: mapping.get(&value).unwrap().clone(),
+                variant,
+            })
+        }
+        StatementKind::UnwrapEnum { value, variant } => builder.build(StatementKind::UnwrapEnum {
             value: mapping.get(&value).unwrap().clone(),
             variant,
         }),

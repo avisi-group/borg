@@ -55,8 +55,8 @@ impl PrimitiveType {
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(PrimitiveType),
-    Product(Vec<(InternedString, Arc<Type>)>),
-    Sum(Vec<(InternedString, Arc<Type>)>),
+    Struct(Vec<(InternedString, Arc<Type>)>),
+    Enum(Vec<(InternedString, Arc<Type>)>),
     Vector {
         element_count: usize,
         element_type: Arc<Type>,
@@ -90,11 +90,11 @@ impl Type {
     }
 
     pub fn new_product(fields: Vec<(InternedString, Arc<Type>)>) -> Self {
-        Self::Product(fields)
+        Self::Struct(fields)
     }
 
     pub fn new_sum(variants: Vec<(InternedString, Arc<Type>)>) -> Self {
-        Self::Sum(variants)
+        Self::Enum(variants)
     }
 
     pub fn void() -> Self {
@@ -115,13 +115,13 @@ impl Type {
     /// vector
     pub fn byte_offset(&self, element_field: usize) -> Option<usize> {
         match self {
-            Type::Product(fields) => Some(
+            Type::Struct(fields) => Some(
                 fields
                     .iter()
                     .take(element_field)
                     .fold(0, |acc, (_, typ)| acc + typ.width_bytes()),
             ),
-            Type::Sum(_) => Some(0),
+            Type::Enum(_) => Some(0),
             Type::Vector { element_type, .. } => Some(element_field * element_type.width_bytes()),
             _ => None,
         }
@@ -129,8 +129,8 @@ impl Type {
 
     pub fn width_bits(&self) -> usize {
         match self {
-            Self::Product(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).sum(),
-            Self::Sum(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).max().unwrap(),
+            Self::Struct(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).sum(),
+            Self::Enum(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).max().unwrap(),
             // smallest with is 8 bits
             Self::Primitive(p) => p.element_width_in_bits.max(8),
             Self::Vector {

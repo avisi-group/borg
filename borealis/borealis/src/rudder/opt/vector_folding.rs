@@ -1,10 +1,11 @@
-use crate::rudder::statement::BinaryOperationKind;
-use crate::rudder::{
-    constant_value::ConstantValue,
-    statement::{StatementBuilder, StatementKind},
-    Block, Function, Type,
+use {
+    crate::rudder::{
+        constant_value::ConstantValue,
+        statement::{BinaryOperationKind, StatementBuilder, StatementKind},
+        Block, Function, Type,
+    },
+    std::sync::Arc,
 };
-use std::sync::Arc;
 
 pub fn run(f: Function) -> bool {
     let mut changed = false;

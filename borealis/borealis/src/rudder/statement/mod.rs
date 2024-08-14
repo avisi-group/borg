@@ -197,22 +197,17 @@ pub enum StatementKind {
     /// `Default::default()`, or uninitialized, or ???
     Undefined,
 
-    /// Prints a character
-    ///
-    /// REMOVE ME ONCE SERIAL PORT DRIVER EXISTS IN BRIG
-    PrintChar(Statement),
-
     Assert {
         condition: Statement,
     },
 
-    CreateProduct {
+    CreateStruct {
         typ: Arc<Type>,
         /// Index of fields should match type
         fields: Vec<Statement>,
     },
 
-    CreateSum {
+    CreateEnum {
         typ: Arc<Type>,
         variant: InternedString,
         value: Statement,
@@ -229,14 +224,14 @@ pub enum StatementKind {
         value: Statement,
     },
 
-    /// Tests whether an instance of a sum type is of a given variant
-    MatchesSum {
+    /// Tests whether an instance of an enum is of a given variant
+    MatchesEnum {
         value: Statement,
         variant: InternedString,
     },
 
-    /// Extracts the contents of a variant of a sum type
-    UnwrapSum {
+    /// Extracts the contents of a variant of an enum
+    UnwrapEnum {
         value: Statement,
         variant: InternedString,
     },
@@ -268,7 +263,6 @@ impl StatementKind {
             | StatementKind::PhiNode { .. }
             | StatementKind::Return { .. }
             | StatementKind::Panic(_)
-            | StatementKind::PrintChar(_)
             | StatementKind::ReadPc
             | StatementKind::WritePc { .. }
             | StatementKind::ReadVariable { .. }
@@ -318,7 +312,7 @@ impl StatementKind {
                 value,
                 index,
             } => [value, vector, index].into_iter().cloned().collect(),
-            StatementKind::CreateProduct { fields, .. } => fields.clone(),
+            StatementKind::CreateStruct { fields, .. } => fields.clone(),
 
             StatementKind::Assert { condition } => vec![condition.clone()],
             StatementKind::BitsCast { value, length, .. } => {
@@ -329,9 +323,9 @@ impl StatementKind {
             }
 
             StatementKind::SizeOf { value }
-            | StatementKind::CreateSum { value, .. }
-            | StatementKind::MatchesSum { value, .. }
-            | StatementKind::UnwrapSum { value, .. }
+            | StatementKind::CreateEnum { value, .. }
+            | StatementKind::MatchesEnum { value, .. }
+            | StatementKind::UnwrapEnum { value, .. }
             | StatementKind::ExtractField { value, .. } => vec![value.clone()],
 
             StatementKind::UpdateField {
@@ -457,7 +451,7 @@ impl Statement {
             StatementKind::Return { .. } => Arc::new(Type::void()),
             StatementKind::Select { true_value, .. } => true_value.typ(),
             StatementKind::Panic(_) => Arc::new(Type::void()),
-            StatementKind::PrintChar(_) => Arc::new(Type::unit()),
+
             StatementKind::ReadPc => Arc::new(Type::u64()),
             StatementKind::WritePc { .. } => Arc::new(Type::void()),
             // todo: this is a simplification, be more precise about lengths?
@@ -477,13 +471,13 @@ impl Statement {
                 // get type of the vector and return it
                 vector.typ()
             }
-            StatementKind::CreateProduct { typ, .. } | StatementKind::CreateSum { typ, .. } => typ,
+            StatementKind::CreateStruct { typ, .. } | StatementKind::CreateEnum { typ, .. } => typ,
             StatementKind::SizeOf { .. } => Arc::new(Type::u16()),
             StatementKind::Assert { .. } => Arc::new(Type::unit()),
             StatementKind::CreateBits { .. } => Arc::new(Type::Bits),
-            StatementKind::MatchesSum { .. } => Arc::new(Type::u1()),
-            StatementKind::UnwrapSum { value, variant } => {
-                let Type::Sum(variants) = &*value.typ() else {
+            StatementKind::MatchesEnum { .. } => Arc::new(Type::u1()),
+            StatementKind::UnwrapEnum { value, variant } => {
+                let Type::Enum(variants) = &*value.typ() else {
                     panic!("cannot unwrap non sum type");
                 };
 
@@ -495,7 +489,7 @@ impl Statement {
                     .clone()
             }
             StatementKind::ExtractField { value, field } => {
-                let Type::Product(fields) = &*value.typ() else {
+                let Type::Struct(fields) = &*value.typ() else {
                     panic!("cannot unwrap non sum type");
                 };
 
@@ -527,7 +521,6 @@ impl Statement {
                 | StatementKind::Branch { .. }
                 | StatementKind::Return { .. }
                 | StatementKind::Panic(_)
-                | StatementKind::PrintChar(_)
                 | StatementKind::Assert { .. }
         )
     }
@@ -761,7 +754,7 @@ impl StatementInner {
                 self.kind = StatementKind::ReadElement { vector, index };
             }
 
-            StatementKind::CreateProduct { typ, fields } => {
+            StatementKind::CreateStruct { typ, fields } => {
                 let fields = fields
                     .iter()
                     .map(|field| {
@@ -773,9 +766,9 @@ impl StatementInner {
                     })
                     .collect();
 
-                self.kind = StatementKind::CreateProduct { typ, fields };
+                self.kind = StatementKind::CreateStruct { typ, fields };
             }
-            StatementKind::CreateSum {
+            StatementKind::CreateEnum {
                 typ,
                 variant,
                 value,
@@ -786,7 +779,7 @@ impl StatementInner {
                     value.clone()
                 };
 
-                self.kind = StatementKind::CreateSum {
+                self.kind = StatementKind::CreateEnum {
                     typ,
                     variant,
                     value,
@@ -912,23 +905,23 @@ impl StatementInner {
 
                 self.kind = StatementKind::CreateBits { value, length };
             }
-            StatementKind::MatchesSum { value, variant } => {
+            StatementKind::MatchesEnum { value, variant } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
                     value.clone()
                 };
 
-                self.kind = StatementKind::MatchesSum { value, variant };
+                self.kind = StatementKind::MatchesEnum { value, variant };
             }
-            StatementKind::UnwrapSum { value, variant } => {
+            StatementKind::UnwrapEnum { value, variant } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
                     value.clone()
                 };
 
-                self.kind = StatementKind::UnwrapSum { value, variant };
+                self.kind = StatementKind::UnwrapEnum { value, variant };
             }
             StatementKind::ExtractField { value, field } => {
                 let value = if value == use_of {
@@ -938,12 +931,6 @@ impl StatementInner {
                 };
 
                 self.kind = StatementKind::ExtractField { value, field };
-            }
-
-            StatementKind::PrintChar(c) => {
-                let c = if c == use_of { with.clone() } else { c.clone() };
-
-                self.kind = StatementKind::PrintChar(c);
             }
 
             StatementKind::UpdateField {

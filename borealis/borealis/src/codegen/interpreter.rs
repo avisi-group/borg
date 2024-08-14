@@ -400,10 +400,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote!(panic!("{:?}", (#(#args),*)))
         }
-        StatementKind::PrintChar(c) => {
-            let c = get_ident(&c);
-            quote!(log::trace!("{}", (#c as u8) as char))
-        }
         StatementKind::ReadElement { vector, index } => {
             let index_typ = index.typ();
 
@@ -433,8 +429,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::CreateProduct { typ, fields } => {
-            let Type::Product(field_types) = &*typ else {
+        StatementKind::CreateStruct { typ, fields } => {
+            let Type::Struct(field_types) = &*typ else {
                 panic!()
             };
 
@@ -453,12 +449,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let typ = codegen_type(typ);
             quote!(#typ { #fields })
         }
-        StatementKind::CreateSum {
+        StatementKind::CreateEnum {
             typ,
             variant,
             value,
         } => {
-            assert!(matches!(&*typ, Type::Sum(_)));
+            assert!(matches!(&*typ, Type::Enum(_)));
             let typ = codegen_type(typ);
             let variant = codegen_ident(variant);
             let value = get_ident(&value);
@@ -511,12 +507,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::MatchesSum { value, variant } => {
+        StatementKind::MatchesEnum { value, variant } => {
             // matches!(value, Enum::Variant(_))
 
             let sum_type = value.typ();
 
-            let Type::Sum(_) = &*sum_type else {
+            let Type::Enum(_) = &*sum_type else {
                 unreachable!();
             };
 
@@ -528,10 +524,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 matches!(#ident, #sum_type::#variant(_))
             }
         }
-        StatementKind::UnwrapSum { value, variant } => {
+        StatementKind::UnwrapEnum { value, variant } => {
             let sum_type = value.typ();
 
-            let Type::Sum(_) = &*sum_type else {
+            let Type::Enum(_) = &*sum_type else {
                 unreachable!();
             };
 

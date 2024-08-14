@@ -76,16 +76,16 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
 
             quote!(#rust_type)
         }
-        Type::Product(t) => {
+        Type::Struct(t) => {
             let mut hasher = DefaultHasher::new();
             t.hash(&mut hasher);
-            let hashed = format_ident!("ProductType{:x}", hasher.finish());
+            let hashed = format_ident!("Struct{:x}", hasher.finish());
             quote! { #hashed }
         }
-        Type::Sum(t) => {
+        Type::Enum(t) => {
             let mut hasher = DefaultHasher::new();
             t.hash(&mut hasher);
-            let hashed = format_ident!("SumType{:x}", hasher.finish());
+            let hashed = format_ident!("Enum{:x}", hasher.finish());
             quote! { #hashed }
         }
         Type::Vector {
@@ -155,7 +155,7 @@ fn codegen_types(rudder: &Context) -> TokenStream {
         .map(|typ| {
             let ident = codegen_type(typ.clone());
 
-            let Type::Product(fields) = &*typ else {
+            let Type::Struct(fields) = &*typ else {
                 panic!("struct must be product type");
             };
 
@@ -184,7 +184,7 @@ fn codegen_types(rudder: &Context) -> TokenStream {
         .map(|typ| {
             let ident = codegen_type(typ.clone());
 
-            let Type::Sum(fields) = &*typ else {
+            let Type::Enum(fields) = &*typ else {
                 panic!("union must be sum type");
             };
 

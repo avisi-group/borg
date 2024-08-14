@@ -220,27 +220,24 @@ impl StatementUseAnalysis {
                         self.add_use(&panic_value, &stmt);
                     }
                 }
-                StatementKind::PrintChar(c) => {
-                    self.add_use(&c, &stmt);
-                }
                 StatementKind::CreateBits { value, length } => {
                     self.add_use(&value, &stmt);
                     self.add_use(&length, &stmt);
                 }
-                StatementKind::CreateProduct { fields, .. } => {
+                StatementKind::CreateStruct { fields, .. } => {
                     for field in fields {
                         self.add_use(&field, &stmt);
                     }
                 }
-                StatementKind::CreateSum { value, .. } => {
+                StatementKind::CreateEnum { value, .. } => {
                     self.add_use(&value, &stmt);
                 }
                 StatementKind::SizeOf { value } => {
                     self.add_use(&value, &stmt);
                 }
 
-                StatementKind::MatchesSum { value, .. } => self.add_use(&value, &stmt),
-                StatementKind::UnwrapSum { value, .. } => self.add_use(&value, &stmt),
+                StatementKind::MatchesEnum { value, .. } => self.add_use(&value, &stmt),
+                StatementKind::UnwrapEnum { value, .. } => self.add_use(&value, &stmt),
                 StatementKind::ExtractField { value, .. } => self.add_use(&value, &stmt),
                 StatementKind::UpdateField {
                     original_value,

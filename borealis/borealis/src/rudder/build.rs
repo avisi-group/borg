@@ -191,7 +191,7 @@ impl BuildContext {
     }
 
     fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Arc::new(Type::Product(
+        let typ = Arc::new(Type::Struct(
             fields
                 .iter()
                 .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
@@ -210,7 +210,7 @@ impl BuildContext {
     }
 
     fn add_union(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Arc::new(Type::Sum(
+        let typ = Arc::new(Type::Enum(
             fields
                 .iter()
                 .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
@@ -1422,7 +1422,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 })),
 
                 // val putchar : (%i) -> %unit
-                "putchar" =>Some(self.builder.build(StatementKind::PrintChar(args[0].clone()))),
+                "putchar" => Some(self.builder.build(StatementKind::Panic(vec![args[0].clone()]))),
 
                 "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"
@@ -1460,7 +1460,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .map(|(typ, _)| typ)
             .cloned()
             .map(|typ| {
-                self.builder.build(StatementKind::CreateSum {
+                self.builder.build(StatementKind::CreateEnum {
                     typ,
                     variant: name,
                     value: args[0].clone(),
@@ -1667,7 +1667,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
             boom::Value::Struct { name, fields } => {
                 let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
-                let Type::Product(field_types) = &*typ else {
+                let Type::Struct(field_types) = &*typ else {
                     panic!();
                 };
 
@@ -1684,7 +1684,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     field_statements[idx] = Some(field_statement_cast);
                 }
 
-                let product = self.builder.build(StatementKind::CreateProduct {
+                let product = self.builder.build(StatementKind::CreateStruct {
                     typ: typ.clone(),
                     fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
                 });
@@ -1727,7 +1727,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 assert_eq!(value.typ(), typ);
 
                 // todo: investigate this further
-                let matches = self.builder.build(StatementKind::MatchesSum {
+                let matches = self.builder.build(StatementKind::MatchesEnum {
                     value,
                     variant: *identifier,
                 });
@@ -1753,7 +1753,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 assert_eq!(value.typ(), typ);
 
-                let unwrap_sum = self.builder.build(StatementKind::UnwrapSum {
+                let unwrap_sum = self.builder.build(StatementKind::UnwrapEnum {
                     value,
                     variant: *identifier,
                 });
@@ -1838,7 +1838,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let source_type = value.typ();
 
                 let kind = match *source_type {
-                    Type::Sum(_) | Type::Product(_) | Type::Vector { .. } | Type::String => {
+                    Type::Enum(_) | Type::Struct(_) | Type::Vector { .. } | Type::String => {
                         panic!("cast on non-primitive type")
                     }
                     Type::Primitive(_) => {
@@ -2063,7 +2063,7 @@ fn fields_to_indices(
         indices.push(idx);
 
         // update current struct to point to field
-        let Type::Product(fields) = &**struct_typ else {
+        let Type::Struct(fields) = &**struct_typ else {
             panic!("cannot get fields of non-product")
         };
         current_type = fields[idx].1.clone();
@@ -2093,7 +2093,7 @@ fn fields_to_offsets(
         offsets.push(current_type.byte_offset(idx).unwrap());
 
         // update current struct to point to field
-        let Type::Product(fields) = &*current_type else {
+        let Type::Struct(fields) = &*current_type else {
             panic!("cannot get fields of non-product")
         };
         current_type = fields[idx].1.clone();
