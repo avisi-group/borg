@@ -26,7 +26,7 @@ impl Id {
             panic!("COUNTER overflowed");
         }
 
-        Id(num)
+        Self(num)
     }
 }
 

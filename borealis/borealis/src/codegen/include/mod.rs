@@ -21,7 +21,7 @@ pub fn get(filename: &str) -> TokenStream {
 mod tests {
     use crate::codegen::include::{
         bits::Bits,
-        dbt::{BinaryOperation, ConstantValue, DynamicTranslator, NodeInner, Type, TypeKind},
+        dbt::dbt::{emitter::Emitter, x86::X86Emitter, Context, Type, TypeKind},
     };
 
     #[test]
@@ -42,45 +42,37 @@ mod tests {
 
     #[test]
     fn dbt_ergonomics() {
-        let dbt = DynamicTranslator;
+        use crate::codegen::include::dbt::dbt::emitter::Emitter;
 
-        let s0 = dbt.build(NodeInner::Constant {
-            value: ConstantValue::Unsigned(0x1234),
-            typ: Type {
+        let ctx = Context::new(X86Emitter);
+        let emitter = ctx.emitter();
+
+        let reg_offset = emitter.constant(
+            0x1234,
+            Type {
                 kind: TypeKind::Unsigned,
                 width: 32,
             },
-        });
+        );
 
-        let s1 = dbt.build(NodeInner::ReadRegister {
-            offset: s0,
-            typ: Type {
+        let reg_value = emitter.read_register(
+            reg_offset.clone(),
+            Type {
                 kind: TypeKind::Unsigned,
                 width: 32,
             },
-        });
+        );
 
-        let s2 = dbt.build(NodeInner::Constant {
-            value: ConstantValue::Unsigned(1),
-            typ: Type {
+        let one = emitter.constant(
+            1,
+            Type {
                 kind: TypeKind::Unsigned,
                 width: 32,
             },
-        });
+        );
 
-        let s3 = dbt.build(NodeInner::BinaryOperation(BinaryOperation::Add(s1, s2)));
+        let sum = emitter.add(reg_value, one);
 
-        let s4 = dbt.build(NodeInner::Constant {
-            value: ConstantValue::Unsigned(0x4000),
-            typ: Type {
-                kind: TypeKind::Unsigned,
-                width: 32,
-            },
-        });
-
-        let _s5 = dbt.build(NodeInner::WriteRegister {
-            value: s3,
-            offset: s4,
-        });
+        let _ = emitter.write_register(sum, reg_offset);
     }
 }

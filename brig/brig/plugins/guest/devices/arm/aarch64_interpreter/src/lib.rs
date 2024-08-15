@@ -3,10 +3,10 @@
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, sync::Arc},
+    alloc::boxed::Box,
     borealis_register_init::borealis_register_init,
     common::{
-        lookup_register_by_offset, ProductTypee2f620c8eb69267c, State, Tracer, REG_PSTATE, REG_U_PC,
+        lookup_register_by_offset, State, Structe2f620c8eb69267c, Tracer, REG_PSTATE, REG_U_PC,
     },
     core::fmt::Debug,
     log::trace,
@@ -104,7 +104,7 @@ impl Aarch64Interpreter {
                     let nzcv = {
                         let pstate = self
                             .state
-                            .read_register::<ProductTypee2f620c8eb69267c>(REG_PSTATE);
+                            .read_register::<Structe2f620c8eb69267c>(REG_PSTATE);
 
                         (pstate.N as u8) << 3
                             | (pstate.Z as u8) << 2

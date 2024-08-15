@@ -6,8 +6,8 @@ use {
     alloc::boxed::Box,
     borealis_register_init::borealis_register_init,
     common::{
-        Bits, ProductType188a1c3bf231c64b, ProductTypea79c7f841a890648, State, Tracer, REG_R0,
-        REG_R1, REG_R19, REG_R2, REG_R3, REG_SEE, REG_U_PC, REG_U__BRANCHTAKEN,
+        Bits, State, Struct188a1c3bf231c64b, Structa79c7f841a890648, Tracer, REG_R0, REG_R1,
+        REG_R19, REG_R2, REG_R3, REG_SEE, REG_U_PC, REG_U__BRANCHTAKEN,
     },
     core::fmt::Debug,
     execute_aarch64_instrs_integer_arithmetic_rev::execute_aarch64_instrs_integer_arithmetic_rev,
@@ -47,7 +47,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
         assert_eq!(
             AddWithCarry(&mut state, TRACER, x, y, carry_in),
-            ProductType188a1c3bf231c64b {
+            Struct188a1c3bf231c64b {
                 tuple__pcnt_bv__pcnt_bv40: Bits::new(-5i64 as u128, 0x40),
                 tuple__pcnt_bv__pcnt_bv41: 0b1000
             }
@@ -64,7 +64,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
         assert_eq!(
             AddWithCarry(&mut state, TRACER, x, y, carry_in),
-            ProductType188a1c3bf231c64b {
+            Struct188a1c3bf231c64b {
                 tuple__pcnt_bv__pcnt_bv40: Bits::new(0x0, 0x40),
                 tuple__pcnt_bv__pcnt_bv41: 0b0100
             }
@@ -82,7 +82,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
         assert_eq!(
             AddWithCarry(&mut state, TRACER, x, y, carry_in),
-            ProductType188a1c3bf231c64b {
+            Struct188a1c3bf231c64b {
                 tuple__pcnt_bv__pcnt_bv40: Bits::new(0x0, 0x40),
                 tuple__pcnt_bv__pcnt_bv41: 0b0110
             }
@@ -100,7 +100,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
         assert_eq!(
             AddWithCarry(&mut state, TRACER, x, y, carry_in),
-            ProductType188a1c3bf231c64b {
+            Struct188a1c3bf231c64b {
                 tuple__pcnt_bv__pcnt_bv40: Bits::new(!0x1, 0x40),
                 tuple__pcnt_bv__pcnt_bv41: 0b1001
             }
@@ -120,7 +120,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
         assert_eq!(
             AddWithCarry(&mut state, TRACER, x, y, carry_in),
-            ProductType188a1c3bf231c64b {
+            Struct188a1c3bf231c64b {
                 tuple__pcnt_bv__pcnt_bv40: Bits::new(0xffffffffffffffe3, 0x40),
                 tuple__pcnt_bv__pcnt_bv41: 0b1000
             }
@@ -138,7 +138,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
 
         assert_eq!(
             AddWithCarry(&mut state, TRACER, x, y, carry_in),
-            ProductType188a1c3bf231c64b {
+            Struct188a1c3bf231c64b {
                 tuple__pcnt_bv__pcnt_bv40: Bits::new(0xffffffc0082b3ca8, 0x40),
                 tuple__pcnt_bv__pcnt_bv41: 0b1010
             }
@@ -174,7 +174,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
             let mut state = State::new(Box::new(NoneEnv));
             // decode bit masks
             assert_eq!(
-                ProductTypea79c7f841a890648 {
+                Structa79c7f841a890648 {
                     tuple__pcnt_bv__pcnt_bv0: Bits::new(0xFFFF00000000000F, 64),
                     tuple__pcnt_bv__pcnt_bv1: Bits::new(0xF, 64)
                 },
@@ -297,7 +297,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
         state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
         state.write_register::<u64>(REG_R2, 0xffff_ffff_ffff_ffc0);
 
-        //   //  let pstate = ProductTypee2f620c8eb69267c::default();
+        //   //  let pstate = Structe2f620c8eb69267c::default();
 
         //     state.write_register::<u64>(REG_PSTATE, pstate);
 
@@ -316,7 +316,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
         state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
         state.write_register::<u64>(REG_R2, 0x0fff_ffff_ffff_ffc0);
 
-        //   //  let pstate = ProductTypee2f620c8eb69267c::default();
+        //   //  let pstate = Structe2f620c8eb69267c::default();
 
         //     state.write_register::<u64>(REG_PSTATE, pstate);
 
