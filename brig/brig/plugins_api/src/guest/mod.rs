@@ -1,14 +1,18 @@
 //! Interfaces for emulated guests
 
 use {
+    crate::guest::dbt::emitter::LoweringContext,
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::fmt::Debug,
 };
+
+pub mod dbt;
 
 /// Guest's external environment (the host system)
 pub trait Environment {
     fn read_memory(&self, address: u64, data: &mut [u8]);
     fn write_memory(&self, address: u64, data: &[u8]);
+    fn lowering_ctx(&self) -> Box<dyn LoweringContext>;
 }
 
 /// Manufacturer of guest devices

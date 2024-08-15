@@ -1,12 +1,13 @@
 use {
     crate::{
+        dbt::x86::X86LoweringContext,
         devices::manager::SharedDeviceManager,
         fs::{tar::TarFilesystem, File, Filesystem},
         guest::memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::ptr,
-    plugins_api::guest,
+    plugins_api::{guest, guest::dbt::emitter::LoweringContext},
     spin::{Mutex, Once},
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
@@ -188,5 +189,9 @@ impl guest::Environment for BrigGuestEnvironment {
             // or forward the request on to the IO handler
             AddressSpaceRegionKind::IO(device) => device.write(address - region.base(), data),
         }
+    }
+
+    fn lowering_ctx(&self) -> Box<dyn LoweringContext> {
+        Box::new(X86LoweringContext::new())
     }
 }

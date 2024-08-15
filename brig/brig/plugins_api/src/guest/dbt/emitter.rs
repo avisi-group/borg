@@ -1,6 +1,7 @@
 use {
-    super::Translation,
+    crate::guest::dbt::Translation,
     alloc::{
+        boxed::Box,
         collections::{BTreeSet, LinkedList},
         rc::{Rc, Weak},
     },
@@ -29,7 +30,7 @@ impl Context {
         block
     }
 
-    pub fn lower<L: LoweringContext>(self, mut lowering_ctx: L) -> Translation {
+    pub fn lower(self, mut lowering_ctx: Box<dyn LoweringContext>) -> Translation {
         let mut work_list = LinkedList::new();
         let mut seen_list = BTreeSet::new();
 
@@ -331,5 +332,5 @@ impl Builder {
 pub trait LoweringContext {
     fn lower_block(&mut self, block: Block);
 
-    fn complete(self) -> Translation;
+    fn complete(&mut self) -> Translation;
 }

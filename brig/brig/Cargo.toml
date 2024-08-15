@@ -1,10 +1,20 @@
 [workspace]
 resolver = "2"
-members = ["kernel", "proc_macro_lib", "plugins_api", "plugins_rt", "plugins/guest/test", "plugins/guest/devices/arm/aarch64","plugins/guest/devices/arm/aarch64_interpreter", "plugins/guest/devices/primecell/pl011"]
+members = [
+    "kernel",
+    "proc_macro_lib",
+    # "plugins_rt",
+    # "plugins/guest/test",
+    # "plugins/guest/devices/arm/aarch64",
+    # "plugins/guest/devices/arm/aarch64_interpreter",
+    "plugins/guest/devices/primecell/pl011",
+    "plugins/guest/demoarch",
+]
 
 [workspace.dependencies]
 plugins_api = { path = "./plugins_api" }
 plugins_rt = { path = "./plugins_rt" }
+kernel = { path = "./kernel" }
 proc_macro_lib = { path = "./proc_macro_lib" }
 
 [profile.dev]

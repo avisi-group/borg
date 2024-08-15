@@ -59,9 +59,10 @@ pub fn load_all(device: &SharedDevice) {
     log::info!("loading plugins");
     // todo: don't hardcode this, load everything in plugins directory
     [
-        "plugins/libtest.so",
+        // "plugins/libtest.so",
+        // "plugins/libaarch64.so",
         "plugins/libpl011.so",
-        "plugins/libaarch64.so",
+        "plugins/libdemoarch.so",
     ]
     .into_iter()
     .map(|path| fs.open(path).unwrap().read_to_vec().unwrap())

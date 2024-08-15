@@ -34,6 +34,11 @@
         }
     ],
     "devices": {
+        "beep": {
+            "kind": "demoarch",
+            "address_space": "as0",
+            "initial_pc": "0x8000_0000"
+        },
         "core0": {
             "kind": "aarch64",
             "address_space": "as0",

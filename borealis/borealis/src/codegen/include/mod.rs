@@ -3,8 +3,6 @@ use {proc_macro2::TokenStream, quote::ToTokens, std::fs};
 #[allow(dead_code)]
 mod bits;
 #[allow(dead_code)]
-mod dbt;
-#[allow(dead_code)]
 mod util;
 
 pub fn get(filename: &str) -> TokenStream {
@@ -19,10 +17,7 @@ pub fn get(filename: &str) -> TokenStream {
 // tests not in the module itself because we don't want them emitted
 #[cfg(test)]
 mod tests {
-    use crate::codegen::include::{
-        bits::Bits,
-        dbt::dbt::{emitter::Emitter, x86::X86Emitter, Context, Type, TypeKind},
-    };
+    use crate::codegen::include::bits::Bits;
 
     #[test]
     fn sign_extend() {
@@ -40,39 +35,39 @@ mod tests {
         assert_eq!(shift.value(), 0xffff_ffff_ffff_ffd8);
     }
 
-    #[test]
-    fn dbt_ergonomics() {
-        use crate::codegen::include::dbt::dbt::emitter::Emitter;
+    // #[test]
+    // fn dbt_ergonomics() {
+    //     use crate::codegen::include::dbt::dbt::emitter::Emitter;
 
-        let ctx = Context::new(X86Emitter);
-        let emitter = ctx.emitter();
+    //     let ctx = Context::new(X86Emitter);
+    //     let emitter = ctx.emitter();
 
-        let reg_offset = emitter.constant(
-            0x1234,
-            Type {
-                kind: TypeKind::Unsigned,
-                width: 32,
-            },
-        );
+    //     let reg_offset = emitter.constant(
+    //         0x1234,
+    //         Type {
+    //             kind: TypeKind::Unsigned,
+    //             width: 32,
+    //         },
+    //     );
 
-        let reg_value = emitter.read_register(
-            reg_offset.clone(),
-            Type {
-                kind: TypeKind::Unsigned,
-                width: 32,
-            },
-        );
+    //     let reg_value = emitter.read_register(
+    //         reg_offset.clone(),
+    //         Type {
+    //             kind: TypeKind::Unsigned,
+    //             width: 32,
+    //         },
+    //     );
 
-        let one = emitter.constant(
-            1,
-            Type {
-                kind: TypeKind::Unsigned,
-                width: 32,
-            },
-        );
+    //     let one = emitter.constant(
+    //         1,
+    //         Type {
+    //             kind: TypeKind::Unsigned,
+    //             width: 32,
+    //         },
+    //     );
 
-        let sum = emitter.add(reg_value, one);
+    //     let sum = emitter.add(reg_value, one);
 
-        let _ = emitter.write_register(sum, reg_offset);
-    }
+    //     let _ = emitter.write_register(sum, reg_offset);
+    // }
 }

@@ -230,7 +230,6 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
         let types = codegen_types(rudder);
         let bits = include::get("bits.rs");
         let util = include::get("util.rs");
-        let dbt = include::get("dbt.rs");
 
         (
             InternedString::from_static("common"),
@@ -246,8 +245,6 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
                     #bits
 
                     #util
-
-                    #dbt
                 }),
             ),
         )

@@ -1,8 +1,11 @@
 use {
-    self::encoder::{Instruction, Operand, PhysicalRegister, Register},
-    super::emitter::{Action, Block, LoweringContext, Value},
+    crate::dbt::x86::encoder::{Instruction, Operand, PhysicalRegister, Register},
     alloc::collections::LinkedList,
     core::borrow::Borrow,
+    plugins_api::guest::dbt::{
+        emitter::{Action, Block, LoweringContext, Value},
+        Translation,
+    },
 };
 
 mod encoder;
@@ -47,13 +50,13 @@ impl X86LoweringContext {
 }
 
 impl LoweringContext for X86LoweringContext {
-    fn lower_block(&mut self, block: super::emitter::Block) {
+    fn lower_block(&mut self, block: Block) {
         for action in (*block).borrow().actions() {
             self.lower_action(block.borrow(), action);
         }
     }
 
-    fn complete(mut self) -> super::Translation {
+    fn complete(&mut self) -> Translation {
         self.allocate();
 
         todo!()
