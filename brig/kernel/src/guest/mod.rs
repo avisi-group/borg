@@ -17,8 +17,12 @@ pub mod memory;
 
 static mut GUEST: Once<Guest> = Once::INIT;
 
-pub static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn guest::DeviceFactory>>> =
+static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn guest::DeviceFactory>>> =
     Mutex::new(BTreeMap::new());
+
+pub fn register_device_factory(name: String, factory: Box<dyn guest::DeviceFactory>) {
+    unsafe { GUEST_DEVICE_FACTORIES.lock() }.insert(name, factory);
+}
 
 #[derive(Default)]
 pub struct Guest {

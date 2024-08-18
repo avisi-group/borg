@@ -3,7 +3,7 @@ use {
         alloc::borrow::ToOwned,
         devices::{guest::demoarch::DemoArchFactory, SharedDevice},
         fs::{tar::TarFilesystem, File, Filesystem},
-        guest::GUEST_DEVICE_FACTORIES,
+        guest::register_device_factory,
         plugins::{host::Host, shared_object::SharedObject},
     },
     alloc::{boxed::Box, collections::BTreeMap},
@@ -34,7 +34,8 @@ impl PluginRegistry {
 }
 
 struct Plugin {
-    // whole point of this is to prevent the shared object getting deallocated
+    // prevent the shared object getting deallocated by holding it here even if rustc thinks it is
+    // never used
     _object: SharedObject,
     // todo: figure out how to make the header the lifetime of the shared object
     header: &'static PluginHeader,
@@ -59,8 +60,7 @@ pub fn load_all(device: &SharedDevice) {
     let mut fs = TarFilesystem::mount(device.as_block());
 
     // loading statically linked arch
-    unsafe { GUEST_DEVICE_FACTORIES.lock() }
-        .insert("demoarch".to_owned(), Box::new(DemoArchFactory));
+    register_device_factory("demoarch".to_owned(), Box::new(DemoArchFactory));
 
     log::info!("loading plugins");
     // todo: don't hardcode this, load everything in plugins directory
@@ -68,7 +68,6 @@ pub fn load_all(device: &SharedDevice) {
         // "plugins/libtest.so",
         // "plugins/libaarch64.so",
         "plugins/libpl011.so",
-        //   "plugins/libdemoarch.so",
     ]
     .into_iter()
     .map(|path| fs.open(path).unwrap().read_to_vec().unwrap())

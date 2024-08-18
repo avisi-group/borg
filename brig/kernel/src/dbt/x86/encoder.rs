@@ -1,11 +1,11 @@
 use {
-    crate::{dbg, dbt::x86::emitter::X86BlockRef},
+    crate::dbt::x86::emitter::X86BlockRef,
     alloc::vec::Vec,
     core::fmt::Debug,
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Opcode {
     MOV,
     ADD,
@@ -15,7 +15,7 @@ pub enum Opcode {
     RET,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PhysicalRegister {
     RAX,
     RCX,
@@ -113,13 +113,13 @@ impl From<PhysicalRegister> for AsmRegister64 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SegmentRegister {
     FS,
     GS,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Register {
     PhysicalRegister(PhysicalRegister),
     VirtualRegister(usize),
@@ -134,7 +134,7 @@ impl Into<iced_x86::Register> for PhysicalRegister {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MemoryScale {
     S1,
     S2,
@@ -142,7 +142,7 @@ pub enum MemoryScale {
     S8,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum OperandKind {
     Immediate(u64),
     Memory {
@@ -180,17 +180,17 @@ impl Debug for OperandKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OperandDirection {
     In,
     Out,
     InOut,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Operand {
-    kind: OperandKind,
-    width_in_bits: u8,
+    pub kind: OperandKind,
+    pub width_in_bits: u8,
 }
 
 impl Operand {
@@ -285,10 +285,10 @@ impl Operand {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Instruction {
-    opcode: Opcode,
-    operands: Vec<(OperandDirection, Operand)>,
+    pub opcode: Opcode,
+    pub operands: Vec<(OperandDirection, Operand)>,
 }
 
 macro_rules! alu_op {
@@ -403,7 +403,7 @@ impl Instruction {
             },
 
             Opcode::ADD => {
-                dbg!(&self.operands);
+                todo!("{:?}", self.operands);
             }
 
             Opcode::LABEL => {}

@@ -1,8 +1,8 @@
 use {
-    crate::{arch::x86::memory::HEAP_ALLOCATOR, guest::GUEST_DEVICE_FACTORIES, print},
+    crate::{arch::x86::memory::HEAP_ALLOCATOR, guest::register_device_factory, print},
     alloc::{borrow::ToOwned, boxed::Box},
     core::{alloc::GlobalAlloc, panic::PanicInfo},
-    plugins_api::PluginHost,
+    plugins_api::{guest::DeviceFactory, PluginHost},
 };
 
 pub struct Host;
@@ -20,12 +20,8 @@ impl PluginHost for Host {
         &HEAP_ALLOCATOR
     }
 
-    fn register_device(
-        &self,
-        name: &'static str,
-        guest_device_factory: Box<dyn plugins_api::guest::DeviceFactory>,
-    ) {
-        unsafe { GUEST_DEVICE_FACTORIES.lock() }.insert(name.to_owned(), guest_device_factory);
+    fn register_device(&self, name: &'static str, factory: Box<dyn DeviceFactory>) {
+        register_device_factory(name.to_owned(), factory);
     }
 
     fn panic(&self, info: &PanicInfo) {

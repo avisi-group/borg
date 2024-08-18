@@ -151,6 +151,3 @@ impl Allocations {
         self.0.get_mut(virtual_register.0).expect("tried to deallocate non-allocated register {virtual_register:?}").take().expect("virtual register slot {virtual_register:?} was previously allocated but not currently")
     }
 }
-
-#[test]
-mod tests {}

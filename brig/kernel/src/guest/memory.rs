@@ -1,5 +1,5 @@
 use {
-    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
+    alloc::{collections::BTreeMap, string::String, sync::Arc},
     core::{
         fmt::Display,
         mem::{size_of, MaybeUninit},

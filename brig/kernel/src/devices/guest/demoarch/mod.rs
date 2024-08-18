@@ -13,14 +13,16 @@ use {
 pub struct DemoArchFactory;
 
 impl DeviceFactory for DemoArchFactory {
-    fn create(&self, _: BTreeMap<String, String>, env: Box<dyn Environment>) -> Arc<dyn Device> {
-        Arc::new(DemoArch { env })
+    fn create(
+        &self,
+        _config: BTreeMap<String, String>,
+        _env: Box<dyn Environment>,
+    ) -> Arc<dyn Device> {
+        Arc::new(DemoArch {})
     }
 }
 
-struct DemoArch {
-    env: Box<dyn Environment>,
-}
+struct DemoArch {}
 
 impl Debug for DemoArch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {

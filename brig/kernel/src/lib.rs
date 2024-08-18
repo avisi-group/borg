@@ -30,6 +30,7 @@ pub mod plugins;
 mod rand;
 mod scheduler;
 mod tasks;
+mod tests;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -71,6 +72,8 @@ pub fn continue_start() {
         .expect("disk not found");
 
     plugins::load_all(&device);
+
+    tests::run_all();
 
     guest::start();
 }

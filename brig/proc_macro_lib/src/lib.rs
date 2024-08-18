@@ -198,3 +198,14 @@ fn generate_asm(inner_fn_ident: &str, with_code: bool) -> String {
         if !with_code { "push $0" } else { "" }
     )
 }
+
+#[proc_macro_attribute]
+pub fn ktest(_attribute: TokenStream, item: TokenStream) -> TokenStream {
+    let item: ItemFn = parse_macro_input!(item);
+
+    quote! {
+        #[linkme::distributed_slice(crate::tests::TESTS)]
+        #item
+    }
+    .into()
+}
