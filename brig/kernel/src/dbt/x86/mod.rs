@@ -1,23 +1,13 @@
 use {
-    crate::{
-        dbg,
-        dbt::{
-            emitter::{Emitter, Type},
-            x86::{
-                emitter::{
-                    BinaryOperationKind, NodeKind, X86Block, X86BlockRef, X86Emitter, X86Node,
-                    X86NodeRef,
-                },
-                encoder::Instruction,
-                register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
-            },
-            Translation, TranslationContext,
+    crate::dbt::{
+        emitter::Emitter,
+        x86::{
+            emitter::{X86Block, X86BlockRef, X86Emitter},
+            register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
         },
+        Translation, TranslationContext,
     },
-    alloc::{
-        collections::{btree_map::BTreeMap, btree_set::BTreeSet},
-        vec::Vec,
-    },
+    alloc::collections::btree_set::BTreeSet,
     core::fmt::Debug,
 };
 

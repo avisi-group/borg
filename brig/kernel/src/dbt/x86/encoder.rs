@@ -1,8 +1,8 @@
 use {
-    crate::dbt::x86::emitter::X86BlockRef,
+    crate::{dbg, dbt::x86::emitter::X86BlockRef},
     alloc::vec::Vec,
     core::fmt::Debug,
-    iced_x86::code_asm::{rax, rbx, rcx, rdx, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler},
 };
 
 #[derive(Debug, Clone)]
@@ -80,26 +80,36 @@ impl PhysicalRegister {
     }
 }
 
-impl Into<AsmRegister64> for &PhysicalRegister {
-    fn into(self) -> AsmRegister64 {
-        match self {
+impl From<&PhysicalRegister> for AsmRegister64 {
+    fn from(phys: &PhysicalRegister) -> Self {
+        use iced_x86::code_asm::{
+            r10, r11, r12, r13, r14, r15, r8, r9, rax, rbp, rbx, rcx, rdi, rdx, rsi, rsp,
+        };
+
+        match phys {
             PhysicalRegister::RAX => rax,
             PhysicalRegister::RCX => rcx,
             PhysicalRegister::RDX => rdx,
             PhysicalRegister::RBX => rbx,
-            PhysicalRegister::RSI => todo!(),
-            PhysicalRegister::RDI => todo!(),
-            PhysicalRegister::RSP => todo!(),
-            PhysicalRegister::RBP => todo!(),
-            PhysicalRegister::R8 => todo!(),
-            PhysicalRegister::R9 => todo!(),
-            PhysicalRegister::R10 => todo!(),
-            PhysicalRegister::R11 => todo!(),
-            PhysicalRegister::R12 => todo!(),
-            PhysicalRegister::R13 => todo!(),
-            PhysicalRegister::R14 => todo!(),
-            PhysicalRegister::R15 => todo!(),
+            PhysicalRegister::RSI => rsi,
+            PhysicalRegister::RDI => rdi,
+            PhysicalRegister::RSP => rsp,
+            PhysicalRegister::RBP => rbp,
+            PhysicalRegister::R8 => r8,
+            PhysicalRegister::R9 => r9,
+            PhysicalRegister::R10 => r10,
+            PhysicalRegister::R11 => r11,
+            PhysicalRegister::R12 => r12,
+            PhysicalRegister::R13 => r13,
+            PhysicalRegister::R14 => r14,
+            PhysicalRegister::R15 => r15,
         }
+    }
+}
+
+impl From<PhysicalRegister> for AsmRegister64 {
+    fn from(phys: PhysicalRegister) -> Self {
+        Self::from(&phys)
     }
 }
 
@@ -347,8 +357,55 @@ impl Instruction {
                         .mov::<AsmRegister64, AsmRegister64>((src).into(), (dst).into())
                         .unwrap();
                 }
+
+                (
+                    Operand {
+                        kind:
+                            OperandKind::Memory {
+                                base,
+                                index,
+                                scale,
+                                displacement,
+                                ..
+                            },
+                        width_in_bits: w,
+                    },
+                    Operand {
+                        kind: OperandKind::Register(Register::PhysicalRegister(dst)),
+                        width_in_bits: w2,
+                    },
+                ) => {
+                    assert!(w == w2);
+
+                    let Some(Register::PhysicalRegister(base)) = base else {
+                        panic!()
+                    };
+
+                    let mut src = AsmRegister64::from(base) + *displacement;
+
+                    if let Some(Register::PhysicalRegister(index)) = index {
+                        let scale = match scale {
+                            MemoryScale::S1 => 1,
+                            MemoryScale::S2 => 2,
+                            MemoryScale::S4 => 4,
+                            MemoryScale::S8 => 8,
+                        };
+
+                        src = src + AsmRegister64::from(index) * scale;
+                    }
+
+                    assembler
+                        .mov::<AsmMemoryOperand, AsmRegister64>(src, (dst).into())
+                        .unwrap();
+                }
+
                 ops => todo!("{ops:?} operands not supported for mov"),
             },
+
+            Opcode::ADD => {
+                dbg!(&self.operands);
+            }
+
             Opcode::LABEL => {}
             o => unimplemented!("opcode {o:?}"),
         };
