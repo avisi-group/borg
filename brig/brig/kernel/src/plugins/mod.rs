@@ -23,7 +23,9 @@ struct PluginRegistry {
 
 impl PluginRegistry {
     pub const fn new() -> Self {
-        Self { plugins: Mutex::new(BTreeMap::new()) }
+        Self {
+            plugins: Mutex::new(BTreeMap::new()),
+        }
     }
 
     pub fn register(&self, plugin: Plugin) {
@@ -57,7 +59,8 @@ pub fn load_all(device: &SharedDevice) {
     let mut fs = TarFilesystem::mount(device.as_block());
 
     // loading statically linked arch
-    unsafe { GUEST_DEVICE_FACTORIES.lock() }.insert("demoarch".to_owned(), Box::new(DemoArchFactory));
+    unsafe { GUEST_DEVICE_FACTORIES.lock() }
+        .insert("demoarch".to_owned(), Box::new(DemoArchFactory));
 
     log::info!("loading plugins");
     // todo: don't hardcode this, load everything in plugins directory

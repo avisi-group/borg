@@ -133,7 +133,7 @@ impl<T> Display for SharedKey<T> {
 #[cfg(test)]
 mod test {
     use {
-        super::{Shared, SharedKey},
+        crate::shared::{Shared, SharedKey},
         pretty_assertions::{assert_eq, assert_ne},
         std::{
             collections::hash_map::DefaultHasher,

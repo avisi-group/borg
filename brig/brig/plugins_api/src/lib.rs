@@ -33,7 +33,11 @@ pub trait PluginHost: Send + Sync {
     fn allocator(&self) -> &dyn GlobalAlloc;
 
     /// Register a new kind of guest device with the host
-    fn register_device(&self, name: &'static str, guest_device_factory: Box<dyn guest::DeviceFactory>);
+    fn register_device(
+        &self,
+        name: &'static str,
+        guest_device_factory: Box<dyn guest::DeviceFactory>,
+    );
 
     /// Panic from plugin
     fn panic(&self, info: &PanicInfo);

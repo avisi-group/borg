@@ -35,11 +35,29 @@ impl Device for DemoArch {
         let emitter = ctx.emitter();
 
         {
-            let reg_offset = emitter.constant(0x1234, Type { kind: TypeKind::Unsigned, width: 32 });
+            let reg_offset = emitter.constant(
+                0x1234,
+                Type {
+                    kind: TypeKind::Unsigned,
+                    width: 32,
+                },
+            );
 
-            let reg_value = emitter.read_register(reg_offset.clone(), Type { kind: TypeKind::Unsigned, width: 32 });
+            let reg_value = emitter.read_register(
+                reg_offset.clone(),
+                Type {
+                    kind: TypeKind::Unsigned,
+                    width: 32,
+                },
+            );
 
-            let one = emitter.constant(1, Type { kind: TypeKind::Unsigned, width: 32 });
+            let one = emitter.constant(
+                1,
+                Type {
+                    kind: TypeKind::Unsigned,
+                    width: 32,
+                },
+            );
 
             let sum = emitter.add(reg_value, one);
 

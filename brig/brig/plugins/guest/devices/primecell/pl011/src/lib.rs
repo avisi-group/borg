@@ -12,7 +12,10 @@ use {
 
 #[no_mangle]
 #[link_section = ".plugin_header"]
-pub static PLUGIN_HEADER: PluginHeader = PluginHeader { name: "pl011", entrypoint };
+pub static PLUGIN_HEADER: PluginHeader = PluginHeader {
+    name: "pl011",
+    entrypoint,
+};
 
 fn entrypoint(host: &'static dyn PluginHost) {
     plugins_rt::init(host);
@@ -25,7 +28,11 @@ fn entrypoint(host: &'static dyn PluginHost) {
 struct Pl011Factory;
 
 impl DeviceFactory for Pl011Factory {
-    fn create(&self, _config: BTreeMap<String, String>, _guest_environment: Box<dyn Environment>) -> Arc<dyn Device> {
+    fn create(
+        &self,
+        _config: BTreeMap<String, String>,
+        _guest_environment: Box<dyn Environment>,
+    ) -> Arc<dyn Device> {
         Arc::new(Pl011)
     }
 }

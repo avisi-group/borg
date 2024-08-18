@@ -135,7 +135,13 @@ pub enum MemoryScale {
 #[derive(Clone)]
 pub enum OperandKind {
     Immediate(u64),
-    Memory { base: Option<Register>, index: Option<Register>, scale: MemoryScale, displacement: i32, segment_override: Option<SegmentRegister> },
+    Memory {
+        base: Option<Register>,
+        index: Option<Register>,
+        scale: MemoryScale,
+        displacement: i32,
+        segment_override: Option<SegmentRegister>,
+    },
     Register(Register),
     Target(X86BlockRef),
 }
@@ -144,7 +150,20 @@ impl Debug for OperandKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Immediate(arg0) => f.debug_tuple("Immediate").field(arg0).finish(),
-            Self::Memory { base, index, scale, displacement, segment_override } => f.debug_struct("Memory").field("base", base).field("index", index).field("scale", scale).field("displacement", displacement).field("segment_override", segment_override).finish(),
+            Self::Memory {
+                base,
+                index,
+                scale,
+                displacement,
+                segment_override,
+            } => f
+                .debug_struct("Memory")
+                .field("base", base)
+                .field("index", index)
+                .field("scale", scale)
+                .field("displacement", displacement)
+                .field("segment_override", segment_override)
+                .finish(),
             Self::Register(arg0) => f.debug_tuple("Register").field(arg0).finish(),
             Self::Target(arg0) => write!(f, "{arg0:x}"),
         }
@@ -166,15 +185,24 @@ pub struct Operand {
 
 impl Operand {
     pub fn imm(width_in_bits: u8, value: u64) -> Operand {
-        Operand { kind: OperandKind::Immediate(value), width_in_bits }
+        Operand {
+            kind: OperandKind::Immediate(value),
+            width_in_bits,
+        }
     }
 
     pub fn preg(width_in_bits: u8, reg: PhysicalRegister) -> Operand {
-        Operand { kind: OperandKind::Register(Register::PhysicalRegister(reg)), width_in_bits }
+        Operand {
+            kind: OperandKind::Register(Register::PhysicalRegister(reg)),
+            width_in_bits,
+        }
     }
 
     pub fn vreg(width_in_bits: u8, reg: usize) -> Operand {
-        Operand { kind: OperandKind::Register(Register::VirtualRegister(reg)), width_in_bits }
+        Operand {
+            kind: OperandKind::Register(Register::VirtualRegister(reg)),
+            width_in_bits,
+        }
     }
 
     pub fn mem_base(width_in_bits: u8, base: Register) -> Operand {
@@ -182,23 +210,68 @@ impl Operand {
     }
 
     pub fn mem_base_displ(width_in_bits: u8, base: Register, displacement: i32) -> Operand {
-        Operand { kind: OperandKind::Memory { base: Some(base), index: None, scale: MemoryScale::S1, displacement, segment_override: None }, width_in_bits }
+        Operand {
+            kind: OperandKind::Memory {
+                base: Some(base),
+                index: None,
+                scale: MemoryScale::S1,
+                displacement,
+                segment_override: None,
+            },
+            width_in_bits,
+        }
     }
 
-    pub fn mem_base_idx_scale(width_in_bits: u8, base: Register, idx: Register, scale: MemoryScale) -> Operand {
+    pub fn mem_base_idx_scale(
+        width_in_bits: u8,
+        base: Register,
+        idx: Register,
+        scale: MemoryScale,
+    ) -> Operand {
         Self::mem_base_idx_scale_displ(width_in_bits, base, idx, scale, 0)
     }
 
-    pub fn mem_base_idx_scale_displ(width_in_bits: u8, base: Register, idx: Register, scale: MemoryScale, displacement: i32) -> Operand {
-        Operand { kind: OperandKind::Memory { base: Some(base), index: Some(idx), scale, displacement, segment_override: None }, width_in_bits }
+    pub fn mem_base_idx_scale_displ(
+        width_in_bits: u8,
+        base: Register,
+        idx: Register,
+        scale: MemoryScale,
+        displacement: i32,
+    ) -> Operand {
+        Operand {
+            kind: OperandKind::Memory {
+                base: Some(base),
+                index: Some(idx),
+                scale,
+                displacement,
+                segment_override: None,
+            },
+            width_in_bits,
+        }
     }
 
-    pub fn mem_seg_displ(width_in_bits: u8, segment: SegmentRegister, displacement: i32) -> Operand {
-        Operand { kind: OperandKind::Memory { base: None, index: None, scale: MemoryScale::S1, displacement, segment_override: Some(segment) }, width_in_bits }
+    pub fn mem_seg_displ(
+        width_in_bits: u8,
+        segment: SegmentRegister,
+        displacement: i32,
+    ) -> Operand {
+        Operand {
+            kind: OperandKind::Memory {
+                base: None,
+                index: None,
+                scale: MemoryScale::S1,
+                displacement,
+                segment_override: Some(segment),
+            },
+            width_in_bits,
+        }
     }
 
     pub fn target(target: X86BlockRef) -> Self {
-        Self { kind: OperandKind::Target(target), width_in_bits: 0 }
+        Self {
+            kind: OperandKind::Target(target),
+            width_in_bits: 0,
+        }
     }
 }
 
@@ -211,26 +284,41 @@ pub struct Instruction {
 macro_rules! alu_op {
     ($gen_name: ident, $opcode: ident) => {
         pub fn $gen_name(src: Operand, dst: Operand) -> Self {
-            Instruction { opcode: Opcode::$opcode, operands: alloc::vec![(OperandDirection::In, src), (OperandDirection::InOut, dst)] }
+            Instruction {
+                opcode: Opcode::$opcode,
+                operands: alloc::vec![(OperandDirection::In, src), (OperandDirection::InOut, dst)],
+            }
         }
     };
 }
 
 impl Instruction {
     pub fn mov(src: Operand, dst: Operand) -> Self {
-        Self { opcode: Opcode::MOV, operands: alloc::vec![(OperandDirection::In, src), (OperandDirection::Out, dst)] }
+        Self {
+            opcode: Opcode::MOV,
+            operands: alloc::vec![(OperandDirection::In, src), (OperandDirection::Out, dst)],
+        }
     }
 
     pub fn label() -> Self {
-        Self { opcode: Opcode::LABEL, operands: alloc::vec![] }
+        Self {
+            opcode: Opcode::LABEL,
+            operands: alloc::vec![],
+        }
     }
 
     pub fn jmp(block: X86BlockRef) -> Self {
-        Self { opcode: Opcode::JMP, operands: alloc::vec![(OperandDirection::In, Operand::target(block))] }
+        Self {
+            opcode: Opcode::JMP,
+            operands: alloc::vec![(OperandDirection::In, Operand::target(block))],
+        }
     }
 
     pub fn ret() -> Self {
-        Self { opcode: Opcode::RET, operands: alloc::vec![] }
+        Self {
+            opcode: Opcode::RET,
+            operands: alloc::vec![],
+        }
     }
 
     alu_op!(add, ADD);
@@ -243,10 +331,21 @@ impl Instruction {
     pub fn encode(&self, assembler: &mut CodeAssembler) {
         match &self.opcode {
             Opcode::MOV => match self.operand_tuple2() {
-                (Operand { kind: OperandKind::Register(Register::PhysicalRegister(src)), width_in_bits: w }, Operand { kind: OperandKind::Register(Register::PhysicalRegister(dst)), width_in_bits: w2 }) => {
+                (
+                    Operand {
+                        kind: OperandKind::Register(Register::PhysicalRegister(src)),
+                        width_in_bits: w,
+                    },
+                    Operand {
+                        kind: OperandKind::Register(Register::PhysicalRegister(dst)),
+                        width_in_bits: w2,
+                    },
+                ) => {
                     assert!(w == w2);
 
-                    assembler.mov::<AsmRegister64, AsmRegister64>((src).into(), (dst).into()).unwrap();
+                    assembler
+                        .mov::<AsmRegister64, AsmRegister64>((src).into(), (dst).into())
+                        .unwrap();
                 }
                 ops => todo!("{ops:?} operands not supported for mov"),
             },
@@ -261,8 +360,15 @@ impl Instruction {
             .filter_map(|(direction, operand)| match &mut operand.kind {
                 OperandKind::Immediate(_) => None,
                 // todo: avoid allocation here
-                OperandKind::Memory { base, index, .. } => Some([base, index].into_iter().filter_map(|reg| reg.as_mut().map(|reg| (OperandDirection::In, reg))).collect::<Vec<_>>()),
-                OperandKind::Register(reg) => Some([(direction.clone(), reg)].into_iter().collect::<Vec<_>>()),
+                OperandKind::Memory { base, index, .. } => Some(
+                    [base, index]
+                        .into_iter()
+                        .filter_map(|reg| reg.as_mut().map(|reg| (OperandDirection::In, reg)))
+                        .collect::<Vec<_>>(),
+                ),
+                OperandKind::Register(reg) => {
+                    Some([(direction.clone(), reg)].into_iter().collect::<Vec<_>>())
+                }
                 OperandKind::Target(_) => None,
             })
             .flatten()
