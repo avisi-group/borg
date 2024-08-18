@@ -1,6 +1,5 @@
 {
-    "rust-analyzer.check.allTargets": false,
-    "rust-analyzer.check.noDefaultFeatures": true,
-    "rust-analyzer.cargo.noDefaultFeatures": true,
-    "rust-analyzer.checkOnSave": false,
+    "rust-analyzer.check.allTargets": true,
+
+    "rust-analyzer.checkOnSave": true,
 }
