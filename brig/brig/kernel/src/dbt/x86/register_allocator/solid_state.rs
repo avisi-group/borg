@@ -9,39 +9,18 @@ use {
     bitset_core::BitSet,
 };
 
-/// Cheap and cheerful single-pass register allocation, where N is the number of
-/// physical registers
-pub struct SolidStateRegisterAllocator;
-
-impl RegisterAllocator for SolidStateRegisterAllocator {
-    fn allocate(instructions: &mut [Instruction], num_virtual_registers: usize) {
-        let mut state = State::new(num_virtual_registers);
-
-        instructions
-            .iter_mut()
-            .rev()
-            .for_each(|instr| state.process(instr));
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct VirtualRegisterIndex(usize);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-struct PhysicalRegisterIndex(usize);
-
-struct State {
+pub struct SolidStateRegisterAllocator {
     register_allocations: Allocations,
     // 16 physical registers
     physical_used: u16,
 }
 
-impl State {
+impl SolidStateRegisterAllocator {
     /// Builds a new `RegisterAllocator`.
     ///
     /// Upon construction, SSA register 0 is bound to local register 0; you
     /// would be well advised to use it as the output of your function.
-    fn new(num_virtual_registers: usize) -> Self {
+    pub fn new(num_virtual_registers: usize) -> Self {
         let mut physical_used = 0;
 
         // prevent use of the reserved registers
@@ -56,6 +35,45 @@ impl State {
         }
     }
 
+    fn lookup_or_allocate(
+        &mut self,
+        virtual_register: VirtualRegisterIndex,
+    ) -> PhysicalRegisterIndex {
+        match self.register_allocations.lookup(virtual_register) {
+            Some(phys) => phys,
+            None => {
+                let phys_index = {
+                    let first_empty = self.physical_used.trailing_ones();
+
+                    if first_empty > 16 {
+                        panic!("ran out of registers :(");
+                    }
+
+                    usize::try_from(first_empty).unwrap()
+                };
+
+                self.physical_used.bit_set(phys_index);
+
+                let phys = PhysicalRegisterIndex(phys_index);
+
+                self.register_allocations.insert(virtual_register, phys);
+
+                phys
+            }
+        }
+    }
+
+    fn lookup_and_deallocate(
+        &mut self,
+        virtual_register: VirtualRegisterIndex,
+    ) -> PhysicalRegisterIndex {
+        let phys = self.register_allocations.remove(virtual_register);
+        self.physical_used.bit_reset(phys.0);
+        phys
+    }
+}
+
+impl RegisterAllocator for SolidStateRegisterAllocator {
     fn process(&mut self, instruction: &mut Instruction) {
         instruction.get_use_defs().for_each(|(dir, reg)| match reg {
             Register::PhysicalRegister(phys_reg) => match dir {
@@ -100,44 +118,13 @@ impl State {
             },
         });
     }
-
-    fn lookup_or_allocate(
-        &mut self,
-        virtual_register: VirtualRegisterIndex,
-    ) -> PhysicalRegisterIndex {
-        match self.register_allocations.lookup(virtual_register) {
-            Some(phys) => phys,
-            None => {
-                let phys_index = {
-                    let first_empty = self.physical_used.trailing_ones();
-
-                    if first_empty > 16 {
-                        panic!("ran out of registers :(");
-                    }
-
-                    usize::try_from(first_empty).unwrap()
-                };
-
-                self.physical_used.bit_set(phys_index);
-
-                let phys = PhysicalRegisterIndex(phys_index);
-
-                self.register_allocations.insert(virtual_register, phys);
-
-                phys
-            }
-        }
-    }
-
-    fn lookup_and_deallocate(
-        &mut self,
-        virtual_register: VirtualRegisterIndex,
-    ) -> PhysicalRegisterIndex {
-        let phys = self.register_allocations.remove(virtual_register);
-        self.physical_used.bit_reset(phys.0);
-        phys
-    }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct VirtualRegisterIndex(usize);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct PhysicalRegisterIndex(usize);
 
 struct Allocations(Vec<Option<PhysicalRegisterIndex>>);
 

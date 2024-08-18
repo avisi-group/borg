@@ -3,6 +3,7 @@ use {
         emitter::Type,
         x86::{
             encoder::{Instruction, Operand, PhysicalRegister, Register},
+            register_allocator::RegisterAllocator,
             Emitter,
         },
     },
@@ -22,7 +23,10 @@ pub struct X86Emitter {
 
 impl X86Emitter {
     pub fn new(initial_block: X86BlockRef) -> Self {
-        Self { current_block: initial_block, next_vreg: 0 }
+        Self {
+            current_block: initial_block,
+            next_vreg: 0,
+        }
     }
 
     pub fn next_vreg(&mut self) -> usize {
@@ -41,12 +45,21 @@ impl Emitter for X86Emitter {
     }
 
     fn constant(&mut self, value: u64, typ: Type) -> Self::NodeRef {
-        Self::NodeRef::from(X86Node { typ, kind: NodeKind::Constant { value, width: typ.width } })
+        Self::NodeRef::from(X86Node {
+            typ,
+            kind: NodeKind::Constant {
+                value,
+                width: typ.width,
+            },
+        })
     }
 
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef {
         match offset.kind() {
-            NodeKind::Constant { value, .. } => Self::NodeRef::from(X86Node { typ, kind: NodeKind::GuestRegister { offset: *value } }),
+            NodeKind::Constant { value, .. } => Self::NodeRef::from(X86Node {
+                typ,
+                kind: NodeKind::GuestRegister { offset: *value },
+            }),
             _ => panic!("can't read non constant offset"),
         }
     }
@@ -54,7 +67,9 @@ impl Emitter for X86Emitter {
     fn add(&mut self, lhs: Self::NodeRef, rhs: Self::NodeRef) -> Self::NodeRef {
         Self::NodeRef::from(X86Node {
             typ: lhs.typ().clone(),
-            kind: NodeKind::BinaryOperation { kind: BinaryOperationKind::Add(lhs, rhs) },
+            kind: NodeKind::BinaryOperation {
+                kind: BinaryOperationKind::Add(lhs, rhs),
+            },
         })
     }
 
@@ -65,7 +80,14 @@ impl Emitter for X86Emitter {
         };
         let value = value.to_operand(self);
 
-        self.current_block.append(Instruction::mov(value, Operand::mem_base_displ(64, Register::PhysicalRegister(PhysicalRegister::RBP), offset)));
+        self.current_block.append(Instruction::mov(
+            value,
+            Operand::mem_base_displ(
+                64,
+                Register::PhysicalRegister(PhysicalRegister::RBP),
+                offset,
+            ),
+        ));
     }
 
     fn jump(&mut self, target: Self::BlockRef) {
@@ -92,11 +114,22 @@ impl X86NodeRef {
 
     pub fn to_operand(&self, emitter: &mut X86Emitter) -> Operand {
         match self.kind() {
-            NodeKind::Constant { value, width } => Operand::imm((*width).try_into().unwrap(), *value),
+            NodeKind::Constant { value, width } => {
+                Operand::imm((*width).try_into().unwrap(), *value)
+            }
             NodeKind::GuestRegister { offset } => {
                 let dst = Operand::vreg(64, emitter.next_vreg());
 
-                emitter.current_block.append(Instruction::mov(Operand::mem_base_displ(64, super::encoder::Register::PhysicalRegister(super::encoder::PhysicalRegister::RBP), (*offset).try_into().unwrap()), dst.clone()));
+                emitter.current_block.append(Instruction::mov(
+                    Operand::mem_base_displ(
+                        64,
+                        super::encoder::Register::PhysicalRegister(
+                            super::encoder::PhysicalRegister::RBP,
+                        ),
+                        (*offset).try_into().unwrap(),
+                    ),
+                    dst.clone(),
+                ));
 
                 dst
             }
@@ -107,8 +140,12 @@ impl X86NodeRef {
                     BinaryOperationKind::Add(lhs, rhs) => {
                         let lhs = lhs.to_operand(emitter);
                         let rhs = rhs.to_operand(emitter);
-                        emitter.current_block.append(Instruction::mov(lhs, dst.clone()));
-                        emitter.current_block.append(Instruction::add(rhs, dst.clone()));
+                        emitter
+                            .current_block
+                            .append(Instruction::mov(lhs, dst.clone()));
+                        emitter
+                            .current_block
+                            .append(Instruction::add(rhs, dst.clone()));
                     }
                     _ => todo!(),
                 }
@@ -209,8 +246,13 @@ impl X86BlockRef {
         assembler.assemble(0).unwrap()
     }
 
-    pub fn get_instructions(&self) -> Vec<Instruction> {
-        self.0.borrow_mut().instructions.clone()
+    pub fn allocate_registers<R: RegisterAllocator>(&self, allocator: &mut R) {
+        self.0
+            .borrow_mut()
+            .instructions
+            .iter_mut()
+            .rev()
+            .for_each(|i| allocator.process(i));
     }
 
     pub fn get_next_0(&self) -> Option<X86BlockRef> {
@@ -244,6 +286,10 @@ pub struct X86Block {
 
 impl X86Block {
     pub fn new() -> Self {
-        Self { instructions: alloc::vec![Instruction::label()], next_0: None, next_1: None }
+        Self {
+            instructions: alloc::vec![Instruction::label()],
+            next_0: None,
+            next_1: None,
+        }
     }
 }

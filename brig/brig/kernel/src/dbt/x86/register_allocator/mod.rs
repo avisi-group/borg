@@ -4,5 +4,5 @@ use crate::dbt::x86::encoder::Instruction;
 pub mod solid_state;
 
 pub trait RegisterAllocator {
-    fn allocate(instructions: &mut [Instruction], num_virtual_registers: usize);
+    fn process(&mut self, instruction: &mut Instruction);
 }

@@ -68,17 +68,12 @@ impl X86TranslationContext {
         }
     }
 
-    // make this an iterator too
-    fn linearize_instructions(&self) -> Vec<Instruction> {
-        let mut instructions = Vec::new();
-
-        let mut visited = BTreeSet::new();
+    fn allocate_registers<R: RegisterAllocator>(&self, mut allocator: R) {
+        let mut visited = alloc::vec![];
         let mut to_visit = alloc::vec![self.initial_block.clone()];
 
         while let Some(next) = to_visit.pop() {
-            instructions.extend(next.get_instructions());
-
-            visited.insert(next.clone());
+            visited.push(next.clone());
 
             if let Some(next_0) = next.get_next_0() {
                 if !visited.contains(&next_0) {
@@ -93,7 +88,9 @@ impl X86TranslationContext {
             }
         }
 
-        instructions
+        visited.into_iter().rev().for_each(|block| {
+            block.allocate_registers(&mut allocator);
+        });
     }
 }
 
@@ -109,13 +106,8 @@ impl TranslationContext for X86TranslationContext {
     }
 
     fn compile(mut self) -> Translation {
-        let mut instrs = self.linearize_instructions();
-
-        log::debug!("pre-allocation: {instrs:#?}");
-
-        SolidStateRegisterAllocator::allocate(&mut instrs, self.emitter.next_vreg());
-
-        log::debug!("post-allocation: {instrs:#?}");
+        let num_virtual_registers = self.emitter.next_vreg();
+        self.allocate_registers(SolidStateRegisterAllocator::new(num_virtual_registers));
 
         Translation {
             code: self.initial_block.lower(),
