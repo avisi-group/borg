@@ -40,9 +40,13 @@ concat-idents = "1.1.5"
 iced-x86 = { version = "1.21.0", default-features = false, features = [
     "decoder",
     "encoder",
+    "block_encoder",
     "gas",
     "no_std",
+    "code_asm"
 ] }
 elfloader = { git = "https://github.com/avisi-group/rust-elfloader", rev = "c7e6230" }
+bitset-core = { version = "0.1.1", default-features = false }
+itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 
 # twox-hash = { version = "1.6.3", default-features = false } # not currently needed, but it's a good no_std hash library when it is needed

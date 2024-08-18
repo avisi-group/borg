@@ -1,10 +1,12 @@
 use {
     crate::{
-        devices::SharedDevice,
+        alloc::borrow::ToOwned,
+        devices::{guest::demoarch::DemoArchFactory, SharedDevice},
         fs::{tar::TarFilesystem, File, Filesystem},
+        guest::GUEST_DEVICE_FACTORIES,
         plugins::{host::Host, shared_object::SharedObject},
     },
-    alloc::collections::BTreeMap,
+    alloc::{boxed::Box, collections::BTreeMap},
     elfloader::ElfBinary,
     plugins_api::PluginHeader,
     spin::Mutex,
@@ -21,9 +23,7 @@ struct PluginRegistry {
 
 impl PluginRegistry {
     pub const fn new() -> Self {
-        Self {
-            plugins: Mutex::new(BTreeMap::new()),
-        }
+        Self { plugins: Mutex::new(BTreeMap::new()) }
     }
 
     pub fn register(&self, plugin: Plugin) {
@@ -56,13 +56,16 @@ pub fn load_all(device: &SharedDevice) {
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
 
+    // loading statically linked arch
+    unsafe { GUEST_DEVICE_FACTORIES.lock() }.insert("demoarch".to_owned(), Box::new(DemoArchFactory));
+
     log::info!("loading plugins");
     // todo: don't hardcode this, load everything in plugins directory
     [
         // "plugins/libtest.so",
         // "plugins/libaarch64.so",
         "plugins/libpl011.so",
-        "plugins/libdemoarch.so",
+        //   "plugins/libdemoarch.so",
     ]
     .into_iter()
     .map(|path| fs.open(path).unwrap().read_to_vec().unwrap())

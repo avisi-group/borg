@@ -49,6 +49,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
 
 [[package]]
+name = "bitset-core"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f421f1bcb30aa9d851a03c2920ab5d96ca920d5786645a597b5fc37922f8b89e"
+
+[[package]]
 name = "bootloader_api"
 version = "0.11.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -90,14 +96,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "demoarch"
-version = "0.1.0"
-dependencies = [
- "log",
- "plugins_rt",
-]
-
-[[package]]
 name = "displaydoc"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -107,6 +105,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "either"
+version = "1.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
 name = "elf"
@@ -157,6 +161,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -167,6 +180,7 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "acpi",
+ "bitset-core",
  "bootloader_api",
  "buddy_system_allocator",
  "byte-unit",
@@ -178,6 +192,7 @@ dependencies = [
  "fastrand",
  "hex",
  "iced-x86",
+ "itertools",
  "log",
  "phf",
  "plugins_api",

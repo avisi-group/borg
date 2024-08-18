@@ -8,7 +8,7 @@ members = [
     # "plugins/guest/devices/arm/aarch64",
     # "plugins/guest/devices/arm/aarch64_interpreter",
     "plugins/guest/devices/primecell/pl011",
-    "plugins/guest/demoarch",
+
 ]
 
 [workspace.dependencies]

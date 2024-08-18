@@ -1,12 +1,11 @@
 use {
-    crate::dbt::x86::X86LoweringContext,
-    alloc::collections::BTreeMap,
-    plugins_api::guest::dbt::{
-        emitter::{Block, Builder, Context, Type},
-        Translation,
-    },
+    crate::dbt::emitter::Emitter,
+    alloc::{collections::BTreeMap, string::String, vec::Vec},
+    core::fmt::{self, Debug},
+    iced_x86::{Formatter, Instruction},
 };
 
+pub mod emitter;
 pub mod x86;
 
 pub struct TranslationManager {
@@ -33,4 +32,37 @@ impl TranslationManager {
     pub fn collect_garbage() {
         todo!()
     }
+}
+
+pub struct Translation {
+    pub code: Vec<u8>,
+}
+
+impl Debug for Translation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut decoder = iced_x86::Decoder::with_ip(64, &self.code, 0, 0);
+
+        let mut formatter = iced_x86::GasFormatter::new();
+
+        let mut output = String::new();
+
+        let mut instr = Instruction::default();
+
+        while decoder.can_decode() {
+            output.clear();
+            decoder.decode_out(&mut instr);
+            formatter.format(&instr, &mut output);
+            writeln!(f, "{:016x} {output}", instr.ip())?;
+        }
+
+        Ok(())
+    }
+}
+
+pub trait TranslationContext {
+    type Emitter: Emitter;
+
+    fn emitter(&mut self) -> &mut Self::Emitter;
+    fn create_block(&mut self) -> <<Self as TranslationContext>::Emitter as Emitter>::BlockRef;
+    fn compile(self) -> Translation;
 }

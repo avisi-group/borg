@@ -37,7 +37,7 @@ pub fn init() {
             const STACK_SIZE: usize = 4096 * 5;
             static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
 
-            let stack_start = VirtAddr::from_ptr(unsafe { addr_of!(STACK) });
+            let stack_start = VirtAddr::from_ptr(addr_of!(STACK));
             stack_start + u64::try_from(STACK_SIZE).unwrap() // stack end
         };
         tss
