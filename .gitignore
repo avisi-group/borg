@@ -1,8 +1,8 @@
 *.rkyv
 *.trace
-aarch64
+/aarch64
 brig-programs
-ir
+./ir
 
 **/.DS_Store
 **/target

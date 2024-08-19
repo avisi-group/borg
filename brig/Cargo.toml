@@ -3,12 +3,10 @@ resolver = "2"
 members = [
     "kernel",
     "proc_macro_lib",
-    # "plugins_rt",
+    "plugins_rt",
     # "plugins/guest/test",
-    # "plugins/guest/devices/arm/aarch64",
     # "plugins/guest/devices/arm/aarch64_interpreter",
     "plugins/guest/devices/primecell/pl011",
-
 ]
 
 [workspace.dependencies]

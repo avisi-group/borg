@@ -3,15 +3,18 @@ name = "aarch64_interpreter"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
-common = { path = "../../../../../../../aarch64/common" }
-u__SetConfig = { path = "../../../../../../../aarch64/u__SetConfig"}
-u__InitSystem = { path = "../../../../../../../aarch64/u__InitSystem" }
-borealis_register_init = { path = "../../../../../../../aarch64/borealis_register_init" }
-step_model = { path = "../../../../../../../aarch64/step_model"}
-ThisInstrAddr = { path = "../../../../../../../aarch64/ThisInstrAddr" }
-u__FetchInstr = { path = "../../../../../../../aarch64/u__FetchInstr" }
-
 plugins_rt.workspace = true
-
 log = "0.4.22"
+spin = "0.9.8"
+
+common = { path = "../../../../../../aarch64/common" }
+u__SetConfig = { path = "../../../../../../aarch64/u__SetConfig"}
+u__InitSystem = { path = "../../../../../../aarch64/u__InitSystem" }
+borealis_register_init = { path = "../../../../../../aarch64/borealis_register_init" }
+step_model = { path = "../../../../../../aarch64/step_model"}
+ThisInstrAddr = { path = "../../../../../../aarch64/ThisInstrAddr" }
+u__FetchInstr = { path = "../../../../../../aarch64/u__FetchInstr" }

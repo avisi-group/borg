@@ -218,7 +218,7 @@ pub fn create_manifest(
                                 version: None,
                                 registry: None,
                                 registry_index: None,
-                                path: Some("../../brig/brig/plugins_api".into()),
+                                path: Some("../../brig/plugins_api".into()),
                                 git: None,
                                 branch: None,
                                 tag: None,
