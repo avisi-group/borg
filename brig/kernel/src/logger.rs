@@ -19,7 +19,7 @@ impl fmt::Write for QemuWriter {
 }*/
 
 /// Global console writer
-static mut WRITER: Once<UART16550Device> = Once::INIT;
+pub static mut WRITER: Once<UART16550Device> = Once::INIT;
 
 static LOGGER: Logger<3> = Logger {
     default_level: LevelFilter::Trace,

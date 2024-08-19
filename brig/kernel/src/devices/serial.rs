@@ -1,10 +1,5 @@
 use core::fmt;
 
-pub trait SerialPort {
-    fn write_byte(b: u8);
-    fn write_bytes(b: &[u8]);
-}
-
 pub struct UART16550Device(uart_16550::SerialPort);
 
 impl UART16550Device {
@@ -12,6 +7,17 @@ impl UART16550Device {
         let mut serial_port = unsafe { uart_16550::SerialPort::new(io_port) };
         serial_port.init();
         Self(serial_port)
+    }
+
+    pub fn read_bytes(&mut self, buf: &mut [u8]) -> usize {
+        let mut index = 0;
+
+        while let Ok(byte) = self.0.try_receive() {
+            buf[index] = byte;
+            index += 1;
+        }
+
+        index
     }
 }
 

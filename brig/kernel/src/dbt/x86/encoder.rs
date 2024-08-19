@@ -470,7 +470,19 @@ impl Instruction {
             },
 
             Opcode::JMP => {
-                //  assembler.jmp(block_ref.ptr());
+                let [(
+                    OperandDirection::Out,
+                    Operand {
+                        kind: OperandKind::Target(target),
+                        width_in_bits,
+                    },
+                )] = self.operands.as_slice()
+                else {
+                    log::warn!("invalid operands");
+                    loop {}
+                };
+
+                // assembler.jmp(target.label());
             }
 
             Opcode::LABEL => {}

@@ -66,7 +66,7 @@ pub fn load_all(device: &SharedDevice) {
     // todo: don't hardcode this, load everything in plugins directory
     [
         // "plugins/libtest.so",
-        // "plugins/libaarch64.so",
+        // "plugins/libaarch64_interpreter.so",
         "plugins/libpl011.so",
     ]
     .into_iter()

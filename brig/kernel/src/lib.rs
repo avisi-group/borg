@@ -13,6 +13,7 @@ use {
             memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
         },
         devices::manager::SharedDeviceManager,
+        logger::WRITER,
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
@@ -65,7 +66,10 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     scheduler::local_run();
 }
 
-pub fn continue_start() {
+fn continue_start() {
+    let serial_in_task = tasks::create_task(serial_in);
+    serial_in_task.start();
+
     let device_manager = SharedDeviceManager::get();
     let device = device_manager
         .get_device_by_alias("disk00:03.0")
@@ -76,6 +80,31 @@ pub fn continue_start() {
     tests::run_all();
 
     guest::start();
+}
+
+fn serial_in() {
+    let mut buf = [0u8; 64];
+
+    loop {
+        let read = unsafe { WRITER.get_mut() }
+            .expect("WRITER not initialized")
+            .read_bytes(&mut buf);
+
+        if read > 0 {
+            match core::str::from_utf8(&buf[..read]) {
+                Ok(s) => match s {
+                    "\u{3}" => {
+                        log::error!("received Ctrl-C, terminating");
+                        qemu_exit();
+                    }
+                    _ => log::debug!("{:?}", s),
+                },
+                Err(e) => log::error!("serial port received invalid UTF-8 {:?}", e),
+            }
+        }
+
+        // todo nap time for a little bit
+    }
 }
 
 #[panic_handler]
