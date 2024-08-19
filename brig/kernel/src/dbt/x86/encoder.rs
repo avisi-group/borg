@@ -334,23 +334,22 @@ impl Instruction {
     alu_op!(add, ADD);
     alu_op!(sub, SUB);
 
-    fn operand_tuple2(&self) -> (&Operand, &Operand) {
-        (&self.operands[0].1, &self.operands[1].1)
-    }
-
     pub fn encode(&self, assembler: &mut CodeAssembler) {
         match &self.opcode {
-            Opcode::MOV => match self.operand_tuple2() {
-                (
+            Opcode::MOV => match self.operands.as_slice() {
+                [(
+                    OperandDirection::In,
                     Operand {
                         kind: OperandKind::Register(Register::PhysicalRegister(src)),
                         width_in_bits: w,
                     },
+                ), (
+                    OperandDirection::Out,
                     Operand {
                         kind: OperandKind::Register(Register::PhysicalRegister(dst)),
                         width_in_bits: w2,
                     },
-                ) => {
+                )] => {
                     assert!(w == w2);
 
                     assembler
@@ -358,7 +357,8 @@ impl Instruction {
                         .unwrap();
                 }
 
-                (
+                [(
+                    OperandDirection::In,
                     Operand {
                         kind:
                             OperandKind::Memory {
@@ -370,11 +370,13 @@ impl Instruction {
                             },
                         width_in_bits: w,
                     },
+                ), (
+                    OperandDirection::Out,
                     Operand {
                         kind: OperandKind::Register(Register::PhysicalRegister(dst)),
                         width_in_bits: w2,
                     },
-                ) => {
+                )] => {
                     assert!(w == w2);
 
                     let Some(Register::PhysicalRegister(base)) = base else {
@@ -395,15 +397,80 @@ impl Instruction {
                     }
 
                     assembler
-                        .mov::<AsmMemoryOperand, AsmRegister64>(src, (dst).into())
+                        .mov::<AsmMemoryOperand, AsmRegister64>(src, dst.into())
+                        .unwrap();
+                }
+
+                [(
+                    OperandDirection::In,
+                    Operand {
+                        kind: OperandKind::Register(Register::PhysicalRegister(src)),
+                        width_in_bits: w2,
+                    },
+                ), (
+                    OperandDirection::Out,
+                    Operand {
+                        kind:
+                            OperandKind::Memory {
+                                base,
+                                index,
+                                scale,
+                                displacement,
+                                ..
+                            },
+                        width_in_bits: w,
+                    },
+                )] => {
+                    assert!(w == w2);
+
+                    let Some(Register::PhysicalRegister(base)) = base else {
+                        panic!()
+                    };
+
+                    let mut dst = AsmRegister64::from(base) + *displacement;
+
+                    if let Some(Register::PhysicalRegister(index)) = index {
+                        let scale = match scale {
+                            MemoryScale::S1 => 1,
+                            MemoryScale::S2 => 2,
+                            MemoryScale::S4 => 4,
+                            MemoryScale::S8 => 8,
+                        };
+
+                        dst = dst + AsmRegister64::from(index) * scale;
+                    }
+
+                    assembler
+                        .mov::<AsmRegister64, AsmMemoryOperand>(src.into(), dst)
                         .unwrap();
                 }
 
                 ops => todo!("{ops:?} operands not supported for mov"),
             },
 
-            Opcode::ADD => {
-                todo!("{:?}", self.operands);
+            Opcode::ADD => match self.operands.as_slice() {
+                [(
+                    OperandDirection::In,
+                    Operand {
+                        kind: OperandKind::Immediate(imm),
+                        width_in_bits: 32,
+                    },
+                ), (
+                    OperandDirection::InOut,
+                    Operand {
+                        kind: OperandKind::Register(Register::PhysicalRegister(dst)),
+                        width_in_bits: 64,
+                    },
+                )] => {
+                    assembler
+                        .add::<AsmRegister64, _>(dst.into(), i32::try_from(*imm).unwrap())
+                        .unwrap();
+                }
+                ops => todo!("{ops:?} operands not supported for add"),
+            },
+
+            Opcode::JMP => {
+                //  assembler.jmp(block_ref.ptr());
             }
 
             Opcode::LABEL => {}
