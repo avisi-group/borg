@@ -471,18 +471,17 @@ impl Instruction {
 
             Opcode::JMP => {
                 let [(
-                    OperandDirection::Out,
+                    OperandDirection::In,
                     Operand {
                         kind: OperandKind::Target(target),
-                        width_in_bits,
+                        ..
                     },
                 )] = self.operands.as_slice()
                 else {
-                    log::warn!("invalid operands");
-                    loop {}
+                    panic!("invalid operands: {:?}", self.operands);
                 };
 
-                // assembler.jmp(target.label());
+                assembler.jmp(target.host_address()).unwrap();
             }
 
             Opcode::LABEL => {}

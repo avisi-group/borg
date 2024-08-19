@@ -9,7 +9,6 @@ use {
 };
 
 pub mod acpi;
-pub mod guest;
 pub mod lapic;
 pub mod manager;
 pub mod pcie;

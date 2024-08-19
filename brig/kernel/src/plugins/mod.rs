@@ -1,9 +1,9 @@
 use {
     crate::{
         alloc::borrow::ToOwned,
-        devices::{guest::demoarch::DemoArchFactory, SharedDevice},
+        devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
-        guest::register_device_factory,
+        guest::{devices::demoarch::DemoArchFactory, register_device_factory},
         plugins::{host::Host, shared_object::SharedObject},
     },
     alloc::{boxed::Box, collections::BTreeMap},

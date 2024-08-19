@@ -74,6 +74,14 @@ impl Device for DemoArch {
         let translation = ctx.compile();
 
         log::debug!("{:?}", translation);
+
+        let ptr = translation.code.as_ptr();
+        log::debug!("executing @ {ptr:p}");
+
+        unsafe {
+            let func: extern "C" fn() = core::mem::transmute(ptr);
+            func();
+        }
     }
 
     fn stop(&self) {

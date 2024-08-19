@@ -1,5 +1,11 @@
 use {
-    crate::dbt::emitter::Emitter,
+    crate::{
+        arch::{
+            x86::memory::{AlignedAllocator, ExecutableAllocator},
+            PAGE_SIZE,
+        },
+        dbt::emitter::Emitter,
+    },
     alloc::{collections::BTreeMap, string::String, vec::Vec},
     core::fmt::{self, Debug},
     iced_x86::{Formatter, Instruction},
@@ -35,7 +41,7 @@ impl TranslationManager {
 }
 
 pub struct Translation {
-    pub code: Vec<u8>,
+    pub code: Vec<u8, ExecutableAllocator>,
 }
 
 impl Debug for Translation {

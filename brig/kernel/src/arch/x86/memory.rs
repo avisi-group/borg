@@ -1,11 +1,12 @@
 use {
+    crate::arch::PAGE_SIZE,
     alloc::alloc::{alloc_zeroed, Global},
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
     byte_unit::{Byte, UnitType},
     core::{
         alloc::{AllocError, Allocator, Layout},
-        ops::{Deref, Range},
+        ops::{Add, Deref, Range},
         ptr::NonNull,
     },
     x86_64::{
@@ -216,5 +217,39 @@ unsafe impl<const N: usize> Allocator for AlignedAllocator<N> {
     }
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         Global.deallocate(ptr, layout.align_to(N).unwrap())
+    }
+}
+
+pub struct ExecutableAllocator(AlignedAllocator<PAGE_SIZE>);
+
+impl ExecutableAllocator {
+    // not really *creating* an allocator so `new` feels wrong
+    pub fn get() -> Self {
+        Self(AlignedAllocator)
+    }
+}
+
+unsafe impl Allocator for ExecutableAllocator {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        self.0.allocate(layout).map(|alloc| {
+            let start = VirtAddr::from_ptr(alloc.as_ptr());
+
+            VirtualMemoryArea::current().update_flags_range(
+                start..start + alloc.len().try_into().unwrap(),
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE, // removing  "NOEXECUTE" flag
+            );
+
+            alloc
+        })
+    }
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        let start = VirtAddr::from_ptr(ptr.as_ptr());
+
+        VirtualMemoryArea::current().update_flags_range(
+            start..start + layout.size().try_into().unwrap(),
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
+        );
+
+        self.0.deallocate(ptr, layout)
     }
 }

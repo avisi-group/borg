@@ -1,2 +1,2 @@
-//pub mod arch;
+pub mod demoarch;
 pub mod virtio;

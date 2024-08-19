@@ -1,10 +1,16 @@
 use {
-    crate::dbt::{
-        emitter::Type,
-        x86::{
-            encoder::{Instruction, Operand, PhysicalRegister, Register},
-            register_allocator::RegisterAllocator,
-            Emitter,
+    crate::{
+        arch::{
+            x86::memory::{AlignedAllocator, ExecutableAllocator},
+            PAGE_SIZE,
+        },
+        dbt::{
+            emitter::Type,
+            x86::{
+                encoder::{Instruction, Operand, PhysicalRegister, Register},
+                register_allocator::RegisterAllocator,
+                Emitter,
+            },
         },
     },
     alloc::{rc::Rc, vec::Vec},
@@ -236,14 +242,22 @@ impl X86BlockRef {
         self.0.borrow_mut().instructions.push(instruction);
     }
 
-    pub fn lower(&self) -> Vec<u8> {
+    pub fn lower(&self) -> Vec<u8, ExecutableAllocator> {
         let mut assembler = CodeAssembler::new(64).unwrap();
 
         for instr in &self.0.borrow().instructions {
             instr.encode(&mut assembler);
         }
 
-        assembler.assemble(0).unwrap()
+        // todo fix unnecessary allocation and byte copy, might require passing
+        // allocator T into assemble
+        let code = assembler.assemble(0).unwrap();
+
+        let mut output = Vec::with_capacity_in(code.len(), ExecutableAllocator::get());
+        for byte in code {
+            output.push(byte);
+        }
+        output
     }
 
     pub fn allocate_registers<R: RegisterAllocator>(&self, allocator: &mut R) {
@@ -253,6 +267,11 @@ impl X86BlockRef {
             .iter_mut()
             .rev()
             .for_each(|i| allocator.process(i));
+    }
+
+    /// Host address of the translated machine code block
+    pub fn host_address(&self) -> u64 {
+        0xffff8000000a82b0
     }
 
     pub fn get_next_0(&self) -> Option<X86BlockRef> {
