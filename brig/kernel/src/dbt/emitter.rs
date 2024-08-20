@@ -7,6 +7,12 @@ pub trait Emitter {
     fn add(&mut self, lhs: Self::NodeRef, rhs: Self::NodeRef) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);
 
+    fn branch(
+        &mut self,
+        condition: Self::NodeRef,
+        true_target: Self::BlockRef,
+        false_target: Self::BlockRef,
+    );
     fn jump(&mut self, target: Self::BlockRef);
     // cleanup and return
     fn leave(&mut self);

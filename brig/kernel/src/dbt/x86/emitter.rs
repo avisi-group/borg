@@ -96,6 +96,25 @@ impl Emitter for X86Emitter {
         ));
     }
 
+    fn branch(
+        &mut self,
+        condition: Self::NodeRef,
+        true_target: Self::BlockRef,
+        false_target: Self::BlockRef,
+    ) {
+        let condition = condition.to_operand(self);
+        self.current_block
+            .append(Instruction::test(condition.clone(), condition));
+
+        self.current_block
+            .append(Instruction::jne(true_target.clone()));
+        self.current_block.set_next_0(true_target);
+
+        self.current_block
+            .append(Instruction::jmp(false_target.clone()));
+        self.current_block.set_next_1(false_target);
+    }
+
     fn jump(&mut self, target: Self::BlockRef) {
         self.current_block.append(Instruction::jmp(target.clone()));
         self.current_block.set_next_0(target);
@@ -242,24 +261,6 @@ impl X86BlockRef {
         self.0.borrow_mut().instructions.push(instruction);
     }
 
-    pub fn lower(&self) -> Vec<u8, ExecutableAllocator> {
-        let mut assembler = CodeAssembler::new(64).unwrap();
-
-        for instr in &self.0.borrow().instructions {
-            instr.encode(&mut assembler);
-        }
-
-        // todo fix unnecessary allocation and byte copy, might require passing
-        // allocator T into assemble
-        let code = assembler.assemble(0).unwrap();
-
-        let mut output = Vec::with_capacity_in(code.len(), ExecutableAllocator::get());
-        for byte in code {
-            output.push(byte);
-        }
-        output
-    }
-
     pub fn allocate_registers<R: RegisterAllocator>(&self, allocator: &mut R) {
         self.0
             .borrow_mut()
@@ -267,6 +268,10 @@ impl X86BlockRef {
             .iter_mut()
             .rev()
             .for_each(|i| allocator.process(i));
+    }
+
+    pub fn instructions(&self) -> Vec<Instruction> {
+        self.0.borrow().instructions.clone()
     }
 
     /// Host address of the translated machine code block
