@@ -45,6 +45,7 @@ impl X86Emitter {
 impl Emitter for X86Emitter {
     type NodeRef = X86NodeRef;
     type BlockRef = X86BlockRef;
+    type SymbolRef = X86SymbolRef;
 
     fn set_current_block(&mut self, block: Self::BlockRef) {
         self.current_block = block;
@@ -123,6 +124,14 @@ impl Emitter for X86Emitter {
     fn leave(&mut self) {
         self.current_block.append(Instruction::ret());
     }
+
+    fn read_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef {
+        symbol.0.borrow().as_ref().unwrap().clone()
+    }
+
+    fn write_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef) {
+        *symbol.0.borrow_mut() = Some(value);
+    }
 }
 
 #[derive(Clone)]
@@ -177,6 +186,13 @@ impl X86NodeRef {
 
                 dst
             }
+            NodeKind::ReadVariable { symbol } => symbol
+                .0
+                .borrow()
+                .as_ref()
+                .unwrap()
+                .clone()
+                .to_operand(emitter),
         }
     }
 }
@@ -196,6 +212,7 @@ pub enum NodeKind {
     Constant { value: u64, width: u16 },
     GuestRegister { offset: u64 },
     BinaryOperation { kind: BinaryOperationKind },
+    ReadVariable { symbol: X86SymbolRef },
 }
 
 pub enum BinaryOperationKind {
@@ -317,3 +334,5 @@ impl X86Block {
         }
     }
 }
+
+pub struct X86SymbolRef(pub Rc<RefCell<Option<X86NodeRef>>>);

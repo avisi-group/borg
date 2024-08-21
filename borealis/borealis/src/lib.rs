@@ -65,6 +65,7 @@ pub fn load_model(path: &Path) -> ListVec<Definition> {
     jib
 }
 
+#[derive(Debug, Clone)]
 pub enum GenerationMode {
     CodeGen,
     CodeGenWithIr(PathBuf),

@@ -4,7 +4,7 @@ use {
         dbt::{
             emitter::Emitter,
             x86::{
-                emitter::{X86Block, X86BlockRef, X86Emitter},
+                emitter::{X86Block, X86BlockRef, X86Emitter, X86SymbolRef},
                 register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
             },
             Translation, TranslationContext,
@@ -12,9 +12,10 @@ use {
     },
     alloc::{
         collections::{btree_map::BTreeMap, btree_set::BTreeSet},
+        rc::Rc,
         vec::Vec,
     },
-    core::fmt::Debug,
+    core::{cell::RefCell, fmt::Debug},
     iced_x86::code_asm::CodeAssembler,
 };
 
@@ -25,6 +26,7 @@ pub mod register_allocator;
 pub struct X86TranslationContext {
     initial_block: X86BlockRef,
     emitter: X86Emitter,
+    next_symbol_id: u64,
 }
 
 impl Debug for X86TranslationContext {
@@ -62,6 +64,7 @@ impl X86TranslationContext {
         Self {
             initial_block: initial_block.clone(),
             emitter: X86Emitter::new(initial_block),
+            next_symbol_id: 0,
         }
     }
 
@@ -149,5 +152,9 @@ impl TranslationContext for X86TranslationContext {
         }
 
         Translation { code }
+    }
+
+    fn create_symbol(&mut self) -> <<Self as TranslationContext>::Emitter as Emitter>::SymbolRef {
+        X86SymbolRef(Rc::new(RefCell::new(None)))
     }
 }

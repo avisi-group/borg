@@ -1,11 +1,15 @@
 pub trait Emitter {
     type BlockRef;
     type NodeRef;
+    type SymbolRef;
 
     fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
-    fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn add(&mut self, lhs: Self::NodeRef, rhs: Self::NodeRef) -> Self::NodeRef;
+    fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);
+
+    fn read_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef;
+    fn write_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef);
 
     fn branch(
         &mut self,

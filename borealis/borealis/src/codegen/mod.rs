@@ -3,7 +3,7 @@
 use {
     crate::{
         codegen::{
-            interpreter::{codegen_block, codegen_parameters, get_block_fn_ident},
+            dynamic::{codegen_block, codegen_parameters, get_block_fn_ident},
             state::codegen_state,
             workspace::create_manifest,
         },
@@ -11,6 +11,7 @@ use {
             analysis::cfg::FunctionCallGraphAnalysis, Context, Function, PrimitiveTypeClass,
             Symbol, Type,
         },
+        GenerationMode,
     },
     cargo_util_schemas::manifest::{TomlManifest, TomlWorkspace},
     common::{intern::InternedString, HashMap, HashSet},
@@ -29,6 +30,7 @@ use {
     syn::Ident,
 };
 
+pub mod dynamic;
 pub mod interpreter;
 pub mod state;
 pub mod workspace;
@@ -222,6 +224,57 @@ fn codegen_types(rudder: &Context) -> TokenStream {
 }
 
 pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
+    {
+        let mut files = HashMap::default();
+
+        rudder.update_names();
+        let rudder_fns = rudder.get_functions();
+
+        let func = dynamic::codegen_function(rudder_fns.get(&"__DecodeA64".into()).unwrap());
+
+        let state = codegen_state(rudder);
+        let types = codegen_types(rudder);
+        let bits = include::get("bits.rs");
+        let util = include::get("util.rs");
+
+        let contents = quote! {
+            //! aarch64
+
+            #![allow(non_snake_case)]
+            #![allow(unused_assignments)]
+            #![allow(unused_mut)]
+            #![allow(unused_parens)]
+            #![allow(unused_variables)]
+            #![allow(unused_imports)]
+            #![allow(dead_code)]
+            #![allow(unreachable_code)]
+            #![allow(unused_doc_comments)]
+            #![allow(non_upper_case_globals)]
+            #![allow(non_camel_case_types)]
+
+            use crate::dbt::{
+                x86::{
+                    emitter::{X86SymbolRef, X86Emitter},
+                    X86TranslationContext,
+                },
+                TranslationContext, emitter::{Type, TypeKind, Emitter},
+            };
+
+            #func
+
+            #state
+
+            #types
+
+            #bits
+
+            #util
+        };
+
+        files.insert("mod.rs".into(), render(&contents));
+        return (files, HashSet::default());
+    }
+
     // common crate depended on by all containing bundle, tracer, state, and
     // structs/enums/unions
     let common = {
@@ -302,49 +355,17 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
         .flat_map(|name| [PathBuf::from(name.as_ref()).join("src")].into_iter())
         .collect();
 
-    let files = rudder_fns.into_par_iter()
+    let files = rudder_fns
+        .into_par_iter()
         .map(|(name, function)| {
-            let name_ident = codegen_ident(name);
-            let (return_type, parameters) = function.signature();
-
-            let function_parameters = codegen_parameters(&parameters);
-            let return_type = codegen_type(return_type);
-
-            let fn_state = codegen_fn_state(&function, parameters);
-
-            let entry_block = get_block_fn_ident(&function.entry_block());
-
-            let block_fns = function
-                .entry_block()
-                .iter()
-                .map(|block| {
-                    let block_name = get_block_fn_ident(&block);
-                    let block_impl = codegen_block(block);
-
-                    quote! {
-                        // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
-                        fn #block_name(state: &mut State, tracer: &dyn Tracer, mut fn_state: FunctionState) -> #return_type {
-                            #block_impl
-                        }
-                    }
-                })
-                .collect::<TokenStream>();
-
-            let contents =
-                quote! {
-                    #[inline(never)] // disabling increases compile time, perf impact not measured
-                    pub fn #name_ident(#function_parameters) -> #return_type {
-                        #fn_state
-
-                        return #entry_block(state, tracer, fn_state);
-
-                        #block_fns
-                    }
-                };
+            let contents = todo!();
 
             let mut dependencies = cfg.get_callees_for(&name);
             dependencies.push("common".into());
-            let dependencies = dependencies.into_iter().filter(|dep| *dep != name).collect::<Vec<_>>();
+            let dependencies = dependencies
+                .into_iter()
+                .filter(|dep| *dep != name)
+                .collect::<Vec<_>>();
 
             let imports: TokenStream = dependencies
                 .iter()
@@ -363,20 +384,19 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
 
             (
                 InternedString::from(codegen_ident(name).to_string()),
-               (
+                (
                     dependencies,
                     render(&quote! {
                         #header
 
                         #imports
 
-                        #contents
+                       // #contents
                     }),
-               )
+                ),
             )
         })
         .chain([common])
-
         .map(|(name, (dependencies, contents))| {
             let manifest = (
                 PathBuf::from(name.as_ref()).join("Cargo.toml"),
@@ -395,49 +415,6 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
         .collect();
 
     (files, dirs)
-}
-
-fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenStream {
-    let fn_state = {
-        let fields = function
-            .local_variables()
-            .iter()
-            .chain(&parameters)
-            .map(|symbol| {
-                let name = codegen_ident(symbol.name());
-                let typ = codegen_type(symbol.typ());
-
-                quote! {
-                    #name: #typ,
-                }
-            })
-            .collect::<TokenStream>();
-
-        // copy from parameters into fn state
-        let parameter_copies = parameters
-            .iter()
-            .map(|symbol| {
-                let name = codegen_ident(symbol.name());
-
-                quote! {
-                    #name,
-                }
-            })
-            .collect::<TokenStream>();
-
-        quote! {
-            #[derive(Default)]
-            struct FunctionState {
-                #fields
-            }
-
-            let fn_state = FunctionState {
-                #parameter_copies
-                ..Default::default()
-            };
-        }
-    };
-    fn_state
 }
 
 pub fn render(tokens: &TokenStream) -> String {

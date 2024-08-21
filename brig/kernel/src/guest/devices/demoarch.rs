@@ -7,6 +7,7 @@ use {
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::fmt::{self, Debug},
     plugins_api::guest::{Device, DeviceFactory, Environment},
+    proc_macro_lib::ktest,
 };
 
 #[derive(Debug)]
@@ -32,56 +33,6 @@ impl Debug for DemoArch {
 
 impl Device for DemoArch {
     fn start(&self) {
-        // let mut ctx = X86TranslationContext::new();
-        // let b0 = ctx.create_block();
-        // let emitter = ctx.emitter();
-
-        // {
-        //     let reg_offset = emitter.constant(
-        //         0x1234,
-        //         Type {
-        //             kind: TypeKind::Unsigned,
-        //             width: 32,
-        //         },
-        //     );
-
-        //     let reg_value = emitter.read_register(
-        //         reg_offset.clone(),
-        //         Type {
-        //             kind: TypeKind::Unsigned,
-        //             width: 32,
-        //         },
-        //     );
-
-        //     let one = emitter.constant(
-        //         1,
-        //         Type {
-        //             kind: TypeKind::Unsigned,
-        //             width: 32,
-        //         },
-        //     );
-
-        //     let sum = emitter.add(reg_value, one);
-
-        //     let _ = emitter.write_register(reg_offset, sum);
-
-        //     emitter.jump(b0.clone());
-        // }
-
-        // emitter.set_current_block(b0);
-        // emitter.leave();
-
-        // let translation = ctx.compile();
-
-        // log::debug!("{:?}", translation);
-
-        // let ptr = translation.code.as_ptr();
-        // log::debug!("executing @ {ptr:p}");
-
-        // unsafe {
-        //     let func: extern "C" fn() = core::mem::transmute(ptr);
-        //     func();
-        // }
         let mut ctx = X86TranslationContext::new();
         let b1 = ctx.create_block();
         let b2 = ctx.create_block();
@@ -233,7 +184,7 @@ impl Device for DemoArch {
 
         let translation = ctx.compile();
 
-        log::debug!("{:?}", translation);
+        log::debug!("\n{:?}", translation);
     }
 
     fn stop(&self) {
@@ -251,3 +202,48 @@ impl Device for DemoArch {
         unimplemented!()
     }
 }
+
+// #[ktest]
+// fn aarch64_addwithcarry() {
+//     use crate::guest::devices::aarch64::{
+//         AddWithCarry, Bits, State, Struct188a1c3bf231c64b, Tracer,
+//     };
+
+//     struct NoneTracer;
+
+//     impl Tracer for NoneTracer {
+//         fn begin(&self, _: u32, _: u64) {}
+
+//         fn end(&self) {}
+
+//         fn read_register(&self, _: usize, _: &dyn Debug) {}
+
+//         fn write_register(&self, _: usize, _: &dyn Debug) {}
+
+//         fn read_memory(&self, _: usize, _: &dyn Debug) {}
+
+//         fn write_memory(&self, _: usize, _: &dyn Debug) {}
+//     }
+
+//     struct NoneEnv;
+
+//     impl Environment for NoneEnv {
+//         fn read_memory(&self, _: u64, _: &mut [u8]) {}
+
+//         fn write_memory(&self, _: u64, _: &[u8]) {}
+//     }
+
+//     let mut state = State::new(Box::new(NoneEnv));
+
+//     let x = Bits::new(0x0, 0x40);
+//     let y = Bits::new(-5i128 as u128, 0x40);
+//     let carry_in = false;
+
+//     assert_eq!(
+//         AddWithCarry(&mut state, &NoneTracer, x, y, carry_in),
+//         Struct188a1c3bf231c64b {
+//             tuple__pcnt_bv__pcnt_bv40: Bits::new(-5i64 as u128, 0x40),
+//             tuple__pcnt_bv__pcnt_bv41: 0b1000
+//         }
+//     );
+// }

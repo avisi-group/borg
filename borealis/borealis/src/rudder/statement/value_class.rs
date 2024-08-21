@@ -7,8 +7,11 @@ use {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum ValueClass {
     None,
+    // Constant
     Constant,
+    // Dependant on compiletime state
     Static,
+    // Dependant on runtime state
     Dynamic,
 }
 

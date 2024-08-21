@@ -506,8 +506,6 @@ impl Instruction {
 
                     let dst = dword_ptr(dst);
 
-                    log::debug!("{:?}", dst);
-
                     assembler
                         .mov::<AsmMemoryOperand, u32>(dst, (*src).try_into().unwrap())
                         .unwrap();
