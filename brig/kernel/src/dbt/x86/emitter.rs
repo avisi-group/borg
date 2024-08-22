@@ -1,16 +1,10 @@
 use {
-    crate::{
-        arch::{
-            x86::memory::{AlignedAllocator, ExecutableAllocator},
-            PAGE_SIZE,
-        },
-        dbt::{
-            emitter::Type,
-            x86::{
-                encoder::{Instruction, Operand, PhysicalRegister, Register},
-                register_allocator::RegisterAllocator,
-                Emitter,
-            },
+    crate::dbt::{
+        emitter::Type,
+        x86::{
+            encoder::{Instruction, Operand, PhysicalRegister, Register},
+            register_allocator::RegisterAllocator,
+            Emitter,
         },
     },
     alloc::{rc::Rc, vec::Vec},
@@ -19,7 +13,6 @@ use {
         fmt::{Debug, LowerHex},
         panic,
     },
-    iced_x86::code_asm::CodeAssembler,
 };
 
 pub struct X86Emitter {
@@ -134,7 +127,7 @@ impl Emitter for X86Emitter {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct X86NodeRef(Rc<X86Node>);
 
 impl X86NodeRef {
@@ -203,11 +196,13 @@ impl From<X86Node> for X86NodeRef {
     }
 }
 
+#[derive(Debug)]
 pub struct X86Node {
     pub typ: Type,
     pub kind: NodeKind,
 }
 
+#[derive(Debug)]
 pub enum NodeKind {
     Constant { value: u64, width: u16 },
     GuestRegister { offset: u64 },
@@ -215,6 +210,7 @@ pub enum NodeKind {
     ReadVariable { symbol: X86SymbolRef },
 }
 
+#[derive(Debug)]
 pub enum BinaryOperationKind {
     Add(X86NodeRef, X86NodeRef),
     Sub(X86NodeRef, X86NodeRef),
@@ -335,4 +331,5 @@ impl X86Block {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct X86SymbolRef(pub Rc<RefCell<Option<X86NodeRef>>>);

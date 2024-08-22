@@ -28,7 +28,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
     let function_parameters = codegen_parameters(&parameters);
     let return_type = codegen_type(return_type);
 
-    let fn_state = codegen_fn_state(&function, parameters);
+    let fn_state = codegen_fn_state(&function, parameters.clone());
 
     let entry_block = get_block_fn_ident(&function.entry_block());
 
@@ -41,10 +41,19 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 
             quote! {
                 // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
-                fn #block_name(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> #return_type {
+                fn #block_name(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> #return_type {
+                    let emitter = ctx.emitter();
                     #block_impl
                 }
             }
+        })
+        .collect::<TokenStream>();
+
+    let parameter_writes = parameters
+        .iter()
+        .map(|symbol| {
+            let name = codegen_ident(symbol.name());
+            quote!(emitter.write_variable(fn_state.#name.clone(), #name);)
         })
         .collect::<TokenStream>();
 
@@ -53,7 +62,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         pub fn #name_ident(#function_parameters) -> #return_type {
             #fn_state
 
-            return #entry_block(emitter, fn_state);
+            {
+                let emitter = ctx.emitter();
+                #parameter_writes
+            }
+
+            return #entry_block(ctx, fn_state);
 
             #block_fns
         }
@@ -62,15 +76,13 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 }
 
 pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
-    let parameters = [
-        quote!(ctx: &mut X86TranslationContext),
-        quote!(emitter: X86Emitter),
-    ]
-    .into_iter()
-    .chain(parameters.iter().map(|sym| {
-        let name = codegen_ident(sym.name());
-        quote!(#name: X86SymbolRef)
-    }));
+    let parameters =
+        [quote!(ctx: &mut X86TranslationContext)]
+            .into_iter()
+            .chain(parameters.iter().map(|sym| {
+                let name = codegen_ident(sym.name());
+                quote!(#name: X86NodeRef)
+            }));
 
     quote! {
         #(#parameters),*
@@ -92,21 +104,10 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
             })
             .collect::<TokenStream>();
 
-        // copy from parameters into fn state
-        let parameter_copies = parameters
-            .iter()
-            .map(|symbol| {
-                let name = codegen_ident(symbol.name());
-
-                quote! {
-                    #name,
-                }
-            })
-            .collect::<TokenStream>();
-
         let field_inits = function
             .local_variables()
             .iter()
+            .chain(&parameters)
             .map(|symbol| {
                 let name = codegen_ident(symbol.name());
 
@@ -122,11 +123,8 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
             }
 
             let fn_state = FunctionState {
-                #parameter_copies
                 #field_inits
             };
-
-            let emitter = ctx.emitter();
         }
     };
     fn_state
@@ -175,10 +173,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
     let statement_tokens = match stmt.kind() {
         StatementKind::Constant { value, typ } => match value {
-            ConstantValue::UnsignedInteger(value) => {
-                let value = Literal::usize_unsuffixed(value);
+            ConstantValue::UnsignedInteger(v) => {
+                let v = Literal::usize_unsuffixed(v);
                 let typ = codegen_type_instance(typ);
-                quote!(emitter.constant(#value, #typ))
+                quote!(emitter.constant(#v, #typ))
             }
             ConstantValue::SignedInteger(v) => {
                 let v = Literal::isize_unsuffixed(v);
@@ -215,13 +213,9 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::ReadRegister { typ, offset } => {
             let offset = get_ident(&offset);
-            let typ = codegen_type(typ);
+            let typ = codegen_type_instance(typ);
             quote! {
-                {
-                    let value = state.read_register::<#typ>(#offset as usize);
-                    tracer.read_register(#offset as usize, &value);
-                    value
-                }
+                emitter.read_register(#offset, #typ);
             }
         }
         StatementKind::WriteRegister { offset, value } => {
@@ -364,11 +358,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             if tail {
                 quote! {
-                    return #ident(emitter, #(#args),*)
+                    return #ident(ctx, #(#args),*)
                 }
             } else {
                 quote! {
-                    #ident(emitter, #(#args),*)
+                    #ident(ctx, #(#args),*)
                 }
             }
         }
@@ -376,7 +370,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Jump { target } => {
             let target = get_block_fn_ident(&target);
             quote! {
-               return #target(emitter, fn_state);
+               return #target(ctx, emitter, fn_state);
             }
         }
         StatementKind::Branch {
@@ -389,7 +383,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let false_target = get_block_fn_ident(&false_target);
 
             quote! {
-                if #condition { return #true_target(emitter, fn_state); } else { return #false_target(emitter, fn_state); }
+                if #condition { return #true_target(ctx,  fn_state); } else { return #false_target(ctx,  fn_state); }
             }
         }
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),

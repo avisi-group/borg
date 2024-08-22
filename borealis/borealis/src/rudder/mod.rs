@@ -581,7 +581,7 @@ impl Function {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum FunctionKind {
     Execute,
     Other,

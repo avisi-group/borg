@@ -1,41 +1,60 @@
 use {
-    crate::dbt::x86::emitter::X86BlockRef,
-    alloc::{collections::btree_map::BTreeMap, vec::Vec},
-    core::fmt::Debug,
-    iced_x86::code_asm::{
+    crate::dbt::x86::emitter::X86BlockRef, alloc::{collections::btree_map::BTreeMap, vec::Vec}, core::fmt::Debug, displaydoc::Display, iced_x86::code_asm::{
         byte_ptr, dword_ptr, qword_ptr, AsmMemoryOperand, AsmRegister64, CodeAssembler, CodeLabel,
-    },
+    }
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum Opcode {
+    /// mov
     MOV,
+    /// add
     ADD,
+    /// sub
     SUB,
-    LABEL,
+    /// jmp
     JMP,
+    /// ret
     RET,
+    /// test
     TEST,
+    /// jne
     JNE,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum PhysicalRegister {
+    /// rax
     RAX,
+    /// rcx
     RCX,
+    /// rdx
     RDX,
+    /// rbx
     RBX,
+    /// rsi
     RSI,
+    /// rdi
     RDI,
+    /// rsp
     RSP,
+    /// rbp
     RBP,
+    /// r8
     R8,
+    /// r9
     R9,
+    /// r10
     R10,
+    /// r11
     R11,
+    /// r12
     R12,
+    /// r13
     R13,
+    /// r14
     R14,
+    /// r15
     R15,
 }
 
@@ -117,9 +136,11 @@ impl From<PhysicalRegister> for AsmRegister64 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum SegmentRegister {
+    /// fs
     FS,
+    /// gs
     GS,
 }
 

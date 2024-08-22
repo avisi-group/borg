@@ -253,12 +253,45 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
             #![allow(non_camel_case_types)]
 
             use crate::dbt::{
+                emitter::{Emitter, Type, TypeKind},
                 x86::{
-                    emitter::{X86SymbolRef, X86Emitter},
+                    emitter::{X86Emitter, X86NodeRef, X86SymbolRef},
                     X86TranslationContext,
                 },
-                TranslationContext, emitter::{Type, TypeKind, Emitter},
+                TranslationContext,
             };
+
+            fn u__DecodeA64_SME(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_Unallocated1(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_Unallocated2(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_SVE(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_DataProcImm(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_BranchExcSys(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_LoadStore(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_DataProcReg(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_DataProcFPSIMD(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+            fn u__DecodeA64_Reserved(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+                todo!();
+            }
+
 
             #func
 

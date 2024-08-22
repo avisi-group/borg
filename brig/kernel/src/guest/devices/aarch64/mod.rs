@@ -11,19 +11,45 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 use crate::dbt::{
+    emitter::{Emitter, Type, TypeKind},
     x86::{
-        emitter::{X86SymbolRef, X86Emitter},
+        emitter::{X86Emitter, X86NodeRef, X86SymbolRef},
         X86TranslationContext,
     },
-    TranslationContext, emitter::{Type, TypeKind, Emitter},
+    TranslationContext,
 };
+fn u__DecodeA64_SME(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_Unallocated1(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_Unallocated2(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_SVE(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_DataProcImm(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_BranchExcSys(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_LoadStore(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_DataProcReg(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_DataProcFPSIMD(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
+fn u__DecodeA64_Reserved(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
+    todo!();
+}
 #[inline(never)]
-pub fn u__DecodeA64(
-    ctx: &mut X86TranslationContext,
-    emitter: X86Emitter,
-    pc: X86SymbolRef,
-    opcode: X86SymbolRef,
-) -> () {
+pub fn u__DecodeA64(ctx: &mut X86TranslationContext, pc: X86NodeRef, opcode: X86NodeRef) -> () {
     struct FunctionState {
         v__21: X86SymbolRef,
         v__0: X86SymbolRef,
@@ -32,15 +58,20 @@ pub fn u__DecodeA64(
         opcode: X86SymbolRef,
     }
     let fn_state = FunctionState {
-        pc,
-        opcode,
         v__21: ctx.create_symbol(),
         v__0: ctx.create_symbol(),
         v__3: ctx.create_symbol(),
+        pc: ctx.create_symbol(),
+        opcode: ctx.create_symbol(),
     };
-    let emitter = ctx.emitter();
-    return block_0(emitter, fn_state);
-    fn block_0(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    {
+        let emitter = ctx.emitter();
+        emitter.write_variable(fn_state.pc.clone(), pc);
+        emitter.write_variable(fn_state.opcode.clone(), opcode);
+    }
+    return block_0(ctx, fn_state);
+    fn block_0(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_0_0: read-var opcode:u32
         let s_0_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_0_1: write-var v__0:u32 <= s_0_0:u32
@@ -58,91 +89,92 @@ pub fn u__DecodeA64(
         // D [D] s_0_7: add s_0_6 s_0_5
         let s_0_7 = (s_0_6 + s_0_5);
         // D [D] s_0_8: bit-extract s_0_3 s_0_2 s_0_7
-        let s_0_8 = (Bits::new(
-            ((s_0_3) >> (s_0_2)).value(),
-            u16::try_from(s_0_7).unwrap(),
-        ));
+        let s_0_8 = (Bits::new(((s_0_3) >> (s_0_2)).value(), u16::try_from(s_0_7).unwrap()));
         // D [D] s_0_9: cast reint s_0_8 -> u8
         let s_0_9 = ((s_0_8.value()) != 0);
         // D [D] s_0_10: cast zx s_0_9 -> bv
         let s_0_10 = Bits::new(s_0_9 as u128, 1u16);
         // D [D] s_0_11: const #0u : u8
-        let s_0_11 = emitter
-            .constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 1,
-                },
-            );
+        let s_0_11 = emitter.constant(
+            0,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_0_12: cast zx s_0_11 -> bv
         let s_0_12 = Bits::new(s_0_11 as u128, 1u16);
         // D [D] s_0_13: cmp-eq s_0_10 s_0_12
         let s_0_13 = ((s_0_10) == (s_0_12));
         // N [-] s_0_14: branch s_0_13 b26 b1
         if s_0_13 {
-            return block_26(emitter, fn_state);
+            return block_26(ctx, fn_state);
         } else {
-            return block_1(emitter, fn_state);
+            return block_1(ctx, fn_state);
         };
     }
-    fn block_1(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_1(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_1_0: const #0u : u8
-        let s_1_0 = emitter
-            .constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 1,
-                },
-            );
+        let s_1_0 = emitter.constant(
+            0,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_1_1: not s_1_0
         let s_1_1 = !s_1_0;
         // D [D] s_1_2: branch s_1_1 b5 b2
         if s_1_1 {
-            return block_5(emitter, fn_state);
+            return block_5(ctx, fn_state);
         } else {
-            return block_2(emitter, fn_state);
+            return block_2(ctx, fn_state);
         };
     }
-    fn block_2(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_2(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_2_0: read-var pc:i
         let s_2_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_2_1: read-var opcode:u32
         let s_2_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_2_2: call __DecodeA64_Reserved(s_2_0, s_2_1)
-        let s_2_2 = u__DecodeA64_Reserved(emitter, s_2_0, s_2_1);
+        let s_2_2 = u__DecodeA64_Reserved(ctx, s_2_0, s_2_1);
         // D [D] s_2_3: const #15664u : u32
-        let s_2_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_2_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_2_4: read-reg s_2_3:u8
-        let s_2_4 = {
-            let value = state.read_register::<bool>(s_2_3 as usize);
-            tracer.read_register(s_2_3 as usize, &value);
-            value
-        };
+        let s_2_4 = emitter.read_register(
+            s_2_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_2_5: branch s_2_4 b4 b3
         if s_2_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_3(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_3(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_3_0: return
         return;
     }
-    fn block_4(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_4(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_4_0: return
         return;
     }
-    fn block_5(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_5(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_5_0: read-var opcode:u32
         let s_5_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_5_1: write-var v__3:u32 <= s_5_0:u32
@@ -160,83 +192,82 @@ pub fn u__DecodeA64(
         // D [D] s_5_7: add s_5_6 s_5_5
         let s_5_7 = (s_5_6 + s_5_5);
         // D [D] s_5_8: bit-extract s_5_3 s_5_2 s_5_7
-        let s_5_8 = (Bits::new(
-            ((s_5_3) >> (s_5_2)).value(),
-            u16::try_from(s_5_7).unwrap(),
-        ));
+        let s_5_8 = (Bits::new(((s_5_3) >> (s_5_2)).value(), u16::try_from(s_5_7).unwrap()));
         // D [D] s_5_9: cast reint s_5_8 -> u8
         let s_5_9 = ((s_5_8.value()) != 0);
         // D [D] s_5_10: cast zx s_5_9 -> bv
         let s_5_10 = Bits::new(s_5_9 as u128, 1u16);
         // D [D] s_5_11: const #1u : u8
-        let s_5_11 = emitter
-            .constant(
-                1,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 1,
-                },
-            );
+        let s_5_11 = emitter.constant(
+            1,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_5_12: cast zx s_5_11 -> bv
         let s_5_12 = Bits::new(s_5_11 as u128, 1u16);
         // D [D] s_5_13: cmp-eq s_5_10 s_5_12
         let s_5_13 = ((s_5_10) == (s_5_12));
         // N [-] s_5_14: branch s_5_13 b25 b6
         if s_5_13 {
-            return block_25(emitter, fn_state);
+            return block_25(ctx, fn_state);
         } else {
-            return block_6(emitter, fn_state);
+            return block_6(ctx, fn_state);
         };
     }
-    fn block_6(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_6(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_6_0: const #0u : u8
-        let s_6_0 = emitter
-            .constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 1,
-                },
-            );
+        let s_6_0 = emitter.constant(
+            0,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_6_1: not s_6_0
         let s_6_1 = !s_6_0;
         // D [D] s_6_2: branch s_6_1 b8 b7
         if s_6_1 {
-            return block_8(emitter, fn_state);
+            return block_8(ctx, fn_state);
         } else {
-            return block_7(emitter, fn_state);
+            return block_7(ctx, fn_state);
         };
     }
-    fn block_7(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_7(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_7_0: read-var pc:i
         let s_7_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_7_1: read-var opcode:u32
         let s_7_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_7_2: call __DecodeA64_SME(s_7_0, s_7_1)
-        let s_7_2 = u__DecodeA64_SME(emitter, s_7_0, s_7_1);
+        let s_7_2 = u__DecodeA64_SME(ctx, s_7_0, s_7_1);
         // D [D] s_7_3: const #15664u : u32
-        let s_7_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_7_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_7_4: read-reg s_7_3:u8
-        let s_7_4 = {
-            let value = state.read_register::<bool>(s_7_3 as usize);
-            tracer.read_register(s_7_3 as usize, &value);
-            value
-        };
+        let s_7_4 = emitter.read_register(
+            s_7_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_7_5: branch s_7_4 b4 b3
         if s_7_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_8(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_8(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_8_0: read-var opcode:u32
         let s_8_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_8_1: const #25s : i
@@ -252,23 +283,19 @@ pub fn u__DecodeA64(
         // D [D] s_8_6: add s_8_5 s_8_4
         let s_8_6 = (s_8_5 + s_8_4);
         // D [D] s_8_7: bit-extract s_8_2 s_8_1 s_8_6
-        let s_8_7 = (Bits::new(
-            ((s_8_2) >> (s_8_1)).value(),
-            u16::try_from(s_8_6).unwrap(),
-        ));
+        let s_8_7 = (Bits::new(((s_8_2) >> (s_8_1)).value(), u16::try_from(s_8_6).unwrap()));
         // D [D] s_8_8: cast reint s_8_7 -> u8
         let s_8_8 = (s_8_7.value() as u8);
         // D [D] s_8_9: cast zx s_8_8 -> bv
         let s_8_9 = Bits::new(s_8_8 as u128, 4u16);
         // D [D] s_8_10: const #1u : u8
-        let s_8_10 = emitter
-            .constant(
-                1,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 4,
-                },
-            );
+        let s_8_10 = emitter.constant(
+            1,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 4,
+            },
+        );
         // D [D] s_8_11: cast zx s_8_10 -> bv
         let s_8_11 = Bits::new(s_8_10 as u128, 4u16);
         // D [D] s_8_12: cmp-eq s_8_9 s_8_11
@@ -277,41 +304,44 @@ pub fn u__DecodeA64(
         let s_8_13 = !s_8_12;
         // D [D] s_8_14: branch s_8_13 b10 b9
         if s_8_13 {
-            return block_10(emitter, fn_state);
+            return block_10(ctx, fn_state);
         } else {
-            return block_9(emitter, fn_state);
+            return block_9(ctx, fn_state);
         };
     }
-    fn block_9(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_9(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_9_0: read-var pc:i
         let s_9_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_9_1: read-var opcode:u32
         let s_9_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_9_2: call __DecodeA64_Unallocated1(s_9_0, s_9_1)
-        let s_9_2 = u__DecodeA64_Unallocated1(emitter, s_9_0, s_9_1);
+        let s_9_2 = u__DecodeA64_Unallocated1(ctx, s_9_0, s_9_1);
         // D [D] s_9_3: const #15664u : u32
-        let s_9_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_9_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_9_4: read-reg s_9_3:u8
-        let s_9_4 = {
-            let value = state.read_register::<bool>(s_9_3 as usize);
-            tracer.read_register(s_9_3 as usize, &value);
-            value
-        };
+        let s_9_4 = emitter.read_register(
+            s_9_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_9_5: branch s_9_4 b4 b3
         if s_9_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_10(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_10(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_10_0: read-var opcode:u32
         let s_10_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_10_1: const #25s : i
@@ -336,14 +366,13 @@ pub fn u__DecodeA64(
         // D [D] s_10_9: cast zx s_10_8 -> bv
         let s_10_9 = Bits::new(s_10_8 as u128, 4u16);
         // D [D] s_10_10: const #2u : u8
-        let s_10_10 = emitter
-            .constant(
-                2,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 4,
-                },
-            );
+        let s_10_10 = emitter.constant(
+            2,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 4,
+            },
+        );
         // D [D] s_10_11: cast zx s_10_10 -> bv
         let s_10_11 = Bits::new(s_10_10 as u128, 4u16);
         // D [D] s_10_12: cmp-eq s_10_9 s_10_11
@@ -352,41 +381,44 @@ pub fn u__DecodeA64(
         let s_10_13 = !s_10_12;
         // D [D] s_10_14: branch s_10_13 b12 b11
         if s_10_13 {
-            return block_12(emitter, fn_state);
+            return block_12(ctx, fn_state);
         } else {
-            return block_11(emitter, fn_state);
+            return block_11(ctx, fn_state);
         };
     }
-    fn block_11(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_11(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_11_0: read-var pc:i
         let s_11_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_11_1: read-var opcode:u32
         let s_11_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_11_2: call __DecodeA64_SVE(s_11_0, s_11_1)
-        let s_11_2 = u__DecodeA64_SVE(emitter, s_11_0, s_11_1);
+        let s_11_2 = u__DecodeA64_SVE(ctx, s_11_0, s_11_1);
         // D [D] s_11_3: const #15664u : u32
-        let s_11_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_11_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_11_4: read-reg s_11_3:u8
-        let s_11_4 = {
-            let value = state.read_register::<bool>(s_11_3 as usize);
-            tracer.read_register(s_11_3 as usize, &value);
-            value
-        };
+        let s_11_4 = emitter.read_register(
+            s_11_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_11_5: branch s_11_4 b4 b3
         if s_11_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_12(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_12(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_12_0: read-var opcode:u32
         let s_12_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_12_1: const #25s : i
@@ -411,14 +443,13 @@ pub fn u__DecodeA64(
         // D [D] s_12_9: cast zx s_12_8 -> bv
         let s_12_9 = Bits::new(s_12_8 as u128, 4u16);
         // D [D] s_12_10: const #3u : u8
-        let s_12_10 = emitter
-            .constant(
-                3,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 4,
-                },
-            );
+        let s_12_10 = emitter.constant(
+            3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 4,
+            },
+        );
         // D [D] s_12_11: cast zx s_12_10 -> bv
         let s_12_11 = Bits::new(s_12_10 as u128, 4u16);
         // D [D] s_12_12: cmp-eq s_12_9 s_12_11
@@ -427,41 +458,44 @@ pub fn u__DecodeA64(
         let s_12_13 = !s_12_12;
         // D [D] s_12_14: branch s_12_13 b14 b13
         if s_12_13 {
-            return block_14(emitter, fn_state);
+            return block_14(ctx, fn_state);
         } else {
-            return block_13(emitter, fn_state);
+            return block_13(ctx, fn_state);
         };
     }
-    fn block_13(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_13(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_13_0: read-var pc:i
         let s_13_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_13_1: read-var opcode:u32
         let s_13_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_13_2: call __DecodeA64_Unallocated2(s_13_0, s_13_1)
-        let s_13_2 = u__DecodeA64_Unallocated2(emitter, s_13_0, s_13_1);
+        let s_13_2 = u__DecodeA64_Unallocated2(ctx, s_13_0, s_13_1);
         // D [D] s_13_3: const #15664u : u32
-        let s_13_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_13_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_13_4: read-reg s_13_3:u8
-        let s_13_4 = {
-            let value = state.read_register::<bool>(s_13_3 as usize);
-            tracer.read_register(s_13_3 as usize, &value);
-            value
-        };
+        let s_13_4 = emitter.read_register(
+            s_13_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_13_5: branch s_13_4 b4 b3
         if s_13_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_14(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_14(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_14_0: read-var opcode:u32
         let s_14_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_14_1: const #26s : i
@@ -486,14 +520,13 @@ pub fn u__DecodeA64(
         // D [D] s_14_9: cast zx s_14_8 -> bv
         let s_14_9 = Bits::new(s_14_8 as u128, 3u16);
         // D [D] s_14_10: const #4u : u8
-        let s_14_10 = emitter
-            .constant(
-                4,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 3,
-                },
-            );
+        let s_14_10 = emitter.constant(
+            4,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 3,
+            },
+        );
         // D [D] s_14_11: cast zx s_14_10 -> bv
         let s_14_11 = Bits::new(s_14_10 as u128, 3u16);
         // D [D] s_14_12: cmp-eq s_14_9 s_14_11
@@ -502,41 +535,44 @@ pub fn u__DecodeA64(
         let s_14_13 = !s_14_12;
         // D [D] s_14_14: branch s_14_13 b16 b15
         if s_14_13 {
-            return block_16(emitter, fn_state);
+            return block_16(ctx, fn_state);
         } else {
-            return block_15(emitter, fn_state);
+            return block_15(ctx, fn_state);
         };
     }
-    fn block_15(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_15(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_15_0: read-var pc:i
         let s_15_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_15_1: read-var opcode:u32
         let s_15_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_15_2: call __DecodeA64_DataProcImm(s_15_0, s_15_1)
-        let s_15_2 = u__DecodeA64_DataProcImm(emitter, s_15_0, s_15_1);
+        let s_15_2 = u__DecodeA64_DataProcImm(ctx, s_15_0, s_15_1);
         // D [D] s_15_3: const #15664u : u32
-        let s_15_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_15_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_15_4: read-reg s_15_3:u8
-        let s_15_4 = {
-            let value = state.read_register::<bool>(s_15_3 as usize);
-            tracer.read_register(s_15_3 as usize, &value);
-            value
-        };
+        let s_15_4 = emitter.read_register(
+            s_15_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_15_5: branch s_15_4 b4 b3
         if s_15_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_16(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_16(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_16_0: read-var opcode:u32
         let s_16_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_16_1: const #26s : i
@@ -561,14 +597,13 @@ pub fn u__DecodeA64(
         // D [D] s_16_9: cast zx s_16_8 -> bv
         let s_16_9 = Bits::new(s_16_8 as u128, 3u16);
         // D [D] s_16_10: const #5u : u8
-        let s_16_10 = emitter
-            .constant(
-                5,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 3,
-                },
-            );
+        let s_16_10 = emitter.constant(
+            5,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 3,
+            },
+        );
         // D [D] s_16_11: cast zx s_16_10 -> bv
         let s_16_11 = Bits::new(s_16_10 as u128, 3u16);
         // D [D] s_16_12: cmp-eq s_16_9 s_16_11
@@ -577,41 +612,44 @@ pub fn u__DecodeA64(
         let s_16_13 = !s_16_12;
         // D [D] s_16_14: branch s_16_13 b18 b17
         if s_16_13 {
-            return block_18(emitter, fn_state);
+            return block_18(ctx, fn_state);
         } else {
-            return block_17(emitter, fn_state);
+            return block_17(ctx, fn_state);
         };
     }
-    fn block_17(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_17(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_17_0: read-var pc:i
         let s_17_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_17_1: read-var opcode:u32
         let s_17_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_17_2: call __DecodeA64_BranchExcSys(s_17_0, s_17_1)
-        let s_17_2 = u__DecodeA64_BranchExcSys(emitter, s_17_0, s_17_1);
+        let s_17_2 = u__DecodeA64_BranchExcSys(ctx, s_17_0, s_17_1);
         // D [D] s_17_3: const #15664u : u32
-        let s_17_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_17_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_17_4: read-reg s_17_3:u8
-        let s_17_4 = {
-            let value = state.read_register::<bool>(s_17_3 as usize);
-            tracer.read_register(s_17_3 as usize, &value);
-            value
-        };
+        let s_17_4 = emitter.read_register(
+            s_17_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_17_5: branch s_17_4 b4 b3
         if s_17_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_18(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_18(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_18_0: read-var opcode:u32
         let s_18_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_18_1: write-var v__21:u32 <= s_18_0:u32
@@ -638,74 +676,76 @@ pub fn u__DecodeA64(
         // D [D] s_18_10: cast zx s_18_9 -> bv
         let s_18_10 = Bits::new(s_18_9 as u128, 1u16);
         // D [D] s_18_11: const #1u : u8
-        let s_18_11 = emitter
-            .constant(
-                1,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 1,
-                },
-            );
+        let s_18_11 = emitter.constant(
+            1,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_18_12: cast zx s_18_11 -> bv
         let s_18_12 = Bits::new(s_18_11 as u128, 1u16);
         // D [D] s_18_13: cmp-eq s_18_10 s_18_12
         let s_18_13 = ((s_18_10) == (s_18_12));
         // N [-] s_18_14: branch s_18_13 b24 b19
         if s_18_13 {
-            return block_24(emitter, fn_state);
+            return block_24(ctx, fn_state);
         } else {
-            return block_19(emitter, fn_state);
+            return block_19(ctx, fn_state);
         };
     }
-    fn block_19(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_19(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_19_0: const #0u : u8
-        let s_19_0 = emitter
-            .constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 1,
-                },
-            );
+        let s_19_0 = emitter.constant(
+            0,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_19_1: not s_19_0
         let s_19_1 = !s_19_0;
         // D [D] s_19_2: branch s_19_1 b21 b20
         if s_19_1 {
-            return block_21(emitter, fn_state);
+            return block_21(ctx, fn_state);
         } else {
-            return block_20(emitter, fn_state);
+            return block_20(ctx, fn_state);
         };
     }
-    fn block_20(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_20(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_20_0: read-var pc:i
         let s_20_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_20_1: read-var opcode:u32
         let s_20_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_20_2: call __DecodeA64_LoadStore(s_20_0, s_20_1)
-        let s_20_2 = u__DecodeA64_LoadStore(emitter, s_20_0, s_20_1);
+        let s_20_2 = u__DecodeA64_LoadStore(ctx, s_20_0, s_20_1);
         // D [D] s_20_3: const #15664u : u32
-        let s_20_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_20_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_20_4: read-reg s_20_3:u8
-        let s_20_4 = {
-            let value = state.read_register::<bool>(s_20_3 as usize);
-            tracer.read_register(s_20_3 as usize, &value);
-            value
-        };
+        let s_20_4 = emitter.read_register(
+            s_20_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_20_5: branch s_20_4 b4 b3
         if s_20_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_21(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_21(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_21_0: read-var opcode:u32
         let s_21_0 = emitter.read_variable(fn_state.opcode);
         // D [D] s_21_1: const #25s : i
@@ -730,14 +770,13 @@ pub fn u__DecodeA64(
         // D [D] s_21_9: cast zx s_21_8 -> bv
         let s_21_9 = Bits::new(s_21_8 as u128, 3u16);
         // D [D] s_21_10: const #5u : u8
-        let s_21_10 = emitter
-            .constant(
-                5,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 3,
-                },
-            );
+        let s_21_10 = emitter.constant(
+            5,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 3,
+            },
+        );
         // D [D] s_21_11: cast zx s_21_10 -> bv
         let s_21_11 = Bits::new(s_21_10 as u128, 3u16);
         // D [D] s_21_12: cmp-eq s_21_9 s_21_11
@@ -746,70 +785,75 @@ pub fn u__DecodeA64(
         let s_21_13 = !s_21_12;
         // D [D] s_21_14: branch s_21_13 b23 b22
         if s_21_13 {
-            return block_23(emitter, fn_state);
+            return block_23(ctx, fn_state);
         } else {
-            return block_22(emitter, fn_state);
+            return block_22(ctx, fn_state);
         };
     }
-    fn block_22(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_22(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_22_0: read-var pc:i
         let s_22_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_22_1: read-var opcode:u32
         let s_22_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_22_2: call __DecodeA64_DataProcReg(s_22_0, s_22_1)
-        let s_22_2 = u__DecodeA64_DataProcReg(emitter, s_22_0, s_22_1);
+        let s_22_2 = u__DecodeA64_DataProcReg(ctx, s_22_0, s_22_1);
         // D [D] s_22_3: const #15664u : u32
-        let s_22_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_22_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_22_4: read-reg s_22_3:u8
-        let s_22_4 = {
-            let value = state.read_register::<bool>(s_22_3 as usize);
-            tracer.read_register(s_22_3 as usize, &value);
-            value
-        };
+        let s_22_4 = emitter.read_register(
+            s_22_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_22_5: branch s_22_4 b4 b3
         if s_22_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_23(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_23(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_23_0: read-var pc:i
         let s_23_0 = emitter.read_variable(fn_state.pc);
         // D [D] s_23_1: read-var opcode:u32
         let s_23_1 = emitter.read_variable(fn_state.opcode);
         // D [D] s_23_2: call __DecodeA64_DataProcFPSIMD(s_23_0, s_23_1)
-        let s_23_2 = u__DecodeA64_DataProcFPSIMD(emitter, s_23_0, s_23_1);
+        let s_23_2 = u__DecodeA64_DataProcFPSIMD(ctx, s_23_0, s_23_1);
         // D [D] s_23_3: const #15664u : u32
-        let s_23_3 = emitter
-            .constant(
-                15664,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 32,
-                },
-            );
+        let s_23_3 = emitter.constant(
+            15664,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 32,
+            },
+        );
         // D [D] s_23_4: read-reg s_23_3:u8
-        let s_23_4 = {
-            let value = state.read_register::<bool>(s_23_3 as usize);
-            tracer.read_register(s_23_3 as usize, &value);
-            value
-        };
+        let s_23_4 = emitter.read_register(
+            s_23_3,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_23_5: branch s_23_4 b4 b3
         if s_23_4 {
-            return block_4(emitter, fn_state);
+            return block_4(ctx, fn_state);
         } else {
-            return block_3(emitter, fn_state);
+            return block_3(ctx, fn_state);
         };
     }
-    fn block_24(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_24(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_24_0: const #25s : i
         let s_24_0 = 25;
         // D [D] s_24_1: read-var v__21:u32
@@ -834,14 +878,13 @@ pub fn u__DecodeA64(
         // D [D] s_24_9: cast zx s_24_8 -> bv
         let s_24_9 = Bits::new(s_24_8 as u128, 1u16);
         // D [D] s_24_10: const #0u : u8
-        let s_24_10 = emitter
-            .constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 1,
-                },
-            );
+        let s_24_10 = emitter.constant(
+            0,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+        );
         // D [D] s_24_11: cast zx s_24_10 -> bv
         let s_24_11 = Bits::new(s_24_10 as u128, 1u16);
         // D [D] s_24_12: cmp-eq s_24_9 s_24_11
@@ -850,12 +893,13 @@ pub fn u__DecodeA64(
         let s_24_13 = !s_24_12;
         // D [D] s_24_14: branch s_24_13 b21 b20
         if s_24_13 {
-            return block_21(emitter, fn_state);
+            return block_21(ctx, fn_state);
         } else {
-            return block_20(emitter, fn_state);
+            return block_20(ctx, fn_state);
         };
     }
-    fn block_25(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_25(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_25_0: const #25s : i
         let s_25_0 = 25;
         // D [D] s_25_1: read-var v__3:u32
@@ -880,14 +924,13 @@ pub fn u__DecodeA64(
         // D [D] s_25_9: cast zx s_25_8 -> bv
         let s_25_9 = Bits::new(s_25_8 as u128, 4u16);
         // D [D] s_25_10: const #0u : u8
-        let s_25_10 = emitter
-            .constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 4,
-                },
-            );
+        let s_25_10 = emitter.constant(
+            0,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 4,
+            },
+        );
         // D [D] s_25_11: cast zx s_25_10 -> bv
         let s_25_11 = Bits::new(s_25_10 as u128, 4u16);
         // D [D] s_25_12: cmp-eq s_25_9 s_25_11
@@ -896,12 +939,13 @@ pub fn u__DecodeA64(
         let s_25_13 = !s_25_12;
         // D [D] s_25_14: branch s_25_13 b8 b7
         if s_25_13 {
-            return block_8(emitter, fn_state);
+            return block_8(ctx, fn_state);
         } else {
-            return block_7(emitter, fn_state);
+            return block_7(ctx, fn_state);
         };
     }
-    fn block_26(emitter: &mut X86Emitter, mut fn_state: FunctionState) -> () {
+    fn block_26(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> () {
+        let emitter = ctx.emitter();
         // D [D] s_26_0: const #25s : i
         let s_26_0 = 25;
         // D [D] s_26_1: read-var v__0:u32
@@ -926,14 +970,13 @@ pub fn u__DecodeA64(
         // D [D] s_26_9: cast zx s_26_8 -> bv
         let s_26_9 = Bits::new(s_26_8 as u128, 4u16);
         // D [D] s_26_10: const #0u : u8
-        let s_26_10 = emitter
-            .constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 4,
-                },
-            );
+        let s_26_10 = emitter.constant(
+            0,
+            Type {
+                kind: TypeKind::Unsigned,
+                width: 4,
+            },
+        );
         // D [D] s_26_11: cast zx s_26_10 -> bv
         let s_26_11 = Bits::new(s_26_10 as u128, 4u16);
         // D [D] s_26_12: cmp-eq s_26_9 s_26_11
@@ -942,9 +985,9 @@ pub fn u__DecodeA64(
         let s_26_13 = !s_26_12;
         // D [D] s_26_14: branch s_26_13 b5 b2
         if s_26_13 {
-            return block_5(emitter, fn_state);
+            return block_5(ctx, fn_state);
         } else {
-            return block_2(emitter, fn_state);
+            return block_2(ctx, fn_state);
         };
     }
 }
@@ -2499,9 +2542,7 @@ pub struct State {
 }
 impl State {
     // Returns the ISA state with initial values and configuration set
-    pub fn new(
-        guest_environment: alloc::boxed::Box<dyn plugins_api::guest::Environment>,
-    ) -> Self {
+    pub fn new(guest_environment: alloc::boxed::Box<dyn plugins_api::guest::Environment>) -> Self {
         Self {
             data: [0; 105036usize],
             guest_environment,
@@ -2510,9 +2551,7 @@ impl State {
     pub fn write_register<T>(&mut self, offset: usize, value: T) {
         let start = offset;
         let end = start + core::mem::size_of::<T>();
-        unsafe {
-            core::ptr::write_unaligned(self.data[start..end].as_mut_ptr().cast(), value)
-        };
+        unsafe { core::ptr::write_unaligned(self.data[start..end].as_mut_ptr().cast(), value) };
     }
     pub fn read_register<T>(&self, offset: usize) -> T {
         let start = offset;
@@ -2534,7 +2573,7 @@ impl core::fmt::Debug for State {
             let (next_offset, _) = window[1];
             write!(f, "{name}: 0x")?;
             for byte_idx in 0..(next_offset - offset) {
-                write!(f, "{:x}", self.read_register:: < u8 > (offset + byte_idx))?;
+                write!(f, "{:x}", self.read_register::<u8>(offset + byte_idx))?;
             }
             writeln!(f)?;
         }
@@ -4094,14 +4133,11 @@ pub fn lookup_register_by_offset(offset: usize) -> Option<RegisterOffset> {
         return None;
     }
     Some(
-        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset))
-        {
-            Ok(idx) => {
-                RegisterOffset {
-                    name: REGISTER_NAME_MAP[idx].1,
-                    offset: 0,
-                }
-            }
+        match REGISTER_NAME_MAP.binary_search_by(|(candidate, _)| candidate.cmp(&offset)) {
+            Ok(idx) => RegisterOffset {
+                name: REGISTER_NAME_MAP[idx].1,
+                offset: 0,
+            },
             Err(idx) => {
                 let (register_offset, name) = REGISTER_NAME_MAP[idx - 1];
                 RegisterOffset {
@@ -4164,10 +4200,14 @@ pub struct Struct29530d10a7ab293e {
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct Structb80fc33b537eeda2 {
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv0: Struct29530d10a7ab293e,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1: Struct5f3b6da595f30aca,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv2: Struct62e97a2b6f14adb0,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv3: Bits,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv0:
+        Struct29530d10a7ab293e,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1:
+        Struct5f3b6da595f30aca,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv2:
+        Struct62e97a2b6f14adb0,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv3:
+        Bits,
 }
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
@@ -4435,8 +4475,10 @@ pub struct Structe2f620c8eb69267c {
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct Struct80233863dd0943a0 {
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_enum_zSDFType0: Struct29530d10a7ab293e,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_enum_zSDFType1: Struct5f3b6da595f30aca,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_enum_zSDFType0:
+        Struct29530d10a7ab293e,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_enum_zSDFType1:
+        Struct5f3b6da595f30aca,
     pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_enum_zSDFType2: u32,
 }
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
@@ -4796,8 +4838,10 @@ pub struct Struct81685a93a903c682 {
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct Structdd965607ed85676a {
-    pub tuple__pcnt_struct_zPhysMemRetStatus__pcnt_struct_zAddressDescriptor0: Structc549f9bcfd9a2c5f,
-    pub tuple__pcnt_struct_zPhysMemRetStatus__pcnt_struct_zAddressDescriptor1: Struct5f3b6da595f30aca,
+    pub tuple__pcnt_struct_zPhysMemRetStatus__pcnt_struct_zAddressDescriptor0:
+        Structc549f9bcfd9a2c5f,
+    pub tuple__pcnt_struct_zPhysMemRetStatus__pcnt_struct_zAddressDescriptor1:
+        Struct5f3b6da595f30aca,
 }
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
@@ -4973,10 +5017,14 @@ pub struct Structb087a10901f763f8 {
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct Struct709429a982f3daf1 {
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1280: Struct29530d10a7ab293e,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1281: Struct5f3b6da595f30aca,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1282: Struct62e97a2b6f14adb0,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1283: u128,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1280:
+        Struct29530d10a7ab293e,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1281:
+        Struct5f3b6da595f30aca,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1282:
+        Struct62e97a2b6f14adb0,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv1283:
+        u128,
 }
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
@@ -5025,10 +5073,14 @@ pub struct Struct3961b7c2b54bd49e {
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
 pub struct Structac221b9646824496 {
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv640: Struct29530d10a7ab293e,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv641: Struct5f3b6da595f30aca,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv642: Struct62e97a2b6f14adb0,
-    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv643: u64,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv640:
+        Struct29530d10a7ab293e,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv641:
+        Struct5f3b6da595f30aca,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv642:
+        Struct62e97a2b6f14adb0,
+    pub tuple__pcnt_struct_zFaultRecord__pcnt_struct_zAddressDescriptor__pcnt_struct_zTTWState__pcnt_bv643:
+        u64,
 }
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 #[repr(C)]
@@ -5321,7 +5373,7 @@ impl Bits {
             value: self.value(),
             length,
         }
-            .normalize()
+        .normalize()
     }
     pub fn sign_extend(&self, i: i128) -> Self {
         let length = u16::try_from(i).unwrap();
@@ -5330,14 +5382,14 @@ impl Bits {
             value: (((self.value() as i128) << shift_amount) >> shift_amount) as u128,
             length,
         }
-            .normalize()
+        .normalize()
     }
     pub fn truncate(&self, i: i128) -> Self {
         Self {
             value: self.value(),
             length: u16::try_from(i).unwrap(),
         }
-            .normalize()
+        .normalize()
     }
     // Returns the current value with `bits` inserted beginning at index
     // `start`
@@ -5374,20 +5426,26 @@ impl core::ops::Shl<i128> for Bits {
     type Output = Self;
     fn shl(self, rhs: i128) -> Self::Output {
         Self {
-            value: self.value().checked_shl(u32::try_from(rhs).unwrap()).unwrap_or(0),
+            value: self
+                .value()
+                .checked_shl(u32::try_from(rhs).unwrap())
+                .unwrap_or(0),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::Shr<i128> for Bits {
     type Output = Self;
     fn shr(self, rhs: i128) -> Self::Output {
         Self {
-            value: self.value().checked_shr(u32::try_from(rhs).unwrap()).unwrap_or(0),
+            value: self
+                .value()
+                .checked_shr(u32::try_from(rhs).unwrap())
+                .unwrap_or(0),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::Shl for Bits {
@@ -5400,7 +5458,7 @@ impl core::ops::Shl for Bits {
                 .unwrap_or(0),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::BitAnd for Bits {
@@ -5410,7 +5468,7 @@ impl core::ops::BitAnd for Bits {
             value: self.value() & rhs.value(),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::BitOr for Bits {
@@ -5420,7 +5478,7 @@ impl core::ops::BitOr for Bits {
             value: self.value() | rhs.value(),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::BitXor for Bits {
@@ -5430,7 +5488,7 @@ impl core::ops::BitXor for Bits {
             value: self.value() ^ rhs.value(),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::Add for Bits {
@@ -5440,7 +5498,7 @@ impl core::ops::Add for Bits {
             value: self.value().wrapping_add(rhs.value()),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::Sub for Bits {
@@ -5450,7 +5508,7 @@ impl core::ops::Sub for Bits {
             value: self.value().wrapping_sub(rhs.value()),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::ops::Not for Bits {
@@ -5460,7 +5518,7 @@ impl core::ops::Not for Bits {
             value: !self.value(),
             length: self.length(),
         }
-            .normalize()
+        .normalize()
     }
 }
 impl core::cmp::PartialEq for Bits {
