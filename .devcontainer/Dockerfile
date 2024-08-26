@@ -9,7 +9,7 @@ RUN apt-get install -y build-essential device-tree-compiler opam mold fish neovi
 RUN opam init --disable-sandboxing --bare -y
 RUN opam switch create 4.14.1+options --packages ocaml-variants.4.14.1+options,ocaml-option-flambda
 
-RUN opam install -y sail=0.17.1 gmp dune ocaml-lsp-server
+RUN opam install -y sail=0.18 gmp dune ocaml-lsp-server ocamlformat
 
 RUN mkdir -p ~/.config/fish
 RUN echo '# Environment variables\n\

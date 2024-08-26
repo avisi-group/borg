@@ -8,9 +8,7 @@ use {
 };
 
 ocaml::import! {
-    pub fn run_sail(filepaths: ListVec<String>) -> Result<(Value, Value, Value), WrapperError>;
-
-    pub fn generate_jib(ast: Value, effect_info: Value, env: Value) -> Result<Value, WrapperError>;
+    pub fn run_sail(filepaths: ListVec<String>) -> Result<Value, WrapperError>;
 
     // Utility
     pub fn util_dedup(l: ListVec<i32>) -> Result<ListVec<i32>, WrapperError>;

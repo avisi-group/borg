@@ -52,6 +52,7 @@ open Libsail
 
 open Ast
 open Ast_util
+open Interactive.State
 open Jib
 open Jib_util
 
@@ -66,18 +67,19 @@ let isla_options = [
 let isla_rewrites =
   let open Rewrites in
   [
-    ("instantiate_outcomes", [String_arg "isla"]);
+    ("instantiate_outcomes", [String_arg "c"]);
     ("realize_mappings", []);
+    ("remove_vector_subrange_pats", []);
     ("toplevel_string_append", []);
     ("pat_string_append", []);
     ("mapping_patterns", []);
     ("truncate_hex_literals", []);
-    ("mono_rewrites", []);
-    ("recheck_defs", []);
-    ("toplevel_nexps", []);
-    ("monomorphise", [String_arg "c"]);
-    ("atoms_to_singletons", [String_arg "c"]);
-    ("recheck_defs", []);
+    ("mono_rewrites", [If_flag opt_mono_rewrites]);
+    ("recheck_defs", [If_flag opt_mono_rewrites]);
+    ("toplevel_nexps", [If_mono_arg]);
+    ("monomorphise", [String_arg "c"; If_mono_arg]);
+    ("atoms_to_singletons", [String_arg "c"; If_mono_arg]);
+    ("recheck_defs", [If_mono_arg]);
     ("undefined", [Bool_arg false]);
     ("vector_string_pats_to_bit_list", []);
     ("remove_not_pats", []);
@@ -87,10 +89,11 @@ let isla_rewrites =
     ("tuple_assignments", []);
     ("vector_concat_assignments", []);
     ("simple_struct_assignments", []);
+    ("split", [String_arg "execute"]);
     ("exp_lift_assign", []);
     ("merge_function_clauses", []);
     ("recheck_defs", []);
-    ("constant_fold", [String_arg "c"])
+    ("constant_fold", [String_arg "c"]);
   ]
 
 
@@ -226,6 +229,7 @@ module Ir_config : Jib_compile.CONFIG = struct
   let track_throw = true
   let branch_coverage = None
   let use_real = false
+  let use_void = false
 end
 
 let jib_of_ast env ast effect_info =
@@ -270,7 +274,7 @@ let remove_casts cdefs =
        else (
          let fid = Printf.sprintf "%s->%s" (string_of_ctyp ctyp_from) (string_of_ctyp ctyp_to) in
          conversions := StringMap.add fid (ctyp_from, ctyp_to) !conversions;
-         [I_aux (I_funcall (clexp, false, (mk_id fid, []), [cval]), aux)]
+         [I_aux (I_funcall (CR_one clexp, false, (mk_id fid, []), [cval]), aux)]
        )
     | I_aux (I_init (ctyp_to, id, cval), aux) ->
        let ctyp_from = cval_ctyp cval in
@@ -289,7 +293,7 @@ let remove_casts cdefs =
   let cdefs = List.map (fun cdef -> cdef_concatmap_instr remove_instr_casts cdef) cdefs in
   let vals =
     List.map (fun (fid, (ctyp_from, ctyp_to)) ->
-        CDEF_val (mk_id fid, Some fid, [ctyp_from], ctyp_to)
+        CDEF_aux (CDEF_val (mk_id fid, Some fid, [ctyp_from], ctyp_to), mk_def_annot Parse_ast.Unknown ())
       ) (StringMap.bindings !conversions)
   in
   vals @ cdefs
@@ -302,12 +306,12 @@ let remove_extern_impls cdefs =
   let exts = ref IdSet.empty in
   List.iter
     (function
-     | CDEF_val (id, Some _, _, _) -> exts := IdSet.add id !exts
+     | CDEF_aux (CDEF_val (id, Some _, _, _), _) -> exts := IdSet.add id !exts
      | _ -> ()
     ) cdefs;
   List.filter
     (function
-     | CDEF_fundef (id, _, _, _) when IdSet.mem id !exts -> false
+     | CDEF_aux (CDEF_fundef (id, _, _, _), _) when IdSet.mem id !exts -> false
      | _ -> true
     ) cdefs
 
@@ -330,13 +334,13 @@ let fix_cons cdefs =
       let cdef = cdef_map_instr (collect_cons_ctyps list_ctyps) cdef in
       let vals =
         List.map (fun ctyp ->
-            CDEF_val (cons_name ctyp, Some "cons", [ctyp; CT_list ctyp], CT_list ctyp)
+            CDEF_aux (CDEF_val (cons_name ctyp, Some "cons", [ctyp; CT_list ctyp], CT_list ctyp), mk_def_annot Parse_ast.Unknown ())
           ) (CTSet.elements (CTSet.diff !list_ctyps !all_list_ctyps)) in
       vals @ [cdef]
     ) cdefs
   |> List.concat
 
-let isla_target _ _ out_file ast effect_info env = ()
+let isla_target out_file { ast; effect_info; env; _ } = ()
 
 let isla_initialize () =
   Preprocess.add_symbol "SYMBOLIC";
@@ -348,6 +352,7 @@ let isla_initialize () =
   Initial_check.opt_magic_hash := true;
 
   Specialize.add_initial_calls (IdSet.singleton (mk_id "isla_footprint"));
+  Specialize.add_initial_calls (IdSet.singleton (mk_id "isla_footprint_no_init"));
   Specialize.add_initial_calls (IdSet.singleton (mk_id "isla_footprint_bare"));
   Specialize.add_initial_calls (IdSet.singleton (mk_id "isla_client"));
   List.iter (fun id ->

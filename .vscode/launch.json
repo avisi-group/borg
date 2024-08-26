@@ -7,22 +7,21 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "brig standalone",
+            "name": "sailrs",
             "cargo": {
-                "args": [
+                "args":[
                     "build",
-                    "--bin=standalone",
-                    "--package=standalone",
-                    "--manifest-path=${workspaceFolder}/brig/standalone/Cargo.toml",
-                    "--release",
+                    "--bin=sailrs",
+                    "--package=sailrs",
+                    "--manifest-path=${workspaceFolder}/borealis/Cargo.toml"
                 ],
                 "filter": {
-                    "name": "standalone",
+                    "name": "sailrs",
                     "kind": "bin"
-                }
+                },
             },
-            "args": [],
-            "cwd": "${workspaceFolder}/brig/standalone",
+            "args": [ "${workspaceFolder}/borealis/data/arm-v9.4-a.json","${workspaceFolder}/arm-v9.4-a_d43f3f4c.rkyv"],
+            "cwd": "${workspaceFolder}/borealis",
         },
         {
             "type": "lldb",

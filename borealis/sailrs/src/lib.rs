@@ -3,14 +3,7 @@
 //! Rust interface to `Sail` compiler library
 
 use {
-    crate::{
-        error::Error,
-        ffi::{generate_jib, run_sail},
-        json::ModelConfig,
-        runtime::RT,
-        sail_ast::Ast,
-        types::ListVec,
-    },
+    crate::{error::Error, ffi::run_sail, json::ModelConfig, runtime::RT, types::ListVec},
     log::trace,
     ocaml::FromValue,
     std::path::Path,
@@ -32,12 +25,12 @@ pub mod types;
 /// Parses supplied Sail files and returns the AST
 pub fn load_from_config<P: AsRef<Path>>(
     config_path: P,
-) -> Result<(Ast, ListVec<jib_ast::Definition>), Error> {
+) -> Result<ListVec<jib_ast::Definition>, Error> {
     let ModelConfig { files } = ModelConfig::load(config_path.as_ref())?;
 
     RT.lock().execute(move |rt| {
         trace!("Compiling Sail");
-        let (ast, env, effect_info) = unsafe {
+        let jib = unsafe {
             run_sail(
                 rt,
                 files
@@ -47,15 +40,9 @@ pub fn load_from_config<P: AsRef<Path>>(
             )
         }??;
 
-        trace!("Generating JIB IR");
-        let jib = unsafe { generate_jib(rt, ast.clone(), env, effect_info) }??;
-
-        trace!("Parsing Sail AST");
-        let ast = Ast::from_value(ast);
-
         trace!("Parsing JIB AST");
         let jib = ListVec::<jib_ast::Definition>::from_value(jib);
 
-        Ok((ast, jib))
+        Ok(jib)
     })?
 }

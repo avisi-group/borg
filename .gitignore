@@ -2,6 +2,8 @@
 *.trace
 /aarch64
 /ir
+/borealis/_sbuild
+/borealis/z3_problems
 
 **/.DS_Store
 **/target

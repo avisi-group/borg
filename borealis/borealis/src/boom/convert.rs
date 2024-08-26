@@ -6,7 +6,10 @@ use {
         Parameter, Size,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
-    sailrs::{jib_ast, sail_ast},
+    sailrs::{
+        jib_ast::{self, CReturn},
+        sail_ast,
+    },
     std::borrow::Borrow,
 };
 
@@ -43,8 +46,8 @@ impl BoomEmitter {
     }
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
-        match definition {
-            jib_ast::Definition::Register(ident, typ, body) => {
+        match &definition.def {
+            jib_ast::DefinitionAux::Register(ident, typ, body) => {
                 self.ast.registers.insert(
                     ident.as_interned(),
                     (
@@ -57,7 +60,7 @@ impl BoomEmitter {
                     ),
                 );
             }
-            jib_ast::Definition::Type(type_def) => {
+            jib_ast::DefinitionAux::Type(type_def) => {
                 let def = match type_def {
                     jib_ast::TypeDefinition::Enum(name, variants) => boom::Definition::Enum {
                         name: name.as_interned(),
@@ -74,7 +77,7 @@ impl BoomEmitter {
                 };
                 self.ast.definitions.push(def);
             }
-            jib_ast::Definition::Let(_, bindings, body) => {
+            jib_ast::DefinitionAux::Let(_, bindings, body) => {
                 self.ast.definitions.push(boom::Definition::Let {
                     bindings: bindings
                         .iter()
@@ -90,7 +93,7 @@ impl BoomEmitter {
                     ),
                 });
             }
-            jib_ast::Definition::Val(id, _, parameters, out) => {
+            jib_ast::DefinitionAux::Val(id, _, parameters, out) => {
                 self.function_types.insert(
                     id.as_interned(),
                     (
@@ -99,7 +102,7 @@ impl BoomEmitter {
                     ),
                 );
             }
-            jib_ast::Definition::Fundef(name, _, arguments, body) => {
+            jib_ast::DefinitionAux::Fundef(name, _, arguments, body) => {
                 let (parameter_types, return_type) =
                     self.function_types.remove(&name.as_interned()).unwrap();
 
@@ -136,12 +139,14 @@ impl BoomEmitter {
                     },
                 );
             }
-            jib_ast::Definition::Startup(_, _) => todo!(),
-            jib_ast::Definition::Finish(_, _) => todo!(),
-            &jib_ast::Definition::Pragma(key, value) => self
-                .ast
-                .definitions
-                .push(boom::Definition::Pragma { key, value }),
+            jib_ast::DefinitionAux::Startup(_, _) => todo!(),
+            jib_ast::DefinitionAux::Finish(_, _) => todo!(),
+            jib_ast::DefinitionAux::Pragma(key, value) => {
+                self.ast.definitions.push(boom::Definition::Pragma {
+                    key: *key,
+                    value: *value,
+                })
+            }
         };
     }
 }
@@ -237,7 +242,10 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
         }],
         jib_ast::InstructionAux::Goto(s) => vec![boom::Statement::Goto(*s)],
         jib_ast::InstructionAux::Label(s) => vec![boom::Statement::Label(*s)],
-        jib_ast::InstructionAux::Funcall(expression, _, (name, _), args) => {
+        jib_ast::InstructionAux::Funcall(ret, _, (name, _), args) => {
+            let CReturn::One(expression) = ret else {
+                todo!()
+            };
             vec![boom::Statement::FunctionCall {
                 expression: convert_expression(expression),
                 name: name.as_interned(),
@@ -276,11 +284,12 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
 
 fn convert_name(name: &jib_ast::Name) -> InternedString {
     match name {
-        jib_ast::Name::Name(ident, _) | jib_ast::Name::Global(ident, _) => ident.as_interned(),
+        jib_ast::Name::Name(ident, _) => ident.as_interned(),
         jib_ast::Name::HaveException(_) => InternedString::from_static("have_exception"),
         jib_ast::Name::CurrentException(_) => InternedString::from_static("current_exception"),
         jib_ast::Name::ThrowLocation(_) => InternedString::from_static("throw"),
         jib_ast::Name::Return(_) => InternedString::from_static("return"),
+        jib_ast::Name::Channel(_, _) => InternedString::from_static("channel"),
     }
 }
 
@@ -340,6 +349,7 @@ fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
                 jib_ast::Op::Neq => boom::Operation::Not(Shared::new(boom::Value::Operation(
                     boom::Operation::Equal(values[0].clone(), values[1].clone()),
                 ))),
+                jib_ast::Op::Ite => todo!(),
                 jib_ast::Op::Ilt => boom::Operation::LessThan(values[0].clone(), values[1].clone()),
 
                 jib_ast::Op::Ilteq => todo!(),
@@ -375,6 +385,7 @@ fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
             value: (convert_value(value)),
             field_name: ident.as_interned(),
         },
+        jib_ast::Value::Member(_, _) => todo!(),
     })
 }
 
