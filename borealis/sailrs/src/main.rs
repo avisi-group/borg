@@ -7,13 +7,10 @@ use {
         HashMap,
     },
     deepsize::DeepSizeOf,
-    log::{info, trace},
+    log::info,
     rkyv::ser::{serializers::AllocSerializer, Serializer},
-    sailrs::{jib_ast::pretty_print, load_from_config},
-    std::{
-        io::{stdout, Write},
-        path::PathBuf,
-    },
+    sailrs::load_from_config,
+    std::{io::Write, path::PathBuf},
 };
 
 #[derive(Parser, Debug)]
@@ -43,8 +40,8 @@ fn main() -> Result<()> {
 
     let jib = load_from_config(args.input)?;
 
-    trace!("JIB size: {:.2} bytes", bytes(jib.deep_size_of()));
-    trace!(
+    info!("JIB size: {:.2} bytes", bytes(jib.deep_size_of()));
+    info!(
         "INTERNER size: {:.2} bytes, {} strings",
         bytes(interner().current_memory_usage()),
         interner().len()

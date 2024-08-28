@@ -349,8 +349,8 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
         match node {
             Value::Id(name, _) => self.visit_name(name),
             Value::Member(id, typ) => {
-                write!(self.writer, "{id}: ").unwrap();
                 self.visit_type(typ);
+                write!(self.writer, "::{id}").unwrap();
             }
             Value::Lit(val, _) => write!(self.writer, "{val:?}").unwrap(),
             Value::Call(op, vals) => {

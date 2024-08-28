@@ -1,6 +1,6 @@
 open Libsail
-open Sail_plugin_isla
 open Ast_util
+open Sail_plugin_sv
 
 type error = Err_exception of string * string | Err_sail of Reporting.error
 
@@ -49,24 +49,26 @@ let file_to_string filename =
     close_in chan;
     Buffer.contents buf
 
+
 let run_sail filepaths =
   (* register isla target *)
   let tgt =
-    Target.register ~name:"isla" ~options:isla_options
-      ~pre_parse_hook:isla_initialize ~rewrites:isla_rewrites isla_target
+    Target.register ~name:"systemverilog" ~flag:"sv" ~options:verilog_options
+      ~rewrites:verilog_rewrites verilog_target
   in
 
-  let options = ref [] in
-  let opt_file_out = ref None in
   let opt_free_arguments = ref [] in
   let opt_project_files = ref [] in
+  let options = ref [] in
   let opt_variable_assignments = ref [] in
   let opt_all_modules = ref true in
   let opt_just_parse_project = ref false in
   let opt_splice = ref [] in
-  let config = None in
+
+  Sail_plugin_sv.opt_nostrings := true;
 
   Rewrites.opt_mono_rewrites := true;
+  (* Rewrites.opt_auto_mono := true; *)
   Constant_fold.optimize_constant_fold := true;
   Util.opt_verbosity := 2;
   Profile.opt_profile := true;
@@ -170,19 +172,32 @@ let run_sail filepaths =
     Rewrites.rewrite ctx effect_info env (Target.rewrites tgt) ast
   in
 
-  Target.action tgt !opt_file_out
-    { ctx; ast; effect_info; env; default_sail_dir = sail_dir; config };
+  let module SV = Jib_sv.Make (struct
+    let max_unknown_integer_width = !opt_max_unknown_integer_width
+    let max_unknown_bitvector_width = !opt_max_unknown_bitvector_width
+    let line_directives = !opt_line_directives
+    let nostrings = !opt_nostrings
+    let nopacked = !opt_nopacked
+    let never_pack_unions = !opt_never_pack_unions
+    let union_padding = !opt_padding
+    let unreachable = !opt_unreachable
+    let comb = !opt_comb
+    let ignore = !opt_fun2wires
+  end) in
+  let open SV in
+  let ast, env, effect_info =
+    let open Specialize in
+    match !opt_int_specialize with
+    | Some num_passes ->
+        specialize_passes num_passes int_specialization env ast effect_info
+    | None -> (ast, env, effect_info)
+  in
+
+  let cdefs, ctx = jib_of_ast SV.make_call_precise env ast effect_info in
+  let cdefs, ctx = Jib_optimize.remove_tuples cdefs ctx in
 
   Constraint.save_digests ();
 
-  let props = Property.find_properties ast in
-  Bindings.bindings props |> List.map fst |> IdSet.of_list
-  |> Specialize.add_initial_calls;
-
-  (* let ast, env = Specialize.(specialize typ_ord_specialization env ast) in *)
-  let cdefs, ctx = jib_of_ast env ast effect_info in
-  let cdefs, _ = Jib_optimize.remove_tuples cdefs ctx in
-  let cdefs = remove_casts cdefs |> remove_extern_impls |> fix_cons in
   cdefs
 
 let () =
