@@ -39,10 +39,10 @@
                     "kind": "bin"
                 },
             },
-            "args": ["--dump-ir","${workspaceFolder}/ir","${workspaceFolder}/arm-v9.4-a_d43f3f4c.rkyv", "${workspaceFolder}/aarch64"],
+            "args": ["--dump-ir","${workspaceFolder}/ir","${workspaceFolder}/arm9.4_sail18.rkyv", "${workspaceFolder}/aarch64"],
             "cwd": "${workspaceFolder}/borealis",
             "env": {
-                "RAYON_NUM_THREADS": "4"
+                "RAYON_NUM_THREADS": "1"
             }
         },
     ]

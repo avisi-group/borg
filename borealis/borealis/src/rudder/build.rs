@@ -11,7 +11,7 @@ use {
                 BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementBuilder,
                 StatementKind, UnaryOperationKind,
             },
-            Block, ConstantValue, Context, Function, FunctionInner, FunctionKind,
+            Block, ConstantValue, Context, Function, FunctionInner, FunctionKind, PrimitiveType,
             PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
         },
     },
@@ -284,7 +284,6 @@ impl BuildContext {
             boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
             boom::Type::Float => Arc::new(rudder::Type::f64()),
             boom::Type::Real => Arc::new(rudder::Type::Rational),
-            boom::Type::Constant(_) => todo!(),
             boom::Type::Enum { name, .. } => self.enums.get(name).unwrap().0.clone(),
             boom::Type::Union { name, .. } => self.unions.get(name).unwrap().0.clone(),
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
@@ -323,6 +322,7 @@ impl BuildContext {
                 )),
                 boom::Size::Runtime(_) | boom::Size::Unknown => Arc::new(rudder::Type::Bits),
             },
+            boom::Type::Constant(_) => panic!("constant types should've been removed in boom"),
         }
     }
 
@@ -673,7 +673,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val add_bits : (%bv, %bv) -> %bv
                 // val add_real : (%real, %real) -> %real
                 "add_atom" | "add_bits" | "add_real" => {
-                    assert!(args[0].typ() == args[1].typ());
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Add,
                         lhs: args[0].clone(),
@@ -1303,7 +1302,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     });
 
 
-                    Some( self.builder.build(StatementKind::BitInsert {
+                    Some(self.builder.build(StatementKind::BitInsert {
                         target: destination,
                         source,
                         start,
@@ -1641,17 +1640,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 // enum
-                if let Some(value) = self
+                if let Some(_) = self
                     .ctx()
                     .enums
                     .iter()
                     .find_map(|(_, (_, variants))| variants.get(ident))
                     .cloned()
                 {
-                    return self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u32()),
-                        value: rudder::ConstantValue::UnsignedInteger(value.try_into().unwrap()),
-                    });
+                    panic!("these should be members now?");
                 }
 
                 panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
@@ -1772,6 +1768,23 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     unwrap_sum
                 }
             }
+            boom::Value::Member {
+                member_ident,
+                enum_ident,
+            } => {
+                let Some((_, variants)) = self.ctx().enums.get(enum_ident) else {
+                    panic!();
+                };
+
+                let value = *variants.get(member_ident).expect(&format!(
+                    "unknown variant {member_ident:?} of enum {enum_ident:?}"
+                ));
+
+                self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(Type::u32()),
+                    value: rudder::ConstantValue::UnsignedInteger(value.try_into().unwrap()),
+                })
+            }
         }
     }
 
@@ -1848,8 +1861,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             Ordering::Equal => CastOperationKind::Reinterpret,
                         }
                     }
-                    Type::Bits | Type::ArbitraryLengthInteger | Type::Rational => todo!(),
-                    Type::Any => todo!(),
+                    Type::Bits | Type::ArbitraryLengthInteger | Type::Rational | Type::Any => {
+                        todo!()
+                    }
                 };
 
                 self.builder.build(StatementKind::Cast {
@@ -1946,20 +1960,20 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn generate_concat(&mut self, lhs: Statement, rhs: Statement) -> Statement {
+    fn generate_concat(&mut self, left: Statement, right: Statement) -> Statement {
         // todo: (zero extend original value || create new bits with runtime length)
         // then bitinsert
-        match (&*lhs.typ(), &*rhs.typ()) {
+        match (&*left.typ(), &*right.typ()) {
             (Type::Bits, Type::Bits) => {
                 let l_value = self
                     .builder
-                    .generate_cast(lhs.clone(), Arc::new(Type::u128()));
-                let l_length = self.builder.build(StatementKind::SizeOf { value: lhs });
+                    .generate_cast(left.clone(), Arc::new(Type::u128()));
+                let l_length = self.builder.build(StatementKind::SizeOf { value: left });
 
                 let r_value = self
                     .builder
-                    .generate_cast(rhs.clone(), Arc::new(Type::u128()));
-                let r_length = self.builder.build(StatementKind::SizeOf { value: rhs });
+                    .generate_cast(right.clone(), Arc::new(Type::u128()));
+                let r_length = self.builder.build(StatementKind::SizeOf { value: right });
 
                 let shift = self.builder.build(StatementKind::ShiftOperation {
                     kind: ShiftOperationKind::LogicalShiftLeft,
@@ -1983,7 +1997,47 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.builder
                     .build(StatementKind::CreateBits { value, length })
             }
-            (a, b) => panic!("{a:?} {b:?}"),
+            (
+                Type::Primitive(PrimitiveType {
+                    tc: PrimitiveTypeClass::UnsignedInteger,
+                    element_width_in_bits: left_width,
+                }),
+                Type::Primitive(PrimitiveType {
+                    tc: PrimitiveTypeClass::UnsignedInteger,
+                    element_width_in_bits: right_width,
+                }),
+            ) => {
+                // cast left to width left + right
+                // shift left by width of right
+                // OR in right
+
+                let left_cast = self.builder.build(StatementKind::Cast {
+                    kind: CastOperationKind::ZeroExtend,
+                    typ: Arc::new(Type::Primitive(PrimitiveType {
+                        tc: PrimitiveTypeClass::UnsignedInteger,
+                        element_width_in_bits: left_width + right_width,
+                    })),
+                    value: left,
+                });
+
+                let right_width_constant = self.builder.build(StatementKind::Constant {
+                    typ: Arc::new(Type::u16()),
+                    value: ConstantValue::UnsignedInteger(*right_width),
+                });
+
+                let left_shift = self.builder.build(StatementKind::ShiftOperation {
+                    kind: ShiftOperationKind::LogicalShiftLeft,
+                    value: left_cast,
+                    amount: right_width_constant,
+                });
+
+                self.builder.build(StatementKind::BinaryOperation {
+                    kind: BinaryOperationKind::Or,
+                    lhs: left_shift,
+                    rhs: right,
+                })
+            }
+            (a, b) => panic!("todo concat for {a:?} {b:?}"),
         }
     }
 }

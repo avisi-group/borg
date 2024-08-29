@@ -23,6 +23,7 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         definitions,
         registers,
         functions,
+        constants,
     } = &*ast.get();
 
     let mut visitor = PrettyPrinter::new(w);
@@ -41,6 +42,11 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         }
         writeln!(visitor.writer, "}}").unwrap();
     });
+
+    constants.iter().for_each(|(name, value)| {
+        writeln!(visitor.writer, "constant {name}: {value}").unwrap();
+    });
+    writeln!(visitor.writer).unwrap();
 
     functions
         .iter()
@@ -205,12 +211,14 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.prindent("let (");
 
                 let mut bindings = bindings.iter();
-                if let Some(NamedType { name, .. }) = bindings.next() {
-                    write!(self.writer, "{name}").unwrap();
+                if let Some(NamedType { name, typ }) = bindings.next() {
+                    write!(self.writer, "{name}: ").unwrap();
+                    self.visit_type(typ.clone());
                 }
-                for NamedType { name, .. } in bindings {
+                for NamedType { name, typ } in bindings {
                     write!(self.writer, ", ").unwrap();
-                    write!(self.writer, "{name}").unwrap();
+                    write!(self.writer, "{name}: ").unwrap();
+                    self.visit_type(typ.clone());
                 }
 
                 writeln!(self.writer, ") {{").unwrap();
@@ -463,6 +471,12 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_value(value.clone());
                 write!(self.writer, " as ").unwrap();
                 write_uid(self, *identifier, types);
+            }
+            Value::Member {
+                member_ident,
+                enum_ident,
+            } => {
+                write!(self.writer, "{enum_ident}::{member_ident}").unwrap();
             }
         }
     }

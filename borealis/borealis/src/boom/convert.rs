@@ -78,20 +78,28 @@ impl BoomEmitter {
                 self.ast.definitions.push(def);
             }
             jib_ast::DefinitionAux::Let(_, bindings, body) => {
-                self.ast.definitions.push(boom::Definition::Let {
-                    bindings: bindings
-                        .iter()
-                        .map(|(ident, typ)| NamedType {
-                            name: ident.as_interned(),
-                            typ: convert_type(typ),
-                        })
-                        .collect(),
-                    //  allow unknown terminators for letbinds
-                    body: ControlFlowGraphBuilder::from_statements(
-                        &convert_body(body.as_ref()),
-                        true,
-                    ),
-                });
+                if let [(name, jib_ast::Type::Constant(c))] = bindings.as_ref() {
+                    assert!(self
+                        .ast
+                        .constants
+                        .insert(name.as_interned(), (&c.0).try_into().unwrap())
+                        .is_none())
+                } else {
+                    self.ast.definitions.push(boom::Definition::Let {
+                        bindings: bindings
+                            .iter()
+                            .map(|(ident, typ)| NamedType {
+                                name: ident.as_interned(),
+                                typ: convert_type(typ),
+                            })
+                            .collect(),
+                        //  allow unknown terminators for letbinds
+                        body: ControlFlowGraphBuilder::from_statements(
+                            &convert_body(body.as_ref()),
+                            true,
+                        ),
+                    });
+                }
             }
             jib_ast::DefinitionAux::Val(id, _, parameters, out) => {
                 self.function_types.insert(
@@ -196,12 +204,8 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Shared<boom::Type> {
             element_type: (convert_type(&**typ)),
         },
         jib_ast::Type::Ref(typ) => boom::Type::Reference(convert_type(&**typ)),
-        jib_ast::Type::Constant(_)
-        | jib_ast::Type::Sbits(_)
-        | jib_ast::Type::Float(_)
-        | jib_ast::Type::RoundingMode
-        | jib_ast::Type::Tup(_)
-        | jib_ast::Type::Poly(_) => todo!(),
+        jib_ast::Type::Constant(c) => boom::Type::Constant((&c.0).try_into().unwrap()),
+        t => todo!("jib type {t:?}"),
     })
 }
 
@@ -385,7 +389,15 @@ fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
             value: (convert_value(value)),
             field_name: ident.as_interned(),
         },
-        jib_ast::Value::Member(_, _) => todo!(),
+        jib_ast::Value::Member(ident, typ) => {
+            let jib_ast::Type::Enum(enum_ident, _) = typ else {
+                todo!()
+            };
+            boom::Value::Member {
+                member_ident: ident.as_interned(),
+                enum_ident: enum_ident.as_interned(),
+            }
+        }
     })
 }
 

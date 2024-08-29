@@ -133,10 +133,6 @@ fn simple_allocation_regression() {
         instrs,
         [
             Instruction {
-                opcode: Opcode::LABEL,
-                operands: alloc::vec![],
-            },
-            Instruction {
                 opcode: Opcode::MOV,
                 operands: alloc::vec![
                     (
