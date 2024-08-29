@@ -10,6 +10,7 @@ pub mod constant_propagation;
 pub mod dead_stmt_elimination;
 pub mod dead_symbol_elimination;
 pub mod dead_write_elimination;
+pub mod destroy_bitvectors;
 pub mod inliner;
 pub mod jump_threading;
 pub mod phi_analysis;
@@ -17,6 +18,7 @@ pub mod return_propagation;
 pub mod tail_calls;
 pub mod variable_elimination;
 pub mod vector_folding;
+pub mod materialise_apints;
 
 pub enum OptLevel {
     Level0,
@@ -43,6 +45,8 @@ static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_si
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
+static DESTROY_BITVECTORS: FunctionPass = ("destroy-bitvectors", destroy_bitvectors::run);
+static MATERIALISE_APINTS: FunctionPass = ("materialise-apints", materialise_apints::run);
 
 pub fn optimise(ctx: &mut Context, level: OptLevel) {
     let passes: Vec<FunctionPass> = match level {
@@ -59,6 +63,8 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
+            DESTROY_BITVECTORS,
+            MATERIALISE_APINTS,
             VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
@@ -74,6 +80,8 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
+            DESTROY_BITVECTORS,
+            MATERIALISE_APINTS,
             VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
@@ -89,6 +97,8 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
+            DESTROY_BITVECTORS,
+            MATERIALISE_APINTS,
             VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
@@ -104,7 +114,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             for pass in &passes {
                 trace!("running pass {}", pass.0);
 
-                function.update_names();
+                function.update_indices();
                 while pass.1(function.clone()) {
                     changed = true;
                 }

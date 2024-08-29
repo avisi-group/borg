@@ -1,8 +1,7 @@
 use {
     crate::rudder::{
-        constant_value::ConstantValue,
-        statement::value_class::{classify_kind, ValueClass},
-        Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type, WeakBlock,
+        constant_value::ConstantValue, Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol,
+        Type, WeakBlock,
     },
     common::{intern::InternedString, shared::Shared},
     std::{
@@ -12,8 +11,6 @@ use {
         sync::Arc,
     },
 };
-
-pub mod value_class;
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperationKind {
@@ -361,8 +358,6 @@ pub struct StatementInner {
     name: InternedString,
     kind: StatementKind,
     parent: WeakBlock,
-    // cached, must be updated any time `kind` is changed
-    class: ValueClass,
 }
 
 impl Statement {
@@ -373,21 +368,15 @@ impl Statement {
     pub fn replace_kind(&self, kind: StatementKind) {
         let mut inner = self.inner.get_mut();
         inner.replace_kind(kind);
-        inner.update_class();
     }
 
     pub fn replace_use(&self, use_of: Statement, with: Statement) {
         let mut inner = self.inner.get_mut();
         inner.replace_use(use_of, with);
-        inner.update_class();
     }
 
     pub fn name(&self) -> InternedString {
         self.inner.get().name
-    }
-
-    pub fn class(&self) -> ValueClass {
-        self.inner.get().class
     }
 
     pub fn parent_block(&self) -> WeakBlock {
@@ -533,10 +522,6 @@ impl StatementInner {
 
     pub fn replace_kind(&mut self, kind: StatementKind) {
         self.kind = kind;
-    }
-
-    pub fn update_class(&mut self) {
-        self.class = classify_kind(&self.kind);
     }
 
     pub fn replace_use(&mut self, use_of: Statement, with: Statement) {
@@ -988,7 +973,6 @@ impl StatementBuilder {
                 name: "???".into(),
                 kind,
                 parent: self.parent.clone(),
-                class: ValueClass::Dynamic, // most conservative default value
             }),
         };
 

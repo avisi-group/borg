@@ -12,7 +12,7 @@ use {
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
-        fmt::Debug,
+        fmt::{Debug, Display},
         hash::{Hash, Hasher},
         sync::Arc,
     },
@@ -24,6 +24,7 @@ pub mod constant_value;
 pub mod internal_fns;
 pub mod opt;
 mod pretty_print;
+pub mod serialize;
 pub mod statement;
 pub mod validator;
 
@@ -131,8 +132,7 @@ impl Type {
         match self {
             Self::Struct(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).sum(),
             Self::Enum(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).max().unwrap(),
-            // smallest with is 8 bits
-            Self::Primitive(p) => p.element_width_in_bits.max(8),
+            Self::Primitive(p) => p.element_width_in_bits,
             Self::Vector {
                 element_count,
                 element_type,
@@ -193,6 +193,10 @@ impl Type {
         matches!(self, Self::Bits)
     }
 
+    pub fn is_apint(&self) -> bool {
+        matches!(self, Self::ArbitraryLengthInteger)
+    }
+
     pub fn is_u1(&self) -> bool {
         match self {
             Self::Primitive(PrimitiveType {
@@ -245,15 +249,9 @@ impl Symbol {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Block {
     inner: Shared<BlockInner>,
-}
-
-impl Debug for Block {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.get().name)
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -280,12 +278,12 @@ impl Block {
         }
     }
 
-    pub fn name(&self) -> InternedString {
-        self.inner.get().name
+    pub fn index(&self) -> usize {
+        self.inner.get().index
     }
 
-    pub fn update_names(&self, name: InternedString) {
-        self.inner.get_mut().update_names(name);
+    pub fn update_index(&self, index: usize) {
+        self.inner.get_mut().update_index(index);
     }
 
     pub fn statements(&self) -> Vec<Statement> {
@@ -360,7 +358,7 @@ impl Default for Block {
     fn default() -> Self {
         Self {
             inner: Shared::new(BlockInner {
-                name: "???".into(),
+                index: 0,
                 statements: Vec::new(),
             }),
         }
@@ -383,17 +381,20 @@ impl Eq for Block {}
 
 #[derive(Debug)]
 pub struct BlockInner {
-    name: InternedString,
+    index: usize,
     statements: Vec<Statement>,
 }
 
 impl BlockInner {
-    pub fn update_names(&mut self, name: InternedString) {
-        self.name = name;
+    pub fn update_index(&mut self, index: usize) {
+        self.index = index;
 
-        self.statements.iter().enumerate().for_each(|(idx, stmt)| {
-            stmt.update_names(format!("s_{}_{}", name.clone(), idx).into());
-        });
+        self.statements
+            .iter()
+            .enumerate()
+            .for_each(|(statement_index, stmt)| {
+                stmt.update_names(format!("b{}_s{}", index, statement_index).into());
+            });
     }
 }
 
@@ -527,14 +528,14 @@ impl Function {
         (self.return_type.clone(), self.parameters.clone())
     }
 
-    pub fn update_names(&self) {
+    pub fn update_indices(&self) {
         self.inner
             .get()
             .entry_block
             .iter()
             .enumerate()
             .for_each(|(idx, b)| {
-                b.update_names(format!("{idx}").into());
+                b.update_index(idx);
             });
     }
 
@@ -613,7 +614,7 @@ impl Context {
 
     pub fn update_names(&self) {
         for (_, func) in self.fns.values() {
-            func.update_names();
+            func.update_indices();
         }
     }
 

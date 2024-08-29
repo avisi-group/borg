@@ -2,8 +2,8 @@ use {
     crate::rudder::{
         analysis::cfg::ControlFlowGraphAnalysis,
         statement::{
-            value_class::ValueClass, BinaryOperationKind, CastOperationKind, ShiftOperationKind,
-            Statement, StatementKind, UnaryOperationKind,
+            BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement, StatementKind,
+            UnaryOperationKind,
         },
         Block, ConstantValue, Context, Function, FunctionKind, PrimitiveTypeClass, Symbol, Type,
     },
@@ -179,7 +179,7 @@ impl Display for StatementKind {
                     length.name()
                 )
             }
-            StatementKind::Jump { target } => write!(f, "jump b{}", target.name()),
+            StatementKind::Jump { target } => write!(f, "jump block{}", target.index()),
             StatementKind::Branch {
                 condition,
                 true_target,
@@ -187,10 +187,10 @@ impl Display for StatementKind {
             } => {
                 write!(
                     f,
-                    "branch {} b{} b{}",
+                    "branch {} block{} block{}",
                     condition.name(),
-                    true_target.name(),
-                    false_target.name()
+                    true_target.index(),
+                    false_target.index()
                 )
             }
             StatementKind::PhiNode { members } => {
@@ -322,14 +322,7 @@ impl Display for StatementKind {
 
 impl Display for Statement {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let vc = match self.class() {
-            ValueClass::None => "-",
-            ValueClass::Constant => "C",
-            ValueClass::Static => "S",
-            ValueClass::Dynamic => "D",
-        };
-
-        write!(f, "[{}] {}: {}", vc, self.name(), self.kind())
+        write!(f, "{}: {}", self.name(), self.kind())
     }
 }
 
@@ -352,20 +345,20 @@ impl Display for Function {
                 .predecessors_for(&block)
                 .unwrap()
                 .iter()
-                .map(|b| b.name())
+                .map(|b| b.index())
                 .join(", ");
 
             let succs = cfg
                 .successors_for(&block)
                 .unwrap()
                 .iter()
-                .map(|b| b.name())
+                .map(|b| b.index())
                 .join(", ");
 
             writeln!(
                 f,
                 "  block {}: preds={{{preds}}}, succs={{{succs}}}",
-                block.name()
+                block.index()
             )?;
             write!(f, "{}", block)
         })
@@ -395,16 +388,5 @@ impl Display for Context {
         }
 
         Ok(())
-    }
-}
-
-impl Display for ValueClass {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        match self {
-            ValueClass::None => write!(f, "N"),
-            ValueClass::Constant => write!(f, "C"),
-            ValueClass::Static => write!(f, "S"),
-            ValueClass::Dynamic => write!(f, "D"),
-        }
     }
 }

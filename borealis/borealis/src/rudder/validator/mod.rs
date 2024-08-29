@@ -30,8 +30,8 @@ impl Display for ValidationMessage {
 
         let scope = match &self.1 {
             Scope::FunctionLevel(f) => format!("{}", f.name()),
-            Scope::BlockLevel(f, b) => format!("{} {}", f.name(), b.name()),
-            Scope::StatementLevel(f, b, s) => format!("{} {} {}", f.name(), b.name(), s.name()),
+            Scope::BlockLevel(f, b) => format!("{} {}", f.name(), b.index()),
+            Scope::StatementLevel(f, b, s) => format!("{} {} {}", f.name(), b.index(), s.name()),
         };
 
         write!(f, "{severity}: {scope}: {}", self.2)

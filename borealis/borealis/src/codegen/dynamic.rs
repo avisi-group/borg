@@ -30,8 +30,6 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 
     let fn_state = codegen_fn_state(&function, parameters.clone());
 
-    let entry_block = get_block_fn_ident(&function.entry_block());
-
     let block_fns = function
         .entry_block()
         .iter()
@@ -41,11 +39,20 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 
             quote! {
                 // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
-                fn #block_name(ctx: &mut X86TranslationContext, mut fn_state: FunctionState) -> #return_type {
-                    let emitter = ctx.emitter();
+                fn #block_name(ctx: &mut X86TranslationContext, fn_state: &FunctionState) -> BlockResult  {
                     #block_impl
                 }
             }
+        })
+        .collect::<TokenStream>();
+
+    let num_blocks = function.entry_block().iter().count();
+    let block_fn_names = function
+        .entry_block()
+        .iter()
+        .map(|block| {
+            let fn_name = get_block_fn_ident(&block);
+            quote!(#fn_name, )
         })
         .collect::<TokenStream>();
 
@@ -53,7 +60,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         .iter()
         .map(|symbol| {
             let name = codegen_ident(symbol.name());
-            quote!(emitter.write_variable(fn_state.#name.clone(), #name);)
+            quote!(ctx.emitter().write_variable(fn_state.#name.clone(), #name);)
         })
         .collect::<TokenStream>();
 
@@ -67,7 +74,43 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                 #parameter_writes
             }
 
-            return #entry_block(ctx, fn_state);
+            const BLOCK_FUNCTIONS: [fn(&mut X86TranslationContext, &FunctionState) -> BlockResult; #num_blocks] = [#block_fn_names];
+
+            fn lookup_block_idx_by_ref(block_refs: &[X86BlockRef], block: X86BlockRef) -> usize {
+                block_refs.iter().position(|r| *r == block).unwrap()
+            }
+
+            enum Block {
+                Static(usize),
+                Dynamic(usize),
+            }
+
+            let mut block_queue = alloc::vec![Block::Static(0)];
+
+            while let Some(block) = block_queue.pop() {
+                let result = match block {
+                    Block::Static(i) => {
+                        log::debug!("static block {i}");
+                        BLOCK_FUNCTIONS[i](ctx, &fn_state)
+                    }
+                    Block::Dynamic(i) => {
+                        log::debug!("dynamic block {i}");
+                        ctx.emitter().set_current_block(fn_state.block_refs[i].clone());
+                        BLOCK_FUNCTIONS[i](ctx, &fn_state)
+                    }
+                };
+
+                match result {
+                    BlockResult::None => {},
+                    BlockResult::Static(block) => {
+                        block_queue.push(Block::Static(lookup_block_idx_by_ref(&fn_state.block_refs, block)));
+                    }
+                    BlockResult::Dynamic(b0, b1) => {
+                        block_queue.push(Block::Dynamic(lookup_block_idx_by_ref(&fn_state.block_refs, b0)));
+                        block_queue.push(Block::Dynamic(lookup_block_idx_by_ref(&fn_state.block_refs, b1)));
+                    },
+                }
+            }
 
             #block_fns
         }
@@ -90,44 +133,51 @@ pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
 }
 
 pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenStream {
-    let fn_state = {
-        let fields = function
-            .local_variables()
-            .iter()
-            .chain(&parameters)
-            .map(|symbol| {
-                let name = codegen_ident(symbol.name());
+    let fields = function
+        .local_variables()
+        .iter()
+        .chain(&parameters)
+        .map(|symbol| {
+            let name = codegen_ident(symbol.name());
 
-                quote! {
-                    #name: X86SymbolRef,
-                }
-            })
-            .collect::<TokenStream>();
-
-        let field_inits = function
-            .local_variables()
-            .iter()
-            .chain(&parameters)
-            .map(|symbol| {
-                let name = codegen_ident(symbol.name());
-
-                quote! {
-                    #name: ctx.create_symbol(),
-                }
-            })
-            .collect::<TokenStream>();
-
-        quote! {
-            struct FunctionState {
-                #fields
+            quote! {
+                #name: X86SymbolRef,
             }
+        })
+        .collect::<TokenStream>();
 
-            let fn_state = FunctionState {
-                #field_inits
-            };
+    let field_inits = function
+        .local_variables()
+        .iter()
+        .chain(&parameters)
+        .map(|symbol| {
+            let name = codegen_ident(symbol.name());
+
+            quote! {
+                #name: ctx.create_symbol(),
+            }
+        })
+        .collect::<TokenStream>();
+
+    let block_ref_inits = function
+        .entry_block()
+        .iter()
+        .map(|_| quote!(ctx.create_block(),))
+        .collect::<TokenStream>();
+
+    let num_blocks = function.entry_block().iter().count();
+
+    quote! {
+        struct FunctionState {
+            #fields
+            block_refs: [X86BlockRef; #num_blocks]
         }
-    };
-    fn_state
+
+        let fn_state = FunctionState {
+            #field_inits
+            block_refs: [#block_ref_inits]
+        };
+    }
 }
 
 pub fn codegen_block(block: Block) -> TokenStream {
@@ -144,7 +194,7 @@ pub fn get_ident(stmt: &Statement) -> TokenStream {
 }
 
 pub fn get_block_fn_ident(b: &Block) -> Ident {
-    format_ident!("block_{}", b.name().as_ref())
+    format_ident!("block_{}", b.index())
 }
 
 /// Converts a rudder type to a `Type` value
@@ -159,11 +209,98 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
                 } },
                 PrimitiveTypeClass::Void => todo!(),
                 PrimitiveTypeClass::Unit => todo!(),
-                PrimitiveTypeClass::SignedInteger => todo!(),
-                PrimitiveTypeClass::FloatingPoint => todo!(),
+                PrimitiveTypeClass::SignedInteger => quote! { Type {
+                    kind: TypeKind::Signed,
+                    width: #width,
+                } },
+                PrimitiveTypeClass::FloatingPoint => quote! { Type {
+                    kind: TypeKind::Floating,
+                    width: #width,
+                } },
             }
         }
-        _ => todo!(),
+        Type::ArbitraryLengthInteger => {
+            quote! {
+                Type {
+                    kind: TypeKind::Signed,
+                    width: todo!(),
+                }
+            }
+        }
+        Type::Bits => {
+            quote! {
+                Type {
+                    kind: TypeKind::Unsigned,
+                    width: todo!(),
+                }
+            }
+        }
+        t => panic!("todo codegen type instance: {t:?}"),
+    }
+}
+
+/// Converts a rudder type to a `Type` value
+fn codegen_type_instance_constant(value: &ConstantValue, typ: Arc<Type>) -> TokenStream {
+    match &(*typ) {
+        Type::Primitive(primitive) => {
+            let width = Literal::usize_unsuffixed(primitive.width());
+            match primitive.tc {
+                PrimitiveTypeClass::UnsignedInteger => quote! { Type {
+                    kind: TypeKind::Unsigned,
+                    width: #width,
+                } },
+                PrimitiveTypeClass::Void => todo!(),
+                PrimitiveTypeClass::Unit => quote! { Type {
+                    kind: TypeKind::Unsigned,
+                    width: 0,
+                } },
+                PrimitiveTypeClass::SignedInteger => quote! { Type {
+                    kind: TypeKind::Signed,
+                    width: #width,
+                } },
+                PrimitiveTypeClass::FloatingPoint => quote! { Type {
+                    kind: TypeKind::Floating,
+                    width: #width,
+                } },
+            }
+        }
+        Type::ArbitraryLengthInteger => {
+            let ConstantValue::SignedInteger(cv) = value else {
+                panic!();
+            };
+
+            let width = u16::try_from(((*cv as usize) + 1).next_power_of_two().ilog2()).unwrap();
+
+            quote! {
+                Type {
+                    kind: TypeKind::Signed,
+                    width: #width,
+                }
+            }
+        }
+        Type::Bits => {
+            let ConstantValue::UnsignedInteger(cv) = value else {
+                panic!();
+            };
+
+            let width = u16::try_from((cv + 1).next_power_of_two().ilog2()).unwrap();
+
+            quote! {
+                Type {
+                    kind: TypeKind::Unsigned,
+                    width: #width,
+                }
+            }
+        }
+        Type::String => {
+            quote! {
+                Type {
+                    kind: TypeKind::Unsigned,
+                    width: 0,
+                }
+            }
+        }
+        t => panic!("todo codegen type instance: {t:?}"),
     }
 }
 
@@ -172,61 +309,53 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
     let statement_tokens = match stmt.kind() {
-        StatementKind::Constant { value, typ } => match value {
-            ConstantValue::UnsignedInteger(v) => {
-                let v = Literal::usize_unsuffixed(v);
-                let typ = codegen_type_instance(typ);
-                quote!(emitter.constant(#v, #typ))
-            }
-            ConstantValue::SignedInteger(v) => {
-                let v = Literal::isize_unsuffixed(v);
-                quote!(#v)
-            }
-            ConstantValue::FloatingPoint(v) => {
-                if v.is_infinite() {
-                    quote!(1.1 / 0.0)
-                } else {
-                    let v = Literal::f64_unsuffixed(v);
-                    quote!(#v)
+        StatementKind::Constant { value, typ } => {
+            let typ = codegen_type_instance_constant(&value, typ);
+            match value {
+                ConstantValue::UnsignedInteger(v) => {
+                    let v = Literal::usize_unsuffixed(v);
+                    quote!(ctx.emitter().constant(#v, #typ))
+                }
+                ConstantValue::SignedInteger(v) => {
+                    quote!(ctx.emitter().constant(#v as u64, #typ))
+                }
+                ConstantValue::FloatingPoint(v) => {
+                    quote!(ctx.emitter().constant(#v as u64, #typ))
+                }
+
+                ConstantValue::Unit => quote!(()),
+                ConstantValue::String(str) => {
+                    let string = str.to_string();
+                    quote!(#string)
+                }
+                ConstantValue::Rational(r) => {
+                    let numer = *r.numer();
+                    let denom = *r.denom();
+                    quote!(num_rational::Ratio::<i128>::new(#numer, #denom))
                 }
             }
-
-            ConstantValue::Unit => quote!(()),
-            ConstantValue::String(str) => {
-                let string = str.to_string();
-                quote!(#string)
-            }
-            ConstantValue::Rational(r) => {
-                let numer = *r.numer();
-                let denom = *r.denom();
-                quote!(num_rational::Ratio::<i128>::new(#numer, #denom))
-            }
-        },
+        }
         StatementKind::ReadVariable { symbol } => {
             let symbol_ident = codegen_ident(symbol.name());
-            quote! { emitter.read_variable(fn_state.#symbol_ident) }
+            quote! { ctx.emitter().read_variable(fn_state.#symbol_ident.clone()) }
         }
         StatementKind::WriteVariable { symbol, value } => {
-            let var = codegen_ident(symbol.name());
+            let symbol_ident = codegen_ident(symbol.name());
             let value = get_ident(&value);
-            quote! { emitter.write_variable(fn_state.#var, #value); }
+            quote! { ctx.emitter().write_variable(fn_state.#symbol_ident.clone(), #value.clone()); }
         }
         StatementKind::ReadRegister { typ, offset } => {
             let offset = get_ident(&offset);
             let typ = codegen_type_instance(typ);
             quote! {
-                emitter.read_register(#offset, #typ);
+                ctx.emitter().read_register(#offset.clone(), #typ);
             }
         }
         StatementKind::WriteRegister { offset, value } => {
             let offset = get_ident(&offset);
-            let typ = codegen_type(value.typ());
             let value = get_ident(&value);
             quote! {
-                {
-                    state.write_register::<#typ>(#offset as usize, #value);
-                    tracer.write_register(#offset as usize, &#value);
-                }
+                ctx.emitter().write_register(#offset.clone(), #value.clone());
             }
         }
         // read `size` bytes at `offset`, return a Bits
@@ -293,64 +422,59 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             //     (_, _) => (),
             // }
 
-            let op = match kind {
-                BinaryOperationKind::CompareEqual => quote! { (#left) == (#right) },
-                BinaryOperationKind::Add => {
-                    quote! { #left + #right }
-                }
-                BinaryOperationKind::Sub => quote! { (#left) - (#right) },
-                BinaryOperationKind::Multiply => quote! { (#left) * (#right) },
-                BinaryOperationKind::Divide => quote! { (#left) / (#right) },
-                BinaryOperationKind::Modulo => quote! { (#left) % (#right) },
-                BinaryOperationKind::And => quote! { (#left) & (#right) },
-                BinaryOperationKind::Or => quote! { (#left) | (#right) },
-                BinaryOperationKind::Xor => quote! { (#left) ^ (#right) },
-                BinaryOperationKind::CompareNotEqual => quote! { (#left) != (#right) },
-                BinaryOperationKind::CompareLessThan => quote! { (#left) < (#right) },
-                BinaryOperationKind::CompareLessThanOrEqual => quote! { (#left) <= (#right) },
-                BinaryOperationKind::CompareGreaterThan => quote! { (#left) > (#right) },
-                BinaryOperationKind::CompareGreaterThanOrEqual => quote! { (#left) >= (#right) },
-                BinaryOperationKind::PowI => quote! { (#left).powi(#right) },
+            let kind = match kind {
+                BinaryOperationKind::Add => quote!(Add),
+                BinaryOperationKind::Sub => quote!(Sub),
+                BinaryOperationKind::Multiply => quote!(Multiply),
+                BinaryOperationKind::Divide => quote!(Divide),
+                BinaryOperationKind::Modulo => quote!(Modulo),
+                BinaryOperationKind::And => quote!(And),
+                BinaryOperationKind::Or => quote!(Or),
+                BinaryOperationKind::Xor => quote!(Xor),
+                BinaryOperationKind::CompareEqual => quote!(CompareEqual),
+                BinaryOperationKind::CompareNotEqual => quote!(CompareNotEqual),
+                BinaryOperationKind::CompareLessThan => quote!(CompareLessThan),
+                BinaryOperationKind::CompareLessThanOrEqual => quote!(CompareLessThanOrEqual),
+                BinaryOperationKind::CompareGreaterThan => quote!(CompareGreaterThan),
+                BinaryOperationKind::CompareGreaterThanOrEqual => quote!(CompareGreaterThanOrEqual),
+                BinaryOperationKind::PowI => quote!(PowI),
             };
 
-            quote! { (#op) }
+            quote! { ctx.emitter().binary_operation(BinaryOperationKind::#kind(#left.clone(), #right.clone())) }
         }
         StatementKind::UnaryOperation { kind, value } => {
             let value = get_ident(&value);
 
-            match kind {
-                UnaryOperationKind::Not => quote! {!#value},
-                UnaryOperationKind::Negate => quote! {-#value},
-                UnaryOperationKind::Complement => quote! {!#value},
-                UnaryOperationKind::Power2 => quote! { (#value).pow(2) },
-                UnaryOperationKind::Absolute => quote! { (#value).abs() },
-                UnaryOperationKind::Ceil => quote! { (#value).ceil() },
-                UnaryOperationKind::Floor => quote! { (#value).floor() },
-                UnaryOperationKind::SquareRoot => quote! { (#value).sqrt() },
-            }
+            let kind = match kind {
+                UnaryOperationKind::Not => quote!(Not),
+                UnaryOperationKind::Negate => quote!(Negate),
+                UnaryOperationKind::Complement => quote!(Complement),
+                UnaryOperationKind::Power2 => quote!(Power2),
+                UnaryOperationKind::Absolute => quote!(Absolute),
+                UnaryOperationKind::Ceil => quote!(Ceil),
+                UnaryOperationKind::Floor => quote!(Floor),
+                UnaryOperationKind::SquareRoot => quote!(SquareRoot),
+            };
+
+            quote! { ctx.emitter().unary_operation(UnaryOperationKind::#kind(#value.clone())) }
         }
         StatementKind::ShiftOperation {
             kind,
             value,
             amount,
         } => {
-            let ident = get_ident(&value);
+            let value = get_ident(&value);
             let amount = get_ident(&amount);
 
-            match kind {
-                ShiftOperationKind::LogicalShiftLeft => quote! {#ident << #amount},
-                ShiftOperationKind::LogicalShiftRight => quote! {#ident >> #amount},
-                ShiftOperationKind::ArithmeticShiftRight => match &*value.typ() {
-                    Type::Bits => {
-                        quote! {
-                            #ident.arithmetic_shift_right(#amount)
-                        }
-                    }
-                    typ => unimplemented!("{typ:?}"),
-                },
-                ShiftOperationKind::RotateRight => todo!(),
-                ShiftOperationKind::RotateLeft => todo!(),
-            }
+            let kind = match kind {
+                ShiftOperationKind::LogicalShiftLeft => quote!(LogicalShiftLeft),
+                ShiftOperationKind::LogicalShiftRight => quote!(LogicalShiftRight),
+                ShiftOperationKind::ArithmeticShiftRight => quote!(ArithmeticShiftRight),
+                ShiftOperationKind::RotateRight => quote!(RotateRight),
+                ShiftOperationKind::RotateLeft => quote!(RotateLeft),
+            };
+
+            quote! { ctx.emitter().shift(#value.clone(), #amount.clone(), ShiftOperationKind::#kind) }
         }
         StatementKind::Call { target, args, tail } => {
             let ident = codegen_ident(target.name());
@@ -366,11 +490,25 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::Cast { typ, value, kind } => codegen_cast(typ, value, kind),
+        StatementKind::Cast { typ, value, kind } => {
+            let typ = codegen_type_instance(typ);
+            let value = get_ident(&value);
+
+            let kind = match kind {
+                CastOperationKind::ZeroExtend => quote!(ZeroExtend),
+                CastOperationKind::SignExtend => quote!(SignExtend),
+                CastOperationKind::Truncate => quote!(Truncate),
+                CastOperationKind::Reinterpret => quote!(Reinterpret),
+                CastOperationKind::Convert => quote!(Convert),
+                CastOperationKind::Broadcast => quote!(Broadcast),
+            };
+
+            quote! { ctx.emitter().cast(#value.clone(), #typ, CastOperationKind::#kind) }
+        }
         StatementKind::Jump { target } => {
-            let target = get_block_fn_ident(&target);
+            let target_index = target.index();
             quote! {
-               return #target(ctx, emitter, fn_state);
+                return ctx.emitter().jump(fn_state.block_refs[#target_index].clone())
             }
         }
         StatementKind::Branch {
@@ -379,11 +517,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             false_target,
         } => {
             let condition = get_ident(&condition);
-            let true_target = get_block_fn_ident(&true_target);
-            let false_target = get_block_fn_ident(&false_target);
+            let true_index = true_target.index();
+            let false_index = false_target.index();
 
             quote! {
-                if #condition { return #true_target(ctx,  fn_state); } else { return #false_target(ctx,  fn_state); }
+                return ctx.emitter().branch(#condition.clone(), fn_state.block_refs[#true_index].clone(), fn_state.block_refs[#false_index].clone())
             }
         }
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
@@ -393,7 +531,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! { return #name; }
             }
             None => {
-                quote! { return; }
+                quote! { return BlockResult::None; }
             }
         },
         StatementKind::Select {
@@ -411,85 +549,22 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             start,
             length,
         } => {
-            if let Type::Bits = &*value.typ() {
-                let length = if let Type::Bits = &*length.typ() {
-                    let length = get_ident(&length);
-                    quote!(#length.value())
-                } else {
-                    let length = get_ident(&length);
-                    quote!(u16::try_from(#length).unwrap())
-                };
-
-                let value = get_ident(&value);
-                let start = get_ident(&start);
-
-                quote! {
-                    (Bits::new(((#value) >> (#start)).value(), #length))
-                }
-            } else {
-                let typ = codegen_type(value.typ());
-
-                let value = get_ident(&value);
-                let start = get_ident(&start);
-                let length = get_ident(&length);
-
-                // todo: pre-cast length to u32
-
-                quote! (
-                    (
-                        (#value >> #start) &
-                        ((1 as #typ).checked_shl(#length as u32).map(|x| x - 1).unwrap_or(!0))
-                    )
-                )
-            }
+            let value = get_ident(&value);
+            let start = get_ident(&start);
+            let length = get_ident(&length);
+            quote! { ctx.emitter().bit_extract(#value.clone(), #start.clone(), #length.clone()) }
         }
         StatementKind::BitInsert {
-            target: original_value,
-            source: insert_value,
+            target,
+            source,
             start,
             length,
         } => {
-            if let Type::Bits = &*original_value.typ() {
-                let length = if let Type::Bits = &*length.typ() {
-                    let length = get_ident(&length);
-                    quote!(#length.value() as i128)
-                } else {
-                    let length = get_ident(&length);
-                    quote!(#length as i128)
-                };
-
-                let original_value = get_ident(&original_value);
-                let insert_value = get_ident(&insert_value);
-                let start = get_ident(&start);
-
-                quote! {
-                    #original_value.insert(#insert_value.truncate(#length), #start)
-                }
-            } else {
-                let typ = codegen_type(original_value.typ());
-
-                let original_value = get_ident(&original_value);
-
-                let insert_value = if let Type::Bits = &*insert_value.typ() {
-                    let insert_value = get_ident(&insert_value);
-                    quote!((#insert_value.value() as i128))
-                } else {
-                    let insert_value = get_ident(&insert_value);
-                    quote!((#insert_value as i128))
-                };
-
-                let start = get_ident(&start);
-                let length = get_ident(&length);
-
-                // todo: pre-cast length to u32
-
-                quote! {
-                    {
-                        let mask = !(((1 as #typ).checked_shl(#length as u32).map(|x| x - 1).unwrap_or(!0)) << #start);
-                        (#original_value & mask) | (#insert_value << #start)
-                    }
-                }
-            }
+            let target = get_ident(&target);
+            let source = get_ident(&source);
+            let start = get_ident(&start);
+            let length = get_ident(&length);
+            quote! {ctx.emitter().bit_insert(#target.clone(), #source.clone(), #start.clone(), #length.clone())}
         }
         StatementKind::Panic(statements) => {
             let args = statements.iter().map(get_ident);
@@ -662,7 +737,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Undefined => quote!(Default::default()),
     };
 
-    let msg = format!(" {} {stmt}", stmt.class());
+    let msg = format!(" {stmt}");
     if stmt.has_value() {
         quote! {
             #[doc = #msg]

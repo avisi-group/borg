@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        emitter::Type,
+        emitter::{BlockResult, Type, TypeKind},
         x86::{
             encoder::{Instruction, Operand, PhysicalRegister, Register},
             register_allocator::RegisterAllocator,
@@ -64,13 +64,190 @@ impl Emitter for X86Emitter {
         }
     }
 
-    fn add(&mut self, lhs: Self::NodeRef, rhs: Self::NodeRef) -> Self::NodeRef {
+    fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef {
+        use UnaryOperationKind::*;
+
+        match &op {
+            Not(value) => match value.kind() {
+                NodeKind::Constant {
+                    value: constant_value,
+                    width,
+                } => Self::NodeRef::from(X86Node {
+                    typ: value.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: constant_value ^ ((1 << *width) - 1),        // only NOT the bits that are part of the size of the datatype
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: value.typ().clone(),
+                    kind: NodeKind::UnaryOperation(op),
+                }),
+            },
+            _ => {
+                todo!()
+            }
+        }
+    }
+
+    fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef {
+        use BinaryOperationKind::*;
+
+        match &op {
+            Add(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value,
+                        width,
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: lhs_value + rhs_value,
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            CompareEqual(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value, ..
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: if lhs_value == rhs_value { 1 } else { 0 },
+                        width: 1,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: Type {
+                        kind: TypeKind::Unsigned,
+                        width: 1,
+                    },
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            _ => {
+                todo!()
+            }
+        }
+    }
+
+    fn cast(
+        &mut self,
+        value: Self::NodeRef,
+        target_type: Type,
+        cast_kind: CastOperationKind,
+    ) -> Self::NodeRef {
+        match value.kind() {
+            NodeKind::Constant {
+                value: constant_value,
+                ..
+            } => {
+                let original_width = value.typ().width;
+                let target_width = target_type.width;
+
+                let casted_value = match cast_kind {
+                    CastOperationKind::ZeroExtend => {
+                        if original_width == 64 {
+                            *constant_value
+                        } else {
+                            // extending from the incoming value type - so can clear
+                            // all upper bits.
+                            let mask = (1 << original_width) - 1;
+                            *constant_value & mask
+                        }
+                    }
+                    CastOperationKind::SignExtend => *constant_value << (64 - original_width) >> 5,
+                    CastOperationKind::Truncate => {
+                        // truncating to the target width - just clear all irrelevant bits
+                        let mask = (1 << target_width) - 1;
+                        *constant_value & mask
+                    }
+                    CastOperationKind::Reinterpret => *constant_value,
+                    CastOperationKind::Convert => *constant_value,
+                    CastOperationKind::Broadcast => *constant_value,
+                };
+
+                Self::NodeRef::from(X86Node {
+                    typ: target_type.clone(),
+                    kind: NodeKind::Constant {
+                        value: casted_value,
+                        width: target_type.width,
+                    },
+                })
+            }
+            _ => Self::NodeRef::from(X86Node {
+                typ: target_type,
+                kind: NodeKind::Cast {
+                    value,
+                    kind: cast_kind,
+                },
+            }),
+        }
+    }
+
+    fn shift(
+        &mut self,
+        value: Self::NodeRef,
+        amount: Self::NodeRef,
+        kind: ShiftOperationKind,
+    ) -> Self::NodeRef {
         Self::NodeRef::from(X86Node {
-            typ: lhs.typ().clone(),
-            kind: NodeKind::BinaryOperation {
-                kind: BinaryOperationKind::Add(lhs, rhs),
+            typ: value.typ().clone(),
+            kind: NodeKind::Shift {
+                value,
+                amount,
+                kind,
             },
         })
+    }
+
+    fn bit_extract(
+        &mut self,
+        value: Self::NodeRef,
+        start: Self::NodeRef,
+        length: Self::NodeRef,
+    ) -> Self::NodeRef {
+        match (value.kind(), start.kind(), length.kind()) {
+            (
+                NodeKind::Constant {
+                    value: value_value, ..
+                },
+                NodeKind::Constant {
+                    value: start_value, ..
+                },
+                NodeKind::Constant {
+                    value: length_value,
+                    ..
+                },
+            ) => Self::NodeRef::from(X86Node {
+                typ: value.typ().clone(),
+                kind: NodeKind::Constant {
+                    value: (value_value >> start_value) & ((1 << length_value) - 1),
+                    width: *length_value as u16,
+                },
+            }),
+            _ => Self::NodeRef::from(X86Node {
+                typ: value.typ().clone(),
+                kind: NodeKind::BitExtract {
+                    value,
+                    start,
+                    length,
+                },
+            }),
+        }
     }
 
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef) {
@@ -95,23 +272,42 @@ impl Emitter for X86Emitter {
         condition: Self::NodeRef,
         true_target: Self::BlockRef,
         false_target: Self::BlockRef,
-    ) {
-        let condition = condition.to_operand(self);
-        self.current_block
-            .append(Instruction::test(condition.clone(), condition));
+    ) -> BlockResult {
+        match condition.kind() {
+            NodeKind::Constant { value, .. } => {
+                if *value == 0 {
+                    self.current_block.set_next_0(false_target.clone());
+                    BlockResult::Static(false_target)
+                } else {
+                    self.current_block.set_next_0(true_target.clone());
+                    BlockResult::Static(true_target)
+                }
+            }
+            _ => {
+                let condition = condition.to_operand(self);
 
-        self.current_block
-            .append(Instruction::jne(true_target.clone()));
-        self.current_block.set_next_0(true_target);
+                self.current_block
+                    .append(Instruction::test(condition.clone(), condition));
 
-        self.current_block
-            .append(Instruction::jmp(false_target.clone()));
-        self.current_block.set_next_1(false_target);
+                self.current_block
+                    .append(Instruction::jne(true_target.clone()));
+                self.current_block.set_next_0(true_target.clone());
+
+                self.current_block
+                    .append(Instruction::jmp(false_target.clone()));
+                self.current_block.set_next_1(false_target.clone());
+
+                // if condition is static, return BlockResult::Static
+                // else
+                BlockResult::Dynamic(true_target, false_target)
+            }
+        }
     }
 
-    fn jump(&mut self, target: Self::BlockRef) {
-        self.current_block.append(Instruction::jmp(target.clone()));
-        self.current_block.set_next_0(target);
+    fn jump(&mut self, target: Self::BlockRef) -> BlockResult {
+        //self.current_block.append(Instruction::jmp(target.clone()));
+        self.current_block.set_next_0(target.clone());
+        BlockResult::Static(target)
     }
 
     fn leave(&mut self) {
@@ -139,7 +335,7 @@ impl X86NodeRef {
         &self.0.typ
     }
 
-    pub fn to_operand(&self, emitter: &mut X86Emitter) -> Operand {
+    fn to_operand(&self, emitter: &mut X86Emitter) -> Operand {
         match self.kind() {
             NodeKind::Constant { value, width } => {
                 Operand::imm((*width).try_into().unwrap(), *value)
@@ -160,25 +356,33 @@ impl X86NodeRef {
 
                 dst
             }
-            NodeKind::BinaryOperation { kind } => {
-                let dst = Operand::vreg(64, emitter.next_vreg());
+            NodeKind::BinaryOperation(kind) => match kind {
+                BinaryOperationKind::Add(lhs, rhs) => {
+                    let dst = Operand::vreg(64, emitter.next_vreg());
 
-                match kind {
-                    BinaryOperationKind::Add(lhs, rhs) => {
-                        let lhs = lhs.to_operand(emitter);
-                        let rhs = rhs.to_operand(emitter);
-                        emitter
-                            .current_block
-                            .append(Instruction::mov(lhs, dst.clone()));
-                        emitter
-                            .current_block
-                            .append(Instruction::add(rhs, dst.clone()));
-                    }
-                    _ => todo!(),
+                    let lhs = lhs.to_operand(emitter);
+                    let rhs = rhs.to_operand(emitter);
+                    emitter
+                        .current_block
+                        .append(Instruction::mov(lhs, dst.clone()));
+                    emitter
+                        .current_block
+                        .append(Instruction::add(rhs, dst.clone()));
+
+                    dst
                 }
+                BinaryOperationKind::CompareEqual(left, right) => {
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
+                    emitter.current_block.append(Instruction::cmp(left, right));
 
-                dst
-            }
+                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    emitter.current_block.append(Instruction::sete(dst.clone()));
+
+                    dst
+                }
+                _ => todo!(),
+            },
             NodeKind::ReadVariable { symbol } => symbol
                 .0
                 .borrow()
@@ -186,6 +390,40 @@ impl X86NodeRef {
                 .unwrap()
                 .clone()
                 .to_operand(emitter),
+            NodeKind::UnaryOperation(kind) => match &kind {
+                _ => {
+                    todo!()
+                }
+            },
+            NodeKind::BitExtract {
+                value: _value,
+                start: _start,
+                length: _length,
+            } => {
+                todo!()
+            }
+            NodeKind::Cast {
+                value: _value,
+                kind: _cast_kind,
+            } => {
+                /*let dst = Operand::vreg(64, emitter.next_vreg());
+
+                let src = value.to_operand(emitter);
+                emitter
+                    .current_block
+                    .append(Instruction::mov(src, dst.clone()));
+
+                dst*/
+
+                todo!()
+            }
+            NodeKind::Shift {
+                value: _value,
+                amount: _shift_amount,
+                kind: _shift_kind,
+            } => {
+                todo!()
+            }
         }
     }
 }
@@ -204,10 +442,32 @@ pub struct X86Node {
 
 #[derive(Debug)]
 pub enum NodeKind {
-    Constant { value: u64, width: u16 },
-    GuestRegister { offset: u64 },
-    BinaryOperation { kind: BinaryOperationKind },
-    ReadVariable { symbol: X86SymbolRef },
+    Constant {
+        value: u64,
+        width: u16,
+    },
+    GuestRegister {
+        offset: u64,
+    },
+    UnaryOperation(UnaryOperationKind),
+    BinaryOperation(BinaryOperationKind),
+    Cast {
+        value: X86NodeRef,
+        kind: CastOperationKind,
+    },
+    Shift {
+        value: X86NodeRef,
+        amount: X86NodeRef,
+        kind: ShiftOperationKind,
+    },
+    ReadVariable {
+        symbol: X86SymbolRef,
+    },
+    BitExtract {
+        value: X86NodeRef,
+        start: X86NodeRef,
+        length: X86NodeRef,
+    },
 }
 
 #[derive(Debug)]
@@ -227,6 +487,37 @@ pub enum BinaryOperationKind {
     CompareLessThanOrEqual(X86NodeRef, X86NodeRef),
     CompareGreaterThan(X86NodeRef, X86NodeRef),
     CompareGreaterThanOrEqual(X86NodeRef, X86NodeRef),
+}
+
+#[derive(Debug)]
+pub enum UnaryOperationKind {
+    Not(X86NodeRef),
+    Negate(X86NodeRef),
+    Complement(X86NodeRef),
+    Power2(X86NodeRef),
+    Absolute(X86NodeRef),
+    Ceil(X86NodeRef),
+    Floor(X86NodeRef),
+    SquareRoot(X86NodeRef),
+}
+
+#[derive(Debug, Clone)]
+pub enum CastOperationKind {
+    ZeroExtend,
+    SignExtend,
+    Truncate,
+    Reinterpret,
+    Convert,
+    Broadcast,
+}
+
+#[derive(Debug, Clone)]
+pub enum ShiftOperationKind {
+    LogicalShiftLeft,
+    LogicalShiftRight,
+    ArithmeticShiftRight,
+    RotateRight,
+    RotateLeft,
 }
 
 #[derive(Clone)]
@@ -324,7 +615,7 @@ pub struct X86Block {
 impl X86Block {
     pub fn new() -> Self {
         Self {
-            instructions: alloc::vec![Instruction::label()],
+            instructions: alloc::vec![],
             next_0: None,
             next_1: None,
         }

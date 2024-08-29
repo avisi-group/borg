@@ -75,13 +75,69 @@ impl SolidStateRegisterAllocator {
 
 impl RegisterAllocator for SolidStateRegisterAllocator {
     fn process(&mut self, instruction: &mut Instruction) {
-        instruction.get_use_defs().for_each(|(dir, reg)| match reg {
+        instruction.get_use_defs().for_each(|usedef| match usedef {
+            crate::dbt::x86::encoder::UseDef::Use(reg) => {
+                match reg {
+                    Register::PhysicalRegister(preg) => {
+                        // use of preg
+                        self.physical_used.bit_set(preg.index());
+                    }
+                    Register::VirtualRegister(vreg) => {
+                        // use of vreg
+                        // if this is the first read we see, it's live range starts here
+
+                        // so allocate a register for it if its the first read, or lookup the
+                        // existing allocation if not
+
+                        // but we don't need to check if it's the first, just lookup or allocate
+                        let phys = self.lookup_or_allocate(VirtualRegisterIndex(*vreg));
+                        *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
+                    }
+                }
+            }
+            crate::dbt::x86::encoder::UseDef::Def(reg) => match reg {
+                Register::PhysicalRegister(preg) => {
+                    // def of preg
+                    self.physical_used.bit_reset(preg.index());
+                }
+                Register::VirtualRegister(vreg) => {
+                    // def of vreg
+                    // if the virtual register is written to, that means it's liveness is over,
+                    // deallocate
+                    let phys = self.lookup_and_deallocate(VirtualRegisterIndex(*vreg));
+                    *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
+                }
+            },
+            crate::dbt::x86::encoder::UseDef::UseDef(reg) => match reg {
+                Register::PhysicalRegister(preg) => {
+                    // usedef of preg
+                    self.physical_used.bit_reset(preg.index());
+                }
+                Register::VirtualRegister(vreg) => {
+                    // usedef of vreg
+                    // assuming always read then write
+
+                    // but we're in reverse land so write then read
+
+                    // deallocate
+                    let _phys = self.lookup_and_deallocate(VirtualRegisterIndex(*vreg));
+                    // don't bother actually mutating the instruction
+                    // *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
+
+                    // start new
+                    let phys = self.lookup_or_allocate(VirtualRegisterIndex(*vreg));
+                    *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
+                }
+            },
+        });
+
+        /*(|(dir, reg)| match reg {
             Register::PhysicalRegister(phys_reg) => match dir {
                 OperandDirection::In => {
-                    self.physical_used.bit_set(phys_reg.index());
+                    self.physical_used.bit_set(phys_reg.index());           // use of preg
                 }
                 OperandDirection::Out | OperandDirection::InOut => {
-                    self.physical_used.bit_reset(phys_reg.index());
+                    self.physical_used.bit_reset(phys_reg.index());         // def/defuse of preg
                 }
             },
             Register::VirtualRegister(index) => match dir {
@@ -116,7 +172,7 @@ impl RegisterAllocator for SolidStateRegisterAllocator {
                     *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
                 }
             },
-        });
+        });*/
     }
 }
 
@@ -148,6 +204,9 @@ impl Allocations {
     }
 
     fn remove(&mut self, virtual_register: VirtualRegisterIndex) -> PhysicalRegisterIndex {
-        self.0.get_mut(virtual_register.0).expect("tried to deallocate non-allocated register {virtual_register:?}").take().expect("virtual register slot {virtual_register:?} was previously allocated but not currently")
+        self.0
+            .get_mut(virtual_register.0).expect("tried to deallocate non-allocated register {virtual_register:?}") // this can happen if a virtual register is written to but never read
+            .take().expect("virtual register slot {virtual_register:?} was previously allocated but not currently")
+        // this should never happen
     }
 }

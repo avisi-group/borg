@@ -33,6 +33,26 @@ fn run_on_stmt(stmt: Statement) -> bool {
     }
 
     match stmt.kind() {
+        StatementKind::UnaryOperation {
+            kind: unary_op_kind,
+            value,
+        } => match value.kind() {
+            StatementKind::Constant {
+                value: constant_value,
+                ..
+            } => match unary_op_kind {
+                crate::rudder::statement::UnaryOperationKind::Not => {
+                    stmt.replace_kind(StatementKind::Constant {
+                        typ: stmt.typ(),
+                        value: !constant_value,
+                    });
+
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
+        },
         StatementKind::BinaryOperation { kind, lhs, rhs } => match (lhs.kind(), rhs.kind()) {
             (
                 StatementKind::Constant { value: lhs, .. },

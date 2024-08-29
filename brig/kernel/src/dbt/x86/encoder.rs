@@ -1,25 +1,36 @@
 use {
-    crate::dbt::x86::emitter::X86BlockRef, alloc::{collections::btree_map::BTreeMap, vec::Vec}, core::fmt::Debug, displaydoc::Display, iced_x86::code_asm::{
+    crate::dbt::x86::emitter::X86BlockRef,
+    alloc::{collections::btree_map::BTreeMap, vec::Vec},
+    core::fmt::{Debug, Display, Formatter},
+    displaydoc::Display,
+    elf::segment,
+    iced_x86::code_asm::{
         byte_ptr, dword_ptr, qword_ptr, AsmMemoryOperand, AsmRegister64, CodeAssembler, CodeLabel,
-    }
+    },
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum Opcode {
-    /// mov
-    MOV,
-    /// add
-    ADD,
-    /// sub
-    SUB,
-    /// jmp
-    JMP,
+    /// mov {0}, {1}
+    MOV(Operand, Operand),
+    /// add {0}, {1}
+    ADD(Operand, Operand),
+    /// sub {0}, {1}
+    SUB(Operand, Operand),
+    /// jmp {0}
+    JMP(Operand),
     /// ret
     RET,
-    /// test
-    TEST,
-    /// jne
-    JNE,
+    /// test {0}, {1}
+    TEST(Operand, Operand),
+    /// cmp {0}, {1}
+    CMP(Operand, Operand),
+    /// sete {0}
+    SETE(Operand),
+    /// jne {0}
+    JNE(Operand),
+    /// nop
+    NOP,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
@@ -150,6 +161,15 @@ pub enum Register {
     VirtualRegister(usize),
 }
 
+impl Display for Register {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Register::PhysicalRegister(pr) => write!(f, "%{pr}"),
+            Register::VirtualRegister(vr) => write!(f, "v{vr}"),
+        }
+    }
+}
+
 impl Into<iced_x86::Register> for PhysicalRegister {
     fn into(self) -> iced_x86::Register {
         match self {
@@ -159,12 +179,27 @@ impl Into<iced_x86::Register> for PhysicalRegister {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum MemoryScale {
+    /// * 1
     S1,
+    /// * 2
     S2,
+    /// * 4
     S4,
+    /// * 8
     S8,
+}
+
+impl Into<i32> for MemoryScale {
+    fn into(self) -> i32 {
+        match self {
+            MemoryScale::S1 => 1,
+            MemoryScale::S2 => 2,
+            MemoryScale::S4 => 4,
+            MemoryScale::S8 => 8,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -179,6 +214,47 @@ pub enum OperandKind {
     },
     Register(Register),
     Target(X86BlockRef),
+}
+
+impl Display for Operand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.kind)
+    }
+}
+
+impl Display for OperandKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            OperandKind::Immediate(immval) => write!(f, "${immval}"),
+            OperandKind::Memory {
+                base,
+                index,
+                scale,
+                displacement,
+                segment_override,
+            } => {
+                if let Some(segment_override) = segment_override {
+                    write!(f, "{segment_override}")?;
+                }
+
+                write!(f, "{displacement}(")?;
+
+                if let Some(base) = base {
+                    write!(f, "{base}")?;
+                } else {
+                    write!(f, "%riz")?;
+                }
+
+                if let Some(index) = index {
+                    write!(f, ", {index}, {scale}")?;
+                }
+
+                write!(f, ")")
+            }
+            OperandKind::Register(reg) => write!(f, "{reg}"),
+            OperandKind::Target(tgt) => write!(f, ">LBL"),
+        }
+    }
 }
 
 impl Debug for OperandKind {
@@ -203,13 +279,6 @@ impl Debug for OperandKind {
             Self::Target(arg0) => write!(f, "{arg0:x}"),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OperandDirection {
-    In,
-    Out,
-    InOut,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -311,63 +380,103 @@ impl Operand {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Instruction {
-    pub opcode: Opcode,
-    pub operands: Vec<(OperandDirection, Operand)>,
-}
+pub struct Instruction(pub Opcode);
 
 macro_rules! alu_op {
     ($gen_name: ident, $opcode: ident) => {
         pub fn $gen_name(src: Operand, dst: Operand) -> Self {
-            Instruction {
-                opcode: Opcode::$opcode,
-                operands: alloc::vec![(OperandDirection::In, src), (OperandDirection::InOut, dst)],
-            }
+            Instruction(Opcode::$opcode(src, dst))
         }
     };
 }
 
-impl Instruction {
-    pub fn mov(src: Operand, dst: Operand) -> Self {
-        Self {
-            opcode: Opcode::MOV,
-            operands: alloc::vec![(OperandDirection::In, src), (OperandDirection::Out, dst)],
+pub enum OperandDirection {
+    None,
+    In,
+    Out,
+    InOut,
+}
+
+pub enum UseDef<'a> {
+    Use(&'a mut Register),
+    Def(&'a mut Register),
+    UseDef(&'a mut Register),
+}
+
+impl<'a> UseDef<'a> {
+    pub fn from_operand_direction(
+        direction: OperandDirection,
+        register: &'a mut Register,
+    ) -> Option<Self> {
+        match direction {
+            OperandDirection::None => None,
+            OperandDirection::In => Some(UseDef::Use(register)),
+            OperandDirection::Out => Some(UseDef::Def(register)),
+            OperandDirection::InOut => Some(UseDef::UseDef(register)),
         }
     }
+}
 
-    pub fn label() -> Self {
-        Self {
-            opcode: Opcode::LABEL,
-            operands: alloc::vec![],
+impl Display for Instruction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+fn memory_operand_to_iced(
+    base: &PhysicalRegister,
+    index: &Option<Register>,
+    scale: &MemoryScale,
+    displacement: &i32,
+) -> AsmMemoryOperand {
+    let mut mem = AsmRegister64::from(base) + *displacement;
+
+    if let Some(Register::PhysicalRegister(index)) = index {
+        let scale: i32 = match scale {
+            MemoryScale::S1 => 1,
+            MemoryScale::S2 => 2,
+            MemoryScale::S4 => 4,
+            MemoryScale::S8 => 8,
         }
+        .into();
+
+        mem = mem + AsmRegister64::from(index) * scale;
+    }
+
+    mem
+}
+
+impl Instruction {
+    pub fn mov(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::MOV(src, dst))
     }
 
     pub fn jmp(block: X86BlockRef) -> Self {
-        Self {
-            opcode: Opcode::JMP,
-            operands: alloc::vec![(OperandDirection::In, Operand::target(block))],
-        }
+        Self(Opcode::JMP(Operand::target(block)))
     }
 
     pub fn ret() -> Self {
-        Self {
-            opcode: Opcode::RET,
-            operands: alloc::vec![],
-        }
+        Self(Opcode::RET)
+    }
+
+    pub fn nop() -> Self {
+        Self(Opcode::NOP)
     }
 
     pub fn test(op0: Operand, op1: Operand) -> Self {
-        Self {
-            opcode: Opcode::TEST,
-            operands: alloc::vec![(OperandDirection::In, op0), (OperandDirection::In, op1)],
-        }
+        Self(Opcode::TEST(op0, op1))
+    }
+
+    pub fn cmp(op0: Operand, op1: Operand) -> Self {
+        Self(Opcode::CMP(op0, op1))
+    }
+
+    pub fn sete(r: Operand) -> Self {
+        Self(Opcode::SETE(r))
     }
 
     pub fn jne(block: X86BlockRef) -> Self {
-        Self {
-            opcode: Opcode::JNE,
-            operands: alloc::vec![(OperandDirection::In, Operand::target(block))],
-        }
+        Self(Opcode::JNE(Operand::target(block)))
     }
 
     alu_op!(add, ADD);
@@ -378,283 +487,277 @@ impl Instruction {
         assembler: &mut CodeAssembler,
         label_map: &BTreeMap<X86BlockRef, CodeLabel>,
     ) {
-        match &self.opcode {
-            Opcode::MOV => match self.operands.as_slice() {
-                [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(src)),
-                        width_in_bits: w,
-                    },
-                ), (
-                    OperandDirection::Out,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(dst)),
-                        width_in_bits: w2,
-                    },
-                )] => {
-                    assert!(w == w2);
-
-                    assembler
-                        .mov::<AsmRegister64, AsmRegister64>((dst).into(), (src).into())
-                        .unwrap();
-                }
-
-                [(
-                    OperandDirection::In,
-                    Operand {
-                        kind:
-                            OperandKind::Memory {
-                                base,
-                                index,
-                                scale,
-                                displacement,
-                                ..
-                            },
-                        width_in_bits: w,
-                    },
-                ), (
-                    OperandDirection::Out,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(dst)),
-                        width_in_bits: w2,
-                    },
-                )] => {
-                    assert!(w == w2);
-
-                    let Some(Register::PhysicalRegister(base)) = base else {
-                        panic!()
-                    };
-
-                    let mut src = AsmRegister64::from(base) + *displacement;
-
-                    if let Some(Register::PhysicalRegister(index)) = index {
-                        let scale = match scale {
-                            MemoryScale::S1 => 1,
-                            MemoryScale::S2 => 2,
-                            MemoryScale::S4 => 4,
-                            MemoryScale::S8 => 8,
-                        };
-
-                        src = src + AsmRegister64::from(index) * scale;
-                    }
-
-                    assembler
-                        .mov::<AsmRegister64, AsmMemoryOperand>(dst.into(), src)
-                        .unwrap();
-                }
-
-                [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(src)),
-                        width_in_bits: w2,
-                    },
-                ), (
-                    OperandDirection::Out,
-                    Operand {
-                        kind:
-                            OperandKind::Memory {
-                                base,
-                                index,
-                                scale,
-                                displacement,
-                                ..
-                            },
-                        width_in_bits: w,
-                    },
-                )] => {
-                    assert!(w == w2);
-
-                    let Some(Register::PhysicalRegister(base)) = base else {
-                        panic!()
-                    };
-
-                    let mut dst = AsmRegister64::from(base) + *displacement;
-
-                    if let Some(Register::PhysicalRegister(index)) = index {
-                        let scale = match scale {
-                            MemoryScale::S1 => 1,
-                            MemoryScale::S2 => 2,
-                            MemoryScale::S4 => 4,
-                            MemoryScale::S8 => 8,
-                        };
-
-                        dst = dst + AsmRegister64::from(index) * scale;
-                    }
-
-                    assembler
-                        .mov::<AsmMemoryOperand, AsmRegister64>(dst, src.into())
-                        .unwrap();
-                }
-
-                [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Immediate(src),
-                        width_in_bits: 64,
-                    },
-                ), (
-                    OperandDirection::Out,
-                    Operand {
-                        kind:
-                            OperandKind::Memory {
-                                base,
-                                index,
-                                scale,
-                                displacement,
-                                ..
-                            },
-                        width_in_bits: 64,
-                    },
-                )] => {
-                    let Some(Register::PhysicalRegister(base)) = base else {
-                        panic!()
-                    };
-
-                    let mut dst = AsmRegister64::from(base) + *displacement;
-
-                    if let Some(Register::PhysicalRegister(index)) = index {
-                        let scale = match scale {
-                            MemoryScale::S1 => 1,
-                            MemoryScale::S2 => 2,
-                            MemoryScale::S4 => 4,
-                            MemoryScale::S8 => 8,
-                        };
-
-                        dst = dst + AsmRegister64::from(index) * scale;
-                    }
-
-                    let dst = dword_ptr(dst);
-
-                    assembler
-                        .mov::<AsmMemoryOperand, u32>(dst, (*src).try_into().unwrap())
-                        .unwrap();
-                }
-
-                ops => todo!("{ops:?} operands not supported for mov"),
-            },
-
-            Opcode::ADD => match self.operands.as_slice() {
-                [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Immediate(imm),
-                        width_in_bits: 32,
-                    },
-                ), (
-                    OperandDirection::InOut,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(dst)),
-                        width_in_bits: 64,
-                    },
-                )] => {
-                    assembler
-                        .add::<AsmRegister64, _>(dst.into(), i32::try_from(*imm).unwrap())
-                        .unwrap();
-                }
-
-                [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(src)),
-                        width_in_bits: 64,
-                    },
-                ), (
-                    OperandDirection::InOut,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(dst)),
-                        width_in_bits: 64,
-                    },
-                )] => {
-                    assembler
-                        .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
-                        .unwrap();
-                }
-
-                ops => todo!("{ops:?} operands not supported for add"),
-            },
-
-            Opcode::JNE => {
-                let [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Target(target),
-                        ..
-                    },
-                )] = self.operands.as_slice()
-                else {
-                    panic!("invalid operands: {:?}", self.operands);
-                };
-
-                let label = label_map.get(target).unwrap().clone();
-                assembler.jne(label).unwrap();
-            }
-
-            Opcode::JMP => {
-                let [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Target(target),
-                        ..
-                    },
-                )] = self.operands.as_slice()
-                else {
-                    panic!("invalid operands: {:?}", self.operands);
-                };
-
-                let label = label_map.get(target).unwrap().clone();
-                assembler.jmp(label).unwrap();
-            }
-
-            Opcode::LABEL => {}
-
-            Opcode::TEST => match self.operands.as_slice() {
-                [(
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(left)),
-                        width_in_bits: w1,
-                    },
-                ), (
-                    OperandDirection::In,
-                    Operand {
-                        kind: OperandKind::Register(Register::PhysicalRegister(right)),
-                        width_in_bits: w2,
-                    },
-                )] => {
-                    assert_eq!(w1, w2);
-
-                    assembler
-                        .test::<AsmRegister64, AsmRegister64>(left.into(), right.into())
-                        .unwrap();
-                }
-                _ => todo!(),
-            },
-
-            Opcode::RET => assembler.ret().unwrap(),
-
-            o => unimplemented!("opcode {o:?}"),
+        use {
+            Opcode::*,
+            OperandKind::{Immediate as I, Memory as M, Register as R},
+            Register::PhysicalRegister as PHYS,
         };
+
+        match &self.0 {
+            // MOV R -> R
+            MOV(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assert!(src_width_in_bits == dst_width_in_bits);
+
+                assembler
+                    .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+            // MOV M -> R
+            MOV(
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assert!(src_width_in_bits == dst_width_in_bits);
+
+                assembler
+                    .mov::<AsmRegister64, AsmMemoryOperand>(
+                        dst.into(),
+                        memory_operand_to_iced(base, index, scale, displacement),
+                    )
+                    .unwrap();
+            }
+            // MOV R -> M
+            MOV(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assert!(src_width_in_bits == dst_width_in_bits);
+
+                assembler
+                    .mov::<AsmMemoryOperand, AsmRegister64>(
+                        memory_operand_to_iced(base, index, scale, displacement),
+                        src.into(),
+                    )
+                    .unwrap();
+            }
+            // MOV I -> M
+            MOV(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assert!(src_width_in_bits == dst_width_in_bits);
+
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        dword_ptr(memory_operand_to_iced(base, index, scale, displacement)),
+                        *src as u32,
+                    )
+                    .unwrap();
+            }
+            _ => panic!("cannot encode this instruction {}", self),
+        }
     }
 
-    pub fn get_use_defs(&mut self) -> impl Iterator<Item = (OperandDirection, &mut Register)> + '_ {
-        self.operands
-            .iter_mut()
-            .filter_map(|(direction, operand)| match &mut operand.kind {
-                OperandKind::Immediate(_) => None,
-                // todo: avoid allocation here
-                OperandKind::Memory { base, index, .. } => Some(
-                    [base, index]
-                        .into_iter()
-                        .filter_map(|reg| reg.as_mut().map(|reg| (OperandDirection::In, reg)))
-                        .collect::<Vec<_>>(),
-                ),
-                OperandKind::Register(reg) => {
-                    Some([(direction.clone(), reg)].into_iter().collect::<Vec<_>>())
-                }
-                OperandKind::Target(_) => None,
-            })
+    //     Opcode::ADD => match self.operands.as_slice() {
+    //         [(
+    //             OperandDirection::In,
+    //             Operand {
+    //                 kind: OperandKind::Immediate(imm),
+    //                 width_in_bits: 32,
+    //             },
+    //         ), (
+    //             OperandDirection::InOut,
+    //             Operand {
+    //                 kind:
+    // OperandKind::Register(Register::PhysicalRegister(dst)),
+    //                 width_in_bits: 64,
+    //             },
+    //         )] => {
+    //             assembler
+    //                 .add::<AsmRegister64, _>(dst.into(),
+    // i32::try_from(*imm).unwrap())                 .unwrap();
+    //         }
+
+    //         [(
+    //             OperandDirection::In,
+    //             Operand {
+    //                 kind:
+    // OperandKind::Register(Register::PhysicalRegister(src)),
+    //                 width_in_bits: 64,
+    //             },
+    //         ), (
+    //             OperandDirection::InOut,
+    //             Operand {
+    //                 kind:
+    // OperandKind::Register(Register::PhysicalRegister(dst)),
+    //                 width_in_bits: 64,
+    //             },
+    //         )] => {
+    //             assembler
+    //                 .add::<AsmRegister64, AsmRegister64>(dst.into(),
+    // src.into())                 .unwrap();
+    //         }
+
+    //         ops => todo!("{ops:?} operands not supported for add"),
+    //     },
+
+    //     Opcode::JNE => {
+    //         let [(
+    //             OperandDirection::In,
+    //             Operand {
+    //                 kind: OperandKind::Target(target),
+    //                 ..
+    //             },
+    //         )] = self.operands.as_slice()
+    //         else {
+    //             panic!("invalid operands: {:?}", self.operands);
+    //         };
+
+    //         let label = label_map.get(target).unwrap().clone();
+    //         assembler.jne(label).unwrap();
+    //     }
+
+    //     Opcode::JMP => {
+    //         let [(
+    //             OperandDirection::In,
+    //             Operand {
+    //                 kind: OperandKind::Target(target),
+    //                 ..
+    //             },
+    //         )] = self.operands.as_slice()
+    //         else {
+    //             panic!("invalid operands: {:?}", self.operands);
+    //         };
+
+    //         let label = label_map.get(target).unwrap().clone();
+    //         assembler.jmp(label).unwrap();
+    //     }
+
+    //     Opcode::LABEL => {}
+
+    //     Opcode::TEST => match self.operands.as_slice() {
+    //         [(
+    //             OperandDirection::In,
+    //             Operand {
+    //                 kind:
+    // OperandKind::Register(Register::PhysicalRegister(left)),
+    //                 width_in_bits: w1,
+    //             },
+    //         ), (
+    //             OperandDirection::In,
+    //             Operand {
+    //                 kind:
+    // OperandKind::Register(Register::PhysicalRegister(right)),
+    //                 width_in_bits: w2,
+    //             },
+    //         )] => {
+    //             assert_eq!(w1, w2);
+
+    //             assembler
+    //                 .test::<AsmRegister64, AsmRegister64>(left.into(),
+    // right.into())                 .unwrap();
+    //         }
+    //         _ => todo!(),
+    //     },
+
+    //     Opcode::RET => assembler.ret().unwrap(),
+
+    //     o => unimplemented!("opcode {o:?}"),
+    // };
+
+    pub fn get_operands(
+        &mut self,
+    ) -> impl Iterator<Item = Option<(OperandDirection, &mut Operand)>> + '_ {
+        match &mut self.0 {
+            Opcode::MOV(src, dst) => [
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::Out, dst)),
+            ]
+            .into_iter(),
+            Opcode::ADD(src, dst) | Opcode::SUB(src, dst) => [
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::InOut, dst)),
+            ]
+            .into_iter(),
+            Opcode::JMP(tgt) => [Some((OperandDirection::None, tgt)), None].into_iter(),
+            Opcode::RET | Opcode::NOP => [None, None].into_iter(),
+            Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => [
+                Some((OperandDirection::In, op0)),
+                Some((OperandDirection::In, op1)),
+            ]
+            .into_iter(),
+            Opcode::JNE(tgt) => [Some((OperandDirection::None, tgt)), None].into_iter(),
+            Opcode::SETE(r) => [Some((OperandDirection::Out, r)), None].into_iter(),
+        }
+    }
+
+    pub fn get_use_defs(&mut self) -> impl Iterator<Item = UseDef> + '_ {
+        self.get_operands()
             .flatten()
+            .filter_map(|operand| match &mut operand.1.kind {
+                OperandKind::Memory {
+                    base: Some(base), ..
+                } => Some(UseDef::Use(base)), // TODO: index
+                OperandKind::Register(register) => {
+                    Some(UseDef::from_operand_direction(operand.0, register).unwrap())
+                }
+                _ => None,
+            })
+
+        // self.operands
+        //     .iter_mut()
+        //     .filter_map(|(direction, operand)| match &mut operand.kind {
+        //         OperandKind::Immediate(_) => None,
+        //         // todo: avoid allocation here
+        //         OperandKind::Memory { base, index, .. } => Some(
+        //             [base, index]
+        //                 .into_iter()
+        //                 .filter_map(|reg| reg.as_mut().map(|reg|
+        // (OperandDirection::In, reg)))
+        // .collect::<Vec<_>>(),         ),
+        //         OperandKind::Register(reg) => {
+        //             Some([(direction.clone(),
+        // reg)].into_iter().collect::<Vec<_>>())         }
+        //         OperandKind::Target(_) => None,
+        //     })
+        //     .flatten()
     }
 }

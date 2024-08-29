@@ -231,6 +231,7 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
         let rudder_fns = rudder.get_functions();
 
         let func = dynamic::codegen_function(rudder_fns.get(&"__DecodeA64".into()).unwrap());
+        let func2 = dynamic::codegen_function(rudder_fns.get(&"__DecodeA64_DataProcReg".into()).unwrap());
 
         let state = codegen_state(rudder);
         let types = codegen_types(rudder);
@@ -253,9 +254,9 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
             #![allow(non_camel_case_types)]
 
             use crate::dbt::{
-                emitter::{Emitter, Type, TypeKind},
+                emitter::{Emitter, Type, TypeKind, BlockResult},
                 x86::{
-                    emitter::{X86Emitter, X86NodeRef, X86SymbolRef},
+                    emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef},
                     X86TranslationContext,
                 },
                 TranslationContext,
@@ -282,9 +283,6 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
             fn u__DecodeA64_LoadStore(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
                 todo!();
             }
-            fn u__DecodeA64_DataProcReg(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
             fn u__DecodeA64_DataProcFPSIMD(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
                 todo!();
             }
@@ -294,6 +292,7 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
 
 
             #func
+            #func2
 
             #state
 

@@ -4,7 +4,7 @@ use {
     num_traits::CheckedMul,
     std::{
         cmp::Ordering,
-        ops::{Add, Div, Mul, Sub},
+        ops::{Add, Div, Mul, Not, Sub},
     },
 };
 
@@ -26,6 +26,14 @@ impl ConstantValue {
             ConstantValue::FloatingPoint(v) => *v == 0.,
             ConstantValue::Rational(r) => *r == (Ratio::<i128>::ZERO),
             ConstantValue::Unit | ConstantValue::String(_) => false,
+        }
+    }
+
+    pub fn smallest_width(&self) -> usize {
+        match self {
+            ConstantValue::UnsignedInteger(v) => (usize::BITS - v.leading_zeros()) as usize,
+            ConstantValue::SignedInteger(v) => (isize::BITS - v.leading_zeros()) as usize,
+            _ => panic!("can't figure out smallest width for this constant"),
         }
     }
 
@@ -87,6 +95,12 @@ impl Add for ConstantValue {
         match (self, rhs) {
             (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
                 ConstantValue::UnsignedInteger(l + r)
+            }
+            (ConstantValue::SignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
+                ConstantValue::SignedInteger(l + r as isize)
+            }
+            (ConstantValue::UnsignedInteger(l), ConstantValue::SignedInteger(r)) => {
+                ConstantValue::SignedInteger(l as isize + r)
             }
             (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
                 ConstantValue::SignedInteger(l + r)
@@ -152,6 +166,21 @@ impl Div for ConstantValue {
                 ConstantValue::FloatingPoint(l / r)
             }
             (l, r) => panic!("invalid types for div: {l:?} {r:?}"),
+        }
+    }
+}
+
+impl Not for ConstantValue {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            ConstantValue::UnsignedInteger(v) => ConstantValue::UnsignedInteger(!v),
+            ConstantValue::SignedInteger(v) => ConstantValue::SignedInteger(!v),
+            ConstantValue::FloatingPoint(_) => panic!("not a thing"),
+            ConstantValue::Rational(_) => panic!("not a thing"),
+            ConstantValue::String(_) => panic!("not a thing"),
+            ConstantValue::Unit => panic!("not a thing"),
         }
     }
 }

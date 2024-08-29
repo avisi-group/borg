@@ -1,7 +1,7 @@
 use {
     crate::dbt::{
         emitter::{Emitter, Type, TypeKind},
-        x86::X86TranslationContext,
+        x86::{emitter::BinaryOperationKind, X86TranslationContext},
         TranslationContext,
     },
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
@@ -106,7 +106,7 @@ impl Device for DemoArch {
                 },
             );
 
-            let sum = emitter.add(read_0, read_8);
+            let sum = emitter.binary_operation(BinaryOperationKind::Add(read_0, read_8));
 
             let _16 = emitter.constant(
                 16,

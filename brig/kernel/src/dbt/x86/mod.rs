@@ -1,4 +1,5 @@
 use {
+    super::emitter::WrappedEmitter,
     crate::{
         arch::x86::memory::ExecutableAllocator,
         dbt::{
@@ -156,5 +157,9 @@ impl TranslationContext for X86TranslationContext {
 
     fn create_symbol(&mut self) -> <<Self as TranslationContext>::Emitter as Emitter>::SymbolRef {
         X86SymbolRef(Rc::new(RefCell::new(None)))
+    }
+
+    fn dump(&self) {
+        todo!()
     }
 }

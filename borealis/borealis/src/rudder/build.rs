@@ -1983,7 +1983,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.builder
                     .build(StatementKind::CreateBits { value, length })
             }
-            _ => todo!(),
+            (a, b) => panic!("{a:?} {b:?}"),
         }
     }
 }

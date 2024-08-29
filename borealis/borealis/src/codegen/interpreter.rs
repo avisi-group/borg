@@ -49,7 +49,7 @@ fn get_ident(stmt: &Statement) -> TokenStream {
 }
 
 pub fn get_block_fn_ident(b: &Block) -> Ident {
-    format_ident!("block_{}", b.name().as_ref())
+    format_ident!("block_{}", b.index())
 }
 
 //
@@ -566,7 +566,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Undefined => quote!(Default::default()),
     };
 
-    let msg = format!(" {} {stmt}", stmt.class());
+    let msg = format!(" {stmt}");
     if stmt.has_value() {
         let typ = codegen_type(stmt.typ());
         quote! {

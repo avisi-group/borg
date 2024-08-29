@@ -42,7 +42,7 @@ pub fn run(f: Function) -> bool {
 
     trace!("live-outs in {}:", f.name());
     for (block, writes) in live_outs {
-        trace!("  block {}:", block.name());
+        trace!("  block {}:", block.index());
         for (symbol, write) in writes {
             trace!("    write: {} = {}", symbol, write);
         }
