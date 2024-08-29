@@ -3,8 +3,8 @@
 use {
     crate::{
         jib_ast::{
-            visitor::Visitor, Definition, Expression, Instruction, InstructionAux, Name, Type,
-            TypeDefinition, Value,
+            visitor::Visitor, CReturn, Definition, DefinitionAux, Expression, Instruction,
+            InstructionAux, Name, Type, TypeDefinition, Value,
         },
         sail_ast::Identifier,
     },
@@ -91,8 +91,8 @@ impl Drop for IndentHandle {
 
 impl<W: Write> Visitor for JibPrettyPrinter<W> {
     fn visit_definition(&mut self, node: &Definition) {
-        match node {
-            Definition::Register(id, typ, init) => {
+        match &node.def {
+            DefinitionAux::Register(id, typ, init) => {
                 self.prindent(format!("register {} : ", id.as_interned()));
                 self.visit_type(typ);
                 write!(self.writer, " = {{").unwrap();
@@ -102,7 +102,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
                 }
                 self.prindentln("}");
             }
-            Definition::Type(TypeDefinition::Enum(id, ids)) => {
+            DefinitionAux::Type(TypeDefinition::Enum(id, ids)) => {
                 self.prindentln(format!("enum {} {{", id.as_interned()));
 
                 {
@@ -113,7 +113,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
                 self.prindentln("}");
             }
-            Definition::Type(TypeDefinition::Struct(id, fields)) => {
+            DefinitionAux::Type(TypeDefinition::Struct(id, fields)) => {
                 self.prindentln(format!("struct {} {{", id.as_interned()));
 
                 {
@@ -127,7 +127,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
                 self.prindentln("}");
             }
-            Definition::Type(TypeDefinition::Variant(id, fields)) => {
+            DefinitionAux::Type(TypeDefinition::Variant(id, fields)) => {
                 self.prindentln(format!("union {} {{", id.as_interned()));
 
                 {
@@ -141,7 +141,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
                 self.prindentln("}");
             }
-            Definition::Let(_, bindings, instructions) => {
+            DefinitionAux::Let(_, bindings, instructions) => {
                 self.prindent("let (");
 
                 let mut bindings = bindings.iter();
@@ -162,7 +162,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
                 writeln!(self.writer, "}}").unwrap();
             }
-            Definition::Val(id, ext, typs, typ) => {
+            DefinitionAux::Val(id, ext, typs, typ) => {
                 let keyword =
                     if let Some(true) = ext.map(|ext| self.abstract_functions.contains(&ext)) {
                         "abstract"
@@ -186,7 +186,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
                 writeln!(self.writer,).unwrap();
             }
-            Definition::Fundef(name, _, args, body) => {
+            DefinitionAux::Fundef(name, _, args, body) => {
                 self.prindent(format!("fn {}(", name.as_interned()));
 
                 let mut args = args.iter();
@@ -206,9 +206,9 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
                 self.prindentln("}");
             }
-            Definition::Startup(_, _) => todo!(),
-            Definition::Finish(_, _) => todo!(),
-            Definition::Pragma(key, value) => {
+            DefinitionAux::Startup(_, _) => todo!(),
+            DefinitionAux::Finish(_, _) => todo!(),
+            DefinitionAux::Pragma(key, value) => {
                 if *key == "abstract".into() {
                     self.abstract_functions.insert(*value);
                 } else {
@@ -251,9 +251,21 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
                 self.visit_name(name);
                 writeln!(self.writer, ")").unwrap();
             }
-            InstructionAux::Funcall(exp, _, (name, _), args) => {
+            InstructionAux::Funcall(ret, _, (name, _), args) => {
                 self.prindent("");
-                self.visit_expression(exp);
+                match ret {
+                    CReturn::One(exp) => {
+                        self.visit_expression(exp);
+                    }
+                    CReturn::Multi(exps) => {
+                        write!(self.writer, "multi ").unwrap();
+                        exps.iter().for_each(|exp| {
+                            self.visit_expression(exp);
+                            write!(self.writer, " ").unwrap();
+                        });
+                    }
+                }
+
                 write!(self.writer, " = {}(", name.as_interned()).unwrap();
 
                 // print correct number of commas
@@ -336,6 +348,10 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
     fn visit_value(&mut self, node: &Value) {
         match node {
             Value::Id(name, _) => self.visit_name(name),
+            Value::Member(id, typ) => {
+                self.visit_type(typ);
+                write!(self.writer, "::{id}").unwrap();
+            }
             Value::Lit(val, _) => write!(self.writer, "{val:?}").unwrap(),
             Value::Call(op, vals) => {
                 write!(self.writer, "{op:?}(").unwrap();
@@ -463,13 +479,12 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
     fn visit_name(&mut self, node: &Name) {
         match node {
-            Name::Global(ident, _) | Name::Name(ident, _) => {
-                write!(self.writer, "{}", ident.as_interned()).unwrap()
-            }
+            Name::Name(ident, _) => write!(self.writer, "{}", ident.as_interned()).unwrap(),
             Name::HaveException(_) => write!(self.writer, "have-exception").unwrap(),
             Name::CurrentException(_) => write!(self.writer, "have-exception").unwrap(),
             Name::ThrowLocation(_) => write!(self.writer, "throw").unwrap(),
             Name::Return(_) => write!(self.writer, "return").unwrap(),
+            Name::Channel(_, _) => write!(self.writer, "channel").unwrap(),
         }
     }
 }

@@ -21,6 +21,8 @@ pub mod fix_exceptions;
 pub mod fold_unconditionals;
 pub mod monomorphize_vectors;
 pub mod remove_const_branch;
+pub mod remove_constant_type;
+pub mod remove_undefined_bv;
 pub mod resolve_return_assigns;
 
 /// Pass that performs an operation on an AST

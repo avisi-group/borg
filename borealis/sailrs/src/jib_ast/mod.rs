@@ -4,12 +4,14 @@
 //!
 //! JIB abstract syntax tree corresponding to data structures in `jib.ml`,
 //! which itself is generated from `jib.lem` and `jib.ott`.
+//!
+//! Do *not* just read https://ocaml.org/p/libsail/latest/doc/Libsail/Jib/index.html, I have lost hours of debugging because of minor differences between the generated JIB file and the rendered docs.
 
 use {
     crate::{
         jib_ast::visitor::{Visitor, Walkable},
         num::BigInt,
-        sail_ast::{Identifier, KindIdentifier, Location},
+        sail_ast::{DefinitionAnnotation, Identifier, KindIdentifier, Location},
         types::ListVec,
     },
     common::intern::InternedString,
@@ -19,6 +21,24 @@ use {
 
 pub mod pretty_print;
 pub mod visitor;
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum Channel {
+    Stdout,
+    Stderr,
+}
 
 /// C type
 #[derive(
@@ -108,10 +128,10 @@ impl Walkable for Type {
 )]
 pub enum Name {
     Name(Identifier, Int),
-    Global(Identifier, Int),
     HaveException(Int),
     CurrentException(Int),
     ThrowLocation(Int),
+    Channel(Channel, Int),
     Return(Int),
 }
 
@@ -145,6 +165,7 @@ pub enum Op {
     ListIsEmpty,
     Eq,
     Neq,
+    Ite,
     Ilt,
     Ilteq,
     Igt,
@@ -175,6 +196,53 @@ impl Walkable for Op {
     }
 }
 
+/// clexp
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
+pub enum Expression {
+    Id(Name, Type),
+    Rmw(Name, Name, Type),
+    Field(#[omit_bounds] Box<Self>, Identifier),
+    Addr(#[omit_bounds] Box<Self>),
+    Tuple(#[omit_bounds] Box<Self>, Int),
+    Void,
+}
+
+impl Walkable for Expression {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match self {
+            Self::Id(name, typ) => {
+                visitor.visit_name(name);
+                visitor.visit_type(typ);
+            }
+            Self::Rmw(name0, name1, typ) => {
+                visitor.visit_name(name0);
+                visitor.visit_name(name1);
+                visitor.visit_type(typ);
+            }
+            Self::Field(expression, _) => {
+                visitor.visit_expression(expression);
+            }
+            Self::Addr(expression) => visitor.visit_expression(expression),
+            Self::Tuple(expression, _) => visitor.visit_expression(expression),
+            Self::Void => (),
+        }
+    }
+}
+
 /// C value
 
 #[derive(
@@ -193,6 +261,7 @@ impl Walkable for Op {
 #[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
 pub enum Value {
     Id(Name, Type),
+    Member(Identifier, Type),
     Lit(Vl, Type),
     Tuple(#[omit_bounds] ListVec<Self>, Type),
     Struct(#[omit_bounds] ListVec<(Identifier, Self)>, Type),
@@ -242,6 +311,263 @@ impl Walkable for Value {
             Self::Field(value, _) => {
                 visitor.visit_value(value);
             }
+            Self::Member(_, _) => todo!(),
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum CReturn {
+    One(Expression),
+    Multi(ListVec<Expression>),
+}
+
+/// C type definition
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum TypeDefinition {
+    Enum(Identifier, ListVec<Identifier>),
+    Struct(Identifier, ListVec<(Identifier, Type)>),
+    Variant(Identifier, ListVec<(Identifier, Type)>),
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
+pub enum InstructionAux {
+    Decl(Type, Name),
+    Init(Type, Name, Value),
+    Jump(Value, InternedString),
+    Goto(InternedString),
+    Label(InternedString),
+    Funcall(CReturn, bool, (Identifier, ListVec<Type>), ListVec<Value>),
+    Copy(Expression, Value),
+    Clear(Type, Name),
+    Undefined(Type),
+    Exit(InternedString),
+    End(Name),
+    If(
+        Value,
+        #[omit_bounds] ListVec<Instruction>,
+        #[omit_bounds] ListVec<Instruction>,
+        Type,
+    ),
+    Block(#[omit_bounds] ListVec<Instruction>),
+    TryBlock(#[omit_bounds] ListVec<Instruction>),
+    Throw(Value),
+    Comment(InternedString),
+    Raw(InternedString),
+    Return(Value),
+    Reset(Type, Name),
+    Reinit(Type, Name, Value),
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub struct Instruction {
+    pub inner: InstructionAux,
+    pub annot: InstructionAnnotation,
+}
+
+impl Walkable for Instruction {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.inner {
+            InstructionAux::Decl(typ, name) => {
+                visitor.visit_type(typ);
+                visitor.visit_name(name);
+            }
+            InstructionAux::Init(typ, name, value) => {
+                visitor.visit_type(typ);
+                visitor.visit_name(name);
+                visitor.visit_value(value);
+            }
+            InstructionAux::Jump(value, _) => visitor.visit_value(value),
+            InstructionAux::Goto(_) => {}
+            InstructionAux::Label(_) => {}
+            InstructionAux::Funcall(cret, _, (_, parameter_types), parameters) => {
+                match cret {
+                    CReturn::One(expr) => {
+                        visitor.visit_expression(expr);
+                    }
+                    CReturn::Multi(exprs) => {
+                        exprs.iter().for_each(|expr| {
+                            visitor.visit_expression(expr);
+                        });
+                    }
+                }
+
+                parameter_types
+                    .iter()
+                    .for_each(|typ| visitor.visit_type(typ));
+                parameters
+                    .iter()
+                    .for_each(|value| visitor.visit_value(value));
+            }
+            InstructionAux::Copy(expression, value) => {
+                visitor.visit_expression(expression);
+                visitor.visit_value(value);
+            }
+            InstructionAux::Clear(typ, name) => {
+                visitor.visit_type(typ);
+                visitor.visit_name(name);
+            }
+            InstructionAux::Undefined(typ) => visitor.visit_type(typ),
+            InstructionAux::Exit(_) => {}
+            InstructionAux::End(name) => visitor.visit_name(name),
+            InstructionAux::If(value, if_body, else_body, typ) => {
+                visitor.visit_value(value);
+                if_body.iter().for_each(|i| visitor.visit_instruction(i));
+                else_body.iter().for_each(|i| visitor.visit_instruction(i));
+                visitor.visit_type(typ);
+            }
+            InstructionAux::Block(instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            InstructionAux::TryBlock(instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            InstructionAux::Throw(value) => visitor.visit_value(value),
+            InstructionAux::Comment(_) => {}
+            InstructionAux::Raw(_) => {}
+            InstructionAux::Return(value) => visitor.visit_value(value),
+            InstructionAux::Reset(typ, name) => {
+                visitor.visit_type(typ);
+                visitor.visit_name(name);
+            }
+            InstructionAux::Reinit(typ, name, value) => {
+                visitor.visit_type(typ);
+                visitor.visit_name(name);
+                visitor.visit_value(value);
+            }
+        }
+    }
+}
+
+/// Cdef_aux
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum DefinitionAux {
+    Register(Identifier, Type, ListVec<Instruction>),
+    Type(TypeDefinition),
+    Let(Int, ListVec<(Identifier, Type)>, ListVec<Instruction>),
+    Val(Identifier, Option<InternedString>, ListVec<Type>, Type),
+    Fundef(
+        Identifier,
+        Option<Identifier>,
+        ListVec<Identifier>,
+        ListVec<Instruction>,
+    ),
+    Startup(Identifier, ListVec<Instruction>),
+    Finish(Identifier, ListVec<Instruction>),
+    Pragma(InternedString, InternedString),
+}
+
+/// cdef
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub struct Definition {
+    pub def: DefinitionAux,
+    pub annot: DefinitionAnnotation,
+}
+
+impl Walkable for Definition {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match &self.def {
+            DefinitionAux::Register(_, typ, instructions) => {
+                visitor.visit_type(typ);
+                instructions
+                    .iter()
+                    .for_each(|i| visitor.visit_instruction(i));
+            }
+            DefinitionAux::Type(type_definition) => visitor.visit_type_definition(type_definition),
+            DefinitionAux::Let(_, types, instructions) => {
+                types.iter().for_each(|(_, typ)| visitor.visit_type(typ));
+                instructions
+                    .iter()
+                    .for_each(|i| visitor.visit_instruction(i));
+            }
+            DefinitionAux::Val(_, _, types, typ) => {
+                types.iter().for_each(|typ| visitor.visit_type(typ));
+                visitor.visit_type(typ)
+            }
+            DefinitionAux::Fundef(_, _, _, instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            DefinitionAux::Startup(_, instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            DefinitionAux::Finish(_, instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            DefinitionAux::Pragma(_, _) => (),
         }
     }
 }
@@ -299,75 +625,7 @@ impl Walkable for Vl {
     }
 }
 
-/// clexp?
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    FromValue,
-    ToValue,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    DeepSizeOf,
-)]
-#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
-pub enum Expression {
-    Id(Name, Type),
-    Rmw(Name, Name, Type),
-    Field(#[omit_bounds] Box<Self>, Identifier),
-    Addr(#[omit_bounds] Box<Self>),
-    Tuple(#[omit_bounds] Box<Self>, Int),
-    Void,
-}
-
-impl Walkable for Expression {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match self {
-            Self::Id(name, typ) => {
-                visitor.visit_name(name);
-                visitor.visit_type(typ);
-            }
-            Self::Rmw(name0, name1, typ) => {
-                visitor.visit_name(name0);
-                visitor.visit_name(name1);
-                visitor.visit_type(typ);
-            }
-            Self::Field(expression, _) => {
-                visitor.visit_expression(expression);
-            }
-            Self::Addr(expression) => visitor.visit_expression(expression),
-            Self::Tuple(expression, _) => visitor.visit_expression(expression),
-            Self::Void => (),
-        }
-    }
-}
-
 type InstructionAnnotation = (Int, Location);
-
-/// C type definition
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    FromValue,
-    ToValue,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    DeepSizeOf,
-)]
-pub enum TypeDefinition {
-    Enum(Identifier, ListVec<Identifier>),
-    Struct(Identifier, ListVec<(Identifier, Type)>),
-    Variant(Identifier, ListVec<(Identifier, Type)>),
-}
 
 impl Walkable for TypeDefinition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
@@ -378,198 +636,6 @@ impl Walkable for TypeDefinition {
                     visitor.visit_type(typ);
                 });
             }
-        }
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    FromValue,
-    ToValue,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    DeepSizeOf,
-)]
-#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
-pub enum InstructionAux {
-    Decl(Type, Name),
-    Init(Type, Name, Value),
-    Jump(Value, InternedString),
-    Goto(InternedString),
-    Label(InternedString),
-    Funcall(
-        Expression,
-        bool,
-        (Identifier, ListVec<Type>),
-        ListVec<Value>,
-    ),
-    Copy(Expression, Value),
-    Clear(Type, Name),
-    Undefined(Type),
-    Exit(InternedString),
-    End(Name),
-    If(
-        Value,
-        #[omit_bounds] ListVec<Instruction>,
-        #[omit_bounds] ListVec<Instruction>,
-        Type,
-    ),
-    Block(#[omit_bounds] ListVec<Instruction>),
-    TryBlock(#[omit_bounds] ListVec<Instruction>),
-    Throw(Value),
-    Comment(InternedString),
-    Raw(InternedString),
-    Return(Value),
-    Reset(Type, Name),
-    Reinit(Type, Name, Value),
-}
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    FromValue,
-    ToValue,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    DeepSizeOf,
-)]
-pub struct Instruction {
-    pub inner: InstructionAux,
-    pub annot: InstructionAnnotation,
-}
-
-impl Walkable for Instruction {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match &self.inner {
-            InstructionAux::Decl(typ, name) => {
-                visitor.visit_type(typ);
-                visitor.visit_name(name);
-            }
-            InstructionAux::Init(typ, name, value) => {
-                visitor.visit_type(typ);
-                visitor.visit_name(name);
-                visitor.visit_value(value);
-            }
-            InstructionAux::Jump(value, _) => visitor.visit_value(value),
-            InstructionAux::Goto(_) => {}
-            InstructionAux::Label(_) => {}
-            InstructionAux::Funcall(expression, _, (_, parameter_types), parameters) => {
-                visitor.visit_expression(expression);
-                parameter_types
-                    .iter()
-                    .for_each(|typ| visitor.visit_type(typ));
-                parameters
-                    .iter()
-                    .for_each(|value| visitor.visit_value(value));
-            }
-            InstructionAux::Copy(expression, value) => {
-                visitor.visit_expression(expression);
-                visitor.visit_value(value);
-            }
-            InstructionAux::Clear(typ, name) => {
-                visitor.visit_type(typ);
-                visitor.visit_name(name);
-            }
-            InstructionAux::Undefined(typ) => visitor.visit_type(typ),
-            InstructionAux::Exit(_) => {}
-            InstructionAux::End(name) => visitor.visit_name(name),
-            InstructionAux::If(value, if_body, else_body, typ) => {
-                visitor.visit_value(value);
-                if_body.iter().for_each(|i| visitor.visit_instruction(i));
-                else_body.iter().for_each(|i| visitor.visit_instruction(i));
-                visitor.visit_type(typ);
-            }
-            InstructionAux::Block(instructions) => instructions
-                .iter()
-                .for_each(|i| visitor.visit_instruction(i)),
-            InstructionAux::TryBlock(instructions) => instructions
-                .iter()
-                .for_each(|i| visitor.visit_instruction(i)),
-            InstructionAux::Throw(value) => visitor.visit_value(value),
-            InstructionAux::Comment(_) => {}
-            InstructionAux::Raw(_) => {}
-            InstructionAux::Return(value) => visitor.visit_value(value),
-            InstructionAux::Reset(typ, name) => {
-                visitor.visit_type(typ);
-                visitor.visit_name(name);
-            }
-            InstructionAux::Reinit(typ, name, value) => {
-                visitor.visit_type(typ);
-                visitor.visit_name(name);
-                visitor.visit_value(value);
-            }
-        }
-    }
-}
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    FromValue,
-    ToValue,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    DeepSizeOf,
-)]
-pub enum Definition {
-    Register(Identifier, Type, ListVec<Instruction>),
-    Type(TypeDefinition),
-    Let(Int, ListVec<(Identifier, Type)>, ListVec<Instruction>),
-    Val(Identifier, Option<InternedString>, ListVec<Type>, Type),
-    Fundef(
-        Identifier,
-        Option<Identifier>,
-        ListVec<Identifier>,
-        ListVec<Instruction>,
-    ),
-    Startup(Identifier, ListVec<Instruction>),
-    Finish(Identifier, ListVec<Instruction>),
-    Pragma(InternedString, InternedString),
-}
-
-impl Walkable for Definition {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match self {
-            Self::Register(_, typ, instructions) => {
-                visitor.visit_type(typ);
-                instructions
-                    .iter()
-                    .for_each(|i| visitor.visit_instruction(i));
-            }
-            Self::Type(type_definition) => visitor.visit_type_definition(type_definition),
-            Self::Let(_, types, instructions) => {
-                types.iter().for_each(|(_, typ)| visitor.visit_type(typ));
-                instructions
-                    .iter()
-                    .for_each(|i| visitor.visit_instruction(i));
-            }
-            Self::Val(_, _, types, typ) => {
-                types.iter().for_each(|typ| visitor.visit_type(typ));
-                visitor.visit_type(typ)
-            }
-            Self::Fundef(_, _, _, instructions) => instructions
-                .iter()
-                .for_each(|i| visitor.visit_instruction(i)),
-            Self::Startup(_, instructions) => instructions
-                .iter()
-                .for_each(|i| visitor.visit_instruction(i)),
-            Self::Finish(_, instructions) => instructions
-                .iter()
-                .for_each(|i| visitor.visit_instruction(i)),
-            Self::Pragma(_, _) => (),
         }
     }
 }

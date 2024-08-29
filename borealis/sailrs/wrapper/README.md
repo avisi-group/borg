@@ -2,8 +2,7 @@
 
 OCaml side of the Rust-OCaml interface to the Sail compiler.
 
-`sail_plugin_sila.ml` is taken from `isla-sail` in [`https://github.com/rems-project/isla`](https://github.com/rems-project/isla), git rev #b572667.
-
+`sail_plugin_isla.ml` is taken from `isla-sail` in [`https://github.com/rems-project/isla`](https://github.com/rems-project/isla), git rev #b572667.
 
 The OCaml ecosystem is frustrating:
 

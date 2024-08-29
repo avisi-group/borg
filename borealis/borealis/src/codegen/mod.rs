@@ -389,8 +389,8 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
 
     let files = rudder_fns
         .into_par_iter()
-        .map(|(name, function)| {
-            let contents = todo!();
+        .map(|(name, _function)| {
+            let contents = quote!();
 
             let mut dependencies = cfg.get_callees_for(&name);
             dependencies.push("common".into());
@@ -423,7 +423,7 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
 
                         #imports
 
-                       // #contents
+                        #contents
                     }),
                 ),
             )

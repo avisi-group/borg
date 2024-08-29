@@ -31,6 +31,7 @@ pub struct Ast {
     pub registers: HashMap<InternedString, (Shared<Type>, ControlFlowBlock)>,
     /// Function definitions by identifier
     pub functions: HashMap<InternedString, FunctionDefinition>,
+    pub constants: HashMap<InternedString, i32>,
 }
 
 impl Ast {
@@ -223,7 +224,7 @@ pub enum Type {
         size: Size,
     },
 
-    Constant(BigInt),
+    Constant(i64),
 
     Enum {
         name: InternedString,
@@ -483,6 +484,10 @@ pub enum Value {
         identifier: InternedString,
         types: Vec<Shared<Type>>,
     },
+    Member {
+        member_ident: InternedString,
+        enum_ident: InternedString,
+    },
 }
 
 impl Value {
@@ -553,6 +558,7 @@ impl Walkable for Value {
                 visitor.visit_value(value.clone());
                 types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
+            Value::Member { .. } => todo!(),
         }
     }
 }

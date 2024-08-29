@@ -1,6 +1,6 @@
 open Libsail
-open Sail_plugin_isla
 open Ast_util
+open Sail_plugin_sv
 
 type error = Err_exception of string * string | Err_sail of Reporting.error
 
@@ -29,82 +29,181 @@ let load_plugin opts plugin =
     prerr_endline
       ("Failed to load plugin " ^ plugin ^ ": " ^ Dynlink.error_message msg)
 
+let sail_dir =
+  match Manifest.dir with
+  | Some opam_dir -> opam_dir
+  | None -> "/root/.opam/4.14.1+options/share/sail"
+
+let file_to_string filename =
+  let chan = open_in filename in
+  let buf = Buffer.create 4096 in
+  try
+    let rec loop () =
+      let line = input_line chan in
+      Buffer.add_string buf line;
+      Buffer.add_char buf '\n';
+      loop ()
+    in
+    loop ()
+  with End_of_file ->
+    close_in chan;
+    Buffer.contents buf
+
+
 let run_sail filepaths =
   (* register isla target *)
   let tgt =
-    Target.register ~name:"isla" ~options:isla_options
-      ~pre_parse_hook:isla_initialize ~rewrites:isla_rewrites isla_target
+    Target.register ~name:"systemverilog" ~flag:"sv" ~options:verilog_options
+      ~rewrites:verilog_rewrites verilog_target
   in
 
-  let options = [] in
-  let opt_splice = [] in
-  let opt_file_out = None in
-  let config = None in
-  Rewrites.opt_mono_rewrites := true;
+  let opt_free_arguments = ref [] in
+  let opt_project_files = ref [] in
+  let options = ref [] in
+  let opt_variable_assignments = ref [] in
+  let opt_all_modules = ref true in
+  let opt_just_parse_project = ref false in
+  let opt_splice = ref [] in
 
+  Sail_plugin_sv.opt_nostrings := true;
+
+  Rewrites.opt_mono_rewrites := true;
+  (* Rewrites.opt_auto_mono := true; *)
+  Constant_fold.optimize_constant_fold := true;
   Util.opt_verbosity := 2;
+  Profile.opt_profile := true;
+  Jib_compile.opt_memo_cache := true;
 
   (* plugins broken with linker errors, removing lem and coq lines from sail stdlib as patch fix *)
   (* (match Sys.getenv_opt "SAIL_NO_PLUGINS" with
-  | Some _ -> ()
-  | None -> (
-      match get_plugin_dir () with
-      | dir :: _ ->
-          List.iter
-            (fun plugin ->
-              let path = Filename.concat dir plugin in
-              if Filename.extension plugin = ".cmxs" then
-                load_plugin options path)
-            (Array.to_list (Sys.readdir dir))
-      | [] -> ())); *)
-
+     | Some _ -> ()
+     | None -> (
+         match get_plugin_dir () with
+         | dir :: _ ->
+             List.iter
+               (fun plugin ->
+                 let path = Filename.concat dir plugin in
+                 if Filename.extension plugin = ".cmxs" then
+                   load_plugin options path)
+               (Array.to_list (Sys.readdir dir))
+         | [] -> ())); *)
   Constraint.load_digests ();
 
   (* rest is copied from sail.ml:run_sail *)
   Target.run_pre_parse_hook tgt ();
-  let ast, env, effect_info =
-    Frontend.load_files ~target:tgt Manifest.dir options Type_check.initial_env
-      filepaths
+
+  let project_files, frees =
+    List.partition
+      (fun free -> Filename.check_suffix free ".sail_project")
+      !opt_free_arguments
+  in
+
+  let ctx, ast, env, effect_info =
+    match (project_files, !opt_project_files) with
+    | [], [] ->
+        (* If there are no provided project files, we concatenate all
+           the free file arguments into one big blob like before *)
+        Frontend.load_files ~target:tgt sail_dir !options Type_check.initial_env
+          filepaths
+    (* Allows project files from either free arguments via suffix, or
+       from -project, but not both as the ordering between them would
+       be unclear. *)
+    | project_files, [] | [], project_files ->
+        let t = Profile.start () in
+        let defs =
+          List.map
+            (fun project_file ->
+              let root_directory = Filename.dirname project_file in
+              let contents = file_to_string project_file in
+              Project.mk_root root_directory
+              :: Initial_check.parse_project ~filename:project_file ~contents ())
+            project_files
+          |> List.concat
+        in
+        let variables = ref Util.StringMap.empty in
+        List.iter
+          (fun assignment ->
+            if not (Project.parse_assignment ~variables assignment) then
+              raise
+                (Reporting.err_general Parse_ast.Unknown
+                   ("Could not parse assignment " ^ assignment)))
+          !opt_variable_assignments;
+        let proj = Project.initialize_project_structure ~variables defs in
+        let mod_ids =
+          if !opt_all_modules then Project.all_modules proj
+          else
+            List.map
+              (fun mod_name ->
+                match Project.get_module_id proj mod_name with
+                | Some id -> id
+                | None ->
+                    raise
+                      (Reporting.err_general Parse_ast.Unknown
+                         ("Unknown module " ^ mod_name)))
+              frees
+        in
+        Profile.finish "parsing project" t;
+        if !opt_just_parse_project then exit 0;
+        let env = Type_check.initial_env_with_modules proj in
+        Frontend.load_modules ~target:tgt sail_dir !options env proj mod_ids
+    | _, _ ->
+        raise
+          (Reporting.err_general Parse_ast.Unknown
+             "Module files (.sail_project) should either be specified with the \
+              appropriate option, or as free arguments with the appropriate \
+              extension, but not both!")
   in
   let ast, env = Frontend.initial_rewrite effect_info env ast in
   let ast, env =
-    List.fold_right
-      (fun file (ast, _) -> Splice.splice ast file)
-      opt_splice (ast, env)
+    match !opt_splice with
+    | [] -> (ast, env)
+    | files -> Splice.splice_files ctx ast (List.rev files)
   in
   let effect_info =
     Effects.infer_side_effects (Target.asserts_termination tgt) ast
   in
 
+  (* Don't show warnings during re-writing for now *)
+  Reporting.suppressed_warning_info ();
+  Reporting.opt_warnings := false;
+
   Target.run_pre_rewrites_hook tgt ast effect_info env;
-  let ast, effect_info, env =
-    Rewrites.rewrite effect_info env (Target.rewrites tgt) ast
+  let ctx, ast, effect_info, env =
+    Rewrites.rewrite ctx effect_info env (Target.rewrites tgt) ast
   in
 
-  Target.action tgt config Manifest.dir opt_file_out ast effect_info env;
+  let module SV = Jib_sv.Make (struct
+    let max_unknown_integer_width = !opt_max_unknown_integer_width
+    let max_unknown_bitvector_width = !opt_max_unknown_bitvector_width
+    let line_directives = !opt_line_directives
+    let nostrings = !opt_nostrings
+    let nopacked = !opt_nopacked
+    let never_pack_unions = !opt_never_pack_unions
+    let union_padding = !opt_padding
+    let unreachable = !opt_unreachable
+    let comb = !opt_comb
+    let ignore = !opt_fun2wires
+  end) in
+  let open SV in
+  let ast, env, effect_info =
+    let open Specialize in
+    match !opt_int_specialize with
+    | Some num_passes ->
+        specialize_passes num_passes int_specialization env ast effect_info
+    | None -> (ast, env, effect_info)
+  in
+
+  let cdefs, ctx = jib_of_ast SV.make_call_precise env ast effect_info in
+  let cdefs, ctx = Jib_optimize.remove_tuples cdefs ctx in
 
   Constraint.save_digests ();
 
-  (ast, env, effect_info)
-
-let generate_jib ast env effect_info =
-  let props = Property.find_properties ast in
-  Bindings.bindings props |> List.map fst |> IdSet.of_list
-  |> Specialize.add_initial_calls;
-
-  (* let ast, env = Specialize.(specialize typ_ord_specialization env ast) in *)
-  let cdefs, ctx = jib_of_ast env ast effect_info in
-  let cdefs, _ = Jib_optimize.remove_tuples cdefs ctx in
-  let cdefs = remove_casts cdefs |> remove_extern_impls |> fix_cons in
   cdefs
 
 let () =
   (* Primary functions *)
   Callback.register "run_sail" (fun filepaths ->
       exception_to_result (fun () -> run_sail filepaths));
-
-  Callback.register "generate_jib" (fun ast env effect_info ->
-      exception_to_result (fun () -> generate_jib ast env effect_info));
 
   (* Utility *)
   Callback.register "util_dedup" (fun a ->

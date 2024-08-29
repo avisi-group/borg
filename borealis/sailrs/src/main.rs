@@ -7,7 +7,7 @@ use {
         HashMap,
     },
     deepsize::DeepSizeOf,
-    log::{info, trace},
+    log::info,
     rkyv::ser::{serializers::AllocSerializer, Serializer},
     sailrs::load_from_config,
     std::{io::Write, path::PathBuf},
@@ -38,14 +38,10 @@ fn main() -> Result<()> {
 
     init_interner(&HashMap::default());
 
-    let (ast, jib) = load_from_config(args.input)?;
+    let jib = load_from_config(args.input)?;
 
-    trace!(
-        "Size: AST {:.2} bytes, JIB {:.2} bytes",
-        bytes(ast.deep_size_of()),
-        bytes(jib.deep_size_of())
-    );
-    trace!(
+    info!("JIB size: {:.2} bytes", bytes(jib.deep_size_of()));
+    info!(
         "INTERNER size: {:.2} bytes, {} strings",
         bytes(interner().current_memory_usage()),
         interner().len()

@@ -100,7 +100,7 @@ impl Walkable for Value {
 
 pub mod visitor;
 
-/// Location
+/// Location (`Parse_ast.l`)
 #[derive(
     Debug,
     Clone,
@@ -176,12 +176,42 @@ pub struct Extern {
 }
 
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum Visibility {
+    Public,
+    Private(Location),
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
 )]
 pub struct DefinitionAnnotation {
     pub doc_comment: Option<InternedString>,
-    pub attrs: ListVec<(Location, InternedString, InternedString)>,
+    pub attrs: ListVec<(Location, InternedString, Option<()>)>, // attribute data missing
+    pub visibility: Visibility,
     pub loc: Location,
+    pub env: (),
 }
 
 #[derive(
