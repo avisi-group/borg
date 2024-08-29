@@ -1,4 +1,5 @@
 use {
+    crate::util::smallest_width_of_value,
     crate::{
         boom::{
             self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature, NamedType,
@@ -16,6 +17,7 @@ use {
         },
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
+    itertools::Itertools,
     log::trace,
     num_rational::Ratio,
     num_traits::cast::FromPrimitive,
@@ -322,7 +324,13 @@ impl BuildContext {
                 )),
                 boom::Size::Runtime(_) | boom::Size::Unknown => Arc::new(rudder::Type::Bits),
             },
-            boom::Type::Constant(_) => panic!("constant types should've been removed in boom"),
+            boom::Type::Constant(c) => {
+                // todo: this should be a panic, but because structs/unions can have constant type fields we do the following
+                Arc::new(rudder::Type::new_primitive(
+                    rudder::PrimitiveTypeClass::SignedInteger,
+                    smallest_width_of_value(*c).into(),
+                ))
+            }
         }
     }
 
@@ -1791,7 +1799,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn build_literal(&mut self, literal: &boom::Literal) -> Statement {
         let kind = match literal {
             boom::Literal::Int(i) => StatementKind::Constant {
-                typ: Arc::new(Type::ArbitraryLengthInteger),
+                typ: Arc::new(Type::new_primitive(
+                    PrimitiveTypeClass::SignedInteger,
+                    smallest_width_of_value(i.try_into().unwrap()).into(),
+                )),
                 value: rudder::ConstantValue::SignedInteger(
                     i.try_into().unwrap_or_else(|_| panic!("{i:x?}")),
                 ),
@@ -2154,4 +2165,10 @@ fn fields_to_offsets(
     });
 
     (offsets, current_type)
+}
+
+/// Used to destructure structs into multiple local variables
+/// `a.b.c = 4` becomes `a_b_c = 4`
+fn struct_fields_to_ident(fields: &[InternedString]) -> InternedString {
+    fields.iter().map(AsRef::as_ref).join("_").into()
 }

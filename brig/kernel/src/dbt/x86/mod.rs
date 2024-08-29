@@ -135,9 +135,12 @@ impl TranslationContext for X86TranslationContext {
             }
 
             // lower block
+
             assembler
                 .set_label(label_map.get_mut(&next).unwrap())
                 .unwrap();
+            assembler.nop().unwrap();
+
             for instr in next.instructions() {
                 instr.encode(&mut assembler, &label_map);
             }
@@ -145,12 +148,15 @@ impl TranslationContext for X86TranslationContext {
 
         // todo fix unnecessary allocation and byte copy, might require passing
         // allocator T into assemble
-        let output = assembler.assemble(0).unwrap();
+        let code = {
+            let output = assembler.assemble(0).unwrap();
 
-        let mut code = Vec::with_capacity_in(output.len(), ExecutableAllocator::get());
-        for byte in output {
-            code.push(byte);
-        }
+            let mut code = Vec::with_capacity_in(output.len(), ExecutableAllocator::get());
+            for byte in output {
+                code.push(byte);
+            }
+            code
+        };
 
         Translation { code }
     }

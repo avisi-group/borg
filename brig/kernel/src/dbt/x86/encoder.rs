@@ -489,7 +489,7 @@ impl Instruction {
     ) {
         use {
             Opcode::*,
-            OperandKind::{Immediate as I, Memory as M, Register as R},
+            OperandKind::{Immediate as I, Memory as M, Register as R, Target as T},
             Register::PhysicalRegister as PHYS,
         };
 
@@ -591,6 +591,53 @@ impl Instruction {
                         *src as u32,
                     )
                     .unwrap();
+            }
+            // ADD R -> R
+            ADD(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assert!(src_width_in_bits == dst_width_in_bits);
+                assembler
+                    .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+            // TEST R, R
+            TEST(
+                Operand {
+                    kind: R(PHYS(left)),
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assert!(src_width_in_bits == dst_width_in_bits);
+                assembler
+                    .test::<AsmRegister64, AsmRegister64>(left.into(), right.into())
+                    .unwrap();
+            }
+            JNE(Operand {
+                kind: T(target), ..
+            }) => {
+                let label = label_map.get(target).unwrap().clone();
+                assembler.jne(label).unwrap();
+            }
+            JMP(Operand {
+                kind: T(target), ..
+            }) => {
+                let label = label_map.get(target).unwrap().clone();
+                assembler.jmp(label).unwrap();
+            }
+            RET => {
+                assembler.ret().unwrap();
             }
             _ => panic!("cannot encode this instruction {}", self),
         }

@@ -230,8 +230,10 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
         rudder.update_names();
         let rudder_fns = rudder.get_functions();
 
-        let func = dynamic::codegen_function(rudder_fns.get(&"__DecodeA64".into()).unwrap());
-        let func2 = dynamic::codegen_function(rudder_fns.get(&"__DecodeA64_DataProcReg".into()).unwrap());
+        let funcs = rudder_fns
+            .values()
+            .map(dynamic::codegen_function)
+            .collect::<TokenStream>();
 
         let state = codegen_state(rudder);
         let types = codegen_types(rudder);
@@ -262,37 +264,7 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
                 TranslationContext,
             };
 
-            fn u__DecodeA64_SME(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_Unallocated1(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_Unallocated2(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_SVE(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_DataProcImm(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_BranchExcSys(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_LoadStore(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_DataProcFPSIMD(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-            fn u__DecodeA64_Reserved(ctx: &mut X86TranslationContext, a: X86NodeRef, b: X86NodeRef) {
-                todo!();
-            }
-
-
-            #func
-            #func2
+            #funcs
 
             #state
 

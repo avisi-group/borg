@@ -14,6 +14,7 @@ use {
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
+        FN_ALLOWLIST,
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
@@ -64,10 +65,8 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         })
         .collect::<TokenStream>();
 
-    let contents = quote! {
-        #[inline(never)] // disabling increases compile time, perf impact not measured
-        pub fn #name_ident(#function_parameters) -> #return_type {
-            #fn_state
+    let body = if FN_ALLOWLIST.contains(&function.name().as_ref()) {
+        quote! {  #fn_state
 
             {
                 let emitter = ctx.emitter();
@@ -112,10 +111,20 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                 }
             }
 
+            ctx.emitter().set_current_block(fn_state.exit_block_ref.clone());
+
             #block_fns
         }
+    } else {
+        quote!(todo!())
     };
-    contents
+
+    quote! {
+        #[inline(never)] // disabling increases compile time, perf impact not measured
+        pub fn #name_ident(#function_parameters) -> #return_type {
+            #body
+        }
+    }
 }
 
 pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
@@ -170,12 +179,14 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
     quote! {
         struct FunctionState {
             #fields
-            block_refs: [X86BlockRef; #num_blocks]
+            block_refs: [X86BlockRef; #num_blocks],
+            exit_block_ref: X86BlockRef,
         }
 
         let fn_state = FunctionState {
             #field_inits
-            block_refs: [#block_ref_inits]
+            block_refs: [#block_ref_inits],
+            exit_block_ref: ctx.create_block(),
         };
     }
 }
@@ -480,14 +491,16 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let ident = codegen_ident(target.name());
             let args = args.iter().map(get_ident);
 
-            if tail {
-                quote! {
-                    return #ident(ctx, #(#args),*)
-                }
-            } else {
-                quote! {
-                    #ident(ctx, #(#args),*)
-                }
+            // if tail {
+            //     quote! {
+            //         return #ident(ctx, #(#args),*)
+            //     }
+            // } else {
+            //
+            // }
+            // todo check me
+            quote! {
+                #ident(ctx, #(#args),*)
             }
         }
         StatementKind::Cast { typ, value, kind } => {
@@ -531,7 +544,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 quote! { return #name; }
             }
             None => {
-                quote! { return BlockResult::None; }
+                quote! {
+                    ctx.emitter().jump(fn_state.exit_block_ref.clone());
+                    return BlockResult::None;
+                }
             }
         },
         StatementKind::Select {

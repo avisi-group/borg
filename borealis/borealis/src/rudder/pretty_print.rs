@@ -283,7 +283,7 @@ impl Display for StatementKind {
                 variant,
                 value,
             } => {
-                write!(f, "create-sum {} = {}:{:?}", typ, variant, value.name(),)
+                write!(f, "create-enum {} = {}:{:?}", typ, variant, value.name(),)
             }
             StatementKind::SizeOf { value } => {
                 write!(f, "size-of {}", value.name())

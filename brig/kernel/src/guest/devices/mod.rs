@@ -31,4 +31,8 @@ fn decodea64_smoke() {
     );
 
     aarch64::u__DecodeA64(&mut ctx, pc, opcode);
+    ctx.emitter().leave();
+    let translation = ctx.compile();
+    log::debug!("\n{:?}", translation);
+    panic!();
 }

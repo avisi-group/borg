@@ -114,7 +114,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
             RemoveConstBranch::new_boxed(),
             ResolveReturns::new_boxed(),
             FixExceptions::new_boxed(),
-            MonomorphizeVectors::new_boxed(),
+            // MonomorphizeVectors::new_boxed(),
             CycleFinder::new_boxed(),
         ],
     );
@@ -173,10 +173,12 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 }
 
+const FN_ALLOWLIST: [&'static str; 2] = ["__DecodeA64_DataProcReg", "__DecodeA64"];
+
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {
     jib_ast.into_iter().map(|d| {
         if let DefinitionAux::Fundef(name, ret, parameters, body) = d.def {
-            let new_body = if name.as_interned().as_ref() == "__DecodeA64" {
+            let new_body = if FN_ALLOWLIST.contains(&name.as_interned().as_ref()) {
                 body
             } else {
                 vec![Instruction {

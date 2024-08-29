@@ -13,12 +13,12 @@ pub mod dead_write_elimination;
 pub mod destroy_bitvectors;
 pub mod inliner;
 pub mod jump_threading;
+pub mod materialise_apints;
 pub mod phi_analysis;
 pub mod return_propagation;
 pub mod tail_calls;
 pub mod variable_elimination;
 pub mod vector_folding;
-pub mod materialise_apints;
 
 pub enum OptLevel {
     Level0,
@@ -63,8 +63,8 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
-            DESTROY_BITVECTORS,
-            MATERIALISE_APINTS,
+            // DESTROY_BITVECTORS,
+            // MATERIALISE_APINTS,
             VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
@@ -80,8 +80,8 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
-            DESTROY_BITVECTORS,
-            MATERIALISE_APINTS,
+            // DESTROY_BITVECTORS,
+            // MATERIALISE_APINTS,
             VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
@@ -97,8 +97,8 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
-            DESTROY_BITVECTORS,
-            MATERIALISE_APINTS,
+            // DESTROY_BITVECTORS,
+            // MATERIALISE_APINTS,
             VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
