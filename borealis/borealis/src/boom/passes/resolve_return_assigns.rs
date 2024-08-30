@@ -62,7 +62,7 @@ impl Pass for ResolveReturns {
                     let mut statements = def.entry_block.statements();
 
                     let return_value_exists = statements.iter().any(|statement| {
-                        if let Statement::TypeDeclaration { name, .. } = &*statement.get() {
+                        if let Statement::VariableDeclaration { name, .. } = &*statement.get() {
                             if name.as_ref() == "return_value" {
                                 return true;
                             }
@@ -74,7 +74,7 @@ impl Pass for ResolveReturns {
                     if !return_value_exists {
                         statements.insert(
                             0,
-                            Statement::TypeDeclaration {
+                            Statement::VariableDeclaration {
                                 name: "return_value".into(),
                                 typ: typ.clone(),
                             }

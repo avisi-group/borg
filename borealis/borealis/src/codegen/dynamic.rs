@@ -27,7 +27,6 @@ pub fn codegen_function(function: &Function) -> TokenStream {
     let (return_type, parameters) = function.signature();
 
     let function_parameters = codegen_parameters(&parameters);
-    let return_type = codegen_type(return_type);
 
     let fn_state = codegen_fn_state(&function, parameters.clone());
 
@@ -66,7 +65,8 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         .collect::<TokenStream>();
 
     let body = if FN_ALLOWLIST.contains(&function.name().as_ref()) {
-        quote! {  #fn_state
+        quote! {
+            #fn_state
 
             {
                 let emitter = ctx.emitter();
@@ -108,10 +108,14 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                         block_queue.push(Block::Dynamic(lookup_block_idx_by_ref(&fn_state.block_refs, b0)));
                         block_queue.push(Block::Dynamic(lookup_block_idx_by_ref(&fn_state.block_refs, b1)));
                     },
+                    BlockResult::Return(node) => {
+                        ctx.emitter().set_current_block(fn_state.exit_block_ref.clone());
+                        return node;
+                    }
                 }
             }
 
-            ctx.emitter().set_current_block(fn_state.exit_block_ref.clone());
+            unreachable!();
 
             #block_fns
         }
@@ -121,7 +125,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 
     quote! {
         #[inline(never)] // disabling increases compile time, perf impact not measured
-        pub fn #name_ident(#function_parameters) -> #return_type {
+        pub fn #name_ident(#function_parameters) -> X86NodeRef {
             #body
         }
     }
@@ -234,7 +238,7 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
             quote! {
                 Type {
                     kind: TypeKind::Signed,
-                    width: todo!(),
+                    width: 128,
                 }
             }
         }
@@ -251,7 +255,7 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
 }
 
 /// Converts a rudder type to a `Type` value
-fn codegen_type_instance_constant(value: &ConstantValue, typ: Arc<Type>) -> TokenStream {
+fn codegen_constant_type_instance(value: &ConstantValue, typ: Arc<Type>) -> TokenStream {
     match &(*typ) {
         Type::Primitive(primitive) => {
             let width = Literal::usize_unsuffixed(primitive.width());
@@ -311,6 +315,15 @@ fn codegen_type_instance_constant(value: &ConstantValue, typ: Arc<Type>) -> Toke
                 }
             }
         }
+        Type::Union { width } => {
+            let width = u16::try_from(*width).unwrap();
+            quote! {
+                Type {
+                    kind: TypeKind::Unsigned,
+                    width: #width,
+                }
+            }
+        }
         t => panic!("todo codegen type instance: {t:?}"),
     }
 }
@@ -321,7 +334,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
     let statement_tokens = match stmt.kind() {
         StatementKind::Constant { value, typ } => {
-            let typ = codegen_type_instance_constant(&value, typ);
+            let typ = codegen_constant_type_instance(&value, typ);
             match value {
                 ConstantValue::UnsignedInteger(v) => {
                     let v = Literal::usize_unsuffixed(v);
@@ -333,17 +346,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 ConstantValue::FloatingPoint(v) => {
                     quote!(ctx.emitter().constant(#v as u64, #typ))
                 }
-
-                ConstantValue::Unit => quote!(()),
-                ConstantValue::String(str) => {
-                    let string = str.to_string();
-                    quote!(#string)
-                }
-                ConstantValue::Rational(r) => {
-                    let numer = *r.numer();
-                    let denom = *r.denom();
-                    quote!(num_rational::Ratio::<i128>::new(#numer, #denom))
-                }
+                ConstantValue::Unit => quote!(ctx.emitter().constant(0, #typ)),
+                ConstantValue::Rational(_) | ConstantValue::String(_) => todo!(),
             }
         }
         StatementKind::ReadVariable { symbol } => {
@@ -487,7 +491,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             quote! { ctx.emitter().shift(#value.clone(), #amount.clone(), ShiftOperationKind::#kind) }
         }
-        StatementKind::Call { target, args, tail } => {
+        StatementKind::Call { target, args, .. } => {
             let ident = codegen_ident(target.name());
             let args = args.iter().map(get_ident);
 
@@ -541,12 +545,15 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::Return { value } => match value {
             Some(value) => {
                 let name = codegen_ident(value.name());
-                quote! { return #name; }
+                quote! { return BlockResult::Return(#name); }
             }
             None => {
                 quote! {
-                    ctx.emitter().jump(fn_state.exit_block_ref.clone());
-                    return BlockResult::None;
+                    let v = ctx.emitter().constant(0, Type {
+                        kind: TypeKind::Unsigned,
+                        width: 0,
+                    });
+                    return BlockResult::Return(v);
                 }
             }
         },
@@ -558,7 +565,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let condition = get_ident(&condition);
             let true_value = get_ident(&true_value);
             let false_value = get_ident(&false_value);
-            quote! { if #condition { #true_value } else { #false_value } }
+            quote! { ctx.emitter().select(#condition, #true_value, #false_value) }
         }
         StatementKind::BitExtract {
             value,
@@ -616,37 +623,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::CreateStruct { typ, fields } => {
-            let Type::Struct(field_types) = &*typ else {
-                panic!()
-            };
 
-            let fields = fields
-                .iter()
-                .enumerate()
-                .map(|(index, statement)| {
-                    let (name, typ) = &field_types[index];
-                    assert_eq!(*typ, statement.typ());
-                    let field_name = codegen_ident(*name);
-                    let value = get_ident(statement);
-                    quote!(#field_name: #value,)
-                })
-                .collect::<TokenStream>();
-
-            let typ = codegen_type(typ);
-            quote!(#typ { #fields })
-        }
-        StatementKind::CreateEnum {
-            typ,
-            variant,
-            value,
-        } => {
-            assert!(matches!(&*typ, Type::Enum(_)));
-            let typ = codegen_type(typ);
-            let variant = codegen_ident(variant);
-            let value = get_ident(&value);
-            quote!(#typ::#variant(#value))
-        }
         StatementKind::CreateBits { value, length } => {
             let value = get_ident(&value);
             let length = get_ident(&length);
@@ -694,62 +671,44 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::MatchesEnum { value, variant } => {
-            // matches!(value, Enum::Variant(_))
+        StatementKind::MatchesUnion { value, variant } => {
+            // // matches!(value, Enum::Variant(_))
 
-            let sum_type = value.typ();
+            // let sum_type = value.typ();
 
-            let Type::Enum(_) = &*sum_type else {
-                unreachable!();
-            };
+            // let Type::Enum(_) = &*sum_type else {
+            //     unreachable!();
+            // };
 
-            let ident = get_ident(&value);
-            let sum_type = codegen_type(sum_type);
-            let variant = codegen_ident(variant);
+            // let ident = get_ident(&value);
+            // let sum_type = codegen_type(sum_type);
+            // let variant = codegen_ident(variant);
 
-            quote! {
-                matches!(#ident, #sum_type::#variant(_))
-            }
+            // quote! {
+            //     matches!(#ident, #sum_type::#variant(_))
+            // }
+            todo!()
         }
-        StatementKind::UnwrapEnum { value, variant } => {
-            let sum_type = value.typ();
+        StatementKind::UnwrapUnion { value, variant } => {
+            // let sum_type = value.typ();
 
-            let Type::Enum(_) = &*sum_type else {
-                unreachable!();
-            };
+            // let Type::Enum(_) = &*sum_type else {
+            //     unreachable!();
+            // };
 
-            let ident = get_ident(&value);
-            let sum_type = codegen_type(sum_type);
-            let variant = codegen_ident(variant);
+            // let ident = get_ident(&value);
+            // let sum_type = codegen_type(sum_type);
+            // let variant = codegen_ident(variant);
 
-            quote! {
-                match #ident {
-                    #sum_type::#variant(inner) => inner,
-                    _ => panic!("unwrap sum failed"),
-                }
-            }
+            // quote! {
+            //     match #ident {
+            //         #sum_type::#variant(inner) => inner,
+            //         _ => panic!("unwrap sum failed"),
+            //     }
+            // }
+            todo!()
         }
-        StatementKind::ExtractField { value, field } => {
-            let ident = get_ident(&value);
-            let field = codegen_ident(field);
-            quote!(#ident.#field)
-        }
-        StatementKind::UpdateField {
-            original_value,
-            field,
-            field_value,
-        } => {
-            let ident = get_ident(&original_value);
-            let value = get_ident(&field_value);
-            let field = codegen_ident(field);
-            quote! {
-                {
-                    let mut local = #ident;
-                    local.#field = #value;
-                    local
-                }
-            }
-        }
+
         StatementKind::Undefined => quote!(Default::default()),
     };
 

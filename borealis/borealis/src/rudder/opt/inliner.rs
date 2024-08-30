@@ -179,23 +179,7 @@ fn clone_statement(
         StatementKind::Assert { condition } => builder.build(StatementKind::Assert {
             condition: mapping.get(&condition).unwrap().clone(),
         }),
-        StatementKind::CreateStruct { typ, fields } => {
-            let fields = fields
-                .iter()
-                .map(|stmt| mapping.get(stmt).unwrap().clone())
-                .collect();
 
-            builder.build(StatementKind::CreateStruct { typ, fields })
-        }
-        StatementKind::CreateEnum {
-            typ,
-            variant,
-            value,
-        } => builder.build(StatementKind::CreateEnum {
-            typ,
-            variant,
-            value: mapping.get(&value).unwrap().clone(),
-        }),
         StatementKind::CreateBits { value, length } => builder.build(StatementKind::CreateBits {
             value: mapping.get(&value).unwrap().clone(),
             length: mapping.get(&length).unwrap().clone(),
@@ -203,31 +187,19 @@ fn clone_statement(
         StatementKind::SizeOf { value } => builder.build(StatementKind::SizeOf {
             value: mapping.get(&value).unwrap().clone(),
         }),
-        StatementKind::MatchesEnum { value, variant } => {
-            builder.build(StatementKind::MatchesEnum {
+        StatementKind::MatchesUnion { value, variant } => {
+            builder.build(StatementKind::MatchesUnion {
                 value: mapping.get(&value).unwrap().clone(),
                 variant,
             })
         }
-        StatementKind::UnwrapEnum { value, variant } => builder.build(StatementKind::UnwrapEnum {
-            value: mapping.get(&value).unwrap().clone(),
-            variant,
-        }),
-        StatementKind::ExtractField { value, field } => {
-            builder.build(StatementKind::ExtractField {
+        StatementKind::UnwrapUnion { value, variant } => {
+            builder.build(StatementKind::UnwrapUnion {
                 value: mapping.get(&value).unwrap().clone(),
-                field,
+                variant,
             })
         }
-        StatementKind::UpdateField {
-            original_value,
-            field,
-            field_value,
-        } => builder.build(StatementKind::UpdateField {
-            original_value: mapping.get(&original_value).unwrap().clone(),
-            field,
-            field_value: mapping.get(&field_value).unwrap().clone(),
-        }),
+
         StatementKind::Undefined => builder.build(StatementKind::Undefined),
     }
 }

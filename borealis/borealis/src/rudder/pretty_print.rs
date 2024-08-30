@@ -22,7 +22,7 @@ impl Display for Type {
                 PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
             },
             Type::Struct(_) => write!(f, "struct"),
-            Type::Enum(_) => write!(f, "enum"),
+            Type::Union { width } => write!(f, "union({width})"),
             Type::Vector {
                 element_count,
                 element_type,
@@ -270,21 +270,7 @@ impl Display for StatementKind {
                 index.name(),
                 value.name()
             ),
-            StatementKind::CreateStruct { typ, fields } => {
-                write!(
-                    f,
-                    "create-product {} = {:?}",
-                    typ,
-                    fields.iter().map(Statement::name).collect::<Vec<_>>()
-                )
-            }
-            StatementKind::CreateEnum {
-                typ,
-                variant,
-                value,
-            } => {
-                write!(f, "create-enum {} = {}:{:?}", typ, variant, value.name(),)
-            }
+
             StatementKind::SizeOf { value } => {
                 write!(f, "size-of {}", value.name())
             }
@@ -295,26 +281,11 @@ impl Display for StatementKind {
             StatementKind::CreateBits { value, length } => {
                 write!(f, "create-bits {} {}", value.name(), length.name())
             }
-            StatementKind::MatchesEnum { value, variant } => {
-                write!(f, "matches-sum {} {variant}", value.name())
+            StatementKind::MatchesUnion { value, variant } => {
+                write!(f, "matches-union {} {variant}", value.name())
             }
-            StatementKind::UnwrapEnum { value, variant } => {
-                write!(f, "unwrap-sum {} {variant}", value.name())
-            }
-            StatementKind::ExtractField { value, field } => {
-                write!(f, "extract-field {}.{field}", value.name())
-            }
-            StatementKind::UpdateField {
-                original_value,
-                field,
-                field_value,
-            } => {
-                write!(
-                    f,
-                    "update-field {}.{field} <- {}",
-                    original_value.name(),
-                    field_value.name()
-                )
+            StatementKind::UnwrapUnion { value, variant } => {
+                write!(f, "unwrap-union {} {variant}", value.name())
             }
         }
     }

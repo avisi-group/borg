@@ -57,10 +57,15 @@ impl PrimitiveType {
 pub enum Type {
     Primitive(PrimitiveType),
     Struct(Vec<(InternedString, Arc<Type>)>),
-    Enum(Vec<(InternedString, Arc<Type>)>),
+
     Vector {
         element_count: usize,
         element_type: Arc<Type>,
+    },
+
+    // anything can be cast to/from a union value?
+    Union {
+        width: usize,
     },
 
     // ehhhh
@@ -94,10 +99,6 @@ impl Type {
         Self::Struct(fields)
     }
 
-    pub fn new_sum(variants: Vec<(InternedString, Arc<Type>)>) -> Self {
-        Self::Enum(variants)
-    }
-
     pub fn void() -> Self {
         Self::Primitive(PrimitiveType {
             tc: PrimitiveTypeClass::Void,
@@ -122,7 +123,6 @@ impl Type {
                     .take(element_field)
                     .fold(0, |acc, (_, typ)| acc + typ.width_bytes()),
             ),
-            Type::Enum(_) => Some(0),
             Type::Vector { element_type, .. } => Some(element_field * element_type.width_bytes()),
             _ => None,
         }
@@ -131,7 +131,7 @@ impl Type {
     pub fn width_bits(&self) -> usize {
         match self {
             Self::Struct(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).sum(),
-            Self::Enum(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).max().unwrap(),
+            Self::Union { width } => *width,
             Self::Primitive(p) => p.element_width_in_bits,
             Self::Vector {
                 element_count,
@@ -594,7 +594,6 @@ pub struct Context {
     // offset-type pairs, offsets may not be unique? todo: ask tom
     registers: HashMap<InternedString, RegisterDescriptor>,
     structs: HashSet<Arc<Type>>,
-    unions: HashSet<Arc<Type>>,
 }
 
 #[derive(Clone, Debug)]
@@ -639,9 +638,5 @@ impl Context {
 
     pub fn get_structs(&self) -> HashSet<Arc<Type>> {
         self.structs.clone()
-    }
-
-    pub fn get_unions(&self) -> HashSet<Arc<Type>> {
-        self.unions.clone()
     }
 }

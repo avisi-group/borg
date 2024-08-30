@@ -1,7 +1,7 @@
 //! Fix exceptions
 
 use {
-    crate::boom::{control_flow::ControlFlowBlock, passes::Pass, Ast, Definition, Type},
+    crate::boom::{control_flow::ControlFlowBlock, passes::Pass, Ast, Definition, Size, Type},
     common::shared::Shared,
     itertools::Itertools,
 };
@@ -24,39 +24,28 @@ impl Pass for FixExceptions {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        let (type_name, type_fields) = ast
-            .get()
-            .definitions
-            .iter()
-            .filter_map(|def| {
-                if let Definition::Union { name, fields } = def {
-                    if name.as_ref() == "exception" {
-                        Some((*name, fields.clone()))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .exactly_one()
-            .unwrap();
+        let (width, _) = *ast.get().unions.get(&("exception".into())).unwrap();
 
-        ast.get_mut().registers.insert(
+        let registers = &mut ast.get_mut().registers;
+
+        registers.insert(
             "have_exception".into(),
             (Shared::new(Type::Bool), ControlFlowBlock::new()),
         );
-        ast.get_mut().registers.insert(
-            "current_exception".into(),
+        registers.insert(
+            "current_exception_tag".into(),
             (
-                Shared::new(Type::Union {
-                    name: type_name,
-                    fields: type_fields,
+                Shared::new(Type::Integer {
+                    size: Size::Static(32),
                 }),
                 ControlFlowBlock::new(),
             ),
         );
-        ast.get_mut().registers.insert(
+        registers.insert(
+            "current_exception_value".into(),
+            (Shared::new(Type::Union { width }), ControlFlowBlock::new()),
+        );
+        registers.insert(
             "throw".into(),
             (Shared::new(Type::String), ControlFlowBlock::new()),
         );

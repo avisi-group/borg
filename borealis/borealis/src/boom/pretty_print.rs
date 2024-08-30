@@ -24,6 +24,7 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         registers,
         functions,
         constants,
+        unions,
     } = &*ast.get();
 
     let mut visitor = PrettyPrinter::new(w);
@@ -45,6 +46,15 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
 
     constants.iter().for_each(|(name, value)| {
         writeln!(visitor.writer, "constant {name}: {value}").unwrap();
+    });
+    writeln!(visitor.writer).unwrap();
+
+    unions.iter().for_each(|(name, (width, variants))| {
+        writeln!(visitor.writer, "union {name}: {width} {{").unwrap();
+        for (variant, tag) in variants {
+            writeln!(visitor.writer, "\t{variant} = {tag},").unwrap();
+        }
+        writeln!(visitor.writer, "}}").unwrap();
     });
     writeln!(visitor.writer).unwrap();
 
@@ -164,32 +174,6 @@ impl Drop for IndentHandle {
 impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     fn visit_definition(&mut self, node: &Definition) {
         match node {
-            Definition::Enum { name, variants } => {
-                self.prindentln(format!("enum {name} {{"));
-
-                {
-                    let _h = self.indent();
-                    variants
-                        .iter()
-                        .for_each(|id| self.prindentln(format!("{id},")));
-                }
-
-                self.prindentln("}");
-            }
-            Definition::Union { name, fields } => {
-                self.prindentln(format!("union {name} {{"));
-
-                {
-                    let _h = self.indent();
-                    fields.iter().for_each(|NamedType { name, typ }| {
-                        self.prindent(format!("{name}: "));
-                        self.visit_type(typ.clone());
-                        writeln!(self.writer, ",").unwrap();
-                    });
-                }
-
-                self.prindentln("}");
-            }
             Definition::Struct { name, fields } => {
                 self.prindentln(format!("struct {name} {{"));
 
@@ -269,7 +253,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
     fn visit_statement(&mut self, node: Shared<Statement>) {
         match &*node.get() {
-            Statement::TypeDeclaration { name, typ } => {
+            Statement::VariableDeclaration { name, typ } => {
                 self.visit_type(typ.clone());
                 write!(self.writer, " {name};").unwrap();
             }
@@ -352,11 +336,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
                 match size {
                     Size::Static(size) => write!(self.writer, "{size}").unwrap(),
-                    Size::Runtime(value) => {
-                        write!(self.writer, "rt(").unwrap();
-                        self.visit_value(value.clone());
-                        write!(self.writer, ")").unwrap();
-                    }
+
                     Size::Unknown => (),
                 };
 
@@ -367,19 +347,17 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 write!(self.writer, "bv").unwrap();
                 match size {
                     Size::Static(size) => write!(self.writer, "{size}").unwrap(),
-                    Size::Runtime(value) => {
-                        write!(self.writer, "rt(").unwrap();
-                        self.visit_value(value.clone());
-                        write!(self.writer, ")").unwrap();
-                    }
                     Size::Unknown => (),
                 };
 
                 Ok(())
             }
             Type::Constant(i) => write!(self.writer, "constant({i})"),
-            Type::Enum { name, .. } | Type::Union { name, .. } | Type::Struct { name, .. } => {
+            Type::Struct { name, .. } => {
                 write!(self.writer, "{name}")
+            }
+            Type::Union { width } => {
+                write!(self.writer, "union({width})")
             }
             Type::List { element_type } => {
                 write!(self.writer, "list<").unwrap();
@@ -471,12 +449,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_value(value.clone());
                 write!(self.writer, " as ").unwrap();
                 write_uid(self, *identifier, types);
-            }
-            Value::Member {
-                member_ident,
-                enum_ident,
-            } => {
-                write!(self.writer, "{enum_ident}::{member_ident}").unwrap();
             }
         }
     }

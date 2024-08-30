@@ -32,6 +32,8 @@ pub struct Ast {
     /// Function definitions by identifier
     pub functions: HashMap<InternedString, FunctionDefinition>,
     pub constants: HashMap<InternedString, i32>,
+    /// name -> (width, variant -> tag)
+    pub unions: HashMap<InternedString, (usize, HashMap<InternedString, usize>)>,
 }
 
 impl Ast {
@@ -42,6 +44,8 @@ impl Ast {
 
         let ast = emitter.finish();
 
+        dbg!(&ast.unions);
+
         Shared::new(ast)
     }
 }
@@ -49,18 +53,6 @@ impl Ast {
 /// Top-level definition of a BOOM item
 #[derive(Debug, Clone)]
 pub enum Definition {
-    /// Enum definition
-    Enum {
-        name: InternedString,
-        variants: Vec<InternedString>,
-    },
-
-    /// Union definition
-    Union {
-        name: InternedString,
-        fields: Vec<NamedType>,
-    },
-
     /// Struct definition
     Struct {
         name: InternedString,
@@ -81,9 +73,9 @@ pub enum Definition {
 impl Walkable for Definition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Self::Enum { .. } | Self::Pragma { .. } => (),
+            Self::Pragma { .. } => (),
 
-            Self::Union { fields, .. } | Self::Struct { fields, .. } => {
+            Self::Struct { fields, .. } => {
                 fields
                     .iter()
                     .for_each(|named_type| visitor.visit_named_type(named_type));
@@ -128,7 +120,7 @@ impl FunctionDefinition {
             .iter()
             .flat_map(|block| block.statements())
             .filter_map(|statement| {
-                if let Statement::TypeDeclaration { name, typ } = &*statement.get() {
+                if let Statement::VariableDeclaration { name, typ } = &*statement.get() {
                     Some((*name, typ.clone()))
                 } else {
                     None
@@ -226,14 +218,8 @@ pub enum Type {
 
     Constant(i64),
 
-    Enum {
-        name: InternedString,
-        variants: Vec<InternedString>,
-    },
-
     Union {
-        name: InternedString,
-        fields: Vec<NamedType>,
+        width: usize,
     },
 
     Struct {
@@ -258,30 +244,20 @@ pub enum Type {
 }
 
 impl Type {
-    // Gets the size of a type if it is an integer
-    pub fn get_size(&self) -> Option<Size> {
+    // Gets the size of a type
+    pub fn get_size(&self) -> Size {
         match self {
-            Type::Integer { size } | Type::Bits { size } => Some(size.clone()),
-            _ => None,
-        }
-    }
-
-    // Gets a reference to the size of a type if it is an integer
-    pub fn get_size_mut(&mut self) -> Option<&mut Size> {
-        match self {
-            Type::Integer { size } | Type::Bits { size } => Some(size),
-            _ => None,
+            Type::Integer { size } | Type::Bits { size } => size.clone(),
+            _ => Size::Unknown,
         }
     }
 }
 
-/// Size of a boom integer
+/// Size of a BOOM type in bits
 #[derive(Debug, Clone)]
 pub enum Size {
     /// Size is known statically at borealis compile time
     Static(usize),
-    /// Size is not static but a runtime value
-    Runtime(Shared<Value>),
     /// Size is unknown (emitted as uint64)
     Unknown,
 }
@@ -300,9 +276,9 @@ impl Walkable for Shared<Type> {
             | Integer { .. }
             | Bits { .. }
             | Bit
-            | Enum { .. } => {}
+            | Union { .. } => {}
 
-            Union { fields, .. } | Struct { fields, .. } => fields
+            Struct { fields, .. } => fields
                 .iter()
                 .for_each(|field| visitor.visit_named_type(field)),
 
@@ -320,7 +296,6 @@ impl TryFrom<&Size> for Shared<Value> {
     fn try_from(value: &Size) -> Result<Self, Self::Error> {
         match value {
             Size::Static(size) => Ok(Literal::Int((*size).into()).into()),
-            Size::Runtime(value) => Ok(value.clone()),
             Size::Unknown => Err(()),
         }
     }
@@ -341,12 +316,6 @@ impl Add for Size {
         match (self, rhs) {
             (Size::Static(l), Size::Static(r)) => Size::Static(l + r),
 
-            (Size::Static(s), Size::Runtime(d)) | (Size::Runtime(d), Size::Static(s)) => {
-                Size::Runtime(Operation::Add(d, Literal::Int(s.into()).into()).into())
-            }
-
-            (Size::Runtime(l), Size::Runtime(r)) => Size::Runtime(Operation::Add(l, r).into()),
-
             _ => panic!("cannot add unknown"),
         }
     }
@@ -354,7 +323,7 @@ impl Add for Size {
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    TypeDeclaration {
+    VariableDeclaration {
         name: InternedString,
         typ: Shared<Type>,
     },
@@ -395,7 +364,7 @@ impl From<Statement> for Shared<Statement> {
 impl Walkable for Statement {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Self::TypeDeclaration { typ, .. } => visitor.visit_type(typ.clone()),
+            Self::VariableDeclaration { typ, .. } => visitor.visit_type(typ.clone()),
             Self::Copy { expression, value } => {
                 visitor.visit_expression(expression);
                 visitor.visit_value(value.clone());
@@ -484,10 +453,6 @@ pub enum Value {
         identifier: InternedString,
         types: Vec<Shared<Type>>,
     },
-    Member {
-        member_ident: InternedString,
-        enum_ident: InternedString,
-    },
 }
 
 impl Value {
@@ -558,7 +523,6 @@ impl Walkable for Value {
                 visitor.visit_value(value.clone());
                 types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
-            Value::Member { .. } => todo!(),
         }
     }
 }

@@ -46,8 +46,8 @@ impl Pass for RemoveConstantType {
                     b.statements()
                         .into_iter()
                         .map(|s| match &*(s.get()) {
-                            Statement::TypeDeclaration { name, typ } => match *(typ.get()) {
-                                Type::Constant(v) => Shared::new(Statement::TypeDeclaration {
+                            Statement::VariableDeclaration { name, typ } => match *(typ.get()) {
+                                Type::Constant(v) => Shared::new(Statement::VariableDeclaration {
                                     name: *name,
                                     typ: Shared::new(Type::Integer {
                                         size: Size::Static(

@@ -40,12 +40,12 @@ impl Pass for MonomorphizeVectors {
     }
 }
 
-fn monomorphize_vectors(ast: Shared<Ast>, entry_block: ControlFlowBlock) -> bool {
+fn monomorphize_vectors(_: Shared<Ast>, entry_block: ControlFlowBlock) -> bool {
     let mut type_declarations = HashMap::default();
 
     for s in entry_block.iter().flat_map(|b| b.statements()) {
         match &*s.get() {
-            Statement::TypeDeclaration { name, typ } => {
+            Statement::VariableDeclaration { name, typ } => {
                 if let Type::Vector { .. } = &*typ.get() {
                     type_declarations.insert(*name, s.clone());
                 } else if let Type::FixedVector { .. } = &*typ.get() {
@@ -73,7 +73,7 @@ fn monomorphize_vectors(ast: Shared<Ast>, entry_block: ControlFlowBlock) -> bool
                 };
 
                 // And, if the destination has a type declaration that is a vector...
-                let Statement::TypeDeclaration {
+                let Statement::VariableDeclaration {
                     typ: destination_type,
                     ..
                 } = &*destination_type_decl.get_mut()
@@ -86,7 +86,7 @@ fn monomorphize_vectors(ast: Shared<Ast>, entry_block: ControlFlowBlock) -> bool
                 };
 
                 // And, if the source has a type declaration that is a fixed vector...
-                let Statement::TypeDeclaration {
+                let Statement::VariableDeclaration {
                     typ: source_type, ..
                 } = &*source_type_decl.get()
                 else {

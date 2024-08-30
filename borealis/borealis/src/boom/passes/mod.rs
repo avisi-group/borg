@@ -17,6 +17,8 @@ use {
 
 pub mod any;
 pub mod cycle_finder;
+pub mod destruct_structs;
+pub mod destruct_unions;
 pub mod fix_exceptions;
 pub mod fold_unconditionals;
 pub mod monomorphize_vectors;

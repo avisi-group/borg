@@ -1,11 +1,15 @@
 //! JIB to BOOM conversion
 
 use {
-    crate::boom::{
-        self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionSignature, NamedType,
-        Parameter, Size,
+    crate::{
+        boom::{
+            self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionSignature,
+            NamedType, Parameter, Size,
+        },
+        util::smallest_width_of_value,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
+    itertools::Itertools,
     sailrs::{
         jib_ast::{self, CReturn},
         sail_ast,
@@ -61,21 +65,27 @@ impl BoomEmitter {
                 );
             }
             jib_ast::DefinitionAux::Type(type_def) => {
-                let def = match type_def {
-                    jib_ast::TypeDefinition::Enum(name, variants) => boom::Definition::Enum {
-                        name: name.as_interned(),
-                        variants: convert_variants(variants.as_ref()),
-                    },
-                    jib_ast::TypeDefinition::Struct(name, fields) => boom::Definition::Struct {
-                        name: name.as_interned(),
-                        fields: convert_fields(fields.iter()),
-                    },
-                    jib_ast::TypeDefinition::Variant(name, fields) => boom::Definition::Union {
-                        name: name.as_interned(),
-                        fields: convert_fields(fields.iter()),
-                    },
-                };
-                self.ast.definitions.push(def);
+                match type_def {
+                    jib_ast::TypeDefinition::Enum(_, _) => (), // type is u32 but don't need to define it
+                    jib_ast::TypeDefinition::Struct(name, fields) => {
+                        self.ast.definitions.push(boom::Definition::Struct {
+                            name: name.as_interned(),
+                            fields: convert_fields(fields.iter()),
+                        })
+                    }
+                    jib_ast::TypeDefinition::Variant(name, fields) => {
+                        let width =
+                            effective_width(&jib_ast::Type::Variant(name.clone(), fields.clone()));
+
+                        let tags = fields
+                            .iter()
+                            .enumerate()
+                            .map(|(i, (name, _))| (name.as_interned(), i))
+                            .collect();
+
+                        self.ast.unions.insert(name.as_interned(), (width, tags));
+                    }
+                }
             }
             jib_ast::DefinitionAux::Let(_, bindings, body) => {
                 if let [(name, jib_ast::Type::Constant(c))] = bindings.as_ref() {
@@ -181,18 +191,22 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Shared<boom::Type> {
         jib_ast::Type::String => boom::Type::String,
         jib_ast::Type::Real => boom::Type::Real,
 
-        jib_ast::Type::Enum(name, variants) => boom::Type::Enum {
-            name: name.as_interned(),
-            variants: convert_variants(variants.as_ref()),
+        // enums are basically constants
+        jib_ast::Type::Enum(_, _) => boom::Type::Integer {
+            size: Size::Static(32),
         },
+
+        // need to destruct these
         jib_ast::Type::Struct(name, fields) => boom::Type::Struct {
             name: name.as_interned(),
             fields: convert_fields(fields.as_ref()),
         },
-        jib_ast::Type::Variant(name, fields) => boom::Type::Union {
-            name: name.as_interned(),
-            fields: convert_fields(fields.as_ref()),
-        },
+
+        // unions are special
+        jib_ast::Type::Variant(_, _) => {
+            let width = effective_width(&typ.borrow());
+            boom::Type::Union { width }
+        }
         jib_ast::Type::Fvector(length, typ) => boom::Type::FixedVector {
             length: *length,
             element_type: convert_type(&**typ),
@@ -224,13 +238,13 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
     }
 
     let statements = match statement {
-        jib_ast::InstructionAux::Decl(typ, name) => vec![boom::Statement::TypeDeclaration {
+        jib_ast::InstructionAux::Decl(typ, name) => vec![boom::Statement::VariableDeclaration {
             name: convert_name(name),
             typ: convert_type(typ),
         }],
         jib_ast::InstructionAux::Init(typ, name, value) => {
             vec![
-                boom::Statement::TypeDeclaration {
+                boom::Statement::VariableDeclaration {
                     name: convert_name(name),
                     typ: convert_type(typ),
                 },
@@ -389,14 +403,21 @@ fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
             value: (convert_value(value)),
             field_name: ident.as_interned(),
         },
+        // convert enum members into their indices as integer literals
         jib_ast::Value::Member(ident, typ) => {
-            let jib_ast::Type::Enum(enum_ident, _) = typ else {
+            let jib_ast::Type::Enum(_, members) = typ else {
                 todo!()
             };
-            boom::Value::Member {
-                member_ident: ident.as_interned(),
-                enum_ident: enum_ident.as_interned(),
-            }
+
+            let member_index = members
+                .iter()
+                .find_position(|s| s.as_interned() == ident.as_interned())
+                .unwrap_or_else(|| {
+                    panic!("failed to find index for enum {ident:?} of type {typ:?}")
+                })
+                .0;
+
+            boom::Value::Literal(Shared::new(boom::Literal::Int(member_index.into())))
         }
     })
 }
@@ -428,14 +449,6 @@ fn convert_bit(bit: &jib_ast::BitU) -> boom::Bit {
     }
 }
 
-/// Converts variants of an enum from JIB to BOOM
-fn convert_variants(variants: &[sail_ast::Identifier]) -> Vec<InternedString> {
-    variants
-        .iter()
-        .map(sail_ast::Identifier::as_interned)
-        .collect()
-}
-
 /// Converts fields of a struct or union from JIB to BOOM
 ///
 /// Generics are required to be able to convert from `LinkedList<((Identifier,
@@ -455,4 +468,43 @@ fn convert_fields<
             typ: convert_type(typ.borrow()),
         })
         .collect()
+}
+
+/// Returns the effective width of a type in bits
+///
+/// "effective" because we're using this for unions
+fn effective_width(typ: &jib_ast::Type) -> usize {
+    match typ {
+        jib_ast::Type::Lint => 128,
+        jib_ast::Type::Fbits(i) | jib_ast::Type::Fint(i) => (*i).try_into().unwrap(),
+        jib_ast::Type::Constant(c) => smallest_width_of_value((&c.0).try_into().unwrap()).into(),
+        jib_ast::Type::Lbits => 128, // todo maybe + 8 for the length?
+        jib_ast::Type::Sbits(_) => todo!(),
+
+        jib_ast::Type::Unit => 0,
+        jib_ast::Type::Bool | jib_ast::Type::Bit => 1,
+
+        jib_ast::Type::String => 32,
+
+        jib_ast::Type::Enum(_, _) => 32,
+        jib_ast::Type::Struct(_, fields) => {
+            fields.iter().map(|(_, typ)| effective_width(typ)).sum()
+        }
+        jib_ast::Type::Variant(_, fields) => fields
+            .iter()
+            .map(|(_, typ)| effective_width(typ))
+            .max()
+            .unwrap(),
+        jib_ast::Type::Fvector(count, typ) => {
+            effective_width(typ) * usize::try_from(*count).unwrap()
+        }
+
+        // Type::Struct { fields, .. } =>
+        // Type::Union { fields, .. } => fields
+        //     .iter()
+        //     .map(|NamedType { typ, .. }| effective_width(typ.clone()))
+        //     .max()
+        //     .unwrap(),
+        _ => panic!("unknown size of type {typ:?}"),
+    }
 }

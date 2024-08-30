@@ -224,29 +224,13 @@ impl StatementUseAnalysis {
                     self.add_use(&value, &stmt);
                     self.add_use(&length, &stmt);
                 }
-                StatementKind::CreateStruct { fields, .. } => {
-                    for field in fields {
-                        self.add_use(&field, &stmt);
-                    }
-                }
-                StatementKind::CreateEnum { value, .. } => {
-                    self.add_use(&value, &stmt);
-                }
+
                 StatementKind::SizeOf { value } => {
                     self.add_use(&value, &stmt);
                 }
 
-                StatementKind::MatchesEnum { value, .. } => self.add_use(&value, &stmt),
-                StatementKind::UnwrapEnum { value, .. } => self.add_use(&value, &stmt),
-                StatementKind::ExtractField { value, .. } => self.add_use(&value, &stmt),
-                StatementKind::UpdateField {
-                    original_value,
-                    field_value,
-                    ..
-                } => {
-                    self.add_use(&original_value, &stmt);
-                    self.add_use(&field_value, &stmt);
-                }
+                StatementKind::MatchesUnion { value, .. } => self.add_use(&value, &stmt),
+                StatementKind::UnwrapUnion { value, .. } => self.add_use(&value, &stmt),
 
                 StatementKind::ReadVariable { .. }
                 | StatementKind::ReadPc

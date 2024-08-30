@@ -1,5 +1,6 @@
 use crate::dbt::x86::emitter::{
     BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
+    X86NodeRef,
 };
 
 pub trait Emitter {
@@ -24,6 +25,13 @@ pub trait Emitter {
         value: Self::NodeRef,
         start: Self::NodeRef,
         length: Self::NodeRef,
+    ) -> Self::NodeRef;
+
+    fn select(
+        &mut self,
+        condition: Self::NodeRef,
+        true_value: Self::NodeRef,
+        false_value: Self::NodeRef,
     ) -> Self::NodeRef;
 
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
@@ -156,10 +164,21 @@ impl<E: Emitter> Emitter for WrappedEmitter<E> {
         log::info!("bit-extract");
         self.subemitter.bit_extract(value, start, length)
     }
+
+    fn select(
+        &mut self,
+        condition: Self::NodeRef,
+        true_value: Self::NodeRef,
+        false_value: Self::NodeRef,
+    ) -> Self::NodeRef {
+        log::info!("select");
+        self.subemitter.select(condition, true_value, false_value)
+    }
 }
 
 pub enum BlockResult {
     None,
     Static(X86BlockRef),
     Dynamic(X86BlockRef, X86BlockRef),
+    Return(X86NodeRef),
 }

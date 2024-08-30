@@ -198,18 +198,6 @@ pub enum StatementKind {
         condition: Statement,
     },
 
-    CreateStruct {
-        typ: Arc<Type>,
-        /// Index of fields should match type
-        fields: Vec<Statement>,
-    },
-
-    CreateEnum {
-        typ: Arc<Type>,
-        variant: InternedString,
-        value: Statement,
-    },
-
     CreateBits {
         value: Statement,
         length: Statement,
@@ -221,29 +209,16 @@ pub enum StatementKind {
         value: Statement,
     },
 
-    /// Tests whether an instance of an enum is of a given variant
-    MatchesEnum {
+    /// Tests whether an instance of a union is of a given variant
+    MatchesUnion {
         value: Statement,
         variant: InternedString,
     },
 
-    /// Extracts the contents of a variant of an enum
-    UnwrapEnum {
+    /// Extracts the contents of a variant of a union
+    UnwrapUnion {
         value: Statement,
         variant: InternedString,
-    },
-
-    /// Extracts a field of a product type
-    ExtractField {
-        value: Statement,
-        field: InternedString,
-    },
-
-    /// Returns the original value with updated field
-    UpdateField {
-        original_value: Statement,
-        field: InternedString,
-        field_value: Statement,
     },
 }
 
@@ -309,7 +284,6 @@ impl StatementKind {
                 value,
                 index,
             } => [value, vector, index].into_iter().cloned().collect(),
-            StatementKind::CreateStruct { fields, .. } => fields.clone(),
 
             StatementKind::Assert { condition } => vec![condition.clone()],
             StatementKind::BitsCast { value, length, .. } => {
@@ -320,16 +294,8 @@ impl StatementKind {
             }
 
             StatementKind::SizeOf { value }
-            | StatementKind::CreateEnum { value, .. }
-            | StatementKind::MatchesEnum { value, .. }
-            | StatementKind::UnwrapEnum { value, .. }
-            | StatementKind::ExtractField { value, .. } => vec![value.clone()],
-
-            StatementKind::UpdateField {
-                original_value,
-                field_value,
-                ..
-            } => [original_value, field_value].into_iter().cloned().collect(),
+            | StatementKind::MatchesUnion { value, .. }
+            | StatementKind::UnwrapUnion { value, .. } => vec![value.clone()],
         }
     }
 }
@@ -460,36 +426,25 @@ impl Statement {
                 // get type of the vector and return it
                 vector.typ()
             }
-            StatementKind::CreateStruct { typ, .. } | StatementKind::CreateEnum { typ, .. } => typ,
+
             StatementKind::SizeOf { .. } => Arc::new(Type::u16()),
             StatementKind::Assert { .. } => Arc::new(Type::unit()),
             StatementKind::CreateBits { .. } => Arc::new(Type::Bits),
-            StatementKind::MatchesEnum { .. } => Arc::new(Type::u1()),
-            StatementKind::UnwrapEnum { value, variant } => {
-                let Type::Enum(variants) = &*value.typ() else {
-                    panic!("cannot unwrap non sum type");
-                };
+            StatementKind::MatchesUnion { .. } => Arc::new(Type::u1()),
+            StatementKind::UnwrapUnion { value, variant } => {
+                // let Type::Enum(variants) = &*value.typ() else {
+                //     panic!("cannot unwrap non sum type");
+                // };
 
-                variants
-                    .iter()
-                    .find(|(name, _)| *name == variant)
-                    .unwrap()
-                    .1
-                    .clone()
+                // variants
+                //     .iter()
+                //     .find(|(name, _)| *name == variant)
+                //     .unwrap()
+                //     .1
+                //     .clone()
+                todo!()
             }
-            StatementKind::ExtractField { value, field } => {
-                let Type::Struct(fields) = &*value.typ() else {
-                    panic!("cannot unwrap non sum type");
-                };
 
-                fields
-                    .iter()
-                    .find(|(name, _)| *name == field)
-                    .unwrap()
-                    .1
-                    .clone()
-            }
-            StatementKind::UpdateField { original_value, .. } => original_value.typ(),
             StatementKind::Undefined => Arc::new(Type::Any),
         }
     }
@@ -739,37 +694,6 @@ impl StatementInner {
                 self.kind = StatementKind::ReadElement { vector, index };
             }
 
-            StatementKind::CreateStruct { typ, fields } => {
-                let fields = fields
-                    .iter()
-                    .map(|field| {
-                        if *field == use_of {
-                            with.clone()
-                        } else {
-                            field.clone()
-                        }
-                    })
-                    .collect();
-
-                self.kind = StatementKind::CreateStruct { typ, fields };
-            }
-            StatementKind::CreateEnum {
-                typ,
-                variant,
-                value,
-            } => {
-                let value = if value == use_of {
-                    with.clone()
-                } else {
-                    value.clone()
-                };
-
-                self.kind = StatementKind::CreateEnum {
-                    typ,
-                    variant,
-                    value,
-                };
-            }
             StatementKind::BitInsert {
                 target: original_value,
                 source: insert_value,
@@ -890,54 +814,23 @@ impl StatementInner {
 
                 self.kind = StatementKind::CreateBits { value, length };
             }
-            StatementKind::MatchesEnum { value, variant } => {
+            StatementKind::MatchesUnion { value, variant } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
                     value.clone()
                 };
 
-                self.kind = StatementKind::MatchesEnum { value, variant };
+                self.kind = StatementKind::MatchesUnion { value, variant };
             }
-            StatementKind::UnwrapEnum { value, variant } => {
+            StatementKind::UnwrapUnion { value, variant } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
                     value.clone()
                 };
 
-                self.kind = StatementKind::UnwrapEnum { value, variant };
-            }
-            StatementKind::ExtractField { value, field } => {
-                let value = if value == use_of {
-                    with.clone()
-                } else {
-                    value.clone()
-                };
-
-                self.kind = StatementKind::ExtractField { value, field };
-            }
-
-            StatementKind::UpdateField {
-                original_value,
-                field,
-                field_value,
-            } => {
-                let original_value = if original_value == use_of {
-                    with.clone()
-                } else {
-                    original_value.clone()
-                };
-                let field_value = if field_value == use_of {
-                    with.clone()
-                } else {
-                    field_value.clone()
-                };
-                self.kind = StatementKind::UpdateField {
-                    original_value,
-                    field,
-                    field_value,
-                };
+                self.kind = StatementKind::UnwrapUnion { value, variant };
             }
 
             StatementKind::Constant { .. } => todo!(),
@@ -1136,6 +1029,19 @@ impl StatementBuilder {
             // allow casting any to anything
             (Type::Any, _) => self.build(StatementKind::Cast {
                 kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            }),
+
+            // unions can go from and to anything
+            // todo: verify width here
+            (Type::Union { .. }, _) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: destination_type,
+                value: source,
+            }),
+            (_, Type::Union { .. }) => self.build(StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
                 typ: destination_type,
                 value: source,
             }),

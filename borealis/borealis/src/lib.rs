@@ -4,7 +4,8 @@ use {
     crate::{
         boom::{
             passes::{
-                cycle_finder::CycleFinder, fix_exceptions::FixExceptions,
+                cycle_finder::CycleFinder, destruct_structs::DestructStructs,
+                destruct_unions::DestructUnions, fix_exceptions::FixExceptions,
                 fold_unconditionals::FoldUnconditionals, monomorphize_vectors::MonomorphizeVectors,
                 remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
                 remove_undefined_bv::RemoveUndefinedBV, resolve_return_assigns::ResolveReturns,
@@ -105,15 +106,23 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Running passes on BOOM");
+    [
+        RemoveUndefinedBV::new_boxed(),
+        RemoveConstantType::new_boxed(),
+        DestructStructs::new_boxed(),
+        DestructUnions::new_boxed(),
+        ResolveReturns::new_boxed(),
+        FixExceptions::new_boxed(),
+    ]
+    .into_iter()
+    .for_each(|mut pass| {
+        pass.run(ast.clone());
+    });
     boom::passes::run_fixed_point(
         ast.clone(),
         &mut [
-            RemoveUndefinedBV::new_boxed(),
-            RemoveConstantType::new_boxed(),
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
-            ResolveReturns::new_boxed(),
-            FixExceptions::new_boxed(),
             // MonomorphizeVectors::new_boxed(),
             CycleFinder::new_boxed(),
         ],
@@ -173,7 +182,12 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 }
 
-const FN_ALLOWLIST: [&'static str; 2] = ["__DecodeA64_DataProcReg", "__DecodeA64"];
+const FN_ALLOWLIST: &[&'static str] = &[
+    "__DecodeA64_DataProcReg",
+    "__DecodeA64",
+    "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+    "DecodeShift",
+];
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {
     jib_ast.into_iter().map(|d| {

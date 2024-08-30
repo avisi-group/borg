@@ -68,22 +68,24 @@ impl Emitter for X86Emitter {
         use UnaryOperationKind::*;
 
         match &op {
-            Not(value) => match value.kind() {
-                NodeKind::Constant {
-                    value: constant_value,
-                    width,
-                } => Self::NodeRef::from(X86Node {
-                    typ: value.typ().clone(),
-                    kind: NodeKind::Constant {
-                        value: constant_value ^ ((1 << *width) - 1),        // only NOT the bits that are part of the size of the datatype
-                        width: *width,
-                    },
-                }),
-                _ => Self::NodeRef::from(X86Node {
-                    typ: value.typ().clone(),
-                    kind: NodeKind::UnaryOperation(op),
-                }),
-            },
+            Not(value) => {
+                match value.kind() {
+                    NodeKind::Constant {
+                        value: constant_value,
+                        width,
+                    } => Self::NodeRef::from(X86Node {
+                        typ: value.typ().clone(),
+                        kind: NodeKind::Constant {
+                            value: constant_value ^ ((1 << *width) - 1), /* only NOT the bits that are part of the size of the datatype */
+                            width: *width,
+                        },
+                    }),
+                    _ => Self::NodeRef::from(X86Node {
+                        typ: value.typ().clone(),
+                        kind: NodeKind::UnaryOperation(op),
+                    }),
+                }
+            }
             _ => {
                 todo!()
             }
@@ -138,8 +140,31 @@ impl Emitter for X86Emitter {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
-            _ => {
-                todo!()
+            CompareLessThan(left, right) => match (left.kind(), right.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: left_value, ..
+                    },
+                    NodeKind::Constant {
+                        value: right_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: left.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: if left_value < right_value { 1 } else { 0 },
+                        width: 1,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: Type {
+                        kind: TypeKind::Unsigned,
+                        width: 1,
+                    },
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            op => {
+                todo!("{op:?}")
             }
         }
     }
@@ -247,6 +272,24 @@ impl Emitter for X86Emitter {
                     length,
                 },
             }),
+        }
+    }
+
+    fn select(
+        &mut self,
+        condition: Self::NodeRef,
+        true_value: Self::NodeRef,
+        false_value: Self::NodeRef,
+    ) -> Self::NodeRef {
+        match condition.kind() {
+            NodeKind::Constant { value, .. } => {
+                if *value == 0 {
+                    false_value
+                } else {
+                    true_value
+                }
+            }
+            _ => todo!(),
         }
     }
 
@@ -381,7 +424,17 @@ impl X86NodeRef {
 
                     dst
                 }
-                _ => todo!(),
+                BinaryOperationKind::CompareLessThan(left, right) => {
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
+                    emitter.current_block.append(Instruction::cmp(left, right));
+
+                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    emitter.current_block.append(Instruction::setb(dst.clone()));
+
+                    dst
+                }
+                op => todo!("{op:?}"),
             },
             NodeKind::ReadVariable { symbol } => symbol
                 .0
@@ -391,9 +444,16 @@ impl X86NodeRef {
                 .clone()
                 .to_operand(emitter),
             NodeKind::UnaryOperation(kind) => match &kind {
-                _ => {
-                    todo!()
+                UnaryOperationKind::Not(value) => {
+                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let value = value.to_operand(emitter);
+                    emitter
+                        .current_block
+                        .append(Instruction::mov(value, dst.clone()));
+                    emitter.current_block.append(Instruction::not(dst.clone()));
+                    dst
                 }
+                kind => todo!("{kind:?}"),
             },
             NodeKind::BitExtract {
                 value: _value,

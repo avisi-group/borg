@@ -147,7 +147,7 @@ fn validate_constant_type(
                     "cannot use floating point type class for unsigned integer constant",
                 )),
             },
-            Type::Struct(_) | Type::Enum(_) => Some(ValidationMessage::stmt_warn(
+            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
                 &f,
                 &block,
                 &stmt,
@@ -170,6 +170,7 @@ fn validate_constant_type(
                 "cannot use AP integer for unsigned integer constant",
             )),
             Type::String | Type::Rational | Type::Any => todo!(),
+            Type::Union { width } => todo!(),
         },
         ConstantValue::SignedInteger(_) => match &*typ {
             Type::Primitive(p) => match p.tc {
@@ -199,7 +200,7 @@ fn validate_constant_type(
                     "cannot use floating point type class for signed integer constant",
                 )),
             },
-            Type::Struct(_) | Type::Enum(_) => Some(ValidationMessage::stmt_warn(
+            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
                 &f,
                 &block,
                 &stmt,
@@ -224,6 +225,7 @@ fn validate_constant_type(
                 None
             }
             Type::String | Type::Rational | Type::Any => todo!(),
+            Type::Union { width } => todo!(),
         },
         ConstantValue::FloatingPoint(_) => match &*typ {
             Type::Primitive(p) => match p.tc {
@@ -253,7 +255,7 @@ fn validate_constant_type(
                 )),
                 PrimitiveTypeClass::FloatingPoint => None,
             },
-            Type::Struct(_) | Type::Enum(_) => Some(ValidationMessage::stmt_warn(
+            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
                 &f,
                 &block,
                 &stmt,
@@ -278,6 +280,7 @@ fn validate_constant_type(
                 "cannot use AP integer for floating point constant",
             )),
             Type::String | Type::Rational | Type::Any => todo!(),
+            Type::Union { width } => todo!(),
         },
         ConstantValue::Unit => match &*typ {
             Type::Primitive(p) => match p.tc {
@@ -307,7 +310,7 @@ fn validate_constant_type(
                     "cannot use floating point type class for unit constant",
                 )),
             },
-            Type::Struct(_) | Type::Enum(_) => Some(ValidationMessage::stmt_warn(
+            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
                 &f,
                 &block,
                 &stmt,
@@ -332,6 +335,7 @@ fn validate_constant_type(
                 "cannot use AP integer for unit constant",
             )),
             Type::String | Type::Rational | Type::Any => todo!(),
+            Type::Union { width } => None,
         },
         ConstantValue::String(_) => {
             assert!(matches!(&*typ, Type::String));

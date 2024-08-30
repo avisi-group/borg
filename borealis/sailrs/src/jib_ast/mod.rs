@@ -261,6 +261,7 @@ impl Walkable for Expression {
 #[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
 pub enum Value {
     Id(Name, Type),
+    // enum member
     Member(Identifier, Type),
     Lit(Vl, Type),
     Tuple(#[omit_bounds] ListVec<Self>, Type),

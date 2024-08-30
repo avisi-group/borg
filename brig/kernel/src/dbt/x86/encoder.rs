@@ -17,6 +17,8 @@ pub enum Opcode {
     ADD(Operand, Operand),
     /// sub {0}, {1}
     SUB(Operand, Operand),
+    /// not {0}
+    NOT(Operand),
     /// jmp {0}
     JMP(Operand),
     /// ret
@@ -27,6 +29,8 @@ pub enum Opcode {
     CMP(Operand, Operand),
     /// sete {0}
     SETE(Operand),
+    /// setb {0}
+    SETB(Operand),
     /// jne {0}
     JNE(Operand),
     /// nop
@@ -475,8 +479,16 @@ impl Instruction {
         Self(Opcode::SETE(r))
     }
 
+    pub fn setb(r: Operand) -> Self {
+        Self(Opcode::SETB(r))
+    }
+
     pub fn jne(block: X86BlockRef) -> Self {
         Self(Opcode::JNE(Operand::target(block)))
+    }
+
+    pub fn not(r: Operand) -> Self {
+        Self(Opcode::NOT(r))
     }
 
     alu_op!(add, ADD);
@@ -772,7 +784,10 @@ impl Instruction {
             ]
             .into_iter(),
             Opcode::JNE(tgt) => [Some((OperandDirection::None, tgt)), None].into_iter(),
-            Opcode::SETE(r) => [Some((OperandDirection::Out, r)), None].into_iter(),
+            Opcode::SETE(r) | Opcode::SETB(r) => {
+                [Some((OperandDirection::Out, r)), None].into_iter()
+            }
+            Opcode::NOT(r) => [Some((OperandDirection::InOut, r)), None].into_iter(),
         }
     }
 

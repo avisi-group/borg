@@ -84,12 +84,7 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
             let hashed = format_ident!("Struct{:x}", hasher.finish());
             quote! { #hashed }
         }
-        Type::Enum(t) => {
-            let mut hasher = DefaultHasher::new();
-            t.hash(&mut hasher);
-            let hashed = format_ident!("Enum{:x}", hasher.finish());
-            quote! { #hashed }
-        }
+
         Type::Vector {
             element_count,
             element_type,
@@ -113,6 +108,10 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
         Type::String => quote!(&'static str),
         // maybe this should be `core::Any`?
         Type::Any => quote!(_),
+        Type::Union { width } => {
+            let num_bytes = width.div_ceil(8);
+            quote!([u8; #num_bytes])
+        }
     }
 }
 
@@ -180,46 +179,8 @@ fn codegen_types(rudder: &Context) -> TokenStream {
         })
         .collect();
 
-    let unions: TokenStream = rudder
-        .get_unions()
-        .into_iter()
-        .map(|typ| {
-            let ident = codegen_type(typ.clone());
-
-            let Type::Enum(fields) = &*typ else {
-                panic!("union must be sum type");
-            };
-
-            let variants: TokenStream = fields
-                .iter()
-                .map(|(name, typ)| {
-                    let name = codegen_ident(*name);
-                    let typ = codegen_type(typ.clone());
-                    quote!(#name(#typ),)
-                })
-                .collect();
-
-            let first_field = codegen_ident(fields.iter().next().unwrap().0);
-
-            quote! {
-                #[derive(Debug, Clone, Copy, PartialEq)]
-                pub enum #ident {
-                    #variants
-                }
-
-                impl Default for #ident {
-                    fn default() -> Self {
-                        Self::#first_field(Default::default())
-                    }
-                }
-            }
-        })
-        .collect();
-
     quote! {
         #structs
-
-        #unions
     }
 }
 
@@ -236,7 +197,6 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
             .collect::<TokenStream>();
 
         let state = codegen_state(rudder);
-        let types = codegen_types(rudder);
         let bits = include::get("bits.rs");
         let util = include::get("util.rs");
 
@@ -267,8 +227,6 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
             #funcs
 
             #state
-
-            #types
 
             #bits
 

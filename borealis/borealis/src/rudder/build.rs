@@ -1,10 +1,7 @@
 use {
     crate::util::smallest_width_of_value,
     crate::{
-        boom::{
-            self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature, NamedType,
-            NamedValue,
-        },
+        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature, NamedType},
         rudder::{
             self,
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
@@ -33,8 +30,6 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
 
     // DEFINITION ORDER DEPENDANT!!!
     ast.definitions.iter().for_each(|def| match def {
-        boom::Definition::Enum { name, variants } => build_ctx.add_enum(*name, variants),
-        boom::Definition::Union { name, fields } => build_ctx.add_union(*name, fields),
         boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
         boom::Definition::Let { bindings, body } => {
             assert_eq!(1, bindings.len());
@@ -161,9 +156,7 @@ struct BuildContext {
     /// Name of struct maps to the rudder type and a map of field names to field
     /// indices
     structs: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, usize>)>,
-    /// Name of union maps to the rudder type and a map of field names to field
-    /// indices
-    unions: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, usize>)>,
+
     /// Name of enum maps to the rudder type and a map of enum variants to the
     /// integer discriminant of that variant
     enums: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, u32>)>,
@@ -208,29 +201,6 @@ impl BuildContext {
 
         if self.structs.insert(name, (typ, fields)).is_some() {
             panic!("struct with name {name} already added");
-        }
-    }
-
-    fn add_union(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Arc::new(Type::Enum(
-            fields
-                .iter()
-                .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
-                .collect(),
-        ));
-
-        let union_fields = fields
-            .iter()
-            .enumerate()
-            .map(|(idx, boom::NamedType { name, .. })| (*name, idx))
-            .collect();
-
-        if self
-            .unions
-            .insert(name, (typ.clone(), union_fields))
-            .is_some()
-        {
-            panic!("union with name {name} already added");
         }
     }
 
@@ -286,8 +256,7 @@ impl BuildContext {
             boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
             boom::Type::Float => Arc::new(rudder::Type::f64()),
             boom::Type::Real => Arc::new(rudder::Type::Rational),
-            boom::Type::Enum { name, .. } => self.enums.get(name).unwrap().0.clone(),
-            boom::Type::Union { name, .. } => self.unions.get(name).unwrap().0.clone(),
+            boom::Type::Union { width } => Arc::new(rudder::Type::Union { width: *width }),
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
             boom::Type::List { .. } => todo!(),
             boom::Type::Vector { element_type } => {
@@ -313,16 +282,14 @@ impl BuildContext {
                     rudder::PrimitiveTypeClass::SignedInteger,
                     *size,
                 )),
-                boom::Size::Runtime(_) | boom::Size::Unknown => {
-                    Arc::new(rudder::Type::ArbitraryLengthInteger)
-                }
+                boom::Size::Unknown => Arc::new(rudder::Type::ArbitraryLengthInteger),
             },
             boom::Type::Bits { size } => match size {
                 boom::Size::Static(size) => Arc::new(rudder::Type::new_primitive(
                     rudder::PrimitiveTypeClass::UnsignedInteger,
                     *size,
                 )),
-                boom::Size::Runtime(_) | boom::Size::Unknown => Arc::new(rudder::Type::Bits),
+                boom::Size::Unknown => Arc::new(rudder::Type::Bits),
             },
             boom::Type::Constant(c) => {
                 // todo: this should be a panic, but because structs/unions can have constant type fields we do the following
@@ -342,7 +309,6 @@ impl BuildContext {
                 .map(|(name, (kind, f, _))| (name, (kind, f)))
                 .collect(),
             structs: self.structs.into_iter().map(|(_, (typ, _))| typ).collect(),
-            unions: self.unions.into_iter().map(|(_, (typ, _))| typ).collect(),
             // register names kept for debugging
             registers: self.registers,
         }
@@ -474,7 +440,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     fn build_statement(&mut self, statement: Shared<boom::Statement>) {
         match &*statement.get() {
-            boom::Statement::TypeDeclaration { name, typ } => {
+            boom::Statement::VariableDeclaration { name, typ } => {
                 let typ = self.ctx().resolve_type(typ.clone());
                 self.fn_ctx().rudder_fn.add_local_variable(*name, typ);
             }
@@ -529,8 +495,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         let fn_statement = {
             if let Some(statement) = self.build_specialized_function(*name, &args) {
-                statement
-            } else if let Some(statement) = self.build_union_constructor(*name, &args) {
                 statement
             } else {
                 let target = match self.ctx().functions.get(name).cloned() {
@@ -1455,25 +1419,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn build_union_constructor(
-        &mut self,
-        name: InternedString,
-        args: &[Statement],
-    ) -> Option<Statement> {
-        self.ctx()
-            .unions
-            .values()
-            .find(|(_, variants)| variants.contains_key(&name))
-            .map(|(typ, _)| typ)
-            .cloned()
-            .map(|typ| {
-                self.builder.build(StatementKind::CreateEnum {
-                    typ,
-                    variant: name,
-                    value: args[0].clone(),
-                })
-            })
-    }
+    // fn build_union_constructor(
+    //     &mut self,
+    //     name: InternedString,
+    //     args: &[Statement],
+    // ) -> Option<Statement> {
+    //     self.ctx()
+    //         .unions
+    //         .values()
+    //         .find(|(_, variants)| variants.contains_key(&name))
+    //         .map(|(typ, _)| typ)
+    //         .cloned()
+    //         .map(|typ| {
+    //             self.builder.build(StatementKind::CreateEnum {
+    //                 typ,
+    //                 variant: name,
+    //                 value: args[0].clone(),
+    //             })
+    //         })
+    // }
 
     /// Generates rudder for a writing a statement to a boom::Expression
     fn build_expression_write(&mut self, target: &boom::Expression, source: Statement) {
@@ -1482,73 +1446,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .split_first()
             .expect("expression should always at least contain the root");
 
+        assert!(fields.is_empty());
+
         match self.fn_ctx().rudder_fn.get_local_variable(*root) {
             Some(symbol) => {
-                let (indices, outer_type) =
-                    fields_to_indices(&self.ctx().structs, symbol.typ(), fields);
+                let (_, outer_type) = fields_to_indices(&self.ctx().structs, symbol.typ(), fields);
 
-                let cast = self.builder.generate_cast(source, outer_type);
-
-                let value = if !fields.is_empty() {
-                    // fields [foo, bar, baz]
-                    // var read
-                    // read foo of var
-                    // read bar of foo
-                    // read baz of bar
-                    // write cast to baz
-                    // modify field bar
-                    // modify field foo
-                    // var write
-
-                    let initial_read = self.builder.build(StatementKind::ReadVariable {
-                        symbol: symbol.clone(),
-                    });
-
-                    let mut stack = vec![initial_read];
-
-                    for field in fields[..indices.len() - 1].iter().copied() {
-                        let value = stack.last().unwrap().clone();
-
-                        // let Type::Product(fields) = &*value.typ() else {
-                        //     // todo: maybe vectors in future?
-                        //     panic!("cannot extract field of non-product");
-                        // };
-                        // assert!(field_index <= (fields.len() - 1));
-
-                        let ex = self
-                            .builder
-                            .build(StatementKind::ExtractField { value, field });
-                        stack.push(ex);
-                    }
-
-                    // stack [initial_read, ex1, ex4]
-                    assert_eq!(1 + (indices.len() - 1), stack.len());
-
-                    let mut last = cast;
-
-                    for field in fields[..indices.len()].iter().rev().copied() {
-                        let original_value = stack.pop().unwrap();
-
-                        // let Type::Product(fields) = &*original_value.typ() else {
-                        //     // todo: maybe vectors in future?
-                        //     panic!("cannot update field of non-product");
-                        // };
-                        // assert!(field_index <= (fields.len() - 1));
-
-                        last = self.builder.build(StatementKind::UpdateField {
-                            original_value,
-                            field,
-                            field_value: last,
-                        });
-                    }
-
-                    // leaving an empty stack
-                    assert_eq!(0, stack.len());
-
-                    last
-                } else {
-                    cast
-                };
+                let value = self.builder.generate_cast(source, outer_type);
 
                 self.builder
                     .build(StatementKind::WriteVariable { symbol, value });
@@ -1590,6 +1494,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn build_value(&mut self, boom_value: Shared<boom::Value>) -> Statement {
         let (base, outer_field_accesses) = value_field_collapse(boom_value.clone());
 
+        assert!(outer_field_accesses.is_empty());
+
         let borrow = base.get();
 
         match &*borrow {
@@ -1600,12 +1506,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let mut last = read_var;
 
-                    for field in outer_field_accesses {
-                        last = self
-                            .builder
-                            .build(StatementKind::ExtractField { value: last, field })
-                    }
-
                     return last;
                 }
 
@@ -1614,12 +1514,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let read_var = self.builder.build(StatementKind::ReadVariable { symbol });
 
                     let mut last = read_var;
-
-                    for field in outer_field_accesses {
-                        last = self
-                            .builder
-                            .build(StatementKind::ExtractField { value: last, field })
-                    }
 
                     return last;
                 }
@@ -1670,42 +1564,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.build_operation(op)
             }
             boom::Value::Struct { name, fields } => {
-                let (typ, field_name_index_map) = self.ctx().structs.get(name).cloned().unwrap();
-                let Type::Struct(field_types) = &*typ else {
-                    panic!();
-                };
-
-                let mut field_statements = vec![None; fields.len()];
-
-                for NamedValue { name, value } in fields {
-                    let field_statement = self.build_value(value.clone());
-                    let idx = *field_name_index_map.get(name).unwrap();
-
-                    let field_statement_cast = self
-                        .builder
-                        .generate_cast(field_statement, field_types[idx].1.clone());
-
-                    field_statements[idx] = Some(field_statement_cast);
-                }
-
-                let product = self.builder.build(StatementKind::CreateStruct {
-                    typ: typ.clone(),
-                    fields: field_statements.into_iter().map(|o| o.unwrap()).collect(),
-                });
-
-                if !outer_field_accesses.is_empty() {
-                    let mut last = product;
-
-                    for field in outer_field_accesses {
-                        last = self
-                            .builder
-                            .build(StatementKind::ExtractField { value: last, field })
-                    }
-
-                    last
-                } else {
-                    product
-                }
+                panic!("structs should have been removed in boom")
             }
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),
@@ -1714,84 +1573,57 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Value::CtorKind {
                 value, identifier, ..
             } => {
-                assert!(outer_field_accesses.is_empty());
+                // assert!(outer_field_accesses.is_empty());
 
-                let value = self.build_value(value.clone());
+                // let value = self.build_value(value.clone());
 
-                // get the rudder type
-                let typ = self
-                    .ctx()
-                    .unions
-                    .values()
-                    .find(|(_, variants)| variants.contains_key(identifier))
-                    .map(|(typ, _)| typ)
-                    .cloned()
-                    .unwrap();
+                // // get the rudder type
+                // let typ = self
+                //     .ctx()
+                //     .unions
+                //     .values()
+                //     .find(|(_, variants)| variants.contains_key(identifier))
+                //     .map(|(typ, _)| typ)
+                //     .cloned()
+                //     .unwrap();
 
-                assert_eq!(value.typ(), typ);
+                // assert_eq!(value.typ(), typ);
 
-                // todo: investigate this further
-                let matches = self.builder.build(StatementKind::MatchesEnum {
-                    value,
-                    variant: *identifier,
-                });
-                self.builder.build(StatementKind::UnaryOperation {
-                    kind: UnaryOperationKind::Not,
-                    value: matches,
-                })
+                // // todo: investigate this further
+                // let matches = self.builder.build(StatementKind::MatchesUnion {
+                //     value,
+                //     variant: *identifier,
+                // });
+                // self.builder.build(StatementKind::UnaryOperation {
+                //     kind: UnaryOperationKind::Not,
+                //     value: matches,
+                // })
+                todo!()
             }
             boom::Value::CtorUnwrap {
                 value, identifier, ..
             } => {
-                let value = self.build_value(value.clone());
+                // let value = self.build_value(value.clone());
 
-                // get the rudder type
-                let typ = self
-                    .ctx()
-                    .unions
-                    .values()
-                    .find(|(_, variants)| variants.contains_key(identifier))
-                    .map(|(typ, _)| typ)
-                    .cloned()
-                    .unwrap();
+                // // get the rudder type
+                // let typ = self
+                //     .ctx()
+                //     .unions
+                //     .values()
+                //     .find(|(_, variants)| variants.contains_key(identifier))
+                //     .map(|(typ, _)| typ)
+                //     .cloned()
+                //     .unwrap();
 
-                assert_eq!(value.typ(), typ);
+                // assert_eq!(value.typ(), typ);
 
-                let unwrap_sum = self.builder.build(StatementKind::UnwrapEnum {
-                    value,
-                    variant: *identifier,
-                });
+                // let unwrap_sum = self.builder.build(StatementKind::UnwrapUnion {
+                //     value,
+                //     variant: *identifier,
+                // });
 
-                if !outer_field_accesses.is_empty() {
-                    let mut last = unwrap_sum;
-
-                    for field in outer_field_accesses {
-                        last = self
-                            .builder
-                            .build(StatementKind::ExtractField { value: last, field })
-                    }
-
-                    last
-                } else {
-                    unwrap_sum
-                }
-            }
-            boom::Value::Member {
-                member_ident,
-                enum_ident,
-            } => {
-                let Some((_, variants)) = self.ctx().enums.get(enum_ident) else {
-                    panic!();
-                };
-
-                let value = *variants.get(member_ident).expect(&format!(
-                    "unknown variant {member_ident:?} of enum {enum_ident:?}"
-                ));
-
-                self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::u32()),
-                    value: rudder::ConstantValue::UnsignedInteger(value.try_into().unwrap()),
-                })
+                // unwrap_sum
+                todo!()
             }
         }
     }
@@ -1862,7 +1694,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let source_type = value.typ();
 
                 let kind = match *source_type {
-                    Type::Enum(_) | Type::Struct(_) | Type::Vector { .. } | Type::String => {
+                    Type::Struct(_) | Type::Vector { .. } | Type::String => {
                         panic!("cast on non-primitive type")
                     }
                     Type::Primitive(_) => {
@@ -1875,6 +1707,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Type::Bits | Type::ArbitraryLengthInteger | Type::Rational | Type::Any => {
                         todo!()
                     }
+                    Type::Union { width } => todo!(),
                 };
 
                 self.builder.build(StatementKind::Cast {

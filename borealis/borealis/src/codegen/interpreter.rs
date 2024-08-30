@@ -429,37 +429,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::CreateStruct { typ, fields } => {
-            let Type::Struct(field_types) = &*typ else {
-                panic!()
-            };
 
-            let fields = fields
-                .iter()
-                .enumerate()
-                .map(|(index, statement)| {
-                    let (name, typ) = &field_types[index];
-                    assert_eq!(*typ, statement.typ());
-                    let field_name = codegen_ident(*name);
-                    let value = get_ident(statement);
-                    quote!(#field_name: #value,)
-                })
-                .collect::<TokenStream>();
-
-            let typ = codegen_type(typ);
-            quote!(#typ { #fields })
-        }
-        StatementKind::CreateEnum {
-            typ,
-            variant,
-            value,
-        } => {
-            assert!(matches!(&*typ, Type::Enum(_)));
-            let typ = codegen_type(typ);
-            let variant = codegen_ident(variant);
-            let value = get_ident(&value);
-            quote!(#typ::#variant(#value))
-        }
         StatementKind::CreateBits { value, length } => {
             let value = get_ident(&value);
             let length = get_ident(&length);
@@ -507,61 +477,42 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::MatchesEnum { value, variant } => {
-            // matches!(value, Enum::Variant(_))
+        StatementKind::MatchesUnion { value, variant } => {
+            // // matches!(value, Enum::Variant(_))
 
-            let sum_type = value.typ();
+            // let sum_type = value.typ();
 
-            let Type::Enum(_) = &*sum_type else {
-                unreachable!();
-            };
+            // let Type::Enum(_) = &*sum_type else {
+            //     unreachable!();
+            // };
 
-            let ident = get_ident(&value);
-            let sum_type = codegen_type(sum_type);
-            let variant = codegen_ident(variant);
+            // let ident = get_ident(&value);
+            // let sum_type = codegen_type(sum_type);
+            // let variant = codegen_ident(variant);
 
-            quote! {
-                matches!(#ident, #sum_type::#variant(_))
-            }
+            // quote! {
+            //     matches!(#ident, #sum_type::#variant(_))
+            // }
+            todo!()
         }
-        StatementKind::UnwrapEnum { value, variant } => {
-            let sum_type = value.typ();
+        StatementKind::UnwrapUnion { value, variant } => {
+            // let sum_type = value.typ();
 
-            let Type::Enum(_) = &*sum_type else {
-                unreachable!();
-            };
+            // let Type::Enum(_) = &*sum_type else {
+            //     unreachable!();
+            // };
 
-            let ident = get_ident(&value);
-            let sum_type = codegen_type(sum_type);
-            let variant = codegen_ident(variant);
+            // let ident = get_ident(&value);
+            // let sum_type = codegen_type(sum_type);
+            // let variant = codegen_ident(variant);
 
-            quote! {
-                match #ident {
-                    #sum_type::#variant(inner) => inner,
-                    _ => panic!("unwrap sum failed"),
-                }
-            }
-        }
-        StatementKind::ExtractField { value, field } => {
-            let ident = get_ident(&value);
-            let field = codegen_ident(field);
-            quote!(#ident.#field)
-        }
-        StatementKind::UpdateField {
-            original_value,
-            field,
-            field_value,
-        } => {
-            let ident = get_ident(&original_value);
-            let value = get_ident(&field_value);
-            let field = codegen_ident(field);
-            quote! {
-                {
-                    let mut local = #ident;
-                    local.#field = #value;
-                    local
-                }
-            }
+            // quote! {
+            //     match #ident {
+            //         #sum_type::#variant(inner) => inner,
+            //         _ => panic!("unwrap sum failed"),
+            //     }
+            // }
+            todo!()
         }
         StatementKind::Undefined => quote!(Default::default()),
     };
