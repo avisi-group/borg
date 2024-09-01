@@ -389,13 +389,10 @@ impl Statement {
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
             StatementKind::UnaryOperation { value, .. } => value.typ(),
             StatementKind::ShiftOperation { value, .. } => value.typ(),
-            StatementKind::Call { target, tail, .. } => {
-                if !tail {
-                    target.return_type()
-                } else {
-                    Arc::new(Type::void())
-                }
-            }
+            StatementKind::Call { target, .. } => match target.return_types().as_slice() {
+                [t] => t.clone(),
+                ts => todo!("{ts:?}",),
+            },
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
             StatementKind::Jump { .. } => Arc::new(Type::void()),
             StatementKind::Branch { .. } => Arc::new(Type::void()),

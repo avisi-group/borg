@@ -107,11 +107,11 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     info!("Running passes on BOOM");
     [
+        ResolveReturns::new_boxed(),
         RemoveUndefinedBV::new_boxed(),
         RemoveConstantType::new_boxed(),
         DestructStructs::new_boxed(),
         DestructUnions::new_boxed(),
-        ResolveReturns::new_boxed(),
         FixExceptions::new_boxed(),
     ]
     .into_iter()
@@ -187,6 +187,7 @@ const FN_ALLOWLIST: &[&'static str] = &[
     "__DecodeA64",
     "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
     "DecodeShift",
+    //"execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
 ];
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

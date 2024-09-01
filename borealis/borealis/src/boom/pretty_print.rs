@@ -230,7 +230,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         FunctionSignature {
             name,
             parameters,
-            return_type,
+            return_types,
         }: &FunctionSignature,
     ) {
         self.prindent(format!("fn {}(", name));
@@ -245,8 +245,12 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             self.visit_parameter(param);
         }
 
-        write!(self.writer, ") -> ").unwrap();
-        self.visit_type(return_type.clone());
+        write!(self.writer, ") -> (").unwrap();
+        for return_type in return_types {
+            self.visit_type(return_type.clone());
+            write!(self.writer, ", ").unwrap();
+        }
+        write!(self.writer, ")").unwrap();
 
         writeln!(self.writer, " {{").unwrap();
     }

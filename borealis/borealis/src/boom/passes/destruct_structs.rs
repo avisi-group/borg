@@ -273,59 +273,58 @@ fn destruct_locals(fn_def: &FunctionDefinition, return_fields: Option<Vec<NamedT
                             .collect()
                     }
 
-                    // if we pass a struct into a function, instead pass a reference
-                    Statement::FunctionCall {
-                        expression,
-                        name,
-                        arguments,
-                    } => {
-                        let mut expression = expression.clone();
-                        let mut arguments = arguments.clone();
+                    // // if we pass a struct into a function, instead pass a reference
+                    // Statement::FunctionCall {
+                    //     expression,
+                    //     name,
+                    //     arguments,
+                    // } => {
+                    //     let mut expression = expression.clone();
+                    //     let mut arguments = arguments.clone();
 
-                        // if return expression is in `structs`, remove it and add *reference*
-                        // fields to arguments
-                        if let Some(Expression::Identifier(dest)) = expression {
-                            if let Some(fields) = structs.get(&dest) {
-                                expression = None;
+                    //     // if return expression is in `structs`, remove it and add *reference*
+                    //     // fields to arguments
+                    //     if let Some(Expression::Identifier(dest)) = expression {
+                    //         if let Some(fields) = structs.get(&dest) {
+                    //             expression = None;
 
-                                arguments = fields
-                                    .iter()
-                                    .map(|NamedType { name, .. }| destructed_ident(dest, *name))
-                                    .map(|name| Shared::new(Value::Identifier(name)))
-                                    .chain(arguments)
-                                    .collect::<Vec<_>>()
-                            }
-                        }
+                    //             arguments = fields
+                    //                 .iter()
+                    //                 .map(|NamedType { name, .. }| destructed_ident(dest, *name))
+                    //                 .map(|name| Shared::new(Value::Identifier(name)))
+                    //                 .chain(arguments)
+                    //                 .collect::<Vec<_>>()
+                    //         }
+                    //     }
 
-                        // if any arguments are in `structs`, replace with
-                        // mangled field names
-                        arguments = arguments
-                            .iter()
-                            .flat_map(|arg| {
-                                let Value::Identifier(ident) = &*arg.get() else {
-                                    return vec![arg.clone()];
-                                };
+                    //     // if any arguments are in `structs`, replace with
+                    //     // mangled field names
+                    //     arguments = arguments
+                    //         .iter()
+                    //         .flat_map(|arg| {
+                    //             let Value::Identifier(ident) = &*arg.get() else {
+                    //                 return vec![arg.clone()];
+                    //             };
 
-                                let Some(fields) = structs.get(ident) else {
-                                    return vec![arg.clone()];
-                                };
+                    //             let Some(fields) = structs.get(ident) else {
+                    //                 return vec![arg.clone()];
+                    //             };
 
-                                fields
-                                    .iter()
-                                    .map(|NamedType { name, .. }| destructed_ident(*ident, *name))
-                                    .map(|name| Shared::new(Value::Identifier(name)))
-                                    .collect()
-                            })
-                            .collect();
+                    //             fields
+                    //                 .iter()
+                    //                 .map(|NamedType { name, .. }| destructed_ident(*ident, *name))
+                    //                 .map(|name| Shared::new(Value::Identifier(name)))
+                    //                 .collect()
+                    //         })
+                    //         .collect();
 
-                        vec![Statement::FunctionCall {
-                            expression,
-                            name: *name,
-                            arguments,
-                        }
-                        .into()]
-                    }
-
+                    //     vec![Statement::FunctionCall {
+                    //         expression,
+                    //         name: *name,
+                    //         arguments,
+                    //     }
+                    //     .into()]
+                    // }
                     _ => vec![clone],
                 }
             })

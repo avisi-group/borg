@@ -18,7 +18,7 @@ use {
 };
 
 type Parameters = Vec<Shared<boom::Type>>;
-type Return = Shared<boom::Type>;
+type Return = Vec<Shared<boom::Type>>;
 
 /// Consumes JIB AST and produces BOOM
 #[derive(Debug, Default)]
@@ -116,12 +116,12 @@ impl BoomEmitter {
                     id.as_interned(),
                     (
                         parameters.iter().map(convert_type).collect(),
-                        convert_type(out),
+                        vec![convert_type(out)],
                     ),
                 );
             }
             jib_ast::DefinitionAux::Fundef(name, _, arguments, body) => {
-                let (parameter_types, return_type) =
+                let (parameter_types, return_types) =
                     self.function_types.remove(&name.as_interned()).unwrap();
 
                 let parameters = Shared::new(
@@ -151,7 +151,7 @@ impl BoomEmitter {
                         signature: FunctionSignature {
                             name,
                             parameters,
-                            return_type,
+                            return_types,
                         },
                         entry_block: control_flow,
                     },

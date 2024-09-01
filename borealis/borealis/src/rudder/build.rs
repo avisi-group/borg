@@ -66,7 +66,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                         signature: boom::FunctionSignature {
                             name,
                             parameters: Shared::new(vec![]),
-                            return_type: Shared::new(boom::Type::Unit),
+                            return_types: vec![Shared::new(boom::Type::Unit)],
                         },
                         entry_block,
                     },
@@ -83,7 +83,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                 signature: boom::FunctionSignature {
                     name: "borealis_register_init".into(),
                     parameters: Shared::new(vec![]),
-                    return_type: Shared::new(boom::Type::Unit),
+                    return_types: vec![Shared::new(boom::Type::Unit)],
                 },
                 entry_block: {
                     let b = ControlFlowBlock::new();
@@ -123,14 +123,14 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                     local_variables: HashMap::default(),
                     entry_block: Block::new(),
                 }),
-                return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
+                return_types: REPLICATE_BITS_BOREALIS_INTERNAL.return_types(),
                 parameters: REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
             },
             boom::FunctionDefinition {
                 signature: FunctionSignature {
                     name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                     parameters: Shared::new(vec![]),
-                    return_type: Shared::new(boom::Type::Unit),
+                    return_types: vec![Shared::new(boom::Type::Unit)],
                 },
                 entry_block: ControlFlowBlock::new(),
             },
@@ -225,7 +225,12 @@ impl BuildContext {
                 FunctionKind::Execute,
                 rudder::Function::new(
                     name,
-                    self.resolve_type(definition.signature.return_type.clone()),
+                    definition
+                        .signature
+                        .return_types
+                        .iter()
+                        .map(|t| self.resolve_type(t.clone()))
+                        .collect(),
                     definition.signature.parameters.get().iter().map(
                         |boom::Parameter { typ, name, is_ref }| {
                             assert!(!is_ref, "no reference parameters allowed");

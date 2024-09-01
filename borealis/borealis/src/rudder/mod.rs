@@ -461,7 +461,7 @@ impl Iterator for BlockIterator {
 pub struct Function {
     inner: Shared<FunctionInner>,
     // return type and parameters are read only, so do not need to exist behind a `Shared`
-    return_type: Arc<Type>,
+    return_types: Vec<Arc<Type>>,
     parameters: Vec<Symbol>,
 }
 
@@ -487,7 +487,7 @@ pub struct FunctionInner {
 impl Function {
     pub fn new<I: Iterator<Item = (InternedString, Arc<Type>)>>(
         name: InternedString,
-        return_type: Arc<Type>,
+        return_types: Vec<Arc<Type>>,
         parameters: I,
     ) -> Self {
         let mut celf = Self {
@@ -497,7 +497,7 @@ impl Function {
                 local_variables: HashMap::default(),
                 entry_block: Block::new(),
             }),
-            return_type: return_type.clone(),
+            return_types,
             parameters: parameters
                 .map(|(name, typ)| Symbol {
                     name,
@@ -507,11 +507,11 @@ impl Function {
                 .collect(),
         };
 
-        if return_type.is_void() {
-            panic!("functions must have a return type (unit not void)");
-        }
+        // if return_types.is_void() {
+        //     panic!("functions must have a return type (unit not void)");
+        // }
 
-        celf.add_local_variable("return_value".into(), return_type);
+        // celf.add_local_variable("return_value".into(), return_type);
 
         celf
     }
@@ -524,8 +524,8 @@ impl Function {
         0 //self.inner.borrow().entry_block().iter().
     }
 
-    pub fn signature(&self) -> (Arc<Type>, Vec<Symbol>) {
-        (self.return_type.clone(), self.parameters.clone())
+    pub fn signature(&self) -> (Vec<Arc<Type>>, Vec<Symbol>) {
+        (self.return_types.clone(), self.parameters.clone())
     }
 
     pub fn update_indices(&self) {
@@ -569,8 +569,8 @@ impl Function {
             .cloned()
     }
 
-    pub fn return_type(&self) -> Arc<Type> {
-        self.return_type.clone()
+    pub fn return_types(&self) -> Vec<Arc<Type>> {
+        self.return_types.clone()
     }
 
     pub fn parameters(&self) -> Vec<Symbol> {

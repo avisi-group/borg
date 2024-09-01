@@ -15,18 +15,12 @@ use {
 };
 
 /// Resolves assignments to `return` variables.
-pub struct ResolveReturns {
-    did_change: bool,
-    return_type: Option<Shared<Type>>,
-}
+pub struct ResolveReturns {}
 
 impl ResolveReturns {
     /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
-        Box::new(Self {
-            did_change: false,
-            return_type: None,
-        })
+        Box::new(Self {})
     }
 }
 
@@ -35,123 +29,51 @@ impl Pass for ResolveReturns {
         "ResolveReturns"
     }
 
-    fn reset(&mut self) {
-        self.did_change = false;
-        self.return_type = None;
-    }
-
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        ast.get()
-            .functions
-            .values()
-            .map(|def| {
-                self.reset();
+        ast.get().functions.values().for_each(|def| {
+            // run before struct/union splitting so should only have one return type
+            assert_eq!(1, def.signature.return_types.len());
 
-                // get return type of function:
-                // if void, there should be no return assigments
-                self.return_type = if let Type::Unit = &*def.signature.return_type.get() {
-                    None
-                } else {
-                    Some(def.signature.return_type.clone())
-                };
-
-                // if not void, create a new local variable called "return_value", and replace
-                // all assignments to "return" to "return_value" then return
-                // "return_value";
-                if let Some(typ) = &self.return_type {
-                    let mut statements = def.entry_block.statements();
-
-                    let return_value_exists = statements.iter().any(|statement| {
-                        if let Statement::VariableDeclaration { name, .. } = &*statement.get() {
-                            if name.as_ref() == "return_value" {
-                                return true;
-                            }
-                        }
-
-                        false
-                    });
-
-                    if !return_value_exists {
-                        statements.insert(
-                            0,
-                            Statement::VariableDeclaration {
-                                name: "return_value".into(),
-                                typ: typ.clone(),
-                            }
-                            .into(),
-                        );
+            {
+                let mut statements = def.entry_block.statements();
+                statements.insert(
+                    0,
+                    Statement::VariableDeclaration {
+                        name: "return_value".into(),
+                        typ: def.signature.return_types[0].clone(),
                     }
-
-                    def.entry_block.set_statements(statements);
-                }
-
-                // visit every block: if not void, replace returns with return return_value
-                // visit every statement: if not void, replace assignments to return with
-                // return_value, if void, no such assignments should exist
-                self.visit_function_definition(def);
-
-                self.did_change
-            })
-            .any()
-    }
-}
-
-impl Visitor for ResolveReturns {
-    // visit every block: if not void, replace returns with return return_value
-    fn visit_control_flow_block(&mut self, block: &ControlFlowBlock) {
-        // only modify returns if the block terminates with a return
-        match block.terminator() {
-            Terminator::Return(None) => {
-                if self.return_type.is_some() {
-                    block.set_terminator(Terminator::Return(Some(Value::Identifier(
-                        "return_value".into(),
-                    ))));
-                    self.did_change = true;
-                }
+                    .into(),
+                );
+                def.entry_block.set_statements(statements);
             }
-            Terminator::Return(Some(Value::Identifier(ident))) => {
-                match self.return_type {
-                    Some(_) => {
-                        if ident.as_ref() != "return_value" {
-                            panic!("return type of function is not void but return value is {ident:?} not \"return_value\"");
+
+            def.entry_block
+                .iter()
+                .flat_map(|b| b.statements())
+                .for_each(|s| {
+                    if let Statement::Copy {
+                        ref mut expression, ..
+                    }
+                    | Statement::FunctionCall {
+                        expression: Some(ref mut expression),
+                        ..
+                    } = &mut *s.get_mut()
+                    {
+                        let Expression::Identifier(ident) = expression else {
+                            return;
+                        };
+
+                        if ident.as_ref() == "return" {
+                            *expression = Expression::Identifier("return_value".into());
                         }
                     }
-                    None => {
-                        panic!("return type of function is void but return value is {ident:?} not None");
-                    }
-                }
-            }
-            Terminator::Return(Some(_)) => {
-                panic!("return already set to non-identifier, should never occur");
-            }
-            // do nothing
-            Terminator::Conditional { .. }
-            | Terminator::Unconditional { .. }
-            | Terminator::Panic(_) => (),
-        }
+                });
+        });
 
-        block.walk(self);
+        false
     }
 
-    fn visit_statement(&mut self, node: Shared<Statement>) {
-        match *node.get_mut() {
-            Statement::Copy {
-                ref mut expression, ..
-            }
-            | Statement::FunctionCall {
-                expression: Some(ref mut expression),
-                ..
-            } => {
-                let Expression::Identifier(ident) = expression else {
-                    return;
-                };
-
-                if ident.as_ref() == "return" {
-                    *expression = Expression::Identifier("return_value".into());
-                    self.did_change = true;
-                }
-            }
-            _ => (),
-        }
+    fn reset(&mut self) {
+        todo!()
     }
 }
