@@ -5,13 +5,13 @@ edition = "2021"
 authors = ["AVISI Research Group"]
 
 [dependencies]
-ocaml = { version = "1.0.0-beta.5", features = ["no-panic-hook"] }
+ocaml = { version = "1.0.1", features = ["no-panic-hook"] }
 deepsize = "0.2.0"
 lasso2 = { version = "0.8.2", features = ["multi-threaded", "deepsize", "serialize"] }
 once_cell = "1.19.0"
-serde = { version = "1.0.208", features = ["derive"] }
+serde = { version = "1.0.209", features = ["derive"] }
 twox-hash = "1.6.3"
-quote = "1.0.36"
+quote = "1.0.37"
 proc-macro2 = "1.0.86"
 errctx = "1.0.0"
 color-eyre = "0.6.3"
