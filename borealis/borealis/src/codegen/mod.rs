@@ -31,7 +31,7 @@ use {
 };
 
 pub mod dynamic;
-pub mod interpreter;
+//pub mod interpreter;
 pub mod state;
 pub mod workspace;
 

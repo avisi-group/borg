@@ -154,7 +154,7 @@ impl Walkable for Parameter {
 pub struct FunctionSignature {
     pub name: InternedString,
     pub parameters: Shared<Vec<Parameter>>,
-    pub return_types: Vec<Shared<Type>>,
+    pub return_type: Shared<Type>,
 }
 
 impl Walkable for FunctionSignature {
@@ -163,9 +163,10 @@ impl Walkable for FunctionSignature {
             .get()
             .iter()
             .for_each(|Parameter { typ, .. }| visitor.visit_type(typ.clone()));
-        self.return_types
-            .iter()
-            .for_each(|typ| visitor.visit_type(typ.clone()));
+        // self.return_types
+        //     .iter()
+        //     .for_each(|typ| visitor.visit_type(typ.clone()));
+        visitor.visit_type(self.return_type.clone());
     }
 }
 
@@ -227,6 +228,8 @@ pub enum Type {
         fields: Vec<NamedType>,
     },
 
+    Tuple(Vec<Shared<Self>>),
+
     List {
         element_type: Shared<Self>,
     },
@@ -286,6 +289,8 @@ impl Walkable for Shared<Type> {
             | Vector { element_type }
             | FixedVector { element_type, .. }
             | Reference(element_type) => visitor.visit_type(element_type.clone()),
+
+            Tuple(ts) => ts.iter().for_each(|t| visitor.visit_type(t.clone())),
         }
     }
 }
@@ -332,7 +337,7 @@ pub enum Statement {
         value: Shared<Value>,
     },
     FunctionCall {
-        expression: Option<Expression>,
+        expression: Option<Expression>, // expressions to write return value(s) to
         name: InternedString,
         arguments: Vec<Shared<Value>>,
     },
@@ -371,11 +376,11 @@ impl Walkable for Statement {
             }
 
             Self::FunctionCall {
-                expression,
+                expression: expressions,
                 arguments,
                 ..
             } => {
-                if let Some(expression) = expression {
+                if let Some(expression) = expressions {
                     visitor.visit_expression(expression);
                 }
                 arguments
@@ -417,6 +422,7 @@ pub enum Expression {
         field: InternedString,
     },
     Address(Box<Self>),
+    Tuple(Vec<Self>),
 }
 
 impl Walkable for Expression {
@@ -426,6 +432,7 @@ impl Walkable for Expression {
             Self::Field { expression, .. } | Self::Address(expression) => {
                 visitor.visit_expression(expression)
             }
+            Self::Tuple(exprs) => exprs.iter().for_each(|e| visitor.visit_expression(e)),
         }
     }
 }

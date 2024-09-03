@@ -8,7 +8,7 @@ use {
                 destruct_unions::DestructUnions, fix_exceptions::FixExceptions,
                 fold_unconditionals::FoldUnconditionals, monomorphize_vectors::MonomorphizeVectors,
                 remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-                remove_undefined_bv::RemoveUndefinedBV, resolve_return_assigns::ResolveReturns,
+                remove_undefined_bv::RemoveUndefinedBV,
             },
             Ast,
         },
@@ -107,7 +107,6 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     info!("Running passes on BOOM");
     [
-        ResolveReturns::new_boxed(),
         RemoveUndefinedBV::new_boxed(),
         RemoveConstantType::new_boxed(),
         DestructStructs::new_boxed(),
@@ -187,7 +186,7 @@ const FN_ALLOWLIST: &[&'static str] = &[
     "__DecodeA64",
     "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
     "DecodeShift",
-    //"execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+    "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
 ];
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

@@ -220,6 +220,11 @@ pub enum StatementKind {
         value: Statement,
         variant: InternedString,
     },
+
+    TupleAccess {
+        index: usize,
+        source: Statement,
+    },
 }
 
 impl StatementKind {
@@ -296,6 +301,8 @@ impl StatementKind {
             StatementKind::SizeOf { value }
             | StatementKind::MatchesUnion { value, .. }
             | StatementKind::UnwrapUnion { value, .. } => vec![value.clone()],
+
+            StatementKind::TupleAccess { source, .. } => vec![source.clone()],
         }
     }
 }
@@ -391,7 +398,7 @@ impl Statement {
             StatementKind::ShiftOperation { value, .. } => value.typ(),
             StatementKind::Call { target, .. } => match target.return_types().as_slice() {
                 [t] => t.clone(),
-                ts => todo!("{ts:?}",),
+                ts => Arc::new(Type::Any),
             },
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
             StatementKind::Jump { .. } => Arc::new(Type::void()),
@@ -443,6 +450,14 @@ impl Statement {
             }
 
             StatementKind::Undefined => Arc::new(Type::Any),
+            StatementKind::TupleAccess { index, source } => {
+                // let Type::Tuple(ts) = source.typ() else {
+                //     panic!();
+                // };
+
+                // ts[index]
+                Arc::new(Type::Any) // todo fix this bad hack
+            }
         }
     }
 
@@ -837,6 +852,15 @@ impl StatementInner {
             StatementKind::Jump { .. } => todo!(),
             StatementKind::PhiNode { .. } => todo!(),
             StatementKind::Undefined => todo!(),
+            StatementKind::TupleAccess { index, source } => {
+                let source = if source == use_of {
+                    with.clone()
+                } else {
+                    source.clone()
+                };
+
+                self.kind = StatementKind::TupleAccess { index, source };
+            }
         }
     }
 }

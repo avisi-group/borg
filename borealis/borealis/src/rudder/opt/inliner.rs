@@ -201,6 +201,12 @@ fn clone_statement(
         }
 
         StatementKind::Undefined => builder.build(StatementKind::Undefined),
+        StatementKind::TupleAccess { index, source } =>  {
+            builder.build(StatementKind::TupleAccess {
+                source: mapping.get(&source).unwrap().clone(),
+                index,
+            })
+        },
     }
 }
 

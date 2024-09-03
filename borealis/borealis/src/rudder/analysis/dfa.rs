@@ -238,6 +238,7 @@ impl StatementUseAnalysis {
                 | StatementKind::PhiNode { .. }
                 | StatementKind::Constant { .. }
                 | StatementKind::Undefined => {}
+                StatementKind::TupleAccess { source, .. } => self.add_use(&source, &stmt),
             }
         }
     }

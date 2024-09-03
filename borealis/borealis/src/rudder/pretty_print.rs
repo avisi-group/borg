@@ -287,6 +287,9 @@ impl Display for StatementKind {
             StatementKind::UnwrapUnion { value, variant } => {
                 write!(f, "unwrap-union {} {variant}", value.name())
             }
+            StatementKind::TupleAccess { index, source } => {
+                write!(f, "tuple-access {}.{index}", source.name())
+            }
         }
     }
 }

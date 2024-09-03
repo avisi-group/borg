@@ -230,7 +230,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         FunctionSignature {
             name,
             parameters,
-            return_types,
+            return_type,
         }: &FunctionSignature,
     ) {
         self.prindent(format!("fn {}(", name));
@@ -245,12 +245,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             self.visit_parameter(param);
         }
 
-        write!(self.writer, ") -> (").unwrap();
-        for return_type in return_types {
-            self.visit_type(return_type.clone());
-            write!(self.writer, ", ").unwrap();
-        }
-        write!(self.writer, ")").unwrap();
+        write!(self.writer, ") -> ").unwrap();
+        self.visit_type(return_type.clone());
 
         writeln!(self.writer, " {{").unwrap();
     }
@@ -389,6 +385,14 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_type(typ.clone());
                 Ok(())
             }
+            Type::Tuple(ts) => {
+                write!(self.writer, "(").unwrap();
+                ts.iter().for_each(|t| {
+                    self.visit_type(t.clone());
+                    write!(self.writer, ", ").unwrap();
+                });
+                write!(self.writer, ")")
+            }
         }
         .unwrap()
     }
@@ -483,6 +487,14 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Expression::Address(expression) => {
                 write!(self.writer, "&").unwrap();
                 self.visit_expression(expression);
+            }
+            Expression::Tuple(exprs) => {
+                write!(self.writer, "(").unwrap();
+                exprs.iter().for_each(|e| {
+                    self.visit_expression(e);
+                    write!(self.writer, ", ").unwrap();
+                });
+                write!(self.writer, ")").unwrap();
             }
         }
     }

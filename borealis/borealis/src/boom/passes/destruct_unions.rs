@@ -66,12 +66,16 @@ fn handle_registers(ast: Shared<Ast>) {
         let body = body.statements();
 
         let Statement::FunctionCall {
-            expression: Some(Expression::Identifier(target)),
+            expression: Some(expression),
             name: function_name,
             arguments,
         } = &*body[0].get()
         else {
             panic!()
+        };
+
+        let Expression::Identifier(target) = expression else {
+            panic!();
         };
 
         assert_eq!(*target, register_name);
@@ -180,24 +184,22 @@ fn destruct_locals(
                         arguments,
                     } => {
                         if let Some(Expression::Identifier(ident)) = expression {
-                            if union_local_idents.contains(ident) {
-                                let tag = *union_tags.get(name).expect("function call into a union that isnt a constructor, implement tuple return types?");
+                                if union_local_idents.contains(ident) {
+                                    let tag = *union_tags.get(name).expect("function call into a union that isnt a constructor, implement tuple return types?");
 
-                                assert_eq!(1, arguments.len());
+                                    assert_eq!(1, arguments.len());
 
-                                vec![
-                                    Shared::new(Statement::Copy { expression: Expression::Identifier(tag_ident(*ident)), value: Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(tag.into())))) }),
-                                    Shared::new(Statement::Copy { expression: Expression::Identifier(value_ident(*ident)), value: arguments[0].clone() })
-                                ]
-
-                            } else {
-                                vec![clone]
-                            }
+                                    vec![
+                                        Shared::new(Statement::Copy { expression: Expression::Identifier(tag_ident(*ident)), value: Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(tag.into())))) }),
+                                        Shared::new(Statement::Copy { expression: Expression::Identifier(value_ident(*ident)), value: arguments[0].clone() })
+                                    ]
+                                } else {
+                                    vec![clone]
+                                }
                         } else {
                             vec![clone]
                         }
                     }
-
                     _ => vec![clone],
                 }
             })

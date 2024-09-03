@@ -66,7 +66,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                         signature: boom::FunctionSignature {
                             name,
                             parameters: Shared::new(vec![]),
-                            return_types: vec![Shared::new(boom::Type::Unit)],
+                            return_type: Shared::new(boom::Type::Unit),
                         },
                         entry_block,
                     },
@@ -83,7 +83,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                 signature: boom::FunctionSignature {
                     name: "borealis_register_init".into(),
                     parameters: Shared::new(vec![]),
-                    return_types: vec![Shared::new(boom::Type::Unit)],
+                    return_type: Shared::new(boom::Type::Unit),
                 },
                 entry_block: {
                     let b = ControlFlowBlock::new();
@@ -130,7 +130,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                 signature: FunctionSignature {
                     name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                     parameters: Shared::new(vec![]),
-                    return_types: vec![Shared::new(boom::Type::Unit)],
+                    return_type: Shared::new(boom::Type::Unit),
                 },
                 entry_block: ControlFlowBlock::new(),
             },
@@ -219,18 +219,19 @@ impl BuildContext {
     }
 
     fn add_function(&mut self, name: InternedString, definition: &boom::FunctionDefinition) {
+        // handle return tuple types
+        let ret = match &*definition.signature.return_type.get() {
+            boom::Type::Tuple(ts) => ts.iter().map(|t| self.resolve_type(t.clone())).collect(),
+            _ => vec![self.resolve_type(definition.signature.return_type.clone())],
+        };
+
         self.functions.insert(
             name,
             (
                 FunctionKind::Execute,
                 rudder::Function::new(
                     name,
-                    definition
-                        .signature
-                        .return_types
-                        .iter()
-                        .map(|t| self.resolve_type(t.clone()))
-                        .collect(),
+                    ret,
                     definition.signature.parameters.get().iter().map(
                         |boom::Parameter { typ, name, is_ref }| {
                             assert!(!is_ref, "no reference parameters allowed");
@@ -303,6 +304,7 @@ impl BuildContext {
                     smallest_width_of_value(*c).into(),
                 ))
             }
+            boom::Type::Tuple(_) => panic!(), // tuple only used as return type, shouldn't need resolving?
         }
     }
 
@@ -530,7 +532,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         };
 
         if let Some(expression) = expression {
-            self.build_expression_write(expression, fn_statement);
+            match expression {
+                boom::Expression::Tuple(exprs) => {
+                    exprs.iter().enumerate().for_each(|(index, expression)| {
+                        let tuple_field = self.builder.build(StatementKind::TupleAccess {
+                            index,
+                            source: fn_statement.clone(),
+                        });
+                        self.build_expression_write(expression, tuple_field);
+                    })
+                }
+                _ => self.build_expression_write(expression, fn_statement),
+            }
         }
     }
 
@@ -1451,7 +1464,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .split_first()
             .expect("expression should always at least contain the root");
 
-        assert!(fields.is_empty());
+        if !fields.is_empty() {
+            panic!("{root} {fields:?}");
+        }
 
         match self.fn_ctx().rudder_fn.get_local_variable(*root) {
             Some(symbol) => {
@@ -1911,6 +1926,7 @@ fn expression_field_collapse(expression: &boom::Expression) -> Vec<InternedStrin
                 current_expression = expression;
             }
             boom::Expression::Address(_) => panic!("addresses not supported"),
+            boom::Expression::Tuple(_) => todo!(),
         }
     }
 }

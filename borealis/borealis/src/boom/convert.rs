@@ -18,7 +18,7 @@ use {
 };
 
 type Parameters = Vec<Shared<boom::Type>>;
-type Return = Vec<Shared<boom::Type>>;
+type Return = Shared<boom::Type>;
 
 /// Consumes JIB AST and produces BOOM
 #[derive(Debug, Default)]
@@ -116,12 +116,12 @@ impl BoomEmitter {
                     id.as_interned(),
                     (
                         parameters.iter().map(convert_type).collect(),
-                        vec![convert_type(out)],
+                        convert_type(out),
                     ),
                 );
             }
             jib_ast::DefinitionAux::Fundef(name, _, arguments, body) => {
-                let (parameter_types, return_types) =
+                let (parameter_types, return_type) =
                     self.function_types.remove(&name.as_interned()).unwrap();
 
                 let parameters = Shared::new(
@@ -139,7 +139,15 @@ impl BoomEmitter {
 
                 let name = name.as_interned();
 
-                let body = convert_body(body.as_ref());
+                let mut body = convert_body(body.as_ref());
+
+                body.insert(
+                    0,
+                    Shared::new(boom::Statement::VariableDeclaration {
+                        name: "return".into(),
+                        typ: return_type.clone(),
+                    }),
+                );
 
                 //debug!("building new control flow graph for {name}");
                 // do not allow unknown terminators for regular functions
@@ -151,7 +159,7 @@ impl BoomEmitter {
                         signature: FunctionSignature {
                             name,
                             parameters,
-                            return_types,
+                            return_type,
                         },
                         entry_block: control_flow,
                     },

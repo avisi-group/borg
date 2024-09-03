@@ -18,13 +18,22 @@ use {
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
-    std::sync::Arc,
+    std::{iter::repeat, sync::Arc},
     syn::Ident,
 };
 
 pub fn codegen_function(function: &Function) -> TokenStream {
     let name_ident = codegen_ident(function.name());
-    let (return_type, parameters) = function.signature();
+    let (return_types, parameters) = function.signature();
+
+    let ret = match return_types.len() {
+        0 => quote!(()),
+        1 => quote!(X86NodeRef),
+        n => {
+            let elements = repeat(quote!(X86NodeRef,)).take(n).collect::<TokenStream>();
+            quote!((#elements))
+        }
+    };
 
     let function_parameters = codegen_parameters(&parameters);
 
@@ -125,7 +134,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 
     quote! {
         #[inline(never)] // disabling increases compile time, perf impact not measured
-        pub fn #name_ident(#function_parameters) -> X86NodeRef {
+        pub fn #name_ident(#function_parameters) -> #ret {
             #body
         }
     }
@@ -710,6 +719,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
 
         StatementKind::Undefined => quote!(Default::default()),
+        StatementKind::TupleAccess { index, source } => {
+            let ident = get_ident(&source);
+            let index = Literal::usize_unsuffixed(index);
+            quote!(#ident.#index)
+        }
     };
 
     let msg = format!(" {stmt}");
