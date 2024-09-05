@@ -40,6 +40,7 @@ fn main() -> Result<()> {
     let jib = load_model(&args.input);
 
     let mode = if let Some(ir_path) = args.dump_ir {
+        std::fs::remove_dir_all(&ir_path).ok();
         if args.ir_only {
             GenerationMode::IrOnly(ir_path)
         } else {

@@ -1,7 +1,7 @@
 use {
     crate::{
         boom::{passes::Pass, Ast, Definition, Size, Statement, Type},
-        util::smallest_width_of_value,
+        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
     },
     common::shared::Shared,
 };
@@ -51,9 +51,7 @@ impl Pass for RemoveConstantType {
                                     name: *name,
                                     typ: Shared::new(Type::Integer {
                                         size: Size::Static(
-                                            smallest_width_of_value(v.try_into().unwrap())
-                                                .try_into()
-                                                .unwrap(),
+                                            signed_smallest_width_of_value(v).try_into().unwrap(),
                                         ),
                                     }),
                                 }),

@@ -381,7 +381,7 @@ fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedStrin
                              name: field_name,
                              typ,
                          }| Parameter {
-                            name: destructed_ident(*struct_name, *field_name),
+                            name: destructed_ident(parameter.name, *field_name),
                             typ: typ.clone(),
                             is_ref: false,
                         },

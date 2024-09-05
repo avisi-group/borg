@@ -13,6 +13,7 @@ use {
         fmt::{Debug, LowerHex},
         panic,
     },
+    proc_macro_lib::ktest,
 };
 
 pub struct X86Emitter {
@@ -45,12 +46,10 @@ impl Emitter for X86Emitter {
     }
 
     fn constant(&mut self, value: u64, typ: Type) -> Self::NodeRef {
+        let width = typ.width;
         Self::NodeRef::from(X86Node {
             typ,
-            kind: NodeKind::Constant {
-                value,
-                width: typ.width,
-            },
+            kind: NodeKind::Constant { value, width },
         })
     }
 
@@ -129,6 +128,29 @@ impl Emitter for X86Emitter {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: if lhs_value == rhs_value { 1 } else { 0 },
+                        width: 1,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: Type {
+                        kind: TypeKind::Unsigned,
+                        width: 1,
+                    },
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            CompareNotEqual(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value, ..
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: if lhs_value != rhs_value { 1 } else { 0 },
                         width: 1,
                     },
                 }),
@@ -241,21 +263,7 @@ impl Emitter for X86Emitter {
                         }
                     }
                     CastOperationKind::SignExtend => {
-                        let signed_value = (*constant_value) as i64;
-
-                        let shifted_left = if original_width != 0 {
-                            signed_value.checked_shl((64 - original_width).into()).unwrap_or_else(|| panic!("failed to shift left {constant_value} by 64 - {original_width}"))
-                        } else {
-                            signed_value
-                        };
-
-                        shifted_left
-                            .checked_shr((64 - target_width).into())
-                            .unwrap_or_else(|| {
-                                panic!(
-                                    "failed to shift right {constant_value} by 64 - {target_width}"
-                                )
-                            }) as u64
+                        sign_extend(*constant_value, original_width, target_width)
                     }
                     CastOperationKind::Truncate => {
                         // truncating to the target width - just clear all irrelevant bits
@@ -457,9 +465,46 @@ impl Emitter for X86Emitter {
     fn assert(&mut self, condition: Self::NodeRef) {
         match condition.kind() {
             NodeKind::Constant { value, .. } => assert!(*value != 0),
-            _ => todo!(),
+            _ => {
+                // current todo: NOP
+                // future todo: emit INTO
+            }
         }
     }
+
+    fn mutate_element(
+        &mut self,
+        vector: Self::NodeRef,
+        index: Self::NodeRef,
+        value: Self::NodeRef,
+    ) -> Self::NodeRef {
+        todo!()
+    }
+}
+
+fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {
+    const CONTAINER_WIDTH: u32 = u64::BITS;
+
+    let original_width = u32::from(original_width);
+
+    let signed_value = value as i64;
+
+    let shifted_left = signed_value
+        .checked_shl(CONTAINER_WIDTH - original_width)
+        .unwrap_or_else(|| panic!("failed to shift left {value} by 64 - {original_width}"));
+
+    let shifted_right = shifted_left
+        .checked_shr(CONTAINER_WIDTH - original_width)
+        .unwrap_or_else(|| panic!("failed to shift right {value} by 64 - {target_width}"));
+
+    let masked = shifted_right as u64 & ones(target_width.into());
+
+    masked
+}
+
+#[ktest]
+fn signextend_64() {
+    assert_eq!(64, sign_extend(64, 8, 64));
 }
 
 #[derive(Debug, Clone)]

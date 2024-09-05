@@ -10,8 +10,8 @@ use {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConstantValue {
-    UnsignedInteger(usize),
-    SignedInteger(isize),
+    UnsignedInteger(u64),
+    SignedInteger(i64),
     FloatingPoint(f64),
     Rational(Ratio<i128>),
     String(InternedString),
@@ -97,10 +97,10 @@ impl Add for ConstantValue {
                 ConstantValue::UnsignedInteger(l + r)
             }
             (ConstantValue::SignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
-                ConstantValue::SignedInteger(l + r as isize)
+                ConstantValue::SignedInteger(l + i64::try_from(r).unwrap())
             }
             (ConstantValue::UnsignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l as isize + r)
+                ConstantValue::SignedInteger(i64::try_from(l).unwrap() + r)
             }
             (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
                 ConstantValue::SignedInteger(l + r)

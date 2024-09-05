@@ -15,6 +15,7 @@ use {
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
+        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
@@ -259,6 +260,21 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
                 }
             }
         }
+        Type::Vector {
+            element_count,
+            element_type,
+        } => {
+            let element_width = u16::try_from(element_type.width_bits()).unwrap();
+            let element_type = codegen_type_instance(element_type.clone());
+            let element_count = Literal::u16_suffixed(u16::try_from(*element_count).unwrap());
+
+            quote! {
+                Type {
+                    kind: TypeKind::Vector { length: #element_count, element: alloc::boxed::Box::new(#element_type) },
+                    width: #element_count * #element_width,
+                }
+            }
+        }
         t => panic!("todo codegen type instance: {t:?}"),
     }
 }
@@ -293,7 +309,7 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Arc<Type>) -> Toke
                 panic!();
             };
 
-            let width = u16::try_from(((*cv as usize) + 1).next_power_of_two().ilog2()).unwrap();
+            let width = signed_smallest_width_of_value(*cv);
 
             quote! {
                 Type {
@@ -307,7 +323,7 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Arc<Type>) -> Toke
                 panic!();
             };
 
-            let width = u16::try_from((cv + 1).next_power_of_two().ilog2()).unwrap();
+            let width = unsigned_smallest_width_of_value(*cv);
 
             quote! {
                 Type {
@@ -346,7 +362,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let typ = codegen_constant_type_instance(&value, typ);
             match value {
                 ConstantValue::UnsignedInteger(v) => {
-                    let v = Literal::usize_unsuffixed(v);
                     quote!(ctx.emitter().constant(#v, #typ))
                 }
                 ConstantValue::SignedInteger(v) => {
@@ -604,18 +619,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote!(panic!("{:?}", (#(#args),*)))
         }
         StatementKind::ReadElement { vector, index } => {
-            let index_typ = index.typ();
-
             let vector = get_ident(&vector);
             let index = get_ident(&index);
 
-            if let Type::Bits = &*index_typ {
-                quote!(#vector[(#index.value()) as usize])
-            } else {
-                quote!(#vector[(#index) as usize])
-            }
+            quote!(ctx.emitter().read_element(#vector, #index))
         }
-        StatementKind::MutateElement {
+        StatementKind::WriteElement {
             vector,
             value,
             index,
@@ -623,14 +632,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let vector = get_ident(&vector);
             let index = get_ident(&index);
             let value = get_ident(&value);
-            // todo: support bundle indexes
-            quote! {
-                {
-                    let mut local = #vector.clone();
-                    local[(#index) as usize] = #value;
-                    local
-                }
-            }
+            quote!(ctx.emitter().mutate_element(#vector, #index, #value))
         }
 
         StatementKind::CreateBits { value, length } => {

@@ -1,6 +1,9 @@
-use crate::dbt::x86::emitter::{
-    BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
-    X86NodeRef,
+use {
+    crate::dbt::x86::emitter::{
+        BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind,
+        X86BlockRef, X86NodeRef,
+    },
+    alloc::boxed::Box,
 };
 
 pub trait Emitter {
@@ -26,6 +29,7 @@ pub trait Emitter {
         start: Self::NodeRef,
         length: Self::NodeRef,
     ) -> Self::NodeRef;
+
     fn bit_insert(
         &mut self,
         target: Self::NodeRef,
@@ -49,6 +53,14 @@ pub trait Emitter {
     fn read_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef;
     fn write_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef);
 
+    // todo: change this to mutate `vector` in place without returning?
+    fn mutate_element(
+        &mut self,
+        vector: Self::NodeRef,
+        index: Self::NodeRef,
+        value: Self::NodeRef,
+    ) -> Self::NodeRef;
+
     fn branch(
         &mut self,
         condition: Self::NodeRef,
@@ -62,17 +74,18 @@ pub trait Emitter {
     fn set_current_block(&mut self, block: Self::BlockRef);
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Type {
     pub kind: TypeKind,
     pub width: u16,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum TypeKind {
     Unsigned,
     Signed,
     Floating,
+    Vector { length: u16, element: Box<Type> },
 }
 
 pub struct WrappedEmitter<E: Emitter> {

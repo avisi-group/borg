@@ -6,7 +6,7 @@ use {
             self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionSignature,
             NamedType, Parameter, Size,
         },
-        util::smallest_width_of_value,
+        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
     },
     common::{intern::InternedString, shared::Shared, HashMap},
     itertools::Itertools,
@@ -67,7 +67,7 @@ impl BoomEmitter {
             jib_ast::DefinitionAux::Type(type_def) => {
                 match type_def {
                     jib_ast::TypeDefinition::Enum(_, _) => (), /* type is u32 but don't need to
-                                                                 * define it */
+                    * define it */
                     jib_ast::TypeDefinition::Struct(name, fields) => {
                         self.ast.definitions.push(boom::Definition::Struct {
                             name: name.as_interned(),
@@ -486,7 +486,9 @@ fn effective_width(typ: &jib_ast::Type) -> usize {
     match typ {
         jib_ast::Type::Lint => 128,
         jib_ast::Type::Fbits(i) | jib_ast::Type::Fint(i) => (*i).try_into().unwrap(),
-        jib_ast::Type::Constant(c) => smallest_width_of_value((&c.0).try_into().unwrap()).into(),
+        jib_ast::Type::Constant(c) => {
+            signed_smallest_width_of_value((&c.0).try_into().unwrap()).into()
+        }
         jib_ast::Type::Lbits => 128, // todo maybe + 8 for the length?
         jib_ast::Type::Sbits(_) => todo!(),
 

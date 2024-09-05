@@ -11,7 +11,7 @@ use {
             Block, ConstantValue, Context, Function, FunctionInner, FunctionKind, PrimitiveType,
             PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
         },
-        util::smallest_width_of_value,
+        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     itertools::Itertools,
@@ -302,7 +302,7 @@ impl BuildContext {
                 // type fields we do the following
                 Arc::new(rudder::Type::new_primitive(
                     rudder::PrimitiveTypeClass::SignedInteger,
-                    smallest_width_of_value(*c).into(),
+                    signed_smallest_width_of_value(*c).into(),
                 ))
             }
             boom::Type::Tuple(_) => panic!(), /* tuple only used as return type, shouldn't need
@@ -568,7 +568,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .unwrap()
             .is_match(name.as_ref())
         {
-            Some(self.builder.build(StatementKind::MutateElement {
+            Some(self.builder.build(StatementKind::WriteElement {
                 vector: args[0].clone(),
                 value: args[2].clone(),
                 index: args[1].clone(),
@@ -653,7 +653,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     }))
                 }
 
-                "neq_bits" | "neq_any<ESecurityState%>" | "neq_any<EFault%>" | "neq_bool" => {
+                "neq_bits" | "neq_any<ESecurityState%>" | "neq_any<EFault%>" | "neq_bool"| "neq_int" => {
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::CompareNotEqual,
                         lhs: args[0].clone(),
@@ -1111,7 +1111,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let base = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
-                        value: rudder::ConstantValue::UnsignedInteger(base),
+                        value: rudder::ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                     });
 
                     let eight = self.builder.build(StatementKind::Constant {
@@ -1149,7 +1149,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let base = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u64()),
-                        value: rudder::ConstantValue::UnsignedInteger(base),
+                        value: rudder::ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                     });
 
                     let eight = self.builder.build(StatementKind::Constant {
@@ -1501,7 +1501,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let offset = self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::u32()),
-                    value: rudder::ConstantValue::UnsignedInteger(offset),
+                    value: rudder::ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
                 });
 
                 self.builder.build(StatementKind::WriteRegister {
@@ -1546,7 +1546,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let offset = self.builder.build(StatementKind::Constant {
                         typ: Arc::new(Type::u32()),
-                        value: rudder::ConstantValue::UnsignedInteger(offset),
+                        value: rudder::ConstantValue::UnsignedInteger(
+                            u64::try_from(offset).unwrap(),
+                        ),
                     });
 
                     return self.builder.build(StatementKind::ReadRegister {
@@ -1647,7 +1649,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Literal::Int(i) => StatementKind::Constant {
                 typ: Arc::new(Type::new_primitive(
                     PrimitiveTypeClass::SignedInteger,
-                    smallest_width_of_value(i.try_into().unwrap()).into(),
+                    signed_smallest_width_of_value(i.try_into().unwrap()).into(),
                 )),
                 value: rudder::ConstantValue::SignedInteger(
                     i.try_into().unwrap_or_else(|_| panic!("{i:x?}")),
@@ -1880,7 +1882,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let right_width_constant = self.builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::u16()),
-                    value: ConstantValue::UnsignedInteger(*right_width),
+                    value: ConstantValue::UnsignedInteger(u64::try_from(*right_width).unwrap()),
                 });
 
                 let left_shift = self.builder.build(StatementKind::ShiftOperation {

@@ -190,9 +190,12 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
         "__id",
         "X_read",
-        "borealis_register_init",
-        "__InitSystem",
-        "TakeReset",
+        "get_R",
+        "read_gpr",
+        "ShiftReg",
+        "AddWithCarry", // "borealis_register_init",
+                        // "__InitSystem",
+                        // "TakeReset",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")

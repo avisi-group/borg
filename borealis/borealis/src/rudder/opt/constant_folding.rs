@@ -69,22 +69,22 @@ fn run_on_stmt(stmt: Statement) -> bool {
                     BinaryOperationKind::Xor => todo!(),
                     BinaryOperationKind::PowI => lhs.powi(rhs),
                     BinaryOperationKind::CompareEqual => {
-                        ConstantValue::UnsignedInteger((lhs == rhs) as usize)
+                        ConstantValue::UnsignedInteger((lhs == rhs) as u64)
                     }
                     BinaryOperationKind::CompareNotEqual => {
-                        ConstantValue::UnsignedInteger((lhs != rhs) as usize)
+                        ConstantValue::UnsignedInteger((lhs != rhs) as u64)
                     }
                     BinaryOperationKind::CompareLessThan => {
-                        ConstantValue::UnsignedInteger((lhs < rhs) as usize)
+                        ConstantValue::UnsignedInteger((lhs < rhs) as u64)
                     }
                     BinaryOperationKind::CompareLessThanOrEqual => {
-                        ConstantValue::UnsignedInteger((lhs <= rhs) as usize)
+                        ConstantValue::UnsignedInteger((lhs <= rhs) as u64)
                     }
                     BinaryOperationKind::CompareGreaterThan => {
-                        ConstantValue::UnsignedInteger((lhs > rhs) as usize)
+                        ConstantValue::UnsignedInteger((lhs > rhs) as u64)
                     }
                     BinaryOperationKind::CompareGreaterThanOrEqual => {
-                        ConstantValue::UnsignedInteger((lhs >= rhs) as usize)
+                        ConstantValue::UnsignedInteger((lhs >= rhs) as u64)
                     }
                 };
 
@@ -233,13 +233,13 @@ fn cast_integer(value: ConstantValue, typ: Arc<Type>) -> ConstantValue {
     match &*typ {
         Type::Primitive(primitive) => match (primitive.tc, value) {
             (PrimitiveTypeClass::SignedInteger, ConstantValue::UnsignedInteger(i)) => {
-                ConstantValue::SignedInteger(isize::try_from(i).unwrap())
+                ConstantValue::SignedInteger(i64::try_from(i).unwrap())
             }
             (PrimitiveTypeClass::SignedInteger, ConstantValue::SignedInteger(i)) => {
                 ConstantValue::SignedInteger(i)
             }
             (PrimitiveTypeClass::UnsignedInteger, ConstantValue::SignedInteger(i)) => {
-                ConstantValue::UnsignedInteger(usize::try_from(i).unwrap())
+                ConstantValue::UnsignedInteger(u64::try_from(i).unwrap())
             }
             (PrimitiveTypeClass::UnsignedInteger, ConstantValue::UnsignedInteger(i)) => {
                 ConstantValue::UnsignedInteger(i)

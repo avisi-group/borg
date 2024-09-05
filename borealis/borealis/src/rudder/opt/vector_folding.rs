@@ -37,7 +37,9 @@ fn run_on_block(block: &Block) -> bool {
 
                 let typ_width = builder.build(StatementKind::Constant {
                     typ: Arc::new(Type::s64()),
-                    value: ConstantValue::SignedInteger(element_type.width_bytes() as isize),
+                    value: ConstantValue::SignedInteger(
+                        i64::try_from(element_type.width_bytes()).unwrap(),
+                    ),
                 });
 
                 let index_scaled = builder.build(StatementKind::BinaryOperation {

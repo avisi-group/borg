@@ -181,7 +181,7 @@ pub enum StatementKind {
         index: Statement,
     },
     /// Returns the vector with the mutated element
-    MutateElement {
+    WriteElement {
         vector: Statement,
         value: Statement,
         index: Statement,
@@ -284,7 +284,7 @@ impl StatementKind {
             StatementKind::ReadElement { vector, index } => {
                 [vector, index].into_iter().cloned().collect()
             }
-            StatementKind::MutateElement {
+            StatementKind::WriteElement {
                 vector,
                 value,
                 index,
@@ -426,7 +426,7 @@ impl Statement {
 
                 element_type.clone()
             }
-            StatementKind::MutateElement { vector, .. } => {
+            StatementKind::WriteElement { vector, .. } => {
                 // get type of the vector and return it
                 vector.typ()
             }
@@ -764,7 +764,7 @@ impl StatementInner {
                 };
             }
 
-            StatementKind::MutateElement {
+            StatementKind::WriteElement {
                 vector,
                 value,
                 index,
@@ -787,7 +787,7 @@ impl StatementInner {
                     index.clone()
                 };
 
-                self.kind = StatementKind::MutateElement {
+                self.kind = StatementKind::WriteElement {
                     vector,
                     value,
                     index,
