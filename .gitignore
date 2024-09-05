@@ -8,3 +8,5 @@
 **/.DS_Store
 **/target
 **/_build
+
+/brig/kernel/src/guest/devices/aarch64
