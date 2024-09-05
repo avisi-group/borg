@@ -121,7 +121,8 @@ fn handle_registers(ast: Shared<Ast>) {
     }
 }
 
-/// split locally declared unions into a tag and a local variable the size of the largest value?
+/// split locally declared unions into a tag and a local variable the size of
+/// the largest value?
 fn destruct_locals(
     union_tags: &HashMap<InternedString, usize>,
     union_tag_type: Shared<Type>,

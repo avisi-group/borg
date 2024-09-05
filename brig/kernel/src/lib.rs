@@ -67,8 +67,8 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
 }
 
 fn continue_start() {
-    let serial_in_task = tasks::create_task(serial_in);
-    serial_in_task.start();
+    // let serial_in_task = tasks::create_task(serial_in);
+    // serial_in_task.start();
 
     let device_manager = SharedDeviceManager::get();
     let device = device_manager

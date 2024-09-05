@@ -160,7 +160,8 @@ fn validate_constant_type(
                 "cannot use vector type for unsigned integer constant",
             )),
             Type::Bits => {
-                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bits for unsigned integer constant"))
+                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bits for
+                // unsigned integer constant"))
                 None
             }
             Type::ArbitraryLengthInteger => Some(ValidationMessage::stmt_warn(
@@ -221,7 +222,8 @@ fn validate_constant_type(
 
             Type::ArbitraryLengthInteger => {
                 // this is ok
-                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer for signed integer constant"))
+                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer
+                // for signed integer constant"))
                 None
             }
             Type::String | Type::Rational | Type::Any => todo!(),

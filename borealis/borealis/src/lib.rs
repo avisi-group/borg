@@ -16,7 +16,7 @@ use {
     },
     common::{
         bytes, create_file_buffered,
-        intern::{init_interner, interner},
+        intern::{init_interner, interner, InternedString},
         HashMap,
     },
     deepsize::DeepSizeOf,
@@ -181,18 +181,27 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 }
 
-const FN_ALLOWLIST: &[&'static str] = &[
-    "__DecodeA64_DataProcReg",
-    "__DecodeA64",
-    "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
-    "DecodeShift",
-    "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
-];
+fn fn_is_allowlisted(name: InternedString) -> bool {
+    const FN_ALLOWLIST: &[&'static str] = &[
+        "__DecodeA64_DataProcReg",
+        "__DecodeA64",
+        "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+        "DecodeShift",
+        "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+        "__id",
+        "X_read",
+        "borealis_register_init",
+        "__InitSystem",
+        "TakeReset",
+    ];
+
+    FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")
+}
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {
     jib_ast.into_iter().map(|d| {
         if let DefinitionAux::Fundef(name, ret, parameters, body) = d.def {
-            let new_body = if FN_ALLOWLIST.contains(&name.as_interned().as_ref()) {
+            let new_body = if fn_is_allowlisted(name.as_interned()) {
                 body
             } else {
                 vec![Instruction {

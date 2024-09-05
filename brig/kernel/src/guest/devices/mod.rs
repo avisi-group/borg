@@ -1,9 +1,13 @@
-use proc_macro_lib::ktest;
-
-use crate::dbt::{
-    emitter::{Emitter, Type, TypeKind},
-    x86::X86TranslationContext,
-    TranslationContext,
+use {
+    crate::{
+        dbt::{
+            emitter::{Emitter, Type, TypeKind},
+            x86::X86TranslationContext,
+            TranslationContext,
+        },
+        guest::devices::aarch64::{borealis_register_init, u__InitSystem},
+    },
+    proc_macro_lib::ktest,
 };
 
 pub mod aarch64;
@@ -13,6 +17,16 @@ pub mod virtio;
 #[ktest]
 fn decodea64_smoke() {
     let mut ctx = X86TranslationContext::new();
+    borealis_register_init(&mut ctx);
+
+    let unit = ctx.emitter().constant(
+        0,
+        Type {
+            kind: TypeKind::Unsigned,
+            width: 0,
+        },
+    );
+    u__InitSystem(&mut ctx, unit);
 
     let pc = ctx.emitter().constant(
         0,

@@ -163,6 +163,52 @@ impl Emitter for X86Emitter {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
+            CompareLessThanOrEqual(left, right) => match (left.kind(), right.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: left_value, ..
+                    },
+                    NodeKind::Constant {
+                        value: right_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: left.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: if left_value <= right_value { 1 } else { 0 },
+                        width: 1,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: Type {
+                        kind: TypeKind::Unsigned,
+                        width: 1,
+                    },
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            CompareGreaterThanOrEqual(left, right) => match (left.kind(), right.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: left_value, ..
+                    },
+                    NodeKind::Constant {
+                        value: right_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: left.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: if left_value >= right_value { 1 } else { 0 },
+                        width: 1,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: Type {
+                        kind: TypeKind::Unsigned,
+                        width: 1,
+                    },
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
             op => {
                 todo!("{op:?}")
             }
@@ -194,7 +240,23 @@ impl Emitter for X86Emitter {
                             *constant_value & mask
                         }
                     }
-                    CastOperationKind::SignExtend => *constant_value << (64 - original_width) >> 5,
+                    CastOperationKind::SignExtend => {
+                        let signed_value = (*constant_value) as i64;
+
+                        let shifted_left = if original_width != 0 {
+                            signed_value.checked_shl((64 - original_width).into()).unwrap_or_else(|| panic!("failed to shift left {constant_value} by 64 - {original_width}"))
+                        } else {
+                            signed_value
+                        };
+
+                        shifted_left
+                            .checked_shr((64 - target_width).into())
+                            .unwrap_or_else(|| {
+                                panic!(
+                                    "failed to shift right {constant_value} by 64 - {target_width}"
+                                )
+                            }) as u64
+                    }
                     CastOperationKind::Truncate => {
                         // truncating to the target width - just clear all irrelevant bits
                         let mask = (1 << target_width) - 1;
@@ -245,29 +307,56 @@ impl Emitter for X86Emitter {
         start: Self::NodeRef,
         length: Self::NodeRef,
     ) -> Self::NodeRef {
+        let typ = value.typ().clone();
         match (value.kind(), start.kind(), length.kind()) {
             (
-                NodeKind::Constant {
-                    value: value_value, ..
-                },
-                NodeKind::Constant {
-                    value: start_value, ..
-                },
-                NodeKind::Constant {
-                    value: length_value,
-                    ..
-                },
+                NodeKind::Constant { value, .. },
+                NodeKind::Constant { value: start, .. },
+                NodeKind::Constant { value: length, .. },
             ) => Self::NodeRef::from(X86Node {
-                typ: value.typ().clone(),
+                typ,
                 kind: NodeKind::Constant {
-                    value: (value_value >> start_value) & ((1 << length_value) - 1),
-                    width: *length_value as u16,
+                    value: bit_extract(*value, *start, *length),
+                    width: u16::try_from(*length).unwrap(),
                 },
             }),
             _ => Self::NodeRef::from(X86Node {
-                typ: value.typ().clone(),
+                typ,
                 kind: NodeKind::BitExtract {
                     value,
+                    start,
+                    length,
+                },
+            }),
+        }
+    }
+
+    fn bit_insert(
+        &mut self,
+        target: Self::NodeRef,
+        source: Self::NodeRef,
+        start: Self::NodeRef,
+        length: Self::NodeRef,
+    ) -> Self::NodeRef {
+        let typ = target.typ().clone();
+        match (target.kind(), source.kind(), start.kind(), length.kind()) {
+            (
+                NodeKind::Constant { value: target, .. },
+                NodeKind::Constant { value: source, .. },
+                NodeKind::Constant { value: start, .. },
+                NodeKind::Constant { value: length, .. },
+            ) => Self::NodeRef::from(X86Node {
+                typ,
+                kind: NodeKind::Constant {
+                    value: bit_insert(*target, *source, *start, *length),
+                    width: u16::try_from(*length).unwrap(),
+                },
+            }),
+            _ => Self::NodeRef::from(X86Node {
+                typ,
+                kind: NodeKind::BitInsert {
+                    target,
+                    source,
                     start,
                     length,
                 },
@@ -363,6 +452,13 @@ impl Emitter for X86Emitter {
 
     fn write_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef) {
         *symbol.0.borrow_mut() = Some(value);
+    }
+
+    fn assert(&mut self, condition: Self::NodeRef) {
+        match condition.kind() {
+            NodeKind::Constant { value, .. } => assert!(*value != 0),
+            _ => todo!(),
+        }
     }
 }
 
@@ -484,6 +580,12 @@ impl X86NodeRef {
             } => {
                 todo!()
             }
+            NodeKind::BitInsert {
+                target,
+                source,
+                start,
+                length,
+            } => todo!(),
         }
     }
 }
@@ -525,6 +627,12 @@ pub enum NodeKind {
     },
     BitExtract {
         value: X86NodeRef,
+        start: X86NodeRef,
+        length: X86NodeRef,
+    },
+    BitInsert {
+        target: X86NodeRef,
+        source: X86NodeRef,
         start: X86NodeRef,
         length: X86NodeRef,
     },
@@ -684,3 +792,82 @@ impl X86Block {
 
 #[derive(Debug, Clone)]
 pub struct X86SymbolRef(pub Rc<RefCell<Option<X86NodeRef>>>);
+
+// generate n ones
+fn ones(n: u64) -> u64 {
+    let (res, overflowed) = 1u64.overflowing_shl(n.try_into().unwrap());
+
+    if overflowed {
+        if n == u64::from(u64::BITS) {
+            u64::MAX
+        } else {
+            panic!("overflowed while generating mask of {n} 1s")
+        }
+    } else {
+        res - 1
+    }
+}
+
+fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
+    let cleared_target = {
+        let mask = !(ones(length) << start);
+        target & mask
+    };
+
+    let shifted_source = {
+        let mask = ones(length);
+        let masked_source = source & mask;
+        masked_source << start
+    };
+
+    cleared_target | shifted_source
+}
+
+fn bit_extract(value: u64, start: u64, length: u64) -> u64 {
+    (value >> start) & ones(length)
+}
+
+// #[cfg(test)]
+// mod tests {
+//     use {
+//         super::{bit_extract, bit_insert, ones},
+//         proptest::prelude::*,
+//     };
+
+//     #[test]
+//     fn ones_smoke() {
+//         assert_eq!(0, ones(0));
+//         assert_eq!(1, ones(1));
+//         assert_eq!(0b111, ones(3));
+//         assert_eq!(u32::MAX as u64, ones(u32::BITS as u64));
+//         assert_eq!(u64::MAX, ones(u64::BITS as u64));
+//     }
+
+//     proptest! {
+//         #[test]
+//         fn ones_extract(start in 0u64..64, length in 0u64..64) {
+//             if start + length <= 64 {
+//                 // put some ones somewhere
+//                 let value = ones(length) << start;
+//                 // extract them out
+//                 let extracted = bit_extract(value, start, length);
+
+//                 // check it is equal
+//                 assert_eq!(extracted, ones(length))
+//             }
+//         }
+
+//         #[test]
+//         fn bit_insert_extract_prop( target: u64,source: u64, start in
+// 0u64..64, length in 0u64..64) {             if start + length <= 64 {
+//                 // insert source into target
+//                 let inserted = bit_insert(target, source, start, length);
+//                 // extract it back out
+//                 let extracted = bit_extract(inserted, start, length);
+
+//                 // check it is equal
+//                 assert_eq!(extracted, source & ((1 << length) - 1))
+//             }
+//         }
+//     }
+// }

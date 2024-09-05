@@ -1,5 +1,4 @@
 use {
-    crate::util::smallest_width_of_value,
     crate::{
         boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature, NamedType},
         rudder::{
@@ -12,6 +11,7 @@ use {
             Block, ConstantValue, Context, Function, FunctionInner, FunctionKind, PrimitiveType,
             PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
         },
+        util::smallest_width_of_value,
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     itertools::Itertools,
@@ -298,13 +298,15 @@ impl BuildContext {
                 boom::Size::Unknown => Arc::new(rudder::Type::Bits),
             },
             boom::Type::Constant(c) => {
-                // todo: this should be a panic, but because structs/unions can have constant type fields we do the following
+                // todo: this should be a panic, but because structs/unions can have constant
+                // type fields we do the following
                 Arc::new(rudder::Type::new_primitive(
                     rudder::PrimitiveTypeClass::SignedInteger,
                     smallest_width_of_value(*c).into(),
                 ))
             }
-            boom::Type::Tuple(_) => panic!(), // tuple only used as return type, shouldn't need resolving?
+            boom::Type::Tuple(_) => panic!(), /* tuple only used as return type, shouldn't need
+                                               * resolving? */
         }
     }
 
@@ -1522,20 +1524,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Value::Identifier(ident) => {
                 // local variable
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
-                    let read_var = self.builder.build(StatementKind::ReadVariable { symbol });
-
-                    let mut last = read_var;
-
-                    return last;
+                    return self.builder.build(StatementKind::ReadVariable { symbol });
                 }
 
                 // parameter
                 if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
-                    let read_var = self.builder.build(StatementKind::ReadVariable { symbol });
-
-                    let mut last = read_var;
-
-                    return last;
+                    return self.builder.build(StatementKind::ReadVariable { symbol });
                 }
 
                 // register

@@ -6,6 +6,7 @@
 use {
     crate::{
         codegen::{codegen_ident, codegen_type},
+        fn_is_allowlisted,
         rudder::{
             constant_value::ConstantValue,
             statement::{
@@ -14,7 +15,6 @@ use {
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
-        FN_ALLOWLIST,
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote, ToTokens},
@@ -73,7 +73,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         })
         .collect::<TokenStream>();
 
-    let body = if FN_ALLOWLIST.contains(&function.name().as_ref()) {
+    let body = if fn_is_allowlisted(function.name()) {
         quote! {
             #fn_state
 
@@ -255,7 +255,7 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
             quote! {
                 Type {
                     kind: TypeKind::Unsigned,
-                    width: todo!(),
+                    width: 64,// todo: bad
                 }
             }
         }
@@ -640,7 +640,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::Assert { condition } => {
             let condition = get_ident(&condition);
-            quote!(assert!(#condition))
+            quote!(ctx.emitter().assert(#condition))
         }
         StatementKind::BitsCast {
             kind,

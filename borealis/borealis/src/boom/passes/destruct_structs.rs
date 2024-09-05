@@ -1,33 +1,3 @@
-//! Destructures structs into their fields as local variables to work around the
-//! lack of struct support in GenSim
-//!
-//!
-//! ## Local structs
-//!
-//! Replaced with multiple definitions, one for each field. Assignments to local
-//! structs are transformed into assingments to these local variables.
-//!
-//! ## Structs as arguments
-//!
-//! Function parameter split into multiple parameters, every callsite similarly
-//! modified.
-//!
-//! ## Structs in return types
-//!
-//! New return type is void, references to each field added as parameters.
-//! Callsite modified: new local vars for fields inserted, references passed to
-//! call.
-//!
-//!
-//! ## Notes
-//!
-//! To avoid ambiguity, the return struct fields are placed at the beginning of
-//! the function parameters, and any parameters that are structs are replaced in
-//! their original location
-//!
-//! fn (foo, bar, baz) becomes fn(return_a, return_b, foo, bar_a, bar_b, bar_c,
-//! baz)
-
 use {
     crate::boom::{
         control_flow::{ControlFlowBlock, Terminator},
@@ -39,8 +9,6 @@ use {
     common::{intern::InternedString, shared::Shared, HashMap},
 };
 
-/// Destructures structs into their fields as local variables to work around the
-/// lack of struct support in GenSim
 #[derive(Debug, Default)]
 pub struct DestructStructs;
 
@@ -59,14 +27,19 @@ impl Pass for DestructStructs {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        // split struct registers into a register per field
-        handle_registers(&mut ast.get_mut().registers);
+        // split struct registers into a register per field, returning the names and types of the *removed* registers
+        let struct_registers = handle_registers(&mut ast.get_mut().registers);
 
-        // replace all field expressions with identifiers of the future register/local var (1 layer only, do not handle nested field exprs yet)
+        // replace all field expressions and values with identifiers of the future
+        // register/local var (1 layer only, do not handle nested field exprs yet)
         ast.get_mut()
             .functions
-            .iter_mut()
-            .for_each(|(_, def)| remove_field_exprs(def));
+            .values_mut()
+            .for_each(|def| remove_field_exprs(def));
+        ast.get_mut()
+            .functions
+            .values_mut()
+            .for_each(|def| remove_field_values(def));
 
         // replace struct return values with tuples
         ast.get_mut()
@@ -74,23 +47,30 @@ impl Pass for DestructStructs {
             .iter_mut()
             .for_each(|(_, def)| split_return(def));
 
-        let functions = &ast.get().functions;
+        {
+            let functions = &ast.get().functions;
 
-        functions
-            .iter()
-            .for_each(|(_, def)| destruct_structs(functions, def));
+            functions.iter().for_each(|(_, def)| {
+                // replace struct parameters in function signatures with individual fields, returning the identifies and types of the removed parameters
+                let mut removed_structs = split_parameters(def.signature.parameters.clone());
+                removed_structs.extend(struct_registers.clone());
+                destruct_local_structs(functions, removed_structs, def)
+            });
+        }
 
         false
     }
 }
 
-fn handle_registers(registers: &mut HashMap<InternedString, (Shared<Type>, ControlFlowBlock)>) {
-    let mut to_remove = vec![];
+fn handle_registers(
+    registers: &mut HashMap<InternedString, (Shared<Type>, ControlFlowBlock)>,
+) -> HashMap<InternedString, Vec<NamedType>> {
+    let mut to_remove = HashMap::default();
     let mut to_add = vec![];
 
     registers.iter().for_each(|(name, (typ, entry))| {
         if let Type::Struct { fields, .. } = &*typ.get() {
-            to_remove.push(*name);
+            to_remove.insert(*name, fields.clone());
             to_add.extend(fields.iter().map(
                 |NamedType {
                      name: field_name,
@@ -105,18 +85,19 @@ fn handle_registers(registers: &mut HashMap<InternedString, (Shared<Type>, Contr
         }
     });
 
-    for name in to_remove {
-        registers.remove(&name).unwrap();
+    for name in to_remove.keys() {
+        registers.remove(name).unwrap();
     }
     registers.extend(to_add);
+
+    to_remove
 }
 
-fn destruct_structs(
+fn destruct_local_structs(
     functions: &HashMap<InternedString, FunctionDefinition>,
+    mut structs: HashMap<InternedString, Vec<NamedType>>,
     fn_def: &FunctionDefinition,
 ) {
-    let mut structs = HashMap::default();
-
     // go through each statement in the function
     // if the statement is a struct type declaration, remove it and replace with
     // type decls for each field of the struct
@@ -212,9 +193,9 @@ fn destruct_structs(
                             // if the value is an identifier, look up fields in structs map, and get
                             // list of values from that
                             Value::Identifier(ident) => {
-                                let fields = structs
-                                    .get(ident)
-                                    .expect("attempting to assign non struct value identifier");
+                                let fields = structs.get(ident).unwrap_or_else(|| {
+                                    panic!("attempting to assign non struct value identifier {ident:?}")
+                                });
 
                                 fields
                                     .iter()
@@ -247,37 +228,51 @@ fn destruct_structs(
                         name,
                         arguments,
                     } => {
-                        let Some(def) = functions.get(name) else {
-                            // should properly handle built-ins here (but none return structs so this should be fine)
-                            return vec![clone];
+                        let expression = {
+                            let Some(def) = functions.get(name) else {
+                                // should properly handle built-ins here (but none return structs so this should be fine)
+                                return vec![clone];
+                            };
+
+                           if let Type::Tuple(return_types) = &*def.signature.return_type.get() {
+
+                            let Expression::Identifier(dest) = expression else {
+                                // only visiting each statement once so this should be true (for now, unions break this)
+                                panic!();
+                            };
+
+                            let fields = structs.get(dest).unwrap();
+
+                            assert_eq!(fields.len(), return_types.len()); //todo: validate the types too
+
+                            Some(Expression::Tuple(
+                                fields
+                                    .iter()
+                                    .map(|NamedType { name, .. }| {
+                                        Expression::Identifier(destructed_ident(*dest, *name))
+                                    })
+                                    .collect(),
+                            ))
+                           } else {
+                            Some(expression.clone())
+
+
+                            }
                         };
 
-                        let Type::Tuple(return_types) = &*def.signature.return_type.get() else {
-                            return vec![clone];
-                        };
-
-                        let Expression::Identifier(dest) = expression else {
-                            // only visiting each statement once so this should be true (for now, unions break this)
-                            panic!();
-                        };
-
-                        let fields = structs.get(dest).unwrap();
-
-                        assert_eq!(fields.len(), return_types.len()); //todo: validate the types too
-
-                        let expression = Some(Expression::Tuple(
-                            fields
-                                .iter()
-                                .map(|NamedType { name, .. }| {
-                                    Expression::Identifier(destructed_ident(*dest, *name))
-                                })
-                                .collect(),
-                        ));
+                        let arguments = arguments.iter().flat_map(|v| if let Value::Identifier(ident) = &*v.get() {
+                            if let Some(fields) = structs.get(ident) {
+                                fields.iter().map(|NamedType { name, .. }| Shared::new(Value::Identifier(destructed_ident(*ident, *name)))).collect()
+                            } else {
+                               vec![v.clone()]
+                            }
+                        } else { vec![v.clone()]}
+                    ).collect();
 
                         vec![Shared::new(Statement::FunctionCall {
                             expression,
                             name: *name,
-                            arguments: arguments.clone(),
+                            arguments,
                         })]
                     }
                     _ => vec![clone],
@@ -287,41 +282,6 @@ fn destruct_structs(
 
         block.set_statements(destructed);
     });
-
-    // transform all field values into local identifier values
-    FieldVisitor.visit_function_definition(fn_def);
-
-    // split struct copies into multiple field copies
-}
-
-fn fix_params(fn_signature: &FunctionSignature) {
-    let mut parameters = fn_signature.parameters.get_mut();
-    *parameters = parameters
-        .iter()
-        .flat_map(|parameter| {
-            if let Type::Struct {
-                name: struct_name,
-                fields,
-            } = &*parameter.typ.get()
-            {
-                fields
-                    .iter()
-                    .map(
-                        |NamedType {
-                             name: field_name,
-                             typ,
-                         }| Parameter {
-                            name: destructed_ident(*struct_name, *field_name),
-                            typ: typ.clone(),
-                            is_ref: false,
-                        },
-                    )
-                    .collect()
-            } else {
-                vec![parameter.clone()]
-            }
-        })
-        .collect();
 }
 
 fn split_return(fn_def: &mut FunctionDefinition) {
@@ -335,27 +295,6 @@ fn split_return(fn_def: &mut FunctionDefinition) {
             .map(|NamedType { typ, .. }| typ)
             .collect(),
     ));
-}
-
-struct FieldVisitor;
-
-impl Visitor for FieldVisitor {
-    fn visit_value(&mut self, node: Shared<Value>) {
-        // if value is a field...
-        let (ident, field) = {
-            let Value::Field { value, field_name } = &*node.get() else {
-                return;
-            };
-            let Value::Identifier(ident) = &*value.get() else {
-                panic!("field access to non identifier")
-            };
-
-            (*ident, *field_name)
-        };
-
-        //...replace it with the identifier of the corresponding local variable
-        *node.get_mut() = Value::Identifier(destructed_ident(ident, field))
-    }
 }
 
 fn destructed_ident(
@@ -394,4 +333,65 @@ fn remove_field_exprs(def: &FunctionDefinition) {
             }
             _ => (),
         })
+}
+
+fn remove_field_values(def: &FunctionDefinition) {
+    struct FieldVisitor;
+
+    impl Visitor for FieldVisitor {
+        fn visit_value(&mut self, node: Shared<Value>) {
+            // if value is a field...
+            let (ident, field) = {
+                let Value::Field { value, field_name } = &*node.get() else {
+                    return;
+                };
+                let Value::Identifier(ident) = &*value.get() else {
+                    panic!("field access to non identifier")
+                };
+
+                (*ident, *field_name)
+            };
+
+            //...replace it with the identifier of the corresponding local variable
+            *node.get_mut() = Value::Identifier(destructed_ident(ident, field))
+        }
+    }
+
+    FieldVisitor.visit_function_definition(def);
+}
+
+fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedString, Vec<NamedType>> {
+    let mut removed = HashMap::default();
+
+    let mut parameters = parameters.get_mut();
+    *parameters = parameters
+        .iter()
+        .flat_map(|parameter| {
+            if let Type::Struct {
+                name: struct_name,
+                fields,
+            } = &*parameter.typ.get()
+            {
+                removed.insert(*struct_name, fields.clone());
+
+                fields
+                    .iter()
+                    .map(
+                        |NamedType {
+                             name: field_name,
+                             typ,
+                         }| Parameter {
+                            name: destructed_ident(*struct_name, *field_name),
+                            typ: typ.clone(),
+                            is_ref: false,
+                        },
+                    )
+                    .collect()
+            } else {
+                vec![parameter.clone()]
+            }
+        })
+        .collect();
+
+    removed
 }

@@ -66,7 +66,8 @@ impl BoomEmitter {
             }
             jib_ast::DefinitionAux::Type(type_def) => {
                 match type_def {
-                    jib_ast::TypeDefinition::Enum(_, _) => (), // type is u32 but don't need to define it
+                    jib_ast::TypeDefinition::Enum(_, _) => (), /* type is u32 but don't need to
+                                                                 * define it */
                     jib_ast::TypeDefinition::Struct(name, fields) => {
                         self.ast.definitions.push(boom::Definition::Struct {
                             name: name.as_interned(),
