@@ -63,6 +63,8 @@ pub enum Type {
         element_type: Arc<Type>,
     },
 
+    Tuple(Vec<Arc<Type>>),
+
     // anything can be cast to/from a union value?
     Union {
         width: usize,
@@ -143,6 +145,8 @@ impl Type {
             Self::String => 32,
             Self::Rational => todo!(),
             Self::Any => todo!(),
+
+            Self::Tuple(ts) => ts.iter().map(|typ| typ.width_bits()).sum(),
         }
     }
 

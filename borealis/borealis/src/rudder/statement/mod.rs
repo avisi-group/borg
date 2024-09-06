@@ -13,6 +13,18 @@ use {
 };
 
 #[derive(Debug, Clone)]
+pub enum UnaryOperationKind {
+    Not,
+    Negate,
+    Complement,
+    Power2,
+    Absolute,
+    Ceil,
+    Floor,
+    SquareRoot,
+}
+
+#[derive(Debug, Clone)]
 pub enum BinaryOperationKind {
     Add,
     Sub,
@@ -32,15 +44,8 @@ pub enum BinaryOperationKind {
 }
 
 #[derive(Debug, Clone)]
-pub enum UnaryOperationKind {
-    Not,
-    Negate,
-    Complement,
-    Power2,
-    Absolute,
-    Ceil,
-    Floor,
-    SquareRoot,
+pub enum TernaryOperationKind {
+    AddWithCarry,
 }
 
 #[derive(Debug, Clone)]
@@ -106,19 +111,23 @@ pub enum StatementKind {
     },
 
     ReadPc,
-
     WritePc {
         value: Statement,
     },
 
+    GetFlag {
+        flag: Flag,
+        operation: Statement,
+    },
+
+    UnaryOperation {
+        kind: UnaryOperationKind,
+        value: Statement,
+    },
     BinaryOperation {
         kind: BinaryOperationKind,
         lhs: Statement,
         rhs: Statement,
-    },
-    UnaryOperation {
-        kind: UnaryOperationKind,
-        value: Statement,
     },
     ShiftOperation {
         kind: ShiftOperationKind,
@@ -221,10 +230,19 @@ pub enum StatementKind {
         variant: InternedString,
     },
 
+    CreateTuple(Vec<Statement>),
     TupleAccess {
         index: usize,
         source: Statement,
     },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Flag {
+    N,
+    Z,
+    C,
+    V,
 }
 
 impl StatementKind {
@@ -303,6 +321,9 @@ impl StatementKind {
             | StatementKind::UnwrapUnion { value, .. } => vec![value.clone()],
 
             StatementKind::TupleAccess { source, .. } => vec![source.clone()],
+
+            StatementKind::GetFlag { operation, .. } => vec![operation.clone()],
+            StatementKind::CreateTuple(values) => values.clone(),
         }
     }
 }
@@ -457,6 +478,11 @@ impl Statement {
 
                 // ts[index]
                 Arc::new(Type::Any) // todo fix this bad hack
+            }
+
+            StatementKind::GetFlag { .. } => Arc::new(Type::u1()),
+            StatementKind::CreateTuple(values) => {
+                Arc::new(Type::Tuple(values.iter().map(|v| v.typ()).collect()))
             }
         }
     }
@@ -860,6 +886,29 @@ impl StatementInner {
                 };
 
                 self.kind = StatementKind::TupleAccess { index, source };
+            }
+
+            StatementKind::GetFlag { flag, operation } => {
+                let operation = if operation == use_of {
+                    with.clone()
+                } else {
+                    operation.clone()
+                };
+                self.kind = StatementKind::GetFlag { flag, operation };
+            }
+            StatementKind::CreateTuple(values) => {
+                self.kind = StatementKind::CreateTuple(
+                    values
+                        .iter()
+                        .map(|v| {
+                            if *v == use_of {
+                                with.clone()
+                            } else {
+                                v.clone()
+                            }
+                        })
+                        .collect(),
+                )
             }
         }
     }

@@ -172,6 +172,7 @@ fn validate_constant_type(
             )),
             Type::String | Type::Rational | Type::Any => todo!(),
             Type::Union { width } => todo!(),
+            Type::Tuple(_) => todo!(),
         },
         ConstantValue::SignedInteger(_) => match &*typ {
             Type::Primitive(p) => match p.tc {
@@ -228,6 +229,7 @@ fn validate_constant_type(
             }
             Type::String | Type::Rational | Type::Any => todo!(),
             Type::Union { width } => todo!(),
+            Type::Tuple(_) => todo!(),
         },
         ConstantValue::FloatingPoint(_) => match &*typ {
             Type::Primitive(p) => match p.tc {
@@ -283,6 +285,7 @@ fn validate_constant_type(
             )),
             Type::String | Type::Rational | Type::Any => todo!(),
             Type::Union { width } => todo!(),
+            Type::Tuple(_) => todo!(),
         },
         ConstantValue::Unit => match &*typ {
             Type::Primitive(p) => match p.tc {
@@ -338,6 +341,7 @@ fn validate_constant_type(
             )),
             Type::String | Type::Rational | Type::Any => todo!(),
             Type::Union { width } => None,
+            Type::Tuple(_) => todo!(),
         },
         ConstantValue::String(_) => {
             assert!(matches!(&*typ, Type::String));
@@ -345,6 +349,10 @@ fn validate_constant_type(
         }
         ConstantValue::Rational(_) => {
             assert!(matches!(&*typ, Type::Rational));
+            None
+        }
+        ConstantValue::Tuple(_) => {
+            assert!(matches!(&*typ, Type::Tuple(_)));
             None
         }
     };

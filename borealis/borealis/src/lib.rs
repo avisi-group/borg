@@ -193,9 +193,12 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "get_R",
         "read_gpr",
         "ShiftReg",
-        "AddWithCarry", // "borealis_register_init",
-                        // "__InitSystem",
-                        // "TakeReset",
+        "X_set",
+        "set_R",
+        "write_gpr", /* "borealis
+                     "_register_init",
+                      * "__InitSystem",
+                      * "TakeReset", */
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")

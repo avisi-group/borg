@@ -53,6 +53,40 @@ fn promote_width(width: usize) -> usize {
     }
 }
 
+pub fn codegen_ident(input: InternedString) -> Ident {
+    static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
+
+    let s = input.as_ref();
+
+    if s == "main" {
+        return Ident::new("model_main", Span::call_site());
+    } else if s == "break" {
+        return Ident::new("_break", Span::call_site());
+    }
+
+    let mut buf = String::with_capacity(s.len());
+
+    for ch in s.chars() {
+        match ch {
+            '%' => buf.push_str("_pcnt_"),
+            '&' => buf.push_str("_ref_"),
+            '?' => buf.push_str("_unknown_"),
+            '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' | '\'' => buf.push('_'),
+            _ => buf.push(ch),
+        }
+    }
+
+    if buf.starts_with('_') {
+        buf = "u".to_owned() + &buf;
+    }
+
+    if !VALIDATOR.is_match(&buf) {
+        panic!("identifier {buf:?} not normalized even after normalizing");
+    }
+
+    Ident::new(&buf, Span::call_site())
+}
+
 pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
     match &*typ {
         Type::Primitive(typ) => {
@@ -112,41 +146,11 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
             let num_bytes = width.div_ceil(8);
             quote!([u8; #num_bytes])
         }
-    }
-}
-
-pub fn codegen_ident(input: InternedString) -> Ident {
-    static VALIDATOR: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap());
-
-    let s = input.as_ref();
-
-    if s == "main" {
-        return Ident::new("model_main", Span::call_site());
-    } else if s == "break" {
-        return Ident::new("_break", Span::call_site());
-    }
-
-    let mut buf = String::with_capacity(s.len());
-
-    for ch in s.chars() {
-        match ch {
-            '%' => buf.push_str("_pcnt_"),
-            '&' => buf.push_str("_ref_"),
-            '?' => buf.push_str("_unknown_"),
-            '-' | '<' | '>' | '#' | ' ' | '(' | ')' | ',' | '\'' => buf.push('_'),
-            _ => buf.push(ch),
+        Type::Tuple(ts) => {
+            let inner = ts.iter().cloned().map(codegen_type);
+            quote!((#(#inner),*))
         }
     }
-
-    if buf.starts_with('_') {
-        buf = "u".to_owned() + &buf;
-    }
-
-    if !VALIDATOR.is_match(&buf) {
-        panic!("identifier {buf:?} not normalized even after normalizing");
-    }
-
-    Ident::new(&buf, Span::call_site())
 }
 
 fn codegen_types(rudder: &Context) -> TokenStream {
@@ -216,9 +220,9 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
             #![allow(non_camel_case_types)]
 
             use crate::dbt::{
-                emitter::{Emitter, Type, TypeKind, BlockResult},
+                emitter::{Emitter, Type, TypeKind, BlockResult, Flag},
                 x86::{
-                    emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef},
+                    emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef, },
                     X86TranslationContext,
                 },
                 TranslationContext,

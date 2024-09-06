@@ -3,7 +3,7 @@ use {
         analysis::cfg::ControlFlowGraphAnalysis,
         statement::{
             BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement, StatementKind,
-            UnaryOperationKind,
+            TernaryOperationKind, UnaryOperationKind,
         },
         Block, ConstantValue, Context, Function, FunctionKind, PrimitiveTypeClass, Symbol, Type,
     },
@@ -32,6 +32,13 @@ impl Display for Type {
             Type::String => write!(f, "str"),
             Type::Rational => write!(f, "rational"),
             Type::Any => write!(f, "any"),
+            Type::Tuple(ts) => {
+                write!(f, "(").unwrap();
+                for t in ts {
+                    write!(f, "{t}, ").unwrap();
+                }
+                write!(f, ")")
+            }
         }
     }
 }
@@ -45,6 +52,11 @@ impl Display for ConstantValue {
             ConstantValue::Unit => write!(f, "()"),
             ConstantValue::String(str) => write!(f, "{str:?}"),
             ConstantValue::Rational(r) => write!(f, "{r:?}"),
+            ConstantValue::Tuple(vs) => {
+                write!(f, "(").unwrap();
+                vs.iter().for_each(|v| write!(f, "{v},  ").unwrap());
+                write!(f, ")")
+            }
         }
     }
 }
@@ -119,6 +131,7 @@ impl Display for StatementKind {
 
                 write!(f, "{} {}", op, value.name())
             }
+
             StatementKind::ShiftOperation {
                 kind,
                 value,
@@ -289,6 +302,16 @@ impl Display for StatementKind {
             }
             StatementKind::TupleAccess { index, source } => {
                 write!(f, "tuple-access {}.{index}", source.name())
+            }
+            StatementKind::GetFlag { flag, operation } => {
+                write!(f, "get-flag {flag:?} {}", operation.name())
+            }
+            StatementKind::CreateTuple(values) => {
+                write!(
+                    f,
+                    "create-tuple {:?}",
+                    values.iter().map(|v| v.name()).collect::<Vec<_>>()
+                )
             }
         }
     }

@@ -6,7 +6,7 @@ use {
             self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionSignature,
             NamedType, Parameter, Size,
         },
-        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
+        util::signed_smallest_width_of_value,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
     itertools::Itertools,
@@ -66,8 +66,8 @@ impl BoomEmitter {
             }
             jib_ast::DefinitionAux::Type(type_def) => {
                 match type_def {
-                    jib_ast::TypeDefinition::Enum(_, _) => (), /* type is u32 but don't need to
-                    * define it */
+                    jib_ast::TypeDefinition::Enum(_, _) => (), /* type is u32 but don't need to */
+                    // define it
                     jib_ast::TypeDefinition::Struct(name, fields) => {
                         self.ast.definitions.push(boom::Definition::Struct {
                             name: name.as_interned(),

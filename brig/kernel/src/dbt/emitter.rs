@@ -1,9 +1,6 @@
-use {
-    crate::dbt::x86::emitter::{
-        BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind,
-        X86BlockRef, X86NodeRef,
-    },
-    alloc::boxed::Box,
+use crate::dbt::x86::emitter::{
+    BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
+    X86NodeRef,
 };
 
 pub trait Emitter {
@@ -47,6 +44,8 @@ pub trait Emitter {
 
     fn assert(&mut self, condition: Self::NodeRef);
 
+    fn get_flag(&mut self, flag: Flag, operation: Self::NodeRef) -> Self::NodeRef;
+
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);
 
@@ -85,7 +84,7 @@ pub enum TypeKind {
     Unsigned,
     Signed,
     Floating,
-    Vector { length: u16, element: Box<Type> },
+    // Vector { length: u16, element: Box<Type> },
 }
 
 pub struct WrappedEmitter<E: Emitter> {
@@ -96,6 +95,15 @@ impl<E: Emitter> WrappedEmitter<E> {
     pub fn new(subemitter: E) -> Self {
         Self { subemitter }
     }
+}
+
+
+#[derive(Debug, Clone, Copy)]
+pub enum Flag {
+    N,
+    Z,
+    C,
+    V,
 }
 
 // impl<E: Emitter> Emitter for WrappedEmitter<E> {

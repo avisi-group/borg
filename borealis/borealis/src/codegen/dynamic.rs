@@ -10,8 +10,7 @@ use {
         rudder::{
             constant_value::ConstantValue,
             statement::{
-                BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
-                StatementKind, UnaryOperationKind,
+                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, Statement, StatementKind, UnaryOperationKind
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
@@ -358,22 +357,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
     let statement_tokens = match stmt.kind() {
-        StatementKind::Constant { value, typ } => {
-            let typ = codegen_constant_type_instance(&value, typ);
-            match value {
-                ConstantValue::UnsignedInteger(v) => {
-                    quote!(ctx.emitter().constant(#v, #typ))
-                }
-                ConstantValue::SignedInteger(v) => {
-                    quote!(ctx.emitter().constant(#v as u64, #typ))
-                }
-                ConstantValue::FloatingPoint(v) => {
-                    quote!(ctx.emitter().constant(#v as u64, #typ))
-                }
-                ConstantValue::Unit => quote!(ctx.emitter().constant(0, #typ)),
-                ConstantValue::Rational(_) | ConstantValue::String(_) => todo!(),
-            }
-        }
+        StatementKind::Constant { value, typ } => codegen_constant_value(value, typ),
         StatementKind::ReadVariable { symbol } => {
             let symbol_ident = codegen_ident(symbol.name());
             quote! { ctx.emitter().read_variable(fn_state.#symbol_ident.clone()) }
@@ -726,6 +710,20 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let index = Literal::usize_unsuffixed(index);
             quote!(#ident.#index)
         }
+        StatementKind::GetFlag { flag, operation } => {
+            let operation = get_ident(&operation);
+            let flag = match flag {
+                Flag::N => quote!(N),
+                Flag::Z => quote!(Z),
+                Flag::C => quote!(C),
+                Flag::V => quote!(V),
+            };
+            quote!(ctx.emitter().get_flag(Flag::#flag, #operation.clone()))
+        }
+        StatementKind::CreateTuple(values) => {
+            let values = values.iter().map(get_ident);
+            quote!((#(#values),*))
+        }
     };
 
     let msg = format!(" {stmt}");
@@ -989,5 +987,32 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
             "failed to generate code for cast of {:?} from {src} to {tgt} of kind {knd:?}",
             value.name()
         ),
+    }
+}
+
+fn codegen_constant_value(value: ConstantValue, typ: Arc<Type>) -> TokenStream {
+    let typ_instance = codegen_constant_type_instance(&value, typ.clone());
+    match value {
+        ConstantValue::UnsignedInteger(v) => {
+            quote!(ctx.emitter().constant(#v, #typ_instance))
+        }
+        ConstantValue::SignedInteger(v) => {
+            quote!(ctx.emitter().constant(#v as u64, #typ_instance))
+        }
+        ConstantValue::FloatingPoint(v) => {
+            quote!(ctx.emitter().constant(#v as u64, #typ_instance))
+        }
+        ConstantValue::Unit => quote!(ctx.emitter().constant(0, #typ_instance)),
+        ConstantValue::Rational(_) | ConstantValue::String(_) => todo!(),
+
+        ConstantValue::Tuple(values) => {
+            let Type::Tuple(types) = &*typ else { panic!() };
+            let values = values
+                .iter()
+                .cloned()
+                .zip(types.iter().cloned())
+                .map(|(value, typ)| codegen_constant_value(value, typ));
+            quote!((#(#values),*))
+        }
     }
 }

@@ -239,6 +239,12 @@ impl StatementUseAnalysis {
                 | StatementKind::Constant { .. }
                 | StatementKind::Undefined => {}
                 StatementKind::TupleAccess { source, .. } => self.add_use(&source, &stmt),
+                StatementKind::GetFlag { operation, .. } => {
+                    self.add_use(&operation, &stmt);
+                }
+                StatementKind::CreateTuple(values) => {
+                    values.iter().for_each(|v| self.add_use(v, &stmt))
+                }
             }
         }
     }

@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        emitter::{BlockResult, Type, TypeKind},
+        emitter::{BlockResult, Flag, Type, TypeKind},
         x86::{
             encoder::{Instruction, Operand, PhysicalRegister, Register},
             register_allocator::RegisterAllocator,
@@ -480,6 +480,16 @@ impl Emitter for X86Emitter {
     ) -> Self::NodeRef {
         todo!()
     }
+
+    fn get_flag(&mut self, flag: Flag, operation: Self::NodeRef) -> Self::NodeRef {
+        Self::NodeRef::from(X86Node {
+            typ: Type {
+                kind: TypeKind::Unsigned,
+                width: 1,
+            },
+            kind: NodeKind::GetFlag { flag, operation },
+        })
+    }
 }
 
 fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {
@@ -497,9 +507,7 @@ fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {
         .checked_shr(CONTAINER_WIDTH - original_width)
         .unwrap_or_else(|| panic!("failed to shift right {value} by 64 - {target_width}"));
 
-    let masked = shifted_right as u64 & ones(target_width.into());
-
-    masked
+    shifted_right as u64
 }
 
 #[ktest]
@@ -631,6 +639,7 @@ impl X86NodeRef {
                 start,
                 length,
             } => todo!(),
+            NodeKind::GetFlag { flag, operation } => todo!(),
         }
     }
 }
@@ -681,6 +690,10 @@ pub enum NodeKind {
         start: X86NodeRef,
         length: X86NodeRef,
     },
+    GetFlag {
+        flag: Flag,
+        operation: X86NodeRef,
+    },
 }
 
 #[derive(Debug)]
@@ -712,6 +725,11 @@ pub enum UnaryOperationKind {
     Ceil(X86NodeRef),
     Floor(X86NodeRef),
     SquareRoot(X86NodeRef),
+}
+
+#[derive(Debug)]
+pub enum TernaryOperationKind {
+    AddWithCarry(X86NodeRef, X86NodeRef, X86NodeRef),
 }
 
 #[derive(Debug, Clone)]

@@ -205,6 +205,17 @@ fn clone_statement(
             source: mapping.get(&source).unwrap().clone(),
             index,
         }),
+        StatementKind::GetFlag { flag, operation } => builder.build(StatementKind::GetFlag {
+            flag,
+            operation: mapping.get(&operation).unwrap().clone(),
+        }),
+        StatementKind::CreateTuple(values) => builder.build(StatementKind::CreateTuple(
+            values
+                .iter()
+                .map(|v| mapping.get(&v).unwrap())
+                .cloned()
+                .collect(),
+        )),
     }
 }
 

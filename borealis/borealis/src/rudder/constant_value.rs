@@ -16,6 +16,7 @@ pub enum ConstantValue {
     Rational(Ratio<i128>),
     String(InternedString),
     Unit,
+    Tuple(Vec<ConstantValue>),
 }
 
 impl ConstantValue {
@@ -26,6 +27,7 @@ impl ConstantValue {
             ConstantValue::FloatingPoint(v) => *v == 0.,
             ConstantValue::Rational(r) => *r == (Ratio::<i128>::ZERO),
             ConstantValue::Unit | ConstantValue::String(_) => false,
+            ConstantValue::Tuple(_) => panic!(),
         }
     }
 
@@ -177,10 +179,11 @@ impl Not for ConstantValue {
         match self {
             ConstantValue::UnsignedInteger(v) => ConstantValue::UnsignedInteger(!v),
             ConstantValue::SignedInteger(v) => ConstantValue::SignedInteger(!v),
-            ConstantValue::FloatingPoint(_) => panic!("not a thing"),
-            ConstantValue::Rational(_) => panic!("not a thing"),
-            ConstantValue::String(_) => panic!("not a thing"),
-            ConstantValue::Unit => panic!("not a thing"),
+            ConstantValue::FloatingPoint(_)
+            | ConstantValue::Rational(_)
+            | ConstantValue::String(_)
+            | ConstantValue::Unit
+            | ConstantValue::Tuple(_) => panic!("not a thing"),
         }
     }
 }

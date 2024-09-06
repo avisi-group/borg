@@ -1,10 +1,7 @@
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::Pass,
-        visitor::Visitor,
-        Ast, Expression, FunctionDefinition, FunctionSignature, NamedType, NamedValue, Parameter,
-        Statement, Type, Value,
+        control_flow::ControlFlowBlock, passes::Pass, visitor::Visitor, Ast, Expression,
+        FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type, Value,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
 };
@@ -27,7 +24,8 @@ impl Pass for DestructStructs {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        // split struct registers into a register per field, returning the names and types of the *removed* registers
+        // split struct registers into a register per field, returning the names and
+        // types of the *removed* registers
         let struct_registers = handle_registers(&mut ast.get_mut().registers);
 
         // replace all field expressions and values with identifiers of the future
@@ -51,7 +49,8 @@ impl Pass for DestructStructs {
             let functions = &ast.get().functions;
 
             functions.iter().for_each(|(_, def)| {
-                // replace struct parameters in function signatures with individual fields, returning the identifies and types of the removed parameters
+                // replace struct parameters in function signatures with individual fields,
+                // returning the identifies and types of the removed parameters
                 let mut removed_structs = split_parameters(def.signature.parameters.clone());
                 removed_structs.extend(struct_registers.clone());
                 destruct_local_structs(functions, removed_structs, def)

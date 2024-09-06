@@ -5,8 +5,8 @@ use {
             self,
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
             statement::{
-                BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementBuilder,
-                StatementKind, UnaryOperationKind,
+                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementBuilder,
+                StatementKind, TernaryOperationKind, UnaryOperationKind,
             },
             Block, ConstantValue, Context, Function, FunctionInner, FunctionKind, PrimitiveType,
             PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
@@ -1049,12 +1049,26 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val ZeroExtend0 : (%bv, %i) -> %bv
                 // val sail_zero_extend : (%bv, %i) -> %bv
                 "ZeroExtend0" | "sail_zero_extend" => {
-                    Some(self.builder.build(StatementKind::BitsCast {
-                        kind: CastOperationKind::ZeroExtend,
-                        typ: Arc::new(Type::Bits),
-                        value: args[0].clone(),
-                        length: args[1].clone(),
-                    }))
+                    let length = args[1].clone();
+                    if let StatementKind::Constant { value, .. } = length.kind() {
+                        let width = match value {
+                            ConstantValue::UnsignedInteger(u) => usize::try_from(u).unwrap(),
+                            ConstantValue::SignedInteger(i) => usize::try_from(i).unwrap(),
+                            _ => panic!(),
+                        };
+                        Some(self.builder.build(StatementKind::Cast {
+                            kind: CastOperationKind::ZeroExtend,
+                            typ: Arc::new(Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, width)),
+                            value: args[0].clone(),
+                        }))
+                    } else {
+                        Some(self.builder.build(StatementKind::BitsCast {
+                            kind: CastOperationKind::ZeroExtend,
+                            typ: Arc::new(Type::Bits),
+                            value: args[0].clone(),
+                            length: length.clone(),
+                        }))
+                    }
                 }
 
                 // val SignExtend0 : (%bv, %i) -> %bv
@@ -1315,6 +1329,36 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 /* ### NON-BUILTIN FUNCTIONS BELOW THIS POINT ### */
+                "AddWithCarry" => {
+                    let x = args[0].clone();
+                    let y = args[1].clone();
+                    let carry_in = args[2].clone();
+
+
+                    let _0 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(0) });
+                    let _1 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(1) });
+                    let _2 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(2) });
+                    let _3 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(3) });
+
+
+                 let partial_sum = self.builder.build(StatementKind::BinaryOperation { kind: BinaryOperationKind::Add, lhs: x, rhs: y });
+                 let sum = self.builder.build(StatementKind::BinaryOperation { kind: BinaryOperationKind::Add, lhs: partial_sum, rhs: carry_in });
+
+
+                 let n = self.builder.build(StatementKind::GetFlag {flag: Flag::N, operation: sum.clone()});
+                 let z = self.builder.build(StatementKind::GetFlag {flag: Flag::Z, operation: sum.clone()});
+                 let c = self.builder.build(StatementKind::GetFlag {flag: Flag::C, operation: sum.clone()});
+                 let v = self.builder.build(StatementKind::GetFlag {flag: Flag::V, operation: sum.clone()});
+
+                    let empty_flags = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4)), value: ConstantValue::UnsignedInteger(0) });
+                  let inserted_n=  self.builder.build(StatementKind::BitInsert { target: empty_flags, source: n, start: _0, length: _1.clone() });
+                  let inserted_z = self.builder.build(StatementKind::BitInsert { target: inserted_n, source: z, start: _1.clone(), length: _1.clone() });
+                  let inserted_c = self.builder.build(StatementKind::BitInsert { target: inserted_z, source: c, start: _2, length: _1.clone() });
+                  let flags = self.builder.build(StatementKind::BitInsert { target: inserted_c, source: v, start: _3, length: _1});
+
+                    Some(self.builder.build(StatementKind::CreateTuple(vec![sum, flags])))
+                }
+
                 /* To maintain correctness, borealis must only specialize on actual Sail compiler builtins, specializing other functions means restricting compatibiliy on a specific model, however memory access simply must be overwritten */
                 "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
                 | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
@@ -1724,6 +1768,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         todo!()
                     }
                     Type::Union { width } => todo!(),
+                    Type::Tuple(_) => todo!(),
                 };
 
                 self.builder.build(StatementKind::Cast {
