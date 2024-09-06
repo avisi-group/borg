@@ -2,7 +2,7 @@
 
 use {
     crate::dbt::x86::{
-        encoder::{Instruction, OperandDirection, PhysicalRegister, Register},
+        encoder::{Instruction, OperandDirection, PhysicalRegister, Register, UseDef},
         register_allocator::RegisterAllocator,
     },
     alloc::vec::Vec,
@@ -76,7 +76,8 @@ impl SolidStateRegisterAllocator {
 impl RegisterAllocator for SolidStateRegisterAllocator {
     fn process(&mut self, instruction: &mut Instruction) {
         instruction.get_use_defs().for_each(|usedef| match usedef {
-            crate::dbt::x86::encoder::UseDef::Use(reg) => {
+            // treat read-writes the same as reads
+            UseDef::UseDef(reg) | UseDef::Use(reg) => {
                 match reg {
                     Register::PhysicalRegister(preg) => {
                         // use of preg
@@ -95,7 +96,7 @@ impl RegisterAllocator for SolidStateRegisterAllocator {
                     }
                 }
             }
-            crate::dbt::x86::encoder::UseDef::Def(reg) => match reg {
+            UseDef::Def(reg) => match reg {
                 Register::PhysicalRegister(preg) => {
                     // def of preg
                     self.physical_used.bit_reset(preg.index());
@@ -105,27 +106,6 @@ impl RegisterAllocator for SolidStateRegisterAllocator {
                     // if the virtual register is written to, that means it's liveness is over,
                     // deallocate
                     let phys = self.lookup_and_deallocate(VirtualRegisterIndex(*vreg));
-                    *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
-                }
-            },
-            crate::dbt::x86::encoder::UseDef::UseDef(reg) => match reg {
-                Register::PhysicalRegister(preg) => {
-                    // usedef of preg
-                    self.physical_used.bit_reset(preg.index());
-                }
-                Register::VirtualRegister(vreg) => {
-                    // usedef of vreg
-                    // assuming always read then write
-
-                    // but we're in reverse land so write then read
-
-                    // deallocate
-                    let _phys = self.lookup_and_deallocate(VirtualRegisterIndex(*vreg));
-                    // don't bother actually mutating the instruction
-                    // *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
-
-                    // start new
-                    let phys = self.lookup_or_allocate(VirtualRegisterIndex(*vreg));
                     *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
                 }
             },
@@ -205,8 +185,8 @@ impl Allocations {
 
     fn remove(&mut self, virtual_register: VirtualRegisterIndex) -> PhysicalRegisterIndex {
         self.0
-            .get_mut(virtual_register.0).expect("tried to deallocate non-allocated register {virtual_register:?}") // this can happen if a virtual register is written to but never read
-            .take().expect("virtual register slot {virtual_register:?} was previously allocated but not currently")
+            .get_mut(virtual_register.0).unwrap_or_else(|| panic!("tried to deallocate non-allocated register {virtual_register:?}")) // this can happen if a virtual register is written to but never read
+            .take().unwrap_or_else(|| panic!("virtual register slot {virtual_register:?} was previously allocated but not currently"))
         // this should never happen
     }
 }

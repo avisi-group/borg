@@ -59,9 +59,11 @@ pub fn codegen_ident(input: InternedString) -> Ident {
     let s = input.as_ref();
 
     if s == "main" {
-        return Ident::new("model_main", Span::call_site());
+        return Ident::new("main_", Span::call_site());
     } else if s == "break" {
-        return Ident::new("_break", Span::call_site());
+        return Ident::new("break_", Span::call_site());
+    } else if s == "return" {
+        return Ident::new("return_", Span::call_site());
     }
 
     let mut buf = String::with_capacity(s.len());

@@ -73,18 +73,17 @@ pub trait Emitter {
     fn set_current_block(&mut self, block: Self::BlockRef);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Type {
     pub kind: TypeKind,
     pub width: u16,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TypeKind {
     Unsigned,
     Signed,
     Floating,
-    // Vector { length: u16, element: Box<Type> },
 }
 
 pub struct WrappedEmitter<E: Emitter> {
@@ -96,7 +95,6 @@ impl<E: Emitter> WrappedEmitter<E> {
         Self { subemitter }
     }
 }
-
 
 #[derive(Debug, Clone, Copy)]
 pub enum Flag {

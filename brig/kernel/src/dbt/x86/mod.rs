@@ -17,7 +17,7 @@ use {
         vec::Vec,
     },
     core::{cell::RefCell, fmt::Debug},
-    iced_x86::code_asm::CodeAssembler,
+    iced_x86::code_asm::{qword_ptr, rax, AsmMemoryOperand, AsmRegister64, CodeAssembler},
 };
 
 pub mod emitter;
@@ -139,8 +139,11 @@ impl TranslationContext for X86TranslationContext {
             assembler
                 .set_label(label_map.get_mut(&next).unwrap())
                 .unwrap();
-            assembler.nop().unwrap();
-
+            assembler
+                .nop_1::<AsmMemoryOperand>(qword_ptr(
+                    AsmRegister64::from(rax) + i32::try_from(visited.len()).unwrap(),
+                ))
+                .unwrap();
             for instr in next.instructions() {
                 instr.encode(&mut assembler, &label_map);
             }

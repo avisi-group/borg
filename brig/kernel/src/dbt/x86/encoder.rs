@@ -5,7 +5,8 @@ use {
     displaydoc::Display,
     elf::segment,
     iced_x86::code_asm::{
-        byte_ptr, dword_ptr, qword_ptr, AsmMemoryOperand, AsmRegister64, CodeAssembler, CodeLabel,
+        byte_ptr, dword_ptr, qword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32,
+        AsmRegister64, AsmRegister8, CodeAssembler, CodeLabel,
     },
 };
 
@@ -13,12 +14,20 @@ use {
 pub enum Opcode {
     /// mov {0}, {1}
     MOV(Operand, Operand),
+    /// movzx {0}, {1}
+    MOVZX(Operand, Operand),
+    /// shl {0}, {1}
+    SHL(Operand, Operand),
     /// add {0}, {1}
     ADD(Operand, Operand),
     /// sub {0}, {1}
     SUB(Operand, Operand),
+    /// or {0}, {1},
+    OR(Operand, Operand),
     /// not {0}
     NOT(Operand),
+    /// bextr {0}, {1}, {2}
+    BEXTR(Operand, Operand, Operand),
     /// jmp {0}
     JMP(Operand),
     /// ret
@@ -29,8 +38,16 @@ pub enum Opcode {
     CMP(Operand, Operand),
     /// sete {0}
     SETE(Operand),
+    /// setne {0}
+    SETNE(Operand),
     /// setb {0}
     SETB(Operand),
+    /// setbe {0}
+    SETBE(Operand),
+    /// seta {0}
+    SETA(Operand),
+    /// setae {0}
+    SETAE(Operand),
     /// jne {0}
     JNE(Operand),
     /// nop
@@ -151,6 +168,105 @@ impl From<PhysicalRegister> for AsmRegister64 {
     }
 }
 
+impl From<&PhysicalRegister> for AsmRegister8 {
+    fn from(phys: &PhysicalRegister) -> Self {
+        use iced_x86::code_asm::{
+            al, bl, bpl, cl, dil, dl, r10b, r11b, r12b, r13b, r14b, r15b, r8b, r9b, sil, spl,
+        };
+
+        match phys {
+            PhysicalRegister::RAX => al,
+            PhysicalRegister::RCX => cl,
+            PhysicalRegister::RDX => dl,
+            PhysicalRegister::RBX => bl,
+            PhysicalRegister::RSI => sil,
+            PhysicalRegister::RDI => dil,
+            PhysicalRegister::RSP => spl,
+            PhysicalRegister::RBP => bpl,
+            PhysicalRegister::R8 => r8b,
+            PhysicalRegister::R9 => r9b,
+            PhysicalRegister::R10 => r10b,
+            PhysicalRegister::R11 => r11b,
+            PhysicalRegister::R12 => r12b,
+            PhysicalRegister::R13 => r13b,
+            PhysicalRegister::R14 => r14b,
+            PhysicalRegister::R15 => r15b,
+        }
+    }
+}
+
+impl From<PhysicalRegister> for AsmRegister8 {
+    fn from(phys: PhysicalRegister) -> Self {
+        Self::from(&phys)
+    }
+}
+
+impl From<&PhysicalRegister> for AsmRegister16 {
+    fn from(phys: &PhysicalRegister) -> Self {
+        use iced_x86::code_asm::{
+            ax, bp, bx, cx, di, dx, r10w, r11w, r12w, r13w, r14w, r15w, r8w, r9w, si, sp,
+        };
+
+        match phys {
+            PhysicalRegister::RAX => ax,
+            PhysicalRegister::RCX => cx,
+            PhysicalRegister::RDX => dx,
+            PhysicalRegister::RBX => bx,
+            PhysicalRegister::RSI => si,
+            PhysicalRegister::RDI => di,
+            PhysicalRegister::RSP => sp,
+            PhysicalRegister::RBP => bp,
+            PhysicalRegister::R8 => r8w,
+            PhysicalRegister::R9 => r9w,
+            PhysicalRegister::R10 => r10w,
+            PhysicalRegister::R11 => r11w,
+            PhysicalRegister::R12 => r12w,
+            PhysicalRegister::R13 => r13w,
+            PhysicalRegister::R14 => r14w,
+            PhysicalRegister::R15 => r15w,
+        }
+    }
+}
+
+impl From<&PhysicalRegister> for AsmRegister32 {
+    fn from(phys: &PhysicalRegister) -> Self {
+        use iced_x86::code_asm::{
+            eax, ebp, ebx, ecx, edi, edx, esi, esp, r10d, r11d, r12d, r13d, r14d, r15d, r8d, r9d,
+        };
+
+        match phys {
+            PhysicalRegister::RAX => eax,
+            PhysicalRegister::RCX => ecx,
+            PhysicalRegister::RDX => edx,
+            PhysicalRegister::RBX => ebx,
+            PhysicalRegister::RSI => esi,
+            PhysicalRegister::RDI => edi,
+            PhysicalRegister::RSP => esp,
+            PhysicalRegister::RBP => ebp,
+            PhysicalRegister::R8 => r8d,
+            PhysicalRegister::R9 => r9d,
+            PhysicalRegister::R10 => r10d,
+            PhysicalRegister::R11 => r11d,
+            PhysicalRegister::R12 => r12d,
+            PhysicalRegister::R13 => r13d,
+            PhysicalRegister::R14 => r14d,
+            PhysicalRegister::R15 => r15d,
+        }
+    }
+}
+
+impl From<PhysicalRegister> for AsmRegister16 {
+    fn from(phys: PhysicalRegister) -> Self {
+        Self::from(&phys)
+    }
+}
+
+impl From<PhysicalRegister> for AsmRegister32 {
+    fn from(phys: PhysicalRegister) -> Self {
+        Self::from(&phys)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum SegmentRegister {
     /// fs
@@ -222,7 +338,7 @@ pub enum OperandKind {
 
 impl Display for Operand {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", self.kind)
+        write!(f, "{}:{}", self.kind, self.width_in_bits)
     }
 }
 
@@ -455,6 +571,18 @@ impl Instruction {
         Self(Opcode::MOV(src, dst))
     }
 
+    pub fn movzx(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::MOVZX(src, dst))
+    }
+
+    pub fn shl(amount: Operand, op0: Operand) -> Self {
+        Self(Opcode::SHL(amount, op0))
+    }
+
+    pub fn bextr(ctrl: Operand, src: Operand, dst: Operand) -> Self {
+        Self(Opcode::BEXTR(ctrl, src, dst))
+    }
+
     pub fn jmp(block: X86BlockRef) -> Self {
         Self(Opcode::JMP(Operand::target(block)))
     }
@@ -479,8 +607,23 @@ impl Instruction {
         Self(Opcode::SETE(r))
     }
 
+    pub fn setne(r: Operand) -> Self {
+        Self(Opcode::SETNE(r))
+    }
+
     pub fn setb(r: Operand) -> Self {
         Self(Opcode::SETB(r))
+    }
+
+    pub fn setbe(r: Operand) -> Self {
+        Self(Opcode::SETBE(r))
+    }
+
+    pub fn seta(r: Operand) -> Self {
+        Self(Opcode::SETA(r))
+    }
+    pub fn setae(r: Operand) -> Self {
+        Self(Opcode::SETAE(r))
     }
 
     pub fn jne(block: X86BlockRef) -> Self {
@@ -493,6 +636,7 @@ impl Instruction {
 
     alu_op!(add, ADD);
     alu_op!(sub, SUB);
+    alu_op!(or, OR);
 
     pub fn encode(
         &self,
@@ -595,7 +739,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert!(src_width_in_bits == dst_width_in_bits);
+                assert_eq!(src_width_in_bits, dst_width_in_bits);
 
                 assembler
                     .mov::<AsmMemoryOperand, u32>(
@@ -604,6 +748,40 @@ impl Instruction {
                     )
                     .unwrap();
             }
+            // MOV I -> R
+            MOV(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assert_eq!(src_width_in_bits, dst_width_in_bits);
+
+                assembler
+                    .mov::<AsmRegister64, u64>(dst.into(), *src)
+                    .unwrap();
+            }
+            // MOVZX R -> R
+            MOVZX(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: src_width,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width,
+                },
+            ) => match (*src_width, *dst_width) {
+                (16, 32) => assembler
+                    .movzx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
+                    .unwrap(),
+                _ => todo!(),
+            },
+
             // ADD R -> R
             ADD(
                 Operand {
@@ -618,6 +796,22 @@ impl Instruction {
                 assert!(src_width_in_bits == dst_width_in_bits);
                 assembler
                     .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+            // ADD IMM -> R
+            ADD(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                // assert!(src_width_in_bits == dst_width_in_bits);
+                assembler
+                    .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
             }
             // TEST R, R
@@ -651,143 +845,121 @@ impl Instruction {
             RET => {
                 assembler.ret().unwrap();
             }
+            CMP(
+                Operand {
+                    kind: I(left),
+                    width_in_bits: left_width,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: right_width,
+                },
+            ) => {
+                //assert_eq!(left_width, right_width);
+                assembler
+                    .cmp::<AsmRegister64, i32>(right.into(), (*left).try_into().unwrap())
+                    .unwrap();
+            }
+            SETAE(Operand {
+                kind: R(PHYS(condition)),
+                ..
+            }) => assembler.setae::<AsmRegister8>(condition.into()).unwrap(),
+            NOT(Operand {
+                kind: R(PHYS(condition)),
+                ..
+            }) => assembler.not::<AsmRegister64>(condition.into()).unwrap(),
+            SHL(
+                Operand {
+                    kind: I(amount), ..
+                },
+                Operand {
+                    kind: R(PHYS(value)),
+                    ..
+                },
+            ) => {
+                assembler
+                    .shl::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .unwrap();
+            }
+            OR(
+                Operand { kind: I(left), .. },
+                Operand {
+                    kind: R(PHYS(right)),
+                    ..
+                },
+            ) => {
+                //assert_eq!(left_width, right_width);
+                assembler
+                    .or::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
+                    .unwrap();
+            }
+            BEXTR(
+                Operand {
+                    kind: R(PHYS(ctrl)),
+                    ..
+                },
+                Operand {
+                    kind: R(PHYS(src)), ..
+                },
+                Operand {
+                    kind: R(PHYS(dst)), ..
+                },
+            ) => {
+                assembler
+                    .bextr::<AsmRegister64, AsmRegister64, AsmRegister64>(
+                        dst.into(),
+                        src.into(),
+                        ctrl.into(),
+                    )
+                    .unwrap();
+            }
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
-
-    //     Opcode::ADD => match self.operands.as_slice() {
-    //         [(
-    //             OperandDirection::In,
-    //             Operand {
-    //                 kind: OperandKind::Immediate(imm),
-    //                 width_in_bits: 32,
-    //             },
-    //         ), (
-    //             OperandDirection::InOut,
-    //             Operand {
-    //                 kind:
-    // OperandKind::Register(Register::PhysicalRegister(dst)),
-    //                 width_in_bits: 64,
-    //             },
-    //         )] => {
-    //             assembler
-    //                 .add::<AsmRegister64, _>(dst.into(),
-    // i32::try_from(*imm).unwrap())                 .unwrap();
-    //         }
-
-    //         [(
-    //             OperandDirection::In,
-    //             Operand {
-    //                 kind:
-    // OperandKind::Register(Register::PhysicalRegister(src)),
-    //                 width_in_bits: 64,
-    //             },
-    //         ), (
-    //             OperandDirection::InOut,
-    //             Operand {
-    //                 kind:
-    // OperandKind::Register(Register::PhysicalRegister(dst)),
-    //                 width_in_bits: 64,
-    //             },
-    //         )] => {
-    //             assembler
-    //                 .add::<AsmRegister64, AsmRegister64>(dst.into(),
-    // src.into())                 .unwrap();
-    //         }
-
-    //         ops => todo!("{ops:?} operands not supported for add"),
-    //     },
-
-    //     Opcode::JNE => {
-    //         let [(
-    //             OperandDirection::In,
-    //             Operand {
-    //                 kind: OperandKind::Target(target),
-    //                 ..
-    //             },
-    //         )] = self.operands.as_slice()
-    //         else {
-    //             panic!("invalid operands: {:?}", self.operands);
-    //         };
-
-    //         let label = label_map.get(target).unwrap().clone();
-    //         assembler.jne(label).unwrap();
-    //     }
-
-    //     Opcode::JMP => {
-    //         let [(
-    //             OperandDirection::In,
-    //             Operand {
-    //                 kind: OperandKind::Target(target),
-    //                 ..
-    //             },
-    //         )] = self.operands.as_slice()
-    //         else {
-    //             panic!("invalid operands: {:?}", self.operands);
-    //         };
-
-    //         let label = label_map.get(target).unwrap().clone();
-    //         assembler.jmp(label).unwrap();
-    //     }
-
-    //     Opcode::LABEL => {}
-
-    //     Opcode::TEST => match self.operands.as_slice() {
-    //         [(
-    //             OperandDirection::In,
-    //             Operand {
-    //                 kind:
-    // OperandKind::Register(Register::PhysicalRegister(left)),
-    //                 width_in_bits: w1,
-    //             },
-    //         ), (
-    //             OperandDirection::In,
-    //             Operand {
-    //                 kind:
-    // OperandKind::Register(Register::PhysicalRegister(right)),
-    //                 width_in_bits: w2,
-    //             },
-    //         )] => {
-    //             assert_eq!(w1, w2);
-
-    //             assembler
-    //                 .test::<AsmRegister64, AsmRegister64>(left.into(),
-    // right.into())                 .unwrap();
-    //         }
-    //         _ => todo!(),
-    //     },
-
-    //     Opcode::RET => assembler.ret().unwrap(),
-
-    //     o => unimplemented!("opcode {o:?}"),
-    // };
 
     pub fn get_operands(
         &mut self,
     ) -> impl Iterator<Item = Option<(OperandDirection, &mut Operand)>> + '_ {
         match &mut self.0 {
-            Opcode::MOV(src, dst) => [
+            Opcode::MOV(src, dst) | Opcode::MOVZX(src, dst) => [
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::Out, dst)),
+                None,
+            ]
+            .into_iter(),
+            Opcode::SHL(src, dst)
+            | Opcode::OR(src, dst)
+            | Opcode::ADD(src, dst)
+            | Opcode::SUB(src, dst) => [
+                Some((OperandDirection::In, src)),
+                Some((OperandDirection::InOut, dst)),
+                None,
+            ]
+            .into_iter(),
+            Opcode::JMP(tgt) => [Some((OperandDirection::None, tgt)), None, None].into_iter(),
+            Opcode::RET | Opcode::NOP => [None, None, None].into_iter(),
+            Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => [
+                Some((OperandDirection::In, op0)),
+                Some((OperandDirection::In, op1)),
+                None,
+            ]
+            .into_iter(),
+            Opcode::JNE(tgt) => [Some((OperandDirection::None, tgt)), None, None].into_iter(),
+            Opcode::SETE(r)
+            | Opcode::SETNE(r)
+            | Opcode::SETB(r)
+            | Opcode::SETBE(r)
+            | Opcode::SETA(r)
+            | Opcode::SETAE(r) => [Some((OperandDirection::Out, r)), None, None].into_iter(),
+            Opcode::NOT(r) => [Some((OperandDirection::InOut, r)), None, None].into_iter(),
+
+            Opcode::BEXTR(ctrl, src, dst) => [
+                Some((OperandDirection::In, ctrl)),
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::Out, dst)),
             ]
             .into_iter(),
-            Opcode::ADD(src, dst) | Opcode::SUB(src, dst) => [
-                Some((OperandDirection::In, src)),
-                Some((OperandDirection::InOut, dst)),
-            ]
-            .into_iter(),
-            Opcode::JMP(tgt) => [Some((OperandDirection::None, tgt)), None].into_iter(),
-            Opcode::RET | Opcode::NOP => [None, None].into_iter(),
-            Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => [
-                Some((OperandDirection::In, op0)),
-                Some((OperandDirection::In, op1)),
-            ]
-            .into_iter(),
-            Opcode::JNE(tgt) => [Some((OperandDirection::None, tgt)), None].into_iter(),
-            Opcode::SETE(r) | Opcode::SETB(r) => {
-                [Some((OperandDirection::Out, r)), None].into_iter()
-            }
-            Opcode::NOT(r) => [Some((OperandDirection::InOut, r)), None].into_iter(),
         }
     }
 

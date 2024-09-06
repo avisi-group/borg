@@ -65,6 +65,8 @@ fn decodea64_smoke() {
         },
     );
 
+    // add x0,x1,x2
+    // (x0 = x1 + x2)
     let opcode = ctx.emitter().constant(
         0x8b020020,
         Type {

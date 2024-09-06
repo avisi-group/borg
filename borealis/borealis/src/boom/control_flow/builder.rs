@@ -131,11 +131,11 @@ impl ControlFlowGraphBuilder {
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
                 }
-                Statement::End(_) => {
+                Statement::End(ident) => {
                     // end current block
                     self.current_block
                         .get_mut()
-                        .set_terminator(MaybeUnresolvedTerminator::Return);
+                        .set_terminator(MaybeUnresolvedTerminator::Return(*ident));
 
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
@@ -207,9 +207,10 @@ impl ControlFlowGraphBuilder {
 
         // resolve each kind of terminator
         let terminator = match &unresolved.get().terminator {
-            MaybeUnresolvedTerminator::Return | MaybeUnresolvedTerminator::Undefined => {
-                Terminator::Return(None)
+            MaybeUnresolvedTerminator::Return(ident) => {
+                Terminator::Return(Some(Value::Identifier(*ident)))
             }
+            MaybeUnresolvedTerminator::Undefined => Terminator::Return(None),
             MaybeUnresolvedTerminator::Panic(values) => Terminator::Panic(values.clone()),
             MaybeUnresolvedTerminator::Conditional {
                 condition,
@@ -289,7 +290,7 @@ impl MaybeUnresolvedControlFlowBlock {
 /// Possibly-unresolved block terminator statement
 #[derive(Debug, Clone)]
 enum MaybeUnresolvedTerminator {
-    Return,
+    Return(InternedString),
     Conditional {
         condition: Value,
         target: MaybeUnresolvedJumpTarget,

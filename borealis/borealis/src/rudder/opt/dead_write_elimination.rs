@@ -6,6 +6,9 @@ pub fn run(f: crate::rudder::Function) -> bool {
     let mut changed = false;
 
     for sym in f.local_variables() {
+        if sym.name().as_ref() == "return" {
+            continue;
+        };
         if !dfa.symbol_has_reads(&sym) {
             trace!("no reads for symbol {}", sym.name());
 

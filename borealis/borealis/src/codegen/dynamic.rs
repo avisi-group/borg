@@ -10,7 +10,8 @@ use {
         rudder::{
             constant_value::ConstantValue,
             statement::{
-                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, Statement, StatementKind, UnaryOperationKind
+                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, Statement,
+                StatementKind, UnaryOperationKind,
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
@@ -73,6 +74,9 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         })
         .collect::<TokenStream>();
 
+    let n = function.name();
+    let fn_name = n.as_ref();
+
     let body = if fn_is_allowlisted(function.name()) {
         quote! {
             #fn_state
@@ -98,11 +102,11 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             while let Some(block) = block_queue.pop() {
                 let result = match block {
                     Block::Static(i) => {
-                        log::debug!("static block {i}");
+                        log::debug!("{}: static block {i}", #fn_name);
                         BLOCK_FUNCTIONS[i](ctx, &fn_state)
                     }
                     Block::Dynamic(i) => {
-                        log::debug!("dynamic block {i}");
+                        log::debug!("{}: dynamic block {i}", #fn_name);
                         ctx.emitter().set_current_block(fn_state.block_refs[i].clone());
                         BLOCK_FUNCTIONS[i](ctx, &fn_state)
                     }
@@ -118,6 +122,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                         block_queue.push(Block::Dynamic(lookup_block_idx_by_ref(&fn_state.block_refs, b1)));
                     },
                     BlockResult::Return(node) => {
+                        ctx.emitter().jump(fn_state.exit_block_ref.clone());
                         ctx.emitter().set_current_block(fn_state.exit_block_ref.clone());
                         return node;
                     }
@@ -247,7 +252,7 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
             quote! {
                 Type {
                     kind: TypeKind::Signed,
-                    width: 128,
+                    width: 64, // bad! bad!
                 }
             }
         }
