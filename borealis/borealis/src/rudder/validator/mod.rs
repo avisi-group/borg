@@ -1,7 +1,7 @@
 use {
     crate::rudder::{
-        statement::StatementKind, Block, ConstantValue, Context, Function, PrimitiveTypeClass,
-        Statement, Type,
+        statement::StatementKind, Block, ConstantValue, Context, Function, PrimitiveType,
+        PrimitiveTypeClass, Statement, Type,
     },
     std::{fmt::Display, sync::Arc},
 };
@@ -118,244 +118,44 @@ fn check_operand_types(ctx: &Context) -> Vec<ValidationMessage> {
 fn validate_constant_type(
     ((stmt, block, f), (typ, value)): ((Statement, Block, Function), (Arc<Type>, ConstantValue)),
 ) -> Option<ValidationMessage> {
-    let msg = match value {
-        ConstantValue::UnsignedInteger(_) => match &*typ {
-            Type::Primitive(p) => match p.tc {
-                PrimitiveTypeClass::Void => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use void type class for unsigned integer constant",
-                )),
-                PrimitiveTypeClass::Unit => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use unit type class for unsigned integer constant",
-                )),
-                PrimitiveTypeClass::UnsignedInteger => None,
-                PrimitiveTypeClass::SignedInteger => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use signed integer type class for unsigned integer constant",
-                )),
-                PrimitiveTypeClass::FloatingPoint => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use floating point type class for unsigned integer constant",
-                )),
-            },
-            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use composite type for unsigned integer constant",
-            )),
-            Type::Vector { .. } => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use vector type for unsigned integer constant",
-            )),
-            Type::Bits => {
-                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use bits for
-                // unsigned integer constant"))
-                None
-            }
-            Type::ArbitraryLengthInteger => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use AP integer for unsigned integer constant",
-            )),
-            Type::String | Type::Rational | Type::Any => todo!(),
-            Type::Union { width } => todo!(),
-            Type::Tuple(_) => todo!(),
-        },
-        ConstantValue::SignedInteger(_) => match &*typ {
-            Type::Primitive(p) => match p.tc {
-                PrimitiveTypeClass::Void => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use void type class for signed integer constant",
-                )),
-                PrimitiveTypeClass::Unit => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use unit type class for signed integer constant",
-                )),
-                PrimitiveTypeClass::UnsignedInteger => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use unsigned integer type class for signed integer constant",
-                )),
-                PrimitiveTypeClass::SignedInteger => None,
-                PrimitiveTypeClass::FloatingPoint => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use floating point type class for signed integer constant",
-                )),
-            },
-            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use composite type for signed integer constant",
-            )),
-            Type::Vector { .. } => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use vector type for signed integer constant",
-            )),
-            Type::Bits => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use bits for signed integer constant",
-            )),
+    match (&value, &*typ) {
+        (
+            ConstantValue::UnsignedInteger(_),
+            Type::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::UnsignedInteger,
+                ..
+            }),
+        )
+        | (
+            ConstantValue::SignedInteger(_),
+            Type::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::SignedInteger,
+                ..
+            }),
+        )
+        | (
+            ConstantValue::FloatingPoint(_),
+            Type::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::FloatingPoint,
+                ..
+            }),
+        )
+        | (
+            ConstantValue::Unit,
+            Type::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::Unit,
+                ..
+            }),
+        )
+        | (ConstantValue::String(_), Type::String)
+        | (ConstantValue::Rational(_), Type::Rational)
+        | (ConstantValue::Tuple(_), Type::Tuple(_)) => None,
 
-            Type::ArbitraryLengthInteger => {
-                // this is ok
-                //Some(ValidationMessage::stmt_warn(&f, &block, &stmt, "cannot use AP integer
-                // for signed integer constant"))
-                None
-            }
-            Type::String | Type::Rational | Type::Any => todo!(),
-            Type::Union { width } => todo!(),
-            Type::Tuple(_) => todo!(),
-        },
-        ConstantValue::FloatingPoint(_) => match &*typ {
-            Type::Primitive(p) => match p.tc {
-                PrimitiveTypeClass::Void => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use void type class for floating point constant",
-                )),
-                PrimitiveTypeClass::Unit => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use unit type class for floating point constant",
-                )),
-                PrimitiveTypeClass::UnsignedInteger => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use unsigned integer type class for floating point constant",
-                )),
-                PrimitiveTypeClass::SignedInteger => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use signed integer type class for floating point constant",
-                )),
-                PrimitiveTypeClass::FloatingPoint => None,
-            },
-            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use composite type for floating point constant",
-            )),
-            Type::Vector { .. } => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use vector type for floating point constant",
-            )),
-            Type::Bits => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use bits for floating point constant",
-            )),
-            Type::ArbitraryLengthInteger => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use AP integer for floating point constant",
-            )),
-            Type::String | Type::Rational | Type::Any => todo!(),
-            Type::Union { width } => todo!(),
-            Type::Tuple(_) => todo!(),
-        },
-        ConstantValue::Unit => match &*typ {
-            Type::Primitive(p) => match p.tc {
-                PrimitiveTypeClass::Void => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use void type class for unit constant",
-                )),
-                PrimitiveTypeClass::Unit => None,
-                PrimitiveTypeClass::UnsignedInteger => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use unsigned integer type class for unit constant",
-                )),
-                PrimitiveTypeClass::SignedInteger => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use signed integer type class for unit constant",
-                )),
-                PrimitiveTypeClass::FloatingPoint => Some(ValidationMessage::stmt_warn(
-                    &f,
-                    &block,
-                    &stmt,
-                    "cannot use floating point type class for unit constant",
-                )),
-            },
-            Type::Struct(_) => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use composite type for unit constant",
-            )),
-            Type::Vector { .. } => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use vector type for unit constant",
-            )),
-            Type::Bits => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use bits for unit constant",
-            )),
-            Type::ArbitraryLengthInteger => Some(ValidationMessage::stmt_warn(
-                &f,
-                &block,
-                &stmt,
-                "cannot use AP integer for unit constant",
-            )),
-            Type::String | Type::Rational | Type::Any => todo!(),
-            Type::Union { width } => None,
-            Type::Tuple(_) => todo!(),
-        },
-        ConstantValue::String(_) => {
-            assert!(matches!(&*typ, Type::String));
-            None
-        }
-        ConstantValue::Rational(_) => {
-            assert!(matches!(&*typ, Type::Rational));
-            None
-        }
-        ConstantValue::Tuple(_) => {
-            assert!(matches!(&*typ, Type::Tuple(_)));
-            None
-        }
-    };
-
-    msg
+        _ => Some(ValidationMessage::stmt_warn(
+            &f,
+            &block,
+            &stmt,
+            format!("cannot use {typ:?} type for {value:?}"),
+        )),
+    }
 }
