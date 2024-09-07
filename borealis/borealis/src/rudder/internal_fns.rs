@@ -250,7 +250,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             },
             entry_block,
         }),
-        return_types: vec![Arc::new(Type::Bits)],
+        return_type: Arc::new(Type::Bits),
         parameters: vec![bits_symbol, count_symbol.clone()],
     }
 });

@@ -465,7 +465,7 @@ impl Iterator for BlockIterator {
 pub struct Function {
     inner: Shared<FunctionInner>,
     // return type and parameters are read only, so do not need to exist behind a `Shared`
-    return_types: Vec<Arc<Type>>,
+    return_type: Arc<Type>,
     parameters: Vec<Symbol>,
 }
 
@@ -491,17 +491,17 @@ pub struct FunctionInner {
 impl Function {
     pub fn new<I: Iterator<Item = (InternedString, Arc<Type>)>>(
         name: InternedString,
-        return_types: Vec<Arc<Type>>,
+        return_type: Arc<Type>,
         parameters: I,
     ) -> Self {
-        let mut celf = Self {
+        Self {
             inner: Shared::new(FunctionInner {
                 name,
 
                 local_variables: HashMap::default(),
                 entry_block: Block::new(),
             }),
-            return_types,
+            return_type,
             parameters: parameters
                 .map(|(name, typ)| Symbol {
                     name,
@@ -509,15 +509,7 @@ impl Function {
                     typ,
                 })
                 .collect(),
-        };
-
-        // if return_types.is_void() {
-        //     panic!("functions must have a return type (unit not void)");
-        // }
-
-        // celf.add_local_variable("return_value".into(), return_type);
-
-        celf
+        }
     }
 
     pub fn name(&self) -> InternedString {
@@ -528,8 +520,8 @@ impl Function {
         0 //self.inner.borrow().entry_block().iter().
     }
 
-    pub fn signature(&self) -> (Vec<Arc<Type>>, Vec<Symbol>) {
-        (self.return_types.clone(), self.parameters.clone())
+    pub fn signature(&self) -> (Arc<Type>, Vec<Symbol>) {
+        (self.return_type(), self.parameters())
     }
 
     pub fn update_indices(&self) {
@@ -573,8 +565,8 @@ impl Function {
             .cloned()
     }
 
-    pub fn return_types(&self) -> Vec<Arc<Type>> {
-        self.return_types.clone()
+    pub fn return_type(&self) -> Arc<Type> {
+        self.return_type.clone()
     }
 
     pub fn parameters(&self) -> Vec<Symbol> {

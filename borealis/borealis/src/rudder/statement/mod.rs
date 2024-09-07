@@ -425,10 +425,7 @@ impl Statement {
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
             StatementKind::UnaryOperation { value, .. } => value.typ(),
             StatementKind::ShiftOperation { value, .. } => value.typ(),
-            StatementKind::Call { target, .. } => match target.return_types().as_slice() {
-                [t] => t.clone(),
-                ts => Arc::new(Type::Any),
-            },
+            StatementKind::Call { target, .. } => target.return_type(),
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
             StatementKind::Jump { .. } => Arc::new(Type::void()),
             StatementKind::Branch { .. } => Arc::new(Type::void()),
@@ -480,12 +477,11 @@ impl Statement {
 
             StatementKind::Undefined => Arc::new(Type::Any),
             StatementKind::TupleAccess { index, source } => {
-                // let Type::Tuple(ts) = source.typ() else {
-                //     panic!();
-                // };
+                let Type::Tuple(ts) = &*source.typ() else {
+                    panic!();
+                };
 
-                // ts[index]
-                Arc::new(Type::Any) // todo fix this bad hack
+                ts[index].clone()
             }
 
             StatementKind::GetFlag { .. } => Arc::new(Type::u1()),

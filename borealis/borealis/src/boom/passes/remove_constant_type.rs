@@ -1,7 +1,7 @@
 use {
     crate::{
         boom::{passes::Pass, Ast, Definition, Size, Statement, Type},
-        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
+        util::signed_smallest_width_of_value,
     },
     common::shared::Shared,
 };

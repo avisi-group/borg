@@ -18,22 +18,20 @@ use {
         util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
     },
     proc_macro2::{Literal, TokenStream},
-    quote::{format_ident, quote, ToTokens},
+    quote::{format_ident, quote},
     std::{iter::repeat, sync::Arc},
     syn::Ident,
 };
 
 pub fn codegen_function(function: &Function) -> TokenStream {
     let name_ident = codegen_ident(function.name());
-    let (return_types, parameters) = function.signature();
+    let (return_type, parameters) = function.signature();
 
-    let ret = match return_types.len() {
-        0 => quote!(()),
-        1 => quote!(X86NodeRef),
-        n => {
-            let elements = repeat(quote!(X86NodeRef,)).take(n).collect::<TokenStream>();
-            quote!((#elements))
-        }
+    let return_type = if let Type::Tuple(ts) = &*return_type {
+        let elements = repeat(quote!(X86NodeRef)).take(ts.len());
+        quote!((#(#elements),*))
+    } else {
+        quote!(X86NodeRef)
     };
 
     let function_parameters = codegen_parameters(&parameters);
@@ -160,7 +158,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 
     quote! {
         #[inline(never)] // disabling increases compile time, perf impact not measured
-        pub fn #name_ident(#function_parameters) -> #ret {
+        pub fn #name_ident(#function_parameters) -> #return_type {
             #body
         }
     }

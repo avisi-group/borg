@@ -1,8 +1,6 @@
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, passes::Pass, visitor::Visitor, Ast, Definition,
-        Expression, FunctionDefinition, FunctionSignature, NamedType, NamedValue, Parameter, Size,
-        Statement, Type, Value,
+        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, shared::Shared, HashMap, HashSet},
 };

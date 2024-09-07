@@ -6,12 +6,12 @@ use {
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
             statement::{
                 BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementBuilder,
-                StatementKind, TernaryOperationKind, UnaryOperationKind,
+                StatementKind, UnaryOperationKind,
             },
             Block, ConstantValue, Context, Function, FunctionInner, FunctionKind, PrimitiveType,
             PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
         },
-        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
+        util::signed_smallest_width_of_value,
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     itertools::Itertools,
@@ -123,7 +123,7 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                     local_variables: HashMap::default(),
                     entry_block: Block::new(),
                 }),
-                return_types: REPLICATE_BITS_BOREALIS_INTERNAL.return_types(),
+                return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
                 parameters: REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
             },
             boom::FunctionDefinition {
@@ -219,19 +219,13 @@ impl BuildContext {
     }
 
     fn add_function(&mut self, name: InternedString, definition: &boom::FunctionDefinition) {
-        // handle return tuple types
-        let ret = match &*definition.signature.return_type.get() {
-            boom::Type::Tuple(ts) => ts.iter().map(|t| self.resolve_type(t.clone())).collect(),
-            _ => vec![self.resolve_type(definition.signature.return_type.clone())],
-        };
-
         self.functions.insert(
             name,
             (
                 FunctionKind::Execute,
                 rudder::Function::new(
                     name,
-                    ret,
+                    self.resolve_type(definition.signature.return_type.clone()),
                     definition.signature.parameters.get().iter().map(
                         |boom::Parameter { typ, name, is_ref }| {
                             assert!(!is_ref, "no reference parameters allowed");
@@ -305,8 +299,9 @@ impl BuildContext {
                     signed_smallest_width_of_value(*c).into(),
                 ))
             }
-            boom::Type::Tuple(_) => panic!(), /* tuple only used as return type, shouldn't need
-                                               * resolving? */
+            boom::Type::Tuple(ts) => Arc::new(rudder::Type::Tuple(
+                ts.iter().cloned().map(|t| self.resolve_type(t)).collect(),
+            )),
         }
     }
 
