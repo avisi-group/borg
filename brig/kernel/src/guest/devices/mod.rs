@@ -7,6 +7,7 @@ use {
         },
         guest::devices::aarch64::{borealis_register_init, u__InitSystem},
     },
+    alloc::boxed::Box,
     proc_macro_lib::ktest,
 };
 
@@ -45,6 +46,8 @@ pub mod virtio;
 
 #[ktest]
 fn decodea64_smoke() {
+    let mut register_file = Box::new([0u8; 104488usize]);
+    let register_file_ptr = register_file.as_mut_ptr();
     let mut ctx = X86TranslationContext::new();
     // borealis_register_init(&mut ctx);
 
@@ -79,5 +82,20 @@ fn decodea64_smoke() {
     ctx.emitter().leave();
     let translation = ctx.compile();
     log::debug!("\n{:?}", translation);
+
+    unsafe {
+        let r0 = register_file_ptr.offset(0x428) as *mut u32;
+        let r1 = register_file_ptr.offset(0x1390) as *mut u32;
+        let r2 = register_file_ptr.offset(0x195F8) as *mut u32;
+
+        *r0 = 2;
+        *r1 = 5;
+        *r2 = 10;
+
+        translation.execute(register_file_ptr);
+
+        log::debug!("{} {} {}", *r0, *r1, *r2);
+    }
+
     panic!();
 }

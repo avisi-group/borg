@@ -12,6 +12,7 @@ use {
 };
 
 pub mod emitter;
+mod trampoline;
 pub mod x86;
 
 pub struct TranslationManager {
@@ -42,6 +43,14 @@ impl TranslationManager {
 
 pub struct Translation {
     pub code: Vec<u8, ExecutableAllocator>,
+}
+
+impl Translation {
+    pub fn execute(&self, register_file: *mut u8) {
+        let code_ptr = self.code.as_ptr();
+
+        unsafe { trampoline::execute(code_ptr, register_file) };
+    }
 }
 
 impl Debug for Translation {

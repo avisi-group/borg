@@ -209,8 +209,8 @@ pub enum Flag {
 //     }
 // }
 
+#[derive(Debug, Clone)]
 pub enum BlockResult {
-    None,
     Static(X86BlockRef),
     Dynamic(X86BlockRef, X86BlockRef),
     Return(X86NodeRef),

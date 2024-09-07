@@ -74,6 +74,27 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         })
         .collect::<TokenStream>();
 
+    // todo: fix this
+    let return_statement = if function
+        .local_variables()
+        .iter()
+        .map(|sym| sym.name())
+        .any(|name| name.as_ref() == "return")
+    {
+        quote! {
+
+                return ctx.emitter().read_variable(fn_state.return_);
+        }
+    } else {
+        quote! {
+
+                return ctx.emitter().constant(0, Type {
+                    kind: TypeKind::Unsigned,
+                    width: 0,
+                });
+        }
+    };
+
     let n = function.name();
     let fn_name = n.as_ref();
 
@@ -112,8 +133,9 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                     }
                 };
 
+                log::debug!("{}: {:?}", #fn_name, result);
+
                 match result {
-                    BlockResult::None => {},
                     BlockResult::Static(block) => {
                         block_queue.push(Block::Static(lookup_block_idx_by_ref(&fn_state.block_refs, block)));
                     }
@@ -123,13 +145,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                     },
                     BlockResult::Return(node) => {
                         ctx.emitter().jump(fn_state.exit_block_ref.clone());
-                        ctx.emitter().set_current_block(fn_state.exit_block_ref.clone());
-                        return node;
                     }
                 }
             }
 
-            unreachable!();
+            ctx.emitter().set_current_block(fn_state.exit_block_ref.clone());
+            #return_statement
 
             #block_fns
         }

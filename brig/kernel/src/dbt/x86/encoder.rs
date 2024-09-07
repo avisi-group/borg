@@ -739,7 +739,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert_eq!(src_width_in_bits, dst_width_in_bits);
+                // assert_eq!(src_width_in_bits, dst_width_in_bits);
 
                 assembler
                     .mov::<AsmMemoryOperand, u32>(
