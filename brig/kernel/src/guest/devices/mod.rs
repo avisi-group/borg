@@ -5,7 +5,9 @@ use {
             x86::{emitter::CastOperationKind, X86TranslationContext},
             TranslationContext,
         },
-        guest::devices::aarch64::{borealis_register_init, u__InitSystem},
+        guest::devices::aarch64::{
+            borealis_register_init, u__DecodeA64::u__DecodeA64, u__InitSystem,
+        },
     },
     alloc::boxed::Box,
     proc_macro_lib::ktest,
@@ -78,7 +80,7 @@ fn decodea64_smoke() {
         },
     );
 
-    aarch64::u__DecodeA64(&mut ctx, pc, opcode);
+    u__DecodeA64(&mut ctx, pc, opcode);
     ctx.emitter().leave();
     let translation = ctx.compile();
     log::debug!("\n{:?}", translation);

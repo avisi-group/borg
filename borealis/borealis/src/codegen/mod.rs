@@ -191,83 +191,77 @@ fn codegen_types(rudder: &Context) -> TokenStream {
 }
 
 pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
-    {
-        let mut files = HashMap::default();
+    // {
+    //     let mut files = HashMap::default();
 
-        rudder.update_names();
-        let rudder_fns = rudder.get_functions();
+    //     rudder.update_names();
+    //     let rudder_fns = rudder.get_functions();
 
-        let funcs = rudder_fns
-            .values()
-            .map(dynamic::codegen_function)
-            .collect::<TokenStream>();
+    //     let funcs = rudder_fns
+    //         .values()
+    //         .map(dynamic::codegen_function)
+    //         .collect::<TokenStream>();
 
-        let state = codegen_state(rudder);
-        let bits = include::get("bits.rs");
-        let util = include::get("util.rs");
+    //     let state = codegen_state(rudder);
+    //     let bits = include::get("bits.rs");
+    //     let util = include::get("util.rs");
 
-        let contents = quote! {
-            //! aarch64
+    //     let contents = quote! {
+    //         //! aarch64
 
-            #![allow(non_snake_case)]
-            #![allow(unused_assignments)]
-            #![allow(unused_mut)]
-            #![allow(unused_parens)]
-            #![allow(unused_variables)]
-            #![allow(unused_imports)]
-            #![allow(dead_code)]
-            #![allow(unreachable_code)]
-            #![allow(unused_doc_comments)]
-            #![allow(non_upper_case_globals)]
-            #![allow(non_camel_case_types)]
+    //         #![allow(non_snake_case)]
+    //         #![allow(unused_assignments)]
+    //         #![allow(unused_mut)]
+    //         #![allow(unused_parens)]
+    //         #![allow(unused_variables)]
+    //         #![allow(unused_imports)]
+    //         #![allow(dead_code)]
+    //         #![allow(unreachable_code)]
+    //         #![allow(unused_doc_comments)]
+    //         #![allow(non_upper_case_globals)]
+    //         #![allow(non_camel_case_types)]
 
-            use crate::dbt::{
-                emitter::{Emitter, Type, TypeKind, BlockResult, Flag},
-                x86::{
-                    emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef, },
-                    X86TranslationContext,
-                },
-                TranslationContext,
-            };
+    //         use crate::dbt::{
+    //             emitter::{Emitter, Type, TypeKind, BlockResult, Flag},
+    //             x86::{
+    //                 emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef, },
+    //                 X86TranslationContext,
+    //             },
+    //             TranslationContext,
+    //         };
 
-            #funcs
+    //         #funcs
 
-            #state
+    //         #state
 
-            #bits
+    //         #bits
 
-            #util
-        };
+    //         #util
+    //     };
 
-        files.insert("mod.rs".into(), render(&contents));
-        return (files, HashSet::default());
-    }
+    //     files.insert("mod.rs".into(), render(&contents));
+    //     return (files, HashSet::default());
+    // }
 
-    // common crate depended on by all containing bundle, tracer, state, and
+    // common module depended on by all containing bundle, tracer, state, and
     // structs/enums/unions
     let common = {
         let header = codegen_header();
         let state = codegen_state(rudder);
-        let types = codegen_types(rudder);
         let bits = include::get("bits.rs");
         let util = include::get("util.rs");
 
         (
             InternedString::from_static("common"),
-            (
-                HashSet::<InternedString>::default(),
-                render(&quote! {
-                    #header
+            render(&quote! {
+                #header
 
-                    #state
+                #state
 
-                    #types
+                #bits
 
-                    #bits
-
-                    #util
-                }),
-            ),
+                #util
+            }),
         )
     };
 
@@ -275,58 +269,32 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
     let cfg = FunctionCallGraphAnalysis::new(rudder);
     let rudder_fns = rudder.get_functions();
 
-    let crate_names = rudder_fns
+    let module_names = rudder_fns
         .keys()
         .copied()
         .chain(["common"].into_iter().map(InternedString::from_static))
-        .map(|name| InternedString::from(codegen_ident(name).to_string()));
+        .collect::<Vec<_>>();
 
-    let workspace_manifest = (
-        PathBuf::from("Cargo.toml"),
-        toml::to_string_pretty(&TomlManifest {
-            cargo_features: None,
-            package: None,
-            project: None,
-            profile: None,
-            lib: None,
-            bin: None,
-            example: None,
-            test: None,
-            bench: None,
-            dependencies: None,
-            dev_dependencies: None,
-            dev_dependencies2: None,
-            build_dependencies: None,
-            build_dependencies2: None,
-            features: None,
-            target: None,
-            replace: None,
-            patch: None,
-            workspace: Some(TomlWorkspace {
-                members: Some(crate_names.clone().map(|s| s.to_string()).collect()),
-                resolver: Some("2".to_owned()),
-                exclude: None,
-                default_members: None,
-                metadata: None,
-                package: None,
-                dependencies: None,
-                lints: None,
-            }),
-            badges: None,
-            lints: None,
-            _unused_keys: BTreeSet::new(),
-        })
-        .unwrap(),
+    let header = codegen_header();
+    let module_root_contents = module_names
+        .iter()
+        .copied()
+        .map(codegen_ident)
+        .map(|name| quote!(pub mod #name;))
+        .collect::<TokenStream>();
+
+    let module_root = (
+        PathBuf::from("mod.rs"),
+        render(&quote! {
+            #header
+            #module_root_contents
+        }),
     );
-
-    let dirs = crate_names
-        .flat_map(|name| [PathBuf::from(name.as_ref()).join("src")].into_iter())
-        .collect();
 
     let files = rudder_fns
         .into_par_iter()
-        .map(|(name, _function)| {
-            let contents = quote!();
+        .map(|(name, function)| {
+            let contents = dynamic::codegen_function(&function);
 
             let mut dependencies = cfg.get_callees_for(&name);
             dependencies.push("common".into());
@@ -335,54 +303,42 @@ pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet
                 .filter(|dep| *dep != name)
                 .collect::<Vec<_>>();
 
-            let imports: TokenStream = dependencies
+            let dyn_imports: TokenStream = dependencies
                 .iter()
-                .map(|krate| {
-                    let krate = codegen_ident(*krate);
-                    quote!(use #krate::*;)
+                .map(|dep_name| {
+                    let name = codegen_ident(*dep_name);
+                    quote!(use super::#name::*;)
                 })
                 .collect();
-
-            let dependencies = dependencies
-                .into_iter()
-                .map(|name| InternedString::from(codegen_ident(name).to_string()))
-                .collect::<HashSet<_>>();
 
             let header = codegen_header();
 
             (
                 InternedString::from(codegen_ident(name).to_string()),
-                (
-                    dependencies,
-                    render(&quote! {
-                        #header
+                render(&quote! {
+                    #header
 
-                        #imports
+                    use crate::dbt::{
+                        emitter::{Emitter, Type, TypeKind, BlockResult, Flag},
+                        x86::{
+                            emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef, },
+                            X86TranslationContext,
+                        },
+                        TranslationContext,
+                    };
 
-                        #contents
-                    }),
-                ),
+                    #dyn_imports
+
+                    #contents
+                }),
             )
         })
         .chain([common])
-        .map(|(name, (dependencies, contents))| {
-            let manifest = (
-                PathBuf::from(name.as_ref()).join("Cargo.toml"),
-                toml::to_string(&create_manifest(name, &dependencies)).unwrap(),
-            );
-
-            let source = (
-                PathBuf::from(name.as_ref()).join("src").join("lib.rs"),
-                contents,
-            );
-
-            [manifest, source]
-        })
-        .flatten()
-        .chain([workspace_manifest])
+        .map(|(name, contents)| (PathBuf::from(format!("{name}.rs")), contents))
+        .chain([module_root])
         .collect();
 
-    (files, dirs)
+    (files, HashSet::default())
 }
 
 pub fn render(tokens: &TokenStream) -> String {
@@ -395,7 +351,7 @@ pub fn render(tokens: &TokenStream) -> String {
 /// Header for all generated Rust files
 fn codegen_header() -> TokenStream {
     quote! {
-        #![no_std]
+        // #![no_std]
 
         #![allow(non_snake_case)]
         #![allow(unused_assignments)]
