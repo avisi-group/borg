@@ -239,10 +239,6 @@ pub fn codegen_block(block: Block) -> TokenStream {
         .collect()
 }
 
-pub fn get_ident(stmt: &Statement) -> TokenStream {
-    format_ident!("{}", stmt.name().to_string()).to_token_stream()
-}
-
 pub fn get_block_fn_ident(b: &Block) -> Ident {
     format_ident!("block_{}", b.index())
 }
@@ -390,28 +386,22 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::WriteVariable { symbol, value } => {
             let symbol_ident = codegen_ident(symbol.name());
-            let value = get_ident(&value);
+
             quote! { ctx.emitter().write_variable(fn_state.#symbol_ident.clone(), #value.clone()); }
         }
         StatementKind::ReadRegister { typ, offset } => {
-            let offset = get_ident(&offset);
             let typ = codegen_type_instance(typ);
             quote! {
                 ctx.emitter().read_register(#offset.clone(), #typ);
             }
         }
         StatementKind::WriteRegister { offset, value } => {
-            let offset = get_ident(&offset);
-            let value = get_ident(&value);
             quote! {
                 ctx.emitter().write_register(#offset.clone(), #value.clone());
             }
         }
         // read `size` bytes at `offset`, return a Bits
         StatementKind::ReadMemory { offset, size } => {
-            let offset = get_ident(&offset);
-            let size = get_ident(&size);
-
             quote! {
                 {
                     let mut buf = alloc::vec![0; #size as usize / 8];
@@ -426,7 +416,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::WriteMemory { offset, value } => {
             // OPTIMIZED VERSION:
-            let offset = get_ident(&offset);
 
             // find size of value, either bundle.length or in type
 
@@ -434,13 +423,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             match &*value.typ() {
                 Type::Primitive(PrimitiveType { .. }) => {
-                    let value = get_ident(&value);
                     quote! {
                         state.write_memory(#offset, &#value.to_ne_bytes())
                     }
                 }
                 Type::Bits => {
-                    let value = get_ident(&value);
                     quote! {
                         state.write_memory(#offset, &#value.value().to_ne_bytes()[..#value.length() as usize / 8])
                     }
@@ -451,8 +438,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            let left = get_ident(&lhs);
-            let right = get_ident(&rhs);
+            let left = lhs; // todo:
+            let right = rhs;
 
             // // hard to decide whether this belongs, but since it's a Rust issue that u1
             // is // not like other types, casting is a codegen thing
@@ -492,8 +479,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! { ctx.emitter().binary_operation(BinaryOperationKind::#kind(#left.clone(), #right.clone())) }
         }
         StatementKind::UnaryOperation { kind, value } => {
-            let value = get_ident(&value);
-
             let kind = match kind {
                 UnaryOperationKind::Not => quote!(Not),
                 UnaryOperationKind::Negate => quote!(Negate),
@@ -512,9 +497,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             value,
             amount,
         } => {
-            let value = get_ident(&value);
-            let amount = get_ident(&amount);
-
             let kind = match kind {
                 ShiftOperationKind::LogicalShiftLeft => quote!(LogicalShiftLeft),
                 ShiftOperationKind::LogicalShiftRight => quote!(LogicalShiftRight),
@@ -527,7 +509,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::Call { target, args, .. } => {
             let ident = codegen_ident(target.name());
-            let args = args.iter().map(get_ident);
 
             // if tail {
             //     quote! {
@@ -543,7 +524,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
         StatementKind::Cast { typ, value, kind } => {
             let typ = codegen_type_instance(typ);
-            let value = get_ident(&value);
 
             let kind = match kind {
                 CastOperationKind::ZeroExtend => quote!(ZeroExtend),
@@ -567,7 +547,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             true_target,
             false_target,
         } => {
-            let condition = get_ident(&condition);
             let true_index = true_target.index();
             let false_index = false_target.index();
 
@@ -596,9 +575,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             true_value,
             false_value,
         } => {
-            let condition = get_ident(&condition);
-            let true_value = get_ident(&true_value);
-            let false_value = get_ident(&false_value);
             quote! { ctx.emitter().select(#condition, #true_value, #false_value) }
         }
         StatementKind::BitExtract {
@@ -606,9 +582,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             start,
             length,
         } => {
-            let value = get_ident(&value);
-            let start = get_ident(&start);
-            let length = get_ident(&length);
             quote! { ctx.emitter().bit_extract(#value.clone(), #start.clone(), #length.clone()) }
         }
         StatementKind::BitInsert {
@@ -617,21 +590,12 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             start,
             length,
         } => {
-            let target = get_ident(&target);
-            let source = get_ident(&source);
-            let start = get_ident(&start);
-            let length = get_ident(&length);
             quote! {ctx.emitter().bit_insert(#target.clone(), #source.clone(), #start.clone(), #length.clone())}
         }
         StatementKind::Panic(statements) => {
-            let args = statements.iter().map(get_ident);
-
-            quote!(panic!("{:?}", (#(#args),*)))
+            quote!(panic!("{:?}", (#(#statements),*)))
         }
         StatementKind::ReadElement { vector, index } => {
-            let vector = get_ident(&vector);
-            let index = get_ident(&index);
-
             quote!(ctx.emitter().read_element(#vector, #index))
         }
         StatementKind::WriteElement {
@@ -639,19 +603,13 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             value,
             index,
         } => {
-            let vector = get_ident(&vector);
-            let index = get_ident(&index);
-            let value = get_ident(&value);
             quote!(ctx.emitter().mutate_element(#vector, #index, #value))
         }
 
         StatementKind::CreateBits { value, length } => {
-            let value = get_ident(&value);
-            let length = get_ident(&length);
             quote!(Bits::new(#value, #length))
         }
         StatementKind::Assert { condition } => {
-            let condition = get_ident(&condition);
             quote!(ctx.emitter().assert(#condition))
         }
         StatementKind::BitsCast {
@@ -662,26 +620,23 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         } => {
             let source_type = value.typ();
             let target_type = typ;
-            let value_ident = get_ident(&value);
-            let length_ident = get_ident(&length);
 
             match (&*source_type, &*target_type, kind) {
                 (Type::Bits, Type::Bits, CastOperationKind::ZeroExtend) => {
-                    quote!(#value_ident.zero_extend(#length_ident))
+                    quote!(#value.zero_extend(#length))
                 }
                 (Type::Bits, Type::Bits, CastOperationKind::SignExtend) => {
-                    quote!(#value_ident.sign_extend(#length_ident))
+                    quote!(#value.sign_extend(#length))
                 }
                 (Type::Bits, Type::Bits, CastOperationKind::Truncate) => {
-                    quote!(#value_ident.truncate(#length_ident))
+                    quote!(#value.truncate(#length))
                 }
                 _ => todo!(),
             }
         }
         StatementKind::SizeOf { value } => {
-            let ident = get_ident(&value);
             match &*value.typ() {
-                Type::Bits => quote!(#ident.length()),
+                Type::Bits => quote!(#value.length()),
                 Type::ArbitraryLengthInteger => {
                     panic!("cannot get size of arbitrary length integer")
                 }
@@ -732,12 +687,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
         StatementKind::Undefined => quote!(Default::default()),
         StatementKind::TupleAccess { index, source } => {
-            let ident = get_ident(&source);
             let index = Literal::usize_unsuffixed(index);
-            quote!(#ident.#index)
+            quote!(#source.#index)
         }
         StatementKind::GetFlag { flag, operation } => {
-            let operation = get_ident(&operation);
             let flag = match flag {
                 Flag::N => quote!(N),
                 Flag::Z => quote!(Z),
@@ -747,7 +700,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote!(ctx.emitter().get_flag(Flag::#flag, #operation.clone()))
         }
         StatementKind::CreateTuple(values) => {
-            let values = values.iter().map(get_ident);
             quote!((#(#values),*))
         }
     };
@@ -769,7 +721,6 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> TokenStream {
     let source_type = value.typ();
     let target_type = typ;
-    let ident = get_ident(&value);
 
     if source_type == target_type {
         log::warn!(
@@ -777,9 +728,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
             value.name(),
             target_type
         );
-        return quote! {
-            ((#ident))
-        };
+        return quote!(#value);
     }
 
     match (&*source_type, &*target_type, kind) {
@@ -792,7 +741,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
             }),
             _,
         ) => quote! {
-            ((#ident) != 0)
+            ((#value) != 0)
         },
 
         // extract value before testing
@@ -804,7 +753,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
             }),
             _,
         ) => quote! {
-            ((#ident.value()) != 0)
+            ((#value.value()) != 0)
         },
 
         // safe even if underlying rudder types are smaller than codegen'd rust
@@ -812,7 +761,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
         (Type::Primitive(_), Type::Primitive(_), CastOperationKind::ZeroExtend) => {
             let target = codegen_type(target_type);
             quote! {
-                (#ident as #target)
+                (#value as #target)
             }
         }
 
@@ -824,13 +773,13 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
                 PrimitiveTypeClass::UnsignedInteger | PrimitiveTypeClass::SignedInteger => {
                     let target = codegen_type(target_type);
                     quote! {
-                        (#target::try_from(#ident).unwrap())
+                        (#target::try_from(#value).unwrap())
                     }
                 }
                 PrimitiveTypeClass::FloatingPoint => {
                     let target = codegen_type(target_type);
                     quote! {
-                        (#ident as #target)
+                        (#value as #target)
                     }
                 }
             }
@@ -855,10 +804,10 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
 
             if let PrimitiveTypeClass::FloatingPoint = tc {
                 // no mask needed for floating point casts
-                quote!((#ident as #target))
+                quote!((#value as #target))
             } else {
                 // mask needed in case of truncating in between rust type widths
-                quote!(((#ident as #target) & #mask))
+                quote!(((#value as #target) & #mask))
             }
         }
 
@@ -886,8 +835,8 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
             // }
             quote! {
                 {
-                    let sign_bit = #ident.length() - 1;
-                    let mut result = #ident.value() as i128;
+                    let sign_bit = #value.length() - 1;
+                    let mut result = #value.value() as i128;
 
                     if ((result >> sign_bit) & 1) == 1 {
                         // If sign bit is unset then we are done, otherwise clear sign_bit and subtract 2**sign_bit
@@ -903,7 +852,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
         (Type::Bits, Type::Primitive(_), CastOperationKind::Reinterpret) => {
             let target = codegen_type(target_type);
             quote! {
-                (#ident.value() as #target)
+                (#value.value() as #target)
             }
         }
 
@@ -911,19 +860,19 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
         (Type::ArbitraryLengthInteger, Type::Primitive(_), CastOperationKind::Reinterpret) => {
             let target = codegen_type(target_type);
             quote! {
-                (#ident as #target)
+                (#value as #target)
             }
         }
 
         (Type::Primitive(_), Type::Primitive(_), CastOperationKind::Reinterpret) => {
             let target = codegen_type(target_type);
             quote! {
-                (#ident as #target)
+                (#value as #target)
             }
         }
 
         (Type::ArbitraryLengthInteger, Type::Bits, CastOperationKind::Convert) => {
-            quote!(Bits::new(#ident as u128, 128))
+            quote!(Bits::new(#value as u128, 128))
         }
 
         (
@@ -932,7 +881,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
             CastOperationKind::Convert | CastOperationKind::ZeroExtend,
         ) => {
             let target_type = codegen_type(target_type);
-            quote!((#ident.value() as #target_type))
+            quote!((#value.value() as #target_type))
         }
 
         // this type of cast replaces a lot of "create-bits"
@@ -947,7 +896,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
         ) => {
             let width = u16::try_from(*element_width_in_bits).unwrap();
             // todo: maybe this as shouldn't be necessary?
-            quote!(Bits::new(#ident as u128, #width))
+            quote!(Bits::new(#value as u128, #width))
         }
 
         (
@@ -963,7 +912,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
         ) => {
             assert_eq!(&**source_type, &**target_type);
 
-            quote!(alloc::vec::Vec::from(#ident))
+            quote!(alloc::vec::Vec::from(#value))
         }
 
         (
@@ -983,7 +932,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
             quote! {
                 {
                     let mut buf = [Default::default(); #element_count];
-                    buf.copy_from_slice(&#ident);
+                    buf.copy_from_slice(&#value);
                     buf
                 }
             }
@@ -991,13 +940,13 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
 
         (Type::Rational, Type::ArbitraryLengthInteger, CastOperationKind::Convert) => {
             quote! {
-                #ident.to_integer()
+                #value.to_integer()
             }
         }
 
         (Type::ArbitraryLengthInteger, Type::Rational, CastOperationKind::Convert) => {
             quote! {
-                num_rational::Ratio::<i128>::from_integer(#ident)
+                num_rational::Ratio::<i128>::from_integer(#value)
             }
         }
 
@@ -1005,7 +954,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
         // identifier and let rust sort out the type
         (Type::Any, _, _) => {
             quote! {
-                (#ident)
+                (#value)
             }
         }
 

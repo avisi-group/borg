@@ -4,6 +4,8 @@ use {
         Type, WeakBlock,
     },
     common::{intern::InternedString, shared::Shared},
+    proc_macro2::TokenStream,
+    quote::{format_ident, ToTokens, TokenStreamExt},
     std::{
         cmp::Ordering,
         fmt::Debug,
@@ -346,6 +348,12 @@ impl PartialEq for Statement {
 }
 
 impl Eq for Statement {}
+
+impl ToTokens for Statement {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix this?
+    }
+}
 
 #[derive(Debug)]
 pub struct StatementInner {
