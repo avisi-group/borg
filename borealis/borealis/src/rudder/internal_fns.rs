@@ -51,9 +51,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             symbol: result_symbol.clone(),
         });
 
-        builder.build(StatementKind::Return {
-            value: Some(read_result),
-        });
+        builder.build(StatementKind::Return { value: read_result });
 
         end_block.set_statements(builder.finish().into_iter());
 

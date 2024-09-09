@@ -18,7 +18,7 @@ pub fn run(f: Function) -> bool {
             };
 
             match terminator.kind() {
-                StatementKind::Return { value: None } => {
+                StatementKind::Return { value } => {
                     trace!("found single statement return block");
 
                     // for each predecessor, if they end in a "jump"

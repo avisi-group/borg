@@ -296,7 +296,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
         }
 
         jib_ast::InstructionAux::Throw(value) => {
-            vec![boom::Statement::Panic(vec![convert_value(value)])]
+            vec![boom::Statement::Panic(convert_value(value))]
         }
         jib_ast::InstructionAux::Comment(s) => vec![boom::Statement::Comment(*s)],
         jib_ast::InstructionAux::TryBlock(_) | jib_ast::InstructionAux::Block(_) => unreachable!(),

@@ -18,11 +18,7 @@ pub fn run(f: Function) -> bool {
         if let StatementKind::Return { value } = terminator.kind() {
             let second_last = block.statements().iter().rev().nth(1).unwrap().clone();
 
-            if let Some(return_value) = value {
-                if return_value != second_last {
-                    continue;
-                }
-            } else {
+            if value != second_last {
                 continue;
             }
 

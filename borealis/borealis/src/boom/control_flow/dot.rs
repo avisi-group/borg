@@ -61,18 +61,15 @@ impl Graph {
             };
 
             let terminator = match node.terminator() {
-                Terminator::Return(value) => match value {
-                    Some(value) => {
-                        let value = {
-                            let mut buf = Vec::new();
-                            boom::pretty_print::print_value(&mut buf, Shared::new(value));
-                            String::from_utf8(buf).unwrap()
-                        };
+                Terminator::Return(value) => {
+                    let value = {
+                        let mut buf = Vec::new();
+                        boom::pretty_print::print_value(&mut buf, Shared::new(value));
+                        String::from_utf8(buf).unwrap()
+                    };
 
-                        format!("return ({value})")
-                    }
-                    None => "return".to_owned(),
-                },
+                    format!("return ({value})")
+                }
                 Terminator::Conditional { condition, .. } => {
                     let condition = {
                         let mut buf = Vec::new();

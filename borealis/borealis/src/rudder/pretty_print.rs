@@ -215,10 +215,8 @@ impl Display for StatementKind {
 
                 Ok(())
             }
-            StatementKind::Return { value: None } => {
-                write!(f, "return")
-            }
-            StatementKind::Return { value: Some(value) } => {
+
+            StatementKind::Return { value } => {
                 write!(f, "return {}", value.name())
             }
             StatementKind::Select {
@@ -234,12 +232,8 @@ impl Display for StatementKind {
                     false_value.name()
                 )
             }
-            StatementKind::Panic(statements) => {
-                write!(
-                    f,
-                    "panic {}",
-                    statements.iter().map(Statement::name).join(" ")
-                )
+            StatementKind::Panic(statement) => {
+                write!(f, "panic {}", statement.name())
             }
             StatementKind::Undefined => write!(f, "undefined",),
 

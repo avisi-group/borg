@@ -166,9 +166,7 @@ impl StatementUseAnalysis {
                     self.add_use(&condition, &stmt);
                 }
                 StatementKind::Return { value } => {
-                    if let Some(value) = value {
-                        self.add_use(&value, &stmt);
-                    }
+                    self.add_use(&value, &stmt);
                 }
                 StatementKind::Select {
                     condition,
@@ -215,10 +213,8 @@ impl StatementUseAnalysis {
                 StatementKind::Assert { condition } => {
                     self.add_use(&condition, &stmt);
                 }
-                StatementKind::Panic(panic_values) => {
-                    for panic_value in panic_values {
-                        self.add_use(&panic_value, &stmt);
-                    }
+                StatementKind::Panic(value) => {
+                    self.add_use(&value, &stmt);
                 }
                 StatementKind::CreateBits { value, length } => {
                     self.add_use(&value, &stmt);

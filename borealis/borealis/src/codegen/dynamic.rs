@@ -93,9 +93,6 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         }
     };
 
-    let n = function.name();
-    let fn_name = n.as_ref();
-
     let body = if fn_is_allowlisted(function.name()) {
         quote! {
             #fn_state
@@ -121,27 +118,36 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             while let Some(block) = block_queue.pop() {
                 let result = match block {
                     Block::Static(i) => {
-                        log::debug!("{}: static block {i}", #fn_name);
+                        log::debug!("static block {i}");
                         BLOCK_FUNCTIONS[i](ctx, &fn_state)
                     }
                     Block::Dynamic(i) => {
-                        log::debug!("{}: dynamic block {i}", #fn_name);
+                        log::debug!("dynamic block {i}");
                         ctx.emitter().set_current_block(fn_state.block_refs[i].clone());
                         BLOCK_FUNCTIONS[i](ctx, &fn_state)
                     }
                 };
 
-                log::debug!("{}: {:?}", #fn_name, result);
-
                 match result {
                     BlockResult::Static(block) => {
-                        block_queue.push(Block::Static(lookup_block_idx_by_ref(&fn_state.block_refs, block)));
+                        let idx = lookup_block_idx_by_ref(&fn_state.block_refs, block);
+                        log::debug!("block result: static({idx})");
+                        block_queue.push(Block::Static(idx));
                     }
                     BlockResult::Dynamic(b0, b1) => {
-                        block_queue.push(Block::Dynamic(lookup_block_idx_by_ref(&fn_state.block_refs, b0)));
-                        block_queue.push(Block::Dynamic(lookup_block_idx_by_ref(&fn_state.block_refs, b1)));
+                        let i0 = lookup_block_idx_by_ref(&fn_state.block_refs, b0);
+                        let i1 = lookup_block_idx_by_ref(&fn_state.block_refs, b1);
+                        log::debug!("block result: dynamic({i0}, {i1})");
+                        block_queue.push(Block::Dynamic(i0));
+                        block_queue.push(Block::Dynamic(i1));
                     },
                     BlockResult::Return(node) => {
+                        log::debug!("block result: return");
+                        ctx.emitter().jump(fn_state.exit_block_ref.clone());
+                    }
+                    BlockResult::Panic => {
+                        log::debug!("block result: panic");
+                        // unreachable but inserted just to make sure *every* block has a path to the exit block
                         ctx.emitter().jump(fn_state.exit_block_ref.clone());
                     }
                 }
@@ -553,21 +559,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
-        StatementKind::Return { value } => match value {
-            Some(value) => {
-                let name = codegen_ident(value.name());
-                quote! { return BlockResult::Return(#name); }
-            }
-            None => {
-                quote! {
-                    let v = ctx.emitter().constant(0, Type {
-                        kind: TypeKind::Unsigned,
-                        width: 0,
-                    });
-                    return BlockResult::Return(v);
-                }
-            }
-        },
+        StatementKind::Return { value } => {
+            let name = codegen_ident(value.name());
+            quote! { return BlockResult::Return(#name); }
+        }
         StatementKind::Select {
             condition,
             true_value,
@@ -590,8 +585,11 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         } => {
             quote! {ctx.emitter().bit_insert(#target.clone(), #source.clone(), #start.clone(), #length.clone())}
         }
-        StatementKind::Panic(statements) => {
-            quote!(panic!("{:?}", (#(#statements),*)))
+        StatementKind::Panic(statement) => {
+            quote! {
+                ctx.emitter().panic(#statement);
+                return BlockResult::Panic;
+            }
         }
         StatementKind::ReadElement { vector, index } => {
             quote!(ctx.emitter().read_element(#vector, #index))
@@ -976,7 +974,11 @@ fn codegen_constant_value(value: ConstantValue, typ: Arc<Type>) -> TokenStream {
             quote!(ctx.emitter().constant(#v as u64, #typ_instance))
         }
         ConstantValue::Unit => quote!(ctx.emitter().constant(0, #typ_instance)),
-        ConstantValue::Rational(_) | ConstantValue::String(_) => todo!(),
+        ConstantValue::String(s) => {
+            let str = s.as_ref();
+            quote!(#str)
+        }
+        ConstantValue::Rational(_) => todo!(),
 
         ConstantValue::Tuple(values) => {
             let Type::Tuple(types) = &*typ else { panic!() };

@@ -11,7 +11,7 @@
 use {
     crate::boom::{
         visitor::{Visitor, Walkable},
-        Statement, Value,
+        Literal, Statement, Value,
     },
     common::{
         identifiable::Id,
@@ -203,9 +203,9 @@ impl Eq for ControlFlowBlockWeak {}
 /// Describes how one block conditionally or unconditionally jumps to the next
 #[derive(Debug, Clone)]
 pub enum Terminator {
-    /// Function return with optional value
-    Return(Option<Value>),
-    Panic(Vec<Shared<Value>>),
+    /// Function return with value
+    Return(Value),
+    Panic(Value),
     /// If condition evaluates to true, then jump to target, otherwise jump to
     /// fallthrough
     Conditional {
@@ -225,7 +225,9 @@ pub enum Terminator {
 
 impl Default for Terminator {
     fn default() -> Self {
-        Self::Return(None)
+        Self::Panic(Value::Literal(Shared::new(Literal::String(
+            "default terminator".into(),
+        ))))
     }
 }
 

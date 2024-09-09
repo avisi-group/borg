@@ -60,6 +60,8 @@ pub trait Emitter {
         value: Self::NodeRef,
     ) -> Self::NodeRef;
 
+    fn panic(&mut self, msg: &'static str);
+
     fn branch(
         &mut self,
         condition: Self::NodeRef,
@@ -214,4 +216,5 @@ pub enum BlockResult {
     Static(X86BlockRef),
     Dynamic(X86BlockRef, X86BlockRef),
     Return(X86NodeRef),
+    Panic,
 }

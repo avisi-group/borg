@@ -164,7 +164,7 @@ pub enum StatementKind {
         members: Vec<(Block, Statement)>,
     },
     Return {
-        value: Option<Statement>,
+        value: Statement,
     },
     Select {
         condition: Statement,
@@ -198,9 +198,9 @@ pub enum StatementKind {
         index: Statement,
     },
 
-    /// Fatal error, printing values of supplied statements for debugging
+    /// Fatal error, printing value of supplied statement for debugging
     /// purposes
-    Panic(Vec<Statement>),
+    Panic(Statement),
 
     /// `Default::default()`, or uninitialized, or ???
     Undefined,
@@ -523,27 +523,40 @@ impl StatementInner {
 
     pub fn replace_use(&mut self, use_of: Statement, with: Statement) {
         match self.kind.clone() {
-            StatementKind::Return { .. } => {
-                self.kind = StatementKind::Return {
-                    value: Some(with.clone()),
+            StatementKind::Return { value } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
                 };
+
+                self.kind = StatementKind::Return { value };
             }
             StatementKind::Branch {
                 true_target,
                 false_target,
-                ..
+                condition,
             } => {
+                let condition = if condition == use_of {
+                    with.clone()
+                } else {
+                    condition.clone()
+                };
+
                 self.kind = StatementKind::Branch {
-                    condition: with.clone(),
+                    condition,
                     true_target,
                     false_target,
                 };
             }
-            StatementKind::WriteVariable { symbol, .. } => {
-                self.kind = StatementKind::WriteVariable {
-                    symbol,
-                    value: with.clone(),
+            StatementKind::WriteVariable { symbol, value } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
                 };
+
+                self.kind = StatementKind::WriteVariable { symbol, value };
             }
             StatementKind::BinaryOperation { kind, lhs, rhs } => {
                 if lhs == use_of {
@@ -562,19 +575,24 @@ impl StatementInner {
                     panic!("should not get here");
                 }
             }
-            StatementKind::UnaryOperation { kind, .. } => {
-                self.kind = StatementKind::UnaryOperation {
-                    kind,
-                    value: with.clone(),
+            StatementKind::UnaryOperation { kind, value } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
                 };
+
+                self.kind = StatementKind::UnaryOperation { kind, value };
             }
 
-            StatementKind::Cast { kind, typ, .. } => {
-                self.kind = StatementKind::Cast {
-                    kind,
-                    typ,
-                    value: with.clone(),
+            StatementKind::Cast { kind, typ, value } => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
                 };
+
+                self.kind = StatementKind::Cast { kind, typ, value };
             }
             StatementKind::BitsCast {
                 kind,
@@ -646,10 +664,14 @@ impl StatementInner {
                 };
             }
 
-            StatementKind::Assert { .. } => {
-                self.kind = StatementKind::Assert {
-                    condition: with.clone(),
+            StatementKind::Assert { condition } => {
+                let condition = if condition == use_of {
+                    with.clone()
+                } else {
+                    condition.clone()
                 };
+
+                self.kind = StatementKind::Assert { condition };
             }
             StatementKind::ShiftOperation {
                 kind,
@@ -832,13 +854,14 @@ impl StatementInner {
 
                 self.kind = StatementKind::WritePc { value };
             }
-            StatementKind::Panic(statements) => {
-                self.kind = StatementKind::Panic(
-                    statements
-                        .into_iter()
-                        .map(|stmt| if stmt == use_of { with.clone() } else { stmt })
-                        .collect(),
-                )
+            StatementKind::Panic(value) => {
+                let value = if value == use_of {
+                    with.clone()
+                } else {
+                    value.clone()
+                };
+
+                self.kind = StatementKind::Panic(value)
             }
 
             StatementKind::CreateBits { value, length } => {

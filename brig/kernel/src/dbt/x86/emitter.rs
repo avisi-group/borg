@@ -511,6 +511,26 @@ impl Emitter for X86Emitter {
             kind: NodeKind::GetFlag { flag, operation },
         })
     }
+
+    fn panic(&mut self, msg: &'static str) {
+        let n = Self::NodeRef::from(X86Node {
+            typ: Type {
+                kind: TypeKind::Unsigned,
+                width: 8,
+            },
+            kind: NodeKind::Constant {
+                value: match msg {
+                    "undefined terminator" => 0x50,
+                    "default terminator" => 0x51,
+                    _ => todo!("{msg}"),
+                },
+                width: 8,
+            },
+        })
+        .to_operand(self);
+
+        self.current_block.append(Instruction::int(n));
+    }
 }
 
 fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {

@@ -124,8 +124,7 @@ impl<'writer, W: Write> PrettyPrinter<'writer, W> {
                 });
 
                 match b.terminator() {
-                    Terminator::Return(None) => writeln!(self.writer, "        return;").unwrap(),
-                    Terminator::Return(Some(value)) => {
+                    Terminator::Return(value) => {
                         write!(self.writer, "        return ").unwrap();
                         self.visit_value(Shared::new(value));
                         writeln!(self.writer, ";").unwrap();
@@ -146,12 +145,9 @@ impl<'writer, W: Write> PrettyPrinter<'writer, W> {
                     Terminator::Unconditional { target } => {
                         writeln!(self.writer, "        goto {target};").unwrap();
                     }
-                    Terminator::Panic(values) => {
+                    Terminator::Panic(value) => {
                         write!(self.writer, "        panic ").unwrap();
-                        for value in values {
-                            self.visit_value(value);
-                            writeln!(self.writer, ", ").unwrap();
-                        }
+                        self.visit_value(Shared::new(value));
                         writeln!(self.writer, ";").unwrap();
                     }
                 }
@@ -302,12 +298,9 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
             Statement::End(_) => todo!(),
             Statement::Undefined => todo!(),
-            Statement::Panic(values) => {
+            Statement::Panic(value) => {
                 write!(self.writer, "panic(").unwrap();
-                values.iter().for_each(|v| {
-                    self.visit_value(v.clone());
-                    write!(self.writer, ", ").unwrap();
-                });
+                self.visit_value(value.clone());
                 write!(self.writer, ")").unwrap();
             }
         }

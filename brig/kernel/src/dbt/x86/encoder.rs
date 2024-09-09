@@ -52,6 +52,8 @@ pub enum Opcode {
     JNE(Operand),
     /// nop
     NOP,
+    /// int {0}
+    INT(Operand),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
@@ -634,6 +636,10 @@ impl Instruction {
         Self(Opcode::NOT(r))
     }
 
+    pub fn int(n: Operand) -> Self {
+        Self(Opcode::INT(n))
+    }
+
     alu_op!(add, ADD);
     alu_op!(sub, SUB);
     alu_op!(or, OR);
@@ -914,6 +920,9 @@ impl Instruction {
                     .unwrap();
             }
 
+            INT(Operand { kind: I(n), .. }) => {
+                assembler.int(i32::try_from(*n).unwrap()).unwrap();
+            }
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -960,6 +969,7 @@ impl Instruction {
                 Some((OperandDirection::Out, dst)),
             ]
             .into_iter(),
+            Opcode::INT(n) => [Some((OperandDirection::In, n)), None, None].into_iter(),
         }
     }
 

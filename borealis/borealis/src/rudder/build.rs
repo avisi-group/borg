@@ -398,11 +398,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         // check terminator, insert final rudder statement
         let kind = match boom_block.terminator() {
-            boom::control_flow::Terminator::Return(value) => {
-                let value = value.map(|v| self.build_value(Shared::new(v)));
-
-                rudder::StatementKind::Return { value }
-            }
+            boom::control_flow::Terminator::Return(value) => rudder::StatementKind::Return {
+                value: self.build_value(Shared::new(value)),
+            },
 
             boom::control_flow::Terminator::Conditional {
                 condition,
@@ -429,10 +427,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     target: rudder_target,
                 }
             }
-            boom::control_flow::Terminator::Panic(values) => {
-                let values = values.iter().map(|v| self.build_value(v.clone())).collect();
-
-                StatementKind::Panic(values)
+            boom::control_flow::Terminator::Panic(value) => {
+                StatementKind::Panic(self.build_value(Shared::new(value.clone())))
             }
         };
 
@@ -468,14 +464,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 panic!("no control flow should exist at this point in compilation!\n{statement:?}")
             }
             boom::Statement::Exit(_) | boom::Statement::Comment(_) => (),
-            boom::Statement::Panic(values) => {
-                let statements = values
-                    .iter()
-                    .cloned()
-                    .map(|v| self.build_value(v))
-                    .collect();
-
-                self.builder.build(StatementKind::Panic(statements));
+            boom::Statement::Panic(value) => {
+                let value = self.build_value(value.clone());
+                self.builder.build(StatementKind::Panic(value));
             }
         }
     }
@@ -1426,7 +1417,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     typ: Arc::new(rudder::Type::u1()),
                     value: ConstantValue::UnsignedInteger(1),
                 })),
-                "write_tag#" => Some(self.builder.build(StatementKind::Panic(vec![]))),
+                "write_tag#" => {
+                    let msg = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::String), value: ConstantValue::String("write_tag panic".into()) });
+                    Some(self.builder.build(StatementKind::Panic(msg)))
+                },
 
                 "DecStr" | "bits_str" | "HexStr" => {
                     Some(self.builder.build(StatementKind::Constant {
@@ -1452,7 +1446,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 })),
 
                 // val putchar : (%i) -> %unit
-                "putchar" => Some(self.builder.build(StatementKind::Panic(vec![args[0].clone()]))),
+                "putchar" => Some(self.builder.build(StatementKind::Panic(args[0].clone()))),
 
                 "AArch64_DC"
                 | "execute_aarch64_instrs_system_barriers_dmb"

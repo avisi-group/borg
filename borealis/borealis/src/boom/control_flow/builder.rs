@@ -1,7 +1,7 @@
 use {
     crate::boom::{
         control_flow::{ControlFlowBlock, Terminator},
-        Statement, Value,
+        Literal, Statement, Value,
     },
     common::{
         intern::InternedString,
@@ -149,11 +149,11 @@ impl ControlFlowGraphBuilder {
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
                 }
-                Statement::Panic(values) => {
+                Statement::Panic(value) => {
                     // end current block
                     self.current_block
                         .get_mut()
-                        .set_terminator(MaybeUnresolvedTerminator::Panic(values.clone()));
+                        .set_terminator(MaybeUnresolvedTerminator::Panic(value.get().clone()));
 
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
@@ -208,10 +208,12 @@ impl ControlFlowGraphBuilder {
         // resolve each kind of terminator
         let terminator = match &unresolved.get().terminator {
             MaybeUnresolvedTerminator::Return(ident) => {
-                Terminator::Return(Some(Value::Identifier(*ident)))
+                Terminator::Return(Value::Identifier(*ident))
             }
-            MaybeUnresolvedTerminator::Undefined => Terminator::Return(None),
-            MaybeUnresolvedTerminator::Panic(values) => Terminator::Panic(values.clone()),
+            MaybeUnresolvedTerminator::Undefined => Terminator::Panic(Value::Literal(Shared::new(
+                Literal::String("undefined terminator".into()),
+            ))),
+            MaybeUnresolvedTerminator::Panic(value) => Terminator::Panic(value.clone()),
             MaybeUnresolvedTerminator::Conditional {
                 condition,
                 target,
@@ -227,7 +229,7 @@ impl ControlFlowGraphBuilder {
 
             MaybeUnresolvedTerminator::Unknown => {
                 if self.allow_unknown_terminators {
-                    Terminator::Return(None)
+                    Terminator::Return(Value::Literal(Shared::new(Literal::Unit)))
                 } else {
                     panic!("encountered unknown terminator during resolution\n{self:#?}")
                 }
@@ -299,7 +301,7 @@ enum MaybeUnresolvedTerminator {
     Unconditional(MaybeUnresolvedJumpTarget),
     Undefined,
     Unknown,
-    Panic(Vec<Shared<Value>>),
+    Panic(Value),
 }
 
 impl Default for MaybeUnresolvedTerminator {

@@ -357,7 +357,7 @@ pub enum Statement {
     Exit(InternedString),
     Comment(InternedString),
     /// Fatal error, printing the supplied values
-    Panic(Vec<Shared<Value>>),
+    Panic(Shared<Value>),
 }
 
 impl From<Statement> for Shared<Statement> {
@@ -407,8 +407,7 @@ impl Walkable for Statement {
             }
             Self::Exit(_) => (),
             Self::Comment(_) => (),
-
-            Self::Panic(values) => values.iter().for_each(|v| visitor.visit_value(v.clone())),
+            Self::Panic(value) => visitor.visit_value(value.clone()),
         }
     }
 }

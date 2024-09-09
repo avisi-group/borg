@@ -119,12 +119,9 @@ fn clone_statement(
             false_target,
         }),
         StatementKind::PhiNode { .. } => todo!(),
-        StatementKind::Return { value: Some(value) } => builder.build(StatementKind::Return {
-            value: Some(mapping.get(&value).unwrap().clone()),
+        StatementKind::Return { value } => builder.build(StatementKind::Return {
+            value: mapping.get(&value).unwrap().clone(),
         }),
-        StatementKind::Return { value: None } => {
-            builder.build(StatementKind::Return { value: None })
-        }
         StatementKind::Select {
             condition,
             true_value,
@@ -167,13 +164,8 @@ fn clone_statement(
             value: mapping.get(&value).unwrap().clone(),
             index: mapping.get(&index).unwrap().clone(),
         }),
-        StatementKind::Panic(stmts) => {
-            let stmts = stmts
-                .iter()
-                .map(|stmt| mapping.get(stmt).unwrap().clone())
-                .collect();
-
-            builder.build(StatementKind::Panic(stmts))
+        StatementKind::Panic(stmt) => {
+            builder.build(StatementKind::Panic(mapping.get(&stmt).unwrap().clone()))
         }
 
         StatementKind::Assert { condition } => builder.build(StatementKind::Assert {

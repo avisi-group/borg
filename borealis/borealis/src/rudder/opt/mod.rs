@@ -15,7 +15,7 @@ pub mod inliner;
 pub mod jump_threading;
 pub mod materialise_apints;
 pub mod phi_analysis;
-pub mod return_propagation;
+//pub mod return_propagation;
 pub mod tail_calls;
 pub mod variable_elimination;
 pub mod vector_folding;
@@ -40,7 +40,7 @@ static DEAD_WRITE_ELIMINATION: FunctionPass =
 static DEAD_STMT_ELIMINATION: FunctionPass = ("dead-stmt-elimination", dead_stmt_elimination::run);
 static CONSTANT_PROPAGATION: FunctionPass = ("constant-propagation", constant_propagation::run);
 static CONSTANT_FOLDING: FunctionPass = ("constant-folding", constant_folding::run);
-static RETURN_PROPAGATION: FunctionPass = ("return-propagation", return_propagation::run);
+//static RETURN_PROPAGATION: FunctionPass = ("return-propagation", return_propagation::run);
 static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_simplification::run);
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
@@ -55,7 +55,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             INLINER,
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
-            RETURN_PROPAGATION,
+            //RETURN_PROPAGATION,
             //TAIL_CALL,
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
@@ -72,7 +72,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             INLINER,
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
-            RETURN_PROPAGATION,
+            //RETURN_PROPAGATION,
             //TAIL_CALL,
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
@@ -89,7 +89,7 @@ pub fn optimise(ctx: &mut Context, level: OptLevel) {
             INLINER,
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
-            RETURN_PROPAGATION,
+            //RETURN_PROPAGATION,
             // TAIL_CALL,
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
