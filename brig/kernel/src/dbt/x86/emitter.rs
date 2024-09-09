@@ -2,7 +2,7 @@ use {
     crate::dbt::{
         emitter::{BlockResult, Flag, Type, TypeKind},
         x86::{
-            encoder::{Instruction, Operand, PhysicalRegister, Register},
+            encoder::{Instruction, Operand, OperandKind, PhysicalRegister, Register},
             register_allocator::RegisterAllocator,
             Emitter,
         },
@@ -15,7 +15,6 @@ use {
     },
     proc_macro_lib::ktest,
 };
-
 pub struct X86Emitter {
     current_block: X86BlockRef,
     next_vreg: usize,
@@ -579,9 +578,7 @@ impl X86NodeRef {
                 emitter.current_block.append(Instruction::mov(
                     Operand::mem_base_displ(
                         64,
-                        super::encoder::Register::PhysicalRegister(
-                            super::encoder::PhysicalRegister::RBP,
-                        ),
+                        Register::PhysicalRegister(PhysicalRegister::RBP),
                         (*offset).try_into().unwrap(),
                     ),
                     dst.clone(),
@@ -966,7 +963,7 @@ fn emit_compare(
 
     // anything else (imm on the right) must be reworked
 
-    match (&left.kind, &right.kind) {
+    let dst = match (&left.kind, &right.kind) {
         (Register(_), Register(_))
         | (Register(_), Memory { .. })
         | (Memory { .. }, Register(_))
@@ -974,16 +971,19 @@ fn emit_compare(
         | (Immediate(_), Memory { .. })
         | (Memory { .. }, Memory { .. }) => {
             let left = if let (Memory { .. }, Memory { .. }) = (&left.kind, &right.kind) {
-                let loaded_left = Operand::vreg(64, emitter.next_vreg());
+                let dst = Operand::vreg(64, emitter.next_vreg());
                 emitter
                     .current_block
-                    .append(Instruction::mov(left, loaded_left.clone()));
-                loaded_left
+                    .append(Instruction::mov(left, dst.clone()));
+                dst
             } else {
                 left
             };
 
             emitter.current_block.append(Instruction::cmp(left, right));
+
+            // setCC only sets the lowest bit
+
             let dst = Operand::vreg(64, emitter.next_vreg());
 
             emitter.current_block.append(match kind {
@@ -1024,7 +1024,20 @@ fn emit_compare(
 
         (Immediate(_), Immediate(_)) => panic!("why was this not const evaluated?"),
         (Target(_), _) | (_, Target(_)) => panic!("why"),
-    }
+    };
+
+    // setCC instructions only set the least significant byte to 0x00 or 0x01, we
+    // need to clear or set the other 63 bits
+    emitter.current_block.append(Instruction::and(
+        Operand {
+            kind: OperandKind::Immediate(0b1),
+            width_in_bits: 64,
+        },
+        dst.clone(),
+    ));
+    emitter.current_block.append(Instruction::neg(dst.clone()));
+
+    dst
 
     // BinaryOperationKind::CompareEqual(left, right) => {
     //     let left = left.to_operand(emitter);

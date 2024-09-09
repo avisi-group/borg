@@ -6,7 +6,8 @@ use {
             TranslationContext,
         },
         guest::devices::aarch64::{
-            borealis_register_init, u__DecodeA64::u__DecodeA64, u__InitSystem,
+            borealis_register_init, get_R::get_R, u__DecodeA64::u__DecodeA64, u__InitSystem,
+            AMEVTYPER0_EL0_initialize,
         },
     },
     alloc::boxed::Box,
@@ -81,11 +82,15 @@ fn decodea64_smoke() {
     );
 
     u__DecodeA64(&mut ctx, pc, opcode);
+
     ctx.emitter().leave();
     let translation = ctx.compile();
     log::debug!("\n{:?}", translation);
 
     unsafe {
+        // SEE
+        *(register_file_ptr.offset(0x8130) as *mut u64) = 0x20;
+
         let r0 = register_file_ptr.offset(0x428) as *mut u32;
         let r1 = register_file_ptr.offset(0x1390) as *mut u32;
         let r2 = register_file_ptr.offset(0x195F8) as *mut u32;

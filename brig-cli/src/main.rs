@@ -5,9 +5,9 @@ use {
     itertools::Itertools,
     std::{
         fs::{self, File},
-        io::{BufReader, Stderr, Write},
+        io::BufReader,
         path::{Path, PathBuf},
-        process::{self, exit, Stdio},
+        process::{self, Stdio},
     },
     walkdir::WalkDir,
 };

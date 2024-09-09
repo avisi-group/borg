@@ -38,6 +38,8 @@ global_asm!(
         pop %rdx
         pop %rcx
         pop %rax
+
+        ret
    "#,
     options(att_syntax)
 );

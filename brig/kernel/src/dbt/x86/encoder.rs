@@ -1,12 +1,11 @@
 use {
     crate::dbt::x86::emitter::X86BlockRef,
-    alloc::{collections::btree_map::BTreeMap, vec::Vec},
+    alloc::collections::btree_map::BTreeMap,
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
-    elf::segment,
     iced_x86::code_asm::{
-        byte_ptr, dword_ptr, qword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32,
-        AsmRegister64, AsmRegister8, CodeAssembler, CodeLabel,
+        dword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8,
+        CodeAssembler, CodeLabel,
     },
 };
 
@@ -16,6 +15,8 @@ pub enum Opcode {
     MOV(Operand, Operand),
     /// movzx {0}, {1}
     MOVZX(Operand, Operand),
+    /// lea {0}, {1}
+    LEA(Operand, Operand),
     /// shl {0}, {1}
     SHL(Operand, Operand),
     /// add {0}, {1}
@@ -24,8 +25,13 @@ pub enum Opcode {
     SUB(Operand, Operand),
     /// or {0}, {1},
     OR(Operand, Operand),
+    /// and {0}, {1},
+    AND(Operand, Operand),
     /// not {0}
     NOT(Operand),
+    /// neg {0}
+    NEG(Operand),
+
     /// bextr {0}, {1}, {2}
     BEXTR(Operand, Operand, Operand),
     /// jmp {0}
@@ -577,6 +583,14 @@ impl Instruction {
         Self(Opcode::MOVZX(src, dst))
     }
 
+    pub fn lea(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::LEA(src, dst))
+    }
+
+    pub fn and(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::AND(src, dst))
+    }
+
     pub fn shl(amount: Operand, op0: Operand) -> Self {
         Self(Opcode::SHL(amount, op0))
     }
@@ -634,6 +648,10 @@ impl Instruction {
 
     pub fn not(r: Operand) -> Self {
         Self(Opcode::NOT(r))
+    }
+
+    pub fn neg(r: Operand) -> Self {
+        Self(Opcode::NEG(r))
     }
 
     pub fn int(n: Operand) -> Self {
@@ -788,6 +806,31 @@ impl Instruction {
                 _ => todo!(),
             },
 
+            LEA(
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: src_width_in_bits,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width_in_bits,
+                },
+            ) => {
+                assembler
+                    .lea::<AsmRegister64, AsmMemoryOperand>(
+                        dst.into(),
+                        memory_operand_to_iced(base, index, scale, displacement),
+                    )
+                    .unwrap();
+            }
+
             // ADD R -> R
             ADD(
                 Operand {
@@ -820,6 +863,7 @@ impl Instruction {
                     .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
             }
+
             // TEST R, R
             TEST(
                 Operand {
@@ -869,11 +913,23 @@ impl Instruction {
             SETAE(Operand {
                 kind: R(PHYS(condition)),
                 ..
-            }) => assembler.setae::<AsmRegister8>(condition.into()).unwrap(),
-            NOT(Operand {
+            }) => {
+                assembler.setae::<AsmRegister8>(condition.into()).unwrap();
+            }
+            SETE(Operand {
                 kind: R(PHYS(condition)),
                 ..
-            }) => assembler.not::<AsmRegister64>(condition.into()).unwrap(),
+            }) => {
+                assembler.sete::<AsmRegister8>(condition.into()).unwrap();
+            }
+            NOT(Operand {
+                kind: R(PHYS(value)),
+                ..
+            }) => assembler.not::<AsmRegister64>(value.into()).unwrap(),
+            NEG(Operand {
+                kind: R(PHYS(value)),
+                ..
+            }) => assembler.neg::<AsmRegister64>(value.into()).unwrap(),
             SHL(
                 Operand {
                     kind: I(amount), ..
@@ -897,6 +953,18 @@ impl Instruction {
                 //assert_eq!(left_width, right_width);
                 assembler
                     .or::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
+                    .unwrap();
+            }
+            AND(
+                Operand { kind: I(left), .. },
+                Operand {
+                    kind: R(PHYS(right)),
+                    ..
+                },
+            ) => {
+                //assert_eq!(left_width, right_width);
+                assembler
+                    .and::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
                     .unwrap();
             }
             BEXTR(
@@ -923,6 +991,7 @@ impl Instruction {
             INT(Operand { kind: I(n), .. }) => {
                 assembler.int(i32::try_from(*n).unwrap()).unwrap();
             }
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -931,7 +1000,7 @@ impl Instruction {
         &mut self,
     ) -> impl Iterator<Item = Option<(OperandDirection, &mut Operand)>> + '_ {
         match &mut self.0 {
-            Opcode::MOV(src, dst) | Opcode::MOVZX(src, dst) => [
+            Opcode::MOV(src, dst) | Opcode::MOVZX(src, dst) | Opcode::LEA(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::Out, dst)),
                 None,
@@ -940,7 +1009,8 @@ impl Instruction {
             Opcode::SHL(src, dst)
             | Opcode::OR(src, dst)
             | Opcode::ADD(src, dst)
-            | Opcode::SUB(src, dst) => [
+            | Opcode::SUB(src, dst)
+            | Opcode::AND(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 None,
@@ -961,7 +1031,9 @@ impl Instruction {
             | Opcode::SETBE(r)
             | Opcode::SETA(r)
             | Opcode::SETAE(r) => [Some((OperandDirection::Out, r)), None, None].into_iter(),
-            Opcode::NOT(r) => [Some((OperandDirection::InOut, r)), None, None].into_iter(),
+            Opcode::NOT(r) | Opcode::NEG(r) => {
+                [Some((OperandDirection::InOut, r)), None, None].into_iter()
+            }
 
             Opcode::BEXTR(ctrl, src, dst) => [
                 Some((OperandDirection::In, ctrl)),
