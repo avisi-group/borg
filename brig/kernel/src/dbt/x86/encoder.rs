@@ -31,7 +31,6 @@ pub enum Opcode {
     NOT(Operand),
     /// neg {0}
     NEG(Operand),
-
     /// bextr {0}, {1}, {2}
     BEXTR(Operand, Operand, Operand),
     /// jmp {0}
@@ -783,7 +782,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert_eq!(src_width_in_bits, dst_width_in_bits);
+                //assert_eq!(src_width_in_bits, dst_width_in_bits);
 
                 assembler
                     .mov::<AsmRegister64, u64>(dst.into(), *src)
@@ -953,6 +952,19 @@ impl Instruction {
                 //assert_eq!(left_width, right_width);
                 assembler
                     .or::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
+                    .unwrap();
+            }
+            OR(
+                Operand {
+                    kind: R(PHYS(src)), ..
+                },
+                Operand {
+                    kind: R(PHYS(dst)), ..
+                },
+            ) => {
+                //assert_eq!(src_width, dst_width);
+                assembler
+                    .or::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
             }
             AND(

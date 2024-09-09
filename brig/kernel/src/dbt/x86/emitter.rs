@@ -636,38 +636,56 @@ impl X86NodeRef {
                 start,
                 length,
             } => {
-                let src = value.to_operand(emitter);
+                let value = value.to_operand(emitter);
                 let start = start.to_operand(emitter);
+                let length = length.to_operand(emitter);
 
-                // let length = start[0..8] + length[0..8];
+                //  start[0..8] ++ length[0..8];
                 let control_byte = {
-                    let d_vreg = emitter.next_vreg();
+                    let mask = Operand::imm(64, 0xff);
 
-                    let l = length.to_operand(emitter);
-                    let d = Operand::vreg(64, d_vreg);
-                    emitter.current_block.append(Instruction::mov(l, d.clone()));
+                    let start = {
+                        let dst = Operand::vreg(64, emitter.next_vreg());
+                        emitter
+                            .current_block
+                            .append(Instruction::mov(start, dst.clone()));
+                        emitter
+                            .current_block
+                            .append(Instruction::and(mask.clone(), dst.clone()));
+                        dst
+                    };
+
+                    let length = {
+                        let dst = Operand::vreg(64, emitter.next_vreg());
+                        emitter
+                            .current_block
+                            .append(Instruction::mov(length, dst.clone()));
+                        emitter
+                            .current_block
+                            .append(Instruction::and(mask.clone(), dst.clone()));
+                        emitter
+                            .current_block
+                            .append(Instruction::shl(Operand::imm(8, 8), dst.clone()));
+                        dst
+                    };
+
+                    let dst = Operand::vreg(64, emitter.next_vreg());
 
                     emitter
                         .current_block
-                        .append(Instruction::shl(Operand::imm(8, 8), d.clone()));
-
-                    emitter.current_block.append(Instruction::movzx(
-                        Operand::vreg(16, d_vreg),
-                        Operand::vreg(32, d_vreg),
-                    ));
-
+                        .append(Instruction::mov(start, dst.clone()));
                     emitter
                         .current_block
-                        .append(Instruction::or(start, Operand::vreg(32, d_vreg)));
+                        .append(Instruction::or(length, dst.clone()));
 
-                    d
+                    dst
                 };
 
                 let dst = Operand::vreg(64, emitter.next_vreg());
 
                 emitter
                     .current_block
-                    .append(Instruction::bextr(control_byte, src, dst.clone()));
+                    .append(Instruction::bextr(control_byte, value, dst.clone()));
 
                 dst
             }
