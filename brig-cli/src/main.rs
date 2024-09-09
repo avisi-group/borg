@@ -1,12 +1,13 @@
 use {
     cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message},
-    clap::Parser,
+    clap::{Parser, Subcommand},
+    elf::{endian::AnyEndian, section::SectionHeader, ElfBytes},
     itertools::Itertools,
     std::{
-        fs::File,
-        io::BufReader,
+        fs::{self, File},
+        io::{BufReader, Stderr, Write},
         path::{Path, PathBuf},
-        process::{Command, Stdio},
+        process::{self, exit, Stdio},
     },
     walkdir::WalkDir,
 };
@@ -14,10 +15,6 @@ use {
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {
-    /// Enable QEMU GDB server
-    #[arg(long)]
-    gdb: bool,
-
     /// Verbose output
     #[arg(short, long)]
     verbose: bool,
@@ -33,6 +30,18 @@ struct Cli {
     /// Do not build brig, use existing UEFI image and guest data
     #[arg(long)]
     no_build: bool,
+
+    /// Enable QEMU GDB server
+    #[arg(long)]
+    gdb: bool,
+
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    GdbCli,
 }
 
 fn main() -> color_eyre::Result<()> {
@@ -46,19 +55,16 @@ fn main() -> color_eyre::Result<()> {
 
     let artifacts = build_cargo("../brig", cli.release, cli.verbose);
 
+    if let Some(Command::GdbCli) = cli.command {
+        gdb_cli(&artifacts);
+    }
+
     // create TAR file containing guest kernel, plugins, and configuration
     let guest_tar = build_guest_tar("./guest_data", &artifacts);
 
     // create an UEFI disk image of kernel
     let uefi_path = {
-        let kernel_path = artifacts
-            .iter()
-            .filter_map(|a| a.executable.as_ref())
-            .filter(|p| matches!(p.file_name(), Some("kernel")))
-            .exactly_one()
-            .unwrap()
-            .canonicalize()
-            .unwrap();
+        let kernel_path = get_kernel_from_artifacts(&artifacts);
 
         if cli.verbose {
             println!("got kernel @ {kernel_path:?}");
@@ -95,7 +101,7 @@ fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Art
     );
 
     let mut cmd = {
-        let mut cmd = Command::new("cargo");
+        let mut cmd = process::Command::new("cargo");
         cmd.arg("build");
 
         if release {
@@ -237,7 +243,7 @@ fn build_dtb<P0: AsRef<Path>, P1: AsRef<Path>, P2: AsRef<Path>>(
     // path to the output DTB
     let dtb_source_path = target_dir.as_ref().join(&dtb_filename);
 
-    let output = Command::new("dtc")
+    let output = process::Command::new("dtc")
         .args(["-I", "dts", "-O", "dtb", "-o"])
         .arg(&dtb_source_path)
         .arg(dts.as_ref())
@@ -299,4 +305,56 @@ fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
+}
+
+fn get_kernel_from_artifacts(artifacts: &[Artifact]) -> PathBuf {
+    artifacts
+        .iter()
+        .filter_map(|a| a.executable.as_ref())
+        .filter(|p| matches!(p.file_name(), Some("kernel")))
+        .exactly_one()
+        .unwrap()
+        .canonicalize()
+        .unwrap()
+}
+
+fn gdb_cli(artifacts: &[Artifact]) {
+    let kernel_path = get_kernel_from_artifacts(artifacts);
+    let data = fs::read(&kernel_path).unwrap();
+    let file = ElfBytes::<AnyEndian>::minimal_parse(data.as_slice()).expect("open kernel ELF");
+
+    let text_header: SectionHeader = file
+        .section_header_by_name(".text")
+        .expect("section table should be parseable")
+        .expect("file should have a .text section");
+
+    let offset = 0xffff800000000000 + text_header.sh_addr;
+
+    let mut gdb = process::Command::new("gdb")
+        .stdin(Stdio::inherit()) // Use terminal's stdin
+        .stdout(Stdio::inherit()) // Use terminal's stdout
+        .stderr(Stdio::inherit()) // Use terminal's stderr
+        .args(
+            format!(
+                r#"
+                    set trace-commands on
+                    tui enable
+                    layout split
+
+                    # offset to kernel load bias + start of .text section
+                    add-symbol-file {} {:#x}
+
+                    target remote :1234
+                "#,
+                kernel_path.to_string_lossy(),
+                offset,
+            )
+            .lines()
+            .map(|cmd| format!("--eval-command={cmd}")),
+        )
+        .spawn()
+        .unwrap();
+
+    gdb.wait().expect("Child process wasn't running properly");
+    std::process::exit(0);
 }

@@ -12,3 +12,4 @@ clap = { version = "4.5.17", features = ["derive"] }
 color-eyre = "0.6.3"
 tar = "0.4.41"
 walkdir = "2.5.0"
+elf = "0.7.4"
