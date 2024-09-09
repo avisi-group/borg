@@ -1,6 +1,6 @@
 {
   "rust-analyzer.check.allTargets": false,
-  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.checkOnSave": false,
   "rust-analyzer.linkedProjects": [
     "borealis/Cargo.toml",
     "brig-cli/Cargo.toml",
