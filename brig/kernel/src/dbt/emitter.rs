@@ -215,6 +215,6 @@ pub enum Flag {
 pub enum BlockResult {
     Static(X86BlockRef),
     Dynamic(X86BlockRef, X86BlockRef),
-    Return(X86NodeRef),
+    Return,
     Panic,
 }

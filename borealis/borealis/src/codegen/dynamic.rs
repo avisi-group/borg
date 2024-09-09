@@ -19,20 +19,22 @@ use {
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
-    std::{iter::repeat, sync::Arc},
+    std::sync::Arc,
     syn::Ident,
 };
 
 pub fn codegen_function(function: &Function) -> TokenStream {
     let name_ident = codegen_ident(function.name());
-    let (return_type, parameters) = function.signature();
+    let (_return_type, parameters) = function.signature();
 
-    let return_type = if let Type::Tuple(ts) = &*return_type {
-        let elements = repeat(quote!(X86NodeRef)).take(ts.len());
-        quote!((#(#elements),*))
-    } else {
-        quote!(X86NodeRef)
-    };
+    // if let Type::Tuple(ts) = &*return_type {
+    //     let elements = repeat(quote!(X86NodeRef)).take(ts.len());
+    //     quote!((#(#elements),*))
+
+    // } else {
+    //     quote!(X86NodeRef)
+    // };
+    let return_type = quote!(X86NodeRef);
 
     let function_parameters = codegen_parameters(&parameters);
 
@@ -71,27 +73,6 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             quote!(ctx.emitter().write_variable(fn_state.#name.clone(), #name);)
         })
         .collect::<TokenStream>();
-
-    // todo: fix this
-    let return_statement = if function
-        .local_variables()
-        .iter()
-        .map(|sym| sym.name())
-        .any(|name| name.as_ref() == "return")
-    {
-        quote! {
-
-                return ctx.emitter().read_variable(fn_state.return_);
-        }
-    } else {
-        quote! {
-
-                return ctx.emitter().constant(0, Type {
-                    kind: TypeKind::Unsigned,
-                    width: 0,
-                });
-        }
-    };
 
     let body = if fn_is_allowlisted(function.name()) {
         quote! {
@@ -141,7 +122,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                         block_queue.push(Block::Dynamic(i0));
                         block_queue.push(Block::Dynamic(i1));
                     },
-                    BlockResult::Return(node) => {
+                    BlockResult::Return => {
                         log::debug!("block result: return");
                         ctx.emitter().jump(fn_state.exit_block_ref.clone());
                     }
@@ -154,7 +135,8 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             }
 
             ctx.emitter().set_current_block(fn_state.exit_block_ref.clone());
-            #return_statement
+
+            return ctx.emitter().read_variable(fn_state.borealis_fn_return_value.clone());
 
             #block_fns
         }
@@ -222,12 +204,14 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
     quote! {
         struct FunctionState {
             #fields
+            borealis_fn_return_value: X86SymbolRef,
             block_refs: [X86BlockRef; #num_blocks],
             exit_block_ref: X86BlockRef,
         }
 
         let fn_state = FunctionState {
             #field_inits
+            borealis_fn_return_value: ctx.create_symbol(),
             block_refs: [#block_ref_inits],
             exit_block_ref: ctx.create_block(),
         };
@@ -561,7 +545,10 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
         StatementKind::Return { value } => {
             let name = codegen_ident(value.name());
-            quote! { return BlockResult::Return(#name); }
+            quote! {
+                ctx.emitter().write_variable(fn_state.borealis_fn_return_value.clone(), #name);
+                return BlockResult::Return;
+            }
         }
         StatementKind::Select {
             condition,
