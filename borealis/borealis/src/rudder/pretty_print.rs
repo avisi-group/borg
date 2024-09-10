@@ -266,7 +266,7 @@ impl Display for StatementKind {
             StatementKind::ReadElement { vector, index } => {
                 write!(f, "read-element {}[{}]", vector.name(), index.name())
             }
-            StatementKind::WriteElement {
+            StatementKind::AssignElement {
                 vector,
                 value,
                 index,

@@ -1,7 +1,8 @@
 //! Fix exceptions
 
 use {
-    crate::boom::{control_flow::ControlFlowBlock, passes::Pass, Ast, Size, Type},
+    crate::boom::control_flow::Terminator,
+    crate::boom::{control_flow::ControlFlowBlock, passes::Pass, Ast, Literal, Size, Type, Value},
     common::shared::Shared,
 };
 
@@ -27,9 +28,17 @@ impl Pass for FixExceptions {
 
         let registers = &mut ast.get_mut().registers;
 
+        let empty_init_body = {
+            let block = ControlFlowBlock::new();
+            block.set_terminator(Terminator::Return(Value::Literal(Shared::new(
+                Literal::Unit,
+            ))));
+            block
+        };
+
         registers.insert(
             "have_exception".into(),
-            (Shared::new(Type::Bool), ControlFlowBlock::new()),
+            (Shared::new(Type::Bool), empty_init_body.clone()),
         );
         registers.insert(
             "current_exception_tag".into(),
@@ -37,16 +46,16 @@ impl Pass for FixExceptions {
                 Shared::new(Type::Integer {
                     size: Size::Static(32),
                 }),
-                ControlFlowBlock::new(),
+                empty_init_body.clone(),
             ),
         );
         registers.insert(
             "current_exception_value".into(),
-            (Shared::new(Type::Union { width }), ControlFlowBlock::new()),
+            (Shared::new(Type::Union { width }), empty_init_body.clone()),
         );
         registers.insert(
             "throw".into(),
-            (Shared::new(Type::String), ControlFlowBlock::new()),
+            (Shared::new(Type::String), empty_init_body.clone()),
         );
 
         false

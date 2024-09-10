@@ -28,6 +28,12 @@ impl<T> Clone for Shared<T> {
     }
 }
 
+impl<T: PartialEq> PartialEq for Shared<T> {
+    fn eq(&self, other: &Self) -> bool {
+        *self.get() == *other.get()
+    }
+}
+
 impl<T> Shared<T> {
     /// Create a new shared data
     pub fn new(data: T) -> Self {

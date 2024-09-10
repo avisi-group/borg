@@ -198,6 +198,8 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "borealis_register_init",
         "__InitSystem",
         "TakeReset",
+        "InitVariantImplemented",
+        "InitFeatureImpl",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")

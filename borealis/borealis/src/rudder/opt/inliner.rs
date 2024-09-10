@@ -155,11 +155,11 @@ fn clone_statement(
             vector: mapping.get(&vector).unwrap().clone(),
             index: mapping.get(&index).unwrap().clone(),
         }),
-        StatementKind::WriteElement {
+        StatementKind::AssignElement {
             vector,
             value,
             index,
-        } => builder.build(StatementKind::WriteElement {
+        } => builder.build(StatementKind::AssignElement {
             vector: mapping.get(&vector).unwrap().clone(),
             value: mapping.get(&value).unwrap().clone(),
             index: mapping.get(&index).unwrap().clone(),

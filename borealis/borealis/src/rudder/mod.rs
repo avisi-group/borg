@@ -232,7 +232,7 @@ pub enum SymbolKind {
     LocalVariable,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Symbol {
     name: InternedString,
     kind: SymbolKind,
@@ -461,7 +461,7 @@ impl Iterator for BlockIterator {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Function {
     inner: Shared<FunctionInner>,
     // return type and parameters are read only, so do not need to exist behind a `Shared`
@@ -481,7 +481,7 @@ impl ToTokens for Function {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FunctionInner {
     name: InternedString,
     local_variables: HashMap<InternedString, Symbol>,

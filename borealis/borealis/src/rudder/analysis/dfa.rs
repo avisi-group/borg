@@ -201,7 +201,7 @@ impl StatementUseAnalysis {
                     self.add_use(&vector, &stmt);
                     self.add_use(&index, &stmt);
                 }
-                StatementKind::WriteElement {
+                StatementKind::AssignElement {
                     vector,
                     value,
                     index,

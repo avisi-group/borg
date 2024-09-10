@@ -145,6 +145,9 @@ impl Mul for ConstantValue {
             (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
                 ConstantValue::SignedInteger(l * r)
             }
+            (ConstantValue::SignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
+                ConstantValue::SignedInteger(l * i64::try_from(r).unwrap())
+            }
             (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
                 ConstantValue::FloatingPoint(l * r)
             }

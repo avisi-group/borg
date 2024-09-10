@@ -581,7 +581,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         StatementKind::ReadElement { vector, index } => {
             quote!(ctx.emitter().read_element(#vector, #index))
         }
-        StatementKind::WriteElement {
+        StatementKind::AssignElement {
             vector,
             value,
             index,

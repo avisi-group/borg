@@ -1,6 +1,10 @@
 use {
     crate::{
-        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature, NamedType},
+        boom::{
+            self, bits_to_int,
+            control_flow::{ControlFlowBlock, Terminator},
+            FunctionSignature, Literal, NamedType, Value,
+        },
         rudder::{
             self,
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
@@ -98,6 +102,9 @@ pub fn from_boom(ast: &boom::Ast) -> Context {
                             })
                             .collect(),
                     );
+                    b.set_terminator(Terminator::Return(Value::Literal(Shared::new(
+                        Literal::Unit,
+                    ))));
                     b
                 },
             },
@@ -539,7 +546,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .unwrap()
             .is_match(name.as_ref())
         {
-            Some(self.builder.build(StatementKind::WriteElement {
+            Some(self.builder.build(StatementKind::AssignElement {
                 vector: args[0].clone(),
                 value: args[2].clone(),
                 index: args[1].clone(),

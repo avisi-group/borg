@@ -1,6 +1,8 @@
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Size, Statement, Type, Value,
+        control_flow::{ControlFlowBlock, Terminator},
+        passes::Pass,
+        Ast, Expression, Literal, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, shared::Shared, HashMap, HashSet},
 };
@@ -97,10 +99,11 @@ fn handle_registers(ast: Shared<Ast>) {
                     let b = ControlFlowBlock::new();
                     b.set_statements(vec![Shared::new(Statement::Copy {
                         expression: Expression::Identifier(tag_ident(register_name)),
-                        value: Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(
-                            tag.into(),
-                        )))),
+                        value: Shared::new(Value::Literal(Shared::new(Literal::Int(tag.into())))),
                     })]);
+                    b.set_terminator(Terminator::Return(Value::Literal(Shared::new(
+                        Literal::Unit,
+                    ))));
                     b
                 },
             ),
@@ -113,6 +116,9 @@ fn handle_registers(ast: Shared<Ast>) {
                     expression: Expression::Identifier(value_ident(register_name)),
                     value: arguments[0].clone(),
                 })]);
+                b.set_terminator(crate::boom::control_flow::Terminator::Return(
+                    Value::Literal(Shared::new(Literal::Unit)),
+                ));
                 b
             }),
         );

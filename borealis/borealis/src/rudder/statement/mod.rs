@@ -14,7 +14,7 @@ use {
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOperationKind {
     Not,
     Negate,
@@ -26,7 +26,7 @@ pub enum UnaryOperationKind {
     SquareRoot,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BinaryOperationKind {
     Add,
     Sub,
@@ -45,12 +45,12 @@ pub enum BinaryOperationKind {
     CompareGreaterThanOrEqual,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TernaryOperationKind {
     AddWithCarry,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CastOperationKind {
     ZeroExtend,
     SignExtend,
@@ -60,7 +60,7 @@ pub enum CastOperationKind {
     Broadcast,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ShiftOperationKind {
     LogicalShiftLeft,
     LogicalShiftRight,
@@ -69,7 +69,7 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StatementKind {
     Constant {
         typ: Arc<Type>,
@@ -192,7 +192,7 @@ pub enum StatementKind {
         index: Statement,
     },
     /// Returns the vector with the mutated element
-    WriteElement {
+    AssignElement {
         vector: Statement,
         value: Statement,
         index: Statement,
@@ -239,7 +239,7 @@ pub enum StatementKind {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Flag {
     N,
     Z,
@@ -304,7 +304,7 @@ impl StatementKind {
             StatementKind::ReadElement { vector, index } => {
                 [vector, index].into_iter().cloned().collect()
             }
-            StatementKind::WriteElement {
+            StatementKind::AssignElement {
                 vector,
                 value,
                 index,
@@ -452,7 +452,7 @@ impl Statement {
 
                 element_type.clone()
             }
-            StatementKind::WriteElement { vector, .. } => {
+            StatementKind::AssignElement { vector, .. } => {
                 // get type of the vector and return it
                 vector.typ()
             }
@@ -816,7 +816,7 @@ impl StatementInner {
                 };
             }
 
-            StatementKind::WriteElement {
+            StatementKind::AssignElement {
                 vector,
                 value,
                 index,
@@ -839,7 +839,7 @@ impl StatementInner {
                     index.clone()
                 };
 
-                self.kind = StatementKind::WriteElement {
+                self.kind = StatementKind::AssignElement {
                     vector,
                     value,
                     index,
