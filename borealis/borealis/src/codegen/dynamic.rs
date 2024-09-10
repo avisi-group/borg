@@ -630,7 +630,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
                 }
             }
         }
-        StatementKind::MatchesUnion { value, variant } => {
+        StatementKind::MatchesUnion { .. } => {
             // // matches!(value, Enum::Variant(_))
 
             // let sum_type = value.typ();
@@ -648,7 +648,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             // }
             todo!()
         }
-        StatementKind::UnwrapUnion { value, variant } => {
+        StatementKind::UnwrapUnion { .. } => {
             // let sum_type = value.typ();
 
             // let Type::Enum(_) = &*sum_type else {

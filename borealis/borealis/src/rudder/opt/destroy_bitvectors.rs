@@ -1,5 +1,3 @@
-use num_traits::cast;
-
 use crate::rudder::{
     analysis::dfa::StatementUseAnalysis,
     statement::{CastOperationKind, Statement},

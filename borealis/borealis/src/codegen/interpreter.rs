@@ -21,6 +21,41 @@ use {
     syn::Ident,
 };
 
+fn codegen_types(rudder: &Context) -> TokenStream {
+    let structs: TokenStream = rudder
+        .get_structs()
+        .into_iter()
+        .map(|typ| {
+            let ident = codegen_type(typ.clone());
+
+            let Type::Struct(fields) = &*typ else {
+                panic!("struct must be product type");
+            };
+
+            let fields: TokenStream = fields
+                .iter()
+                .map(|(name, typ)| {
+                    let name = codegen_ident(*name);
+                    let typ = codegen_type(typ.clone());
+                    quote!(pub #name: #typ,)
+                })
+                .collect();
+
+            quote! {
+                #[derive(Default, Debug, Clone, Copy, PartialEq)]
+                #[repr(C)]
+                pub struct #ident {
+                    #fields
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        #structs
+    }
+}
+
 pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
     let parameters = [quote!(state: &mut State), quote!(tracer: &dyn Tracer)]
         .into_iter()

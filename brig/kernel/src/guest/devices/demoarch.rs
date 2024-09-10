@@ -7,7 +7,6 @@ use {
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::fmt::{self, Debug},
     plugins_api::guest::{Device, DeviceFactory, Environment},
-    proc_macro_lib::ktest,
 };
 
 #[derive(Debug)]

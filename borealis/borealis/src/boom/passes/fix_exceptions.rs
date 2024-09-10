@@ -1,9 +1,8 @@
 //! Fix exceptions
 
 use {
-    crate::boom::{control_flow::ControlFlowBlock, passes::Pass, Ast, Definition, Size, Type},
+    crate::boom::{control_flow::ControlFlowBlock, passes::Pass, Ast, Size, Type},
     common::shared::Shared,
-    itertools::Itertools,
 };
 
 /// Adds registers needed for exceptions

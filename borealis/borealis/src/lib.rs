@@ -6,9 +6,8 @@ use {
             passes::{
                 cycle_finder::CycleFinder, destruct_structs::DestructStructs,
                 destruct_unions::DestructUnions, fix_exceptions::FixExceptions,
-                fold_unconditionals::FoldUnconditionals, monomorphize_vectors::MonomorphizeVectors,
-                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-                remove_undefined_bv::RemoveUndefinedBV,
+                fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
+                remove_constant_type::RemoveConstantType, remove_undefined_bv::RemoveUndefinedBV,
             },
             Ast,
         },
@@ -195,10 +194,10 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "ShiftReg",
         "X_set",
         "set_R",
-        "write_gpr", /* "borealis
-                     "_register_init",
-                      * "__InitSystem",
-                      * "TakeReset", */
+        "write_gpr",
+        "borealis_register_init",
+        "__InitSystem",
+        "TakeReset",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")

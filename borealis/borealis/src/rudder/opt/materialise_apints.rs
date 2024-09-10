@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
 use crate::rudder::{
     analysis::dfa::StatementUseAnalysis,
-    statement::{BinaryOperationKind, CastOperationKind, Statement, StatementKind},
+    statement::{CastOperationKind, Statement, StatementKind},
     Block, Function, Type,
 };
+use std::sync::Arc;
 
 pub fn run(f: Function) -> bool {
     let mut changed = false;

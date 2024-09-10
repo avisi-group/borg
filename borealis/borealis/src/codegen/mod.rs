@@ -2,18 +2,9 @@
 
 use {
     crate::{
-        codegen::{
-            dynamic::{codegen_block, codegen_parameters, get_block_fn_ident},
-            state::codegen_state,
-            workspace::create_manifest,
-        },
-        rudder::{
-            analysis::cfg::FunctionCallGraphAnalysis, Context, Function, PrimitiveTypeClass,
-            Symbol, Type,
-        },
-        GenerationMode,
+        codegen::state::codegen_state,
+        rudder::{analysis::cfg::FunctionCallGraphAnalysis, Context, PrimitiveTypeClass, Type},
     },
-    cargo_util_schemas::manifest::{TomlManifest, TomlWorkspace},
     common::{intern::InternedString, HashMap, HashSet},
     log::warn,
     once_cell::sync::Lazy,
@@ -22,7 +13,6 @@ use {
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
     std::{
-        collections::BTreeSet,
         hash::{DefaultHasher, Hash, Hasher},
         path::PathBuf,
         sync::Arc,
@@ -152,41 +142,6 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
             let inner = ts.iter().cloned().map(codegen_type);
             quote!((#(#inner),*))
         }
-    }
-}
-
-fn codegen_types(rudder: &Context) -> TokenStream {
-    let structs: TokenStream = rudder
-        .get_structs()
-        .into_iter()
-        .map(|typ| {
-            let ident = codegen_type(typ.clone());
-
-            let Type::Struct(fields) = &*typ else {
-                panic!("struct must be product type");
-            };
-
-            let fields: TokenStream = fields
-                .iter()
-                .map(|(name, typ)| {
-                    let name = codegen_ident(*name);
-                    let typ = codegen_type(typ.clone());
-                    quote!(pub #name: #typ,)
-                })
-                .collect();
-
-            quote! {
-                #[derive(Default, Debug, Clone, Copy, PartialEq)]
-                #[repr(C)]
-                pub struct #ident {
-                    #fields
-                }
-            }
-        })
-        .collect();
-
-    quote! {
-        #structs
     }
 }
 

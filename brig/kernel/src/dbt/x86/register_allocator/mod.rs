@@ -19,15 +19,6 @@ pub trait RegisterAllocator {
 #[ktest]
 fn simple_allocation_regression() {
     let mut instrs = [Instruction(Opcode::MOV(
-        Operand::mem_base_displ(
-            64,
-            Register::PhysicalRegister(PhysicalRegister::RBP),
-            0x1234,
-        ),
-        Operand::vreg(64, 1),
-    ))];
-
-    let mut instrs = [Instruction(Opcode::MOV(
         Operand::vreg(64, 1),
         Operand::mem_base_displ(
             64,

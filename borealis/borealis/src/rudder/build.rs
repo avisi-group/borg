@@ -14,7 +14,6 @@ use {
         util::signed_smallest_width_of_value,
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
-    itertools::Itertools,
     log::trace,
     num_rational::Ratio,
     num_traits::cast::FromPrimitive,
@@ -201,20 +200,6 @@ impl BuildContext {
 
         if self.structs.insert(name, (typ, fields)).is_some() {
             panic!("struct with name {name} already added");
-        }
-    }
-
-    fn add_enum(&mut self, name: InternedString, variants: &[InternedString]) {
-        let typ = Arc::new(Type::u32());
-
-        let variants = variants
-            .iter()
-            .enumerate()
-            .map(|(idx, name)| (*name, u32::try_from(idx).unwrap()))
-            .collect();
-
-        if self.enums.insert(name, (typ, variants)).is_some() {
-            panic!("enum with name {name} already added");
         }
     }
 
@@ -1613,15 +1598,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.build_operation(op)
             }
             boom::Value::Struct { name, fields } => {
-                panic!("structs should have been removed in boom")
+                panic!("got struct {name} {fields:?} but structs should have been removed in boom")
             }
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),
 
             // return false if `value`` is of the variant `identifier`, else true
-            boom::Value::CtorKind {
-                value, identifier, ..
-            } => {
+            boom::Value::CtorKind { .. } => {
                 // assert!(outer_field_accesses.is_empty());
 
                 // let value = self.build_value(value.clone());
@@ -1649,9 +1632,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // })
                 todo!()
             }
-            boom::Value::CtorUnwrap {
-                value, identifier, ..
-            } => {
+            boom::Value::CtorUnwrap { .. } => {
                 // let value = self.build_value(value.clone());
 
                 // // get the rudder type
@@ -1756,7 +1737,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Type::Bits | Type::ArbitraryLengthInteger | Type::Rational | Type::Any => {
                         todo!()
                     }
-                    Type::Union { width } => todo!(),
+                    Type::Union { .. } => todo!(),
                     Type::Tuple(_) => todo!(),
                 };
 
@@ -2049,10 +2030,4 @@ fn fields_to_offsets(
     });
 
     (offsets, current_type)
-}
-
-/// Used to destructure structs into multiple local variables
-/// `a.b.c = 4` becomes `a_b_c = 4`
-fn struct_fields_to_ident(fields: &[InternedString]) -> InternedString {
-    fields.iter().map(AsRef::as_ref).join("_").into()
 }

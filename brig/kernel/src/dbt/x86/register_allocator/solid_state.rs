@@ -2,7 +2,7 @@
 
 use {
     crate::dbt::x86::{
-        encoder::{Instruction, OperandDirection, PhysicalRegister, Register, UseDef},
+        encoder::{Instruction, PhysicalRegister, Register, UseDef},
         register_allocator::RegisterAllocator,
     },
     alloc::vec::Vec,

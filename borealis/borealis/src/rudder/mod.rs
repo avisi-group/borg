@@ -12,7 +12,7 @@ use {
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
-        fmt::{Debug, Display},
+        fmt::Debug,
         hash::{Hash, Hasher},
         sync::Arc,
     },
