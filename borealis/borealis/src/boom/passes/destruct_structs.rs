@@ -1,7 +1,10 @@
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, passes::Pass, visitor::Visitor, Ast, Expression,
-        FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type, Value,
+        control_flow::{ControlFlowBlock, Terminator},
+        passes::Pass,
+        visitor::Visitor,
+        Ast, Expression, FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type,
+        Value,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
 };
@@ -280,6 +283,12 @@ fn destruct_local_structs(
             .collect();
 
         block.set_statements(destructed);
+
+        if let Terminator::Return(Value::Identifier(return_value_ident)) = block.terminator() {
+            if let Some(fields) = structs.get(&return_value_ident) {
+                block.set_terminator(Terminator::Return(Value::Tuple(fields.iter().map(|NamedType { name, .. }| Value::Identifier(destructed_ident(return_value_ident, *name))).map(Shared::new).collect())));
+            }
+        }
     });
 }
 

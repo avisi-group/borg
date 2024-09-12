@@ -200,6 +200,10 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "TakeReset",
         "InitVariantImplemented",
         "InitFeatureImpl",
+        "_get_RMR_EL3_Type_AA64",
+        "_get_ID_AA64PFR0_EL1_Type_EL3",
+        "SetResetVector",
+        "Mk_RVBAR_EL1_Type",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")

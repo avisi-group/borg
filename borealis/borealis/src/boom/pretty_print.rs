@@ -451,6 +451,15 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 write!(self.writer, " as ").unwrap();
                 write_uid(self, *identifier, types);
             }
+            Value::Tuple(values) => {
+                write!(self.writer, "(").unwrap();
+                values.iter().for_each(|v| {
+                    self.visit_value(v.clone());
+                    write!(self.writer, ", ").unwrap();
+                });
+
+                write!(self.writer, ")").unwrap();
+            }
         }
     }
 

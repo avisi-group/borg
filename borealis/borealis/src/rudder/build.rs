@@ -1604,6 +1604,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 assert!(outer_field_accesses.is_empty());
                 self.build_operation(op)
             }
+            boom::Value::Tuple(values) => {
+                let values = values.iter().map(|v| self.build_value(v.clone())).collect();
+                return self.builder.build(StatementKind::CreateTuple(values));
+            }
             boom::Value::Struct { name, fields } => {
                 panic!("got struct {name} {fields:?} but structs should have been removed in boom")
             }

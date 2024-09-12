@@ -714,6 +714,12 @@ impl X86NodeRef {
                         CastOperationKind::Convert => {
                             panic!("{:?}\n{:#?}", self.typ(), value);
                         }
+                        CastOperationKind::Truncate => {
+                            assert!(src.width_in_bits > dst.width_in_bits);
+                            emitter
+                                .current_block
+                                .append(Instruction::mov(src, dst.clone()));
+                        }
                         _ => todo!("{kind:?}: {value:?}"),
                     }
                 }
@@ -744,7 +750,69 @@ impl X86NodeRef {
                 source,
                 start,
                 length,
-            } => todo!(),
+            } => {
+                // todo: test this
+                let target = target.to_operand(emitter);
+                let source = source.to_operand(emitter);
+                let start = start.to_operand(emitter);
+                let length = length.to_operand(emitter);
+
+                let mask = Operand::vreg(64, emitter.next_vreg());
+                emitter
+                    .current_block
+                    .append(Instruction::mov(Operand::imm(64, 1), mask.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::shl(length.clone(), mask.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::sub(Operand::imm(64, 1), mask.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::shl(start, mask.clone()));
+
+                let masked_target = Operand::vreg(64, emitter.next_vreg());
+                emitter
+                    .current_block
+                    .append(Instruction::mov(target, masked_target.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::and(mask.clone(), masked_target.clone()));
+
+                let shifted_source = Operand::vreg(64, emitter.next_vreg());
+                emitter
+                    .current_block
+                    .append(Instruction::mov(source, shifted_source.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::shl(length.clone(), shifted_source.clone()));
+
+                {
+                    // not strictly necessary but may avoid issues if there is junk data
+                    let invert_mask = Operand::vreg(64, emitter.next_vreg());
+                    emitter
+                        .current_block
+                        .append(Instruction::mov(mask.clone(), invert_mask.clone()));
+                    emitter
+                        .current_block
+                        .append(Instruction::not(invert_mask.clone()));
+                    emitter.current_block.append(Instruction::and(
+                        invert_mask.clone(),
+                        shifted_source.clone(),
+                    ));
+                }
+
+                // mask off target bits
+                // shift source by start
+                // apply ~mask to source
+                // OR source and target
+                emitter.current_block.append(Instruction::or(
+                    shifted_source.clone(),
+                    masked_target.clone(),
+                ));
+
+                masked_target
+            }
             NodeKind::GetFlag { flag, operation } => todo!(),
         }
     }

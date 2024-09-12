@@ -19,22 +19,20 @@ use {
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
-    std::sync::Arc,
+    std::{iter::repeat, sync::Arc},
     syn::Ident,
 };
 
 pub fn codegen_function(function: &Function) -> TokenStream {
     let name_ident = codegen_ident(function.name());
-    let (_return_type, parameters) = function.signature();
+    let (return_type, parameters) = function.signature();
 
-    // if let Type::Tuple(ts) = &*return_type {
-    //     let elements = repeat(quote!(X86NodeRef)).take(ts.len());
-    //     quote!((#(#elements),*))
-
-    // } else {
-    //     quote!(X86NodeRef)
-    // };
-    let return_type = quote!(X86NodeRef);
+    let return_type = if let Type::Tuple(ts) = &*return_type {
+        let elements = repeat(quote!(X86NodeRef)).take(ts.len());
+        quote!((#(#elements,)*))
+    } else {
+        quote!(X86NodeRef)
+    };
 
     let function_parameters = codegen_parameters(&parameters);
 
@@ -669,10 +667,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
         }
 
         StatementKind::Undefined => quote!(Default::default()),
-        StatementKind::TupleAccess { index, source } => {
-            let index = Literal::usize_unsuffixed(index);
-            quote!(#source.#index)
-        }
+
         StatementKind::GetFlag { flag, operation } => {
             let flag = match flag {
                 Flag::N => quote!(N),
@@ -682,8 +677,13 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             };
             quote!(ctx.emitter().get_flag(Flag::#flag, #operation.clone()))
         }
+        // tuples only exist in Rust, not in the DBT
+        StatementKind::TupleAccess { index, source } => {
+            let index = Literal::usize_unsuffixed(index);
+            quote!(#source.#index)
+        }
         StatementKind::CreateTuple(values) => {
-            quote!((#(#values),*))
+            quote!((#(#values,)*))
         }
     };
 

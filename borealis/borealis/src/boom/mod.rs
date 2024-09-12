@@ -459,6 +459,7 @@ pub enum Value {
         identifier: InternedString,
         types: Vec<Shared<Type>>,
     },
+    Tuple(Vec<Shared<Self>>),
 }
 
 impl Value {
@@ -529,6 +530,7 @@ impl Walkable for Value {
                 visitor.visit_value(value.clone());
                 types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
+            Value::Tuple(values) => values.iter().for_each(|v| visitor.visit_value(v.clone())),
         }
     }
 }
