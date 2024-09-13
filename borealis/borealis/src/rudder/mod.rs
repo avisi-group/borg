@@ -56,14 +56,14 @@ impl PrimitiveType {
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum Type {
     Primitive(PrimitiveType),
-    Struct(Vec<(InternedString, Arc<Type>)>),
+    Struct(Vec<(InternedString, Type)>),
 
     Vector {
         element_count: usize,
-        element_type: Arc<Type>,
+        element_type: Box<Type>,
     },
 
-    Tuple(Vec<Arc<Type>>),
+    Tuple(Vec<Type>),
 
     // anything can be cast to/from a union value?
     Union {
@@ -97,7 +97,7 @@ impl Type {
         })
     }
 
-    pub fn new_product(fields: Vec<(InternedString, Arc<Type>)>) -> Self {
+    pub fn new_product(fields: Vec<(InternedString, Type)>) -> Self {
         Self::Struct(fields)
     }
 
@@ -171,7 +171,7 @@ impl Type {
     pub fn vectorize(self, element_count: usize) -> Self {
         Self::Vector {
             element_count,
-            element_type: Arc::new(self),
+            element_type: Box::new(self),
         }
     }
 
@@ -236,7 +236,7 @@ pub enum SymbolKind {
 pub struct Symbol {
     name: InternedString,
     kind: SymbolKind,
-    typ: Arc<Type>,
+    typ: Type,
 }
 
 impl Symbol {
@@ -248,7 +248,7 @@ impl Symbol {
         self.kind
     }
 
-    pub fn typ(&self) -> Arc<Type> {
+    pub fn typ(&self) -> Type {
         self.typ.clone()
     }
 }
@@ -465,7 +465,7 @@ impl Iterator for BlockIterator {
 pub struct Function {
     inner: Shared<FunctionInner>,
     // return type and parameters are read only, so do not need to exist behind a `Shared`
-    return_type: Arc<Type>,
+    return_type: Type,
     parameters: Vec<Symbol>,
 }
 
@@ -489,9 +489,9 @@ pub struct FunctionInner {
 }
 
 impl Function {
-    pub fn new<I: Iterator<Item = (InternedString, Arc<Type>)>>(
+    pub fn new<I: Iterator<Item = (InternedString, Type)>>(
         name: InternedString,
-        return_type: Arc<Type>,
+        return_type: Type,
         parameters: I,
     ) -> Self {
         Self {
@@ -520,7 +520,7 @@ impl Function {
         0 //self.inner.borrow().entry_block().iter().
     }
 
-    pub fn signature(&self) -> (Arc<Type>, Vec<Symbol>) {
+    pub fn signature(&self) -> (Type, Vec<Symbol>) {
         (self.return_type(), self.parameters())
     }
 
@@ -535,7 +535,7 @@ impl Function {
             });
     }
 
-    pub fn add_local_variable(&mut self, name: InternedString, typ: Arc<Type>) {
+    pub fn add_local_variable(&mut self, name: InternedString, typ: Type) {
         self.inner.get_mut().local_variables.insert(
             name,
             Symbol {
@@ -565,7 +565,7 @@ impl Function {
             .cloned()
     }
 
-    pub fn return_type(&self) -> Arc<Type> {
+    pub fn return_type(&self) -> Type {
         self.return_type.clone()
     }
 
@@ -589,12 +589,12 @@ pub struct Model {
     fns: HashMap<InternedString, (FunctionKind, Function)>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
     registers: HashMap<InternedString, RegisterDescriptor>,
-    structs: HashSet<Arc<Type>>,
+    structs: HashSet<Type>,
 }
 
 #[derive(Clone, Debug)]
 pub struct RegisterDescriptor {
-    pub typ: Arc<Type>,
+    pub typ: Type,
     pub offset: usize,
 }
 
@@ -632,7 +632,7 @@ impl Model {
         self.registers.clone()
     }
 
-    pub fn get_structs(&self) -> HashSet<Arc<Type>> {
+    pub fn get_structs(&self) -> HashSet<Type> {
         self.structs.clone()
     }
 }

@@ -72,7 +72,7 @@ pub enum ShiftOperationKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatementKind {
     Constant {
-        typ: Arc<Type>,
+        typ: Type,
         value: ConstantValue,
     },
 
@@ -86,7 +86,7 @@ pub enum StatementKind {
     },
 
     ReadRegister {
-        typ: Arc<Type>,
+        typ: Type,
         /// offset into register state
         ///
         /// During building, this should just be the `next_register_offset`
@@ -143,12 +143,12 @@ pub enum StatementKind {
     },
     Cast {
         kind: CastOperationKind,
-        typ: Arc<Type>,
+        typ: Type,
         value: Statement,
     },
     BitsCast {
         kind: CastOperationKind,
-        typ: Arc<Type>,
+        typ: Type,
         value: Statement,
         length: Statement,
     },
@@ -389,15 +389,15 @@ impl Statement {
         self.inner.get_mut().update_names(name);
     }
 
-    pub fn typ(&self) -> Arc<Type> {
+    pub fn typ(&self) -> Type {
         match self.kind() {
             StatementKind::Constant { typ, .. } => typ,
             StatementKind::ReadVariable { symbol } => symbol.typ(),
-            StatementKind::WriteVariable { .. } => Arc::new(Type::void()),
+            StatementKind::WriteVariable { .. } => (Type::void()),
             StatementKind::ReadRegister { typ, .. } => typ,
-            StatementKind::WriteRegister { .. } => Arc::new(Type::unit()),
-            StatementKind::ReadMemory { .. } => Arc::new(Type::Bits),
-            StatementKind::WriteMemory { .. } => Arc::new(Type::unit()),
+            StatementKind::WriteRegister { .. } => (Type::unit()),
+            StatementKind::ReadMemory { .. } => (Type::Bits),
+            StatementKind::WriteMemory { .. } => (Type::unit()),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
                 ..
@@ -421,24 +421,24 @@ impl Statement {
             | StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareLessThan,
                 ..
-            } => Arc::new(Type::u1()),
+            } => (Type::u1()),
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
             StatementKind::UnaryOperation { value, .. } => value.typ(),
             StatementKind::ShiftOperation { value, .. } => value.typ(),
             StatementKind::Call { target, .. } => target.return_type(),
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
-            StatementKind::Jump { .. } => Arc::new(Type::void()),
-            StatementKind::Branch { .. } => Arc::new(Type::void()),
+            StatementKind::Jump { .. } => (Type::void()),
+            StatementKind::Branch { .. } => (Type::void()),
             StatementKind::PhiNode { members } => members
                 .first()
                 .map(|(_, stmt)| stmt.typ())
-                .unwrap_or_else(|| Arc::new(Type::void())),
-            StatementKind::Return { .. } => Arc::new(Type::void()),
+                .unwrap_or_else(|| (Type::void())),
+            StatementKind::Return { .. } => (Type::void()),
             StatementKind::Select { true_value, .. } => true_value.typ(),
-            StatementKind::Panic(_) => Arc::new(Type::void()),
+            StatementKind::Panic(_) => (Type::void()),
 
-            StatementKind::ReadPc => Arc::new(Type::u64()),
-            StatementKind::WritePc { .. } => Arc::new(Type::void()),
+            StatementKind::ReadPc => (Type::u64()),
+            StatementKind::WritePc { .. } => (Type::void()),
             // todo: this is a simplification, be more precise about lengths?
             StatementKind::BitExtract { value, .. } => value.typ(),
             StatementKind::BitInsert {
@@ -446,21 +446,21 @@ impl Statement {
                 ..
             } => original_value.typ(),
             StatementKind::ReadElement { vector, .. } => {
-                let Type::Vector { element_type, .. } = &*vector.typ() else {
+                let Type::Vector { element_type, .. } = &vector.typ() else {
                     panic!("cannot read field of non-composite type")
                 };
 
-                element_type.clone()
+                (**element_type).clone()
             }
             StatementKind::AssignElement { vector, .. } => {
                 // get type of the vector and return it
                 vector.typ()
             }
 
-            StatementKind::SizeOf { .. } => Arc::new(Type::u16()),
-            StatementKind::Assert { .. } => Arc::new(Type::unit()),
-            StatementKind::CreateBits { .. } => Arc::new(Type::Bits),
-            StatementKind::MatchesUnion { .. } => Arc::new(Type::u1()),
+            StatementKind::SizeOf { .. } => (Type::u16()),
+            StatementKind::Assert { .. } => (Type::unit()),
+            StatementKind::CreateBits { .. } => (Type::Bits),
+            StatementKind::MatchesUnion { .. } => (Type::u1()),
             StatementKind::UnwrapUnion { value, variant } => {
                 // let Type::Enum(variants) = &*value.typ() else {
                 //     panic!("cannot unwrap non sum type");
@@ -475,18 +475,18 @@ impl Statement {
                 todo!()
             }
 
-            StatementKind::Undefined => Arc::new(Type::Any),
+            StatementKind::Undefined => (Type::Any),
             StatementKind::TupleAccess { index, source } => {
-                let Type::Tuple(ts) = &*source.typ() else {
+                let Type::Tuple(ts) = &source.typ() else {
                     panic!();
                 };
 
                 ts[index].clone()
             }
 
-            StatementKind::GetFlag { .. } => Arc::new(Type::u1()),
+            StatementKind::GetFlag { .. } => (Type::u1()),
             StatementKind::CreateTuple(values) => {
-                Arc::new(Type::Tuple(values.iter().map(|v| v.typ()).collect()))
+                (Type::Tuple(values.iter().map(|v| v.typ()).collect()))
             }
         }
     }
@@ -977,12 +977,12 @@ impl StatementBuilder {
     }
 
     // No-op if same type
-    pub fn generate_cast(&mut self, source: Statement, destination_type: Arc<Type>) -> Statement {
+    pub fn generate_cast(&mut self, source: Statement, destination_type: Type) -> Statement {
         if source.typ() == destination_type {
             return source;
         }
 
-        match (&*source.typ(), &*destination_type) {
+        match (&source.typ(), &destination_type) {
             // both primitives, do a cast
             (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
                 // compare widths

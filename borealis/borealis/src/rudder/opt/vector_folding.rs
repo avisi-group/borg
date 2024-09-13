@@ -48,7 +48,7 @@ fn run_on_block(block: &Block) -> bool {
 
                     let mut builder = StatementBuilder::new(block.weak());
                     let vector_width = builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u16()),
+                        typ: (Type::u16()),
                         value: ConstantValue::UnsignedInteger(
                             assign_value.typ().width_bytes().try_into().unwrap(),
                         ),
@@ -86,12 +86,12 @@ fn run_on_block(block: &Block) -> bool {
                 let element_type = stmt.typ();
                 let mut builder = StatementBuilder::new(block.weak());
 
-                let index = builder.generate_cast(index, Arc::new(Type::s64()));
+                let index = builder.generate_cast(index, (Type::s64()));
 
-                let offset = builder.generate_cast(offset, Arc::new(Type::s64()));
+                let offset = builder.generate_cast(offset, (Type::s64()));
 
                 let typ_width = builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::s64()),
+                    typ: (Type::s64()),
                     value: ConstantValue::SignedInteger(
                         i64::try_from(element_type.width_bytes()).unwrap(),
                     ),

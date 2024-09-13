@@ -23,7 +23,7 @@ use {
     num_traits::cast::FromPrimitive,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
-    std::{cmp::Ordering, sync::Arc},
+    std::cmp::Ordering,
 };
 
 pub fn from_boom(ast: &boom::Ast) -> Model {
@@ -92,11 +92,11 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 struct BuildContext {
     /// Name of struct maps to the rudder type and a map of field names to field
     /// indices
-    structs: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, usize>)>,
+    structs: HashMap<InternedString, (rudder::Type, HashMap<InternedString, usize>)>,
 
     /// Name of enum maps to the rudder type and a map of enum variants to the
     /// integer discriminant of that variant
-    enums: HashMap<InternedString, (Arc<rudder::Type>, HashMap<InternedString, u32>)>,
+    enums: HashMap<InternedString, (rudder::Type, HashMap<InternedString, u32>)>,
 
     /// Register name to type and offset mapping
     registers: HashMap<InternedString, RegisterDescriptor>,
@@ -107,7 +107,7 @@ struct BuildContext {
 }
 
 impl BuildContext {
-    fn add_register(&mut self, name: InternedString, typ: Arc<Type>) {
+    fn add_register(&mut self, name: InternedString, typ: Type) {
         self.registers.insert(
             name,
             RegisterDescriptor {
@@ -123,7 +123,7 @@ impl BuildContext {
     }
 
     fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Arc::new(Type::Struct(
+        let typ = (Type::Struct(
             fields
                 .iter()
                 .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
@@ -171,60 +171,61 @@ impl BuildContext {
             });
     }
 
-    fn resolve_type(&self, typ: Shared<boom::Type>) -> Arc<rudder::Type> {
+    fn resolve_type(&self, typ: Shared<boom::Type>) -> rudder::Type {
         match &*typ.get() {
-            boom::Type::Unit => Arc::new(rudder::Type::unit()),
-            boom::Type::String => Arc::new(rudder::Type::String),
+            boom::Type::Unit => (rudder::Type::unit()),
+            boom::Type::String => (rudder::Type::String),
             // value
-            boom::Type::Bool | boom::Type::Bit => Arc::new(rudder::Type::u1()),
-            boom::Type::Float => Arc::new(rudder::Type::f64()),
-            boom::Type::Real => Arc::new(rudder::Type::Rational),
-            boom::Type::Union { width } => Arc::new(rudder::Type::Union { width: *width }),
+            boom::Type::Bool | boom::Type::Bit => (rudder::Type::u1()),
+            boom::Type::Float => (rudder::Type::f64()),
+            boom::Type::Real => (rudder::Type::Rational),
+            boom::Type::Union { width } => (rudder::Type::Union { width: *width }),
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
             boom::Type::List { .. } => todo!(),
             boom::Type::Vector { element_type } => {
-                let element_type = (*self.resolve_type(element_type.clone())).clone();
+                let element_type = (self.resolve_type(element_type.clone())).clone();
                 // todo: Brian Campbell said the Sail C backend had functionality to staticize
                 // all bitvector lengths
-                Arc::new(element_type.vectorize(0))
+                (element_type.vectorize(0))
             }
             boom::Type::FixedVector {
                 length,
                 element_type,
             } => {
-                let element_type = (*self.resolve_type(element_type.clone())).clone();
+                let element_type = (self.resolve_type(element_type.clone())).clone();
 
-                Arc::new(element_type.vectorize(usize::try_from(*length).unwrap()))
+                (element_type.vectorize(usize::try_from(*length).unwrap()))
             }
             boom::Type::Reference(inner) => {
                 // todo: this is broken:(
                 self.resolve_type(inner.clone())
             }
             boom::Type::Integer { size } => match size {
-                boom::Size::Static(size) => Arc::new(rudder::Type::new_primitive(
-                    rudder::PrimitiveTypeClass::SignedInteger,
-                    *size,
-                )),
-                boom::Size::Unknown => Arc::new(rudder::Type::ArbitraryLengthInteger),
+                boom::Size::Static(size) => {
+                    (rudder::Type::new_primitive(rudder::PrimitiveTypeClass::SignedInteger, *size))
+                }
+                boom::Size::Unknown => (rudder::Type::ArbitraryLengthInteger),
             },
             boom::Type::Bits { size } => match size {
-                boom::Size::Static(size) => Arc::new(rudder::Type::new_primitive(
-                    rudder::PrimitiveTypeClass::UnsignedInteger,
-                    *size,
-                )),
-                boom::Size::Unknown => Arc::new(rudder::Type::Bits),
+                boom::Size::Static(size) => {
+                    (rudder::Type::new_primitive(
+                        rudder::PrimitiveTypeClass::UnsignedInteger,
+                        *size,
+                    ))
+                }
+                boom::Size::Unknown => (rudder::Type::Bits),
             },
             boom::Type::Constant(c) => {
                 // todo: this should be a panic, but because structs/unions can have constant
                 // type fields we do the following
-                Arc::new(rudder::Type::new_primitive(
+                (rudder::Type::new_primitive(
                     rudder::PrimitiveTypeClass::SignedInteger,
                     signed_smallest_width_of_value(*c).into(),
                 ))
             }
-            boom::Type::Tuple(ts) => Arc::new(rudder::Type::Tuple(
-                ts.iter().cloned().map(|t| self.resolve_type(t)).collect(),
-            )),
+            boom::Type::Tuple(ts) => {
+                (rudder::Type::Tuple(ts.iter().cloned().map(|t| self.resolve_type(t)).collect()))
+            }
         }
     }
 
@@ -331,7 +332,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 fallthrough: boom_fallthrough,
             } => {
                 let condition = self.build_value(Shared::new(condition));
-                let condition = self.builder.generate_cast(condition, Arc::new(Type::u1()));
+                let condition = self.builder.generate_cast(condition, (Type::u1()));
 
                 let rudder_true_target = self.fn_ctx().resolve_block(boom_target);
                 let rudder_false_target = self.fn_ctx().resolve_block(boom_fallthrough);
@@ -497,16 +498,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // assert_eq!(Type::s64(), *args[0].typ());
                     Some(
                         self.builder
-                            .generate_cast(args[0].clone(), Arc::new(Type::ArbitraryLengthInteger)),
+                            .generate_cast(args[0].clone(), (Type::ArbitraryLengthInteger)),
                     )
                 }
 
                 "%i->%i64" => {
-                    assert!(matches!(*args[0].typ(), Type::ArbitraryLengthInteger));
+                    assert!(matches!(args[0].typ(), Type::ArbitraryLengthInteger));
 
                     Some(
                         self.builder
-                            .generate_cast(args[0].clone(), Arc::new(Type::s64())),
+                            .generate_cast(args[0].clone(), (Type::s64())),
                     )
                 }
 
@@ -522,7 +523,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let r = Ratio::<i128>::from_f64(str.as_ref().parse().unwrap()).unwrap();
 
                     Some(self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::Rational),
+                        typ: (Type::Rational),
                         value: ConstantValue::Rational(r),
                     }))
                 }
@@ -532,7 +533,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "subrange_bits" => {
                     // end - start + 1
                     let one = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::s64()),
+                        typ: (Type::s64()),
                         value: rudder::ConstantValue::SignedInteger(1),
                     });
                     let one = self.builder.generate_cast(one, args[1].typ());
@@ -585,7 +586,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "add_bits_int" => {
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::Bits));
+                        .generate_cast(args[1].clone(), (Type::Bits));
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Add,
                         lhs: args[0].clone(),
@@ -597,7 +598,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sub_bits_int" => {
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::Bits));
+                        .generate_cast(args[1].clone(), (Type::Bits));
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
                         lhs: args[0].clone(),
@@ -691,7 +692,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     });
                     Some(
                         self.builder
-                            .generate_cast(ceil, Arc::new(Type::ArbitraryLengthInteger)),
+                            .generate_cast(ceil, (Type::ArbitraryLengthInteger)),
                     )
                 }
 
@@ -703,14 +704,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     });
                     Some(
                         self.builder
-                            .generate_cast(floor, Arc::new(Type::ArbitraryLengthInteger)),
+                            .generate_cast(floor, (Type::ArbitraryLengthInteger)),
                     )
                 }
 
                 // val to_real : (%i) -> %real
                 "to_real" => Some(
                     self.builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::Rational)),
+                        .generate_cast(args[0].clone(), (Type::Rational)),
                 ),
 
                 // val pow2 : (%i) -> %i
@@ -725,7 +726,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // hopefully correct
                     // 1 << args[0]
                     let const_1 = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::ArbitraryLengthInteger),
+                        typ: (Type::ArbitraryLengthInteger),
                         value: ConstantValue::SignedInteger(1),
                     });
                     Some(self.builder.build(StatementKind::ShiftOperation {
@@ -740,7 +741,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // cast args[1] to i32, todo: move this to codegen cause it's a rust thing
                     let i = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::s32()));
+                        .generate_cast(args[1].clone(), (Type::s32()));
 
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::PowI,
@@ -829,7 +830,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 "bitvector_access" => {
                     let length = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(1),
                     });
                     let bitex = self.builder.build(StatementKind::BitExtract {
@@ -838,11 +839,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length,
                     });
 
-                    Some(self.builder.generate_cast(bitex, Arc::new(Type::u1())))
+                    Some(self.builder.generate_cast(bitex, (Type::u1())))
                 }
 
                 "bitvector_length" => {
-                    assert!(matches!(*args[0].typ(), Type::Bits));
+                    assert!(matches!(args[0].typ(), Type::Bits));
 
                     Some(self.builder.build(StatementKind::SizeOf {
                         value: args[0].clone(),
@@ -857,17 +858,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     //    }
                     let op = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::u64()));
+                        .generate_cast(args[0].clone(), (Type::u64()));
                     let n = args[1].clone();
                     let bit = self.builder.build(StatementKind::Cast {
                         kind: CastOperationKind::ZeroExtend,
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: args[2].clone(),
                     });
 
                     // 1
                     let one = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(1),
                     });
 
@@ -925,7 +926,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     Some(self.builder.build(StatementKind::Cast {
                         kind: CastOperationKind::ZeroExtend,
-                        typ: Arc::new(Type::ArbitraryLengthInteger),
+                        typ: (Type::ArbitraryLengthInteger),
                         value: args[0].clone(),
                     }))
                 }
@@ -950,7 +951,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // }
                     Some(self.builder.build(StatementKind::Cast {
                         kind: CastOperationKind::SignExtend,
-                        typ: Arc::new(Type::ArbitraryLengthInteger),
+                        typ: (Type::ArbitraryLengthInteger),
                         value: args[0].clone(),
                     }))
                 }
@@ -967,13 +968,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         };
                         Some(self.builder.build(StatementKind::Cast {
                             kind: CastOperationKind::ZeroExtend,
-                            typ: Arc::new(Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, width)),
+                            typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, width)),
                             value: args[0].clone(),
                         }))
                     } else {
                         Some(self.builder.build(StatementKind::BitsCast {
                             kind: CastOperationKind::ZeroExtend,
-                            typ: Arc::new(Type::Bits),
+                            typ: (Type::Bits),
                             value: args[0].clone(),
                             length: length.clone(),
                         }))
@@ -985,7 +986,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "SignExtend0" | "sail_sign_extend" => {
                     Some(self.builder.build(StatementKind::BitsCast {
                         kind: CastOperationKind::SignExtend,
-                        typ: Arc::new(Type::Bits),
+                        typ: (Type::Bits),
                         value: args[0].clone(),
                         length: args[1].clone(),
                     }))
@@ -994,7 +995,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val truncate : (%bv, %i) -> %bv
                 "truncate" => Some(self.builder.build(StatementKind::BitsCast {
                     kind: CastOperationKind::Truncate,
-                    typ: Arc::new(Type::Bits),
+                    typ: (Type::Bits),
                     value: args[0].clone(),
                     length: args[1].clone(),
                 })),
@@ -1003,15 +1004,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let length = args[0].clone();
 
                     let const_0 = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u8()),
+                        typ: (Type::u8()),
                         value: rudder::ConstantValue::UnsignedInteger(0),
                     });
 
-                    let value = self.builder.generate_cast(const_0, Arc::new(Type::Bits));
+                    let value = self.builder.generate_cast(const_0, (Type::Bits));
 
                     Some(self.builder.build(StatementKind::BitsCast {
                         kind: CastOperationKind::ZeroExtend,
-                        typ: Arc::new(Type::Bits),
+                        typ: (Type::Bits),
                         value,
                         length,
                     }))
@@ -1028,17 +1029,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // %i argument to unsigned
                     let n = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::u64()));
+                        .generate_cast(args[0].clone(), (Type::u64()));
 
                     let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
 
                     let base = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                     });
 
                     let eight = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(8),
                     });
 
@@ -1066,17 +1067,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // %i argument to unsigned
                     let n = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::u64()));
+                        .generate_cast(args[0].clone(), (Type::u64()));
 
                     let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
 
                     let base = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                     });
 
                     let eight = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: rudder::ConstantValue::UnsignedInteger(8),
                     });
 
@@ -1093,7 +1094,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     });
 
                     Some(self.builder.build(StatementKind::ReadRegister {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         offset,
                     }))
                 }
@@ -1102,14 +1103,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "bitvector_update" => {
                     let target = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::Bits));
+                        .generate_cast(args[0].clone(), (Type::Bits));
                     let i = args[1].clone();
                     let bit = self
                         .builder
-                        .generate_cast(args[2].clone(), Arc::new(Type::Bits));
+                        .generate_cast(args[2].clone(), (Type::Bits));
 
                     let const_1 = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: ConstantValue::UnsignedInteger(1),
                     });
 
@@ -1125,7 +1126,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "append_64" => {
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::Bits));
+                        .generate_cast(args[1].clone(), (Type::Bits));
                     Some(self.generate_concat(args[0].clone(), rhs))
                 }
 
@@ -1160,11 +1161,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length: args[0].clone(),
                     });
 
-                    let value = self.builder.generate_cast(extract, Arc::new(Type::u128()));
+                    let value = self.builder.generate_cast(extract, (Type::u128()));
 
                     let length = self
                         .builder
-                        .generate_cast(args[0].clone(), Arc::new(Type::u16()));
+                        .generate_cast(args[0].clone(), (Type::u16()));
 
                     Some(
                         self.builder
@@ -1204,7 +1205,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     let const_1 = {
                         let _u1 = self.builder.build(StatementKind::Constant {
-                            typ: Arc::new(Type::u64()),
+                            typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(1),
                         });
                         self.builder.generate_cast(_u1, sum.typ())
@@ -1229,7 +1230,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // // bundle length = bits_length * count
                     let count = self
                         .builder
-                        .generate_cast(args[1].clone(), Arc::new(Type::u64()));
+                        .generate_cast(args[1].clone(), (Type::u64()));
                     Some(self.builder.build(StatementKind::Call {
                         target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
                         args: vec![args[0].clone(), count],
@@ -1244,10 +1245,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let carry_in = args[2].clone();
 
 
-                    let _0 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(0) });
-                    let _1 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(1) });
-                    let _2 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(2) });
-                    let _3 = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u8()), value: ConstantValue::UnsignedInteger(3) });
+                    let _0 = self.builder.build(StatementKind::Constant { typ: (Type::u8()), value: ConstantValue::UnsignedInteger(0) });
+                    let _1 = self.builder.build(StatementKind::Constant { typ: (Type::u8()), value: ConstantValue::UnsignedInteger(1) });
+                    let _2 = self.builder.build(StatementKind::Constant { typ: (Type::u8()), value: ConstantValue::UnsignedInteger(2) });
+                    let _3 = self.builder.build(StatementKind::Constant { typ: (Type::u8()), value: ConstantValue::UnsignedInteger(3) });
 
 
                  let partial_sum = self.builder.build(StatementKind::BinaryOperation { kind: BinaryOperationKind::Add, lhs: x, rhs: y });
@@ -1259,7 +1260,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                  let c = self.builder.build(StatementKind::GetFlag {flag: Flag::C, operation: sum.clone()});
                  let v = self.builder.build(StatementKind::GetFlag {flag: Flag::V, operation: sum.clone()});
 
-                    let empty_flags = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4)), value: ConstantValue::UnsignedInteger(0) });
+                    let empty_flags = self.builder.build(StatementKind::Constant { typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4)), value: ConstantValue::UnsignedInteger(0) });
                   let inserted_n=  self.builder.build(StatementKind::BitInsert { target: empty_flags, source: n, start: _0, length: _1.clone() });
                   let inserted_z = self.builder.build(StatementKind::BitInsert { target: inserted_n, source: z, start: _1.clone(), length: _1.clone() });
                   let inserted_c = self.builder.build(StatementKind::BitInsert { target: inserted_z, source: c, start: _2, length: _1.clone() });
@@ -1277,10 +1278,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let phys_addr = args[2].clone();
                     let n = args[3].clone();
 
-                    let size_bytes = self.builder.generate_cast(n, Arc::new(Type::u64()));
+                    let size_bytes = self.builder.generate_cast(n, (Type::u64()));
 
                     let const_8 = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: ConstantValue::UnsignedInteger(8),
                     });
                     let size_bits = self.builder.build(StatementKind::BinaryOperation {
@@ -1289,7 +1290,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: const_8,
                     });
 
-                    let offset = self.builder.generate_cast(phys_addr, Arc::new(Type::u64()));
+                    let offset = self.builder.generate_cast(phys_addr, (Type::u64()));
 
                     Some(self.builder.build(StatementKind::ReadMemory {
                         offset,
@@ -1305,10 +1306,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let n = args[3].clone();
                     let data = args[4].clone();
 
-                    let size_bytes = self.builder.generate_cast(n, Arc::new(Type::u64()));
+                    let size_bytes = self.builder.generate_cast(n, (Type::u64()));
 
                     let const_8 = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u64()),
+                        typ: (Type::u64()),
                         value: ConstantValue::UnsignedInteger(8),
                     });
                     let size_bits = self.builder.build(StatementKind::BinaryOperation {
@@ -1317,15 +1318,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: const_8,
                     });
 
-                    let size_bits_cast =  self.builder.generate_cast(size_bits, Arc::new(Type::ArbitraryLengthInteger));
+                    let size_bits_cast =  self.builder.generate_cast(size_bits, (Type::ArbitraryLengthInteger));
 
-                    let value = self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: Arc::new(Type::Bits), value: data, length:size_bits_cast });
-                    let offset = self.builder.generate_cast(phys_addr, Arc::new(Type::u64()));
+                    let value = self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: (Type::Bits), value: data, length:size_bits_cast });
+                    let offset = self.builder.generate_cast(phys_addr, (Type::u64()));
 
                     self.builder.build(StatementKind::WriteMemory { offset, value });
 
                     // return value also appears to be always ignored
-                    Some(self.builder.build(StatementKind::Constant { typ: Arc::new(Type::u1()), value: ConstantValue::UnsignedInteger(0) }))
+                    Some(self.builder.build(StatementKind::Constant { typ: (Type::u1()), value: ConstantValue::UnsignedInteger(0) }))
                 }
 
                 // ignore
@@ -1337,34 +1338,34 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 //     Err(statuscode) => (CreatePhysMemRetStatus(statuscode), sail_zeros(8 * size))
                 //   }
                 "read_tag#" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(rudder::Type::u1()),
+                    typ: (rudder::Type::u1()),
                     value: ConstantValue::UnsignedInteger(1),
                 })),
                 "write_tag#" => {
-                    let msg = self.builder.build(StatementKind::Constant { typ: Arc::new(Type::String), value: ConstantValue::String("write_tag panic".into()) });
+                    let msg = self.builder.build(StatementKind::Constant { typ: (Type::String), value: ConstantValue::String("write_tag panic".into()) });
                     Some(self.builder.build(StatementKind::Panic(msg)))
                 },
 
                 "DecStr" | "bits_str" | "HexStr" => {
                     Some(self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(rudder::Type::String),
+                        typ: (rudder::Type::String),
                         value: ConstantValue::String("fix me in build_specialized_function".into()),
                     }))
                 }
 
                 "__GetVerbosity" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(rudder::Type::u64()),
+                    typ: (rudder::Type::u64()),
                     value: ConstantValue::UnsignedInteger(0),
                 })),
 
                 "get_cycle_count"  => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(rudder::Type::ArbitraryLengthInteger),
+                    typ: (rudder::Type::ArbitraryLengthInteger),
                     value: ConstantValue::SignedInteger(0),
                 })),
 
                 // requires u256 internally :(
                 "SHA256hash" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(rudder::Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
+                    typ: (rudder::Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
                     value: ConstantValue::UnsignedInteger(0),
                 })),
 
@@ -1387,7 +1388,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "print_endline"
                 | "check_cycle_count"
                 | "sail_take_exception" => Some(self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::unit()),
+                    typ: (Type::unit()),
                     value: ConstantValue::Unit,
                 })),
                 _ => None,
@@ -1456,7 +1457,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let cast = self.builder.generate_cast(source, outer_type);
 
                 let offset = self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::u32()),
+                    typ: (Type::u32()),
                     value: rudder::ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
                 });
 
@@ -1501,7 +1502,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = register_offset + offsets.iter().sum::<usize>();
 
                     let offset = self.builder.build(StatementKind::Constant {
-                        typ: Arc::new(Type::u32()),
+                        typ: (Type::u32()),
                         value: rudder::ConstantValue::UnsignedInteger(
                             u64::try_from(offset).unwrap(),
                         ),
@@ -1603,7 +1604,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn build_literal(&mut self, literal: &boom::Literal) -> Statement {
         let kind = match literal {
             boom::Literal::Int(i) => StatementKind::Constant {
-                typ: Arc::new(Type::new_primitive(
+                typ: (Type::new_primitive(
                     PrimitiveTypeClass::SignedInteger,
                     signed_smallest_width_of_value(i.try_into().unwrap()).into(),
                 )),
@@ -1612,28 +1613,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ),
             },
             boom::Literal::Bits(bits) => StatementKind::Constant {
-                typ: Arc::new(Type::new_primitive(
-                    rudder::PrimitiveTypeClass::UnsignedInteger,
-                    bits.len(),
-                )),
+                typ: (Type::new_primitive(rudder::PrimitiveTypeClass::UnsignedInteger, bits.len())),
                 value: rudder::ConstantValue::UnsignedInteger(
                     bits_to_int(bits).try_into().unwrap(),
                 ),
             },
             boom::Literal::Bit(bit) => StatementKind::Constant {
-                typ: Arc::new(Type::u1()),
+                typ: (Type::u1()),
                 value: rudder::ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
             },
             boom::Literal::Bool(b) => StatementKind::Constant {
-                typ: Arc::new(Type::u1()),
+                typ: (Type::u1()),
                 value: rudder::ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
             },
             boom::Literal::String(str) => StatementKind::Constant {
-                typ: Arc::new(Type::String),
+                typ: (Type::String),
                 value: rudder::ConstantValue::String(*str),
             },
             boom::Literal::Unit => StatementKind::Constant {
-                typ: Arc::new(Type::unit()),
+                typ: (Type::unit()),
                 value: rudder::ConstantValue::Unit,
             },
             boom::Literal::Reference(_) => todo!(),
@@ -1665,7 +1663,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let source_type = value.typ();
 
-                let kind = match *source_type {
+                let kind = match source_type {
                     Type::Struct(_) | Type::Vector { .. } | Type::String => {
                         panic!("cast on non-primitive type")
                     }
@@ -1780,16 +1778,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn generate_concat(&mut self, left: Statement, right: Statement) -> Statement {
         // todo: (zero extend original value || create new bits with runtime length)
         // then bitinsert
-        match (&*left.typ(), &*right.typ()) {
+        match (left.typ(), right.typ()) {
             (Type::Bits, Type::Bits) => {
-                let l_value = self
-                    .builder
-                    .generate_cast(left.clone(), Arc::new(Type::u128()));
+                let l_value = self.builder.generate_cast(left.clone(), (Type::u128()));
                 let l_length = self.builder.build(StatementKind::SizeOf { value: left });
 
-                let r_value = self
-                    .builder
-                    .generate_cast(right.clone(), Arc::new(Type::u128()));
+                let r_value = self.builder.generate_cast(right.clone(), (Type::u128()));
                 let r_length = self.builder.build(StatementKind::SizeOf { value: right });
 
                 let shift = self.builder.build(StatementKind::ShiftOperation {
@@ -1830,7 +1824,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let left_cast = self.builder.build(StatementKind::Cast {
                     kind: CastOperationKind::ZeroExtend,
-                    typ: Arc::new(Type::Primitive(PrimitiveType {
+                    typ: (Type::Primitive(PrimitiveType {
                         tc: PrimitiveTypeClass::UnsignedInteger,
                         element_width_in_bits: left_width + right_width,
                     })),
@@ -1838,8 +1832,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 });
 
                 let right_width_constant = self.builder.build(StatementKind::Constant {
-                    typ: Arc::new(Type::u16()),
-                    value: ConstantValue::UnsignedInteger(u64::try_from(*right_width).unwrap()),
+                    typ: (Type::u16()),
+                    value: ConstantValue::UnsignedInteger(u64::try_from(right_width).unwrap()),
                 });
 
                 let left_shift = self.builder.build(StatementKind::ShiftOperation {
@@ -1915,10 +1909,10 @@ fn value_field_collapse(value: Shared<boom::Value>) -> (Shared<boom::Value>, Vec
 /// Given a type and array of field accesses, produce a corresponding array of
 /// indices to each field access, and the type of the outermost access
 fn fields_to_indices(
-    structs: &HashMap<InternedString, (Arc<Type>, HashMap<InternedString, usize>)>,
-    initial_type: Arc<Type>,
+    structs: &HashMap<InternedString, (Type, HashMap<InternedString, usize>)>,
+    initial_type: Type,
     fields: &[InternedString],
-) -> (Vec<usize>, Arc<Type>) {
+) -> (Vec<usize>, Type) {
     let mut current_type = initial_type;
 
     let mut indices = vec![];
@@ -1927,7 +1921,7 @@ fn fields_to_indices(
         // get the fields of the current struct
         let (_, (struct_typ, fields)) = structs
             .iter()
-            .find(|(_, (candidate, _))| Arc::ptr_eq(&current_type, candidate))
+            .find(|(_, (candidate, _))| current_type == *candidate)
             .expect("failed to find struct :(");
 
         // get index and push
@@ -1935,7 +1929,7 @@ fn fields_to_indices(
         indices.push(idx);
 
         // update current struct to point to field
-        let Type::Struct(fields) = &**struct_typ else {
+        let Type::Struct(fields) = struct_typ else {
             panic!("cannot get fields of non-product")
         };
         current_type = fields[idx].1.clone();
@@ -1945,10 +1939,10 @@ fn fields_to_indices(
 }
 
 fn fields_to_offsets(
-    structs: &HashMap<InternedString, (Arc<Type>, HashMap<InternedString, usize>)>,
-    initial_type: Arc<Type>,
+    structs: &HashMap<InternedString, (Type, HashMap<InternedString, usize>)>,
+    initial_type: Type,
     fields: &[InternedString],
-) -> (Vec<usize>, Arc<Type>) {
+) -> (Vec<usize>, Type) {
     let mut current_type = initial_type;
 
     let mut offsets = vec![];
@@ -1957,7 +1951,7 @@ fn fields_to_offsets(
         // get the fields of the current struct
         let (_, (_, fields)) = structs
             .iter()
-            .find(|(_, (candidate, _))| Arc::ptr_eq(&current_type, candidate))
+            .find(|(_, (candidate, _))| current_type == *candidate)
             .expect("failed to find struct :(");
 
         // get index and push
@@ -1965,7 +1959,7 @@ fn fields_to_offsets(
         offsets.push(current_type.byte_offset(idx).unwrap());
 
         // update current struct to point to field
-        let Type::Struct(fields) = &*current_type else {
+        let Type::Struct(fields) = &current_type else {
             panic!("cannot get fields of non-product")
         };
         current_type = fields[idx].1.clone();

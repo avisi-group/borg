@@ -1,9 +1,9 @@
 use {
     crate::rudder::{
-        statement::StatementKind, Block, ConstantValue, Model, Function, PrimitiveType,
+        statement::StatementKind, Block, ConstantValue, Function, Model, PrimitiveType,
         PrimitiveTypeClass, Statement, Type,
     },
-    std::{fmt::Display, sync::Arc},
+    std::fmt::Display,
 };
 
 pub enum Severity {
@@ -116,9 +116,9 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 }
 
 fn validate_constant_type(
-    ((stmt, block, f), (typ, value)): ((Statement, Block, Function), (Arc<Type>, ConstantValue)),
+    ((stmt, block, f), (typ, value)): ((Statement, Block, Function), (Type, ConstantValue)),
 ) -> Option<ValidationMessage> {
-    match (&value, &*typ) {
+    match (&value, &typ) {
         (
             ConstantValue::UnsignedInteger(_),
             Type::Primitive(PrimitiveType {

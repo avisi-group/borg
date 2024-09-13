@@ -24,23 +24,23 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     let bits_symbol = Symbol {
         name: "bits".into(),
         kind: SymbolKind::Parameter,
-        typ: Arc::new(Type::Bits),
+        typ: (Type::Bits),
     };
     let count_symbol = Symbol {
         name: "count".into(),
         kind: SymbolKind::Parameter,
-        typ: Arc::new(Type::u64()),
+        typ: (Type::u64()),
     };
 
     let local_count_symbol = Symbol {
         name: "local_count".into(),
         kind: SymbolKind::LocalVariable,
-        typ: Arc::new(Type::u64()),
+        typ: (Type::u64()),
     };
     let result_symbol = Symbol {
         name: "result".into(),
         kind: SymbolKind::LocalVariable,
-        typ: Arc::new(Type::Bits),
+        typ: (Type::Bits),
     };
 
     let end_block = {
@@ -66,7 +66,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     {
         let mut check_builder = StatementBuilder::new(check_block.weak());
         let _0 = check_builder.build(StatementKind::Constant {
-            typ: Arc::new(Type::u64()),
+            typ: (Type::u64()),
             value: ConstantValue::UnsignedInteger(0),
         });
 
@@ -97,7 +97,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         });
 
         let _1 = shift_builder.build(StatementKind::Constant {
-            typ: Arc::new(Type::u64()),
+            typ: (Type::u64()),
             value: ConstantValue::UnsignedInteger(1),
         });
 
@@ -127,19 +127,19 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         });
 
         let _8 = shift_builder.build(StatementKind::Constant {
-            typ: Arc::new(Type::u8()),
+            typ: (Type::u8()),
             value: ConstantValue::UnsignedInteger(8),
         });
 
         let cast_len = shift_builder.build(StatementKind::Cast {
             kind: CastOperationKind::ZeroExtend,
-            typ: Arc::new(Type::u8()),
+            typ: (Type::u8()),
             value: len.clone(),
         });
 
         let bundle_len = shift_builder.build(StatementKind::Cast {
             kind: CastOperationKind::Convert,
-            typ: Arc::new(Type::Bits),
+            typ: (Type::Bits),
             value: cast_len.clone(),
         });
 
@@ -186,7 +186,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         });
 
         let zero = entry_builder.build(StatementKind::Constant {
-            typ: Arc::new(Type::u128()),
+            typ: (Type::u128()),
             value: ConstantValue::UnsignedInteger(0),
         });
 
@@ -200,13 +200,13 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let read_count_cast = entry_builder.build(StatementKind::Cast {
             kind: CastOperationKind::Truncate,
-            typ: Arc::new(Type::u16()),
+            typ: (Type::u16()),
             value: read_count.clone(),
         });
 
         let bits_length_cast = entry_builder.build(StatementKind::Cast {
             kind: CastOperationKind::Truncate,
-            typ: Arc::new(Type::u16()),
+            typ: (Type::u16()),
             value: bits_length.clone(),
         });
 
@@ -248,7 +248,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             },
             entry_block,
         }),
-        return_type: Arc::new(Type::Bits),
+        return_type: (Type::Bits),
         parameters: vec![bits_symbol, count_symbol.clone()],
     }
 });

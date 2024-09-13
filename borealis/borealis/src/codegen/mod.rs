@@ -79,8 +79,8 @@ pub fn codegen_ident(input: InternedString) -> Ident {
     Ident::new(&buf, Span::call_site())
 }
 
-pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
-    match &*typ {
+pub fn codegen_type(typ: Type) -> TokenStream {
+    match &typ {
         Type::Primitive(typ) => {
             if typ.type_class() == PrimitiveTypeClass::UnsignedInteger && typ.width() == 1 {
                 return quote!(bool);
@@ -115,7 +115,7 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
             element_count,
             element_type,
         } => {
-            let element_type = codegen_type(element_type.clone());
+            let element_type = codegen_type((**element_type).clone());
 
             if *element_count == 0 {
                 quote!(alloc::vec::Vec<#element_type>)

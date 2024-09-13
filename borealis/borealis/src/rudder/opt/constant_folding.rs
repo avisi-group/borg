@@ -171,7 +171,7 @@ fn run_on_stmt(stmt: Statement) -> bool {
         } => {
             // watch out! if you cast a constant primitive to an arbitrary bits you lose
             // length information
-            if let Type::Primitive(_) = &*typ {
+            if let Type::Primitive(_) = &typ {
                 if let StatementKind::Constant { value, .. } = value.kind() {
                     let value = cast_integer(value, typ.clone());
                     stmt.replace_kind(StatementKind::Constant { typ, value });
@@ -229,8 +229,8 @@ fn run_on_stmt(stmt: Statement) -> bool {
     }
 }
 
-fn cast_integer(value: ConstantValue, typ: Arc<Type>) -> ConstantValue {
-    match &*typ {
+fn cast_integer(value: ConstantValue, typ: Type) -> ConstantValue {
+    match &typ {
         Type::Primitive(primitive) => match (primitive.tc, value) {
             (PrimitiveTypeClass::SignedInteger, ConstantValue::UnsignedInteger(i)) => {
                 ConstantValue::SignedInteger(i64::try_from(i).unwrap())

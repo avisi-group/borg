@@ -567,7 +567,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     }
 }
 
-fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> TokenStream {
+fn codegen_cast(typ: Type, value: Statement, kind: CastOperationKind) -> TokenStream {
     let source_type = value.typ();
     let target_type = typ;
     let ident = get_ident(&value);

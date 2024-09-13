@@ -32,10 +32,10 @@ fn run_on_stmt(stmt: Statement, sua: &StatementUseAnalysis) -> bool {
         StatementKind::Constant { typ, value } => {
             if typ.is_apint() {
                 stmt.replace_kind(StatementKind::Constant {
-                    typ: Arc::new(Type::new_primitive(
+                    typ: Type::new_primitive(
                         crate::rudder::PrimitiveTypeClass::SignedInteger,
                         value.smallest_width(),
-                    )),
+                    ),
                     value,
                 });
 

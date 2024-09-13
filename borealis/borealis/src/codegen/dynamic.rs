@@ -19,7 +19,7 @@ use {
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
-    std::{iter::repeat, sync::Arc},
+    std::iter::repeat,
     syn::Ident,
 };
 
@@ -27,7 +27,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
     let name_ident = codegen_ident(function.name());
     let (return_type, parameters) = function.signature();
 
-    let return_type = if let Type::Tuple(ts) = &*return_type {
+    let return_type = if let Type::Tuple(ts) = &return_type {
         let elements = repeat(quote!(X86NodeRef)).take(ts.len());
         quote!((#(#elements,)*))
     } else {
@@ -230,8 +230,8 @@ pub fn get_block_fn_ident(b: &Block) -> Ident {
 }
 
 /// Converts a rudder type to a `Type` value
-fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
-    match &(*rudder) {
+fn codegen_type_instance(rudder: Type) -> TokenStream {
+    match &(rudder) {
         Type::Primitive(primitive) => {
             let width = Literal::usize_unsuffixed(primitive.width());
             match primitive.tc {
@@ -272,7 +272,7 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
             element_type,
         } => {
             let element_width = u16::try_from(element_type.width_bits()).unwrap();
-            let element_type = codegen_type_instance(element_type.clone());
+            let element_type = codegen_type_instance((**element_type).clone());
             let element_count = Literal::u16_suffixed(u16::try_from(*element_count).unwrap());
 
             quote! {
@@ -287,8 +287,8 @@ fn codegen_type_instance(rudder: Arc<Type>) -> TokenStream {
 }
 
 /// Converts a rudder type to a `Type` value
-fn codegen_constant_type_instance(value: &ConstantValue, typ: Arc<Type>) -> TokenStream {
-    match &(*typ) {
+fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStream {
+    match &(typ) {
         Type::Primitive(primitive) => {
             let width = Literal::usize_unsuffixed(primitive.width());
             match primitive.tc {
@@ -407,7 +407,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
 
             // emit match on this length to create mut pointer
 
-            match &*value.typ() {
+            match &value.typ() {
                 Type::Primitive(PrimitiveType { .. }) => {
                     quote! {
                         state.write_memory(#offset, &#value.to_ne_bytes())
@@ -602,7 +602,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             let source_type = value.typ();
             let target_type = typ;
 
-            match (&*source_type, &*target_type, kind) {
+            match (&source_type, &target_type, kind) {
                 (Type::Bits, Type::Bits, CastOperationKind::ZeroExtend) => {
                     quote!(#value.zero_extend(#length))
                 }
@@ -616,7 +616,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::SizeOf { value } => {
-            match &*value.typ() {
+            match &value.typ() {
                 Type::Bits => quote!(#value.length()),
                 Type::ArbitraryLengthInteger => {
                     panic!("cannot get size of arbitrary length integer")
@@ -701,7 +701,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
     }
 }
 
-pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -> TokenStream {
+pub fn codegen_cast(typ: Type, value: Statement, kind: CastOperationKind) -> TokenStream {
     let source_type = value.typ();
     let target_type = typ;
 
@@ -714,7 +714,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
         return quote!(#value);
     }
 
-    match (&*source_type, &*target_type, kind) {
+    match (&source_type, &target_type, kind) {
         // need to special case casting to booleans
         (
             Type::Primitive(_),
@@ -948,7 +948,7 @@ pub fn codegen_cast(typ: Arc<Type>, value: Statement, kind: CastOperationKind) -
     }
 }
 
-fn codegen_constant_value(value: ConstantValue, typ: Arc<Type>) -> TokenStream {
+fn codegen_constant_value(value: ConstantValue, typ: Type) -> TokenStream {
     let typ_instance = codegen_constant_type_instance(&value, typ.clone());
     match value {
         ConstantValue::UnsignedInteger(v) => {
@@ -968,7 +968,7 @@ fn codegen_constant_value(value: ConstantValue, typ: Arc<Type>) -> TokenStream {
         ConstantValue::Rational(_) => todo!(),
 
         ConstantValue::Tuple(values) => {
-            let Type::Tuple(types) = &*typ else { panic!() };
+            let Type::Tuple(types) = &typ else { panic!() };
             let values = values
                 .iter()
                 .cloned()
