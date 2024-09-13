@@ -3,8 +3,8 @@
 use {
     crate::{
         boom::{
-            self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionSignature,
-            NamedType, Parameter, Size,
+            self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionDefinition,
+            FunctionSignature, NamedType, Parameter, Size, Type,
         },
         util::signed_smallest_width_of_value,
     },
@@ -28,6 +28,8 @@ pub struct BoomEmitter {
     /// Temporarily stored type signatures as spec and function definitions are
     /// separate
     function_types: HashMap<InternedString, (Parameters, Return)>,
+    /// Register initialization statements (also letbinds)
+    register_init_statements: Vec<Shared<boom::Statement>>,
 }
 
 impl BoomEmitter {
@@ -45,24 +47,45 @@ impl BoomEmitter {
     }
 
     /// Emit BOOM AST
-    pub fn finish(self) -> boom::Ast {
+    pub fn finish(mut self) -> boom::Ast {
+        self.register_init_statements
+            .push(Shared::new(boom::Statement::VariableDeclaration {
+                name: "ret".into(),
+                typ: Shared::new(Type::Unit),
+            }));
+        self.register_init_statements
+            .push(Shared::new(boom::Statement::Copy {
+                expression: boom::Expression::Identifier("ret".into()),
+                value: Shared::new(boom::Value::Literal(Shared::new(boom::Literal::Unit))),
+            }));
+        self.register_init_statements
+            .push(Shared::new(boom::Statement::End("ret".into())));
+
+        self.ast.functions.insert(
+            "borealis_register_init".into(),
+            FunctionDefinition {
+                signature: FunctionSignature {
+                    name: "borealis_register_init".into(),
+                    parameters: Shared::new(vec![]),
+                    return_type: Shared::new(Type::Unit),
+                },
+                entry_block: ControlFlowGraphBuilder::from_statements(
+                    &self.register_init_statements,
+                ),
+            },
+        );
+
         self.ast
     }
 
     fn process_definition(&mut self, definition: &jib_ast::Definition) {
         match &definition.def {
             jib_ast::DefinitionAux::Register(ident, typ, body) => {
-                self.ast.registers.insert(
-                    ident.as_interned(),
-                    (
-                        convert_type(typ),
-                        //  allow unknown terminators for registers
-                        ControlFlowGraphBuilder::from_statements(
-                            &convert_body(body.as_ref()),
-                            true,
-                        ),
-                    ),
-                );
+                self.ast
+                    .registers
+                    .insert(ident.as_interned(), convert_type(typ));
+                self.register_init_statements
+                    .extend_from_slice(&convert_body(body.as_ref()));
             }
             jib_ast::DefinitionAux::Type(type_def) => {
                 match type_def {
@@ -89,28 +112,13 @@ impl BoomEmitter {
                 }
             }
             jib_ast::DefinitionAux::Let(_, bindings, body) => {
-                if let [(name, jib_ast::Type::Constant(c))] = bindings.as_ref() {
-                    assert!(self
-                        .ast
-                        .constants
-                        .insert(name.as_interned(), (&c.0).try_into().unwrap())
-                        .is_none())
-                } else {
-                    self.ast.definitions.push(boom::Definition::Let {
-                        bindings: bindings
-                            .iter()
-                            .map(|(ident, typ)| NamedType {
-                                name: ident.as_interned(),
-                                typ: convert_type(typ),
-                            })
-                            .collect(),
-                        //  allow unknown terminators for letbinds
-                        body: ControlFlowGraphBuilder::from_statements(
-                            &convert_body(body.as_ref()),
-                            true,
-                        ),
-                    });
-                }
+                bindings.iter().for_each(|(ident, typ)| {
+                    self.ast
+                        .registers
+                        .insert(ident.as_interned(), convert_type(typ));
+                });
+                self.register_init_statements
+                    .extend_from_slice(&convert_body(body.as_ref()));
             }
             jib_ast::DefinitionAux::Val(id, _, parameters, out) => {
                 self.function_types.insert(
@@ -142,6 +150,7 @@ impl BoomEmitter {
 
                 let mut body = convert_body(body.as_ref());
 
+                // make implicit return variable explicit
                 body.insert(
                     0,
                     Shared::new(boom::Statement::VariableDeclaration {
@@ -151,8 +160,7 @@ impl BoomEmitter {
                 );
 
                 //debug!("building new control flow graph for {name}");
-                // do not allow unknown terminators for regular functions
-                let control_flow = ControlFlowGraphBuilder::from_statements(&body, false);
+                let control_flow = ControlFlowGraphBuilder::from_statements(&body);
 
                 self.ast.functions.insert(
                     name,

@@ -1,8 +1,6 @@
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::Pass,
-        Ast, Expression, Literal, Size, Statement, Type, Value,
+        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, shared::Shared, HashMap, HashSet},
 };
@@ -56,72 +54,22 @@ fn handle_registers(ast: Shared<Ast>) {
         .get_mut()
         .registers
         .iter()
-        .filter(|(_, (typ, _))| matches!(&*typ.get(), Type::Union { .. }))
-        .map(|(name, (typ, b))| (*name, typ.clone(), b.clone()))
+        .filter(|(_, typ)| matches!(&*typ.get(), Type::Union { .. }))
+        .map(|(name, typ)| (*name, typ.clone()))
         .collect::<Vec<_>>();
 
-    for (register_name, typ, body) in union_regs {
+    for (register_name, typ) in union_regs {
         ast.get_mut().registers.remove(&register_name);
-
-        let body = body.statements();
-
-        let Statement::FunctionCall {
-            expression: Some(expression),
-            name: function_name,
-            arguments,
-        } = &*body[0].get()
-        else {
-            panic!()
-        };
-
-        let Expression::Identifier(target) = expression else {
-            panic!();
-        };
-
-        assert_eq!(*target, register_name);
-
-        let tag = *ast
-            .get()
-            .unions
-            .values()
-            .map(|(_, tags)| tags)
-            .flat_map(|tags| tags.get(function_name))
-            .next()
-            .unwrap();
 
         ast.get_mut().registers.insert(
             tag_ident(register_name),
-            (
-                Shared::new(Type::Integer {
-                    size: Size::Static(32),
-                }),
-                {
-                    let b = ControlFlowBlock::new();
-                    b.set_statements(vec![Shared::new(Statement::Copy {
-                        expression: Expression::Identifier(tag_ident(register_name)),
-                        value: Shared::new(Value::Literal(Shared::new(Literal::Int(tag.into())))),
-                    })]);
-                    b.set_terminator(Terminator::Return(Value::Literal(Shared::new(
-                        Literal::Unit,
-                    ))));
-                    b
-                },
-            ),
-        );
-        ast.get_mut().registers.insert(
-            value_ident(register_name),
-            (typ, {
-                let b = ControlFlowBlock::new();
-                b.set_statements(vec![Shared::new(Statement::Copy {
-                    expression: Expression::Identifier(value_ident(register_name)),
-                    value: arguments[0].clone(),
-                })]);
-                b.set_terminator(crate::boom::control_flow::Terminator::Return(
-                    Value::Literal(Shared::new(Literal::Unit)),
-                ));
-                b
+            Shared::new(Type::Integer {
+                size: Size::Static(32),
             }),
         );
+        ast.get_mut()
+            .registers
+            .insert(value_ident(register_name), typ);
     }
 }
 
@@ -163,44 +111,58 @@ fn destruct_locals(
                             return vec![clone];
                         }
                     }
-                    Statement::Copy { expression: Expression::Identifier(dst), value } =>
-                          {
-                             let Value::Identifier(src) =  &*value.get() else {
-                                return vec![clone];
-                            };
+                    Statement::Copy {
+                        expression: Expression::Identifier(dst),
+                        value,
+                    } => {
+                        let Value::Identifier(src) = &*value.get() else {
+                            return vec![clone];
+                        };
 
-                            if union_local_idents.contains(dst) || union_local_idents.contains(src)  {
-                                vec![
-                                    Shared::new(Statement::Copy { expression: Expression::Identifier(tag_ident(*dst)),value: Shared::new(Value::Identifier(tag_ident(*src)))}),
-                                    Shared::new(Statement::Copy { expression: Expression::Identifier(value_ident(*dst)), value: Shared::new(Value::Identifier(value_ident(*src))) })
-                                ]
+                        if union_local_idents.contains(dst) || union_local_idents.contains(src) {
+                            vec![
+                                Shared::new(Statement::Copy {
+                                    expression: Expression::Identifier(tag_ident(*dst)),
+                                    value: Shared::new(Value::Identifier(tag_ident(*src))),
+                                }),
+                                Shared::new(Statement::Copy {
+                                    expression: Expression::Identifier(value_ident(*dst)),
+                                    value: Shared::new(Value::Identifier(value_ident(*src))),
+                                }),
+                            ]
 
-                                // assign value
-                                // assign tag
-                            } else {
-                                vec![clone]
-                            }
-                        },
-
+                            // assign value
+                            // assign tag
+                        } else {
+                            vec![clone]
+                        }
+                    }
 
                     Statement::FunctionCall {
                         expression,
                         name,
                         arguments,
                     } => {
-                        if let Some(Expression::Identifier(ident)) = expression {
-                                if union_local_idents.contains(ident) {
-                                    let tag = *union_tags.get(name).expect("function call into a union that isnt a constructor, implement tuple return types?");
+                        // function name is a union tag constructor
+                        if let Some(tag) = union_tags.get(name) {
+                            if let Some(Expression::Identifier(ident)) = expression {
+                                assert_eq!(1, arguments.len());
 
-                                    assert_eq!(1, arguments.len());
-
-                                    vec![
-                                        Shared::new(Statement::Copy { expression: Expression::Identifier(tag_ident(*ident)), value: Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(tag.into())))) }),
-                                        Shared::new(Statement::Copy { expression: Expression::Identifier(value_ident(*ident)), value: arguments[0].clone() })
-                                    ]
-                                } else {
-                                    vec![clone]
-                                }
+                                vec![
+                                    Shared::new(Statement::Copy {
+                                        expression: Expression::Identifier(tag_ident(*ident)),
+                                        value: Shared::new(Value::Literal(Shared::new(
+                                            crate::boom::Literal::Int((*tag).into()),
+                                        ))),
+                                    }),
+                                    Shared::new(Statement::Copy {
+                                        expression: Expression::Identifier(value_ident(*ident)),
+                                        value: arguments[0].clone(),
+                                    }),
+                                ]
+                            } else {
+                                panic!();
+                            }
                         } else {
                             vec![clone]
                         }

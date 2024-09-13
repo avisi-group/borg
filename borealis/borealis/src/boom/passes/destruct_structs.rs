@@ -65,24 +65,19 @@ impl Pass for DestructStructs {
 }
 
 fn handle_registers(
-    registers: &mut HashMap<InternedString, (Shared<Type>, ControlFlowBlock)>,
+    registers: &mut HashMap<InternedString, Shared<Type>>,
 ) -> HashMap<InternedString, Vec<NamedType>> {
     let mut to_remove = HashMap::default();
     let mut to_add = vec![];
 
-    registers.iter().for_each(|(name, (typ, entry))| {
+    registers.iter().for_each(|(name, typ)| {
         if let Type::Struct { fields, .. } = &*typ.get() {
             to_remove.insert(*name, fields.clone());
             to_add.extend(fields.iter().map(
                 |NamedType {
                      name: field_name,
                      typ,
-                 }| {
-                    (
-                        destructed_ident(*name, *field_name),
-                        (typ.clone(), entry.clone()),
-                    )
-                },
+                 }| { (destructed_ident(*name, *field_name), typ.clone()) },
             ));
         }
     });

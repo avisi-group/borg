@@ -29,87 +29,18 @@ use {
 pub fn from_boom(ast: &boom::Ast) -> Model {
     let mut build_ctx = BuildContext::default();
 
-    let mut register_init_blocks = HashMap::default();
-
     // DEFINITION ORDER DEPENDANT!!!
     ast.definitions.iter().for_each(|def| match def {
         boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
-        boom::Definition::Let { bindings, body } => {
-            assert_eq!(1, bindings.len());
-            let NamedType { name, typ } = &bindings[0];
-
-            let typ = build_ctx.resolve_type(typ.clone());
-
-            register_init_blocks.insert(name, body.clone());
-
-            build_ctx.add_register(*name, typ);
-        }
         // todo contains KV pairs, "mangled" and "tuplestruct" as keys and type names as values
         boom::Definition::Pragma { .. } => (),
     });
 
-    ast.registers.iter().for_each(|(name, (typ, init))| {
+    ast.registers.iter().for_each(|(name, typ)| {
         let typ = build_ctx.resolve_type(typ.clone());
-
-        register_init_blocks.insert(name, init.clone());
 
         build_ctx.add_register(*name, typ);
     });
-
-    {
-        let mut register_init_names = vec![];
-        register_init_blocks
-            .into_iter()
-            .filter(|(name, ..)| name.as_ref() != "GPRs")
-            .map(|(name, entry_block)| {
-                let name = format!("{name}_initialize").into();
-                (
-                    name,
-                    boom::FunctionDefinition {
-                        signature: boom::FunctionSignature {
-                            name,
-                            parameters: Shared::new(vec![]),
-                            return_type: Shared::new(boom::Type::Unit),
-                        },
-                        entry_block,
-                    },
-                )
-            })
-            .for_each(|(name, fn_def)| {
-                build_ctx.add_function(name, &fn_def);
-                register_init_names.push(name);
-            });
-
-        build_ctx.add_function(
-            "borealis_register_init".into(),
-            &boom::FunctionDefinition {
-                signature: boom::FunctionSignature {
-                    name: "borealis_register_init".into(),
-                    parameters: Shared::new(vec![]),
-                    return_type: Shared::new(boom::Type::Unit),
-                },
-                entry_block: {
-                    let b = ControlFlowBlock::new();
-                    b.set_statements(
-                        register_init_names
-                            .into_iter()
-                            .map(|name| {
-                                Shared::new(boom::Statement::FunctionCall {
-                                    expression: None,
-                                    name,
-                                    arguments: vec![],
-                                })
-                            })
-                            .collect(),
-                    );
-                    b.set_terminator(Terminator::Return(Value::Literal(Shared::new(
-                        Literal::Unit,
-                    ))));
-                    b
-                },
-            },
-        );
-    }
 
     // need all functions with signatures before building
     ast.functions

@@ -182,6 +182,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
 fn fn_is_allowlisted(name: InternedString) -> bool {
     const FN_ALLOWLIST: &[&'static str] = &[
+        "borealis_register_init",
         "__DecodeA64_DataProcReg",
         "__DecodeA64",
         "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
@@ -195,7 +196,6 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "X_set",
         "set_R",
         "write_gpr",
-        "borealis_register_init",
         "__InitSystem",
         "TakeReset",
         "InitVariantImplemented",
@@ -203,7 +203,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "_get_RMR_EL3_Type_AA64",
         "_get_ID_AA64PFR0_EL1_Type_EL3",
         "SetResetVector",
-        "Mk_RVBAR_EL1_Type",
+        // "Mk_RVBAR_EL1_Type",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")

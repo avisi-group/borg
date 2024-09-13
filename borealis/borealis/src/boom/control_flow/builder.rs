@@ -20,14 +20,10 @@ pub struct ControlFlowGraphBuilder {
     resolved_blocks: HashMap<SharedKey<MaybeUnresolvedControlFlowBlock>, ControlFlowBlock>,
     entry_block: Shared<MaybeUnresolvedControlFlowBlock>,
     current_block: Shared<MaybeUnresolvedControlFlowBlock>,
-    allow_unknown_terminators: bool,
 }
 
 impl ControlFlowGraphBuilder {
-    pub fn from_statements(
-        statements: &[Shared<Statement>],
-        allow_unknown_terminators: bool,
-    ) -> ControlFlowBlock {
+    pub fn from_statements(statements: &[Shared<Statement>]) -> ControlFlowBlock {
         let entry_block = MaybeUnresolvedControlFlowBlock::new();
 
         let mut celf = Self {
@@ -35,7 +31,6 @@ impl ControlFlowGraphBuilder {
             resolved_blocks: Default::default(),
             current_block: entry_block.clone(),
             entry_block,
-            allow_unknown_terminators,
         };
 
         celf.process_statements(statements);
@@ -228,11 +223,7 @@ impl ControlFlowGraphBuilder {
             },
 
             MaybeUnresolvedTerminator::Unknown => {
-                if self.allow_unknown_terminators {
-                    Terminator::Return(Value::Literal(Shared::new(Literal::Unit)))
-                } else {
-                    panic!("encountered unknown terminator during resolution\n{self:#?}")
-                }
+                panic!("encountered unknown terminator during resolution\n{self:#?}")
             }
         };
         ControlFlowBlock::set_terminator(&resolved, terminator);

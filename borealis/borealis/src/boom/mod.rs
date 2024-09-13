@@ -28,7 +28,7 @@ pub struct Ast {
     /// Sequence of definitions
     pub definitions: Vec<Definition>,
     /// Register types by identifier
-    pub registers: HashMap<InternedString, (Shared<Type>, ControlFlowBlock)>,
+    pub registers: HashMap<InternedString, Shared<Type>>,
     /// Function definitions by identifier
     pub functions: HashMap<InternedString, FunctionDefinition>,
     pub constants: HashMap<InternedString, i32>,
@@ -61,11 +61,6 @@ pub enum Definition {
         key: InternedString,
         value: InternedString,
     },
-
-    Let {
-        bindings: Vec<NamedType>,
-        body: ControlFlowBlock,
-    },
 }
 
 impl Walkable for Definition {
@@ -77,14 +72,6 @@ impl Walkable for Definition {
                 fields
                     .iter()
                     .for_each(|named_type| visitor.visit_named_type(named_type));
-            }
-
-            Self::Let { bindings, body } => {
-                bindings
-                    .iter()
-                    .for_each(|named_type| visitor.visit_named_type(named_type));
-
-                visitor.visit_control_flow_block(body);
             }
         }
     }

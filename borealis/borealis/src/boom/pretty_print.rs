@@ -33,15 +33,10 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         .iter()
         .for_each(|def| visitor.visit_definition(def));
 
-    registers.iter().for_each(|(name, (typ, init))| {
+    registers.iter().for_each(|(name, typ)| {
         write!(visitor.writer, "register {name}: ").unwrap();
         visitor.visit_type(typ.clone());
-        writeln!(visitor.writer, " = {{").unwrap();
-        {
-            let _h = visitor.indent();
-            visitor.print_control_flow_graph(init.clone());
-        }
-        writeln!(visitor.writer, "}}").unwrap();
+        writeln!(visitor.writer).unwrap();
     });
 
     constants.iter().for_each(|(name, value)| {
@@ -186,29 +181,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             }
             Definition::Pragma { key, value } => {
                 self.prindent(format!("#{key} {value}"));
-            }
-            Definition::Let { bindings, body } => {
-                self.prindent("let (");
-
-                let mut bindings = bindings.iter();
-                if let Some(NamedType { name, typ }) = bindings.next() {
-                    write!(self.writer, "{name}: ").unwrap();
-                    self.visit_type(typ.clone());
-                }
-                for NamedType { name, typ } in bindings {
-                    write!(self.writer, ", ").unwrap();
-                    write!(self.writer, "{name}: ").unwrap();
-                    self.visit_type(typ.clone());
-                }
-
-                writeln!(self.writer, ") {{").unwrap();
-
-                {
-                    let _h = self.indent();
-                    self.print_control_flow_graph(body.clone());
-                }
-
-                writeln!(self.writer, "}}").unwrap();
             }
         }
     }

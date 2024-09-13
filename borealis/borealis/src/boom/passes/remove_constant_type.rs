@@ -1,6 +1,6 @@
 use {
     crate::{
-        boom::{passes::Pass, Ast, Definition, Size, Statement, Type},
+        boom::{passes::Pass, Ast, Size, Statement, Type},
         util::signed_smallest_width_of_value,
     },
     common::shared::Shared,
@@ -29,18 +29,6 @@ impl Pass for RemoveConstantType {
         ast.functions
             .iter()
             .flat_map(|(_, def)| def.entry_block.iter())
-            .chain(
-                ast.definitions
-                    .iter()
-                    .filter_map(|d| {
-                        if let Definition::Let { body, .. } = d {
-                            Some(body.iter())
-                        } else {
-                            None
-                        }
-                    })
-                    .flatten(),
-            )
             .for_each(|b| {
                 b.set_statements(
                     b.statements()
