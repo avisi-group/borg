@@ -585,7 +585,7 @@ pub enum FunctionKind {
 }
 
 #[derive(Default)]
-pub struct Context {
+pub struct Model {
     fns: HashMap<InternedString, (FunctionKind, Function)>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
     registers: HashMap<InternedString, RegisterDescriptor>,
@@ -598,7 +598,7 @@ pub struct RegisterDescriptor {
     pub offset: usize,
 }
 
-impl Context {
+impl Model {
     pub fn new() -> Self {
         Self::default()
     }

@@ -1,14 +1,14 @@
 use {
     crate::{
         codegen::codegen_ident,
-        rudder::{Context, RegisterDescriptor},
+        rudder::{Model, RegisterDescriptor},
     },
     proc_macro2::TokenStream,
     quote::{format_ident, quote},
 };
 
 /// Code generation for ISA state
-pub fn codegen_state(rudder: &Context) -> TokenStream {
+pub fn codegen_state(rudder: &Model) -> TokenStream {
     // generate constant for each register offset
     let register_offsets = rudder
         .get_registers()

@@ -3,7 +3,7 @@
 use {
     crate::{
         codegen::state::codegen_state,
-        rudder::{analysis::cfg::FunctionCallGraphAnalysis, Context, PrimitiveTypeClass, Type},
+        rudder::{analysis::cfg::FunctionCallGraphAnalysis, Model, PrimitiveTypeClass, Type},
     },
     common::{intern::InternedString, HashMap, HashSet},
     log::warn,
@@ -145,7 +145,7 @@ pub fn codegen_type(typ: Arc<Type>) -> TokenStream {
     }
 }
 
-pub fn codegen_workspace(rudder: &Context) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
+pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     // {
     //     let mut files = HashMap::default();
 

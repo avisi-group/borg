@@ -12,7 +12,7 @@ use {
                 BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementBuilder,
                 StatementKind, UnaryOperationKind,
             },
-            Block, ConstantValue, Context, Function, FunctionInner, FunctionKind, PrimitiveType,
+            Block, ConstantValue, Function, FunctionInner, FunctionKind, Model, PrimitiveType,
             PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
         },
         util::signed_smallest_width_of_value,
@@ -26,7 +26,7 @@ use {
     std::{cmp::Ordering, sync::Arc},
 };
 
-pub fn from_boom(ast: &boom::Ast) -> Context {
+pub fn from_boom(ast: &boom::Ast) -> Model {
     let mut build_ctx = BuildContext::default();
 
     let mut register_init_blocks = HashMap::default();
@@ -297,8 +297,8 @@ impl BuildContext {
         }
     }
 
-    fn finalise(self) -> Context {
-        Context {
+    fn finalise(self) -> Model {
+        Model {
             fns: self
                 .functions
                 .into_iter()

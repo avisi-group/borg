@@ -5,7 +5,7 @@ use {
             BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement, StatementKind,
             TernaryOperationKind, UnaryOperationKind,
         },
-        Block, ConstantValue, Context, Function, FunctionKind, PrimitiveTypeClass, Symbol, Type,
+        Block, ConstantValue, Model, Function, FunctionKind, PrimitiveTypeClass, Symbol, Type,
     },
     itertools::Itertools,
     std::fmt::{Display, Formatter, Result},
@@ -356,7 +356,7 @@ impl Display for Function {
     }
 }
 
-impl Display for Context {
+impl Display for Model {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         self.update_names();
 

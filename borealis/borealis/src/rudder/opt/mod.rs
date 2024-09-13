@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{Context, Function},
+    crate::rudder::{Model, Function},
     log::trace,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
 };
@@ -48,7 +48,7 @@ static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
 static DESTROY_BITVECTORS: FunctionPass = ("destroy-bitvectors", destroy_bitvectors::run);
 static MATERIALISE_APINTS: FunctionPass = ("materialise-apints", materialise_apints::run);
 
-pub fn optimise(ctx: &mut Context, level: OptLevel) {
+pub fn optimise(ctx: &mut Model, level: OptLevel) {
     let passes: Vec<FunctionPass> = match level {
         OptLevel::Level0 => vec![],
         OptLevel::Level1 => vec![

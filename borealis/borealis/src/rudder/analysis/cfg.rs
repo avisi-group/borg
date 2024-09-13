@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{statement::StatementKind, Block, Context, Function},
+    crate::rudder::{statement::StatementKind, Block, Model, Function},
     common::{intern::InternedString, HashMap, HashSet},
     dot::{GraphWalk, Labeller},
     log::trace,
@@ -100,7 +100,7 @@ pub struct FunctionCallGraphAnalysis {
 }
 
 impl FunctionCallGraphAnalysis {
-    pub fn new(ctx: &Context) -> Self {
+    pub fn new(ctx: &Model) -> Self {
         let mut selph = Self {
             fn_callers: HashMap::default(),
             fn_callees: HashMap::default(),
@@ -111,7 +111,7 @@ impl FunctionCallGraphAnalysis {
         selph
     }
 
-    fn analyse(&mut self, ctx: &Context) {
+    fn analyse(&mut self, ctx: &Model) {
         for (fname, f) in ctx.get_functions() {
             assert!(fname == f.name());
 
@@ -211,7 +211,7 @@ impl<'ast> GraphWalk<'ast, NodeId, EdgeId> for FunctionCallGraphAnalysis {
 pub struct FunctionCallGraphPartitioner;
 
 impl FunctionCallGraphPartitioner {
-    pub fn new(ctx: &Context) -> Self {
+    pub fn new(ctx: &Model) -> Self {
         let fcg = FunctionCallGraphAnalysis::new(ctx);
 
         let mut selph = Self;

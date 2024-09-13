@@ -1,6 +1,6 @@
 use {
     crate::rudder::{
-        statement::StatementKind, Block, ConstantValue, Context, Function, PrimitiveType,
+        statement::StatementKind, Block, ConstantValue, Model, Function, PrimitiveType,
         PrimitiveTypeClass, Statement, Type,
     },
     std::{fmt::Display, sync::Arc},
@@ -62,13 +62,13 @@ impl ValidationMessage {
     }
 }
 
-pub fn validate(ctx: &Context) -> Vec<ValidationMessage> {
+pub fn validate(ctx: &Model) -> Vec<ValidationMessage> {
     let messages = [check_constant_value_types(ctx), check_operand_types(ctx)];
 
     messages.into_iter().flatten().collect()
 }
 
-fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
+fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
     // iterate over every statement in every function, passing
     ctx.get_functions()
         .values()
@@ -92,7 +92,7 @@ fn check_constant_value_types(ctx: &Context) -> Vec<ValidationMessage> {
         .collect()
 }
 
-fn check_operand_types(ctx: &Context) -> Vec<ValidationMessage> {
+fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
     let mut messages = Vec::new();
 
     for (_, f) in ctx.get_functions() {
