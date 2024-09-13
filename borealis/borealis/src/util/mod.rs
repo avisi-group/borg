@@ -1,3 +1,5 @@
+pub mod arena;
+
 pub fn signed_smallest_width_of_value(value: i64) -> u16 {
     let value = if value.is_negative() {
         value.abs() - 1
