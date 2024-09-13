@@ -1,11 +1,8 @@
-use {
-    crate::rudder::{
+use crate::rudder::{
         constant_value::ConstantValue,
         statement::{BinaryOperationKind, StatementBuilder, StatementKind},
         Block, Function, Type,
-    },
-    std::sync::Arc,
-};
+    };
 
 pub fn run(f: Function) -> bool {
     let mut changed = false;
@@ -86,9 +83,9 @@ fn run_on_block(block: &Block) -> bool {
                 let element_type = stmt.typ();
                 let mut builder = StatementBuilder::new(block.weak());
 
-                let index = builder.generate_cast(index, (Type::s64()));
+                let index = builder.generate_cast(index, Type::s64());
 
-                let offset = builder.generate_cast(offset, (Type::s64()));
+                let offset = builder.generate_cast(offset, Type::s64());
 
                 let typ_width = builder.build(StatementKind::Constant {
                     typ: (Type::s64()),

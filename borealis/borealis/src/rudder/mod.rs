@@ -14,7 +14,6 @@ use {
     std::{
         fmt::Debug,
         hash::{Hash, Hasher},
-        sync::Arc,
     },
 };
 

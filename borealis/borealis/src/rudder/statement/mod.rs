@@ -10,7 +10,6 @@ use {
         cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
-        sync::Arc,
     },
 };
 
@@ -393,11 +392,11 @@ impl Statement {
         match self.kind() {
             StatementKind::Constant { typ, .. } => typ,
             StatementKind::ReadVariable { symbol } => symbol.typ(),
-            StatementKind::WriteVariable { .. } => (Type::void()),
+            StatementKind::WriteVariable { .. } => Type::void(),
             StatementKind::ReadRegister { typ, .. } => typ,
-            StatementKind::WriteRegister { .. } => (Type::unit()),
-            StatementKind::ReadMemory { .. } => (Type::Bits),
-            StatementKind::WriteMemory { .. } => (Type::unit()),
+            StatementKind::WriteRegister { .. } => Type::unit(),
+            StatementKind::ReadMemory { .. } => Type::Bits,
+            StatementKind::WriteMemory { .. } => Type::unit(),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
                 ..
@@ -421,24 +420,24 @@ impl Statement {
             | StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareLessThan,
                 ..
-            } => (Type::u1()),
+            } => Type::u1(),
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
             StatementKind::UnaryOperation { value, .. } => value.typ(),
             StatementKind::ShiftOperation { value, .. } => value.typ(),
             StatementKind::Call { target, .. } => target.return_type(),
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
-            StatementKind::Jump { .. } => (Type::void()),
-            StatementKind::Branch { .. } => (Type::void()),
+            StatementKind::Jump { .. } => Type::void(),
+            StatementKind::Branch { .. } => Type::void(),
             StatementKind::PhiNode { members } => members
                 .first()
                 .map(|(_, stmt)| stmt.typ())
                 .unwrap_or_else(|| (Type::void())),
-            StatementKind::Return { .. } => (Type::void()),
+            StatementKind::Return { .. } => Type::void(),
             StatementKind::Select { true_value, .. } => true_value.typ(),
-            StatementKind::Panic(_) => (Type::void()),
+            StatementKind::Panic(_) => Type::void(),
 
-            StatementKind::ReadPc => (Type::u64()),
-            StatementKind::WritePc { .. } => (Type::void()),
+            StatementKind::ReadPc => Type::u64(),
+            StatementKind::WritePc { .. } => Type::void(),
             // todo: this is a simplification, be more precise about lengths?
             StatementKind::BitExtract { value, .. } => value.typ(),
             StatementKind::BitInsert {
@@ -457,10 +456,10 @@ impl Statement {
                 vector.typ()
             }
 
-            StatementKind::SizeOf { .. } => (Type::u16()),
-            StatementKind::Assert { .. } => (Type::unit()),
-            StatementKind::CreateBits { .. } => (Type::Bits),
-            StatementKind::MatchesUnion { .. } => (Type::u1()),
+            StatementKind::SizeOf { .. } => Type::u16(),
+            StatementKind::Assert { .. } => Type::unit(),
+            StatementKind::CreateBits { .. } => Type::Bits,
+            StatementKind::MatchesUnion { .. } => Type::u1(),
             StatementKind::UnwrapUnion { value, variant } => {
                 // let Type::Enum(variants) = &*value.typ() else {
                 //     panic!("cannot unwrap non sum type");
@@ -475,7 +474,7 @@ impl Statement {
                 todo!()
             }
 
-            StatementKind::Undefined => (Type::Any),
+            StatementKind::Undefined => Type::Any,
             StatementKind::TupleAccess { index, source } => {
                 let Type::Tuple(ts) = &source.typ() else {
                     panic!();
@@ -484,9 +483,9 @@ impl Statement {
                 ts[index].clone()
             }
 
-            StatementKind::GetFlag { .. } => (Type::u1()),
+            StatementKind::GetFlag { .. } => Type::u1(),
             StatementKind::CreateTuple(values) => {
-                (Type::Tuple(values.iter().map(|v| v.typ()).collect()))
+                Type::Tuple(values.iter().map(|v| v.typ()).collect())
             }
         }
     }

@@ -2,8 +2,7 @@ use {
     crate::rudder::{
         analysis::cfg::ControlFlowGraphAnalysis,
         statement::{
-            BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement, StatementKind,
-            TernaryOperationKind, UnaryOperationKind,
+            BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement, StatementKind, UnaryOperationKind,
         },
         Block, ConstantValue, Model, Function, FunctionKind, PrimitiveTypeClass, Symbol, Type,
     },

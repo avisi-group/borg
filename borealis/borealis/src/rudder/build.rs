@@ -2,8 +2,8 @@ use {
     crate::{
         boom::{
             self, bits_to_int,
-            control_flow::{ControlFlowBlock, Terminator},
-            FunctionSignature, Literal, NamedType, Value,
+            control_flow::ControlFlowBlock,
+            FunctionSignature,
         },
         rudder::{
             self,
@@ -123,12 +123,12 @@ impl BuildContext {
     }
 
     fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = (Type::Struct(
+        let typ = Type::Struct(
             fields
                 .iter()
                 .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
                 .collect(),
-        ));
+        );
 
         let fields = fields
             .iter()
@@ -173,20 +173,20 @@ impl BuildContext {
 
     fn resolve_type(&self, typ: Shared<boom::Type>) -> rudder::Type {
         match &*typ.get() {
-            boom::Type::Unit => (rudder::Type::unit()),
-            boom::Type::String => (rudder::Type::String),
+            boom::Type::Unit => rudder::Type::unit(),
+            boom::Type::String => rudder::Type::String,
             // value
-            boom::Type::Bool | boom::Type::Bit => (rudder::Type::u1()),
-            boom::Type::Float => (rudder::Type::f64()),
-            boom::Type::Real => (rudder::Type::Rational),
-            boom::Type::Union { width } => (rudder::Type::Union { width: *width }),
+            boom::Type::Bool | boom::Type::Bit => rudder::Type::u1(),
+            boom::Type::Float => rudder::Type::f64(),
+            boom::Type::Real => rudder::Type::Rational,
+            boom::Type::Union { width } => rudder::Type::Union { width: *width },
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
             boom::Type::List { .. } => todo!(),
             boom::Type::Vector { element_type } => {
                 let element_type = (self.resolve_type(element_type.clone())).clone();
                 // todo: Brian Campbell said the Sail C backend had functionality to staticize
                 // all bitvector lengths
-                (element_type.vectorize(0))
+                element_type.vectorize(0)
             }
             boom::Type::FixedVector {
                 length,
@@ -194,7 +194,7 @@ impl BuildContext {
             } => {
                 let element_type = (self.resolve_type(element_type.clone())).clone();
 
-                (element_type.vectorize(usize::try_from(*length).unwrap()))
+                element_type.vectorize(usize::try_from(*length).unwrap())
             }
             boom::Type::Reference(inner) => {
                 // todo: this is broken:(
@@ -202,29 +202,29 @@ impl BuildContext {
             }
             boom::Type::Integer { size } => match size {
                 boom::Size::Static(size) => {
-                    (rudder::Type::new_primitive(rudder::PrimitiveTypeClass::SignedInteger, *size))
+                    rudder::Type::new_primitive(rudder::PrimitiveTypeClass::SignedInteger, *size)
                 }
-                boom::Size::Unknown => (rudder::Type::ArbitraryLengthInteger),
+                boom::Size::Unknown => rudder::Type::ArbitraryLengthInteger,
             },
             boom::Type::Bits { size } => match size {
                 boom::Size::Static(size) => {
-                    (rudder::Type::new_primitive(
+                    rudder::Type::new_primitive(
                         rudder::PrimitiveTypeClass::UnsignedInteger,
                         *size,
-                    ))
+                    )
                 }
-                boom::Size::Unknown => (rudder::Type::Bits),
+                boom::Size::Unknown => rudder::Type::Bits,
             },
             boom::Type::Constant(c) => {
                 // todo: this should be a panic, but because structs/unions can have constant
                 // type fields we do the following
-                (rudder::Type::new_primitive(
+                rudder::Type::new_primitive(
                     rudder::PrimitiveTypeClass::SignedInteger,
                     signed_smallest_width_of_value(*c).into(),
-                ))
+                )
             }
             boom::Type::Tuple(ts) => {
-                (rudder::Type::Tuple(ts.iter().cloned().map(|t| self.resolve_type(t)).collect()))
+                rudder::Type::Tuple(ts.iter().cloned().map(|t| self.resolve_type(t)).collect())
             }
         }
     }
@@ -332,7 +332,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 fallthrough: boom_fallthrough,
             } => {
                 let condition = self.build_value(Shared::new(condition));
-                let condition = self.builder.generate_cast(condition, (Type::u1()));
+                let condition = self.builder.generate_cast(condition, Type::u1());
 
                 let rudder_true_target = self.fn_ctx().resolve_block(boom_target);
                 let rudder_false_target = self.fn_ctx().resolve_block(boom_fallthrough);
@@ -498,7 +498,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // assert_eq!(Type::s64(), *args[0].typ());
                     Some(
                         self.builder
-                            .generate_cast(args[0].clone(), (Type::ArbitraryLengthInteger)),
+                            .generate_cast(args[0].clone(), Type::ArbitraryLengthInteger),
                     )
                 }
 
@@ -507,7 +507,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                     Some(
                         self.builder
-                            .generate_cast(args[0].clone(), (Type::s64())),
+                            .generate_cast(args[0].clone(), Type::s64()),
                     )
                 }
 
@@ -586,7 +586,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "add_bits_int" => {
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), (Type::Bits));
+                        .generate_cast(args[1].clone(), Type::Bits);
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Add,
                         lhs: args[0].clone(),
@@ -598,7 +598,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sub_bits_int" => {
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), (Type::Bits));
+                        .generate_cast(args[1].clone(), Type::Bits);
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
                         lhs: args[0].clone(),
@@ -692,7 +692,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     });
                     Some(
                         self.builder
-                            .generate_cast(ceil, (Type::ArbitraryLengthInteger)),
+                            .generate_cast(ceil, Type::ArbitraryLengthInteger),
                     )
                 }
 
@@ -704,14 +704,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     });
                     Some(
                         self.builder
-                            .generate_cast(floor, (Type::ArbitraryLengthInteger)),
+                            .generate_cast(floor, Type::ArbitraryLengthInteger),
                     )
                 }
 
                 // val to_real : (%i) -> %real
                 "to_real" => Some(
                     self.builder
-                        .generate_cast(args[0].clone(), (Type::Rational)),
+                        .generate_cast(args[0].clone(), Type::Rational),
                 ),
 
                 // val pow2 : (%i) -> %i
@@ -741,7 +741,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // cast args[1] to i32, todo: move this to codegen cause it's a rust thing
                     let i = self
                         .builder
-                        .generate_cast(args[1].clone(), (Type::s32()));
+                        .generate_cast(args[1].clone(), Type::s32());
 
                     Some(self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::PowI,
@@ -839,7 +839,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length,
                     });
 
-                    Some(self.builder.generate_cast(bitex, (Type::u1())))
+                    Some(self.builder.generate_cast(bitex, Type::u1()))
                 }
 
                 "bitvector_length" => {
@@ -858,7 +858,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     //    }
                     let op = self
                         .builder
-                        .generate_cast(args[0].clone(), (Type::u64()));
+                        .generate_cast(args[0].clone(), Type::u64());
                     let n = args[1].clone();
                     let bit = self.builder.build(StatementKind::Cast {
                         kind: CastOperationKind::ZeroExtend,
@@ -1008,7 +1008,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         value: rudder::ConstantValue::UnsignedInteger(0),
                     });
 
-                    let value = self.builder.generate_cast(const_0, (Type::Bits));
+                    let value = self.builder.generate_cast(const_0, Type::Bits);
 
                     Some(self.builder.build(StatementKind::BitsCast {
                         kind: CastOperationKind::ZeroExtend,
@@ -1029,7 +1029,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // %i argument to unsigned
                     let n = self
                         .builder
-                        .generate_cast(args[0].clone(), (Type::u64()));
+                        .generate_cast(args[0].clone(), Type::u64());
 
                     let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
 
@@ -1067,7 +1067,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // %i argument to unsigned
                     let n = self
                         .builder
-                        .generate_cast(args[0].clone(), (Type::u64()));
+                        .generate_cast(args[0].clone(), Type::u64());
 
                     let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
 
@@ -1103,11 +1103,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "bitvector_update" => {
                     let target = self
                         .builder
-                        .generate_cast(args[0].clone(), (Type::Bits));
+                        .generate_cast(args[0].clone(), Type::Bits);
                     let i = args[1].clone();
                     let bit = self
                         .builder
-                        .generate_cast(args[2].clone(), (Type::Bits));
+                        .generate_cast(args[2].clone(), Type::Bits);
 
                     let const_1 = self.builder.build(StatementKind::Constant {
                         typ: (Type::u64()),
@@ -1126,7 +1126,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "append_64" => {
                     let rhs = self
                         .builder
-                        .generate_cast(args[1].clone(), (Type::Bits));
+                        .generate_cast(args[1].clone(), Type::Bits);
                     Some(self.generate_concat(args[0].clone(), rhs))
                 }
 
@@ -1161,11 +1161,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         length: args[0].clone(),
                     });
 
-                    let value = self.builder.generate_cast(extract, (Type::u128()));
+                    let value = self.builder.generate_cast(extract, Type::u128());
 
                     let length = self
                         .builder
-                        .generate_cast(args[0].clone(), (Type::u16()));
+                        .generate_cast(args[0].clone(), Type::u16());
 
                     Some(
                         self.builder
@@ -1230,7 +1230,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     // // bundle length = bits_length * count
                     let count = self
                         .builder
-                        .generate_cast(args[1].clone(), (Type::u64()));
+                        .generate_cast(args[1].clone(), Type::u64());
                     Some(self.builder.build(StatementKind::Call {
                         target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
                         args: vec![args[0].clone(), count],
@@ -1278,7 +1278,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let phys_addr = args[2].clone();
                     let n = args[3].clone();
 
-                    let size_bytes = self.builder.generate_cast(n, (Type::u64()));
+                    let size_bytes = self.builder.generate_cast(n, Type::u64());
 
                     let const_8 = self.builder.build(StatementKind::Constant {
                         typ: (Type::u64()),
@@ -1290,7 +1290,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: const_8,
                     });
 
-                    let offset = self.builder.generate_cast(phys_addr, (Type::u64()));
+                    let offset = self.builder.generate_cast(phys_addr, Type::u64());
 
                     Some(self.builder.build(StatementKind::ReadMemory {
                         offset,
@@ -1306,7 +1306,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let n = args[3].clone();
                     let data = args[4].clone();
 
-                    let size_bytes = self.builder.generate_cast(n, (Type::u64()));
+                    let size_bytes = self.builder.generate_cast(n, Type::u64());
 
                     let const_8 = self.builder.build(StatementKind::Constant {
                         typ: (Type::u64()),
@@ -1318,10 +1318,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: const_8,
                     });
 
-                    let size_bits_cast =  self.builder.generate_cast(size_bits, (Type::ArbitraryLengthInteger));
+                    let size_bits_cast =  self.builder.generate_cast(size_bits, Type::ArbitraryLengthInteger);
 
                     let value = self.builder.build(StatementKind::BitsCast { kind: CastOperationKind::Truncate, typ: (Type::Bits), value: data, length:size_bits_cast });
-                    let offset = self.builder.generate_cast(phys_addr, (Type::u64()));
+                    let offset = self.builder.generate_cast(phys_addr, Type::u64());
 
                     self.builder.build(StatementKind::WriteMemory { offset, value });
 
@@ -1780,10 +1780,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         // then bitinsert
         match (left.typ(), right.typ()) {
             (Type::Bits, Type::Bits) => {
-                let l_value = self.builder.generate_cast(left.clone(), (Type::u128()));
+                let l_value = self.builder.generate_cast(left.clone(), Type::u128());
                 let l_length = self.builder.build(StatementKind::SizeOf { value: left });
 
-                let r_value = self.builder.generate_cast(right.clone(), (Type::u128()));
+                let r_value = self.builder.generate_cast(right.clone(), Type::u128());
                 let r_length = self.builder.build(StatementKind::SizeOf { value: right });
 
                 let shift = self.builder.build(StatementKind::ShiftOperation {

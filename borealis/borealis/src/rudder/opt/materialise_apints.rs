@@ -3,7 +3,6 @@ use crate::rudder::{
     statement::{CastOperationKind, Statement, StatementKind},
     Block, Function, Type,
 };
-use std::sync::Arc;
 
 pub fn run(f: Function) -> bool {
     let mut changed = false;

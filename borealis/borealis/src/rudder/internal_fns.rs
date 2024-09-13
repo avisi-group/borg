@@ -9,7 +9,6 @@ use {
     },
     common::{intern::InternedString, shared::Shared, HashMap},
     once_cell::sync::Lazy,
-    std::sync::Arc,
 };
 
 pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {

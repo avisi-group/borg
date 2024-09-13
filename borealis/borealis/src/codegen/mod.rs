@@ -15,7 +15,6 @@ use {
     std::{
         hash::{DefaultHasher, Hash, Hasher},
         path::PathBuf,
-        sync::Arc,
     },
     syn::Ident,
 };

@@ -1,6 +1,6 @@
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
+        control_flow::Terminator,
         passes::Pass,
         visitor::Visitor,
         Ast, Expression, FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type,
