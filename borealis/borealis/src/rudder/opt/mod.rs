@@ -1,5 +1,6 @@
+use rayon::iter::IntoParallelRefMutIterator;
 use {
-    crate::rudder::{Model, Function},
+    crate::rudder::{Function, Model},
     log::trace,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
 };
@@ -27,7 +28,7 @@ pub enum OptLevel {
     Level3,
 }
 
-pub type FunctionPassFn = fn(Function) -> bool;
+pub type FunctionPassFn = fn(&mut Function) -> bool;
 pub type FunctionPass = (&'static str, FunctionPassFn);
 
 static INLINER: FunctionPass = ("inliner", inliner::run);
@@ -104,21 +105,23 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
         ],
     };
 
-    ctx.get_functions().par_iter().for_each(|(name, function)| {
-        let mut changed = true;
+    ctx.get_functions_mut()
+        .par_iter_mut()
+        .for_each(|(name, function)| {
+            let mut changed = true;
 
-        trace!("optimising function {name:?}");
+            trace!("optimising function {name:?}");
 
-        while changed {
-            changed = false;
-            for pass in &passes {
-                trace!("running pass {}", pass.0);
+            while changed {
+                changed = false;
+                for pass in &passes {
+                    trace!("running pass {}", pass.0);
 
-                function.update_indices();
-                while pass.1(function.clone()) {
-                    changed = true;
+                    function.update_indices();
+                    while pass.1(function) {
+                        changed = true;
+                    }
                 }
             }
-        }
-    });
+        });
 }

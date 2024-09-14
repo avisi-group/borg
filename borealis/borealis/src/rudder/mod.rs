@@ -1,7 +1,10 @@
 use {
-    crate::rudder::{
-        constant_value::ConstantValue,
-        statement::{Statement, StatementKind},
+    crate::{
+        rudder::{
+            constant_value::ConstantValue,
+            statement::{Statement, StatementKind},
+        },
+        util::arena::{Arena, Ref},
     },
     common::{
         intern::InternedString,
@@ -234,17 +237,16 @@ pub enum SymbolKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Symbol {
     name: InternedString,
-    kind: SymbolKind,
     typ: Type,
 }
 
 impl Symbol {
-    pub fn name(&self) -> InternedString {
-        self.name
+    pub fn new(name: InternedString, typ: Type) -> Self {
+        Self { name, typ }
     }
 
-    pub fn kind(&self) -> SymbolKind {
-        self.kind
+    pub fn name(&self) -> InternedString {
+        self.name
     }
 
     pub fn typ(&self) -> Type {
@@ -257,28 +259,9 @@ pub struct Block {
     inner: Shared<BlockInner>,
 }
 
-#[derive(Debug, Clone)]
-pub struct WeakBlock {
-    inner: Weak<BlockInner>,
-}
-
-impl WeakBlock {
-    pub fn upgrade(&self) -> Block {
-        Block {
-            inner: self.inner.upgrade().unwrap(),
-        }
-    }
-}
-
 impl Block {
     pub fn new() -> Self {
         Self::default()
-    }
-
-    pub fn weak(&self) -> WeakBlock {
-        WeakBlock {
-            inner: self.inner.downgrade(),
-        }
     }
 
     pub fn index(&self) -> usize {
@@ -333,11 +316,11 @@ impl Block {
         self.inner.get_mut().statements.remove(index);
     }
 
-    pub fn iter(&self) -> BlockIterator {
-        BlockIterator::new(self.clone())
-    }
+    // pub fn iter(&self) -> BlockIterator {
+    //     BlockIterator::new(self.clone())
+    // }
 
-    pub fn targets(&self) -> Vec<Block> {
+    pub fn targets(&self) -> Vec<Ref<Block>> {
         match self.terminator_statement().unwrap().kind() {
             StatementKind::Jump { target } => vec![target],
             StatementKind::Branch {
@@ -401,22 +384,24 @@ impl BlockInner {
     }
 }
 
-pub struct BlockIterator {
-    visited: HashSet<Block>,
-    remaining: Vec<Block>,
+pub struct BlockIterator<'arena> {
+    visited: HashSet<Ref<Block>>,
+    remaining: Vec<Ref<Block>>,
+    arena: &'arena Arena<Block>,
 }
 
-impl BlockIterator {
-    fn new(start_block: Block) -> Self {
+impl<'arena> BlockIterator<'arena> {
+    fn new(arena: &'arena Arena<Block>, start_block: Ref<Block>) -> Self {
         Self {
             visited: HashSet::default(),
             remaining: vec![start_block],
+            arena,
         }
     }
 }
 
-impl Iterator for BlockIterator {
-    type Item = Block;
+impl<'arena> Iterator for BlockIterator<'arena> {
+    type Item = Ref<Block>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = loop {
@@ -438,39 +423,26 @@ impl Iterator for BlockIterator {
         self.visited.insert(current.clone());
 
         // push children to visit
-        if let Some(last) = current.statements().last() {
-            self.remaining.extend(match last.kind() {
-                StatementKind::Jump { target } => vec![target.clone()],
-                StatementKind::Branch {
-                    true_target,
-                    false_target,
-                    ..
-                } => vec![true_target.clone(), false_target.clone()],
-                StatementKind::Return { .. }
-                | StatementKind::Panic(_)
-                | StatementKind::Call { tail: true, .. } => vec![],
-                _ => {
-                    warn!("block missing terminator");
-                    vec![]
-                }
-            })
-        }
+        self.remaining.extend(current.get(&self.arena).targets());
 
         Some(current)
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct Function {
-    inner: Shared<FunctionInner>,
     // return type and parameters are read only, so do not need to exist behind a `Shared`
     return_type: Type,
     parameters: Vec<Symbol>,
+    name: InternedString,
+    local_variables: HashMap<InternedString, Symbol>,
+    block_arena: Arena<Block>,
+    entry_block: Ref<Block>,
 }
 
 impl Debug for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.inner.get().name)
+        write!(f, "{}", self.name)
     }
 }
 
@@ -480,39 +452,22 @@ impl ToTokens for Function {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct FunctionInner {
-    name: InternedString,
-    local_variables: HashMap<InternedString, Symbol>,
-    entry_block: Block,
-}
-
 impl Function {
-    pub fn new<I: Iterator<Item = (InternedString, Type)>>(
-        name: InternedString,
-        return_type: Type,
-        parameters: I,
-    ) -> Self {
+    pub fn new(name: InternedString, return_type: Type, parameters: Vec<Symbol>) -> Self {
+        let mut block_arena = Arena::new();
+        let entry_block = block_arena.insert(Block::new());
         Self {
-            inner: Shared::new(FunctionInner {
-                name,
-
-                local_variables: HashMap::default(),
-                entry_block: Block::new(),
-            }),
+            name,
+            local_variables: HashMap::default(),
+            entry_block,
+            block_arena,
             return_type,
-            parameters: parameters
-                .map(|(name, typ)| Symbol {
-                    name,
-                    kind: SymbolKind::Parameter,
-                    typ,
-                })
-                .collect(),
+            parameters,
         }
     }
 
     pub fn name(&self) -> InternedString {
-        self.inner.get().name
+        self.name
     }
 
     pub fn weight(&self) -> u64 {
@@ -524,37 +479,25 @@ impl Function {
     }
 
     pub fn update_indices(&self) {
-        self.inner
-            .get()
-            .entry_block
-            .iter()
-            .enumerate()
-            .for_each(|(idx, b)| {
-                b.update_index(idx);
-            });
+        self.block_iter().enumerate().for_each(|(idx, b)| {
+            b.get(self.block_arena()).update_index(idx);
+        });
     }
 
-    pub fn add_local_variable(&mut self, name: InternedString, typ: Type) {
-        self.inner.get_mut().local_variables.insert(
-            name,
-            Symbol {
-                name,
-                kind: SymbolKind::LocalVariable,
-                typ,
-            },
-        );
+    pub fn add_local_variable(&mut self, symbol: Symbol) {
+        self.local_variables.insert(symbol.name(), symbol);
     }
 
     pub fn get_local_variable(&self, name: InternedString) -> Option<Symbol> {
-        self.inner.get().local_variables.get(&name).cloned()
+        self.local_variables.get(&name).cloned()
     }
 
     pub fn local_variables(&self) -> Vec<Symbol> {
-        self.inner.get().local_variables.values().cloned().collect()
+        self.local_variables.values().cloned().collect()
     }
 
-    pub fn remove_local_variable(&self, symbol: &Symbol) {
-        self.inner.get_mut().local_variables.remove(&symbol.name());
+    pub fn remove_local_variable(&mut self, symbol: &Symbol) {
+        self.local_variables.remove(&symbol.name());
     }
 
     pub fn get_parameter(&self, name: InternedString) -> Option<Symbol> {
@@ -572,20 +515,30 @@ impl Function {
         self.parameters.clone()
     }
 
-    pub fn entry_block(&self) -> Block {
-        self.inner.get().entry_block.clone()
+    pub fn new_block(&mut self) -> Ref<Block> {
+        self.block_arena.insert(Block::new())
     }
-}
 
-#[derive(Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum FunctionKind {
-    Execute,
-    Other,
+    pub fn block_arena(&self) -> &Arena<Block> {
+        &self.block_arena
+    }
+
+    pub fn block_arena_mut(&mut self) -> &mut Arena<Block> {
+        &mut self.block_arena
+    }
+
+    pub fn entry_block(&self) -> Ref<Block> {
+        self.entry_block
+    }
+
+    pub fn block_iter(&self) -> BlockIterator {
+        BlockIterator::new(self.block_arena(), self.entry_block)
+    }
 }
 
 #[derive(Default)]
 pub struct Model {
-    fns: HashMap<InternedString, (FunctionKind, Function)>,
+    fns: HashMap<InternedString, Function>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
     registers: HashMap<InternedString, RegisterDescriptor>,
     structs: HashSet<Type>,
@@ -602,12 +555,12 @@ impl Model {
         Self::default()
     }
 
-    pub fn add_function(&mut self, name: InternedString, kind: FunctionKind, func: Function) {
-        self.fns.insert(name, (kind, func));
+    pub fn add_function(&mut self, name: InternedString, func: Function) {
+        self.fns.insert(name, func);
     }
 
     pub fn update_names(&self) {
-        for (_, func) in self.fns.values() {
+        for func in self.fns.values() {
             func.update_indices();
         }
     }
@@ -620,11 +573,12 @@ impl Model {
         validator::validate(self)
     }
 
-    pub fn get_functions(&self) -> HashMap<InternedString, Function> {
-        self.fns
-            .iter()
-            .map(|(name, (_, function))| (*name, function.clone()))
-            .collect()
+    pub fn get_functions(&self) -> &HashMap<InternedString, Function> {
+        &self.fns
+    }
+
+    pub fn get_functions_mut(&mut self) -> &mut HashMap<InternedString, Function> {
+        &mut self.fns
     }
 
     pub fn get_registers(&self) -> HashMap<InternedString, RegisterDescriptor> {

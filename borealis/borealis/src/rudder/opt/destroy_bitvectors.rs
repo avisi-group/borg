@@ -1,24 +1,27 @@
-use crate::rudder::{
-    analysis::dfa::StatementUseAnalysis,
-    statement::{CastOperationKind, Statement},
-    Block, Function,
+use crate::{
+    rudder::{
+        analysis::dfa::StatementUseAnalysis,
+        statement::{CastOperationKind, Statement},
+        Block, Function,
+    },
+    util::arena::{Arena, Ref},
 };
 
-pub fn run(f: Function) -> bool {
+pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
-    for block in f.entry_block().iter() {
-        changed |= run_on_block(block);
+    for block in f.block_iter() {
+        changed |= run_on_block(f.block_arena(), block);
     }
 
     changed
 }
 
-fn run_on_block(b: Block) -> bool {
+fn run_on_block(arena: &Arena<Block>, b: Ref<Block>) -> bool {
     let mut changed = false;
 
-    let sua = StatementUseAnalysis::new(&b);
-    for stmt in b.statements() {
+    let sua = StatementUseAnalysis::new(arena, b);
+    for stmt in b.get(arena).statements() {
         changed |= run_on_stmt(stmt, &sua);
     }
 

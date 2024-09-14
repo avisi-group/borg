@@ -5,9 +5,8 @@ use {
             BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementBuilder,
             StatementKind,
         },
-        Block, Function, FunctionInner, Symbol, SymbolKind, Type,
+        Function, Symbol, Type,
     },
-    common::{intern::InternedString, shared::Shared, HashMap},
     once_cell::sync::Lazy,
 };
 
@@ -22,29 +21,35 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
     let bits_symbol = Symbol {
         name: "bits".into(),
-        kind: SymbolKind::Parameter,
+
         typ: (Type::Bits),
     };
     let count_symbol = Symbol {
         name: "count".into(),
-        kind: SymbolKind::Parameter,
+
         typ: (Type::u64()),
     };
 
     let local_count_symbol = Symbol {
         name: "local_count".into(),
-        kind: SymbolKind::LocalVariable,
         typ: (Type::u64()),
     };
     let result_symbol = Symbol {
         name: "result".into(),
-        kind: SymbolKind::LocalVariable,
         typ: (Type::Bits),
     };
 
-    let end_block = {
-        let end_block = Block::new();
-        let mut builder = StatementBuilder::new(end_block.weak());
+    let mut function = Function::new(
+        "replicate_bits_borealis_internal".into(),
+        Type::Bits,
+        vec![bits_symbol.clone(), count_symbol.clone()],
+    );
+    function.add_local_variable(result_symbol.clone());
+    function.add_local_variable(local_count_symbol.clone());
+
+    let end_block_ref = {
+        let end_block_ref = function.new_block();
+        let mut builder = StatementBuilder::new(end_block_ref);
 
         let read_result = builder.build(StatementKind::ReadVariable {
             symbol: result_symbol.clone(),
@@ -52,18 +57,20 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         builder.build(StatementKind::Return { value: read_result });
 
-        end_block.set_statements(builder.finish().into_iter());
+        end_block_ref
+            .get(function.block_arena_mut())
+            .set_statements(builder.finish().into_iter());
 
-        end_block
+        end_block_ref
     };
 
     // cyclic so need both created here
-    let check_block = Block::new();
-    let shift_block = Block::new();
+    let check_block_ref = function.new_block();
+    let shift_block_ref = function.new_block();
 
     // check block if local_count == 0
     {
-        let mut check_builder = StatementBuilder::new(check_block.weak());
+        let mut check_builder = StatementBuilder::new(check_block_ref);
         let _0 = check_builder.build(StatementKind::Constant {
             typ: (Type::u64()),
             value: ConstantValue::UnsignedInteger(0),
@@ -81,16 +88,18 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         check_builder.build(StatementKind::Branch {
             condition: count_is_zero,
-            true_target: end_block,
-            false_target: shift_block.clone(),
+            true_target: end_block_ref,
+            false_target: shift_block_ref,
         });
 
-        check_block.set_statements(check_builder.finish().into_iter());
+        check_block_ref
+            .get(function.block_arena_mut())
+            .set_statements(check_builder.finish().into_iter());
     }
 
     // decrement count
     {
-        let mut shift_builder = StatementBuilder::new(shift_block.weak());
+        let mut shift_builder = StatementBuilder::new(shift_block_ref);
         let read_count = shift_builder.build(StatementKind::ReadVariable {
             symbol: local_count_symbol.clone(),
         });
@@ -164,15 +173,17 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         // jump
         shift_builder.build(StatementKind::Jump {
-            target: check_block.clone(),
+            target: check_block_ref,
         });
 
-        shift_block.set_statements(shift_builder.finish().into_iter());
+        shift_block_ref
+            .get(function.block_arena_mut())
+            .set_statements(shift_builder.finish().into_iter());
     }
 
     let entry_block = {
-        let entry_block = Block::new();
-        let mut entry_builder = StatementBuilder::new(entry_block.weak());
+        let entry_block_ref = function.new_block();
+        let mut entry_builder = StatementBuilder::new(entry_block_ref);
         // copy count to count_local
         // jump to check block
         let read_count = entry_builder.build(StatementKind::ReadVariable {
@@ -227,27 +238,17 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         });
 
         entry_builder.build(StatementKind::Jump {
-            target: check_block.clone(),
+            target: check_block_ref,
         });
 
-        entry_block.set_statements(entry_builder.finish().into_iter());
+        entry_block_ref
+            .get(function.block_arena())
+            .set_statements(entry_builder.finish().into_iter());
 
-        entry_block
+        entry_block_ref
     };
 
-    Function {
-        inner: Shared::new(FunctionInner {
-            name: InternedString::from_static("replicate_bits_borealis_internal"),
+    function.entry_block = entry_block;
 
-            local_variables: {
-                let mut locals = HashMap::default();
-                locals.insert(result_symbol.name(), result_symbol);
-                locals.insert(local_count_symbol.name(), local_count_symbol);
-                locals
-            },
-            entry_block,
-        }),
-        return_type: (Type::Bits),
-        parameters: vec![bits_symbol, count_symbol.clone()],
-    }
+    function
 });

@@ -1,7 +1,10 @@
 use {
-    crate::rudder::{
-        statement::StatementKind, Block, ConstantValue, Function, Model, PrimitiveType,
-        PrimitiveTypeClass, Statement, Type,
+    crate::{
+        rudder::{
+            statement::StatementKind, Block, ConstantValue, Function, Model, PrimitiveType,
+            PrimitiveTypeClass, Statement, Type,
+        },
+        util::arena::Ref,
     },
     std::fmt::Display,
 };
@@ -12,15 +15,15 @@ pub enum Severity {
     Note,
 }
 
-pub enum Scope {
-    FunctionLevel(Function),
-    BlockLevel(Function, Block),
-    StatementLevel(Function, Block, Statement),
+pub enum Scope<'f> {
+    FunctionLevel(&'f Function),
+    BlockLevel(&'f Function, Ref<Block>),
+    StatementLevel(&'f Function, Ref<Block>, Statement),
 }
 
-pub struct ValidationMessage(Severity, Scope, String);
+pub struct ValidationMessage<'f>(Severity, Scope<'f>, String);
 
-impl Display for ValidationMessage {
+impl<'f> Display for ValidationMessage<'f> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let severity = match self.0 {
             Severity::Error => "ERROR",
@@ -30,34 +33,30 @@ impl Display for ValidationMessage {
 
         let scope = match &self.1 {
             Scope::FunctionLevel(f) => format!("{}", f.name()),
-            Scope::BlockLevel(f, b) => format!("{} {}", f.name(), b.index()),
-            Scope::StatementLevel(f, b, s) => format!("{} {} {}", f.name(), b.index(), s.name()),
+            Scope::BlockLevel(f, b) => format!("{} {b:?}", f.name()), //todo: fix block ref debug printing to be the block index
+            Scope::StatementLevel(f, b, s) => format!("{} {b:?} {}", f.name(), s.name()),
         };
 
         write!(f, "{severity}: {scope}: {}", self.2)
     }
 }
 
-impl ValidationMessage {
+impl<'f> ValidationMessage<'f> {
     pub fn stmt_msg<T: ToString>(
-        f: &Function,
-        b: &Block,
+        f: &'f Function,
+        b: Ref<Block>,
         s: &Statement,
         v: Severity,
         m: T,
     ) -> Self {
-        Self(
-            v,
-            Scope::StatementLevel(f.clone(), b.clone(), s.clone()),
-            m.to_string(),
-        )
+        Self(v, Scope::StatementLevel(f, b, s.clone()), m.to_string())
     }
 
-    pub fn stmt_warn<T: ToString>(f: &Function, b: &Block, s: &Statement, m: T) -> Self {
+    pub fn stmt_warn<T: ToString>(f: &'f Function, b: Ref<Block>, s: &Statement, m: T) -> Self {
         Self::stmt_msg(f, b, s, Severity::Warning, m)
     }
 
-    pub fn stmt_err<T: ToString>(f: &Function, b: &Block, s: &Statement, m: T) -> Self {
+    pub fn stmt_err<T: ToString>(f: &'f Function, b: Ref<Block>, s: &Statement, m: T) -> Self {
         Self::stmt_msg(f, b, s, Severity::Error, m)
     }
 }
@@ -72,13 +71,13 @@ fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
     // iterate over every statement in every function, passing
     ctx.get_functions()
         .values()
-        .map(|f| f.entry_block().iter().map(|b| (f.clone(), b)))
+        .map(|f| f.block_iter().map(move |b| (f, b)))
         .flatten()
         .map(|(f, b)| {
-            b.clone()
+            b.get(f.block_arena())
                 .statements()
                 .into_iter()
-                .map(move |s| ((b.clone(), f.clone()), s))
+                .map(move |s| ((b, f), s))
         })
         .flatten()
         .filter_map(|((b, f), s)| {
@@ -96,13 +95,13 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
     let mut messages = Vec::new();
 
     for (_, f) in ctx.get_functions() {
-        for b in f.entry_block().iter() {
-            for s in b.statements() {
+        for b in f.block_iter() {
+            for s in b.get(f.block_arena()).statements() {
                 if let StatementKind::BinaryOperation { lhs, rhs, .. } = s.kind() {
                     if !lhs.typ().is_compatible_with(&rhs.typ()) {
                         messages.push(ValidationMessage::stmt_err(
                             &f,
-                            &b,
+                            b,
                             &s,
                             "incompatible operand types in binary operation",
                         ));
@@ -116,7 +115,7 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 }
 
 fn validate_constant_type(
-    ((stmt, block, f), (typ, value)): ((Statement, Block, Function), (Type, ConstantValue)),
+    ((stmt, block, f), (typ, value)): ((Statement, Ref<Block>, &Function), (Type, ConstantValue)),
 ) -> Option<ValidationMessage> {
     match (&value, &typ) {
         (
@@ -153,7 +152,7 @@ fn validate_constant_type(
 
         _ => Some(ValidationMessage::stmt_warn(
             &f,
-            &block,
+            block,
             &stmt,
             format!("cannot use {typ:?} type for {value:?}"),
         )),

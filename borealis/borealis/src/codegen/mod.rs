@@ -250,11 +250,11 @@ pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<P
         .map(|(name, function)| {
             let contents = dynamic::codegen_function(&function);
 
-            let mut dependencies = cfg.get_callees_for(&name);
+            let mut dependencies = cfg.get_callees_for(*name);
             dependencies.push("common".into());
             let dependencies = dependencies
                 .into_iter()
-                .filter(|dep| *dep != name)
+                .filter(|dep| *dep != *name)
                 .collect::<Vec<_>>();
 
             let dyn_imports: TokenStream = dependencies
@@ -268,7 +268,7 @@ pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<P
             let header = codegen_header();
 
             (
-                InternedString::from(codegen_ident(name).to_string()),
+                InternedString::from(codegen_ident(*name).to_string()),
                 render(&quote! {
                     #header
 

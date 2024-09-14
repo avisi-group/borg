@@ -1,7 +1,10 @@
 use {
-    crate::rudder::{
-        analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
-        Block, Function, StatementKind,
+    crate::{
+        rudder::{
+            analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
+            Block, Function, StatementKind,
+        },
+        util::arena::{Arena, Ref},
     },
     common::HashMap,
     log::trace,
@@ -9,7 +12,7 @@ use {
 
 // execute_aarch64_instrs_branch_conditional_cond
 
-pub fn run(f: Function) -> bool {
+pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
     //trace!("constant propagation {}", f.name());
@@ -17,7 +20,7 @@ pub fn run(f: Function) -> bool {
     // if there is a single write to a variable, and it's a constant value, replace
     // all reads with the constant value
 
-    let sua = SymbolUseAnalysis::new(&f);
+    let sua = SymbolUseAnalysis::new(f);
 
     for symbol in f.local_variables() {
         if !sua.symbol_has_writes(&symbol) {
@@ -57,21 +60,21 @@ pub fn run(f: Function) -> bool {
         }
     }
 
-    for block in f.entry_block().iter() {
-        changed |= simplify_block_local_writes(block);
+    for block in f.block_iter() {
+        changed |= simplify_block_local_writes(f.block_arena(), block);
     }
 
     changed
 }
 
-fn simplify_block_local_writes(block: Block) -> bool {
+fn simplify_block_local_writes(arena: &Arena<Block>, block: Ref<Block>) -> bool {
     let mut changed = false;
 
     let mut most_recent_writes = HashMap::default();
 
-    let sua = StatementUseAnalysis::new(&block);
+    let sua = StatementUseAnalysis::new(arena, block);
 
-    for stmt in block.statements() {
+    for stmt in block.get(arena).statements() {
         if let StatementKind::WriteVariable { symbol, value } = stmt.kind() {
             most_recent_writes.insert(symbol.name(), value);
         } else if let StatementKind::ReadVariable { symbol } = stmt.kind() {

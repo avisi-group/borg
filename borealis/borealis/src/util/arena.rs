@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,12 @@ impl<T> Arena<T> {
 pub struct Ref<T> {
     index: usize,
     _phantom: PhantomData<T>,
+}
+
+impl<T> Hash for Ref<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+    }
 }
 
 impl<T> PartialEq for Ref<T> {

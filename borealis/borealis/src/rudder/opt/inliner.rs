@@ -1,22 +1,25 @@
 use {
-    crate::rudder::{
-        statement::{Statement, StatementBuilder, StatementKind},
-        Block, Function,
+    crate::{
+        rudder::{
+            statement::{Statement, StatementBuilder, StatementKind},
+            Block, Function,
+        },
+        util::arena::Ref,
     },
     common::HashMap,
 };
 
 const INLINE_SIZE_THRESHOLD: usize = 5;
 
-pub fn run(f: Function) -> bool {
-    do_block_inlining(&f)
+pub fn run(f: &mut Function) -> bool {
+    do_block_inlining(f)
 }
 
 fn do_block_inlining(f: &Function) -> bool {
     let mut changed = false;
 
-    for block in f.entry_block().iter() {
-        changed |= inline_target_block(block);
+    for block in f.block_iter() {
+        changed |= inline_target_block(f, block);
     }
 
     changed
@@ -211,10 +214,13 @@ fn clone_statement(
     }
 }
 
-fn inline_target_block(source_block: Block) -> bool {
+fn inline_target_block(f: &Function, source_block: Ref<Block>) -> bool {
     // if a block ends in a jump statement, and the target block is "small", inline
     // it.
-    let terminator = source_block.terminator_statement().unwrap();
+    let terminator = source_block
+        .get(f.block_arena())
+        .terminator_statement()
+        .unwrap();
 
     let StatementKind::Jump {
         target: target_block,
@@ -223,22 +229,26 @@ fn inline_target_block(source_block: Block) -> bool {
         return false;
     };
 
-    if target_block.size() > INLINE_SIZE_THRESHOLD {
+    if target_block.get(f.block_arena()).size() > INLINE_SIZE_THRESHOLD {
         return false;
     }
 
     // kill the jump statement, copy target block statements in.
-    source_block.kill_statement(&terminator);
+    source_block
+        .get(f.block_arena())
+        .kill_statement(&terminator);
 
-    let mut builder = StatementBuilder::new(source_block.weak());
+    let mut builder = StatementBuilder::new(source_block);
 
     let mut mapping = HashMap::default();
-    for stmt in target_block.statements() {
+    for stmt in target_block.get(f.block_arena()).statements() {
         let cloned_stmt = clone_statement(&mut builder, &stmt, &mapping);
         mapping.insert(stmt, cloned_stmt.clone());
     }
 
-    source_block.extend_statements(builder.finish().into_iter());
+    source_block
+        .get(f.block_arena())
+        .extend_statements(builder.finish().into_iter());
 
     true
 }

@@ -15,7 +15,7 @@ use {
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
-        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
+        util::{arena::Arena, signed_smallest_width_of_value, unsigned_smallest_width_of_value},
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
@@ -39,11 +39,10 @@ pub fn codegen_function(function: &Function) -> TokenStream {
     let fn_state = codegen_fn_state(&function, parameters.clone());
 
     let block_fns = function
-        .entry_block()
-        .iter()
+        .block_iter()
         .map(|block| {
-            let block_name = get_block_fn_ident(&block);
-            let block_impl = codegen_block(block);
+            let block_name = get_block_fn_ident(&block.get(function.block_arena()));
+            let block_impl = codegen_block(function.block_arena(),block.get(function.block_arena()));
 
             quote! {
                 // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
@@ -54,12 +53,11 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         })
         .collect::<TokenStream>();
 
-    let num_blocks = function.entry_block().iter().count();
+    let num_blocks = function.block_iter().count();
     let block_fn_names = function
-        .entry_block()
-        .iter()
+        .block_iter()
         .map(|block| {
-            let fn_name = get_block_fn_ident(&block);
+            let fn_name = get_block_fn_ident(&block.get(function.block_arena()));
             quote!(#fn_name, )
         })
         .collect::<TokenStream>();
@@ -192,12 +190,11 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
         .collect::<TokenStream>();
 
     let block_ref_inits = function
-        .entry_block()
-        .iter()
+        .block_iter()
         .map(|_| quote!(ctx.create_block(),))
         .collect::<TokenStream>();
 
-    let num_blocks = function.entry_block().iter().count();
+    let num_blocks = function.block_iter().count();
 
     quote! {
         struct FunctionState {
@@ -216,12 +213,12 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
     }
 }
 
-pub fn codegen_block(block: Block) -> TokenStream {
+pub fn codegen_block(arena: &Arena<Block>, block: &Block) -> TokenStream {
     block
         .statements()
         .iter()
         .cloned()
-        .map(codegen_stmt)
+        .map(|s| codegen_stmt(arena, s))
         .collect()
 }
 
@@ -361,7 +358,7 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStre
 }
 
 //
-pub fn codegen_stmt(stmt: Statement) -> TokenStream {
+pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
     let statement_tokens = match stmt.kind() {
@@ -494,7 +491,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! { ctx.emitter().shift(#value.clone(), #amount.clone(), ShiftOperationKind::#kind) }
         }
         StatementKind::Call { target, args, .. } => {
-            let ident = codegen_ident(target.name());
+            let ident = codegen_ident(target);
 
             // if tail {
             //     quote! {
@@ -523,7 +520,7 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             quote! { ctx.emitter().cast(#value.clone(), #typ, CastOperationKind::#kind) }
         }
         StatementKind::Jump { target } => {
-            let target_index = target.index();
+            let target_index = target.get(arena).index();
             quote! {
                 return ctx.emitter().jump(fn_state.block_refs[#target_index].clone())
             }
@@ -533,8 +530,8 @@ pub fn codegen_stmt(stmt: Statement) -> TokenStream {
             true_target,
             false_target,
         } => {
-            let true_index = true_target.index();
-            let false_index = false_target.index();
+            let true_index = true_target.get(arena).index();
+            let false_index = false_target.get(arena).index();
 
             quote! {
                 return ctx.emitter().branch(#condition.clone(), fn_state.block_refs[#true_index].clone(), fn_state.block_refs[#false_index].clone())

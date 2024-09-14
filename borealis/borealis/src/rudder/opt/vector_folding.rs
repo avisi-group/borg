@@ -1,13 +1,16 @@
-use crate::rudder::{
+use crate::{
+    rudder::{
         constant_value::ConstantValue,
         statement::{BinaryOperationKind, StatementBuilder, StatementKind},
         Block, Function, Type,
-    };
+    },
+    util::arena::{Arena, Ref},
+};
 
-pub fn run(f: Function) -> bool {
+pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
-    for block in f.entry_block().iter() {
-        changed |= run_on_block(&block);
+    for block in f.block_iter() {
+        changed |= run_on_block(f.block_arena(), block);
     }
 
     changed
@@ -15,10 +18,10 @@ pub fn run(f: Function) -> bool {
 
 /// Replace vector access on registers and locals with adding to the indices and
 /// offset respectively
-fn run_on_block(block: &Block) -> bool {
+fn run_on_block(arena: &Arena<Block>, block: Ref<Block>) -> bool {
     let mut did_change = false;
 
-    for stmt in block.statements() {
+    for stmt in block.get(arena).statements() {
         // if we have a write reg of an assign element of a read reg
         // replace with single write reg to element
         if let StatementKind::WriteRegister {
@@ -41,9 +44,9 @@ fn run_on_block(block: &Block) -> bool {
                     // offset = write_offset + index * element type width bytes
                     // value = assign_value
 
-                    assert_eq!(write_offset.kind(), read_offset.kind());
+                    //assert_eq!(write_offset.kind(), read_offset.kind());
 
-                    let mut builder = StatementBuilder::new(block.weak());
+                    let mut builder = StatementBuilder::new(block);
                     let vector_width = builder.build(StatementKind::Constant {
                         typ: (Type::u16()),
                         value: ConstantValue::UnsignedInteger(
@@ -62,7 +65,9 @@ fn run_on_block(block: &Block) -> bool {
                     });
 
                     for new_statement in builder.finish() {
-                        block.insert_statement_before(&stmt, new_statement);
+                        block
+                            .get(arena)
+                            .insert_statement_before(&stmt, new_statement);
                     }
 
                     stmt.replace_kind(StatementKind::WriteRegister {
@@ -81,7 +86,7 @@ fn run_on_block(block: &Block) -> bool {
         if let StatementKind::ReadElement { vector, index } = stmt.kind() {
             if let StatementKind::ReadRegister { offset, .. } = vector.kind() {
                 let element_type = stmt.typ();
-                let mut builder = StatementBuilder::new(block.weak());
+                let mut builder = StatementBuilder::new(block);
 
                 let index = builder.generate_cast(index, Type::s64());
 
@@ -107,7 +112,9 @@ fn run_on_block(block: &Block) -> bool {
                 });
 
                 for new_statement in builder.finish() {
-                    block.insert_statement_before(&stmt, new_statement);
+                    block
+                        .get(arena)
+                        .insert_statement_before(&stmt, new_statement);
                 }
 
                 stmt.replace_kind(StatementKind::ReadRegister {

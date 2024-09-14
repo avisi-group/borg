@@ -3,12 +3,12 @@ use {
     log::trace,
 };
 
-pub fn run(f: Function) -> bool {
+pub fn run(f: &mut Function) -> bool {
     // check condition for branch.  if it's const, replace with a jump.  if both
     // targets are the same, replace with a jump
 
     let mut changed = false;
-    for block in f.entry_block().iter() {
+    for block in f.block_iter().map(|b| b.get(f.block_arena())) {
         let Some(terminator) = block.terminator_statement() else {
             continue;
         };
