@@ -1,5 +1,8 @@
 use {
-    crate::rudder::{statement::StatementKind, Block, Model, Function},
+    crate::{
+        rudder::{statement::StatementKind, Block, Function, Model},
+        util::arena::Ref,
+    },
     common::{intern::InternedString, HashMap, HashSet},
     dot::{GraphWalk, Labeller},
     log::trace,
@@ -7,8 +10,8 @@ use {
 };
 
 pub struct ControlFlowGraphAnalysis {
-    block_preds: HashMap<Block, Vec<Block>>,
-    block_succs: HashMap<Block, Vec<Block>>,
+    block_preds: HashMap<Ref<Block>, Vec<Ref<Block>>>,
+    block_succs: HashMap<Ref<Block>, Vec<Ref<Block>>>,
 }
 
 impl ControlFlowGraphAnalysis {
@@ -40,11 +43,11 @@ impl ControlFlowGraphAnalysis {
 
             seen_list.insert(current.clone());
 
-            let terminator = current.terminator_statement().unwrap();
+            let terminator = current.get(f.block_arena()).terminator_statement().unwrap();
             match terminator.kind() {
                 crate::rudder::StatementKind::Jump { target } => {
-                    self.insert_successor(&current, &target);
-                    self.insert_predecessor(&target, &current);
+                    self.insert_successor(current, target);
+                    self.insert_predecessor(target, current);
 
                     work_list.push_back(target.clone());
                 }
@@ -53,10 +56,10 @@ impl ControlFlowGraphAnalysis {
                     false_target,
                     ..
                 } => {
-                    self.insert_successor(&current, &true_target);
-                    self.insert_successor(&current, &false_target);
-                    self.insert_predecessor(&true_target, &current);
-                    self.insert_predecessor(&false_target, &current);
+                    self.insert_successor(current, true_target);
+                    self.insert_successor(current, false_target);
+                    self.insert_predecessor(true_target, current);
+                    self.insert_predecessor(false_target, current);
 
                     work_list.push_back(true_target.clone());
                     work_list.push_back(false_target.clone());
@@ -71,26 +74,26 @@ impl ControlFlowGraphAnalysis {
         }
     }
 
-    fn insert_successor(&mut self, rb: &Block, sb: &Block) {
+    fn insert_successor(&mut self, rb: Ref<Block>, sb: Ref<Block>) {
         self.block_succs
             .entry(rb.clone())
             .and_modify(|e| e.push(sb.clone()))
             .or_insert(vec![sb.clone()]);
     }
 
-    fn insert_predecessor(&mut self, rb: &Block, pb: &Block) {
+    fn insert_predecessor(&mut self, rb: Ref<Block>, pb: Ref<Block>) {
         self.block_preds
             .entry(rb.clone())
             .and_modify(|e| e.push(pb.clone()))
             .or_insert(vec![pb.clone()]);
     }
 
-    pub fn predecessors_for(&self, block: &Block) -> Option<&Vec<Block>> {
-        self.block_preds.get(block)
+    pub fn predecessors_for(&self, block: Ref<Block>) -> Option<&Vec<Ref<Block>>> {
+        self.block_preds.get(&block)
     }
 
-    pub fn successors_for(&self, block: &Block) -> Option<&Vec<Block>> {
-        self.block_succs.get(block)
+    pub fn successors_for(&self, block: Ref<Block>) -> Option<&Vec<Ref<Block>>> {
+        self.block_succs.get(&block)
     }
 }
 
@@ -113,7 +116,7 @@ impl FunctionCallGraphAnalysis {
 
     fn analyse(&mut self, ctx: &Model) {
         for (fname, f) in ctx.get_functions() {
-            assert!(fname == f.name());
+            assert!(*fname == f.name());
 
             self.fn_callees.insert(f.name(), HashSet::default());
             self.fn_callers.insert(f.name(), HashSet::default());
@@ -125,10 +128,10 @@ impl FunctionCallGraphAnalysis {
     }
 
     fn analyse_function(&mut self, f: &Function) {
-        for block in f.entry_block().iter() {
-            let statements = block.statements();
+        for block in f.block_iter() {
+            let statements = block.get(f.block_arena()).statements();
             let call_targets = statements.iter().filter_map(|s| match s.kind() {
-                StatementKind::Call { target, .. } => Some(target.name()),
+                StatementKind::Call { target, .. } => Some(target),
                 _ => None,
             });
             // TODO .unique();
@@ -147,15 +150,15 @@ impl FunctionCallGraphAnalysis {
         }
     }
 
-    pub fn get_callers_for(&self, f: &InternedString) -> Vec<InternedString> {
+    pub fn get_callers_for(&self, f: InternedString) -> Vec<InternedString> {
         self.fn_callers
-            .get(f)
+            .get(&f)
             .map_or(vec![], |f| f.iter().cloned().collect())
     }
 
-    pub fn get_callees_for(&self, f: &InternedString) -> Vec<InternedString> {
+    pub fn get_callees_for(&self, f: InternedString) -> Vec<InternedString> {
         self.fn_callees
-            .get(f)
+            .get(&f)
             .map_or(vec![], |f| f.iter().cloned().collect())
     }
 

@@ -1,77 +1,92 @@
 use {
-    crate::rudder::{statement::StatementKind, Block, Function, Statement, Symbol},
+    crate::{
+        rudder::{statement::StatementKind, Block, Function, Statement, Symbol},
+        util::arena::{Arena, Ref},
+    },
     common::{intern::InternedString, HashMap, HashSet},
 };
 
 pub struct SymbolUseAnalysis {
-    f: Function,
     symbol_uses: HashMap<InternedString, Vec<Statement>>,
     symbol_reads: HashMap<InternedString, Vec<Statement>>,
     symbol_writes: HashMap<InternedString, Vec<Statement>>,
-    symbol_blocks: HashMap<InternedString, HashSet<Block>>,
+    symbol_blocks: HashMap<InternedString, HashSet<Ref<Block>>>,
 }
 
-impl SymbolUseAnalysis {
-    pub fn new(f: &Function) -> Self {
-        let mut celf = Self {
-            f: f.clone(),
-            symbol_uses: HashMap::default(),
-            symbol_reads: HashMap::default(),
-            symbol_writes: HashMap::default(),
-            symbol_blocks: HashMap::default(),
-        };
+struct SymbolUseAnalysisBuilder<'f> {
+    f: &'f Function,
+    inner: SymbolUseAnalysis,
+}
 
-        celf.analyse();
-        celf
-    }
-
+impl<'f> SymbolUseAnalysisBuilder<'f> {
     fn analyse(&mut self) {
-        for block in self.f.entry_block().iter() {
-            for stmt in block.statements() {
-                match stmt.kind() {
-                    crate::rudder::StatementKind::ReadVariable { symbol, .. } => {
-                        self.insert_use(&symbol, &stmt)
-                    }
-                    crate::rudder::StatementKind::WriteVariable { symbol, .. } => {
-                        self.insert_use(&symbol, &stmt)
-                    }
-                    _ => {}
-                }
-            }
-        }
+        let uses = self
+            .f
+            .block_iter()
+            .flat_map(|b| b.get(self.f.block_arena()).statements())
+            .filter_map(|stmt| match stmt.kind() {
+                StatementKind::ReadVariable { symbol, .. }
+                | StatementKind::WriteVariable { symbol, .. } => Some((symbol, stmt)),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        uses.into_iter()
+            .for_each(|(symbol, stmt)| self.insert_use(symbol, stmt));
     }
 
-    fn insert_use(&mut self, symbol: &Symbol, stmt: &Statement) {
-        self.symbol_uses
+    fn insert_use(&mut self, symbol: Symbol, stmt: Statement) {
+        self.inner
+            .symbol_uses
             .entry(symbol.name())
             .and_modify(|u| u.push(stmt.clone()))
             .or_insert(vec![stmt.clone()]);
 
         if let StatementKind::ReadVariable { .. } = stmt.kind() {
-            self.symbol_reads
+            self.inner
+                .symbol_reads
                 .entry(symbol.name())
                 .and_modify(|u| u.push(stmt.clone()))
                 .or_insert(vec![stmt.clone()]);
         }
 
         if let StatementKind::WriteVariable { .. } = stmt.kind() {
-            self.symbol_writes
+            self.inner
+                .symbol_writes
                 .entry(symbol.name())
                 .and_modify(|u| u.push(stmt.clone()))
                 .or_insert(vec![stmt.clone()]);
         }
 
-        self.symbol_blocks
+        self.inner
+            .symbol_blocks
             .entry(symbol.name())
             .and_modify(|u| {
-                u.insert(stmt.parent_block().upgrade());
+                u.insert(stmt.parent_block());
             })
             .or_insert({
                 let mut h = HashSet::default();
-                h.insert(stmt.parent_block().upgrade());
+                h.insert(stmt.parent_block());
 
                 h
             });
+    }
+}
+
+impl SymbolUseAnalysis {
+    pub fn new(f: &Function) -> Self {
+        let mut builder = SymbolUseAnalysisBuilder {
+            f,
+            inner: Self {
+                symbol_uses: HashMap::default(),
+                symbol_reads: HashMap::default(),
+                symbol_writes: HashMap::default(),
+                symbol_blocks: HashMap::default(),
+            },
+        };
+
+        builder.analyse();
+        builder.inner
     }
 
     pub fn is_symbol_dead(&self, symbol: &Symbol) -> bool {
@@ -99,15 +114,17 @@ impl SymbolUseAnalysis {
     }
 }
 
-pub struct StatementUseAnalysis {
-    block: Block,
+pub struct StatementUseAnalysis<'a> {
+    arena: &'a Arena<Block>,
+    block: Ref<Block>,
     stmt_uses: HashMap<Statement, HashSet<Statement>>,
 }
 
-impl StatementUseAnalysis {
-    pub fn new(b: &Block) -> Self {
+impl<'a> StatementUseAnalysis<'a> {
+    pub fn new(arena: &'a Arena<Block>, b: Ref<Block>) -> Self {
         let mut celf = Self {
-            block: b.clone(),
+            arena,
+            block: b,
             stmt_uses: HashMap::default(),
         };
 
@@ -116,7 +133,7 @@ impl StatementUseAnalysis {
     }
 
     fn analyse(&mut self) {
-        for stmt in self.block.statements() {
+        for stmt in self.block.get(self.arena).statements() {
             match stmt.kind() {
                 StatementKind::WriteVariable { value, .. } => {
                     self.add_use(&value, &stmt);

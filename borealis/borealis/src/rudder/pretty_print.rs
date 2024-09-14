@@ -2,9 +2,10 @@ use {
     crate::rudder::{
         analysis::cfg::ControlFlowGraphAnalysis,
         statement::{
-            BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement, StatementKind, UnaryOperationKind,
+            BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement, StatementKind,
+            UnaryOperationKind,
         },
-        Block, ConstantValue, Model, Function, FunctionKind, PrimitiveTypeClass, Symbol, Type,
+        Block, ConstantValue, Function, Model, PrimitiveTypeClass, Symbol, Type,
     },
     itertools::Itertools,
     std::fmt::{Display, Formatter, Result},
@@ -151,7 +152,7 @@ impl Display for StatementKind {
                     f,
                     "{}call {}({})",
                     if *tail { "tail-" } else { "" },
-                    target.name(),
+                    target,
                     args.iter().map(Statement::name).join(", ")
                 )
             }
@@ -191,7 +192,7 @@ impl Display for StatementKind {
                     length.name()
                 )
             }
-            StatementKind::Jump { target } => write!(f, "jump block{}", target.index()),
+            StatementKind::Jump { target } => write!(f, "jump block{:?}", target), // removed .index
             StatementKind::Branch {
                 condition,
                 true_target,
@@ -199,10 +200,10 @@ impl Display for StatementKind {
             } => {
                 write!(
                     f,
-                    "branch {} block{} block{}",
+                    "branch {} block{:?} block{:?}", // removed .index
                     condition.name(),
-                    true_target.index(),
-                    false_target.index()
+                    true_target,
+                    false_target,
                 )
             }
             StatementKind::PhiNode { members } => {
@@ -330,27 +331,27 @@ impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let cfg = ControlFlowGraphAnalysis::new(self);
 
-        self.inner.get().entry_block.iter().try_for_each(|block| {
+        self.block_iter().try_for_each(|block| {
             let preds = cfg
-                .predecessors_for(&block)
+                .predecessors_for(block)
                 .unwrap()
                 .iter()
-                .map(|b| b.index())
+                .map(|b| b.get(self.block_arena()).index())
                 .join(", ");
 
             let succs = cfg
-                .successors_for(&block)
+                .successors_for(block)
                 .unwrap()
                 .iter()
-                .map(|b| b.index())
+                .map(|b| b.get(self.block_arena()).index())
                 .join(", ");
 
             writeln!(
                 f,
-                "  block {}: preds={{{preds}}}, succs={{{succs}}}",
-                block.index()
+                "  block{}: preds={{{preds}}}, succs={{{succs}}}",
+                block.get(self.block_arena()).index()
             )?;
-            write!(f, "{}", block)
+            write!(f, "{}", block.get(self.block_arena()))
         })
     }
 }
@@ -361,17 +362,8 @@ impl Display for Model {
 
         writeln!(f, "rudder context:")?;
 
-        for (name, (kind, func)) in self.fns.iter() {
-            writeln!(
-                f,
-                "function {} ({}):",
-                name,
-                if matches!(kind, FunctionKind::Execute) {
-                    "execute"
-                } else {
-                    "other"
-                }
-            )?;
+        for (name, (func)) in self.fns.iter() {
+            writeln!(f, "function {}:", name,)?;
 
             write!(f, "{}", func)?;
             writeln!(f)?;

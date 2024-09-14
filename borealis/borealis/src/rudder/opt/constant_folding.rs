@@ -1,20 +1,20 @@
 use crate::rudder::{
-        statement::{BinaryOperationKind, CastOperationKind, Statement, StatementKind},
-        Block, ConstantValue, Function, PrimitiveTypeClass, Type,
-    };
+    statement::{BinaryOperationKind, CastOperationKind, Statement, StatementKind},
+    Block, ConstantValue, Function, PrimitiveTypeClass, Type,
+};
 
-pub fn run(f: Function) -> bool {
+pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
     //trace!("constant folding {}", f.name());
-    for block in f.entry_block().iter() {
+    for block in f.block_iter().map(|b| b.get(f.block_arena())) {
         changed |= run_on_block(block);
     }
 
     changed
 }
 
-fn run_on_block(b: Block) -> bool {
+fn run_on_block(b: &Block) -> bool {
     let mut changed = false;
 
     for stmt in b.statements() {

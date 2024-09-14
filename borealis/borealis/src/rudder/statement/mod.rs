@@ -1,7 +1,10 @@
 use {
-    crate::rudder::{
-        constant_value::ConstantValue, Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol,
-        Type, WeakBlock,
+    crate::{
+        rudder::{
+            constant_value::ConstantValue, Block, Function, PrimitiveType, PrimitiveTypeClass,
+            Symbol, Type,
+        },
+        util::arena::Ref,
     },
     common::{intern::InternedString, shared::Shared},
     proc_macro2::TokenStream,
@@ -68,7 +71,7 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum StatementKind {
     Constant {
         typ: Type,
@@ -136,7 +139,7 @@ pub enum StatementKind {
         amount: Statement,
     },
     Call {
-        target: Function,
+        target: InternedString, // todo: ref<function>
         args: Vec<Statement>,
         tail: bool,
     },
@@ -152,15 +155,15 @@ pub enum StatementKind {
         length: Statement,
     },
     Jump {
-        target: Block,
+        target: Ref<Block>,
     },
     Branch {
         condition: Statement,
-        true_target: Block,
-        false_target: Block,
+        true_target: Ref<Block>,
+        false_target: Ref<Block>,
     },
     PhiNode {
-        members: Vec<(Block, Statement)>,
+        members: Vec<(Ref<Block>, Statement)>,
     },
     Return {
         value: Statement,
@@ -358,7 +361,7 @@ impl ToTokens for Statement {
 pub struct StatementInner {
     name: InternedString,
     kind: StatementKind,
-    parent: WeakBlock,
+    parent: Ref<Block>,
 }
 
 impl Statement {
@@ -380,7 +383,7 @@ impl Statement {
         self.inner.get().name
     }
 
-    pub fn parent_block(&self) -> WeakBlock {
+    pub fn parent_block(&self) -> Ref<Block> {
         self.inner.get().parent.clone()
     }
 
@@ -424,7 +427,7 @@ impl Statement {
             StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
             StatementKind::UnaryOperation { value, .. } => value.typ(),
             StatementKind::ShiftOperation { value, .. } => value.typ(),
-            StatementKind::Call { target, .. } => target.return_type(),
+            StatementKind::Call { target, .. } => Type::unit(),
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
             StatementKind::Jump { .. } => Type::void(),
             StatementKind::Branch { .. } => Type::void(),
@@ -942,12 +945,12 @@ impl StatementInner {
 
 pub struct StatementBuilder {
     statements: Vec<Statement>,
-    parent: WeakBlock,
+    parent: Ref<Block>,
 }
 
 impl StatementBuilder {
     /// Creates a new `StatementBuilder`
-    pub fn new(parent: WeakBlock) -> Self {
+    pub fn new(parent: Ref<Block>) -> Self {
         Self {
             statements: vec![],
             parent,

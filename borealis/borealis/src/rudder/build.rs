@@ -1,10 +1,6 @@
 use {
     crate::{
-        boom::{
-            self, bits_to_int,
-            control_flow::ControlFlowBlock,
-            FunctionSignature,
-        },
+        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature},
         rudder::{
             self,
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
@@ -12,10 +8,10 @@ use {
                 BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementBuilder,
                 StatementKind, UnaryOperationKind,
             },
-            Block, ConstantValue, Function, FunctionInner, FunctionKind, Model, PrimitiveType,
-            PrimitiveTypeClass, RegisterDescriptor, Statement, Type,
+            Block, ConstantValue, Function, Model, PrimitiveType, PrimitiveTypeClass,
+            RegisterDescriptor, Statement, Symbol, Type,
         },
-        util::signed_smallest_width_of_value,
+        util::{arena::Ref, signed_smallest_width_of_value},
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     log::trace,
@@ -38,7 +34,6 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 
     ast.registers.iter().for_each(|(name, typ)| {
         let typ = build_ctx.resolve_type(typ.clone());
-
         build_ctx.add_register(*name, typ);
     });
 
@@ -52,17 +47,12 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
     build_ctx.functions.insert(
         REPLICATE_BITS_BOREALIS_INTERNAL.name(),
         (
-            FunctionKind::Execute,
             // have to make a new function here or `build_functions` will overwrite it
-            rudder::Function {
-                inner: Shared::new(FunctionInner {
-                    name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-                    local_variables: HashMap::default(),
-                    entry_block: Block::new(),
-                }),
-                return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
-                parameters: REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
-            },
+            rudder::Function::new(
+                REPLICATE_BITS_BOREALIS_INTERNAL.name(),
+                REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
+                REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
+            ),
             boom::FunctionDefinition {
                 signature: FunctionSignature {
                     name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
@@ -75,17 +65,16 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
     );
 
     log::warn!("starting build functions");
-    build_ctx.build_functions();
+    let mut model = build_ctx.build_functions();
     log::warn!("done build functions");
 
     // insert again to overwrite empty boom generated rudder
-    build_ctx
-        .functions
-        .get_mut(&REPLICATE_BITS_BOREALIS_INTERNAL.name())
-        .unwrap()
-        .1 = REPLICATE_BITS_BOREALIS_INTERNAL.clone();
+    model.fns.insert(
+        REPLICATE_BITS_BOREALIS_INTERNAL.name(),
+        REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
+    );
 
-    build_ctx.finalise()
+    model
 }
 
 #[derive(Default)]
@@ -103,7 +92,7 @@ struct BuildContext {
     next_register_offset: usize,
 
     /// Functions
-    functions: HashMap<InternedString, (FunctionKind, Function, boom::FunctionDefinition)>,
+    functions: HashMap<InternedString, (Function, boom::FunctionDefinition)>,
 }
 
 impl BuildContext {
@@ -145,30 +134,63 @@ impl BuildContext {
         self.functions.insert(
             name,
             (
-                FunctionKind::Execute,
                 rudder::Function::new(
                     name,
                     self.resolve_type(definition.signature.return_type.clone()),
-                    definition.signature.parameters.get().iter().map(
-                        |boom::Parameter { typ, name, is_ref }| {
+                    definition
+                        .signature
+                        .parameters
+                        .get()
+                        .iter()
+                        .map(|boom::Parameter { typ, name, is_ref }| {
                             assert!(!is_ref, "no reference parameters allowed");
-                            (*name, self.resolve_type(typ.clone()))
-                        },
-                    ),
+                            Symbol::new(*name, self.resolve_type(typ.clone()))
+                        })
+                        .collect(),
                 ),
                 definition.clone(),
             ),
         );
     }
 
-    fn build_functions(&mut self) {
-        self.functions
-            .clone()
+    fn build_functions(self) -> Model {
+        let BuildContext {
+            structs,
+            enums,
+            registers,
+            next_register_offset,
+            functions,
+        } = self;
+
+        let removed_fns = BuildContext {
+            functions: HashMap::default(),
+            structs,
+            enums,
+            registers,
+            next_register_offset,
+        };
+
+        let fns = functions
             .into_par_iter()
-            .for_each(|(name, (_kind, rudder_fn, boom_fn))| {
+            .map(|(name, (rudder_fn, boom_fn))| {
                 log::debug!("building function {name:?}");
-                FunctionBuildContext::new(self, rudder_fn.clone()).build_fn(boom_fn.clone());
-            });
+                (
+                    name,
+                    FunctionBuildContext::new(&removed_fns, rudder_fn).build_fn(boom_fn.clone()),
+                )
+            })
+            .collect();
+
+        Model {
+            fns,
+            structs: removed_fns
+                .structs
+                .into_iter()
+                .map(|(_, (typ, _))| typ)
+                .collect(),
+            // register names kept for debugging
+            registers: removed_fns.registers,
+        }
     }
 
     fn resolve_type(&self, typ: Shared<boom::Type>) -> rudder::Type {
@@ -208,10 +230,7 @@ impl BuildContext {
             },
             boom::Type::Bits { size } => match size {
                 boom::Size::Static(size) => {
-                    rudder::Type::new_primitive(
-                        rudder::PrimitiveTypeClass::UnsignedInteger,
-                        *size,
-                    )
+                    rudder::Type::new_primitive(rudder::PrimitiveTypeClass::UnsignedInteger, *size)
                 }
                 boom::Size::Unknown => rudder::Type::Bits,
             },
@@ -228,25 +247,12 @@ impl BuildContext {
             }
         }
     }
-
-    fn finalise(self) -> Model {
-        Model {
-            fns: self
-                .functions
-                .into_iter()
-                .map(|(name, (kind, f, _))| (name, (kind, f)))
-                .collect(),
-            structs: self.structs.into_iter().map(|(_, (typ, _))| typ).collect(),
-            // register names kept for debugging
-            registers: self.registers,
-        }
-    }
 }
 
 struct FunctionBuildContext<'ctx> {
     build_context: &'ctx BuildContext,
     rudder_fn: Function,
-    blocks: HashMap<Id, rudder::Block>,
+    blocks: HashMap<Id, Ref<rudder::Block>>,
 }
 
 impl<'ctx> FunctionBuildContext<'ctx> {
@@ -258,10 +264,19 @@ impl<'ctx> FunctionBuildContext<'ctx> {
         }
     }
 
+    pub fn build_fn(mut self, boom_fn: boom::FunctionDefinition) -> rudder::Function {
+        trace!(
+            "converting function {:?} from boom to rudder",
+            boom_fn.signature.name
+        );
+        self.rudder_fn.entry_block = self.resolve_block(boom_fn.entry_block);
+        self.rudder_fn
+    }
+
     pub fn resolve_block(
         &mut self,
         boom_block: boom::control_flow::ControlFlowBlock,
-    ) -> rudder::Block {
+    ) -> Ref<rudder::Block> {
         trace!("resolving: {:x}", boom_block.id());
 
         if let Some(block) = self.blocks.get(&boom_block.id()) {
@@ -272,29 +287,21 @@ impl<'ctx> FunctionBuildContext<'ctx> {
             BlockBuildContext::new(self).build_block(boom_block)
         }
     }
-
-    pub fn build_fn(&mut self, boom_fn: boom::FunctionDefinition) {
-        trace!(
-            "converting function {:?} from boom to rudder",
-            boom_fn.signature.name
-        );
-        self.rudder_fn.inner.get_mut().entry_block = self.resolve_block(boom_fn.entry_block);
-    }
 }
 
 struct BlockBuildContext<'ctx, 'fn_ctx> {
     function_build_context: &'fn_ctx mut FunctionBuildContext<'ctx>,
     builder: StatementBuilder,
-    block: rudder::Block,
+    block: Ref<rudder::Block>,
 }
 
 impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     pub fn new(function_build_context: &'fn_ctx mut FunctionBuildContext<'ctx>) -> Self {
-        let block = rudder::Block::new();
+        let block = function_build_context.rudder_fn.new_block();
 
         Self {
             function_build_context,
-            builder: StatementBuilder::new(block.weak()),
+            builder: StatementBuilder::new(block),
             block,
         }
     }
@@ -307,7 +314,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         self.function_build_context
     }
 
-    fn build_block(mut self, boom_block: boom::control_flow::ControlFlowBlock) -> rudder::Block {
+    fn build_block(
+        mut self,
+        boom_block: boom::control_flow::ControlFlowBlock,
+    ) -> Ref<rudder::Block> {
         // pre-insert empty rudder block to avoid infinite recursion with cyclic blocks
         {
             let rudder_block = self.block.clone();
@@ -358,15 +368,26 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         self.builder.build(kind);
 
-        self.block.set_statements(self.builder.finish().into_iter());
-        self.block
+        let Self {
+            function_build_context,
+            builder,
+            block,
+        } = self;
+
+        block
+            .get(function_build_context.rudder_fn.block_arena())
+            .set_statements(builder.finish().into_iter());
+
+        block
     }
 
     fn build_statement(&mut self, statement: Shared<boom::Statement>) {
         match &*statement.get() {
             boom::Statement::VariableDeclaration { name, typ } => {
                 let typ = self.ctx().resolve_type(typ.clone());
-                self.fn_ctx().rudder_fn.add_local_variable(*name, typ);
+                self.fn_ctx()
+                    .rudder_fn
+                    .add_local_variable(Symbol::new(*name, typ));
             }
             boom::Statement::Copy { expression, value } => {
                 self.build_copy(value.clone(), expression);
@@ -416,28 +437,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             if let Some(statement) = self.build_specialized_function(*name, &args) {
                 statement
             } else {
-                let target = match self.ctx().functions.get(name).cloned() {
-                    Some((_, target, _)) => target,
-                    // all functions should exist in boom by the time rudder is generated
-                    None => {
-                        panic!("unknown function {name}")
-                    }
-                };
-
-                // cast all arguments to the correct type
-                let casts = args
-                    .iter()
-                    .enumerate()
-                    .map(|(i, stmt)| {
-                        let typ = target.signature().1[i].typ();
-                        self.builder.generate_cast(stmt.clone(), typ)
-                    })
-                    .collect::<Vec<_>>();
-
                 // call statement
                 self.builder.build(StatementKind::Call {
-                    target,
-                    args: casts.clone(),
+                    target: *name,
+                    args,
                     tail: false,
                 })
             }
@@ -1232,7 +1235,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .builder
                         .generate_cast(args[1].clone(), Type::u64());
                     Some(self.builder.build(StatementKind::Call {
-                        target: REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
+                        target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                         args: vec![args[0].clone(), count],
                         tail: false,
                     }))

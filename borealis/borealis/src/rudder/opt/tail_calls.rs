@@ -3,12 +3,12 @@ use {
     log::trace,
 };
 
-pub fn run(f: Function) -> bool {
+pub fn run(f: &mut Function) -> bool {
     // If a block contains a call followed by a return, optimise this into a tail
     // call
 
     let mut changed = false;
-    for block in f.entry_block().iter() {
+    for block in f.block_iter().map(|b| b.get(f.block_arena())) {
         if block.statements().len() < 2 {
             continue;
         }

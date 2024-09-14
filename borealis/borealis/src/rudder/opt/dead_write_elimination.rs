@@ -1,7 +1,10 @@
-use {crate::rudder::analysis, log::trace};
+use {
+    crate::rudder::{analysis, Function},
+    log::trace,
+};
 
-pub fn run(f: crate::rudder::Function) -> bool {
-    let dfa = analysis::dfa::SymbolUseAnalysis::new(&f);
+pub fn run(f: &mut Function) -> bool {
+    let dfa = analysis::dfa::SymbolUseAnalysis::new(f);
 
     let mut changed = false;
 
@@ -18,7 +21,10 @@ pub fn run(f: crate::rudder::Function) -> bool {
             }
 
             for write in dfa.get_symbol_writes(&sym) {
-                write.parent_block().upgrade().kill_statement(write);
+                write
+                    .parent_block()
+                    .get(f.block_arena())
+                    .kill_statement(write);
                 changed |= true;
             }
         }

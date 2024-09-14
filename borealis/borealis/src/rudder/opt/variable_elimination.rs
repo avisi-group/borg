@@ -1,24 +1,31 @@
 use {
-    crate::rudder::{analysis, Block, Function, StatementKind, SymbolKind},
+    crate::{
+        rudder::{analysis, Block, Function, StatementKind, SymbolKind},
+        util::arena::{Arena, Ref},
+    },
     common::HashMap,
     log::trace,
     std::collections::hash_map::Entry,
 };
 
-pub fn run(f: Function) -> bool {
-    let symbol_ua = analysis::dfa::SymbolUseAnalysis::new(&f);
+pub fn run(f: &mut Function) -> bool {
+    let symbol_ua = analysis::dfa::SymbolUseAnalysis::new(f);
 
     let mut changed = false;
 
     trace!("running on function {}", f.name());
-    for block in f.entry_block().iter() {
-        changed |= run_on_block(&symbol_ua, block);
+    for block in f.block_iter() {
+        changed |= run_on_block(&symbol_ua, f.block_arena(), block);
     }
 
     changed
 }
 
-fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> bool {
+fn run_on_block(
+    symbol_ua: &analysis::dfa::SymbolUseAnalysis,
+    arena: &Arena<Block>,
+    block: Ref<Block>,
+) -> bool {
     // collapse multiple reads
     //
     // 1: write-var SYM
@@ -34,15 +41,15 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
     // if we see a write to a local symbol, then all reads until the next write can
     // be replaced.
 
-    let stmt_ua = analysis::dfa::StatementUseAnalysis::new(&block);
+    let stmt_ua = analysis::dfa::StatementUseAnalysis::new(arena, block);
 
     let mut live_writes = HashMap::default();
 
     let mut changed = false;
-    for stmt in block.statements() {
+    for stmt in block.get(arena).statements() {
         if let StatementKind::WriteVariable { symbol, value } = stmt.kind() {
             // Ignore global symbols (for now)
-            if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
+            if !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }
 
@@ -61,7 +68,7 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, block: Block) -> b
                 }
             }
         } else if let StatementKind::ReadVariable { symbol } = stmt.kind() {
-            if symbol.kind() == SymbolKind::Parameter || !symbol_ua.is_symbol_local(&symbol) {
+            if !symbol_ua.is_symbol_local(&symbol) {
                 continue;
             }
 

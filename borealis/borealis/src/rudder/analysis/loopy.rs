@@ -29,7 +29,7 @@ impl LoopAnalysis {
                 break;
             }
 
-            work_list.extend(current.targets());
+            work_list.extend(current.get(f.block_arena()).targets());
             seen_list.insert(current);
         }
     }

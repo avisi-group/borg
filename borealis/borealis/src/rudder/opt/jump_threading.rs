@@ -1,20 +1,27 @@
-use crate::rudder::{Block, StatementKind};
+use crate::{
+    rudder::{Block, Function, StatementKind},
+    util::arena::Ref,
+};
 
-pub fn run(f: crate::rudder::Function) -> bool {
+pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
-    for block in f.entry_block().iter() {
-        changed |= run_on_block(block);
+    for block in f.block_iter() {
+        changed |= run_on_block(f, block);
     }
 
     changed
 }
 
-fn target_for_threadable(target: &Block) -> Option<Block> {
-    if target.size() == 1 {
+fn target_for_threadable(f: &Function, target: Ref<Block>) -> Option<Ref<Block>> {
+    if target.get(f.block_arena()).size() == 1 {
         if let StatementKind::Jump {
             target: target_target,
-        } = target.terminator_statement().unwrap().kind()
+        } = target
+            .get(f.block_arena())
+            .terminator_statement()
+            .unwrap()
+            .kind()
         {
             Some(target_target)
         } else {
@@ -25,12 +32,12 @@ fn target_for_threadable(target: &Block) -> Option<Block> {
     }
 }
 
-fn run_on_block(block: Block) -> bool {
-    let terminator = block.terminator_statement().unwrap();
+fn run_on_block(f: &Function, block: Ref<Block>) -> bool {
+    let terminator = block.get(f.block_arena()).terminator_statement().unwrap();
 
     match terminator.kind() {
         StatementKind::Jump { target } => {
-            if let Some(thread_to) = target_for_threadable(&target) {
+            if let Some(thread_to) = target_for_threadable(f, target) {
                 terminator.replace_kind(StatementKind::Jump { target: thread_to });
                 true
             } else {
@@ -44,14 +51,15 @@ fn run_on_block(block: Block) -> bool {
         } => {
             let mut changed = false;
 
-            let true_target = if let Some(true_thread_to) = target_for_threadable(&true_target) {
+            let true_target = if let Some(true_thread_to) = target_for_threadable(f, true_target) {
                 changed = true;
                 true_thread_to
             } else {
                 true_target
             };
 
-            let false_target = if let Some(false_thread_to) = target_for_threadable(&false_target) {
+            let false_target = if let Some(false_thread_to) = target_for_threadable(f, false_target)
+            {
                 changed = true;
                 false_thread_to
             } else {
