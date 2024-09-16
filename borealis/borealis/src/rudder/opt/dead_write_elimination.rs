@@ -20,11 +20,8 @@ pub fn run(f: &mut Function) -> bool {
                 continue;
             }
 
-            for write in dfa.get_symbol_writes(&sym) {
-                write
-                    .parent_block()
-                    .get_mut(f.block_arena_mut())
-                    .kill_statement(write);
+            for (write, block) in dfa.get_symbol_writes(&sym) {
+                block.get_mut(f.block_arena_mut()).kill_statement(*write);
                 changed |= true;
             }
         }

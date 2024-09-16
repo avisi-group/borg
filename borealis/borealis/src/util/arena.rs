@@ -1,5 +1,4 @@
-use std::hash::Hash;
-use std::marker::PhantomData;
+use std::{hash::Hash, marker::PhantomData};
 
 #[derive(Debug, Clone)]
 pub struct Arena<T> {

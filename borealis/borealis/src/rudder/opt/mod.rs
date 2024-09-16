@@ -1,8 +1,7 @@
-use rayon::iter::IntoParallelRefMutIterator;
 use {
     crate::rudder::{Function, Model},
     log::trace,
-    rayon::iter::{IntoParallelRefIterator, ParallelIterator},
+    rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
 };
 
 pub mod branch_simplification;
@@ -34,14 +33,13 @@ pub type FunctionPass = (&'static str, FunctionPassFn);
 static INLINER: FunctionPass = ("inliner", inliner::run);
 static JUMP_THREADING: FunctionPass = ("jump-threading", jump_threading::run);
 static VARIABLE_ELIMINATION: FunctionPass = ("var-elimination", variable_elimination::run);
-static DEAD_SYMBOL_ELIMINATION: FunctionPass =
-    ("dead-symbol-elimination", dead_symbol_elimination::run);
-static DEAD_WRITE_ELIMINATION: FunctionPass =
-    ("dead-write-elimination", dead_write_elimination::run);
+static DEAD_SYMBOL_ELIMINATION: FunctionPass = ("dead-symbol-elimination", dead_symbol_elimination::run);
+static DEAD_WRITE_ELIMINATION: FunctionPass = ("dead-write-elimination", dead_write_elimination::run);
 static DEAD_STMT_ELIMINATION: FunctionPass = ("dead-stmt-elimination", dead_stmt_elimination::run);
 static CONSTANT_PROPAGATION: FunctionPass = ("constant-propagation", constant_propagation::run);
 static CONSTANT_FOLDING: FunctionPass = ("constant-folding", constant_folding::run);
-//static RETURN_PROPAGATION: FunctionPass = ("return-propagation", return_propagation::run);
+//static RETURN_PROPAGATION: FunctionPass = ("return-propagation",
+// return_propagation::run);
 static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_simplification::run);
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 // static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
@@ -105,23 +103,21 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
         ],
     };
 
-    ctx.get_functions_mut()
-        .par_iter_mut()
-        .for_each(|(name, function)| {
-            let mut changed = true;
+    ctx.get_functions_mut().par_iter_mut().for_each(|(name, function)| {
+        let mut changed = true;
 
-            trace!("optimising function {name:?}");
+        trace!("optimising function {name:?}");
 
-            while changed {
-                changed = false;
-                for pass in &passes {
-                    trace!("running pass {}", pass.0);
+        while changed {
+            changed = false;
+            for pass in &passes {
+                trace!("running pass {}", pass.0);
 
-                    function.update_indices();
-                    while pass.1(function) {
-                        changed = true;
-                    }
+                function.update_indices();
+                while pass.1(function) {
+                    changed = true;
                 }
             }
-        });
+        }
+    });
 }

@@ -17,12 +17,13 @@ pub fn run(f: &mut Function) -> bool {
 }
 
 fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
-    let sua = StatementUseAnalysis::new(arena, b);
+    let mut sua = StatementUseAnalysis::new(arena, b);
 
-    for stmt in b.get(arena).statements() {
-        if sua.is_dead(&stmt) {
-            trace!("killing dead statement: {}", stmt);
-            b.get_mut(arena).kill_statement(&stmt);
+    for stmt in b.get(sua.block_arena()).statements() {
+        if sua.is_dead(stmt) {
+            let s_arena = &b.get(arena).statement_arena;
+            trace!("killing dead statement: {}", stmt.get(s_arena).to_string(s_arena));
+            b.get_mut(arena).kill_statement(stmt);
             return true;
         }
     }

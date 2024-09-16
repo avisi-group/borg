@@ -10,12 +10,15 @@ use {
         rudder::{
             constant_value::ConstantValue,
             statement::{
-                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, Statement,
-                StatementKind, UnaryOperationKind,
+                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementInner, StatementKind,
+                UnaryOperationKind,
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
-        util::{arena::Arena, signed_smallest_width_of_value, unsigned_smallest_width_of_value},
+        util::{
+            arena::{Arena, Ref},
+            signed_smallest_width_of_value, unsigned_smallest_width_of_value,
+        },
     },
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
@@ -42,7 +45,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         .block_iter()
         .map(|block| {
             let block_name = get_block_fn_ident(&block.get(function.block_arena()));
-            let block_impl = codegen_block(function.block_arena(),block.get(function.block_arena()));
+            let block_impl = codegen_block(function.block_arena(), block.get(function.block_arena()));
 
             quote! {
                 // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
@@ -149,13 +152,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 }
 
 pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
-    let parameters =
-        [quote!(ctx: &mut X86TranslationContext)]
-            .into_iter()
-            .chain(parameters.iter().map(|sym| {
-                let name = codegen_ident(sym.name());
-                quote!(#name: X86NodeRef)
-            }));
+    let parameters = [quote!(ctx: &mut X86TranslationContext)]
+        .into_iter()
+        .chain(parameters.iter().map(|sym| {
+            let name = codegen_ident(sym.name());
+            quote!(#name: X86NodeRef)
+        }));
 
     quote! {
         #(#parameters),*
@@ -218,7 +220,7 @@ pub fn codegen_block(arena: &Arena<Block>, block: &Block) -> TokenStream {
         .statements()
         .iter()
         .cloned()
-        .map(|s| codegen_stmt(arena, s))
+        .map(|s| codegen_stmt(arena, s, block.arena()))
         .collect()
 }
 
@@ -358,33 +360,40 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStre
 }
 
 //
-pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
+pub fn codegen_stmt(b_arena: &Arena<Block>, stmt: Ref<StatementInner>, s_arena: &Arena<StatementInner>) -> TokenStream {
+    let stmt = stmt.get(s_arena);
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
-    let statement_tokens = match stmt.kind() {
+    let statement_tokens = match stmt.kind().clone() {
         StatementKind::Constant { value, typ } => codegen_constant_value(value, typ),
         StatementKind::ReadVariable { symbol } => {
             let symbol_ident = codegen_ident(symbol.name());
             quote! { ctx.emitter().read_variable(fn_state.#symbol_ident.clone()) }
         }
         StatementKind::WriteVariable { symbol, value } => {
+            let value = value.get(s_arena);
             let symbol_ident = codegen_ident(symbol.name());
 
             quote! { ctx.emitter().write_variable(fn_state.#symbol_ident.clone(), #value.clone()); }
         }
         StatementKind::ReadRegister { typ, offset } => {
+            let offset = offset.get(s_arena);
             let typ = codegen_type_instance(typ);
             quote! {
                 ctx.emitter().read_register(#offset.clone(), #typ);
             }
         }
         StatementKind::WriteRegister { offset, value } => {
+            let offset = offset.get(s_arena);
+            let value = value.get(s_arena);
             quote! {
                 ctx.emitter().write_register(#offset.clone(), #value.clone());
             }
         }
         // read `size` bytes at `offset`, return a Bits
         StatementKind::ReadMemory { offset, size } => {
+            let offset = offset.get(s_arena);
+            let size = size.get(s_arena);
             quote! {
                 {
                     let mut buf = alloc::vec![0; #size as usize / 8];
@@ -398,13 +407,15 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::WriteMemory { offset, value } => {
+            let offset = offset.get(s_arena);
+            let value = value.get(s_arena);
             // OPTIMIZED VERSION:
 
             // find size of value, either bundle.length or in type
 
             // emit match on this length to create mut pointer
 
-            match &value.typ() {
+            match &value.typ(s_arena) {
                 Type::Primitive(PrimitiveType { .. }) => {
                     quote! {
                         state.write_memory(#offset, &#value.to_ne_bytes())
@@ -421,8 +432,8 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
         StatementKind::ReadPc => quote!(todo!("read-pc")),
         StatementKind::WritePc { .. } => quote!(todo!("write-pc")),
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            let left = lhs; // todo:
-            let right = rhs;
+            let left = lhs.get(s_arena); // todo:
+            let right = rhs.get(s_arena);
 
             // // hard to decide whether this belongs, but since it's a Rust issue that u1
             // is // not like other types, casting is a codegen thing
@@ -462,6 +473,8 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             quote! { ctx.emitter().binary_operation(BinaryOperationKind::#kind(#left.clone(), #right.clone())) }
         }
         StatementKind::UnaryOperation { kind, value } => {
+            let value = value.get(s_arena);
+
             let kind = match kind {
                 UnaryOperationKind::Not => quote!(Not),
                 UnaryOperationKind::Negate => quote!(Negate),
@@ -475,11 +488,10 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
 
             quote! { ctx.emitter().unary_operation(UnaryOperationKind::#kind(#value.clone())) }
         }
-        StatementKind::ShiftOperation {
-            kind,
-            value,
-            amount,
-        } => {
+        StatementKind::ShiftOperation { kind, value, amount } => {
+            let value = value.get(s_arena);
+            let amount = amount.get(s_arena);
+
             let kind = match kind {
                 ShiftOperationKind::LogicalShiftLeft => quote!(LogicalShiftLeft),
                 ShiftOperationKind::LogicalShiftRight => quote!(LogicalShiftRight),
@@ -492,6 +504,7 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
         }
         StatementKind::Call { target, args, .. } => {
             let ident = codegen_ident(target);
+            let args = args.iter().map(|a| a.get(s_arena));
 
             // if tail {
             //     quote! {
@@ -508,6 +521,8 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
         StatementKind::Cast { typ, value, kind } => {
             let typ = codegen_type_instance(typ);
 
+            let value = value.get(s_arena);
+
             let kind = match kind {
                 CastOperationKind::ZeroExtend => quote!(ZeroExtend),
                 CastOperationKind::SignExtend => quote!(SignExtend),
@@ -520,7 +535,7 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             quote! { ctx.emitter().cast(#value.clone(), #typ, CastOperationKind::#kind) }
         }
         StatementKind::Jump { target } => {
-            let target_index = target.get(arena).index();
+            let target_index = target.get(b_arena).index();
             quote! {
                 return ctx.emitter().jump(fn_state.block_refs[#target_index].clone())
             }
@@ -530,8 +545,10 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             true_target,
             false_target,
         } => {
-            let true_index = true_target.get(arena).index();
-            let false_index = false_target.get(arena).index();
+            let condition = condition.get(s_arena);
+
+            let true_index = true_target.get(b_arena).index();
+            let false_index = false_target.get(b_arena).index();
 
             quote! {
                 return ctx.emitter().branch(#condition.clone(), fn_state.block_refs[#true_index].clone(), fn_state.block_refs[#false_index].clone())
@@ -539,6 +556,7 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
         }
         StatementKind::PhiNode { .. } => quote!(todo!("phi")),
         StatementKind::Return { value } => {
+            let value = value.get(s_arena);
             let name = codegen_ident(value.name());
             quote! {
                 ctx.emitter().write_variable(fn_state.borealis_fn_return_value.clone(), #name);
@@ -550,13 +568,15 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             true_value,
             false_value,
         } => {
+            let condition = condition.get(s_arena);
+            let true_value = true_value.get(s_arena);
+            let false_value = false_value.get(s_arena);
             quote! { ctx.emitter().select(#condition, #true_value, #false_value) }
         }
-        StatementKind::BitExtract {
-            value,
-            start,
-            length,
-        } => {
+        StatementKind::BitExtract { value, start, length } => {
+            let value = value.get(s_arena);
+            let start = start.get(s_arena);
+            let length = length.get(s_arena);
             quote! { ctx.emitter().bit_extract(#value.clone(), #start.clone(), #length.clone()) }
         }
         StatementKind::BitInsert {
@@ -565,29 +585,38 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             start,
             length,
         } => {
+            let target = target.get(s_arena);
+            let source = source.get(s_arena);
+            let start = start.get(s_arena);
+            let length = length.get(s_arena);
             quote! {ctx.emitter().bit_insert(#target.clone(), #source.clone(), #start.clone(), #length.clone())}
         }
-        StatementKind::Panic(statement) => {
+        StatementKind::Panic(value) => {
+            let value = value.get(s_arena);
             quote! {
-                ctx.emitter().panic(#statement);
+                ctx.emitter().panic(#value);
                 return BlockResult::Panic;
             }
         }
         StatementKind::ReadElement { vector, index } => {
+            let vector = vector.get(s_arena);
+            let index = index.get(s_arena);
             quote!(ctx.emitter().read_element(#vector, #index))
         }
-        StatementKind::AssignElement {
-            vector,
-            value,
-            index,
-        } => {
+        StatementKind::AssignElement { vector, value, index } => {
+            let vector = vector.get(s_arena);
+            let value = value.get(s_arena);
+            let index = index.get(s_arena);
             quote!(ctx.emitter().mutate_element(#vector, #index, #value))
         }
 
         StatementKind::CreateBits { value, length } => {
+            let value = value.get(s_arena);
+            let length = length.get(s_arena);
             quote!(Bits::new(#value, #length))
         }
         StatementKind::Assert { condition } => {
+            let condition = condition.get(s_arena);
             quote!(ctx.emitter().assert(#condition))
         }
         StatementKind::BitsCast {
@@ -596,7 +625,10 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             value,
             length,
         } => {
-            let source_type = value.typ();
+            let value = value.get(s_arena);
+            let length = length.get(s_arena);
+
+            let source_type = value.typ(s_arena);
             let target_type = typ;
 
             match (&source_type, &target_type, kind) {
@@ -613,14 +645,16 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
             }
         }
         StatementKind::SizeOf { value } => {
-            match &value.typ() {
+            let value = value.get(s_arena);
+
+            match &value.typ(s_arena) {
                 Type::Bits => quote!(#value.length()),
                 Type::ArbitraryLengthInteger => {
                     panic!("cannot get size of arbitrary length integer")
                 }
                 _ => {
                     // we represent all bitvector lengths as `u16`s
-                    let length = u16::try_from(value.typ().width_bits()).unwrap();
+                    let length = u16::try_from(value.typ(s_arena).width_bits()).unwrap();
                     quote!(#length)
                 }
             }
@@ -666,6 +700,8 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
         StatementKind::Undefined => quote!(Default::default()),
 
         StatementKind::GetFlag { flag, operation } => {
+            let operation = operation.get(s_arena);
+
             let flag = match flag {
                 Flag::N => quote!(N),
                 Flag::Z => quote!(Z),
@@ -676,38 +712,35 @@ pub fn codegen_stmt(arena: &Arena<Block>, stmt: Statement) -> TokenStream {
         }
         // tuples only exist in Rust, not in the DBT
         StatementKind::TupleAccess { index, source } => {
+            let source = source.get(s_arena);
             let index = Literal::usize_unsuffixed(index);
             quote!(#source.#index)
         }
         StatementKind::CreateTuple(values) => {
+            let values = values.iter().map(|s| s.get(s_arena));
             quote!((#(#values,)*))
         }
     };
 
-    let msg = format!(" {stmt}");
-    if stmt.has_value() {
-        quote! {
-            #[doc = #msg]
-            let #stmt_name = #statement_tokens;
-        }
-    } else {
-        quote! {
-            #[doc = #msg]
-            #statement_tokens;
-        }
+    let msg = format!(" {}", stmt.to_string(s_arena));
+    quote! {
+        #[doc = #msg]
+        let #stmt_name = #statement_tokens;
     }
 }
 
-pub fn codegen_cast(typ: Type, value: Statement, kind: CastOperationKind) -> TokenStream {
-    let source_type = value.typ();
+pub fn codegen_cast(
+    typ: Type,
+    value: Ref<StatementInner>,
+    kind: CastOperationKind,
+    s_arena: &Arena<StatementInner>,
+) -> TokenStream {
+    let value = value.get(s_arena);
+    let source_type = value.typ(s_arena);
     let target_type = typ;
 
     if source_type == target_type {
-        log::warn!(
-            "attemping to cast {:?} into same type ({})",
-            value.name(),
-            target_type
-        );
+        log::warn!("attemping to cast {:?} into same type ({})", value.name(), target_type);
         return quote!(#value);
     }
 
@@ -745,31 +778,25 @@ pub fn codegen_cast(typ: Type, value: Statement, kind: CastOperationKind) -> Tok
             }
         }
 
-        (Type::Primitive(pt), Type::ArbitraryLengthInteger, CastOperationKind::ZeroExtend) => {
-            match pt.tc {
-                PrimitiveTypeClass::Void | PrimitiveTypeClass::Unit => {
-                    panic!("cannot cast from void or unit")
-                }
-                PrimitiveTypeClass::UnsignedInteger | PrimitiveTypeClass::SignedInteger => {
-                    let target = codegen_type(target_type);
-                    quote! {
-                        (#target::try_from(#value).unwrap())
-                    }
-                }
-                PrimitiveTypeClass::FloatingPoint => {
-                    let target = codegen_type(target_type);
-                    quote! {
-                        (#value as #target)
-                    }
+        (Type::Primitive(pt), Type::ArbitraryLengthInteger, CastOperationKind::ZeroExtend) => match pt.tc {
+            PrimitiveTypeClass::Void | PrimitiveTypeClass::Unit => {
+                panic!("cannot cast from void or unit")
+            }
+            PrimitiveTypeClass::UnsignedInteger | PrimitiveTypeClass::SignedInteger => {
+                let target = codegen_type(target_type);
+                quote! {
+                    (#target::try_from(#value).unwrap())
                 }
             }
-        }
+            PrimitiveTypeClass::FloatingPoint => {
+                let target = codegen_type(target_type);
+                quote! {
+                    (#value as #target)
+                }
+            }
+        },
 
-        (
-            Type::Primitive(PrimitiveType { tc, .. }),
-            Type::Primitive(_),
-            CastOperationKind::Truncate,
-        ) => {
+        (Type::Primitive(PrimitiveType { tc, .. }), Type::Primitive(_), CastOperationKind::Truncate) => {
             assert!(target_type.width_bits() < source_type.width_bits());
 
             // create mask of length target
@@ -855,11 +882,7 @@ pub fn codegen_cast(typ: Type, value: Statement, kind: CastOperationKind) -> Tok
             quote!(Bits::new(#value as u128, 128))
         }
 
-        (
-            Type::Bits,
-            Type::ArbitraryLengthInteger,
-            CastOperationKind::Convert | CastOperationKind::ZeroExtend,
-        ) => {
+        (Type::Bits, Type::ArbitraryLengthInteger, CastOperationKind::Convert | CastOperationKind::ZeroExtend) => {
             let target_type = codegen_type(target_type);
             quote!((#value.value() as #target_type))
         }
@@ -868,8 +891,7 @@ pub fn codegen_cast(typ: Type, value: Statement, kind: CastOperationKind) -> Tok
         // todo ask tom about convert vs zeroextend
         (
             Type::Primitive(PrimitiveType {
-                element_width_in_bits,
-                ..
+                element_width_in_bits, ..
             }),
             Type::Bits,
             CastOperationKind::Convert | CastOperationKind::ZeroExtend,

@@ -2,7 +2,7 @@ use {
     crate::{
         rudder::{
             constant_value::ConstantValue,
-            statement::{Statement, StatementKind},
+            statement::{StatementInner, StatementKind},
         },
         util::arena::{Arena, Ref},
     },
@@ -258,7 +258,8 @@ impl Symbol {
 #[derive(Clone, Debug)]
 pub struct Block {
     index: usize,
-    statements: Vec<Statement>,
+    statement_arena: Arena<StatementInner>,
+    statements: Vec<Ref<StatementInner>>,
 }
 
 impl Block {
@@ -277,45 +278,50 @@ impl Block {
             .iter()
             .enumerate()
             .for_each(|(statement_index, stmt)| {
-                stmt.update_names(format!("b{}_s{}", index, statement_index).into());
+                stmt.get_mut(&mut self.statement_arena)
+                    .update_names(format!("b{}_s{}", index, statement_index).into());
             });
     }
 
-    pub fn statements(&self) -> Vec<Statement> {
+    pub fn statements(&self) -> Vec<Ref<StatementInner>> {
         self.statements.clone()
     }
 
-    pub fn terminator_statement(&self) -> Option<Statement> {
+    pub fn terminator_statement(&self) -> Option<Ref<StatementInner>> {
         self.statements.last().cloned()
     }
 
-    pub fn set_statements<I: Iterator<Item = Statement>>(&mut self, statements: I) {
+    pub fn set_statements<I: Iterator<Item = Ref<StatementInner>>>(&mut self, statements: I) {
         self.statements = statements.collect();
     }
 
-    pub fn extend_statements<I: Iterator<Item = Statement>>(&mut self, stmts: I) {
+    pub fn extend_statements<I: Iterator<Item = Ref<StatementInner>>>(&mut self, stmts: I) {
         self.statements.extend(stmts)
     }
 
-    fn index_of_statement(&self, reference: &Statement) -> usize {
+    fn index_of_statement(&self, reference: Ref<StatementInner>) -> usize {
         self.statements
             .iter()
             .enumerate()
-            .find(|(_, candidate)| *candidate == reference)
+            .find(|(_, candidate)| **candidate == reference)
             .unwrap()
             .0
     }
 
-    pub fn insert_statement_before(&mut self, reference: &Statement, new: Statement) {
+    pub fn insert_statement_before(
+        &mut self,
+        reference: Ref<StatementInner>,
+        new: Ref<StatementInner>,
+    ) {
         let index = self.index_of_statement(reference);
         self.statements.insert(index, new);
     }
 
-    pub fn append_statement(&mut self, new: Statement) {
+    pub fn append_statement(&mut self, new: Ref<StatementInner>) {
         self.statements.push(new);
     }
 
-    pub fn kill_statement(&mut self, stmt: &Statement) {
+    pub fn kill_statement(&mut self, stmt: Ref<StatementInner>) {
         //assert!(Rc::ptr_eq()
 
         let index = self.index_of_statement(stmt);
@@ -324,22 +330,35 @@ impl Block {
     }
 
     pub fn targets(&self) -> Vec<Ref<Block>> {
-        match self.terminator_statement().unwrap().kind() {
-            StatementKind::Jump { target } => vec![target],
+        match self
+            .terminator_statement()
+            .unwrap()
+            .get(&self.statement_arena)
+            .kind()
+        {
+            StatementKind::Jump { target } => vec![*target],
             StatementKind::Branch {
                 true_target,
                 false_target,
                 ..
-            } => vec![true_target, false_target],
+            } => vec![*true_target, *false_target],
             StatementKind::Return { .. } | StatementKind::Panic(_) => {
                 vec![]
             }
-            _ => panic!("invalid terminator for block"),
+            k => panic!("invalid terminator for block: {k:?}"),
         }
     }
 
     pub fn size(&self) -> usize {
         self.statements().len()
+    }
+
+    pub fn arena_mut(&mut self) -> &mut Arena<StatementInner> {
+        &mut self.statement_arena
+    }
+
+    pub fn arena(&self) -> &Arena<StatementInner> {
+        &self.statement_arena
     }
 }
 
@@ -348,6 +367,7 @@ impl Default for Block {
         Self {
             index: 0,
             statements: Vec::new(),
+            statement_arena: Arena::new(),
         }
     }
 }

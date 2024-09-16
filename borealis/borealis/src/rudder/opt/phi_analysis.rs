@@ -1,6 +1,6 @@
 use {
     crate::{
-        rudder::{analysis::loopy::LoopAnalysis, Block, Function, Statement, StatementKind},
+        rudder::{analysis::loopy::LoopAnalysis, statement::StatementInner, Block, Function, StatementKind},
         util::arena::Ref,
     },
     common::{intern::InternedString, HashMap},
@@ -18,11 +18,11 @@ pub fn run(f: &mut Function) -> bool {
     // Compute dominance graph
 
     // Compute live outs
-    let mut live_outs: HashMap<Ref<Block>, HashMap<InternedString, Statement>> = HashMap::default();
+    let mut live_outs: HashMap<Ref<Block>, HashMap<InternedString, Ref<StatementInner>>> = HashMap::default();
 
     for block in f.block_iter() {
         for stmt in block.get(f.block_arena()).statements() {
-            if let StatementKind::WriteVariable { symbol, .. } = stmt.kind() {
+            if let StatementKind::WriteVariable { symbol, .. } = stmt.get(block.get(f.block_arena()).arena()).kind() {
                 live_outs
                     .entry(block)
                     .and_modify(|e| {
@@ -47,7 +47,9 @@ pub fn run(f: &mut Function) -> bool {
     for (block, writes) in live_outs {
         trace!("  block {}:", block.get(f.block_arena()).index());
         for (symbol, write) in writes {
-            trace!("    write: {} = {}", symbol, write);
+            let arena = block.get(f.block_arena()).arena();
+
+            trace!("    write: {} = {}", symbol, write.get(arena).to_string(arena));
         }
     }
 

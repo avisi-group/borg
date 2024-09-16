@@ -1,5 +1,7 @@
-use crate::rudder::Function;
-use {crate::rudder::analysis, log::trace};
+use {
+    crate::rudder::{analysis, Function},
+    log::trace,
+};
 
 pub fn run(f: &mut Function) -> bool {
     let dfa = analysis::dfa::SymbolUseAnalysis::new(f);

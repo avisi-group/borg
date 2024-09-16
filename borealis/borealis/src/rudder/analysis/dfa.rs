@@ -1,15 +1,18 @@
 use {
     crate::{
-        rudder::{statement::StatementKind, Block, Function, Statement, Symbol},
+        rudder::{
+            statement::{StatementInner, StatementKind},
+            Block, Function, Symbol,
+        },
         util::arena::{Arena, Ref},
     },
     common::{intern::InternedString, HashMap, HashSet},
 };
 
 pub struct SymbolUseAnalysis {
-    symbol_uses: HashMap<InternedString, Vec<Statement>>,
-    symbol_reads: HashMap<InternedString, Vec<Statement>>,
-    symbol_writes: HashMap<InternedString, Vec<Statement>>,
+    symbol_uses: HashMap<InternedString, Vec<(Ref<StatementInner>, Ref<Block>)>>,
+    symbol_reads: HashMap<InternedString, Vec<(Ref<StatementInner>, Ref<Block>)>>,
+    symbol_writes: HashMap<InternedString, Vec<(Ref<StatementInner>, Ref<Block>)>>,
     symbol_blocks: HashMap<InternedString, HashSet<Ref<Block>>>,
 }
 
@@ -20,53 +23,60 @@ struct SymbolUseAnalysisBuilder<'f> {
 
 impl<'f> SymbolUseAnalysisBuilder<'f> {
     fn analyse(&mut self) {
-        let uses = self
-            .f
-            .block_iter()
-            .flat_map(|b| b.get(self.f.block_arena()).statements())
-            .filter_map(|stmt| match stmt.kind() {
-                StatementKind::ReadVariable { symbol, .. }
-                | StatementKind::WriteVariable { symbol, .. } => Some((symbol, stmt)),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
+        self.f.block_iter().collect::<Vec<_>>().into_iter().for_each(|b| {
+            let block = b.get(self.f.block_arena());
 
-        uses.into_iter()
-            .for_each(|(symbol, stmt)| self.insert_use(symbol, stmt));
+            block
+                .statements()
+                .into_iter()
+                .filter_map(|stmt| match stmt.get(&block.statement_arena).kind() {
+                    StatementKind::ReadVariable { symbol, .. } | StatementKind::WriteVariable { symbol, .. } => {
+                        Some((symbol.clone(), stmt))
+                    }
+                    _ => None,
+                })
+                .for_each(|(symbol, stmt)| self.insert_use(symbol, stmt, b, &block.statement_arena));
+        });
     }
 
-    fn insert_use(&mut self, symbol: Symbol, stmt: Statement) {
+    fn insert_use(
+        &mut self,
+        symbol: Symbol,
+        stmt: Ref<StatementInner>,
+        block: Ref<Block>,
+        arena: &Arena<StatementInner>,
+    ) {
         self.inner
             .symbol_uses
             .entry(symbol.name())
-            .and_modify(|u| u.push(stmt.clone()))
-            .or_insert(vec![stmt.clone()]);
+            .and_modify(|u| u.push((stmt, block)))
+            .or_insert(vec![(stmt, block)]);
 
-        if let StatementKind::ReadVariable { .. } = stmt.kind() {
+        if let StatementKind::ReadVariable { .. } = stmt.get(arena).kind() {
             self.inner
                 .symbol_reads
                 .entry(symbol.name())
-                .and_modify(|u| u.push(stmt.clone()))
-                .or_insert(vec![stmt.clone()]);
+                .and_modify(|u| u.push((stmt, block)))
+                .or_insert(vec![(stmt, block)]);
         }
 
-        if let StatementKind::WriteVariable { .. } = stmt.kind() {
+        if let StatementKind::WriteVariable { .. } = stmt.get(arena).kind() {
             self.inner
                 .symbol_writes
                 .entry(symbol.name())
-                .and_modify(|u| u.push(stmt.clone()))
-                .or_insert(vec![stmt.clone()]);
+                .and_modify(|u| u.push((stmt, block)))
+                .or_insert(vec![(stmt, block)]);
         }
 
         self.inner
             .symbol_blocks
             .entry(symbol.name())
             .and_modify(|u| {
-                u.insert(stmt.parent_block());
+                u.insert(stmt.get(arena).parent_block());
             })
             .or_insert({
                 let mut h = HashSet::default();
-                h.insert(stmt.parent_block());
+                h.insert(stmt.get(arena).parent_block());
 
                 h
             });
@@ -101,11 +111,11 @@ impl SymbolUseAnalysis {
         self.symbol_writes.contains_key(&symbol.name())
     }
 
-    pub fn get_symbol_writes(&self, symbol: &Symbol) -> &Vec<Statement> {
+    pub fn get_symbol_writes(&self, symbol: &Symbol) -> &Vec<(Ref<StatementInner>, Ref<Block>)> {
         self.symbol_writes.get(&symbol.name()).unwrap()
     }
 
-    pub fn get_symbol_reads(&self, symbol: &Symbol) -> &Vec<Statement> {
+    pub fn get_symbol_reads(&self, symbol: &Symbol) -> &Vec<(Ref<StatementInner>, Ref<Block>)> {
         self.symbol_reads.get(&symbol.name()).unwrap()
     }
 
@@ -115,13 +125,13 @@ impl SymbolUseAnalysis {
 }
 
 pub struct StatementUseAnalysis<'a> {
-    arena: &'a Arena<Block>,
+    arena: &'a mut Arena<Block>,
     block: Ref<Block>,
-    stmt_uses: HashMap<Statement, HashSet<Statement>>,
+    stmt_uses: HashMap<Ref<StatementInner>, HashSet<Ref<StatementInner>>>,
 }
 
 impl<'a> StatementUseAnalysis<'a> {
-    pub fn new(arena: &'a Arena<Block>, b: Ref<Block>) -> Self {
+    pub fn new(arena: &'a mut Arena<Block>, b: Ref<Block>) -> Self {
         let mut celf = Self {
             arena,
             block: b,
@@ -132,76 +142,76 @@ impl<'a> StatementUseAnalysis<'a> {
         celf
     }
 
+    pub fn block_arena(&mut self) -> &mut Arena<Block> {
+        self.arena
+    }
+
     fn analyse(&mut self) {
         for stmt in self.block.get(self.arena).statements() {
-            match stmt.kind() {
+            match stmt.get(&self.block.get(&self.arena).statement_arena).kind().clone() {
                 StatementKind::WriteVariable { value, .. } => {
-                    self.add_use(&value, &stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::WriteRegister { offset, value } => {
-                    self.add_use(&offset, &stmt);
-                    self.add_use(&value, &stmt);
+                    self.add_use(offset, stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::ReadRegister { offset, .. } => {
-                    self.add_use(&offset, &stmt);
+                    self.add_use(offset, stmt);
                 }
                 StatementKind::ReadMemory { offset, size } => {
-                    self.add_use(&offset, &stmt);
-                    self.add_use(&size, &stmt);
+                    self.add_use(offset, stmt);
+                    self.add_use(size, stmt);
                 }
                 StatementKind::WriteMemory { offset, value } => {
-                    self.add_use(&offset, &stmt);
-                    self.add_use(&value, &stmt);
+                    self.add_use(offset, stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::WritePc { value } => {
-                    self.add_use(&value, &stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::BinaryOperation { lhs, rhs, .. } => {
-                    self.add_use(&lhs, &stmt);
-                    self.add_use(&rhs, &stmt);
+                    self.add_use(lhs, stmt);
+                    self.add_use(rhs, stmt);
                 }
                 StatementKind::UnaryOperation { value, .. } => {
-                    self.add_use(&value, &stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::ShiftOperation { value, amount, .. } => {
-                    self.add_use(&value, &stmt);
-                    self.add_use(&amount, &stmt);
+                    self.add_use(value, stmt);
+                    self.add_use(amount, stmt);
                 }
                 StatementKind::Call { args, .. } => {
                     for arg in args {
-                        self.add_use(&arg, &stmt);
+                        self.add_use(arg, stmt);
                     }
                 }
                 StatementKind::Cast { value, .. } => {
-                    self.add_use(&value, &stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::BitsCast { value, length, .. } => {
-                    self.add_use(&value, &stmt);
-                    self.add_use(&length, &stmt);
+                    self.add_use(value, stmt);
+                    self.add_use(length, stmt);
                 }
                 StatementKind::Branch { condition, .. } => {
-                    self.add_use(&condition, &stmt);
+                    self.add_use(condition, stmt);
                 }
                 StatementKind::Return { value } => {
-                    self.add_use(&value, &stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::Select {
                     condition,
                     true_value,
                     false_value,
                 } => {
-                    self.add_use(&condition, &stmt);
-                    self.add_use(&true_value, &stmt);
-                    self.add_use(&false_value, &stmt);
+                    self.add_use(condition, stmt);
+                    self.add_use(true_value, stmt);
+                    self.add_use(false_value, stmt);
                 }
-                StatementKind::BitExtract {
-                    value,
-                    start,
-                    length,
-                } => {
-                    self.add_use(&value, &stmt);
-                    self.add_use(&start, &stmt);
-                    self.add_use(&length, &stmt);
+                StatementKind::BitExtract { value, start, length } => {
+                    self.add_use(value, stmt);
+                    self.add_use(start, stmt);
+                    self.add_use(length, stmt);
                 }
                 StatementKind::BitInsert {
                     target,
@@ -209,41 +219,37 @@ impl<'a> StatementUseAnalysis<'a> {
                     start,
                     length,
                 } => {
-                    self.add_use(&target, &stmt);
-                    self.add_use(&source, &stmt);
-                    self.add_use(&start, &stmt);
-                    self.add_use(&length, &stmt);
+                    self.add_use(target, stmt);
+                    self.add_use(source, stmt);
+                    self.add_use(start, stmt);
+                    self.add_use(length, stmt);
                 }
                 StatementKind::ReadElement { vector, index } => {
-                    self.add_use(&vector, &stmt);
-                    self.add_use(&index, &stmt);
+                    self.add_use(vector, stmt);
+                    self.add_use(index, stmt);
                 }
-                StatementKind::AssignElement {
-                    vector,
-                    value,
-                    index,
-                } => {
-                    self.add_use(&vector, &stmt);
-                    self.add_use(&value, &stmt);
-                    self.add_use(&index, &stmt);
+                StatementKind::AssignElement { vector, value, index } => {
+                    self.add_use(vector, stmt);
+                    self.add_use(value, stmt);
+                    self.add_use(index, stmt);
                 }
                 StatementKind::Assert { condition } => {
-                    self.add_use(&condition, &stmt);
+                    self.add_use(condition, stmt);
                 }
                 StatementKind::Panic(value) => {
-                    self.add_use(&value, &stmt);
+                    self.add_use(value, stmt);
                 }
                 StatementKind::CreateBits { value, length } => {
-                    self.add_use(&value, &stmt);
-                    self.add_use(&length, &stmt);
+                    self.add_use(value, stmt);
+                    self.add_use(length, stmt);
                 }
 
                 StatementKind::SizeOf { value } => {
-                    self.add_use(&value, &stmt);
+                    self.add_use(value, stmt);
                 }
 
-                StatementKind::MatchesUnion { value, .. } => self.add_use(&value, &stmt),
-                StatementKind::UnwrapUnion { value, .. } => self.add_use(&value, &stmt),
+                StatementKind::MatchesUnion { value, .. } => self.add_use(value, stmt),
+                StatementKind::UnwrapUnion { value, .. } => self.add_use(value, stmt),
 
                 StatementKind::ReadVariable { .. }
                 | StatementKind::ReadPc
@@ -251,18 +257,16 @@ impl<'a> StatementUseAnalysis<'a> {
                 | StatementKind::PhiNode { .. }
                 | StatementKind::Constant { .. }
                 | StatementKind::Undefined => {}
-                StatementKind::TupleAccess { source, .. } => self.add_use(&source, &stmt),
+                StatementKind::TupleAccess { source, .. } => self.add_use(source, stmt),
                 StatementKind::GetFlag { operation, .. } => {
-                    self.add_use(&operation, &stmt);
+                    self.add_use(operation, stmt);
                 }
-                StatementKind::CreateTuple(values) => {
-                    values.iter().for_each(|v| self.add_use(v, &stmt))
-                }
+                StatementKind::CreateTuple(values) => values.into_iter().for_each(|v| self.add_use(v, stmt)),
             }
         }
     }
 
-    fn add_use(&mut self, stmt: &Statement, use_: &Statement) {
+    fn add_use(&mut self, stmt: Ref<StatementInner>, use_: Ref<StatementInner>) {
         self.stmt_uses
             .entry(stmt.clone())
             .and_modify(|uses| {
@@ -275,22 +279,29 @@ impl<'a> StatementUseAnalysis<'a> {
             });
     }
 
-    pub fn is_dead(&self, stmt: &Statement) -> bool {
-        !stmt.has_side_effects() && !self.has_uses(stmt)
+    pub fn is_dead(&self, stmt: Ref<StatementInner>) -> bool {
+        !stmt
+            .get(&self.block.get(&self.arena).statement_arena)
+            .has_side_effects()
+            && !self.has_uses(stmt)
     }
 
-    pub fn has_uses(&self, stmt: &Statement) -> bool {
-        self.stmt_uses.contains_key(stmt)
+    pub fn has_uses(&self, stmt: Ref<StatementInner>) -> bool {
+        self.stmt_uses.contains_key(&stmt)
     }
 
-    pub fn get_uses(&self, stmt: &Statement) -> &HashSet<Statement> {
-        self.stmt_uses.get(stmt).unwrap()
+    pub fn get_uses(&self, stmt: Ref<StatementInner>) -> &HashSet<Ref<StatementInner>> {
+        self.stmt_uses.get(&stmt).unwrap()
     }
 
-    pub fn is_used_in_write_var(&self, stmt: &Statement) -> bool {
-        if let Some(uses) = self.stmt_uses.get(stmt) {
-            uses.iter()
-                .any(|u| matches!(u.kind(), StatementKind::WriteVariable { .. }))
+    pub fn is_used_in_write_var(&self, stmt: Ref<StatementInner>) -> bool {
+        if let Some(uses) = self.stmt_uses.get(&stmt) {
+            uses.iter().any(|u| {
+                matches!(
+                    u.get(&self.block.get(&self.arena).statement_arena).kind(),
+                    StatementKind::WriteVariable { .. }
+                )
+            })
         } else {
             false
         }

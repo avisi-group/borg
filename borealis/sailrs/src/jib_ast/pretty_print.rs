@@ -3,8 +3,8 @@
 use {
     crate::{
         jib_ast::{
-            visitor::Visitor, CReturn, Definition, DefinitionAux, Expression, Instruction,
-            InstructionAux, Name, Type, TypeDefinition, Value,
+            visitor::Visitor, CReturn, Definition, DefinitionAux, Expression, Instruction, InstructionAux, Name, Type,
+            TypeDefinition, Value,
         },
         sail_ast::Identifier,
     },
@@ -163,12 +163,11 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
                 writeln!(self.writer, "}}").unwrap();
             }
             DefinitionAux::Val(id, ext, typs, typ) => {
-                let keyword =
-                    if let Some(true) = ext.map(|ext| self.abstract_functions.contains(&ext)) {
-                        "abstract"
-                    } else {
-                        "val"
-                    };
+                let keyword = if let Some(true) = ext.map(|ext| self.abstract_functions.contains(&ext)) {
+                    "abstract"
+                } else {
+                    "val"
+                };
 
                 self.prindent(format!("{keyword} {} : (", id.as_interned()));
 
@@ -447,12 +446,8 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
             }
 
             Type::Enum(ident, _) => write!(self.writer, "enum {}", ident.as_interned()).unwrap(),
-            Type::Struct(ident, _) => {
-                write!(self.writer, "struct {}", ident.as_interned()).unwrap()
-            }
-            Type::Variant(ident, _) => {
-                write!(self.writer, "union {}", ident.as_interned()).unwrap()
-            }
+            Type::Struct(ident, _) => write!(self.writer, "struct {}", ident.as_interned()).unwrap(),
+            Type::Variant(ident, _) => write!(self.writer, "union {}", ident.as_interned()).unwrap(),
 
             Type::Vector(typ) => {
                 write!(self.writer, "%vec<").unwrap();

@@ -77,9 +77,7 @@ impl ControlFlowBlock {
                 let res = {
                     let borrow = statement.get();
                     match &*borrow {
-                        Statement::Copy { expression, value } => {
-                            Some((expression.clone(), value.clone()))
-                        }
+                        Statement::Copy { expression, value } => Some((expression.clone(), value.clone())),
                         _ => None,
                     }
                 };
@@ -151,20 +149,15 @@ impl ControlFlowBlock {
 /// once to find rejoining block
 ///
 /// :(
-pub fn find_common_block(
-    left: ControlFlowBlock,
-    right: ControlFlowBlock,
-) -> Option<ControlFlowBlock> {
+pub fn find_common_block(left: ControlFlowBlock, right: ControlFlowBlock) -> Option<ControlFlowBlock> {
     log::trace!("finding common block of {left} and {right}");
 
     let left_path = walk(left);
     let right_path = walk(right);
 
-    let result = left_path.into_iter().find(|left_block| {
-        right_path
-            .iter()
-            .any(|right_block| left_block.id() == right_block.id())
-    });
+    let result = left_path
+        .into_iter()
+        .find(|left_block| right_path.iter().any(|right_block| left_block.id() == right_block.id()));
 
     if let Some(common) = &result {
         log::trace!("found common block {}", common);

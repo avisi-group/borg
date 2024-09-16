@@ -32,13 +32,10 @@ impl ModelConfig {
 
         let file = fs::File::open(config_path).map_err(PathCtx::f(config_path))?;
 
-        let mut config =
-            serde_json::from_reader::<_, ModelConfig>(file).map_err(PathCtx::f(config_path))?;
+        let mut config = serde_json::from_reader::<_, ModelConfig>(file).map_err(PathCtx::f(config_path))?;
 
         // directory that config file is in
-        let config_dir = (config_path)
-            .parent()
-            .ok_or(Error::NoParent(config_path.to_owned()))?;
+        let config_dir = (config_path).parent().ok_or(Error::NoParent(config_path.to_owned()))?;
 
         // if a path is not absolute, prepend the directory the config file is in to
         // each

@@ -129,9 +129,8 @@ impl From<&ocaml::CamlError> for OCamlErrorInner {
             CamlError::SysBlockedIo => Self::SysBlockedIo,
             CamlError::Exception(v) => {
                 // unsafe if `from` is called outside of the worker thread
-                let msg = unsafe { v.exception_to_string() }.unwrap_or_else(|e| {
-                    format!("Failed to convert exception to string due to UTF-8 error: {e}",)
-                });
+                let msg = unsafe { v.exception_to_string() }
+                    .unwrap_or_else(|e| format!("Failed to convert exception to string due to UTF-8 error: {e}",));
 
                 Self::Exception(msg)
             }
