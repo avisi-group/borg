@@ -6,24 +6,23 @@ use crate::{
 pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
-    for block in f.block_iter() {
+    for block in f.block_iter().collect::<Vec<_>>().into_iter() {
         changed |= run_on_block(f, block);
     }
 
     changed
 }
 
-fn target_for_threadable(f: &Function, target: Ref<Block>) -> Option<Ref<Block>> {
-    if target.get(f.block_arena()).size() == 1 {
-        if let StatementKind::Jump {
-            target: target_target,
-        } = target
-            .get(f.block_arena())
+fn target_for_threadable(f: &Function, block_ref: Ref<Block>) -> Option<Ref<Block>> {
+    let block = block_ref.get(f.block_arena());
+    if block.size() == 1 {
+        if let StatementKind::Jump { target } = block
             .terminator_statement()
             .unwrap()
+            .get(&block.statement_arena)
             .kind()
         {
-            Some(target_target)
+            Some(*target)
         } else {
             None
         }
@@ -32,13 +31,16 @@ fn target_for_threadable(f: &Function, target: Ref<Block>) -> Option<Ref<Block>>
     }
 }
 
-fn run_on_block(f: &Function, block: Ref<Block>) -> bool {
-    let terminator = block.get(f.block_arena()).terminator_statement().unwrap();
+fn run_on_block(f: &mut Function, block_ref: Ref<Block>) -> bool {
+    let block = block_ref.get(f.block_arena());
+    let terminator_ref = block.terminator_statement().unwrap();
 
-    match terminator.kind() {
+    match terminator_ref.get(&block.statement_arena).kind().clone() {
         StatementKind::Jump { target } => {
             if let Some(thread_to) = target_for_threadable(f, target) {
-                terminator.replace_kind(StatementKind::Jump { target: thread_to });
+                terminator_ref
+                    .get_mut(&mut block_ref.get_mut(f.block_arena_mut()).statement_arena)
+                    .replace_kind(StatementKind::Jump { target: thread_to });
                 true
             } else {
                 false
@@ -67,11 +69,13 @@ fn run_on_block(f: &Function, block: Ref<Block>) -> bool {
             };
 
             if changed {
-                terminator.replace_kind(StatementKind::Branch {
-                    condition,
-                    true_target,
-                    false_target,
-                });
+                terminator_ref
+                    .get_mut(&mut block_ref.get_mut(f.block_arena_mut()).statement_arena)
+                    .replace_kind(StatementKind::Branch {
+                        condition,
+                        true_target,
+                        false_target,
+                    });
             }
 
             changed

@@ -1,17 +1,18 @@
 use {
     crate::{
         rudder::{
-            constant_value::ConstantValue, Block, Function, PrimitiveType, PrimitiveTypeClass,
-            Symbol, Type,
+            constant_value::ConstantValue, Block, Function, Model, PrimitiveType,
+            PrimitiveTypeClass, Symbol, Type,
         },
-        util::arena::Ref,
+        util::arena::{Arena, Ref},
     },
     common::{intern::InternedString, shared::Shared},
+    itertools::Itertools,
     proc_macro2::TokenStream,
     quote::{format_ident, ToTokens, TokenStreamExt},
     std::{
         cmp::Ordering,
-        fmt::Debug,
+        fmt::{Debug, Formatter, Write},
         hash::{Hash, Hasher},
     },
 };
@@ -84,7 +85,7 @@ pub enum StatementKind {
 
     WriteVariable {
         symbol: Symbol,
-        value: Statement,
+        value: Ref<StatementInner>,
     },
 
     ReadRegister {
@@ -93,7 +94,7 @@ pub enum StatementKind {
         ///
         /// During building, this should just be the `next_register_offset`
         /// value, not accessing any elements or fields
-        offset: Statement,
+        offset: Ref<StatementInner>,
     },
 
     WriteRegister {
@@ -101,142 +102,142 @@ pub enum StatementKind {
         ///
         /// During building, this should just be the `next_register_offset`
         /// value, not accessing any elements or fields
-        offset: Statement,
-        value: Statement,
+        offset: Ref<StatementInner>,
+        value: Ref<StatementInner>,
     },
 
     ReadMemory {
-        offset: Statement,
-        size: Statement,
+        offset: Ref<StatementInner>,
+        size: Ref<StatementInner>,
     },
     WriteMemory {
-        offset: Statement,
-        value: Statement,
+        offset: Ref<StatementInner>,
+        value: Ref<StatementInner>,
     },
 
     ReadPc,
     WritePc {
-        value: Statement,
+        value: Ref<StatementInner>,
     },
 
     GetFlag {
         flag: Flag,
-        operation: Statement,
+        operation: Ref<StatementInner>,
     },
 
     UnaryOperation {
         kind: UnaryOperationKind,
-        value: Statement,
+        value: Ref<StatementInner>,
     },
     BinaryOperation {
         kind: BinaryOperationKind,
-        lhs: Statement,
-        rhs: Statement,
+        lhs: Ref<StatementInner>,
+        rhs: Ref<StatementInner>,
     },
     ShiftOperation {
         kind: ShiftOperationKind,
-        value: Statement,
-        amount: Statement,
+        value: Ref<StatementInner>,
+        amount: Ref<StatementInner>,
     },
     Call {
         target: InternedString, // todo: ref<function>
-        args: Vec<Statement>,
+        args: Vec<Ref<StatementInner>>,
     },
     Cast {
         kind: CastOperationKind,
         typ: Type,
-        value: Statement,
+        value: Ref<StatementInner>,
     },
     BitsCast {
         kind: CastOperationKind,
         typ: Type,
-        value: Statement,
-        length: Statement,
+        value: Ref<StatementInner>,
+        length: Ref<StatementInner>,
     },
     Jump {
         target: Ref<Block>,
     },
     Branch {
-        condition: Statement,
+        condition: Ref<StatementInner>,
         true_target: Ref<Block>,
         false_target: Ref<Block>,
     },
     PhiNode {
-        members: Vec<(Ref<Block>, Statement)>,
+        members: Vec<(Ref<Block>, Ref<StatementInner>)>,
     },
     Return {
-        value: Statement,
+        value: Ref<StatementInner>,
     },
     Select {
-        condition: Statement,
-        true_value: Statement,
-        false_value: Statement,
+        condition: Ref<StatementInner>,
+        true_value: Ref<StatementInner>,
+        false_value: Ref<StatementInner>,
     },
     BitExtract {
-        value: Statement,
-        start: Statement,
-        length: Statement,
+        value: Ref<StatementInner>,
+        start: Ref<StatementInner>,
+        length: Ref<StatementInner>,
     },
     BitInsert {
         /// Target data that `length` bits of `source` will be inserted into at
         /// position `start`
-        target: Statement,
+        target: Ref<StatementInner>,
         /// Source bits that will be inserted into target
-        source: Statement,
+        source: Ref<StatementInner>,
         /// Offset into `target` that `source` will be inserted
-        start: Statement,
+        start: Ref<StatementInner>,
         /// Length of `source` that will be inserted
-        length: Statement,
+        length: Ref<StatementInner>,
     },
     ReadElement {
-        vector: Statement,
-        index: Statement,
+        vector: Ref<StatementInner>,
+        index: Ref<StatementInner>,
     },
     /// Returns the vector with the mutated element
     AssignElement {
-        vector: Statement,
-        value: Statement,
-        index: Statement,
+        vector: Ref<StatementInner>,
+        value: Ref<StatementInner>,
+        index: Ref<StatementInner>,
     },
 
-    /// Fatal error, printing value of supplied statement for debugging
+    /// Fatal error, printing value of supplied Ref<StatementInner> for debugging
     /// purposes
-    Panic(Statement),
+    Panic(Ref<StatementInner>),
 
     /// `Default::default()`, or uninitialized, or ???
     Undefined,
 
     Assert {
-        condition: Statement,
+        condition: Ref<StatementInner>,
     },
 
     CreateBits {
-        value: Statement,
-        length: Statement,
+        value: Ref<StatementInner>,
+        length: Ref<StatementInner>,
     },
 
     // creating bits and getting the value done through casting
     // gets the length when applied to bits
     SizeOf {
-        value: Statement,
+        value: Ref<StatementInner>,
     },
 
     /// Tests whether an instance of a union is of a given variant
     MatchesUnion {
-        value: Statement,
+        value: Ref<StatementInner>,
         variant: InternedString,
     },
 
     /// Extracts the contents of a variant of a union
     UnwrapUnion {
-        value: Statement,
+        value: Ref<StatementInner>,
         variant: InternedString,
     },
 
-    CreateTuple(Vec<Statement>),
+    CreateTuple(Vec<Ref<StatementInner>>),
     TupleAccess {
         index: usize,
-        source: Statement,
+        source: Ref<StatementInner>,
     },
 }
 
@@ -249,7 +250,7 @@ pub enum Flag {
 }
 
 impl StatementKind {
-    fn children(&self) -> Vec<Statement> {
+    fn children(&self) -> Vec<Ref<StatementInner>> {
         match self {
             StatementKind::Constant { .. }
             | StatementKind::Jump { .. }
@@ -329,73 +330,346 @@ impl StatementKind {
             StatementKind::CreateTuple(values) => values.clone(),
         }
     }
+
+    pub fn to_string(&self, arena: &Arena<StatementInner>) -> InternedString {
+        match &self {
+            StatementKind::Constant { typ, value } => format!("const #{} : {}", value, typ),
+            StatementKind::ReadVariable { symbol } => {
+                format!("read-var {}:{}", symbol.name(), symbol.typ())
+            }
+            StatementKind::WriteVariable { symbol, value } => {
+                format!(
+                    "write-var {}:{} <= {}:{}",
+                    symbol.name(),
+                    symbol.typ(),
+                    value.get(arena).name(),
+                    value.get(arena).typ(arena)
+                )
+            }
+            StatementKind::ReadRegister { typ, offset } => {
+                format!("read-reg {}:{}", offset.get(arena).name(), typ)
+            }
+            StatementKind::WriteRegister { offset, value } => {
+                format!(
+                    "write-reg {} <= {}",
+                    offset.get(arena).name(),
+                    value.get(arena).name()
+                )
+            }
+            StatementKind::ReadMemory { offset, size } => {
+                format!(
+                    "read-mem {}:{}",
+                    offset.get(arena).name(),
+                    size.get(arena).name()
+                )
+            }
+            StatementKind::WriteMemory { offset, value } => {
+                format!(
+                    "write-mem {} <= {}",
+                    offset.get(arena).name(),
+                    value.get(arena).name()
+                )
+            }
+            StatementKind::BinaryOperation { kind, lhs, rhs } => {
+                let op = match kind {
+                    BinaryOperationKind::Add => "add",
+                    BinaryOperationKind::Sub => "sub",
+                    BinaryOperationKind::Multiply => "mul",
+                    BinaryOperationKind::Divide => "div",
+                    BinaryOperationKind::Modulo => "mod",
+                    BinaryOperationKind::CompareEqual => "cmp-eq",
+                    BinaryOperationKind::CompareNotEqual => "cmp-ne",
+                    BinaryOperationKind::CompareLessThan => "cmp-lt",
+                    BinaryOperationKind::CompareLessThanOrEqual => "cmp-le",
+                    BinaryOperationKind::CompareGreaterThan => "cmp-gt",
+                    BinaryOperationKind::CompareGreaterThanOrEqual => "cmp-ge",
+                    BinaryOperationKind::And => "and",
+                    BinaryOperationKind::Or => "or",
+                    BinaryOperationKind::Xor => "xor",
+                    BinaryOperationKind::PowI => "powi",
+                };
+
+                format!("{} {} {}", op, lhs.get(arena).name(), rhs.get(arena).name())
+            }
+            StatementKind::UnaryOperation { kind, value } => {
+                let op = match kind {
+                    UnaryOperationKind::Complement => "cmpl",
+                    UnaryOperationKind::Not => "not",
+                    UnaryOperationKind::Negate => "neg",
+                    UnaryOperationKind::Power2 => "pow2",
+                    UnaryOperationKind::Absolute => "abs",
+                    UnaryOperationKind::Ceil => "ceil",
+                    UnaryOperationKind::Floor => "floor",
+                    UnaryOperationKind::SquareRoot => "sqrt",
+                };
+
+                format!("{} {}", op, value.get(arena).name())
+            }
+
+            StatementKind::ShiftOperation {
+                kind,
+                value,
+                amount,
+            } => {
+                let op = match kind {
+                    ShiftOperationKind::LogicalShiftLeft => "lsl",
+                    ShiftOperationKind::LogicalShiftRight => "lsr",
+                    ShiftOperationKind::ArithmeticShiftRight => "asr",
+                    ShiftOperationKind::RotateRight => "ror",
+                    ShiftOperationKind::RotateLeft => "rol",
+                };
+
+                format!(
+                    "{} {} {}",
+                    op,
+                    value.get(arena).name(),
+                    amount.get(arena).name()
+                )
+            }
+            StatementKind::Call { target, args } => {
+                format!(
+                    "call {}({})",
+                    target,
+                    args.iter().map(|s| s.get(arena).name()).join(", ")
+                )
+            }
+            StatementKind::Cast { kind, typ, value } => {
+                let op = match kind {
+                    CastOperationKind::ZeroExtend => "zx",
+                    CastOperationKind::SignExtend => "sx",
+                    CastOperationKind::Truncate => "trunc",
+                    CastOperationKind::Reinterpret => "reint",
+                    CastOperationKind::Convert => "cvt",
+                    CastOperationKind::Broadcast => "bcast",
+                };
+
+                format!("cast {} {} -> {}", op, value.get(arena).name(), typ)
+            }
+            StatementKind::BitsCast {
+                kind,
+                typ,
+                value,
+                length,
+            } => {
+                let op = match kind {
+                    CastOperationKind::ZeroExtend => "zx",
+                    CastOperationKind::SignExtend => "sx",
+                    CastOperationKind::Truncate => "trunc",
+                    CastOperationKind::Reinterpret => "reint",
+                    CastOperationKind::Convert => "cvt",
+                    CastOperationKind::Broadcast => "bcast",
+                };
+
+                format!(
+                    "bits-cast {} {} -> {} length {}",
+                    op,
+                    value.get(arena).name(),
+                    typ,
+                    length.get(arena).name()
+                )
+            }
+            StatementKind::Jump { target } => format!("jump block{:?}", target), // removed .index
+            StatementKind::Branch {
+                condition,
+                true_target,
+                false_target,
+            } => {
+                format!(
+                    "branch {} block{:?} block{:?}", // removed .index
+                    condition.get(arena).name(),
+                    true_target,
+                    false_target,
+                )
+            }
+            StatementKind::PhiNode { members } => {
+                // format!( "phi ")?;
+
+                // for member in members {
+                //     format!( "(BLOCK, {}) ", member.1)?;
+                // }
+
+                // Ok(())
+                todo!()
+            }
+
+            StatementKind::Return { value } => {
+                format!("return {}", value.get(arena).name())
+            }
+            StatementKind::Select {
+                condition,
+                true_value,
+                false_value,
+            } => {
+                format!(
+                    "select {} {} {}",
+                    condition.get(arena).name(),
+                    true_value.get(arena).name(),
+                    false_value.get(arena).name()
+                )
+            }
+            StatementKind::Panic(statement) => {
+                format!("panic {}", statement.get(arena).name())
+            }
+            StatementKind::Undefined => format!("undefined",),
+
+            StatementKind::ReadPc => format!("read-pc"),
+            StatementKind::WritePc { value } => format!("write-pc {}", value.get(arena).name()),
+            StatementKind::BitExtract {
+                value,
+                start,
+                length,
+            } => format!(
+                "bit-extract {} {} {}",
+                value.get(arena).name(),
+                start.get(arena).name(),
+                length.get(arena).name()
+            ),
+            StatementKind::BitInsert {
+                target: original_value,
+                source: insert_value,
+                start,
+                length,
+            } => format!(
+                "bit-insert {} {} {} {}",
+                original_value.get(arena).name(),
+                insert_value.get(arena).name(),
+                start.get(arena).name(),
+                length.get(arena).name()
+            ),
+            StatementKind::ReadElement { vector, index } => {
+                format!(
+                    "read-element {}[{}]",
+                    vector.get(arena).name(),
+                    index.get(arena).name()
+                )
+            }
+            StatementKind::AssignElement {
+                vector,
+                value,
+                index,
+            } => format!(
+                "mutate-element {}[{}] <= {}",
+                vector.get(arena).name(),
+                index.get(arena).name(),
+                value.get(arena).name()
+            ),
+
+            StatementKind::SizeOf { value } => {
+                format!("size-of {}", value.get(arena).name())
+            }
+            StatementKind::Assert { condition } => {
+                format!("assert {}", condition.get(arena).name())
+            }
+
+            StatementKind::CreateBits { value, length } => {
+                format!(
+                    "create-bits {} {}",
+                    value.get(arena).name(),
+                    length.get(arena).name()
+                )
+            }
+            StatementKind::MatchesUnion { value, variant } => {
+                format!("matches-union {} {variant}", value.get(arena).name())
+            }
+            StatementKind::UnwrapUnion { value, variant } => {
+                format!("unwrap-union {} {variant}", value.get(arena).name())
+            }
+            StatementKind::TupleAccess { index, source } => {
+                format!("tuple-access {}.{index}", source.get(arena).name())
+            }
+            StatementKind::GetFlag { flag, operation } => {
+                format!("get-flag {flag:?} {}", operation.get(arena).name())
+            }
+            StatementKind::CreateTuple(values) => {
+                format!(
+                    "create-tuple {:?}",
+                    values
+                        .iter()
+                        .map(|v| v.get(arena).name())
+                        .collect::<Vec<_>>()
+                )
+            }
+        }
+        .into()
+    }
 }
 
 #[derive(Debug, Clone)]
-pub struct Statement {
-    inner: Shared<StatementInner>,
-}
-
-impl Hash for Statement {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        core::ptr::hash(self.inner.as_ptr(), state)
-    }
-}
-
-impl PartialEq for Statement {
-    fn eq(&self, other: &Self) -> bool {
-        Shared::ptr_eq(&self.inner, &other.inner)
-    }
-}
-
-impl Eq for Statement {}
-
-impl ToTokens for Statement {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix this?
-    }
-}
-
-#[derive(Debug)]
 pub struct StatementInner {
     name: InternedString,
     kind: StatementKind,
     parent: Ref<Block>,
 }
+impl ToTokens for StatementInner {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix this?
+    }
+}
 
-impl Statement {
-    pub fn kind(&self) -> StatementKind {
-        self.inner.get().kind.clone()
+// impl Statement {
+
+//     pub fn replace_kind(&self, kind: StatementKind) {
+//         let mut inner = self.inner.get_mut();
+//         inner.replace_kind(kind);
+//     }
+
+//     pub fn replace_use(&self, use_of: Statement, with: Statement) {
+//         let mut inner = self.inner.get_mut();
+//         inner.replace_use(use_of, with);
+//     }
+
+//     pub fn update_names(&self, name: InternedString) {
+//         self.inner.get_mut().update_names(name);
+//     }
+
+//     pub fn typ(&self) -> Type {
+
+//     }
+
+// }
+
+impl StatementInner {
+    pub fn to_string(&self, arena: &Arena<StatementInner>) -> InternedString {
+        format!("{}: {}", self.name(), self.kind().to_string(arena)).into()
     }
 
-    pub fn replace_kind(&self, kind: StatementKind) {
-        let mut inner = self.inner.get_mut();
-        inner.replace_kind(kind);
+    pub fn kind(&self) -> &StatementKind {
+        &self.kind
     }
-
-    pub fn replace_use(&self, use_of: Statement, with: Statement) {
-        let mut inner = self.inner.get_mut();
-        inner.replace_use(use_of, with);
-    }
-
     pub fn name(&self) -> InternedString {
-        self.inner.get().name
+        self.name
     }
 
     pub fn parent_block(&self) -> Ref<Block> {
-        self.inner.get().parent.clone()
+        self.parent
     }
 
-    pub fn update_names(&self, name: InternedString) {
-        self.inner.get_mut().update_names(name);
+    //     pub fn has_value(&self) -> bool {
+    //     !self.typ().is_void()
+    // }
+
+    pub fn has_side_effects(&self) -> bool {
+        matches!(
+            self.kind(),
+            StatementKind::WriteVariable { .. }
+                | StatementKind::WriteRegister { .. }
+                | StatementKind::WriteMemory { .. }
+                | StatementKind::WritePc { .. }
+                | StatementKind::Call { .. }
+                | StatementKind::Jump { .. }
+                | StatementKind::Branch { .. }
+                | StatementKind::Return { .. }
+                | StatementKind::Panic(_)
+                | StatementKind::Assert { .. }
+        )
     }
 
-    pub fn typ(&self) -> Type {
-        match self.kind() {
-            StatementKind::Constant { typ, .. } => typ,
+    pub fn typ(&self, arena: &Arena<StatementInner>) -> Type {
+        match &self.kind {
+            StatementKind::Constant { typ, .. } => typ.clone(),
             StatementKind::ReadVariable { symbol } => symbol.typ(),
             StatementKind::WriteVariable { .. } => Type::void(),
-            StatementKind::ReadRegister { typ, .. } => typ,
+            StatementKind::ReadRegister { typ, .. } => typ.clone(),
             StatementKind::WriteRegister { .. } => Type::unit(),
             StatementKind::ReadMemory { .. } => Type::Bits,
             StatementKind::WriteMemory { .. } => Type::unit(),
@@ -423,31 +697,31 @@ impl Statement {
                 kind: BinaryOperationKind::CompareLessThan,
                 ..
             } => Type::u1(),
-            StatementKind::BinaryOperation { lhs, .. } => lhs.typ(),
-            StatementKind::UnaryOperation { value, .. } => value.typ(),
-            StatementKind::ShiftOperation { value, .. } => value.typ(),
-            StatementKind::Call { target, .. } => Type::unit(),
-            StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ,
+            StatementKind::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
+            StatementKind::UnaryOperation { value, .. } => value.get(arena).typ(arena),
+            StatementKind::ShiftOperation { value, .. } => value.get(arena).typ(arena),
+            StatementKind::Call { target, .. } => todo!(),
+            StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ.clone(),
             StatementKind::Jump { .. } => Type::void(),
             StatementKind::Branch { .. } => Type::void(),
             StatementKind::PhiNode { members } => members
                 .first()
-                .map(|(_, stmt)| stmt.typ())
+                .map(|(_, stmt)| stmt.get(arena).typ(arena))
                 .unwrap_or_else(|| (Type::void())),
             StatementKind::Return { .. } => Type::void(),
-            StatementKind::Select { true_value, .. } => true_value.typ(),
+            StatementKind::Select { true_value, .. } => true_value.get(arena).typ(arena),
             StatementKind::Panic(_) => Type::void(),
 
             StatementKind::ReadPc => Type::u64(),
             StatementKind::WritePc { .. } => Type::void(),
             // todo: this is a simplification, be more precise about lengths?
-            StatementKind::BitExtract { value, .. } => value.typ(),
+            StatementKind::BitExtract { value, .. } => value.get(arena).typ(arena),
             StatementKind::BitInsert {
                 target: original_value,
                 ..
-            } => original_value.typ(),
+            } => original_value.get(arena).typ(arena),
             StatementKind::ReadElement { vector, .. } => {
-                let Type::Vector { element_type, .. } = &vector.typ() else {
+                let Type::Vector { element_type, .. } = &vector.get(arena).typ(arena) else {
                     panic!("cannot read field of non-composite type")
                 };
 
@@ -455,7 +729,7 @@ impl Statement {
             }
             StatementKind::AssignElement { vector, .. } => {
                 // get type of the vector and return it
-                vector.typ()
+                vector.get(arena).typ(arena)
             }
 
             StatementKind::SizeOf { .. } => Type::u16(),
@@ -463,7 +737,7 @@ impl Statement {
             StatementKind::CreateBits { .. } => Type::Bits,
             StatementKind::MatchesUnion { .. } => Type::u1(),
             StatementKind::UnwrapUnion { value, variant } => {
-                // let Type::Enum(variants) = &*value.typ() else {
+                // let Type::Enum(variants) = &*value.get(arena).typ(arena) else {
                 //     panic!("cannot unwrap non sum type");
                 // };
 
@@ -478,42 +752,20 @@ impl Statement {
 
             StatementKind::Undefined => Type::Any,
             StatementKind::TupleAccess { index, source } => {
-                let Type::Tuple(ts) = &source.typ() else {
+                let Type::Tuple(ts) = &source.get(arena).typ(arena) else {
                     panic!();
                 };
 
-                ts[index].clone()
+                ts[*index].clone()
             }
 
             StatementKind::GetFlag { .. } => Type::u1(),
             StatementKind::CreateTuple(values) => {
-                Type::Tuple(values.iter().map(|v| v.typ()).collect())
+                Type::Tuple(values.iter().map(|v| v.get(arena).typ(arena)).collect())
             }
         }
     }
 
-    pub fn has_value(&self) -> bool {
-        !self.typ().is_void()
-    }
-
-    pub fn has_side_effects(&self) -> bool {
-        matches!(
-            self.kind(),
-            StatementKind::WriteVariable { .. }
-                | StatementKind::WriteRegister { .. }
-                | StatementKind::WriteMemory { .. }
-                | StatementKind::WritePc { .. }
-                | StatementKind::Call { .. }
-                | StatementKind::Jump { .. }
-                | StatementKind::Branch { .. }
-                | StatementKind::Return { .. }
-                | StatementKind::Panic(_)
-                | StatementKind::Assert { .. }
-        )
-    }
-}
-
-impl StatementInner {
     pub fn update_names(&mut self, name: InternedString) {
         self.name = name;
     }
@@ -522,7 +774,7 @@ impl StatementInner {
         self.kind = kind;
     }
 
-    pub fn replace_use(&mut self, use_of: Statement, with: Statement) {
+    pub fn replace_use(&mut self, use_of: Ref<StatementInner>, with: Ref<StatementInner>) {
         match self.kind.clone() {
             StatementKind::Return { value } => {
                 let value = if value == use_of {
@@ -942,7 +1194,7 @@ impl StatementInner {
 }
 
 pub struct StatementBuilder {
-    statements: Vec<Statement>,
+    statements: Vec<Ref<StatementInner>>,
     parent: Ref<Block>,
 }
 
@@ -957,199 +1209,206 @@ impl StatementBuilder {
 
     /// Builds a new `Statement` from a `StatementKind`, adds it to the builder,
     /// and returns it
-    pub fn build(&mut self, kind: StatementKind) -> Statement {
-        let statement = Statement {
-            inner: Shared::new(StatementInner {
-                name: "???".into(),
-                kind,
-                parent: self.parent.clone(),
-            }),
-        };
+    pub fn build(&mut self, kind: StatementKind) -> Ref<StatementInner> {
+        // let statement =  Ref<StatementInner> {
+        //     inner: Shared::new(StatementInner {
+        //         name: "???".into(),
+        //         kind,
+        //         parent: self.parent.clone(),
+        //     }),
+        // };
+        // let statement = todo!();
 
-        self.statements.push(statement.clone());
+        // self.statements.push(statement.clone());
 
-        statement
+        // statement
+        todo!()
     }
 
     /// Consumes a `StatementBuilder` and returns it's statements
-    pub fn finish(self) -> Vec<Statement> {
+    pub fn finish(self) -> Vec<Ref<StatementInner>> {
         self.statements
     }
 
     // No-op if same type
-    pub fn generate_cast(&mut self, source: Statement, destination_type: Type) -> Statement {
-        if source.typ() == destination_type {
-            return source;
-        }
+    pub fn generate_cast(
+        &mut self,
+        source: Ref<StatementInner>,
+        destination_type: Type,
+    ) -> Ref<StatementInner> {
+        // if source.typ(self.parent.get(arena)) == destination_type {
+        //     return source;
+        // }
 
-        match (&source.typ(), &destination_type) {
-            // both primitives, do a cast
-            (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
-                // compare widths
-                match source_primitive.width().cmp(&dest_primitive.width()) {
-                    // source is larger than destination
-                    Ordering::Greater => self.build(StatementKind::Cast {
-                        kind: CastOperationKind::Truncate,
-                        typ: destination_type,
-                        value: source,
-                    }),
+        // match (&source.typ(), &destination_type) {
+        //     // both primitives, do a cast
+        //     (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
+        //         // compare widths
+        //         match source_primitive.width().cmp(&dest_primitive.width()) {
+        //             // source is larger than destination
+        //             Ordering::Greater => self.build(StatementKind::Cast {
+        //                 kind: CastOperationKind::Truncate,
+        //                 typ: destination_type,
+        //                 value: source,
+        //             }),
 
-                    // destination is larger than source
-                    Ordering::Less => {
-                        let kind = match source_primitive.type_class() {
-                            PrimitiveTypeClass::Void => panic!("cannot cast void"),
-                            PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
-                            PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
-                            PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
-                            PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
-                        };
+        //             // destination is larger than source
+        //             Ordering::Less => {
+        //                 let kind = match source_primitive.type_class() {
+        //                     PrimitiveTypeClass::Void => panic!("cannot cast void"),
+        //                     PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
+        //                     PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
+        //                     PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
+        //                     PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
+        //                 };
 
-                        self.build(StatementKind::Cast {
-                            kind,
-                            typ: destination_type,
-                            value: source,
-                        })
-                    }
+        //                 self.build(StatementKind::Cast {
+        //                     kind,
+        //                     typ: destination_type,
+        //                     value: source,
+        //                 })
+        //             }
 
-                    // equal width
-                    Ordering::Equal => self.build(StatementKind::Cast {
-                        kind: CastOperationKind::Reinterpret,
-                        typ: destination_type,
-                        value: source,
-                    }),
-                }
-            }
+        //             // equal width
+        //             Ordering::Equal => self.build(StatementKind::Cast {
+        //                 kind: CastOperationKind::Reinterpret,
+        //                 typ: destination_type,
+        //                 value: source,
+        //             }),
+        //         }
+        //     }
 
-            (
-                Type::Vector {
-                    element_count: src_count,
-                    element_type: src_type,
-                },
-                Type::Vector {
-                    element_count: dst_count,
-                    element_type: dst_type,
-                },
-            ) => {
-                if src_type != dst_type {
-                    todo!();
-                }
+        //     (
+        //         Type::Vector {
+        //             element_count: src_count,
+        //             element_type: src_type,
+        //         },
+        //         Type::Vector {
+        //             element_count: dst_count,
+        //             element_type: dst_type,
+        //         },
+        //     ) => {
+        //         if src_type != dst_type {
+        //             todo!();
+        //         }
 
-                match (src_count, dst_count) {
-                    (0, 0) => panic!("no cast needed, both unknown"),
-                    (_, 0) => {
-                        // casting fixed to unknown
-                        self.build(StatementKind::Cast {
-                            kind: CastOperationKind::Convert,
-                            typ: destination_type,
-                            value: source,
-                        })
-                    }
-                    (0, _) => {
-                        // casting fixed to unknown
-                        self.build(StatementKind::Cast {
-                            kind: CastOperationKind::Convert,
-                            typ: destination_type,
-                            value: source,
-                        })
-                    }
-                    (_, _) => panic!("casting from fixed to fixed"),
-                }
-            }
+        //         match (src_count, dst_count) {
+        //             (0, 0) => panic!("no cast needed, both unknown"),
+        //             (_, 0) => {
+        //                 // casting fixed to unknown
+        //                 self.build(StatementKind::Cast {
+        //                     kind: CastOperationKind::Convert,
+        //                     typ: destination_type,
+        //                     value: source,
+        //                 })
+        //             }
+        //             (0, _) => {
+        //                 // casting fixed to unknown
+        //                 self.build(StatementKind::Cast {
+        //                     kind: CastOperationKind::Convert,
+        //                     typ: destination_type,
+        //                     value: source,
+        //                 })
+        //             }
+        //             (_, _) => panic!("casting from fixed to fixed"),
+        //         }
+        //     }
 
-            (
-                Type::Primitive(PrimitiveType {
-                    element_width_in_bits,
-                    ..
-                }),
-                Type::ArbitraryLengthInteger,
-            ) => {
-                assert!(*element_width_in_bits < 128);
+        //     (
+        //         Type::Primitive(PrimitiveType {
+        //             element_width_in_bits,
+        //             ..
+        //         }),
+        //         Type::ArbitraryLengthInteger,
+        //     ) => {
+        //         assert!(*element_width_in_bits < 128);
 
-                self.build(StatementKind::Cast {
-                    kind: CastOperationKind::ZeroExtend,
-                    typ: destination_type,
-                    value: source,
-                })
-            }
+        //         self.build(StatementKind::Cast {
+        //             kind: CastOperationKind::ZeroExtend,
+        //             typ: destination_type,
+        //             value: source,
+        //         })
+        //     }
 
-            (
-                Type::Primitive(PrimitiveType {
-                    element_width_in_bits,
-                    ..
-                }),
-                Type::Bits,
-            ) => {
-                if *element_width_in_bits > 128 {
-                    log::warn!(
-                        "source type in cast {} -> {} exceeds 128 bits",
-                        source.typ(),
-                        destination_type
-                    );
-                }
+        //     (
+        //         Type::Primitive(PrimitiveType {
+        //             element_width_in_bits,
+        //             ..
+        //         }),
+        //         Type::Bits,
+        //     ) => {
+        //         if *element_width_in_bits > 128 {
+        //             log::warn!(
+        //                 "source type in cast {} -> {} exceeds 128 bits",
+        //                 source.typ(),
+        //                 destination_type
+        //             );
+        //         }
 
-                self.build(StatementKind::Cast {
-                    kind: CastOperationKind::ZeroExtend,
-                    typ: destination_type,
-                    value: source,
-                })
-            }
+        //         self.build(StatementKind::Cast {
+        //             kind: CastOperationKind::ZeroExtend,
+        //             typ: destination_type,
+        //             value: source,
+        //         })
+        //     }
 
-            (Type::ArbitraryLengthInteger, Type::Primitive(_)) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            }),
+        //     (Type::ArbitraryLengthInteger, Type::Primitive(_)) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Reinterpret,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
 
-            (Type::Bits, Type::Primitive(_)) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            }),
+        //     (Type::Bits, Type::Primitive(_)) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Reinterpret,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
 
-            (Type::ArbitraryLengthInteger, Type::Bits) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Convert,
-                typ: destination_type,
-                value: source,
-            }),
+        //     (Type::ArbitraryLengthInteger, Type::Bits) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Convert,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
 
-            (Type::ArbitraryLengthInteger, Type::Rational) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Convert,
-                typ: destination_type,
-                value: source,
-            }),
-            (Type::Rational, Type::ArbitraryLengthInteger) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Convert,
-                typ: destination_type,
-                value: source,
-            }),
+        //     (Type::ArbitraryLengthInteger, Type::Rational) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Convert,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
+        //     (Type::Rational, Type::ArbitraryLengthInteger) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Convert,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
 
-            // allow casting any to anything
-            (Type::Any, _) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Convert,
-                typ: destination_type,
-                value: source,
-            }),
+        //     // allow casting any to anything
+        //     (Type::Any, _) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Convert,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
 
-            // unions can go from and to anything
-            // todo: verify width here
-            (Type::Union { .. }, _) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            }),
-            (_, Type::Union { .. }) => self.build(StatementKind::Cast {
-                kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            }),
+        //     // unions can go from and to anything
+        //     // todo: verify width here
+        //     (Type::Union { .. }, _) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Reinterpret,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
+        //     (_, Type::Union { .. }) => self.build(StatementKind::Cast {
+        //         kind: CastOperationKind::Reinterpret,
+        //         typ: destination_type,
+        //         value: source,
+        //     }),
 
-            (src, dst) => {
-                println!("current statements: {:?}", self.statements);
-                panic!(
-                    "cannot cast {:?} from {src:?} to {dst:?}",
-                    *source.inner.get()
-                );
-            }
-        }
+        //     (src, dst) => {
+        //         println!("current statements: {:?}", self.statements);
+        //         panic!(
+        //             "cannot cast {:?} from {src:?} to {dst:?}",
+        //             *source.inner.get()
+        //         );
+        //     }
+        // }
+        todo!()
     }
 }

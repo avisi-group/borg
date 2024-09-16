@@ -1,7 +1,7 @@
 use crate::{
     rudder::{
         analysis::dfa::StatementUseAnalysis,
-        statement::{CastOperationKind, Statement, StatementKind},
+        statement::{CastOperationKind, StatementInner, StatementKind},
         Block, Function, Type,
     },
     util::arena::{Arena, Ref},
@@ -10,36 +10,45 @@ use crate::{
 pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
-    for block in f.block_iter() {
-        changed |= run_on_block(f.block_arena(), block);
+    for block in f.block_iter().collect::<Vec<_>>().into_iter() {
+        changed |= run_on_block(f.block_arena_mut(), block);
     }
 
     changed
 }
 
-fn run_on_block(arena: &Arena<Block>, b: Ref<Block>) -> bool {
+fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
     let mut changed = false;
 
-    let sua = StatementUseAnalysis::new(arena, b);
+    let mut sua = StatementUseAnalysis::new(arena, b);
 
-    for stmt in b.get(arena).statements() {
-        changed |= run_on_stmt(stmt, &sua);
+    for stmt in b.get(sua.block_arena()).statements() {
+        changed |= run_on_stmt(stmt, b, &mut sua);
     }
 
     changed
 }
 
-fn run_on_stmt(stmt: Statement, sua: &StatementUseAnalysis) -> bool {
-    match stmt.kind() {
+fn run_on_stmt(
+    stmt: Ref<StatementInner>,
+    block: Ref<Block>,
+    sua: &mut StatementUseAnalysis,
+) -> bool {
+    match stmt
+        .get(&block.get(sua.block_arena()).statement_arena)
+        .kind()
+        .clone()
+    {
         StatementKind::Constant { typ, value } => {
             if typ.is_apint() {
-                stmt.replace_kind(StatementKind::Constant {
-                    typ: Type::new_primitive(
-                        crate::rudder::PrimitiveTypeClass::SignedInteger,
-                        value.smallest_width(),
-                    ),
-                    value,
-                });
+                stmt.get_mut(&mut block.get_mut(sua.block_arena()).statement_arena)
+                    .replace_kind(StatementKind::Constant {
+                        typ: Type::new_primitive(
+                            crate::rudder::PrimitiveTypeClass::SignedInteger,
+                            value.smallest_width(),
+                        ),
+                        value,
+                    });
 
                 true
             } else {
@@ -56,9 +65,10 @@ fn run_on_stmt(stmt: Statement, sua: &StatementUseAnalysis) -> bool {
 
                 let mut changed = false;
 
-                if sua.has_uses(&stmt) {
-                    for u in sua.get_uses(&stmt) {
-                        u.replace_use(stmt.clone(), value.clone());
+                if sua.has_uses(stmt) {
+                    for u in sua.get_uses(stmt).clone() {
+                        u.get_mut(&mut block.get_mut(sua.block_arena()).statement_arena)
+                            .replace_use(stmt.clone(), value.clone());
                         changed = true;
                     }
                 }

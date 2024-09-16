@@ -27,18 +27,18 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
         if let StatementKind::WriteRegister {
             offset: write_offset,
             value: write_value,
-        } = stmt.kind()
+        } = stmt.get(block.get(arena).arena()).kind().clone()
         {
             if let StatementKind::AssignElement {
                 vector: assign_vector,
                 value: assign_value,
                 index: assign_index,
-            } = write_value.kind()
+            } = write_value.get(block.get(arena).arena()).kind().clone()
             {
                 if let StatementKind::ReadRegister {
                     typ: _read_type,
                     offset: read_offset,
-                } = assign_vector.kind()
+                } = assign_vector.get(block.get(arena).arena()).kind().clone()
                 {
                     // write-register
                     // offset = write_offset + index * element type width bytes
@@ -50,7 +50,12 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     let vector_width = builder.build(StatementKind::Constant {
                         typ: (Type::u16()),
                         value: ConstantValue::UnsignedInteger(
-                            assign_value.typ().width_bytes().try_into().unwrap(),
+                            assign_value
+                                .get(block.get(arena).arena())
+                                .typ(block.get(arena).arena())
+                                .width_bytes()
+                                .try_into()
+                                .unwrap(),
                         ),
                     });
                     let vector_offset = builder.build(StatementKind::BinaryOperation {
@@ -67,13 +72,15 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     for new_statement in builder.finish() {
                         block
                             .get_mut(arena)
-                            .insert_statement_before(&stmt, new_statement);
+                            .insert_statement_before(stmt, new_statement);
                     }
 
-                    stmt.replace_kind(StatementKind::WriteRegister {
-                        offset,
-                        value: assign_value,
-                    });
+                    stmt.get_mut(block.get_mut(arena).arena_mut()).replace_kind(
+                        StatementKind::WriteRegister {
+                            offset,
+                            value: assign_value,
+                        },
+                    );
                     did_change = true;
                 }
             }
@@ -83,9 +90,15 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
         // see if index is constant (check if the bundle is constant)
         // if vector is a register read, add index to offset
         // todo: if vector is a local variable read, add index to indices
-        if let StatementKind::ReadElement { vector, index } = stmt.kind() {
-            if let StatementKind::ReadRegister { offset, .. } = vector.kind() {
-                let element_type = stmt.typ();
+        if let StatementKind::ReadElement { vector, index } =
+            stmt.get(block.get(arena).arena()).kind().clone()
+        {
+            if let StatementKind::ReadRegister { offset, .. } =
+                vector.get(block.get(arena).arena()).kind().clone()
+            {
+                let element_type = stmt
+                    .get(block.get(arena).arena())
+                    .typ(block.get(arena).arena());
                 let mut builder = StatementBuilder::new(block);
 
                 let index = builder.generate_cast(index, Type::s64());
@@ -114,13 +127,15 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                 for new_statement in builder.finish() {
                     block
                         .get_mut(arena)
-                        .insert_statement_before(&stmt, new_statement);
+                        .insert_statement_before(stmt, new_statement);
                 }
 
-                stmt.replace_kind(StatementKind::ReadRegister {
-                    typ: element_type,
-                    offset: new_offset,
-                });
+                stmt.get_mut(block.get_mut(arena).arena_mut()).replace_kind(
+                    StatementKind::ReadRegister {
+                        typ: element_type,
+                        offset: new_offset,
+                    },
+                );
 
                 did_change = true;
             }

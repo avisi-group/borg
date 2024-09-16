@@ -3,7 +3,7 @@ use common::{intern::InternedString, HashMap};
 use crate::{
     fn_is_allowlisted,
     rudder::{
-        statement::{Statement, StatementBuilder, StatementKind},
+        statement::{StatementBuilder, StatementKind},
         Block, Function, Model, Symbol,
     },
     util::arena::{Arena, Ref},
@@ -41,7 +41,13 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
         let calls = statements
             .iter()
             .enumerate()
-            .filter(|(_, s)| matches!(s.kind(), StatementKind::Call { .. }))
+            .filter(|(_, s)| {
+                matches!(
+                    s.get(&block_ref.get(function.block_arena()).statement_arena)
+                        .kind(),
+                    StatementKind::Call { .. }
+                )
+            })
             .collect::<Vec<_>>();
 
         for (index, call) in calls {
@@ -52,7 +58,10 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
             let mut pre_statements = pre.to_owned();
             let post_statements = post.to_owned();
 
-            let StatementKind::Call { target, args, .. } = call.kind() else {
+            let StatementKind::Call { target, args, .. } = call
+                .get(&block_ref.get(function.block_arena()).statement_arena)
+                .kind()
+            else {
                 unreachable!()
             };
             let other_fn = functions.get(&target).unwrap();
@@ -65,6 +74,8 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 post_block_ref,
             );
 
+            // todo: !!!!!!!!!!!!!!!!!!!       import and mangle local variables
+
             {
                 let mut builder = StatementBuilder::new(block_ref);
 
@@ -73,16 +84,22 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                     target: entry_block_ref,
                 });
 
-                // for arg in args, pre_statements.push(statement::copy)
+                // todo: !!!!!!!!!!!!!!!!!!!         for arg in args, pre_statements.push(statement::copy)
                 pre_statements.push(statement)
             }
 
-            post_statements[0].replace_kind(StatementKind::ReadVariable {
-                symbol: Symbol {
-                    name: "borealis_inline_return".into(),
-                    typ: other_fn.return_type(),
-                },
-            });
+            post_statements[0]
+                .get_mut(
+                    &mut block_ref
+                        .get_mut(function.block_arena_mut())
+                        .statement_arena,
+                )
+                .replace_kind(StatementKind::ReadVariable {
+                    symbol: Symbol {
+                        name: "borealis_inline_return".into(),
+                        typ: other_fn.return_type(),
+                    },
+                });
 
             block_ref
                 .get_mut(function.block_arena_mut())
@@ -123,7 +140,11 @@ fn import_blocks(
             let mut builder = StatementBuilder::new(this_block_ref);
 
             for statement in other_statements {
-                let kind = match statement.kind() {
+                let kind = match statement
+                    .get(&this_block_ref.get(&this_arena).statement_arena)
+                    .kind()
+                    .clone()
+                {
                     StatementKind::Jump { target } => StatementKind::Jump {
                         target: import_block_rec(
                             ref_map,
@@ -138,7 +159,7 @@ fn import_blocks(
                         true_target,
                         false_target,
                     } => StatementKind::Branch {
-                        condition,
+                        condition: condition,
                         true_target: import_block_rec(
                             ref_map,
                             this_arena,
@@ -158,14 +179,19 @@ fn import_blocks(
 
                     StatementKind::Return { value } => {
                         builder.build(StatementKind::WriteVariable {
-                            symbol: Symbol::new("borealis_inline_return".into(), value.typ()),
+                            symbol: Symbol::new(
+                                "borealis_inline_return".into(),
+                                value
+                                    .get(&this_block_ref.get(&this_arena).statement_arena)
+                                    .typ(&this_block_ref.get(&this_arena).statement_arena),
+                            ),
                             value,
                         });
                         StatementKind::Jump {
                             target: this_block_ref,
                         }
                     }
-                    k => k,
+                    k => k.clone(),
                 };
                 builder.build(kind);
             }

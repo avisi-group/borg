@@ -1,10 +1,10 @@
 use {
     crate::{
         rudder::{
-            statement::{Statement, StatementBuilder, StatementKind},
+            statement::{StatementBuilder, StatementInner, StatementKind},
             Block, Function,
         },
-        util::arena::Ref,
+        util::arena::{Arena, Ref},
     },
     common::HashMap,
 };
@@ -21,12 +21,60 @@ pub fn run(f: &mut Function) -> bool {
     changed
 }
 
+fn inline_target_block(f: &mut Function, source_block: Ref<Block>) -> bool {
+    // if a block ends in a jump statement, and the target block is "small", inline
+    // it.
+    let terminator = source_block
+        .get(f.block_arena())
+        .terminator_statement()
+        .unwrap();
+
+    let StatementKind::Jump {
+        target: target_block,
+    } = terminator
+        .get(&source_block.get(f.block_arena()).statement_arena)
+        .kind()
+        .clone()
+    else {
+        return false;
+    };
+
+    if target_block.get(f.block_arena()).size() > INLINE_SIZE_THRESHOLD {
+        return false;
+    }
+
+    // kill the jump statement, copy target block statements in.
+    source_block
+        .get_mut(f.block_arena_mut())
+        .kill_statement(terminator);
+
+    let mut builder = StatementBuilder::new(source_block);
+
+    let mut mapping = HashMap::default();
+    for stmt in target_block.get(f.block_arena()).statements() {
+        let cloned_stmt = clone_statement(
+            &mut builder,
+            stmt,
+            &mapping,
+            &target_block.get(f.block_arena()).statement_arena,
+        );
+        mapping.insert(stmt, cloned_stmt.clone());
+    }
+
+    source_block
+        .get_mut(f.block_arena_mut())
+        .extend_statements(builder.finish().into_iter());
+
+    true
+}
+
 fn clone_statement(
     builder: &mut StatementBuilder,
-    template: &Statement,
-    mapping: &HashMap<Statement, Statement>,
-) -> Statement {
-    match template.kind() {
+    template: Ref<StatementInner>,
+    mapping: &HashMap<Ref<StatementInner>, Ref<StatementInner>>,
+    arena: &Arena<StatementInner>,
+) -> Ref<StatementInner> {
+    match template.get(arena).kind().clone() {
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
             builder.build(StatementKind::BinaryOperation {
                 kind,
@@ -208,43 +256,4 @@ fn clone_statement(
                 .collect(),
         )),
     }
-}
-
-fn inline_target_block(f: &mut Function, source_block: Ref<Block>) -> bool {
-    // if a block ends in a jump statement, and the target block is "small", inline
-    // it.
-    let terminator = source_block
-        .get(f.block_arena())
-        .terminator_statement()
-        .unwrap();
-
-    let StatementKind::Jump {
-        target: target_block,
-    } = terminator.kind()
-    else {
-        return false;
-    };
-
-    if target_block.get(f.block_arena()).size() > INLINE_SIZE_THRESHOLD {
-        return false;
-    }
-
-    // kill the jump statement, copy target block statements in.
-    source_block
-        .get_mut(f.block_arena_mut())
-        .kill_statement(&terminator);
-
-    let mut builder = StatementBuilder::new(source_block);
-
-    let mut mapping = HashMap::default();
-    for stmt in target_block.get(f.block_arena()).statements() {
-        let cloned_stmt = clone_statement(&mut builder, &stmt, &mapping);
-        mapping.insert(stmt, cloned_stmt.clone());
-    }
-
-    source_block
-        .get_mut(f.block_arena_mut())
-        .extend_statements(builder.finish().into_iter());
-
-    true
 }

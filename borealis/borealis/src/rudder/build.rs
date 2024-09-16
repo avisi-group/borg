@@ -1,17 +1,20 @@
 use {
     crate::{
-        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature},
+        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature, Statement},
         rudder::{
             self,
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
             statement::{
                 BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementBuilder,
-                StatementKind, UnaryOperationKind,
+                StatementInner, StatementKind, UnaryOperationKind,
             },
             Block, ConstantValue, Function, Model, PrimitiveType, PrimitiveTypeClass,
-            RegisterDescriptor, Statement, Symbol, Type,
+            RegisterDescriptor, Symbol, Type,
         },
-        util::{arena::Ref, signed_smallest_width_of_value},
+        util::{
+            arena::{Arena, Ref},
+            signed_smallest_width_of_value,
+        },
     },
     common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     log::trace,
@@ -310,7 +313,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         self.function_build_context.build_context
     }
 
-    fn fn_ctx(&mut self) -> &mut FunctionBuildContext<'ctx> {
+    fn fn_ctx(&self) -> &FunctionBuildContext<'ctx> {
+        self.function_build_context
+    }
+
+    fn fn_ctx_mut(&mut self) -> &mut FunctionBuildContext<'ctx> {
         self.function_build_context
     }
 
@@ -321,7 +328,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         // pre-insert empty rudder block to avoid infinite recursion with cyclic blocks
         {
             let rudder_block = self.block.clone();
-            self.fn_ctx().blocks.insert(boom_block.id(), rudder_block);
+            self.fn_ctx_mut()
+                .blocks
+                .insert(boom_block.id(), rudder_block);
         }
 
         // convert statements
@@ -344,8 +353,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let condition = self.build_value(Shared::new(condition));
                 let condition = self.builder.generate_cast(condition, Type::u1());
 
-                let rudder_true_target = self.fn_ctx().resolve_block(boom_target);
-                let rudder_false_target = self.fn_ctx().resolve_block(boom_fallthrough);
+                let rudder_true_target = self.fn_ctx_mut().resolve_block(boom_target);
+                let rudder_false_target = self.fn_ctx_mut().resolve_block(boom_fallthrough);
 
                 StatementKind::Branch {
                     condition,
@@ -356,7 +365,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::control_flow::Terminator::Unconditional {
                 target: boom_target,
             } => {
-                let rudder_target = self.fn_ctx().resolve_block(boom_target);
+                let rudder_target = self.fn_ctx_mut().resolve_block(boom_target);
                 StatementKind::Jump {
                     target: rudder_target,
                 }
@@ -385,7 +394,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         match &*statement.get() {
             boom::Statement::VariableDeclaration { name, typ } => {
                 let typ = self.ctx().resolve_type(typ.clone());
-                self.fn_ctx()
+                self.fn_ctx_mut()
                     .rudder_fn
                     .add_local_variable(Symbol::new(*name, typ));
             }
@@ -465,8 +474,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn build_specialized_function(
         &mut self,
         name: InternedString,
-        args: &[Statement],
-    ) -> Option<Statement> {
+        args: &[Ref<StatementInner>],
+    ) -> Option<Ref<StatementInner>> {
         if Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$")
             .unwrap()
             .is_match(name.as_ref())
@@ -505,7 +514,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "%i->%i64" => {
-                    assert!(matches!(args[0].typ(), Type::ArbitraryLengthInteger));
+                    let arena = self.statement_arena();
+                    assert!(matches!(args[0].get(arena).typ(arena), Type::ArbitraryLengthInteger));
 
                     Some(
                         self.builder
@@ -514,7 +524,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "%string->%real" => {
-                    let StatementKind::Constant { value, .. } = args[0].kind() else {
+                    let StatementKind::Constant { value, .. } = args[0].get(self.statement_arena()).kind() else {
                         panic!();
                     };
 
@@ -538,7 +548,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         typ: (Type::s64()),
                         value: rudder::ConstantValue::SignedInteger(1),
                     });
-                    let one = self.builder.generate_cast(one, args[1].typ());
+                    let arena =self.statement_arena();
+                    let one = self.builder.generate_cast(one, args[1].get(arena).typ(arena));
                     let diff = self.builder.build(StatementKind::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
                         lhs: args[1].clone(),
@@ -845,7 +856,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "bitvector_length" => {
-                    assert!(matches!(args[0].typ(), Type::Bits));
+                    let arena =self.statement_arena();
+                    assert!(matches!(args[0].get(arena).typ(arena), Type::Bits));
 
                     Some(self.builder.build(StatementKind::SizeOf {
                         value: args[0].clone(),
@@ -961,11 +973,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val ZeroExtend0 : (%bv, %i) -> %bv
                 // val sail_zero_extend : (%bv, %i) -> %bv
                 "ZeroExtend0" | "sail_zero_extend" => {
-                    let length = args[1].clone();
+                    let length = args[1].get(self.statement_arena());
                     if let StatementKind::Constant { value, .. } = length.kind() {
                         let width = match value {
-                            ConstantValue::UnsignedInteger(u) => usize::try_from(u).unwrap(),
-                            ConstantValue::SignedInteger(i) => usize::try_from(i).unwrap(),
+                            ConstantValue::UnsignedInteger(u) => usize::try_from(*u).unwrap(),
+                            ConstantValue::SignedInteger(i) => usize::try_from(*i).unwrap(),
                             _ => panic!(),
                         };
                         Some(self.builder.build(StatementKind::Cast {
@@ -977,8 +989,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         Some(self.builder.build(StatementKind::BitsCast {
                             kind: CastOperationKind::ZeroExtend,
                             typ: (Type::Bits),
-                            value: args[0].clone(),
-                            length: length.clone(),
+                            value: args[0],
+                            length: args[1],
                         }))
                     }
                 }
@@ -1210,7 +1222,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(1),
                         });
-                        self.builder.generate_cast(_u1, sum.typ())
+                     let arena=    self.statement_arena();
+                        self.builder.generate_cast(_u1, sum.get(arena).typ(arena))
                     };
 
                     let source_length = self.builder.build(StatementKind::BinaryOperation {
@@ -1419,7 +1432,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     // }
 
     /// Generates rudder for a writing a statement to a boom::Expression
-    fn build_expression_write(&mut self, target: &boom::Expression, source: Statement) {
+    fn build_expression_write(&mut self, target: &boom::Expression, source: Ref<StatementInner>) {
         let idents = expression_field_collapse(target);
         let (root, fields) = idents
             .split_first()
@@ -1429,7 +1442,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             panic!("{root} {fields:?}");
         }
 
-        match self.fn_ctx().rudder_fn.get_local_variable(*root) {
+        match self.fn_ctx_mut().rudder_fn.get_local_variable(*root) {
             Some(symbol) => {
                 let (_, outer_type) = fields_to_indices(&self.ctx().structs, symbol.typ(), fields);
 
@@ -1472,7 +1485,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     /// Last statement returned is the value
-    fn build_value(&mut self, boom_value: Shared<boom::Value>) -> Statement {
+    fn build_value(&mut self, boom_value: Shared<boom::Value>) -> Ref<StatementInner> {
         let (base, outer_field_accesses) = value_field_collapse(boom_value.clone());
 
         assert!(outer_field_accesses.is_empty());
@@ -1482,12 +1495,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         match &*borrow {
             boom::Value::Identifier(ident) => {
                 // local variable
-                if let Some(symbol) = self.fn_ctx().rudder_fn.get_local_variable(*ident) {
+                if let Some(symbol) = self.fn_ctx_mut().rudder_fn.get_local_variable(*ident) {
                     return self.builder.build(StatementKind::ReadVariable { symbol });
                 }
 
                 // parameter
-                if let Some(symbol) = self.fn_ctx().rudder_fn.get_parameter(*ident) {
+                if let Some(symbol) = self.fn_ctx_mut().rudder_fn.get_parameter(*ident) {
                     return self.builder.build(StatementKind::ReadVariable { symbol });
                 }
 
@@ -1603,7 +1616,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn build_literal(&mut self, literal: &boom::Literal) -> Statement {
+    fn build_literal(&mut self, literal: &boom::Literal) -> Ref<StatementInner> {
         let kind = match literal {
             boom::Literal::Int(i) => StatementKind::Constant {
                 typ: (Type::new_primitive(
@@ -1643,7 +1656,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         self.builder.build(kind)
     }
 
-    fn build_operation(&mut self, op: &boom::Operation) -> Statement {
+    fn build_operation(&mut self, op: &boom::Operation) -> Ref<StatementInner> {
         match op {
             boom::Operation::Not(value) => {
                 let value = self.build_value(value.clone());
@@ -1663,7 +1676,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let target_type = self.ctx().resolve_type(typ.clone());
                 let value = self.build_value(value.clone());
 
-                let source_type = value.typ();
+                let source_type = value
+                    .get(self.statement_arena())
+                    .typ(self.statement_arena());
 
                 let kind = match source_type {
                     Type::Struct(_) | Type::Vector { .. } | Type::String => {
@@ -1732,12 +1747,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let mut lhs = self.build_value(left.clone());
                 let mut rhs = self.build_value(right.clone());
 
-                if lhs.typ() != rhs.typ() {
+                let arena = self.statement_arena();
+
+                if lhs.get(arena).typ(arena) != rhs.get(arena).typ(arena) {
                     // need to insert casts
-                    let destination_type = if lhs.typ().width_bits() > rhs.typ().width_bits() {
-                        lhs.typ()
+                    let destination_type = if lhs.get(arena).typ(arena).width_bits()
+                        > rhs.get(arena).typ(arena).width_bits()
+                    {
+                        lhs.get(arena).typ(arena)
                     } else {
-                        rhs.typ()
+                        rhs.get(arena).typ(arena)
                     };
 
                     lhs = self
@@ -1777,10 +1796,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn generate_concat(&mut self, left: Statement, right: Statement) -> Statement {
+    fn generate_concat(
+        &mut self,
+        left: Ref<StatementInner>,
+        right: Ref<StatementInner>,
+    ) -> Ref<StatementInner> {
+        let arena = self.statement_arena();
+
         // todo: (zero extend original value || create new bits with runtime length)
         // then bitinsert
-        match (left.typ(), right.typ()) {
+        match (left.get(arena).typ(arena), right.get(arena).typ(arena)) {
             (Type::Bits, Type::Bits) => {
                 let l_value = self.builder.generate_cast(left.clone(), Type::u128());
                 let l_length = self.builder.build(StatementKind::SizeOf { value: left });
@@ -1852,6 +1877,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
             (a, b) => panic!("todo concat for {a:?} {b:?}"),
         }
+    }
+
+    fn statement_arena(&self) -> &Arena<StatementInner> {
+        &self
+            .block
+            .get(self.fn_ctx().rudder_fn.block_arena())
+            .statement_arena
     }
 }
 

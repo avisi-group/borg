@@ -43,26 +43,27 @@ impl ControlFlowGraphAnalysis {
 
             seen_list.insert(current.clone());
 
-            let terminator = current.get(f.block_arena()).terminator_statement().unwrap();
-            match terminator.kind() {
+            let current_block = current.get(f.block_arena());
+            let terminator = current_block.terminator_statement().unwrap();
+            match terminator.get(&current_block.statement_arena).kind() {
                 StatementKind::Jump { target } => {
-                    self.insert_successor(current, target);
-                    self.insert_predecessor(target, current);
+                    self.insert_successor(current, *target);
+                    self.insert_predecessor(*target, current);
 
-                    work_list.push_back(target.clone());
+                    work_list.push_back(*target);
                 }
                 StatementKind::Branch {
                     true_target,
                     false_target,
                     ..
                 } => {
-                    self.insert_successor(current, true_target);
-                    self.insert_successor(current, false_target);
-                    self.insert_predecessor(true_target, current);
-                    self.insert_predecessor(false_target, current);
+                    self.insert_successor(current, *true_target);
+                    self.insert_successor(current, *false_target);
+                    self.insert_predecessor(*true_target, current);
+                    self.insert_predecessor(*false_target, current);
 
-                    work_list.push_back(true_target.clone());
-                    work_list.push_back(false_target.clone());
+                    work_list.push_back(*true_target);
+                    work_list.push_back(*false_target);
                 }
                 StatementKind::Return { .. } | StatementKind::Panic { .. } => {
                     self.block_succs.insert(current.clone(), Vec::new());
@@ -126,12 +127,16 @@ impl FunctionCallGraphAnalysis {
     }
 
     fn analyse_function(&mut self, f: &Function) {
-        for block in f.block_iter() {
-            let statements = block.get(f.block_arena()).statements();
-            let call_targets = statements.iter().filter_map(|s| match s.kind() {
-                StatementKind::Call { target, .. } => Some(target),
-                _ => None,
-            });
+        for block_ref in f.block_iter() {
+            let block = block_ref.get(f.block_arena());
+            let statements = block.statements();
+            let call_targets =
+                statements
+                    .iter()
+                    .filter_map(|s| match s.get(&block.statement_arena).kind() {
+                        StatementKind::Call { target, .. } => Some(*target),
+                        _ => None,
+                    });
             // TODO .unique();
 
             for call_target in call_targets {
