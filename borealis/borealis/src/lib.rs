@@ -168,12 +168,15 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         warn!("{msg}");
     }
 
+    info!("Inlining");
+    rudder.inline();
+
     if matches!(
         &mode,
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
     ) {
         info!("Generating Rust");
-        let ws = codegen_workspace(&rudder);
+        let ws = codegen_workspace(rudder);
 
         info!("Writing workspace to {:?}", &path);
         write_workspace(ws, path);
@@ -183,7 +186,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 fn fn_is_allowlisted(name: InternedString) -> bool {
     const FN_ALLOWLIST: &[&'static str] = &[
         "borealis_register_init",
-        //"__DecodeA64_DataProcReg",
+        "__DecodeA64_DataProcReg",
         "__DecodeA64",
         // "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
         // "DecodeShift",

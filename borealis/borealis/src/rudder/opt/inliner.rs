@@ -12,13 +12,9 @@ use {
 const INLINE_SIZE_THRESHOLD: usize = 5;
 
 pub fn run(f: &mut Function) -> bool {
-    do_block_inlining(f)
-}
-
-fn do_block_inlining(f: &Function) -> bool {
     let mut changed = false;
 
-    for block in f.block_iter() {
+    for block in f.block_iter().collect::<Vec<_>>().into_iter() {
         changed |= inline_target_block(f, block);
     }
 
@@ -87,13 +83,13 @@ fn clone_statement(
             value: mapping.get(&value).unwrap().clone(),
             amount: mapping.get(&amount).unwrap().clone(),
         }),
-        StatementKind::Call { target, args, tail } => {
+        StatementKind::Call { target, args } => {
             let args = args
                 .iter()
                 .map(|stmt| mapping.get(stmt).unwrap().clone())
                 .collect();
 
-            builder.build(StatementKind::Call { target, args, tail })
+            builder.build(StatementKind::Call { target, args })
         }
         StatementKind::Cast { kind, typ, value } => builder.build(StatementKind::Cast {
             kind,
@@ -214,7 +210,7 @@ fn clone_statement(
     }
 }
 
-fn inline_target_block(f: &Function, source_block: Ref<Block>) -> bool {
+fn inline_target_block(f: &mut Function, source_block: Ref<Block>) -> bool {
     // if a block ends in a jump statement, and the target block is "small", inline
     // it.
     let terminator = source_block
@@ -235,7 +231,7 @@ fn inline_target_block(f: &Function, source_block: Ref<Block>) -> bool {
 
     // kill the jump statement, copy target block statements in.
     source_block
-        .get(f.block_arena())
+        .get_mut(f.block_arena_mut())
         .kill_statement(&terminator);
 
     let mut builder = StatementBuilder::new(source_block);
@@ -247,7 +243,7 @@ fn inline_target_block(f: &Function, source_block: Ref<Block>) -> bool {
     }
 
     source_block
-        .get(f.block_arena())
+        .get_mut(f.block_arena_mut())
         .extend_statements(builder.finish().into_iter());
 
     true

@@ -375,7 +375,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         } = self;
 
         block
-            .get(function_build_context.rudder_fn.block_arena())
+            .get_mut(function_build_context.rudder_fn.block_arena_mut())
             .set_statements(builder.finish().into_iter());
 
         block
@@ -441,7 +441,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.builder.build(StatementKind::Call {
                     target: *name,
                     args,
-                    tail: false,
                 })
             }
         };
@@ -1237,7 +1236,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(self.builder.build(StatementKind::Call {
                         target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                         args: vec![args[0].clone(), count],
-                        tail: false,
+
                     }))
                 }
 

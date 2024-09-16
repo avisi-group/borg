@@ -58,7 +58,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         builder.build(StatementKind::Return { value: read_result });
 
         end_block_ref
-            .get(function.block_arena_mut())
+            .get_mut(function.block_arena_mut())
             .set_statements(builder.finish().into_iter());
 
         end_block_ref
@@ -93,7 +93,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         });
 
         check_block_ref
-            .get(function.block_arena_mut())
+            .get_mut(function.block_arena_mut())
             .set_statements(check_builder.finish().into_iter());
     }
 
@@ -177,7 +177,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         });
 
         shift_block_ref
-            .get(function.block_arena_mut())
+            .get_mut(function.block_arena_mut())
             .set_statements(shift_builder.finish().into_iter());
     }
 
@@ -242,7 +242,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         });
 
         entry_block_ref
-            .get(function.block_arena())
+            .get_mut(function.block_arena_mut())
             .set_statements(entry_builder.finish().into_iter());
 
         entry_block_ref

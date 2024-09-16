@@ -10,7 +10,7 @@ pub fn run(f: Function) -> bool {
     // (not branch) to it
 
     let mut changed = false;
-    for block in  f.block_iter().map(|b| b.get(f.block_arena())) {
+    for block in f.block_iter().map(|b| b.get(f.block_arena())) {
         // If the block has exactly one statement
         if block.statements().len() == 1 {
             let Some(terminator) = block.terminator_statement() else {

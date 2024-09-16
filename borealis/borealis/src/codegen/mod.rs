@@ -3,6 +3,7 @@
 use {
     crate::{
         codegen::state::codegen_state,
+        fn_is_allowlisted,
         rudder::{analysis::cfg::FunctionCallGraphAnalysis, Model, PrimitiveTypeClass, Type},
     },
     common::{intern::InternedString, HashMap, HashSet},
@@ -144,7 +145,7 @@ pub fn codegen_type(typ: Type) -> TokenStream {
     }
 }
 
-pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
+pub fn codegen_workspace(mut rudder: Model) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     // {
     //     let mut files = HashMap::default();
 
@@ -201,7 +202,7 @@ pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<P
     // structs/enums/unions
     let common = {
         let header = codegen_header();
-        let state = codegen_state(rudder);
+        let state = codegen_state(&rudder);
         let bits = include::get("bits.rs");
         let util = include::get("util.rs");
 
@@ -220,8 +221,13 @@ pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<P
     };
 
     rudder.update_names();
-    let cfg = FunctionCallGraphAnalysis::new(rudder);
-    let rudder_fns = rudder.get_functions();
+    let cfg = FunctionCallGraphAnalysis::new(&rudder);
+    let rudder_fns = rudder
+        .get_functions()
+        .into_iter()
+        .filter(|(name, _)| fn_is_allowlisted(**name))
+        .map(|(name, function)| (*name, function))
+        .collect::<HashMap<_, _>>();
 
     let module_names = rudder_fns
         .keys()
@@ -250,11 +256,11 @@ pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<P
         .map(|(name, function)| {
             let contents = dynamic::codegen_function(&function);
 
-            let mut dependencies = cfg.get_callees_for(*name);
+            let mut dependencies = cfg.get_callees_for(name);
             dependencies.push("common".into());
             let dependencies = dependencies
                 .into_iter()
-                .filter(|dep| *dep != *name)
+                .filter(|dep| *dep != name)
                 .collect::<Vec<_>>();
 
             let dyn_imports: TokenStream = dependencies
@@ -268,7 +274,7 @@ pub fn codegen_workspace(rudder: &Model) -> (HashMap<PathBuf, String>, HashSet<P
             let header = codegen_header();
 
             (
-                InternedString::from(codegen_ident(*name).to_string()),
+                InternedString::from(codegen_ident(name).to_string()),
                 render(&quote! {
                     #header
 

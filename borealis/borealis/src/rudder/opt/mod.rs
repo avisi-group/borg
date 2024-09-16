@@ -17,7 +17,7 @@ pub mod jump_threading;
 pub mod materialise_apints;
 pub mod phi_analysis;
 //pub mod return_propagation;
-pub mod tail_calls;
+//pub mod tail_calls;
 pub mod variable_elimination;
 pub mod vector_folding;
 
@@ -44,7 +44,7 @@ static CONSTANT_FOLDING: FunctionPass = ("constant-folding", constant_folding::r
 //static RETURN_PROPAGATION: FunctionPass = ("return-propagation", return_propagation::run);
 static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_simplification::run);
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
-static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
+// static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
 static DESTROY_BITVECTORS: FunctionPass = ("destroy-bitvectors", destroy_bitvectors::run);
 static MATERIALISE_APINTS: FunctionPass = ("materialise-apints", materialise_apints::run);

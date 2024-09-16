@@ -45,13 +45,13 @@ impl ControlFlowGraphAnalysis {
 
             let terminator = current.get(f.block_arena()).terminator_statement().unwrap();
             match terminator.kind() {
-                crate::rudder::StatementKind::Jump { target } => {
+                StatementKind::Jump { target } => {
                     self.insert_successor(current, target);
                     self.insert_predecessor(target, current);
 
                     work_list.push_back(target.clone());
                 }
-                crate::rudder::StatementKind::Branch {
+                StatementKind::Branch {
                     true_target,
                     false_target,
                     ..
@@ -64,9 +64,7 @@ impl ControlFlowGraphAnalysis {
                     work_list.push_back(true_target.clone());
                     work_list.push_back(false_target.clone());
                 }
-                crate::rudder::StatementKind::Return { .. }
-                | crate::rudder::StatementKind::Call { tail: true, .. }
-                | crate::rudder::StatementKind::Panic { .. } => {
+                StatementKind::Return { .. } | StatementKind::Panic { .. } => {
                     self.block_succs.insert(current.clone(), Vec::new());
                 }
                 _ => panic!("invalid terminator statement for block"),

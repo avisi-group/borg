@@ -141,7 +141,6 @@ pub enum StatementKind {
     Call {
         target: InternedString, // todo: ref<function>
         args: Vec<Statement>,
-        tail: bool,
     },
     Cast {
         kind: CastOperationKind,
@@ -621,8 +620,7 @@ impl StatementInner {
                     length,
                 };
             }
-
-            StatementKind::Call { target, args, tail } => {
+            StatementKind::Call { target, args } => {
                 let args = args
                     .iter()
                     .map(|arg| {
@@ -634,7 +632,7 @@ impl StatementInner {
                     })
                     .collect();
 
-                self.kind = StatementKind::Call { target, args, tail };
+                self.kind = StatementKind::Call { target, args };
             }
             StatementKind::BitExtract {
                 value,

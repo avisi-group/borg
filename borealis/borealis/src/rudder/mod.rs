@@ -23,6 +23,7 @@ use {
 pub mod analysis;
 pub mod build;
 pub mod constant_value;
+pub mod inliner;
 pub mod internal_fns;
 pub mod opt;
 mod pretty_print;
@@ -256,7 +257,8 @@ impl Symbol {
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    inner: Shared<BlockInner>,
+    index: usize,
+    statements: Vec<Statement>,
 }
 
 impl Block {
@@ -265,33 +267,38 @@ impl Block {
     }
 
     pub fn index(&self) -> usize {
-        self.inner.get().index
+        self.index
     }
 
-    pub fn update_index(&self, index: usize) {
-        self.inner.get_mut().update_index(index);
+    pub fn update_index(&mut self, index: usize) {
+        self.index = index;
+
+        self.statements
+            .iter()
+            .enumerate()
+            .for_each(|(statement_index, stmt)| {
+                stmt.update_names(format!("b{}_s{}", index, statement_index).into());
+            });
     }
 
     pub fn statements(&self) -> Vec<Statement> {
-        self.inner.get().statements.clone()
+        self.statements.clone()
     }
 
     pub fn terminator_statement(&self) -> Option<Statement> {
-        self.inner.get().statements.last().cloned()
+        self.statements.last().cloned()
     }
 
-    pub fn set_statements<I: Iterator<Item = Statement>>(&self, statements: I) {
-        self.inner.get_mut().statements = statements.collect();
+    pub fn set_statements<I: Iterator<Item = Statement>>(&mut self, statements: I) {
+        self.statements = statements.collect();
     }
 
-    pub fn extend_statements<I: Iterator<Item = Statement>>(&self, stmts: I) {
-        self.inner.get_mut().statements.extend(stmts)
+    pub fn extend_statements<I: Iterator<Item = Statement>>(&mut self, stmts: I) {
+        self.statements.extend(stmts)
     }
 
     fn index_of_statement(&self, reference: &Statement) -> usize {
-        self.inner
-            .get()
-            .statements
+        self.statements
             .iter()
             .enumerate()
             .find(|(_, candidate)| *candidate == reference)
@@ -299,26 +306,22 @@ impl Block {
             .0
     }
 
-    pub fn insert_statement_before(&self, reference: &Statement, new: Statement) {
+    pub fn insert_statement_before(&mut self, reference: &Statement, new: Statement) {
         let index = self.index_of_statement(reference);
-        self.inner.get_mut().statements.insert(index, new);
+        self.statements.insert(index, new);
     }
 
-    pub fn append_statement(&self, new: Statement) {
-        self.inner.get_mut().statements.push(new);
+    pub fn append_statement(&mut self, new: Statement) {
+        self.statements.push(new);
     }
 
-    pub fn kill_statement(&self, stmt: &Statement) {
+    pub fn kill_statement(&mut self, stmt: &Statement) {
         //assert!(Rc::ptr_eq()
 
         let index = self.index_of_statement(stmt);
 
-        self.inner.get_mut().statements.remove(index);
+        self.statements.remove(index);
     }
-
-    // pub fn iter(&self) -> BlockIterator {
-    //     BlockIterator::new(self.clone())
-    // }
 
     pub fn targets(&self) -> Vec<Ref<Block>> {
         match self.terminator_statement().unwrap().kind() {
@@ -328,9 +331,9 @@ impl Block {
                 false_target,
                 ..
             } => vec![true_target, false_target],
-            StatementKind::Return { .. }
-            | StatementKind::Panic(_)
-            | StatementKind::Call { tail: true, .. } => vec![],
+            StatementKind::Return { .. } | StatementKind::Panic(_) => {
+                vec![]
+            }
             _ => panic!("invalid terminator for block"),
         }
     }
@@ -343,44 +346,9 @@ impl Block {
 impl Default for Block {
     fn default() -> Self {
         Self {
-            inner: Shared::new(BlockInner {
-                index: 0,
-                statements: Vec::new(),
-            }),
+            index: 0,
+            statements: Vec::new(),
         }
-    }
-}
-
-impl Hash for Block {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        core::ptr::hash(self.inner.as_ptr(), state)
-    }
-}
-
-impl PartialEq for Block {
-    fn eq(&self, other: &Self) -> bool {
-        Shared::ptr_eq(&self.inner, &other.inner)
-    }
-}
-
-impl Eq for Block {}
-
-#[derive(Debug)]
-pub struct BlockInner {
-    index: usize,
-    statements: Vec<Statement>,
-}
-
-impl BlockInner {
-    pub fn update_index(&mut self, index: usize) {
-        self.index = index;
-
-        self.statements
-            .iter()
-            .enumerate()
-            .for_each(|(statement_index, stmt)| {
-                stmt.update_names(format!("b{}_s{}", index, statement_index).into());
-            });
     }
 }
 
@@ -478,10 +446,14 @@ impl Function {
         (self.return_type(), self.parameters())
     }
 
-    pub fn update_indices(&self) {
-        self.block_iter().enumerate().for_each(|(idx, b)| {
-            b.get(self.block_arena()).update_index(idx);
-        });
+    pub fn update_indices(&mut self) {
+        self.block_iter()
+            .enumerate()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|(idx, b)| {
+                b.get_mut(self.block_arena_mut()).update_index(idx);
+            });
     }
 
     pub fn add_local_variable(&mut self, symbol: Symbol) {
@@ -559,8 +531,8 @@ impl Model {
         self.fns.insert(name, func);
     }
 
-    pub fn update_names(&self) {
-        for func in self.fns.values() {
+    pub fn update_names(&mut self) {
+        for func in self.fns.values_mut() {
             func.update_indices();
         }
     }
@@ -571,6 +543,10 @@ impl Model {
 
     pub fn validate(&mut self) -> Vec<validator::ValidationMessage> {
         validator::validate(self)
+    }
+
+    pub fn inline(&mut self) {
+        inliner::inline(self);
     }
 
     pub fn get_functions(&self) -> &HashMap<InternedString, Function> {

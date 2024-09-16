@@ -147,11 +147,10 @@ impl Display for StatementKind {
 
                 write!(f, "{} {} {}", op, value.name(), amount.name())
             }
-            StatementKind::Call { target, args, tail } => {
+            StatementKind::Call { target, args } => {
                 write!(
                     f,
-                    "{}call {}({})",
-                    if *tail { "tail-" } else { "" },
+                    "call {}({})",
                     target,
                     args.iter().map(Statement::name).join(", ")
                 )
@@ -319,7 +318,7 @@ impl Display for Statement {
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        for stmt in &self.inner.get().statements {
+        for stmt in &self.statements {
             writeln!(f, "    {}", stmt)?;
         }
 
@@ -358,8 +357,6 @@ impl Display for Function {
 
 impl Display for Model {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        self.update_names();
-
         writeln!(f, "rudder context:")?;
 
         for (name, (func)) in self.fns.iter() {

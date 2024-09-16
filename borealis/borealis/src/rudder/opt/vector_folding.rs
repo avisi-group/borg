@@ -9,8 +9,8 @@ use crate::{
 
 pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
-    for block in f.block_iter() {
-        changed |= run_on_block(f.block_arena(), block);
+    for block in f.block_iter().collect::<Vec<_>>().into_iter() {
+        changed |= run_on_block(f.block_arena_mut(), block);
     }
 
     changed
@@ -18,7 +18,7 @@ pub fn run(f: &mut Function) -> bool {
 
 /// Replace vector access on registers and locals with adding to the indices and
 /// offset respectively
-fn run_on_block(arena: &Arena<Block>, block: Ref<Block>) -> bool {
+fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
     let mut did_change = false;
 
     for stmt in block.get(arena).statements() {
@@ -66,7 +66,7 @@ fn run_on_block(arena: &Arena<Block>, block: Ref<Block>) -> bool {
 
                     for new_statement in builder.finish() {
                         block
-                            .get(arena)
+                            .get_mut(arena)
                             .insert_statement_before(&stmt, new_statement);
                     }
 
@@ -113,7 +113,7 @@ fn run_on_block(arena: &Arena<Block>, block: Ref<Block>) -> bool {
 
                 for new_statement in builder.finish() {
                     block
-                        .get(arena)
+                        .get_mut(arena)
                         .insert_statement_before(&stmt, new_statement);
                 }
 
