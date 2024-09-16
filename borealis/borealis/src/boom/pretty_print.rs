@@ -4,8 +4,8 @@ use {
     crate::boom::{
         control_flow::{ControlFlowBlock, Terminator},
         visitor::Visitor,
-        Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
-        NamedValue, Operation, Parameter, Size, Statement, Type, Value,
+        Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType, NamedValue, Operation,
+        Parameter, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, shared::Shared},
     std::{
@@ -29,9 +29,7 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
 
     let mut visitor = PrettyPrinter::new(w);
 
-    definitions
-        .iter()
-        .for_each(|def| visitor.visit_definition(def));
+    definitions.iter().for_each(|def| visitor.visit_definition(def));
 
     registers.iter().for_each(|(name, typ)| {
         write!(visitor.writer, "register {name}: ").unwrap();
@@ -336,10 +334,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 write!(self.writer, ">").unwrap();
                 Ok(())
             }
-            Type::FixedVector {
-                length,
-                element_type,
-            } => {
+            Type::FixedVector { length, element_type } => {
                 write!(self.writer, "[").unwrap();
                 self.visit_type(element_type.clone());
                 write!(self.writer, "; {length}]").unwrap();
@@ -363,11 +358,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     }
 
     fn visit_value(&mut self, node: Shared<Value>) {
-        fn write_uid<W: Write>(
-            printer: &mut PrettyPrinter<'_, W>,
-            id: InternedString,
-            typs: &[Shared<Type>],
-        ) {
+        fn write_uid<W: Write>(printer: &mut PrettyPrinter<'_, W>, id: InternedString, typs: &[Shared<Type>]) {
             write!(printer.writer, "{id}").unwrap();
 
             if !typs.is_empty() {
@@ -488,12 +479,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
     }
 
     fn visit_operation(&mut self, node: &Operation) {
-        fn emit_op2<W: Write>(
-            printer: &mut PrettyPrinter<'_, W>,
-            lhs: &Shared<Value>,
-            rhs: &Shared<Value>,
-            op: &str,
-        ) {
+        fn emit_op2<W: Write>(printer: &mut PrettyPrinter<'_, W>, lhs: &Shared<Value>, rhs: &Shared<Value>, op: &str) {
             write!(printer.writer, "(").unwrap();
             printer.visit_value(lhs.clone());
             write!(printer.writer, " {op} ").unwrap();

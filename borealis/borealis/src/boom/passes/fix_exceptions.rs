@@ -30,14 +30,9 @@ impl Pass for FixExceptions {
         registers.insert("have_exception".into(), Shared::new(Type::Bool));
         registers.insert(
             "current_exception_tag".into(),
-            Shared::new(Type::Integer {
-                size: Size::Static(32),
-            }),
+            Shared::new(Type::Integer { size: Size::Static(32) }),
         );
-        registers.insert(
-            "current_exception_value".into(),
-            Shared::new(Type::Union { width }),
-        );
+        registers.insert("current_exception_value".into(), Shared::new(Type::Union { width }));
         registers.insert("throw".into(), Shared::new(Type::String));
 
         false

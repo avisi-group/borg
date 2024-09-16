@@ -104,12 +104,8 @@ impl Add for ConstantValue {
             (ConstantValue::UnsignedInteger(l), ConstantValue::SignedInteger(r)) => {
                 ConstantValue::SignedInteger(i64::try_from(l).unwrap() + r)
             }
-            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l + r)
-            }
-            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
-                ConstantValue::FloatingPoint(l + r)
-            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => ConstantValue::SignedInteger(l + r),
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => ConstantValue::FloatingPoint(l + r),
             (l, r) => panic!("invalid types for add: {l:?} {r:?}"),
         }
     }
@@ -123,12 +119,8 @@ impl Sub for ConstantValue {
             (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
                 ConstantValue::UnsignedInteger(l - r)
             }
-            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l - r)
-            }
-            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
-                ConstantValue::FloatingPoint(l - r)
-            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => ConstantValue::SignedInteger(l - r),
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => ConstantValue::FloatingPoint(l - r),
             (l, r) => panic!("invalid types for sub: {l:?} {r:?}"),
         }
     }
@@ -142,15 +134,11 @@ impl Mul for ConstantValue {
             (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
                 ConstantValue::UnsignedInteger(l * r)
             }
-            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l * r)
-            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => ConstantValue::SignedInteger(l * r),
             (ConstantValue::SignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
                 ConstantValue::SignedInteger(l * i64::try_from(r).unwrap())
             }
-            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
-                ConstantValue::FloatingPoint(l * r)
-            }
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => ConstantValue::FloatingPoint(l * r),
             (l, r) => panic!("invalid types for mul: {l:?} {r:?}"),
         }
     }
@@ -164,12 +152,8 @@ impl Div for ConstantValue {
             (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
                 ConstantValue::UnsignedInteger(l / r)
             }
-            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => {
-                ConstantValue::SignedInteger(l / r)
-            }
-            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => {
-                ConstantValue::FloatingPoint(l / r)
-            }
+            (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => ConstantValue::SignedInteger(l / r),
+            (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => ConstantValue::FloatingPoint(l / r),
             (l, r) => panic!("invalid types for div: {l:?} {r:?}"),
         }
     }
@@ -194,9 +178,7 @@ impl Not for ConstantValue {
 impl PartialOrd for ConstantValue {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
-                l.partial_cmp(r)
-            }
+            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => l.partial_cmp(r),
             (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => l.partial_cmp(r),
             (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => l.partial_cmp(r),
             (ConstantValue::Unit, ConstantValue::Unit) => Some(Ordering::Equal),

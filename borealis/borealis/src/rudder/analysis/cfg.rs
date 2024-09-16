@@ -32,8 +32,7 @@ impl ControlFlowGraphAnalysis {
         let mut work_list = VecDeque::new();
         work_list.push_back(f.entry_block());
 
-        self.block_preds
-            .insert(work_list.front().unwrap().clone(), Vec::new());
+        self.block_preds.insert(work_list.front().unwrap().clone(), Vec::new());
 
         while !work_list.is_empty() {
             let current = work_list.pop_front().unwrap();
@@ -130,13 +129,12 @@ impl FunctionCallGraphAnalysis {
         for block_ref in f.block_iter() {
             let block = block_ref.get(f.block_arena());
             let statements = block.statements();
-            let call_targets =
-                statements
-                    .iter()
-                    .filter_map(|s| match s.get(&block.statement_arena).kind() {
-                        StatementKind::Call { target, .. } => Some(*target),
-                        _ => None,
-                    });
+            let call_targets = statements
+                .iter()
+                .filter_map(|s| match s.get(&block.statement_arena).kind() {
+                    StatementKind::Call { target, .. } => Some(*target),
+                    _ => None,
+                });
             // TODO .unique();
 
             for call_target in call_targets {
@@ -154,15 +152,11 @@ impl FunctionCallGraphAnalysis {
     }
 
     pub fn get_callers_for(&self, f: InternedString) -> Vec<InternedString> {
-        self.fn_callers
-            .get(&f)
-            .map_or(vec![], |f| f.iter().cloned().collect())
+        self.fn_callers.get(&f).map_or(vec![], |f| f.iter().cloned().collect())
     }
 
     pub fn get_callees_for(&self, f: InternedString) -> Vec<InternedString> {
-        self.fn_callees
-            .get(&f)
-            .map_or(vec![], |f| f.iter().cloned().collect())
+        self.fn_callees.get(&f).map_or(vec![], |f| f.iter().cloned().collect())
     }
 
     pub fn to_dot<W: io::Write>(&self, w: &mut W) -> io::Result<()> {

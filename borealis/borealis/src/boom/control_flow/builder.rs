@@ -48,13 +48,11 @@ impl ControlFlowGraphBuilder {
 
                     next.get_mut().label = Some(*label);
 
-                    self.current_block.get_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
-                            MaybeUnresolvedJumpTarget::Resolved {
-                                target: next.clone(),
-                            },
-                        ),
-                    );
+                    self.current_block
+                        .get_mut()
+                        .set_terminator(MaybeUnresolvedTerminator::Unconditional(
+                            MaybeUnresolvedJumpTarget::Resolved { target: next.clone() },
+                        ));
 
                     self.current_block = next;
                 }
@@ -67,8 +65,9 @@ impl ControlFlowGraphBuilder {
                     let else_block = MaybeUnresolvedControlFlowBlock::new();
                     let post_block = MaybeUnresolvedControlFlowBlock::new();
 
-                    self.current_block.get_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Conditional {
+                    self.current_block
+                        .get_mut()
+                        .set_terminator(MaybeUnresolvedTerminator::Conditional {
                             condition: condition.get().clone(),
                             target: MaybeUnresolvedJumpTarget::Resolved {
                                 target: if_block.clone(),
@@ -76,52 +75,51 @@ impl ControlFlowGraphBuilder {
                             fallthrough: MaybeUnresolvedJumpTarget::Resolved {
                                 target: else_block.clone(),
                             },
-                        },
-                    );
+                        });
 
                     self.current_block = if_block;
                     self.process_statements(if_body.as_slice());
-                    self.current_block.get_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
+                    self.current_block
+                        .get_mut()
+                        .set_terminator(MaybeUnresolvedTerminator::Unconditional(
                             MaybeUnresolvedJumpTarget::Resolved {
                                 target: post_block.clone(),
                             },
-                        ),
-                    );
+                        ));
 
                     self.current_block = else_block;
                     self.process_statements(else_body);
-                    self.current_block.get_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
+                    self.current_block
+                        .get_mut()
+                        .set_terminator(MaybeUnresolvedTerminator::Unconditional(
                             MaybeUnresolvedJumpTarget::Resolved {
                                 target: post_block.clone(),
                             },
-                        ),
-                    );
+                        ));
 
                     self.current_block = post_block;
                 }
                 Statement::Jump { target, condition } => {
                     let fallthrough_block = MaybeUnresolvedControlFlowBlock::new();
-                    self.current_block.get_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Conditional {
+                    self.current_block
+                        .get_mut()
+                        .set_terminator(MaybeUnresolvedTerminator::Conditional {
                             condition: condition.get().clone(),
                             target: MaybeUnresolvedJumpTarget::Unresolved { label: *target },
                             fallthrough: MaybeUnresolvedJumpTarget::Resolved {
                                 target: fallthrough_block.clone(),
                             },
-                        },
-                    );
+                        });
 
                     self.current_block = fallthrough_block;
                 }
                 Statement::Goto(label) => {
                     // end current block
-                    self.current_block.get_mut().set_terminator(
-                        MaybeUnresolvedTerminator::Unconditional(
+                    self.current_block
+                        .get_mut()
+                        .set_terminator(MaybeUnresolvedTerminator::Unconditional(
                             MaybeUnresolvedJumpTarget::Unresolved { label: *label },
-                        ),
-                    );
+                        ));
 
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
@@ -165,10 +163,7 @@ impl ControlFlowGraphBuilder {
         self.resolve_block(self.entry_block.clone())
     }
 
-    fn resolve_block(
-        &mut self,
-        unresolved: Shared<MaybeUnresolvedControlFlowBlock>,
-    ) -> ControlFlowBlock {
+    fn resolve_block(&mut self, unresolved: Shared<MaybeUnresolvedControlFlowBlock>) -> ControlFlowBlock {
         // if block is already resolved, return that
         if let Some(resolved) = self.resolved_blocks.get(&unresolved.clone().into()) {
             return resolved.clone();
@@ -188,11 +183,10 @@ impl ControlFlowGraphBuilder {
         // terminator resolution can acquire a reference to the resolved block,
         // if we inserted the correctly resolved block after the recursive call,
         // it would loop forever.
-        if let Some(block) = self
-            .resolved_blocks
-            .insert(unresolved.clone().into(), resolved.clone())
-        {
-            panic!("unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}")
+        if let Some(block) = self.resolved_blocks.insert(unresolved.clone().into(), resolved.clone()) {
+            panic!(
+                "unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}"
+            )
         }
 
         resolved.set_label(unresolved.get().label);
@@ -202,12 +196,10 @@ impl ControlFlowGraphBuilder {
 
         // resolve each kind of terminator
         let terminator = match &unresolved.get().terminator {
-            MaybeUnresolvedTerminator::Return(ident) => {
-                Terminator::Return(Value::Identifier(*ident))
-            }
-            MaybeUnresolvedTerminator::Undefined => Terminator::Panic(Value::Literal(Shared::new(
-                Literal::String("undefined terminator".into()),
-            ))),
+            MaybeUnresolvedTerminator::Return(ident) => Terminator::Return(Value::Identifier(*ident)),
+            MaybeUnresolvedTerminator::Undefined => Terminator::Panic(Value::Literal(Shared::new(Literal::String(
+                "undefined terminator".into(),
+            )))),
             MaybeUnresolvedTerminator::Panic(value) => Terminator::Panic(value.clone()),
             MaybeUnresolvedTerminator::Conditional {
                 condition,
@@ -271,9 +263,7 @@ impl MaybeUnresolvedControlFlowBlock {
 
     fn set_terminator(&mut self, terminator: MaybeUnresolvedTerminator) {
         if self.has_terminator() {
-            panic!(
-                "attempted to set terminator to block with terminator: \n{self:#?}\n{terminator:#?}"
-            )
+            panic!("attempted to set terminator to block with terminator: \n{self:#?}\n{terminator:#?}")
         } else {
             self.terminator = terminator;
         }

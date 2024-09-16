@@ -41,7 +41,8 @@ fn run_on_stmt(stmt: Ref<StatementInner>, sua: &StatementUseAnalysis) -> bool {
     //             value: cast_value,
     //         } => {
     //             if typ.is_bits() {
-    //                 stmt.replace_kind(crate::rudder::statement::StatementKind::BitExtract {
+    //
+    // stmt.replace_kind(crate::rudder::statement::StatementKind::BitExtract {
     //                     value: cast_value,
     //                     length,
     //                     start,

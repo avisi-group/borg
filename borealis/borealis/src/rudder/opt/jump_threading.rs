@@ -16,11 +16,7 @@ pub fn run(f: &mut Function) -> bool {
 fn target_for_threadable(f: &Function, block_ref: Ref<Block>) -> Option<Ref<Block>> {
     let block = block_ref.get(f.block_arena());
     if block.size() == 1 {
-        if let StatementKind::Jump { target } = block
-            .terminator_statement()
-            .unwrap()
-            .get(&block.statement_arena)
-            .kind()
+        if let StatementKind::Jump { target } = block.terminator_statement().unwrap().get(&block.statement_arena).kind()
         {
             Some(*target)
         } else {
@@ -60,8 +56,7 @@ fn run_on_block(f: &mut Function, block_ref: Ref<Block>) -> bool {
                 true_target
             };
 
-            let false_target = if let Some(false_thread_to) = target_for_threadable(f, false_target)
-            {
+            let false_target = if let Some(false_thread_to) = target_for_threadable(f, false_target) {
                 changed = true;
                 false_thread_to
             } else {

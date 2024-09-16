@@ -345,7 +345,7 @@ impl Block {
             StatementKind::Return { .. } | StatementKind::Panic(_) => {
                 vec![]
             }
-            _ => panic!("invalid terminator for block"),
+            k => panic!("invalid terminator for block: {k:?}"),
         }
     }
 

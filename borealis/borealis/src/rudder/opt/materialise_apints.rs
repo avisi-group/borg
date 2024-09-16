@@ -29,16 +29,8 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
     changed
 }
 
-fn run_on_stmt(
-    stmt: Ref<StatementInner>,
-    block: Ref<Block>,
-    sua: &mut StatementUseAnalysis,
-) -> bool {
-    match stmt
-        .get(&block.get(sua.block_arena()).statement_arena)
-        .kind()
-        .clone()
-    {
+fn run_on_stmt(stmt: Ref<StatementInner>, block: Ref<Block>, sua: &mut StatementUseAnalysis) -> bool {
+    match stmt.get(&block.get(sua.block_arena()).statement_arena).kind().clone() {
         StatementKind::Constant { typ, value } => {
             if typ.is_apint() {
                 stmt.get_mut(&mut block.get_mut(sua.block_arena()).statement_arena)

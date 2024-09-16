@@ -10,8 +10,8 @@ use {
         rudder::{
             constant_value::ConstantValue,
             statement::{
-                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementInner,
-                StatementKind, UnaryOperationKind,
+                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementInner, StatementKind,
+                UnaryOperationKind,
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
@@ -45,7 +45,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         .block_iter()
         .map(|block| {
             let block_name = get_block_fn_ident(&block.get(function.block_arena()));
-            let block_impl = codegen_block(function.block_arena(),block.get(function.block_arena()));
+            let block_impl = codegen_block(function.block_arena(), block.get(function.block_arena()));
 
             quote! {
                 // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
@@ -152,13 +152,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 }
 
 pub fn codegen_parameters(parameters: &[Symbol]) -> TokenStream {
-    let parameters =
-        [quote!(ctx: &mut X86TranslationContext)]
-            .into_iter()
-            .chain(parameters.iter().map(|sym| {
-                let name = codegen_ident(sym.name());
-                quote!(#name: X86NodeRef)
-            }));
+    let parameters = [quote!(ctx: &mut X86TranslationContext)]
+        .into_iter()
+        .chain(parameters.iter().map(|sym| {
+            let name = codegen_ident(sym.name());
+            quote!(#name: X86NodeRef)
+        }));
 
     quote! {
         #(#parameters),*
@@ -361,11 +360,7 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStre
 }
 
 //
-pub fn codegen_stmt(
-    b_arena: &Arena<Block>,
-    stmt: Ref<StatementInner>,
-    s_arena: &Arena<StatementInner>,
-) -> TokenStream {
+pub fn codegen_stmt(b_arena: &Arena<Block>, stmt: Ref<StatementInner>, s_arena: &Arena<StatementInner>) -> TokenStream {
     let stmt = stmt.get(s_arena);
     let stmt_name = format_ident!("{}", stmt.name().to_string());
 
@@ -493,11 +488,7 @@ pub fn codegen_stmt(
 
             quote! { ctx.emitter().unary_operation(UnaryOperationKind::#kind(#value.clone())) }
         }
-        StatementKind::ShiftOperation {
-            kind,
-            value,
-            amount,
-        } => {
+        StatementKind::ShiftOperation { kind, value, amount } => {
             let value = value.get(s_arena);
             let amount = amount.get(s_arena);
 
@@ -582,11 +573,7 @@ pub fn codegen_stmt(
             let false_value = false_value.get(s_arena);
             quote! { ctx.emitter().select(#condition, #true_value, #false_value) }
         }
-        StatementKind::BitExtract {
-            value,
-            start,
-            length,
-        } => {
+        StatementKind::BitExtract { value, start, length } => {
             let value = value.get(s_arena);
             let start = start.get(s_arena);
             let length = length.get(s_arena);
@@ -616,11 +603,7 @@ pub fn codegen_stmt(
             let index = index.get(s_arena);
             quote!(ctx.emitter().read_element(#vector, #index))
         }
-        StatementKind::AssignElement {
-            vector,
-            value,
-            index,
-        } => {
+        StatementKind::AssignElement { vector, value, index } => {
             let vector = vector.get(s_arena);
             let value = value.get(s_arena);
             let index = index.get(s_arena);
@@ -757,11 +740,7 @@ pub fn codegen_cast(
     let target_type = typ;
 
     if source_type == target_type {
-        log::warn!(
-            "attemping to cast {:?} into same type ({})",
-            value.name(),
-            target_type
-        );
+        log::warn!("attemping to cast {:?} into same type ({})", value.name(), target_type);
         return quote!(#value);
     }
 
@@ -799,31 +778,25 @@ pub fn codegen_cast(
             }
         }
 
-        (Type::Primitive(pt), Type::ArbitraryLengthInteger, CastOperationKind::ZeroExtend) => {
-            match pt.tc {
-                PrimitiveTypeClass::Void | PrimitiveTypeClass::Unit => {
-                    panic!("cannot cast from void or unit")
-                }
-                PrimitiveTypeClass::UnsignedInteger | PrimitiveTypeClass::SignedInteger => {
-                    let target = codegen_type(target_type);
-                    quote! {
-                        (#target::try_from(#value).unwrap())
-                    }
-                }
-                PrimitiveTypeClass::FloatingPoint => {
-                    let target = codegen_type(target_type);
-                    quote! {
-                        (#value as #target)
-                    }
+        (Type::Primitive(pt), Type::ArbitraryLengthInteger, CastOperationKind::ZeroExtend) => match pt.tc {
+            PrimitiveTypeClass::Void | PrimitiveTypeClass::Unit => {
+                panic!("cannot cast from void or unit")
+            }
+            PrimitiveTypeClass::UnsignedInteger | PrimitiveTypeClass::SignedInteger => {
+                let target = codegen_type(target_type);
+                quote! {
+                    (#target::try_from(#value).unwrap())
                 }
             }
-        }
+            PrimitiveTypeClass::FloatingPoint => {
+                let target = codegen_type(target_type);
+                quote! {
+                    (#value as #target)
+                }
+            }
+        },
 
-        (
-            Type::Primitive(PrimitiveType { tc, .. }),
-            Type::Primitive(_),
-            CastOperationKind::Truncate,
-        ) => {
+        (Type::Primitive(PrimitiveType { tc, .. }), Type::Primitive(_), CastOperationKind::Truncate) => {
             assert!(target_type.width_bits() < source_type.width_bits());
 
             // create mask of length target
@@ -909,11 +882,7 @@ pub fn codegen_cast(
             quote!(Bits::new(#value as u128, 128))
         }
 
-        (
-            Type::Bits,
-            Type::ArbitraryLengthInteger,
-            CastOperationKind::Convert | CastOperationKind::ZeroExtend,
-        ) => {
+        (Type::Bits, Type::ArbitraryLengthInteger, CastOperationKind::Convert | CastOperationKind::ZeroExtend) => {
             let target_type = codegen_type(target_type);
             quote!((#value.value() as #target_type))
         }
@@ -922,8 +891,7 @@ pub fn codegen_cast(
         // todo ask tom about convert vs zeroextend
         (
             Type::Primitive(PrimitiveType {
-                element_width_in_bits,
-                ..
+                element_width_in_bits, ..
             }),
             Type::Bits,
             CastOperationKind::Convert | CastOperationKind::ZeroExtend,

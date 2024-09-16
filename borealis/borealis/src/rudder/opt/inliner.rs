@@ -1,7 +1,7 @@
 use {
     crate::{
         rudder::{
-            statement::{StatementBuilder, StatementInner, StatementKind},
+            statement::{build, StatementInner, StatementKind},
             Block, Function,
         },
         util::arena::{Arena, Ref},
@@ -44,216 +44,310 @@ fn inline_target_block(f: &mut Function, source_block: Ref<Block>) -> bool {
     }
 
     // kill the jump statement, copy target block statements in.
-    source_block
-        .get_mut(f.block_arena_mut())
-        .kill_statement(terminator);
-
-    let mut builder = StatementBuilder::new(source_block);
 
     let mut mapping = HashMap::default();
     for stmt in target_block.get(f.block_arena()).statements() {
-        let cloned_stmt = clone_statement(
-            &mut builder,
-            stmt,
-            &mapping,
-            &target_block.get(f.block_arena()).statement_arena,
-        );
+        let cloned_stmt = clone_statement(source_block, f.block_arena_mut(), stmt, &mapping);
         mapping.insert(stmt, cloned_stmt.clone());
     }
-
-    source_block
-        .get_mut(f.block_arena_mut())
-        .extend_statements(builder.finish().into_iter());
 
     true
 }
 
 fn clone_statement(
-    builder: &mut StatementBuilder,
+    source_block: Ref<Block>,
+    block_arena: &mut Arena<Block>,
     template: Ref<StatementInner>,
     mapping: &HashMap<Ref<StatementInner>, Ref<StatementInner>>,
-    arena: &Arena<StatementInner>,
 ) -> Ref<StatementInner> {
-    match template.get(arena).kind().clone() {
-        StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            builder.build(StatementKind::BinaryOperation {
+    match template
+        .get(source_block.get(&block_arena).arena())
+        .kind()
+        .clone()
+    {
+        StatementKind::BinaryOperation { kind, lhs, rhs } => build(
+            source_block,
+            block_arena,
+            StatementKind::BinaryOperation {
                 kind,
                 lhs: mapping.get(&lhs).unwrap().clone(),
                 rhs: mapping.get(&rhs).unwrap().clone(),
-            })
-        }
-        StatementKind::Constant { typ, value } => {
-            builder.build(StatementKind::Constant { typ, value })
-        }
-        StatementKind::ReadVariable { symbol } => {
-            builder.build(StatementKind::ReadVariable { symbol })
-        }
-        StatementKind::WriteVariable { symbol, value } => {
-            builder.build(StatementKind::WriteVariable {
+            },
+        ),
+        StatementKind::Constant { typ, value } => build(
+            source_block,
+            block_arena,
+            StatementKind::Constant { typ, value },
+        ),
+        StatementKind::ReadVariable { symbol } => build(
+            source_block,
+            block_arena,
+            StatementKind::ReadVariable { symbol },
+        ),
+        StatementKind::WriteVariable { symbol, value } => build(
+            source_block,
+            block_arena,
+            StatementKind::WriteVariable {
                 symbol,
                 value: mapping.get(&value).unwrap().clone(),
-            })
-        }
-        StatementKind::ReadRegister { typ, offset } => builder.build(StatementKind::ReadRegister {
-            typ,
-            offset: mapping.get(&offset).unwrap().clone(),
-        }),
-        StatementKind::WriteRegister { offset, value } => {
-            builder.build(StatementKind::WriteRegister {
+            },
+        ),
+        StatementKind::ReadRegister { typ, offset } => build(
+            source_block,
+            block_arena,
+            StatementKind::ReadRegister {
+                typ,
+                offset: mapping.get(&offset).unwrap().clone(),
+            },
+        ),
+        StatementKind::WriteRegister { offset, value } => build(
+            source_block,
+            block_arena,
+            StatementKind::WriteRegister {
                 offset: mapping.get(&offset).unwrap().clone(),
                 value: mapping.get(&value).unwrap().clone(),
-            })
-        }
-        StatementKind::ReadMemory { offset, size } => builder.build(StatementKind::ReadMemory {
-            offset: mapping.get(&offset).unwrap().clone(),
-            size: mapping.get(&size).unwrap().clone(),
-        }),
-        StatementKind::WriteMemory { offset, value } => builder.build(StatementKind::WriteMemory {
-            offset: mapping.get(&offset).unwrap().clone(),
-            value: mapping.get(&value).unwrap().clone(),
-        }),
-        StatementKind::ReadPc => builder.build(StatementKind::ReadPc),
-        StatementKind::WritePc { value } => builder.build(StatementKind::WritePc {
-            value: mapping.get(&value).unwrap().clone(),
-        }),
-        StatementKind::UnaryOperation { kind, value } => {
-            builder.build(StatementKind::UnaryOperation {
+            },
+        ),
+        StatementKind::ReadMemory { offset, size } => build(
+            source_block,
+            block_arena,
+            StatementKind::ReadMemory {
+                offset: mapping.get(&offset).unwrap().clone(),
+                size: mapping.get(&size).unwrap().clone(),
+            },
+        ),
+        StatementKind::WriteMemory { offset, value } => build(
+            source_block,
+            block_arena,
+            StatementKind::WriteMemory {
+                offset: mapping.get(&offset).unwrap().clone(),
+                value: mapping.get(&value).unwrap().clone(),
+            },
+        ),
+        StatementKind::ReadPc => build(source_block, block_arena, StatementKind::ReadPc),
+        StatementKind::WritePc { value } => build(
+            source_block,
+            block_arena,
+            StatementKind::WritePc {
+                value: mapping.get(&value).unwrap().clone(),
+            },
+        ),
+        StatementKind::UnaryOperation { kind, value } => build(
+            source_block,
+            block_arena,
+            StatementKind::UnaryOperation {
                 kind,
                 value: mapping.get(&value).unwrap().clone(),
-            })
-        }
+            },
+        ),
         StatementKind::ShiftOperation {
             kind,
             value,
             amount,
-        } => builder.build(StatementKind::ShiftOperation {
-            kind,
-            value: mapping.get(&value).unwrap().clone(),
-            amount: mapping.get(&amount).unwrap().clone(),
-        }),
+        } => build(
+            source_block,
+            block_arena,
+            StatementKind::ShiftOperation {
+                kind,
+                value: mapping.get(&value).unwrap().clone(),
+                amount: mapping.get(&amount).unwrap().clone(),
+            },
+        ),
         StatementKind::Call { target, args } => {
             let args = args
                 .iter()
                 .map(|stmt| mapping.get(stmt).unwrap().clone())
                 .collect();
 
-            builder.build(StatementKind::Call { target, args })
+            build(
+                source_block,
+                block_arena,
+                StatementKind::Call { target, args },
+            )
         }
-        StatementKind::Cast { kind, typ, value } => builder.build(StatementKind::Cast {
-            kind,
-            typ: typ.clone(),
-            value: mapping.get(&value).unwrap().clone(),
-        }),
+        StatementKind::Cast { kind, typ, value } => build(
+            source_block,
+            block_arena,
+            StatementKind::Cast {
+                kind,
+                typ: typ.clone(),
+                value: mapping.get(&value).unwrap().clone(),
+            },
+        ),
         StatementKind::BitsCast {
             kind,
             typ,
             value,
             length,
-        } => builder.build(StatementKind::BitsCast {
-            kind,
-            typ: typ.clone(),
-            value: mapping.get(&value).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
-        }),
-        StatementKind::Jump { target } => builder.build(StatementKind::Jump { target }),
+        } => build(
+            source_block,
+            block_arena,
+            StatementKind::BitsCast {
+                kind,
+                typ: typ.clone(),
+                value: mapping.get(&value).unwrap().clone(),
+                length: mapping.get(&length).unwrap().clone(),
+            },
+        ),
+        StatementKind::Jump { target } => {
+            build(source_block, block_arena, StatementKind::Jump { target })
+        }
         StatementKind::Branch {
             condition,
             true_target,
             false_target,
-        } => builder.build(StatementKind::Branch {
-            condition: mapping.get(&condition).unwrap().clone(),
-            true_target,
-            false_target,
-        }),
+        } => build(
+            source_block,
+            block_arena,
+            StatementKind::Branch {
+                condition: mapping.get(&condition).unwrap().clone(),
+                true_target,
+                false_target,
+            },
+        ),
         StatementKind::PhiNode { .. } => todo!(),
-        StatementKind::Return { value } => builder.build(StatementKind::Return {
-            value: mapping.get(&value).unwrap().clone(),
-        }),
+        StatementKind::Return { value } => build(
+            source_block,
+            block_arena,
+            StatementKind::Return {
+                value: mapping.get(&value).unwrap().clone(),
+            },
+        ),
         StatementKind::Select {
             condition,
             true_value,
             false_value,
-        } => builder.build(StatementKind::Select {
-            condition: mapping.get(&condition).unwrap().clone(),
-            true_value: mapping.get(&true_value).unwrap().clone(),
-            false_value: mapping.get(&false_value).unwrap().clone(),
-        }),
+        } => build(
+            source_block,
+            block_arena,
+            StatementKind::Select {
+                condition: mapping.get(&condition).unwrap().clone(),
+                true_value: mapping.get(&true_value).unwrap().clone(),
+                false_value: mapping.get(&false_value).unwrap().clone(),
+            },
+        ),
         StatementKind::BitExtract {
             value,
             start,
             length,
-        } => builder.build(StatementKind::BitExtract {
-            value: mapping.get(&value).unwrap().clone(),
-            start: mapping.get(&start).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
-        }),
+        } => build(
+            source_block,
+            block_arena,
+            StatementKind::BitExtract {
+                value: mapping.get(&value).unwrap().clone(),
+                start: mapping.get(&start).unwrap().clone(),
+                length: mapping.get(&length).unwrap().clone(),
+            },
+        ),
         StatementKind::BitInsert {
             target,
             source,
             start,
             length,
-        } => builder.build(StatementKind::BitInsert {
-            target: mapping.get(&target).unwrap().clone(),
-            source: mapping.get(&source).unwrap().clone(),
-            start: mapping.get(&start).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
-        }),
-        StatementKind::ReadElement { vector, index } => builder.build(StatementKind::ReadElement {
-            vector: mapping.get(&vector).unwrap().clone(),
-            index: mapping.get(&index).unwrap().clone(),
-        }),
+        } => build(
+            source_block,
+            block_arena,
+            StatementKind::BitInsert {
+                target: mapping.get(&target).unwrap().clone(),
+                source: mapping.get(&source).unwrap().clone(),
+                start: mapping.get(&start).unwrap().clone(),
+                length: mapping.get(&length).unwrap().clone(),
+            },
+        ),
+        StatementKind::ReadElement { vector, index } => build(
+            source_block,
+            block_arena,
+            StatementKind::ReadElement {
+                vector: mapping.get(&vector).unwrap().clone(),
+                index: mapping.get(&index).unwrap().clone(),
+            },
+        ),
         StatementKind::AssignElement {
             vector,
             value,
             index,
-        } => builder.build(StatementKind::AssignElement {
-            vector: mapping.get(&vector).unwrap().clone(),
-            value: mapping.get(&value).unwrap().clone(),
-            index: mapping.get(&index).unwrap().clone(),
-        }),
-        StatementKind::Panic(stmt) => {
-            builder.build(StatementKind::Panic(mapping.get(&stmt).unwrap().clone()))
-        }
+        } => build(
+            source_block,
+            block_arena,
+            StatementKind::AssignElement {
+                vector: mapping.get(&vector).unwrap().clone(),
+                value: mapping.get(&value).unwrap().clone(),
+                index: mapping.get(&index).unwrap().clone(),
+            },
+        ),
+        StatementKind::Panic(stmt) => build(
+            source_block,
+            block_arena,
+            StatementKind::Panic(mapping.get(&stmt).unwrap().clone()),
+        ),
 
-        StatementKind::Assert { condition } => builder.build(StatementKind::Assert {
-            condition: mapping.get(&condition).unwrap().clone(),
-        }),
+        StatementKind::Assert { condition } => build(
+            source_block,
+            block_arena,
+            StatementKind::Assert {
+                condition: mapping.get(&condition).unwrap().clone(),
+            },
+        ),
 
-        StatementKind::CreateBits { value, length } => builder.build(StatementKind::CreateBits {
-            value: mapping.get(&value).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
-        }),
-        StatementKind::SizeOf { value } => builder.build(StatementKind::SizeOf {
-            value: mapping.get(&value).unwrap().clone(),
-        }),
-        StatementKind::MatchesUnion { value, variant } => {
-            builder.build(StatementKind::MatchesUnion {
+        StatementKind::CreateBits { value, length } => build(
+            source_block,
+            block_arena,
+            StatementKind::CreateBits {
+                value: mapping.get(&value).unwrap().clone(),
+                length: mapping.get(&length).unwrap().clone(),
+            },
+        ),
+        StatementKind::SizeOf { value } => build(
+            source_block,
+            block_arena,
+            StatementKind::SizeOf {
+                value: mapping.get(&value).unwrap().clone(),
+            },
+        ),
+        StatementKind::MatchesUnion { value, variant } => build(
+            source_block,
+            block_arena,
+            StatementKind::MatchesUnion {
                 value: mapping.get(&value).unwrap().clone(),
                 variant,
-            })
-        }
-        StatementKind::UnwrapUnion { value, variant } => {
-            builder.build(StatementKind::UnwrapUnion {
+            },
+        ),
+        StatementKind::UnwrapUnion { value, variant } => build(
+            source_block,
+            block_arena,
+            StatementKind::UnwrapUnion {
                 value: mapping.get(&value).unwrap().clone(),
                 variant,
-            })
-        }
+            },
+        ),
 
-        StatementKind::Undefined => builder.build(StatementKind::Undefined),
-        StatementKind::TupleAccess { index, source } => builder.build(StatementKind::TupleAccess {
-            source: mapping.get(&source).unwrap().clone(),
-            index,
-        }),
-        StatementKind::GetFlag { flag, operation } => builder.build(StatementKind::GetFlag {
-            flag,
-            operation: mapping.get(&operation).unwrap().clone(),
-        }),
-        StatementKind::CreateTuple(values) => builder.build(StatementKind::CreateTuple(
-            values
-                .iter()
-                .map(|v| mapping.get(&v).unwrap())
-                .cloned()
-                .collect(),
-        )),
+        StatementKind::Undefined => build(source_block, block_arena, StatementKind::Undefined),
+        StatementKind::TupleAccess { index, source } => build(
+            source_block,
+            block_arena,
+            StatementKind::TupleAccess {
+                source: mapping.get(&source).unwrap().clone(),
+                index,
+            },
+        ),
+        StatementKind::GetFlag { flag, operation } => build(
+            source_block,
+            block_arena,
+            StatementKind::GetFlag {
+                flag,
+                operation: mapping.get(&operation).unwrap().clone(),
+            },
+        ),
+        StatementKind::CreateTuple(values) => build(
+            source_block,
+            block_arena,
+            StatementKind::CreateTuple(
+                values
+                    .iter()
+                    .map(|v| mapping.get(&v).unwrap())
+                    .cloned()
+                    .collect(),
+            ),
+        ),
     }
 }

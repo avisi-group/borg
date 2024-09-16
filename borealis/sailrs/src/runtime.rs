@@ -54,38 +54,40 @@ impl Runtime {
         let builder = thread::Builder::new().stack_size(DEFAULT_RUNTIME_THREAD_STACK_SIZE);
 
         // handle dropped implicitly by not assigning detaches thread
-        builder.spawn(move || {
-            // initialise runtime *once* in a *single* thread
-            let mut rt = ocaml::runtime::init();
+        builder
+            .spawn(move || {
+                // initialise runtime *once* in a *single* thread
+                let mut rt = ocaml::runtime::init();
 
-            let requests = req_rx;
-            let responses = res_tx;
+                let requests = req_rx;
+                let responses = res_tx;
 
-            trace!("Initialised OCaml runtime handler thread, looping...");
+                trace!("Initialised OCaml runtime handler thread, looping...");
 
-            // loop indefinitely processing requests
-            loop {
-                // block on receiving a request
-                match requests.recv() {
-                    // if successful, execute request
-                    Ok(request) => {
-                        let response = request(&mut rt);
+                // loop indefinitely processing requests
+                loop {
+                    // block on receiving a request
+                    match requests.recv() {
+                        // if successful, execute request
+                        Ok(request) => {
+                            let response = request(&mut rt);
 
-                        // log errors if sending failed but do not terminate instead process next
-                        // request
-                        if let Err(e) = responses.send(response) {
-                            error!("Runtime thread failed to send response with error {e}, terminating thread");
+                            // log errors if sending failed but do not terminate instead process next
+                            // request
+                            if let Err(e) = responses.send(response) {
+                                error!("Runtime thread failed to send response with error {e}, terminating thread");
+                                break;
+                            }
+                        }
+                        // if unsuccessful, channel must be closed so report error and terminate
+                        Err(e) => {
+                            error!("Runtime thread receive returned error {e}, terminating thread");
                             break;
                         }
                     }
-                    // if unsuccessful, channel must be closed so report error and terminate
-                    Err(e) => {
-                        error!("Runtime thread receive returned error {e}, terminating thread");
-                        break;
-                    }
                 }
-            }
-        }).expect("Failed to spawn runtime thread");
+            })
+            .expect("Failed to spawn runtime thread");
 
         Self {
             request: req_tx,
@@ -94,16 +96,12 @@ impl Runtime {
     }
 
     /// Execute a closure on the runtime thread
-    pub fn execute<
-        F: FnOnce(&mut OCamlRuntime) -> RET + Send + Sync + 'static,
-        RET: Send + Sync + 'static,
-    >(
+    pub fn execute<F: FnOnce(&mut OCamlRuntime) -> RET + Send + Sync + 'static, RET: Send + Sync + 'static>(
         &self,
         f: F,
     ) -> Result<RET, Error> {
         // coerce the concrete return type (RET) into `Box<dyn Any>`
-        let boxed_return: ExecutableFunction<BoxAny> =
-            Box::new(move |rt: &mut OCamlRuntime| Box::new(f(rt)));
+        let boxed_return: ExecutableFunction<BoxAny> = Box::new(move |rt: &mut OCamlRuntime| Box::new(f(rt)));
 
         // send closure
         self.request.send(boxed_return)?;

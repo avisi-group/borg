@@ -97,10 +97,7 @@ impl rkyv::Archive for BigInt {
 }
 
 impl<S: Fallible + ScratchSpace + rkyv::ser::Serializer> rkyv::Serialize<S> for BigInt {
-    fn serialize(
-        &self,
-        serializer: &mut S,
-    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+    fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
         ArchivedVec::serialize_from_slice(self.0.to_signed_bytes_be().as_slice(), serializer)
     }
 }

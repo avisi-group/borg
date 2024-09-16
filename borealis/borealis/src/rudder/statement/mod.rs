@@ -200,8 +200,8 @@ pub enum StatementKind {
         index: Ref<StatementInner>,
     },
 
-    /// Fatal error, printing value of supplied Ref<StatementInner> for debugging
-    /// purposes
+    /// Fatal error, printing value of supplied Ref<StatementInner> for
+    /// debugging purposes
     Panic(Ref<StatementInner>),
 
     /// `Default::default()`, or uninitialized, or ???
@@ -266,7 +266,9 @@ impl StatementKind {
             | StatementKind::WritePc { .. }
             | StatementKind::ReadVariable { .. }
             | StatementKind::WriteVariable { .. }
-            | StatementKind::Undefined => vec![],
+            | StatementKind::Undefined => {
+                vec![]
+            }
 
             StatementKind::BinaryOperation { lhs, rhs, .. } => {
                 [lhs, rhs].into_iter().cloned().collect()
@@ -602,7 +604,8 @@ pub struct StatementInner {
 }
 impl ToTokens for StatementInner {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix this?
+        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix
+                                                                    // this?
     }
 }
 
@@ -700,7 +703,7 @@ impl StatementInner {
             StatementKind::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
             StatementKind::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             StatementKind::ShiftOperation { value, .. } => value.get(arena).typ(arena),
-            StatementKind::Call { target, .. } => todo!(),
+            StatementKind::Call { target, .. } => Type::Any, // todo: need rudder model
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ.clone(),
             StatementKind::Jump { .. } => Type::void(),
             StatementKind::Branch { .. } => Type::void(),
@@ -1193,222 +1196,262 @@ impl StatementInner {
     }
 }
 
-pub struct StatementBuilder {
-    statements: Vec<Ref<StatementInner>>,
-    parent: Ref<Block>,
+/// Creates a new statement in the block's arena, and pushes it to the end of
+/// the block's statements
+pub fn build(
+    block: Ref<Block>,
+    arena: &mut Arena<Block>,
+    kind: StatementKind,
+) -> Ref<StatementInner> {
+    let r = block.get_mut(arena).arena_mut().insert(StatementInner {
+        name: "???".into(),
+        kind,
+        parent: block,
+    });
+    block.get_mut(arena).statements.push(r);
+    r
 }
 
-impl StatementBuilder {
-    /// Creates a new `StatementBuilder`
-    pub fn new(parent: Ref<Block>) -> Self {
-        Self {
-            statements: vec![],
-            parent,
+// No-op if same type
+pub fn cast(
+    block: Ref<Block>,
+    arena: &mut Arena<Block>,
+    source: Ref<StatementInner>,
+    destination_type: Type,
+) -> Ref<StatementInner> {
+    let s_arena = block.get(arena).arena();
+
+    if source.get(s_arena).typ(s_arena) == destination_type {
+        return source;
+    }
+
+    match (&source.get(s_arena).typ(s_arena), &destination_type) {
+        // both primitives, do a cast
+        (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
+            // compare widths
+            match source_primitive.width().cmp(&dest_primitive.width()) {
+                // source is larger than destination
+                Ordering::Greater => build(
+                    block,
+                    arena,
+                    StatementKind::Cast {
+                        kind: CastOperationKind::Truncate,
+                        typ: destination_type,
+                        value: source,
+                    },
+                ),
+
+                // destination is larger than source
+                Ordering::Less => {
+                    let kind = match source_primitive.type_class() {
+                        PrimitiveTypeClass::Void => panic!("cannot cast void"),
+                        PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
+                        PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
+                        PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
+                        PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
+                    };
+
+                    build(
+                        block,
+                        arena,
+                        StatementKind::Cast {
+                            kind,
+                            typ: destination_type,
+                            value: source,
+                        },
+                    )
+                }
+
+                // equal width
+                Ordering::Equal => build(
+                    block,
+                    arena,
+                    StatementKind::Cast {
+                        kind: CastOperationKind::Reinterpret,
+                        typ: destination_type,
+                        value: source,
+                    },
+                ),
+            }
         }
-    }
 
-    /// Builds a new `Statement` from a `StatementKind`, adds it to the builder,
-    /// and returns it
-    pub fn build(&mut self, kind: StatementKind) -> Ref<StatementInner> {
-        // let statement =  Ref<StatementInner> {
-        //     inner: Shared::new(StatementInner {
-        //         name: "???".into(),
-        //         kind,
-        //         parent: self.parent.clone(),
-        //     }),
-        // };
-        // let statement = todo!();
+        (
+            Type::Vector {
+                element_count: src_count,
+                element_type: src_type,
+            },
+            Type::Vector {
+                element_count: dst_count,
+                element_type: dst_type,
+            },
+        ) => {
+            if src_type != dst_type {
+                todo!();
+            }
 
-        // self.statements.push(statement.clone());
+            match (src_count, dst_count) {
+                (0, 0) => panic!("no cast needed, both unknown"),
+                (_, 0) => {
+                    // casting fixed to unknown
+                    build(
+                        block,
+                        arena,
+                        StatementKind::Cast {
+                            kind: CastOperationKind::Convert,
+                            typ: destination_type,
+                            value: source,
+                        },
+                    )
+                }
+                (0, _) => {
+                    // casting fixed to unknown
+                    build(
+                        block,
+                        arena,
+                        StatementKind::Cast {
+                            kind: CastOperationKind::Convert,
+                            typ: destination_type,
+                            value: source,
+                        },
+                    )
+                }
+                (_, _) => panic!("casting from fixed to fixed"),
+            }
+        }
 
-        // statement
-        todo!()
-    }
+        (
+            Type::Primitive(PrimitiveType {
+                element_width_in_bits,
+                ..
+            }),
+            Type::ArbitraryLengthInteger,
+        ) => {
+            assert!(*element_width_in_bits < 128);
 
-    /// Consumes a `StatementBuilder` and returns it's statements
-    pub fn finish(self) -> Vec<Ref<StatementInner>> {
-        self.statements
-    }
+            build(
+                block,
+                arena,
+                StatementKind::Cast {
+                    kind: CastOperationKind::ZeroExtend,
+                    typ: destination_type,
+                    value: source,
+                },
+            )
+        }
 
-    // No-op if same type
-    pub fn generate_cast(
-        &mut self,
-        source: Ref<StatementInner>,
-        destination_type: Type,
-    ) -> Ref<StatementInner> {
-        // if source.typ(self.parent.get(arena)) == destination_type {
-        //     return source;
-        // }
+        (
+            Type::Primitive(PrimitiveType {
+                element_width_in_bits,
+                ..
+            }),
+            Type::Bits,
+        ) => {
+            if *element_width_in_bits > 128 {
+                log::warn!(
+                    "source type in cast {} -> {} exceeds 128 bits",
+                    source.get(s_arena).typ(s_arena),
+                    destination_type
+                );
+            }
 
-        // match (&source.typ(), &destination_type) {
-        //     // both primitives, do a cast
-        //     (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
-        //         // compare widths
-        //         match source_primitive.width().cmp(&dest_primitive.width()) {
-        //             // source is larger than destination
-        //             Ordering::Greater => self.build(StatementKind::Cast {
-        //                 kind: CastOperationKind::Truncate,
-        //                 typ: destination_type,
-        //                 value: source,
-        //             }),
+            build(
+                block,
+                arena,
+                StatementKind::Cast {
+                    kind: CastOperationKind::ZeroExtend,
+                    typ: destination_type,
+                    value: source,
+                },
+            )
+        }
 
-        //             // destination is larger than source
-        //             Ordering::Less => {
-        //                 let kind = match source_primitive.type_class() {
-        //                     PrimitiveTypeClass::Void => panic!("cannot cast void"),
-        //                     PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
-        //                     PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
-        //                     PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
-        //                     PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
-        //                 };
+        (Type::ArbitraryLengthInteger, Type::Primitive(_)) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: destination_type,
+                value: source,
+            },
+        ),
 
-        //                 self.build(StatementKind::Cast {
-        //                     kind,
-        //                     typ: destination_type,
-        //                     value: source,
-        //                 })
-        //             }
+        (Type::Bits, Type::Primitive(_)) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: destination_type,
+                value: source,
+            },
+        ),
 
-        //             // equal width
-        //             Ordering::Equal => self.build(StatementKind::Cast {
-        //                 kind: CastOperationKind::Reinterpret,
-        //                 typ: destination_type,
-        //                 value: source,
-        //             }),
-        //         }
-        //     }
+        (Type::ArbitraryLengthInteger, Type::Bits) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            },
+        ),
 
-        //     (
-        //         Type::Vector {
-        //             element_count: src_count,
-        //             element_type: src_type,
-        //         },
-        //         Type::Vector {
-        //             element_count: dst_count,
-        //             element_type: dst_type,
-        //         },
-        //     ) => {
-        //         if src_type != dst_type {
-        //             todo!();
-        //         }
+        (Type::ArbitraryLengthInteger, Type::Rational) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            },
+        ),
+        (Type::Rational, Type::ArbitraryLengthInteger) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            },
+        ),
 
-        //         match (src_count, dst_count) {
-        //             (0, 0) => panic!("no cast needed, both unknown"),
-        //             (_, 0) => {
-        //                 // casting fixed to unknown
-        //                 self.build(StatementKind::Cast {
-        //                     kind: CastOperationKind::Convert,
-        //                     typ: destination_type,
-        //                     value: source,
-        //                 })
-        //             }
-        //             (0, _) => {
-        //                 // casting fixed to unknown
-        //                 self.build(StatementKind::Cast {
-        //                     kind: CastOperationKind::Convert,
-        //                     typ: destination_type,
-        //                     value: source,
-        //                 })
-        //             }
-        //             (_, _) => panic!("casting from fixed to fixed"),
-        //         }
-        //     }
+        // allow casting any to anything
+        (Type::Any, _) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Convert,
+                typ: destination_type,
+                value: source,
+            },
+        ),
 
-        //     (
-        //         Type::Primitive(PrimitiveType {
-        //             element_width_in_bits,
-        //             ..
-        //         }),
-        //         Type::ArbitraryLengthInteger,
-        //     ) => {
-        //         assert!(*element_width_in_bits < 128);
+        // unions can go from and to anything
+        // todo: verify width here
+        (Type::Union { .. }, _) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: destination_type,
+                value: source,
+            },
+        ),
+        (_, Type::Union { .. }) => build(
+            block,
+            arena,
+            StatementKind::Cast {
+                kind: CastOperationKind::Reinterpret,
+                typ: destination_type,
+                value: source,
+            },
+        ),
 
-        //         self.build(StatementKind::Cast {
-        //             kind: CastOperationKind::ZeroExtend,
-        //             typ: destination_type,
-        //             value: source,
-        //         })
-        //     }
-
-        //     (
-        //         Type::Primitive(PrimitiveType {
-        //             element_width_in_bits,
-        //             ..
-        //         }),
-        //         Type::Bits,
-        //     ) => {
-        //         if *element_width_in_bits > 128 {
-        //             log::warn!(
-        //                 "source type in cast {} -> {} exceeds 128 bits",
-        //                 source.typ(),
-        //                 destination_type
-        //             );
-        //         }
-
-        //         self.build(StatementKind::Cast {
-        //             kind: CastOperationKind::ZeroExtend,
-        //             typ: destination_type,
-        //             value: source,
-        //         })
-        //     }
-
-        //     (Type::ArbitraryLengthInteger, Type::Primitive(_)) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Reinterpret,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-
-        //     (Type::Bits, Type::Primitive(_)) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Reinterpret,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-
-        //     (Type::ArbitraryLengthInteger, Type::Bits) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Convert,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-
-        //     (Type::ArbitraryLengthInteger, Type::Rational) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Convert,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-        //     (Type::Rational, Type::ArbitraryLengthInteger) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Convert,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-
-        //     // allow casting any to anything
-        //     (Type::Any, _) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Convert,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-
-        //     // unions can go from and to anything
-        //     // todo: verify width here
-        //     (Type::Union { .. }, _) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Reinterpret,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-        //     (_, Type::Union { .. }) => self.build(StatementKind::Cast {
-        //         kind: CastOperationKind::Reinterpret,
-        //         typ: destination_type,
-        //         value: source,
-        //     }),
-
-        //     (src, dst) => {
-        //         println!("current statements: {:?}", self.statements);
-        //         panic!(
-        //             "cannot cast {:?} from {src:?} to {dst:?}",
-        //             *source.inner.get()
-        //         );
-        //     }
-        // }
-        todo!()
+        (src, dst) => {
+            println!("current block: {:?}", block.get(arena));
+            panic!(
+                "cannot cast {:?} from {src:?} to {dst:?}",
+                source.get(s_arena)
+            );
+        }
     }
 }
