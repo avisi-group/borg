@@ -3,17 +3,25 @@ use std::{hash::Hash, marker::PhantomData};
 #[derive(Debug, Clone)]
 pub struct Arena<T> {
     vec: Vec<T>,
+    #[cfg(debug_assertions)]
+    id: common::identifiable::Id,
 }
 
 impl<T> Arena<T> {
     pub fn new() -> Self {
-        Self { vec: Vec::new() }
+        Self {
+            vec: Vec::new(),
+            #[cfg(debug_assertions)]
+            id: common::identifiable::Id::new(),
+        }
     }
 
     pub fn insert(&mut self, t: T) -> Ref<T> {
         self.vec.push(t);
         Ref {
             index: self.vec.len() - 1,
+            #[cfg(debug_assertions)]
+            arena: self.id,
             _phantom: PhantomData,
         }
     }
@@ -22,6 +30,8 @@ impl<T> Arena<T> {
 #[derive(Debug)]
 pub struct Ref<T> {
     index: usize,
+    #[cfg(debug_assertions)]
+    arena: common::identifiable::Id,
     _phantom: PhantomData<T>,
 }
 
@@ -43,6 +53,8 @@ impl<T> Clone for Ref<T> {
     fn clone(&self) -> Self {
         Self {
             index: self.index,
+            #[cfg(debug_assertions)]
+            arena: self.arena,
             _phantom: PhantomData,
         }
     }
@@ -52,10 +64,16 @@ impl<T> Copy for Ref<T> {}
 
 impl<T> Ref<T> {
     pub fn get_mut<'s, 'c: 's>(&self, arena: &'c mut Arena<T>) -> &'s mut T {
+        #[cfg(debug_assertions)]
+        assert_eq!(arena.id, self.arena);
+
         arena.vec.get_mut(self.index).unwrap()
     }
 
     pub fn get<'s, 'c: 's>(&self, arena: &'c Arena<T>) -> &'s T {
+        #[cfg(debug_assertions)]
+        assert_eq!(arena.id, self.arena);
+
         arena.vec.get(self.index).unwrap()
     }
 }
