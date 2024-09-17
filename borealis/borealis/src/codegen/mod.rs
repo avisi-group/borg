@@ -11,7 +11,6 @@ use {
     once_cell::sync::Lazy,
     proc_macro2::{Span, TokenStream},
     quote::{format_ident, quote},
-    rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
     std::{
         hash::{DefaultHasher, Hash, Hasher},
@@ -253,7 +252,7 @@ pub fn codegen_workspace(mut rudder: Model) -> (HashMap<PathBuf, String>, HashSe
     );
 
     let files = rudder_fns
-        .into_par_iter()
+        .into_iter() // todo: parallel
         .map(|(name, function)| {
             let contents = dynamic::codegen_function(&function);
 
@@ -261,13 +260,13 @@ pub fn codegen_workspace(mut rudder: Model) -> (HashMap<PathBuf, String>, HashSe
             dependencies.push("common".into());
             let dependencies = dependencies.into_iter().filter(|dep| *dep != name).collect::<Vec<_>>();
 
-            let dyn_imports: TokenStream = dependencies
-                .iter()
-                .map(|dep_name| {
-                    let name = codegen_ident(*dep_name);
-                    quote!(use super::#name::*;)
-                })
-                .collect();
+            // let dyn_imports: TokenStream = dependencies
+            //     .iter()
+            //     .map(|dep_name| {
+            //         let name = codegen_ident(*dep_name);
+            //         quote!(use super::#name::*;)
+            //     })
+            //     .collect();
 
             let header = codegen_header();
 
@@ -284,8 +283,6 @@ pub fn codegen_workspace(mut rudder: Model) -> (HashMap<PathBuf, String>, HashSe
                         },
                         TranslationContext,
                     };
-
-                    #dyn_imports
 
                     #contents
                 }),

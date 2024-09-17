@@ -23,7 +23,7 @@ use {
 pub mod analysis;
 pub mod build;
 pub mod constant_value;
-pub mod inliner;
+pub mod function_inliner;
 pub mod internal_fns;
 pub mod opt;
 mod pretty_print;
@@ -565,8 +565,8 @@ impl Model {
         validator::validate(self)
     }
 
-    pub fn inline(&mut self) {
-        inliner::inline(self);
+    pub fn inline_functions(&mut self, top_level_fns: &[&'static str]) {
+        function_inliner::inline(self, top_level_fns);
     }
 
     pub fn get_functions(&self) -> &HashMap<InternedString, Function> {

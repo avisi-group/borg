@@ -4,7 +4,7 @@ resolver = "2"
 
 # deserializing/converting the AST takes forever and overflows the stack without optimisations
 [profile.dev]
-opt-level = 3
+opt-level = 1
 
 [profile.release]
 lto = "thin" # fat made it around 5% faster

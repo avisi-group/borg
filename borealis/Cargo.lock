@@ -200,7 +200,6 @@ dependencies = [
  "prettyplease",
  "proc-macro2",
  "quote",
- "rayon",
  "regex",
  "rkyv",
  "sailrs",

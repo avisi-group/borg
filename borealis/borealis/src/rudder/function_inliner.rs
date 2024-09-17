@@ -19,20 +19,18 @@ use {
 /// all local variables in the inlined function need to be inserted into the
 /// calling function (and mangled) parameter local variables need to be made and
 /// arguments copied into them return local variable also needs mangling?
-pub fn inline(model: &mut Model) {
-    let names = model
-        .fns
-        .keys()
+pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
+    top_level_fns
+        .iter()
         .copied()
-        .filter(|name| fn_is_allowlisted(*name))
-        .collect::<Vec<_>>();
-
-    names.into_iter().for_each(|name| {
-        let mut function = model.fns.remove(&name).unwrap();
-        run_inliner(&mut function, &model.fns);
-        function.update_indices();
-        model.fns.insert(name, function);
-    });
+        .map(InternedString::from_static)
+        .for_each(|name| {
+            log::warn!("inlining {name}");
+            let mut function = model.fns.remove(&name).unwrap();
+            run_inliner(&mut function, &model.fns);
+            function.update_indices();
+            model.fns.insert(name, function);
+        });
 }
 
 fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Function>) {
@@ -46,7 +44,8 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
             .enumerate()
             .filter(|(_, s)| {
                 matches!(
-                    s.get(&block_ref.get(function.block_arena()).statement_arena).kind(),
+                    s.get(&block_ref.get(function.block_arena()).statement_arena)
+                        .kind(),
                     StatementKind::Call { .. }
                 )
             })
@@ -60,8 +59,9 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
             let pre_statements = pre.to_owned();
             let post_statements = post.to_owned();
 
-            let StatementKind::Call { target, args, .. } =
-                call.get(&block_ref.get(function.block_arena()).statement_arena).kind()
+            let StatementKind::Call { target, args, .. } = call
+                .get(&block_ref.get(function.block_arena()).statement_arena)
+                .kind()
             else {
                 unreachable!()
             };
@@ -92,7 +92,11 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
             }
 
             post_statements[0]
-                .get_mut(&mut block_ref.get_mut(function.block_arena_mut()).statement_arena)
+                .get_mut(
+                    &mut block_ref
+                        .get_mut(function.block_arena_mut())
+                        .statement_arena,
+                )
                 .replace_kind(StatementKind::ReadVariable {
                     symbol: Symbol {
                         name: "borealis_inline_return".into(),
@@ -144,7 +148,13 @@ fn import_blocks(
                     .clone()
                 {
                     StatementKind::Jump { target } => StatementKind::Jump {
-                        target: import_block_rec(ref_map, this_arena, other_arena, target, this_exit_block_ref),
+                        target: import_block_rec(
+                            ref_map,
+                            this_arena,
+                            other_arena,
+                            target,
+                            this_exit_block_ref,
+                        ),
                     },
                     StatementKind::Branch {
                         condition,
@@ -183,7 +193,9 @@ fn import_blocks(
                                 value,
                             },
                         );
-                        StatementKind::Jump { target: this_block_ref }
+                        StatementKind::Jump {
+                            target: this_block_ref,
+                        }
                     }
                     k => k.clone(),
                 };

@@ -4,10 +4,10 @@ use {
     crate::{
         boom::{
             passes::{
-                cycle_finder::CycleFinder, destruct_structs::DestructStructs, destruct_unions::DestructUnions,
-                fix_exceptions::FixExceptions, fold_unconditionals::FoldUnconditionals,
-                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-                remove_undefined_bv::RemoveUndefinedBV,
+                cycle_finder::CycleFinder, destruct_structs::DestructStructs,
+                destruct_unions::DestructUnions, fix_exceptions::FixExceptions,
+                fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
+                remove_constant_type::RemoveConstantType, remove_undefined_bv::RemoveUndefinedBV,
             },
             Ast,
         },
@@ -98,7 +98,10 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     // // useful for debugging
     if let Some(path) = &dump_ir {
-        boom::pretty_print::print_ast(&mut create_file_buffered(path.join("ast.boom")).unwrap(), ast.clone());
+        boom::pretty_print::print_ast(
+            &mut create_file_buffered(path.join("ast.boom")).unwrap(),
+            ast.clone(),
+        );
     }
 
     info!("Running passes on BOOM");
@@ -135,7 +138,11 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     let mut rudder = rudder::build::from_boom(&ast.get());
 
     if let Some(path) = &dump_ir {
-        writeln!(&mut create_file_buffered(path.join("ast.rudder")).unwrap(), "{rudder}").unwrap();
+        writeln!(
+            &mut create_file_buffered(path.join("ast.rudder")).unwrap(),
+            "{rudder}"
+        )
+        .unwrap();
     }
 
     info!("Validating rudder");
@@ -161,10 +168,13 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         warn!("{msg}");
     }
 
-    info!("Inlining");
-    rudder.inline();
+    // info!("Inlining");
+    // rudder.inline(&["borealis_register_init", "__DecodeA64"]); //__InitSystem
 
-    if matches!(&mode, GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)) {
+    if matches!(
+        &mode,
+        GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
+    ) {
         info!("Generating Rust");
         let ws = codegen_workspace(rudder);
 
@@ -176,7 +186,6 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 fn fn_is_allowlisted(name: InternedString) -> bool {
     const FN_ALLOWLIST: &[&'static str] = &[
         "borealis_register_init",
-        "__DecodeA64_DataProcReg",
         "__DecodeA64",
         // "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
         // "DecodeShift",

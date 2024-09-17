@@ -20,7 +20,6 @@ use {
     log::trace,
     num_rational::Ratio,
     num_traits::cast::FromPrimitive,
-    rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
     std::cmp::Ordering,
 };
@@ -174,7 +173,7 @@ impl BuildContext {
         };
 
         let fns = functions
-            .into_par_iter()
+            .into_iter() // todo parallel
             .map(|(name, (rudder_fn, boom_fn))| {
                 log::debug!("building function {name:?}");
                 (
