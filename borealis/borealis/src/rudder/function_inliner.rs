@@ -1,6 +1,5 @@
 use {
     crate::{
-        fn_is_allowlisted,
         rudder::{
             statement::{build, StatementKind},
             Block, Function, Model, Symbol,
@@ -59,7 +58,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
             let pre_statements = pre.to_owned();
             let post_statements = post.to_owned();
 
-            let StatementKind::Call { target, args, .. } = call
+            let StatementKind::Call { target,  .. } = call
                 .get(&block_ref.get(function.block_arena()).statement_arena)
                 .kind()
             else {

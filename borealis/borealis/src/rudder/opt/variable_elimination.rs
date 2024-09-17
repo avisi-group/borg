@@ -1,6 +1,6 @@
 use {
     crate::{
-        rudder::{analysis, Block, Function, StatementKind, SymbolKind},
+        rudder::{analysis, Block, Function, StatementKind},
         util::arena::{Arena, Ref},
     },
     common::HashMap,

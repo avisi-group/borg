@@ -1,7 +1,7 @@
 use crate::{
     rudder::{
         analysis::dfa::StatementUseAnalysis,
-        statement::{CastOperationKind, StatementInner},
+        statement::StatementInner,
         Block, Function,
     },
     util::arena::{Arena, Ref},

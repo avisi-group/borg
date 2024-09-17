@@ -81,66 +81,66 @@ fn import_statement(
         .clone()
     {
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            (StatementKind::BinaryOperation {
+            StatementKind::BinaryOperation {
                 kind,
                 lhs: mapping.get(&lhs).unwrap().clone(),
                 rhs: mapping.get(&rhs).unwrap().clone(),
-            })
+            }
         }
-        StatementKind::Constant { typ, value } => (StatementKind::Constant { typ, value }),
-        StatementKind::ReadVariable { symbol } => (StatementKind::ReadVariable { symbol }),
+        StatementKind::Constant { typ, value } => StatementKind::Constant { typ, value },
+        StatementKind::ReadVariable { symbol } => StatementKind::ReadVariable { symbol },
         StatementKind::WriteVariable { symbol, value } => {
-            (StatementKind::WriteVariable {
+            StatementKind::WriteVariable {
                 symbol,
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::ReadRegister { typ, offset } => {
-            (StatementKind::ReadRegister {
+            StatementKind::ReadRegister {
                 typ,
                 offset: mapping.get(&offset).unwrap().clone(),
-            })
+            }
         }
         StatementKind::WriteRegister { offset, value } => {
-            (StatementKind::WriteRegister {
+            StatementKind::WriteRegister {
                 offset: mapping.get(&offset).unwrap().clone(),
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::ReadMemory { offset, size } => {
-            (StatementKind::ReadMemory {
+            StatementKind::ReadMemory {
                 offset: mapping.get(&offset).unwrap().clone(),
                 size: mapping.get(&size).unwrap().clone(),
-            })
+            }
         }
         StatementKind::WriteMemory { offset, value } => {
-            (StatementKind::WriteMemory {
+            StatementKind::WriteMemory {
                 offset: mapping.get(&offset).unwrap().clone(),
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::ReadPc => StatementKind::ReadPc,
         StatementKind::WritePc { value } => {
-            (StatementKind::WritePc {
+            StatementKind::WritePc {
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::UnaryOperation { kind, value } => {
-            (StatementKind::UnaryOperation {
+            StatementKind::UnaryOperation {
                 kind,
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::ShiftOperation {
             kind,
             value,
             amount,
         } => {
-            (StatementKind::ShiftOperation {
+            StatementKind::ShiftOperation {
                 kind,
                 value: mapping.get(&value).unwrap().clone(),
                 amount: mapping.get(&amount).unwrap().clone(),
-            })
+            }
         }
         StatementKind::Call { target, args } => {
             let args = args
@@ -148,14 +148,14 @@ fn import_statement(
                 .map(|stmt| mapping.get(stmt).unwrap().clone())
                 .collect();
 
-            (StatementKind::Call { target, args })
+            StatementKind::Call { target, args }
         }
         StatementKind::Cast { kind, typ, value } => {
-            (StatementKind::Cast {
+            StatementKind::Cast {
                 kind,
                 typ: typ.clone(),
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::BitsCast {
             kind,
@@ -163,52 +163,52 @@ fn import_statement(
             value,
             length,
         } => {
-            (StatementKind::BitsCast {
+            StatementKind::BitsCast {
                 kind,
                 typ: typ.clone(),
                 value: mapping.get(&value).unwrap().clone(),
                 length: mapping.get(&length).unwrap().clone(),
-            })
+            }
         }
-        StatementKind::Jump { target } => (StatementKind::Jump { target }),
+        StatementKind::Jump { target } => StatementKind::Jump { target },
         StatementKind::Branch {
             condition,
             true_target,
             false_target,
         } => {
-            (StatementKind::Branch {
+            StatementKind::Branch {
                 condition: mapping.get(&condition).unwrap().clone(),
                 true_target,
                 false_target,
-            })
+            }
         }
         StatementKind::PhiNode { .. } => todo!(),
         StatementKind::Return { value } => {
-            (StatementKind::Return {
+            StatementKind::Return {
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::Select {
             condition,
             true_value,
             false_value,
         } => {
-            (StatementKind::Select {
+            StatementKind::Select {
                 condition: mapping.get(&condition).unwrap().clone(),
                 true_value: mapping.get(&true_value).unwrap().clone(),
                 false_value: mapping.get(&false_value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::BitExtract {
             value,
             start,
             length,
         } => {
-            (StatementKind::BitExtract {
+            StatementKind::BitExtract {
                 value: mapping.get(&value).unwrap().clone(),
                 start: mapping.get(&start).unwrap().clone(),
                 length: mapping.get(&length).unwrap().clone(),
-            })
+            }
         }
         StatementKind::BitInsert {
             target,
@@ -216,83 +216,83 @@ fn import_statement(
             start,
             length,
         } => {
-            (StatementKind::BitInsert {
+            StatementKind::BitInsert {
                 target: mapping.get(&target).unwrap().clone(),
                 source: mapping.get(&source).unwrap().clone(),
                 start: mapping.get(&start).unwrap().clone(),
                 length: mapping.get(&length).unwrap().clone(),
-            })
+            }
         }
         StatementKind::ReadElement { vector, index } => {
-            (StatementKind::ReadElement {
+            StatementKind::ReadElement {
                 vector: mapping.get(&vector).unwrap().clone(),
                 index: mapping.get(&index).unwrap().clone(),
-            })
+            }
         }
         StatementKind::AssignElement {
             vector,
             value,
             index,
         } => {
-            (StatementKind::AssignElement {
+            StatementKind::AssignElement {
                 vector: mapping.get(&vector).unwrap().clone(),
                 value: mapping.get(&value).unwrap().clone(),
                 index: mapping.get(&index).unwrap().clone(),
-            })
+            }
         }
-        StatementKind::Panic(stmt) => (StatementKind::Panic(mapping.get(&stmt).unwrap().clone())),
+        StatementKind::Panic(stmt) => StatementKind::Panic(mapping.get(&stmt).unwrap().clone()),
 
         StatementKind::Assert { condition } => {
-            (StatementKind::Assert {
+            StatementKind::Assert {
                 condition: mapping.get(&condition).unwrap().clone(),
-            })
+            }
         }
 
         StatementKind::CreateBits { value, length } => {
-            (StatementKind::CreateBits {
+            StatementKind::CreateBits {
                 value: mapping.get(&value).unwrap().clone(),
                 length: mapping.get(&length).unwrap().clone(),
-            })
+            }
         }
         StatementKind::SizeOf { value } => {
-            (StatementKind::SizeOf {
+            StatementKind::SizeOf {
                 value: mapping.get(&value).unwrap().clone(),
-            })
+            }
         }
         StatementKind::MatchesUnion { value, variant } => {
-            (StatementKind::MatchesUnion {
+            StatementKind::MatchesUnion {
                 value: mapping.get(&value).unwrap().clone(),
                 variant,
-            })
+            }
         }
         StatementKind::UnwrapUnion { value, variant } => {
-            (StatementKind::UnwrapUnion {
+            StatementKind::UnwrapUnion {
                 value: mapping.get(&value).unwrap().clone(),
                 variant,
-            })
+            }
         }
 
-        StatementKind::Undefined => (StatementKind::Undefined),
+        StatementKind::Undefined => StatementKind::Undefined,
         StatementKind::TupleAccess { index, source } => {
-            (StatementKind::TupleAccess {
+            StatementKind::TupleAccess {
                 source: mapping.get(&source).unwrap().clone(),
                 index,
-            })
+            }
         }
         StatementKind::GetFlag { flag, operation } => {
-            (StatementKind::GetFlag {
+            StatementKind::GetFlag {
                 flag,
                 operation: mapping.get(&operation).unwrap().clone(),
-            })
+            }
         }
         StatementKind::CreateTuple(values) => {
-            (StatementKind::CreateTuple(
+            StatementKind::CreateTuple(
                 values
                     .iter()
                     .map(|v| mapping.get(&v).unwrap())
                     .cloned()
                     .collect(),
-            ))
+            )
         }
     };
 

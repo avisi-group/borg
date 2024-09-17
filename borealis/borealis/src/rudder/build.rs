@@ -1,6 +1,6 @@
 use {
     crate::{
-        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature, Statement},
+        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature},
         rudder::{
             self,
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,

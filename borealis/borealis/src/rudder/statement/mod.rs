@@ -1,19 +1,19 @@
 use {
     crate::{
         rudder::{
-            constant_value::ConstantValue, Block, Function, Model, PrimitiveType,
+            constant_value::ConstantValue, Block, PrimitiveType,
             PrimitiveTypeClass, Symbol, Type,
         },
         util::arena::{Arena, Ref},
     },
-    common::{intern::InternedString, shared::Shared},
+    common::intern::InternedString,
     itertools::Itertools,
     proc_macro2::TokenStream,
     quote::{format_ident, ToTokens, TokenStreamExt},
     std::{
         cmp::Ordering,
-        fmt::{Debug, Formatter, Write},
-        hash::{Hash, Hasher},
+        fmt::{Debug, Write},
+        hash::Hasher,
     },
 };
 
@@ -703,7 +703,7 @@ impl StatementInner {
             StatementKind::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
             StatementKind::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             StatementKind::ShiftOperation { value, .. } => value.get(arena).typ(arena),
-            StatementKind::Call { target, .. } => Type::Any, // todo: need rudder model
+            StatementKind::Call {  .. } => Type::Any, // todo: need rudder model
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ.clone(),
             StatementKind::Jump { .. } => Type::void(),
             StatementKind::Branch { .. } => Type::void(),

@@ -8,10 +8,8 @@ use {
     },
     common::{
         intern::InternedString,
-        shared::{Shared, Weak},
         HashMap, HashSet,
     },
-    log::warn,
     proc_macro2::TokenStream,
     quote::ToTokens,
     std::{
