@@ -1,7 +1,7 @@
 use {
     crate::{
         rudder::{
-            statement::{StatementInner, StatementKind},
+            statement::{Statement, StatementKind},
             Block, Function, Symbol,
         },
         util::arena::{Arena, Ref},
@@ -10,9 +10,9 @@ use {
 };
 
 pub struct SymbolUseAnalysis {
-    symbol_uses: HashMap<InternedString, Vec<(Ref<StatementInner>, Ref<Block>)>>,
-    symbol_reads: HashMap<InternedString, Vec<(Ref<StatementInner>, Ref<Block>)>>,
-    symbol_writes: HashMap<InternedString, Vec<(Ref<StatementInner>, Ref<Block>)>>,
+    symbol_uses: HashMap<InternedString, Vec<(Ref<Statement>, Ref<Block>)>>,
+    symbol_reads: HashMap<InternedString, Vec<(Ref<Statement>, Ref<Block>)>>,
+    symbol_writes: HashMap<InternedString, Vec<(Ref<Statement>, Ref<Block>)>>,
     symbol_blocks: HashMap<InternedString, HashSet<Ref<Block>>>,
 }
 
@@ -42,9 +42,9 @@ impl<'f> SymbolUseAnalysisBuilder<'f> {
     fn insert_use(
         &mut self,
         symbol: Symbol,
-        stmt: Ref<StatementInner>,
+        stmt: Ref<Statement>,
         block: Ref<Block>,
-        arena: &Arena<StatementInner>,
+        arena: &Arena<Statement>,
     ) {
         self.inner
             .symbol_uses
@@ -111,11 +111,11 @@ impl SymbolUseAnalysis {
         self.symbol_writes.contains_key(&symbol.name())
     }
 
-    pub fn get_symbol_writes(&self, symbol: &Symbol) -> &Vec<(Ref<StatementInner>, Ref<Block>)> {
+    pub fn get_symbol_writes(&self, symbol: &Symbol) -> &Vec<(Ref<Statement>, Ref<Block>)> {
         self.symbol_writes.get(&symbol.name()).unwrap()
     }
 
-    pub fn get_symbol_reads(&self, symbol: &Symbol) -> &Vec<(Ref<StatementInner>, Ref<Block>)> {
+    pub fn get_symbol_reads(&self, symbol: &Symbol) -> &Vec<(Ref<Statement>, Ref<Block>)> {
         self.symbol_reads.get(&symbol.name()).unwrap()
     }
 
@@ -127,7 +127,7 @@ impl SymbolUseAnalysis {
 pub struct StatementUseAnalysis<'a> {
     arena: &'a mut Arena<Block>,
     block: Ref<Block>,
-    stmt_uses: HashMap<Ref<StatementInner>, HashSet<Ref<StatementInner>>>,
+    stmt_uses: HashMap<Ref<Statement>, HashSet<Ref<Statement>>>,
 }
 
 impl<'a> StatementUseAnalysis<'a> {
@@ -266,7 +266,7 @@ impl<'a> StatementUseAnalysis<'a> {
         }
     }
 
-    fn add_use(&mut self, stmt: Ref<StatementInner>, use_: Ref<StatementInner>) {
+    fn add_use(&mut self, stmt: Ref<Statement>, use_: Ref<Statement>) {
         self.stmt_uses
             .entry(stmt.clone())
             .and_modify(|uses| {
@@ -279,22 +279,22 @@ impl<'a> StatementUseAnalysis<'a> {
             });
     }
 
-    pub fn is_dead(&self, stmt: Ref<StatementInner>) -> bool {
+    pub fn is_dead(&self, stmt: Ref<Statement>) -> bool {
         !stmt
             .get(&self.block.get(&self.arena).statement_arena)
             .has_side_effects()
             && !self.has_uses(stmt)
     }
 
-    pub fn has_uses(&self, stmt: Ref<StatementInner>) -> bool {
+    pub fn has_uses(&self, stmt: Ref<Statement>) -> bool {
         self.stmt_uses.contains_key(&stmt)
     }
 
-    pub fn get_uses(&self, stmt: Ref<StatementInner>) -> &HashSet<Ref<StatementInner>> {
+    pub fn get_uses(&self, stmt: Ref<Statement>) -> &HashSet<Ref<Statement>> {
         self.stmt_uses.get(&stmt).unwrap()
     }
 
-    pub fn is_used_in_write_var(&self, stmt: Ref<StatementInner>) -> bool {
+    pub fn is_used_in_write_var(&self, stmt: Ref<Statement>) -> bool {
         if let Some(uses) = self.stmt_uses.get(&stmt) {
             uses.iter().any(|u| {
                 matches!(

@@ -1,6 +1,6 @@
 use crate::{
     rudder::{
-        statement::{BinaryOperationKind, CastOperationKind, StatementInner, StatementKind},
+        statement::{BinaryOperationKind, CastOperationKind, Statement, StatementKind},
         Block, ConstantValue, Function, PrimitiveTypeClass, Type,
     },
     util::arena::{Arena, Ref},
@@ -27,7 +27,7 @@ fn run_on_block(b: Ref<Block>, arena: &mut Arena<Block>) -> bool {
     changed
 }
 
-fn run_on_stmt(stmt: Ref<StatementInner>, arena: &mut Arena<StatementInner>) -> bool {
+fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
     if matches!(stmt.get(arena).kind(), StatementKind::Constant { .. }) {
         return false;
     }

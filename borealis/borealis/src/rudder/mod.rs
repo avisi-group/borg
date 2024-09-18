@@ -2,20 +2,14 @@ use {
     crate::{
         rudder::{
             constant_value::ConstantValue,
-            statement::{StatementInner, StatementKind},
+            statement::{Statement, StatementKind},
         },
         util::arena::{Arena, Ref},
     },
-    common::{
-        intern::InternedString,
-        HashMap, HashSet,
-    },
+    common::{intern::InternedString, HashMap, HashSet},
     proc_macro2::TokenStream,
     quote::ToTokens,
-    std::{
-        fmt::Debug,
-        hash::{Hash, Hasher},
-    },
+    std::{fmt::Debug, hash::Hash},
 };
 
 pub mod analysis;
@@ -256,8 +250,8 @@ impl Symbol {
 #[derive(Clone, Debug)]
 pub struct Block {
     index: usize,
-    statement_arena: Arena<StatementInner>,
-    statements: Vec<Ref<StatementInner>>,
+    statement_arena: Arena<Statement>,
+    statements: Vec<Ref<Statement>>,
 }
 
 impl Block {
@@ -281,23 +275,23 @@ impl Block {
             });
     }
 
-    pub fn statements(&self) -> Vec<Ref<StatementInner>> {
+    pub fn statements(&self) -> Vec<Ref<Statement>> {
         self.statements.clone()
     }
 
-    pub fn terminator_statement(&self) -> Option<Ref<StatementInner>> {
+    pub fn terminator_statement(&self) -> Option<Ref<Statement>> {
         self.statements.last().cloned()
     }
 
-    pub fn set_statements<I: Iterator<Item = Ref<StatementInner>>>(&mut self, statements: I) {
+    pub fn set_statements<I: Iterator<Item = Ref<Statement>>>(&mut self, statements: I) {
         self.statements = statements.collect();
     }
 
-    pub fn extend_statements<I: Iterator<Item = Ref<StatementInner>>>(&mut self, stmts: I) {
+    pub fn extend_statements<I: Iterator<Item = Ref<Statement>>>(&mut self, stmts: I) {
         self.statements.extend(stmts)
     }
 
-    fn index_of_statement(&self, reference: Ref<StatementInner>) -> usize {
+    fn index_of_statement(&self, reference: Ref<Statement>) -> usize {
         self.statements
             .iter()
             .enumerate()
@@ -306,20 +300,16 @@ impl Block {
             .0
     }
 
-    pub fn insert_statement_before(
-        &mut self,
-        reference: Ref<StatementInner>,
-        new: Ref<StatementInner>,
-    ) {
+    pub fn insert_statement_before(&mut self, reference: Ref<Statement>, new: Ref<Statement>) {
         let index = self.index_of_statement(reference);
         self.statements.insert(index, new);
     }
 
-    pub fn append_statement(&mut self, new: Ref<StatementInner>) {
+    pub fn append_statement(&mut self, new: Ref<Statement>) {
         self.statements.push(new);
     }
 
-    pub fn kill_statement(&mut self, stmt: Ref<StatementInner>) {
+    pub fn kill_statement(&mut self, stmt: Ref<Statement>) {
         //assert!(Rc::ptr_eq()
 
         let index = self.index_of_statement(stmt);
@@ -351,11 +341,11 @@ impl Block {
         self.statements().len()
     }
 
-    pub fn arena_mut(&mut self) -> &mut Arena<StatementInner> {
+    pub fn arena_mut(&mut self) -> &mut Arena<Statement> {
         &mut self.statement_arena
     }
 
-    pub fn arena(&self) -> &Arena<StatementInner> {
+    pub fn arena(&self) -> &Arena<Statement> {
         &self.statement_arena
     }
 }
@@ -563,7 +553,7 @@ impl Model {
         validator::validate(self)
     }
 
-    pub fn inline_functions(&mut self, top_level_fns: &[&'static str]) {
+    pub fn function_inline(&mut self, top_level_fns: &[&'static str]) {
         function_inliner::inline(self, top_level_fns);
     }
 

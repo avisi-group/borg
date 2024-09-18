@@ -1,7 +1,7 @@
 use crate::{
     rudder::{
         analysis::dfa::StatementUseAnalysis,
-        statement::{CastOperationKind, StatementInner, StatementKind},
+        statement::{CastOperationKind, Statement, StatementKind},
         Block, Function, Type,
     },
     util::arena::{Arena, Ref},
@@ -29,7 +29,7 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
     changed
 }
 
-fn run_on_stmt(stmt: Ref<StatementInner>, block: Ref<Block>, sua: &mut StatementUseAnalysis) -> bool {
+fn run_on_stmt(stmt: Ref<Statement>, block: Ref<Block>, sua: &mut StatementUseAnalysis) -> bool {
     match stmt.get(&block.get(sua.block_arena()).statement_arena).kind().clone() {
         StatementKind::Constant { typ, value } => {
             if typ.is_apint() {

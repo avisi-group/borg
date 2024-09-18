@@ -168,8 +168,8 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         warn!("{msg}");
     }
 
-    // info!("Inlining");
-    // rudder.inline(&["borealis_register_init", "__DecodeA64"]); //__InitSystem
+    info!("Inlining");
+    rudder.function_inline(&["borealis_register_init", "__DecodeA64"]); //__InitSystem
 
     if matches!(
         &mode,
@@ -187,6 +187,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
     const FN_ALLOWLIST: &[&'static str] = &[
         "borealis_register_init",
         "__DecodeA64",
+        "__DecodeA64_DataProcReg",
         // "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
         // "DecodeShift",
         // "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",

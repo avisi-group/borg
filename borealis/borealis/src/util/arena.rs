@@ -25,6 +25,10 @@ impl<T> Arena<T> {
             _phantom: PhantomData,
         }
     }
+
+    pub fn into_inner(self) -> Vec<T> {
+        self.vec
+    }
 }
 
 #[derive(Debug)]

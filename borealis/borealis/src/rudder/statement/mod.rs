@@ -1,20 +1,15 @@
 use {
     crate::{
         rudder::{
-            constant_value::ConstantValue, Block, PrimitiveType,
-            PrimitiveTypeClass, Symbol, Type,
+            constant_value::ConstantValue, Block, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
         },
         util::arena::{Arena, Ref},
     },
-    common::intern::InternedString,
+    common::{intern::InternedString, HashMap},
     itertools::Itertools,
     proc_macro2::TokenStream,
     quote::{format_ident, ToTokens, TokenStreamExt},
-    std::{
-        cmp::Ordering,
-        fmt::{Debug, Write},
-        hash::Hasher,
-    },
+    std::{cmp::Ordering, fmt::Debug},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -85,7 +80,7 @@ pub enum StatementKind {
 
     WriteVariable {
         symbol: Symbol,
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
     },
 
     ReadRegister {
@@ -94,7 +89,7 @@ pub enum StatementKind {
         ///
         /// During building, this should just be the `next_register_offset`
         /// value, not accessing any elements or fields
-        offset: Ref<StatementInner>,
+        offset: Ref<Statement>,
     },
 
     WriteRegister {
@@ -102,142 +97,142 @@ pub enum StatementKind {
         ///
         /// During building, this should just be the `next_register_offset`
         /// value, not accessing any elements or fields
-        offset: Ref<StatementInner>,
-        value: Ref<StatementInner>,
+        offset: Ref<Statement>,
+        value: Ref<Statement>,
     },
 
     ReadMemory {
-        offset: Ref<StatementInner>,
-        size: Ref<StatementInner>,
+        offset: Ref<Statement>,
+        size: Ref<Statement>,
     },
     WriteMemory {
-        offset: Ref<StatementInner>,
-        value: Ref<StatementInner>,
+        offset: Ref<Statement>,
+        value: Ref<Statement>,
     },
 
     ReadPc,
     WritePc {
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
     },
 
     GetFlag {
         flag: Flag,
-        operation: Ref<StatementInner>,
+        operation: Ref<Statement>,
     },
 
     UnaryOperation {
         kind: UnaryOperationKind,
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
     },
     BinaryOperation {
         kind: BinaryOperationKind,
-        lhs: Ref<StatementInner>,
-        rhs: Ref<StatementInner>,
+        lhs: Ref<Statement>,
+        rhs: Ref<Statement>,
     },
     ShiftOperation {
         kind: ShiftOperationKind,
-        value: Ref<StatementInner>,
-        amount: Ref<StatementInner>,
+        value: Ref<Statement>,
+        amount: Ref<Statement>,
     },
     Call {
         target: InternedString, // todo: ref<function>
-        args: Vec<Ref<StatementInner>>,
+        args: Vec<Ref<Statement>>,
     },
     Cast {
         kind: CastOperationKind,
         typ: Type,
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
     },
     BitsCast {
         kind: CastOperationKind,
         typ: Type,
-        value: Ref<StatementInner>,
-        length: Ref<StatementInner>,
+        value: Ref<Statement>,
+        length: Ref<Statement>,
     },
     Jump {
         target: Ref<Block>,
     },
     Branch {
-        condition: Ref<StatementInner>,
+        condition: Ref<Statement>,
         true_target: Ref<Block>,
         false_target: Ref<Block>,
     },
     PhiNode {
-        members: Vec<(Ref<Block>, Ref<StatementInner>)>,
+        members: Vec<(Ref<Block>, Ref<Statement>)>,
     },
     Return {
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
     },
     Select {
-        condition: Ref<StatementInner>,
-        true_value: Ref<StatementInner>,
-        false_value: Ref<StatementInner>,
+        condition: Ref<Statement>,
+        true_value: Ref<Statement>,
+        false_value: Ref<Statement>,
     },
     BitExtract {
-        value: Ref<StatementInner>,
-        start: Ref<StatementInner>,
-        length: Ref<StatementInner>,
+        value: Ref<Statement>,
+        start: Ref<Statement>,
+        length: Ref<Statement>,
     },
     BitInsert {
         /// Target data that `length` bits of `source` will be inserted into at
         /// position `start`
-        target: Ref<StatementInner>,
+        target: Ref<Statement>,
         /// Source bits that will be inserted into target
-        source: Ref<StatementInner>,
+        source: Ref<Statement>,
         /// Offset into `target` that `source` will be inserted
-        start: Ref<StatementInner>,
+        start: Ref<Statement>,
         /// Length of `source` that will be inserted
-        length: Ref<StatementInner>,
+        length: Ref<Statement>,
     },
     ReadElement {
-        vector: Ref<StatementInner>,
-        index: Ref<StatementInner>,
+        vector: Ref<Statement>,
+        index: Ref<Statement>,
     },
     /// Returns the vector with the mutated element
     AssignElement {
-        vector: Ref<StatementInner>,
-        value: Ref<StatementInner>,
-        index: Ref<StatementInner>,
+        vector: Ref<Statement>,
+        value: Ref<Statement>,
+        index: Ref<Statement>,
     },
 
     /// Fatal error, printing value of supplied Ref<StatementInner> for
     /// debugging purposes
-    Panic(Ref<StatementInner>),
+    Panic(Ref<Statement>),
 
     /// `Default::default()`, or uninitialized, or ???
     Undefined,
 
     Assert {
-        condition: Ref<StatementInner>,
+        condition: Ref<Statement>,
     },
 
     CreateBits {
-        value: Ref<StatementInner>,
-        length: Ref<StatementInner>,
+        value: Ref<Statement>,
+        length: Ref<Statement>,
     },
 
     // creating bits and getting the value done through casting
     // gets the length when applied to bits
     SizeOf {
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
     },
 
     /// Tests whether an instance of a union is of a given variant
     MatchesUnion {
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
         variant: InternedString,
     },
 
     /// Extracts the contents of a variant of a union
     UnwrapUnion {
-        value: Ref<StatementInner>,
+        value: Ref<Statement>,
         variant: InternedString,
     },
 
-    CreateTuple(Vec<Ref<StatementInner>>),
+    CreateTuple(Vec<Ref<Statement>>),
     TupleAccess {
         index: usize,
-        source: Ref<StatementInner>,
+        source: Ref<Statement>,
     },
 }
 
@@ -250,90 +245,7 @@ pub enum Flag {
 }
 
 impl StatementKind {
-    fn children(&self) -> Vec<Ref<StatementInner>> {
-        match self {
-            StatementKind::Constant { .. }
-            | StatementKind::Jump { .. }
-            | StatementKind::ReadRegister { .. }
-            | StatementKind::WriteRegister { .. }
-            | StatementKind::ReadMemory { .. }
-            | StatementKind::WriteMemory { .. }
-            | StatementKind::Branch { .. }
-            | StatementKind::PhiNode { .. }
-            | StatementKind::Return { .. }
-            | StatementKind::Panic(_)
-            | StatementKind::ReadPc
-            | StatementKind::WritePc { .. }
-            | StatementKind::ReadVariable { .. }
-            | StatementKind::WriteVariable { .. }
-            | StatementKind::Undefined => {
-                vec![]
-            }
-
-            StatementKind::BinaryOperation { lhs, rhs, .. } => {
-                [lhs, rhs].into_iter().cloned().collect()
-            }
-            StatementKind::UnaryOperation { value, .. } => vec![value.clone()],
-            StatementKind::ShiftOperation { value, amount, .. } => {
-                [value, amount].into_iter().cloned().collect()
-            }
-            StatementKind::Call { args, .. } => args.clone(),
-            StatementKind::Cast { value, .. } => vec![value.clone()],
-            StatementKind::Select {
-                condition,
-                true_value,
-                false_value,
-            } => [condition, true_value, false_value]
-                .into_iter()
-                .cloned()
-                .collect(),
-
-            StatementKind::BitExtract {
-                value,
-                start,
-                length,
-            } => [value, start, length].into_iter().cloned().collect(),
-
-            StatementKind::BitInsert {
-                target: original_value,
-                source: insert_value,
-                start,
-                length,
-            } => [original_value, insert_value, start, length]
-                .into_iter()
-                .cloned()
-                .collect(),
-
-            // complicated! todo: be more precise here
-            StatementKind::ReadElement { vector, index } => {
-                [vector, index].into_iter().cloned().collect()
-            }
-            StatementKind::AssignElement {
-                vector,
-                value,
-                index,
-            } => [value, vector, index].into_iter().cloned().collect(),
-
-            StatementKind::Assert { condition } => vec![condition.clone()],
-            StatementKind::BitsCast { value, length, .. } => {
-                [value, length].into_iter().cloned().collect()
-            }
-            StatementKind::CreateBits { value, length } => {
-                [value, length].into_iter().cloned().collect()
-            }
-
-            StatementKind::SizeOf { value }
-            | StatementKind::MatchesUnion { value, .. }
-            | StatementKind::UnwrapUnion { value, .. } => vec![value.clone()],
-
-            StatementKind::TupleAccess { source, .. } => vec![source.clone()],
-
-            StatementKind::GetFlag { operation, .. } => vec![operation.clone()],
-            StatementKind::CreateTuple(values) => values.clone(),
-        }
-    }
-
-    pub fn to_string(&self, arena: &Arena<StatementInner>) -> InternedString {
+    pub fn to_string(&self, arena: &Arena<Statement>) -> InternedString {
         match &self {
             StatementKind::Constant { typ, value } => format!("const #{} : {}", value, typ),
             StatementKind::ReadVariable { symbol } => {
@@ -597,47 +509,27 @@ impl StatementKind {
 }
 
 #[derive(Debug, Clone)]
-pub struct StatementInner {
+pub struct Statement {
     name: InternedString,
     kind: StatementKind,
     parent: Ref<Block>,
 }
-impl ToTokens for StatementInner {
+impl ToTokens for Statement {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix
-                                                                    // this?
+        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix this?
     }
 }
 
-// impl Statement {
-
-//     pub fn replace_kind(&self, kind: StatementKind) {
-//         let mut inner = self.inner.get_mut();
-//         inner.replace_kind(kind);
-//     }
-
-//     pub fn replace_use(&self, use_of: Statement, with: Statement) {
-//         let mut inner = self.inner.get_mut();
-//         inner.replace_use(use_of, with);
-//     }
-
-//     pub fn update_names(&self, name: InternedString) {
-//         self.inner.get_mut().update_names(name);
-//     }
-
-//     pub fn typ(&self) -> Type {
-
-//     }
-
-// }
-
-impl StatementInner {
-    pub fn to_string(&self, arena: &Arena<StatementInner>) -> InternedString {
+impl Statement {
+    pub fn to_string(&self, arena: &Arena<Statement>) -> InternedString {
         format!("{}: {}", self.name(), self.kind().to_string(arena)).into()
     }
 
     pub fn kind(&self) -> &StatementKind {
         &self.kind
+    }
+    pub fn kind_mut(&mut self) -> &mut StatementKind {
+        &mut self.kind
     }
     pub fn name(&self) -> InternedString {
         self.name
@@ -646,10 +538,6 @@ impl StatementInner {
     pub fn parent_block(&self) -> Ref<Block> {
         self.parent
     }
-
-    //     pub fn has_value(&self) -> bool {
-    //     !self.typ().is_void()
-    // }
 
     pub fn has_side_effects(&self) -> bool {
         matches!(
@@ -667,7 +555,7 @@ impl StatementInner {
         )
     }
 
-    pub fn typ(&self, arena: &Arena<StatementInner>) -> Type {
+    pub fn typ(&self, arena: &Arena<Statement>) -> Type {
         match &self.kind {
             StatementKind::Constant { typ, .. } => typ.clone(),
             StatementKind::ReadVariable { symbol } => symbol.typ(),
@@ -703,7 +591,7 @@ impl StatementInner {
             StatementKind::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
             StatementKind::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             StatementKind::ShiftOperation { value, .. } => value.get(arena).typ(arena),
-            StatementKind::Call {  .. } => Type::Any, // todo: need rudder model
+            StatementKind::Call { .. } => Type::Any, // todo: need rudder model
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ.clone(),
             StatementKind::Jump { .. } => Type::void(),
             StatementKind::Branch { .. } => Type::void(),
@@ -777,7 +665,7 @@ impl StatementInner {
         self.kind = kind;
     }
 
-    pub fn replace_use(&mut self, use_of: Ref<StatementInner>, with: Ref<StatementInner>) {
+    pub fn replace_use(&mut self, use_of: Ref<Statement>, with: Ref<Statement>) {
         match self.kind.clone() {
             StatementKind::Return { value } => {
                 let value = if value == use_of {
@@ -1198,12 +1086,8 @@ impl StatementInner {
 
 /// Creates a new statement in the block's arena, and pushes it to the end of
 /// the block's statements
-pub fn build(
-    block: Ref<Block>,
-    arena: &mut Arena<Block>,
-    kind: StatementKind,
-) -> Ref<StatementInner> {
-    let r = block.get_mut(arena).arena_mut().insert(StatementInner {
+pub fn build(block: Ref<Block>, arena: &mut Arena<Block>, kind: StatementKind) -> Ref<Statement> {
+    let r = block.get_mut(arena).arena_mut().insert(Statement {
         name: "???".into(),
         kind,
         parent: block,
@@ -1216,9 +1100,9 @@ pub fn build(
 pub fn cast(
     block: Ref<Block>,
     arena: &mut Arena<Block>,
-    source: Ref<StatementInner>,
+    source: Ref<Statement>,
     destination_type: Type,
-) -> Ref<StatementInner> {
+) -> Ref<Statement> {
     let s_arena = block.get(arena).arena();
 
     if source.get(s_arena).typ(s_arena) == destination_type {
@@ -1454,4 +1338,183 @@ pub fn cast(
             );
         }
     }
+}
+
+pub fn import_statement(
+    source_block: Ref<Block>,
+    target_block: Ref<Block>,
+    block_arena: &mut Arena<Block>,
+    target_statement: Ref<Statement>,
+    mapping: &HashMap<Ref<Statement>, Ref<Statement>>,
+) -> Ref<Statement> {
+    let mapped_kind = match target_statement
+        .get(target_block.get(&block_arena).arena())
+        .kind()
+        .clone()
+    {
+        StatementKind::BinaryOperation { kind, lhs, rhs } => StatementKind::BinaryOperation {
+            kind,
+            lhs: mapping.get(&lhs).unwrap().clone(),
+            rhs: mapping.get(&rhs).unwrap().clone(),
+        },
+        StatementKind::Constant { typ, value } => StatementKind::Constant { typ, value },
+        StatementKind::ReadVariable { symbol } => StatementKind::ReadVariable { symbol },
+        StatementKind::WriteVariable { symbol, value } => StatementKind::WriteVariable {
+            symbol,
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::ReadRegister { typ, offset } => StatementKind::ReadRegister {
+            typ,
+            offset: mapping.get(&offset).unwrap().clone(),
+        },
+        StatementKind::WriteRegister { offset, value } => StatementKind::WriteRegister {
+            offset: mapping.get(&offset).unwrap().clone(),
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::ReadMemory { offset, size } => StatementKind::ReadMemory {
+            offset: mapping.get(&offset).unwrap().clone(),
+            size: mapping.get(&size).unwrap().clone(),
+        },
+        StatementKind::WriteMemory { offset, value } => StatementKind::WriteMemory {
+            offset: mapping.get(&offset).unwrap().clone(),
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::ReadPc => StatementKind::ReadPc,
+        StatementKind::WritePc { value } => StatementKind::WritePc {
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::UnaryOperation { kind, value } => StatementKind::UnaryOperation {
+            kind,
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::ShiftOperation {
+            kind,
+            value,
+            amount,
+        } => StatementKind::ShiftOperation {
+            kind,
+            value: mapping.get(&value).unwrap().clone(),
+            amount: mapping.get(&amount).unwrap().clone(),
+        },
+        StatementKind::Call { target, args } => {
+            let args = args
+                .iter()
+                .map(|stmt| mapping.get(stmt).unwrap().clone())
+                .collect();
+
+            StatementKind::Call { target, args }
+        }
+        StatementKind::Cast { kind, typ, value } => StatementKind::Cast {
+            kind,
+            typ: typ.clone(),
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::BitsCast {
+            kind,
+            typ,
+            value,
+            length,
+        } => StatementKind::BitsCast {
+            kind,
+            typ: typ.clone(),
+            value: mapping.get(&value).unwrap().clone(),
+            length: mapping.get(&length).unwrap().clone(),
+        },
+        StatementKind::Jump { target } => StatementKind::Jump { target },
+        StatementKind::Branch {
+            condition,
+            true_target,
+            false_target,
+        } => StatementKind::Branch {
+            condition: mapping.get(&condition).unwrap().clone(),
+            true_target,
+            false_target,
+        },
+        StatementKind::PhiNode { .. } => todo!(),
+        StatementKind::Return { value } => StatementKind::Return {
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::Select {
+            condition,
+            true_value,
+            false_value,
+        } => StatementKind::Select {
+            condition: mapping.get(&condition).unwrap().clone(),
+            true_value: mapping.get(&true_value).unwrap().clone(),
+            false_value: mapping.get(&false_value).unwrap().clone(),
+        },
+        StatementKind::BitExtract {
+            value,
+            start,
+            length,
+        } => StatementKind::BitExtract {
+            value: mapping.get(&value).unwrap().clone(),
+            start: mapping.get(&start).unwrap().clone(),
+            length: mapping.get(&length).unwrap().clone(),
+        },
+        StatementKind::BitInsert {
+            target,
+            source,
+            start,
+            length,
+        } => StatementKind::BitInsert {
+            target: mapping.get(&target).unwrap().clone(),
+            source: mapping.get(&source).unwrap().clone(),
+            start: mapping.get(&start).unwrap().clone(),
+            length: mapping.get(&length).unwrap().clone(),
+        },
+        StatementKind::ReadElement { vector, index } => StatementKind::ReadElement {
+            vector: mapping.get(&vector).unwrap().clone(),
+            index: mapping.get(&index).unwrap().clone(),
+        },
+        StatementKind::AssignElement {
+            vector,
+            value,
+            index,
+        } => StatementKind::AssignElement {
+            vector: mapping.get(&vector).unwrap().clone(),
+            value: mapping.get(&value).unwrap().clone(),
+            index: mapping.get(&index).unwrap().clone(),
+        },
+        StatementKind::Panic(stmt) => StatementKind::Panic(mapping.get(&stmt).unwrap().clone()),
+
+        StatementKind::Assert { condition } => StatementKind::Assert {
+            condition: mapping.get(&condition).unwrap().clone(),
+        },
+
+        StatementKind::CreateBits { value, length } => StatementKind::CreateBits {
+            value: mapping.get(&value).unwrap().clone(),
+            length: mapping.get(&length).unwrap().clone(),
+        },
+        StatementKind::SizeOf { value } => StatementKind::SizeOf {
+            value: mapping.get(&value).unwrap().clone(),
+        },
+        StatementKind::MatchesUnion { value, variant } => StatementKind::MatchesUnion {
+            value: mapping.get(&value).unwrap().clone(),
+            variant,
+        },
+        StatementKind::UnwrapUnion { value, variant } => StatementKind::UnwrapUnion {
+            value: mapping.get(&value).unwrap().clone(),
+            variant,
+        },
+
+        StatementKind::Undefined => StatementKind::Undefined,
+        StatementKind::TupleAccess { index, source } => StatementKind::TupleAccess {
+            source: mapping.get(&source).unwrap().clone(),
+            index,
+        },
+        StatementKind::GetFlag { flag, operation } => StatementKind::GetFlag {
+            flag,
+            operation: mapping.get(&operation).unwrap().clone(),
+        },
+        StatementKind::CreateTuple(values) => StatementKind::CreateTuple(
+            values
+                .iter()
+                .map(|v| mapping.get(&v).unwrap())
+                .cloned()
+                .collect(),
+        ),
+    };
+
+    build(source_block, block_arena, mapped_kind)
 }

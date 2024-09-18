@@ -1,7 +1,7 @@
 use crate::{
     rudder::{
         analysis::dfa::StatementUseAnalysis,
-        statement::StatementInner,
+        statement::Statement,
         Block, Function,
     },
     util::arena::{Arena, Ref},
@@ -28,7 +28,7 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
     changed
 }
 
-fn run_on_stmt(stmt: Ref<StatementInner>, sua: &StatementUseAnalysis) -> bool {
+fn run_on_stmt(stmt: Ref<Statement>, sua: &StatementUseAnalysis) -> bool {
     // match stmt.kind() {
     //     /*crate::rudder::statement::StatementKind::BitExtract {
     //         value,

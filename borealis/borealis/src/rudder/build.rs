@@ -6,7 +6,7 @@ use {
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
             statement::{
                 build, cast, BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind,
-                StatementInner, StatementKind, UnaryOperationKind,
+                Statement, StatementKind, UnaryOperationKind,
             },
             Block, ConstantValue, Function, Model, PrimitiveType, PrimitiveTypeClass,
             RegisterDescriptor, Symbol, Type,
@@ -477,8 +477,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn build_specialized_function(
         &mut self,
         name: InternedString,
-        args: &[Ref<StatementInner>],
-    ) -> Option<Ref<StatementInner>> {
+        args: &[Ref<Statement>],
+    ) -> Option<Ref<Statement>> {
         if Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$")
             .unwrap()
             .is_match(name.as_ref())
@@ -1917,7 +1917,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     // }
 
     /// Generates rudder for a writing a statement to a boom::Expression
-    fn build_expression_write(&mut self, target: &boom::Expression, source: Ref<StatementInner>) {
+    fn build_expression_write(&mut self, target: &boom::Expression, source: Ref<Statement>) {
         let idents = expression_field_collapse(target);
         let (root, fields) = idents
             .split_first()
@@ -1983,7 +1983,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     /// Last statement returned is the value
-    fn build_value(&mut self, boom_value: Shared<boom::Value>) -> Ref<StatementInner> {
+    fn build_value(&mut self, boom_value: Shared<boom::Value>) -> Ref<Statement> {
         let (base, outer_field_accesses) = value_field_collapse(boom_value.clone());
 
         assert!(outer_field_accesses.is_empty());
@@ -2136,7 +2136,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn build_literal(&mut self, literal: &boom::Literal) -> Ref<StatementInner> {
+    fn build_literal(&mut self, literal: &boom::Literal) -> Ref<Statement> {
         let kind = match literal {
             boom::Literal::Int(i) => StatementKind::Constant {
                 typ: (Type::new_primitive(
@@ -2176,7 +2176,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         build(self.block, self.block_arena_mut(), kind)
     }
 
-    fn build_operation(&mut self, op: &boom::Operation) -> Ref<StatementInner> {
+    fn build_operation(&mut self, op: &boom::Operation) -> Ref<Statement> {
         match op {
             boom::Operation::Not(value) => {
                 let value = self.build_value(value.clone());
@@ -2346,9 +2346,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     fn generate_concat(
         &mut self,
-        left: Ref<StatementInner>,
-        right: Ref<StatementInner>,
-    ) -> Ref<StatementInner> {
+        left: Ref<Statement>,
+        right: Ref<Statement>,
+    ) -> Ref<Statement> {
         let arena = self.statement_arena();
 
         // todo: (zero extend original value || create new bits with runtime length)
@@ -2476,7 +2476,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn statement_arena(&self) -> &Arena<StatementInner> {
+    fn statement_arena(&self) -> &Arena<Statement> {
         &self
             .block
             .get(self.fn_ctx().rudder_fn.block_arena())

@@ -10,7 +10,7 @@ use {
         rudder::{
             constant_value::ConstantValue,
             statement::{
-                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, StatementInner,
+                BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, Statement,
                 StatementKind, UnaryOperationKind,
             },
             Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
@@ -371,8 +371,8 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStre
 //
 pub fn codegen_stmt(
     b_arena: &Arena<Block>,
-    stmt: Ref<StatementInner>,
-    s_arena: &Arena<StatementInner>,
+    stmt: Ref<Statement>,
+    s_arena: &Arena<Statement>,
 ) -> TokenStream {
     let stmt = stmt.get(s_arena);
     let stmt_name = format_ident!("{}", stmt.name().to_string());
@@ -756,9 +756,9 @@ pub fn codegen_stmt(
 
 pub fn codegen_cast(
     typ: Type,
-    value: Ref<StatementInner>,
+    value: Ref<Statement>,
     kind: CastOperationKind,
-    s_arena: &Arena<StatementInner>,
+    s_arena: &Arena<Statement>,
 ) -> TokenStream {
     let value = value.get(s_arena);
     let source_type = value.typ(s_arena);

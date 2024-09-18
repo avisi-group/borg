@@ -1,7 +1,7 @@
 use {
     crate::{
         rudder::{
-            statement::{StatementInner, StatementKind},
+            statement::{Statement, StatementKind},
             Block, ConstantValue, Function, Model, PrimitiveType, PrimitiveTypeClass, Type,
         },
         util::arena::Ref,
@@ -116,7 +116,7 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 }
 
 fn validate_constant_type(
-    ((stmt, block, f), (typ, value)): ((Ref<StatementInner>, Ref<Block>, &Function), (Type, ConstantValue)),
+    ((stmt, block, f), (typ, value)): ((Ref<Statement>, Ref<Block>, &Function), (Type, ConstantValue)),
 ) -> Option<ValidationMessage> {
     match (&value, &typ) {
         (
