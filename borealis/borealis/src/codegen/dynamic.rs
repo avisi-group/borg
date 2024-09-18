@@ -519,20 +519,13 @@ pub fn codegen_stmt(
 
             quote! { ctx.emitter().shift(#value.clone(), #amount.clone(), ShiftOperationKind::#kind) }
         }
-        StatementKind::Call { target, args, .. } => {
-            let ident = codegen_ident(target);
-            let args = args.iter().map(|a| a.get(s_arena));
-
-            // if tail {
-            //     quote! {
-            //         return #ident(ctx, #(#args),*)
-            //     }
-            // } else {
-            //
-            // }
-            // todo check me
+        StatementKind::Call { target, .. } => {
+            let ident = target.as_ref();
             quote! {
-                #ident(ctx, #(#args),*)
+                {
+                    let foo: X86NodeRef = todo!(#ident);
+                    foo
+                }
             }
         }
         StatementKind::Cast { typ, value, kind } => {

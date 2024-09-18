@@ -144,60 +144,10 @@ pub fn codegen_type(typ: Type) -> TokenStream {
     }
 }
 
-pub fn codegen_workspace(mut rudder: Model) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
-    // {
-    //     let mut files = HashMap::default();
-
-    //     rudder.update_names();
-    //     let rudder_fns = rudder.get_functions();
-
-    //     let funcs = rudder_fns
-    //         .values()
-    //         .map(dynamic::codegen_function)
-    //         .collect::<TokenStream>();
-
-    //     let state = codegen_state(rudder);
-    //     let bits = include::get("bits.rs");
-    //     let util = include::get("util.rs");
-
-    //     let contents = quote! {
-    //         //! aarch64
-
-    //         #![allow(non_snake_case)]
-    //         #![allow(unused_assignments)]
-    //         #![allow(unused_mut)]
-    //         #![allow(unused_parens)]
-    //         #![allow(unused_variables)]
-    //         #![allow(unused_imports)]
-    //         #![allow(dead_code)]
-    //         #![allow(unreachable_code)]
-    //         #![allow(unused_doc_comments)]
-    //         #![allow(non_upper_case_globals)]
-    //         #![allow(non_camel_case_types)]
-
-    //         use crate::dbt::{
-    //             emitter::{Emitter, Type, TypeKind, BlockResult, Flag},
-    //             x86::{
-    //                 emitter::{UnaryOperationKind,
-    // BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef,
-    // X86Emitter, X86NodeRef, X86SymbolRef, },
-    // X86TranslationContext,             },
-    //             TranslationContext,
-    //         };
-
-    //         #funcs
-
-    //         #state
-
-    //         #bits
-
-    //         #util
-    //     };
-
-    //     files.insert("mod.rs".into(), render(&contents));
-    //     return (files, HashSet::default());
-    // }
-
+pub fn codegen_workspace(
+    mut rudder: Model,
+    toplevel_fns: &[&'static str],
+) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     // common module depended on by all containing bundle, tracer, state, and
     // structs/enums/unions
     let common = {
@@ -222,11 +172,11 @@ pub fn codegen_workspace(mut rudder: Model) -> (HashMap<PathBuf, String>, HashSe
 
     rudder.update_names();
     let cfg = FunctionCallGraphAnalysis::new(&rudder);
-    let rudder_fns = rudder
-        .get_functions()
-        .into_iter()
-        .filter(|(name, _)| fn_is_allowlisted(**name))
-        .map(|(name, function)| (*name, function))
+    let rudder_fns = toplevel_fns
+        .iter()
+        .copied()
+        .map(InternedString::from_static)
+        .map(|name| (name, rudder.get_functions().get(&name).unwrap()))
         .collect::<HashMap<_, _>>();
 
     let module_names = rudder_fns

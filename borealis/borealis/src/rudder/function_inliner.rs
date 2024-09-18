@@ -3,11 +3,11 @@ use {
         fn_is_allowlisted,
         rudder::{
             statement::{build, import_statement, StatementKind},
-            Block, Function, Model, Symbol,
+            Block, Function, Model, Symbol, Type,
         },
         util::arena::{Arena, Ref},
     },
-    common::{intern::InternedString, HashMap},
+    common::{identifiable::Id, intern::InternedString, HashMap},
 };
 
 /// In a function, go through all blocks, looking for function calls
@@ -30,13 +30,17 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
         .for_each(|name| {
             log::warn!("inlining {name}");
             let mut function = model.fns.remove(&name).unwrap();
-            run_inliner(&mut function, &model.fns);
+            function.add_local_variable(Symbol::new("borealis_inline_return".into(), Type::Any));
+
+            while run_inliner(&mut function, &model.fns) {}
+
             function.update_indices();
             model.fns.insert(name, function);
         });
 }
 
-fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Function>) {
+fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Function>) -> bool {
+    let mut did_change = false;
     function
         .block_iter()
         .collect::<Vec<_>>()
@@ -64,18 +68,18 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 })
                 .collect::<Vec<_>>();
 
-            if calls.len() > 1 {
-                todo!();
-            }
+            if let Some((index, (call_name, call_args))) = calls.first() {
+                did_change = true;
 
-            for (index, (call_name, call_args)) in calls {
-                log::warn!(
+                log::debug!(
                     "inlining call {call_name:?} in \n{}",
                     block_ref.get(function.block_arena())
                 );
 
+                let symbol_prefix = format!("inline{:x}_", Id::new());
+
                 let (pre_statements, post_statements) = {
-                    let (pre, post) = statements.split_at(index);
+                    let (pre, post) = statements.split_at(*index);
                     (pre.to_owned(), post.to_owned())
                 };
 
@@ -84,18 +88,38 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
 
                 let other_fn = functions.get(&call_name).unwrap();
 
-                log::warn!("other entry block: {:?}", other_fn.entry_block());
+                log::debug!("other entry block: {:?}", other_fn.entry_block());
+
+                // import local variables
+                other_fn
+                    .local_variables()
+                    .iter()
+                    .chain(other_fn.parameters().iter())
+                    .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
+                    .for_each(|sym| function.add_local_variable(sym));
 
                 // import the target's blocks, assigning new blockrefs, and replacing returns
                 // with jumps to post_block_ref
-                let entry_block_ref = import_blocks(function, other_fn, post_block_ref);
-
-                // todo: !!!!!!!!!!!!!!!!!!!       import and mangle local variables
+                let entry_block_ref =
+                    import_blocks(function, other_fn, post_block_ref, &symbol_prefix);
 
                 // set pre-statements and end pre block with jump to inlined function entry block
                 pre_block_ref
                     .get_mut(function.block_arena_mut())
                     .set_statements(pre_statements.into_iter());
+
+                for (symbol, value) in other_fn
+                    .parameters()
+                    .iter()
+                    .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
+                    .zip(call_args.iter().copied())
+                {
+                    build(
+                        pre_block_ref,
+                        function.block_arena_mut(),
+                        StatementKind::WriteVariable { symbol, value },
+                    );
+                }
                 build(
                     pre_block_ref,
                     function.block_arena_mut(),
@@ -103,15 +127,12 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                         target: entry_block_ref,
                     },
                 );
-
-                log::warn!(
+                log::debug!(
                     "new pre block\n{}",
                     pre_block_ref.get(function.block_arena())
                 );
 
-                // todo: !!!!!!!!!!!!!!!!!!!         for arg in args,
-                // pre_statements.push(statement::copy)
-
+                // import post statenents to new block, replacing call with read variable
                 {
                     let mut mapping = HashMap::default();
 
@@ -141,19 +162,22 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                     }
                 }
 
-                log::warn!(
+                log::debug!(
                     "new post block\n{}",
                     post_block_ref.get(function.block_arena())
                 );
             }
         });
+
+    did_change
 }
 
 /// returns entry block of imported blocks
 fn import_blocks(
     this_function: &mut Function,
     other_function: &Function,
-    return_target_block: Ref<Block>,
+    return_target_block: Ref<Block>, // replace returns with jumps to this block
+    symbol_prefix: &str,             // insert this prefix into symbol names
 ) -> Ref<Block> {
     let other_refs = other_function.block_iter().collect::<Vec<_>>();
 
@@ -187,6 +211,13 @@ fn import_blocks(
                     *false_target = *mapping.get(false_target).unwrap();
                 }
                 StatementKind::PhiNode { .. } => todo!(),
+
+                StatementKind::ReadVariable { symbol } => {
+                    *symbol = symbol_add_prefix(symbol, symbol_prefix)
+                }
+                StatementKind::WriteVariable { symbol, .. } => {
+                    *symbol = symbol_add_prefix(symbol, symbol_prefix)
+                }
                 _ => (),
             }
         }
@@ -226,4 +257,8 @@ fn import_blocks(
     });
 
     *mapping.get(&other_entry).unwrap()
+}
+
+fn symbol_add_prefix(symbol: &Symbol, prefix: &str) -> Symbol {
+    Symbol::new(format!("{prefix}{}", symbol.name()).into(), symbol.typ())
 }

@@ -1,7 +1,9 @@
 use {
     crate::rudder::{
         constant_value::ConstantValue,
-        statement::{build, BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementKind},
+        statement::{
+            build, BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementKind,
+        },
         Function, Symbol, Type,
     },
     once_cell::sync::Lazy,
@@ -283,7 +285,9 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         let bits_length = build(
             entry_block_ref,
             function.block_arena_mut(),
-            StatementKind::SizeOf { value: bits.clone() },
+            StatementKind::SizeOf {
+                value: bits.clone(),
+            },
         );
 
         let read_count_cast = build(

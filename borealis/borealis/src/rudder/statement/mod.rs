@@ -1084,24 +1084,54 @@ impl Statement {
     }
 }
 
+pub enum Location {
+    End,
+    Before(Ref<Statement>),
+}
+
 /// Creates a new statement in the block's arena, and pushes it to the end of
 /// the block's statements
-pub fn build(block: Ref<Block>, arena: &mut Arena<Block>, kind: StatementKind) -> Ref<Statement> {
+pub fn build_at(
+    block: Ref<Block>,
+    arena: &mut Arena<Block>,
+    kind: StatementKind,
+    location: Location,
+) -> Ref<Statement> {
     let r = block.get_mut(arena).arena_mut().insert(Statement {
         name: "???".into(),
         kind,
         parent: block,
     });
-    block.get_mut(arena).statements.push(r);
+    match location {
+        Location::Before(before) => block.get_mut(arena).insert_statement_before(before, r),
+        Location::End => block.get_mut(arena).statements.push(r),
+    }
+
     r
 }
 
-// No-op if same type
+/// Creates a new statement in the block's arena, and pushes it to the end of
+/// the block's statements
+pub fn build(block: Ref<Block>, arena: &mut Arena<Block>, kind: StatementKind) -> Ref<Statement> {
+    build_at(block, arena, kind, Location::End)
+}
+
 pub fn cast(
     block: Ref<Block>,
     arena: &mut Arena<Block>,
     source: Ref<Statement>,
     destination_type: Type,
+) -> Ref<Statement> {
+    cast_at(block, arena, source, destination_type, Location::End)
+}
+
+// No-op if same type
+pub fn cast_at(
+    block: Ref<Block>,
+    arena: &mut Arena<Block>,
+    source: Ref<Statement>,
+    destination_type: Type,
+    location: Location,
 ) -> Ref<Statement> {
     let s_arena = block.get(arena).arena();
 
@@ -1115,7 +1145,7 @@ pub fn cast(
             // compare widths
             match source_primitive.width().cmp(&dest_primitive.width()) {
                 // source is larger than destination
-                Ordering::Greater => build(
+                Ordering::Greater => build_at(
                     block,
                     arena,
                     StatementKind::Cast {
@@ -1123,6 +1153,7 @@ pub fn cast(
                         typ: destination_type,
                         value: source,
                     },
+                    location,
                 ),
 
                 // destination is larger than source
@@ -1135,7 +1166,7 @@ pub fn cast(
                         PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
                     };
 
-                    build(
+                    build_at(
                         block,
                         arena,
                         StatementKind::Cast {
@@ -1143,11 +1174,12 @@ pub fn cast(
                             typ: destination_type,
                             value: source,
                         },
+                        location,
                     )
                 }
 
                 // equal width
-                Ordering::Equal => build(
+                Ordering::Equal => build_at(
                     block,
                     arena,
                     StatementKind::Cast {
@@ -1155,6 +1187,7 @@ pub fn cast(
                         typ: destination_type,
                         value: source,
                     },
+                    location,
                 ),
             }
         }
@@ -1177,7 +1210,7 @@ pub fn cast(
                 (0, 0) => panic!("no cast needed, both unknown"),
                 (_, 0) => {
                     // casting fixed to unknown
-                    build(
+                    build_at(
                         block,
                         arena,
                         StatementKind::Cast {
@@ -1185,11 +1218,12 @@ pub fn cast(
                             typ: destination_type,
                             value: source,
                         },
+                        location,
                     )
                 }
                 (0, _) => {
                     // casting fixed to unknown
-                    build(
+                    build_at(
                         block,
                         arena,
                         StatementKind::Cast {
@@ -1197,6 +1231,7 @@ pub fn cast(
                             typ: destination_type,
                             value: source,
                         },
+                        location,
                     )
                 }
                 (_, _) => panic!("casting from fixed to fixed"),
@@ -1212,7 +1247,7 @@ pub fn cast(
         ) => {
             assert!(*element_width_in_bits < 128);
 
-            build(
+            build_at(
                 block,
                 arena,
                 StatementKind::Cast {
@@ -1220,6 +1255,7 @@ pub fn cast(
                     typ: destination_type,
                     value: source,
                 },
+                location,
             )
         }
 
@@ -1238,7 +1274,7 @@ pub fn cast(
                 );
             }
 
-            build(
+            build_at(
                 block,
                 arena,
                 StatementKind::Cast {
@@ -1246,10 +1282,11 @@ pub fn cast(
                     typ: destination_type,
                     value: source,
                 },
+                location,
             )
         }
 
-        (Type::ArbitraryLengthInteger, Type::Primitive(_)) => build(
+        (Type::ArbitraryLengthInteger, Type::Primitive(_)) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1257,9 +1294,10 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
 
-        (Type::Bits, Type::Primitive(_)) => build(
+        (Type::Bits, Type::Primitive(_)) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1267,9 +1305,10 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
 
-        (Type::ArbitraryLengthInteger, Type::Bits) => build(
+        (Type::ArbitraryLengthInteger, Type::Bits) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1277,9 +1316,10 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
 
-        (Type::ArbitraryLengthInteger, Type::Rational) => build(
+        (Type::ArbitraryLengthInteger, Type::Rational) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1287,8 +1327,9 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
-        (Type::Rational, Type::ArbitraryLengthInteger) => build(
+        (Type::Rational, Type::ArbitraryLengthInteger) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1296,10 +1337,11 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
 
         // allow casting any to anything
-        (Type::Any, _) => build(
+        (Type::Any, _) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1307,11 +1349,12 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
 
         // unions can go from and to anything
         // todo: verify width here
-        (Type::Union { .. }, _) => build(
+        (Type::Union { .. }, _) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1319,8 +1362,9 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
-        (_, Type::Union { .. }) => build(
+        (_, Type::Union { .. }) => build_at(
             block,
             arena,
             StatementKind::Cast {
@@ -1328,6 +1372,7 @@ pub fn cast(
                 typ: destination_type,
                 value: source,
             },
+            location,
         ),
 
         (src, dst) => {

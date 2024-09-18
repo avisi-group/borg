@@ -169,47 +169,47 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Inlining");
-    rudder.function_inline(&["borealis_register_init", "__DecodeA64"]); //__InitSystem
+    rudder.function_inline(FN_TOPLEVEL);
 
     if matches!(
         &mode,
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
     ) {
         info!("Generating Rust");
-        let ws = codegen_workspace(rudder);
+        let ws = codegen_workspace(rudder, FN_TOPLEVEL);
 
         info!("Writing workspace to {:?}", &path);
         write_workspace(ws, path);
     }
 }
 
+const FN_TOPLEVEL: &[&'static str] = &["borealis_register_init", "__DecodeA64", "__InitSystem"];
+
 fn fn_is_allowlisted(name: InternedString) -> bool {
     const FN_ALLOWLIST: &[&'static str] = &[
-        "borealis_register_init",
-        "__DecodeA64",
         "__DecodeA64_DataProcReg",
-        // "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
-        // "DecodeShift",
-        // "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
-        // "__id",
-        // "X_read",
-        // "get_R",
-        // "read_gpr",
-        // "ShiftReg",
-        // "X_set",
-        // "set_R",
-        // "write_gpr",
+        "decode_add_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+        "DecodeShift",
+        "execute_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+        "__id",
+        "X_read",
+        "get_R",
+        "read_gpr",
+        "ShiftReg",
+        "X_set",
+        "set_R",
+        "write_gpr",
         // "__InitSystem",
-        // "TakeReset",
-        // "InitVariantImplemented",
-        // "InitFeatureImpl",
+        "TakeReset",
+        "InitVariantImplemented",
+        "InitFeatureImpl",
         // "_get_RMR_EL3_Type_AA64",
         // "_get_ID_AA64PFR0_EL1_Type_EL3",
         // "SetResetVector",
         // "Mk_RVBAR_EL1_Type",
     ];
 
-    FN_ALLOWLIST.contains(&name.as_ref()) || name.as_ref().ends_with("_initialize")
+    FN_ALLOWLIST.contains(&name.as_ref()) || FN_TOPLEVEL.contains(&name.as_ref())
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {
