@@ -30,7 +30,6 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
         .for_each(|name| {
             log::warn!("inlining {name}");
             let mut function = model.fns.remove(&name).unwrap();
-            function.add_local_variable(Symbol::new("borealis_inline_return".into(), Type::Any));
 
             while run_inliner(&mut function, &model.fns) {}
 
@@ -48,27 +47,23 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
         .for_each(|block_ref| {
             let statements = block_ref.get(function.block_arena()).statements();
 
-            let calls = statements
-                .iter()
-                .enumerate()
-                .filter_map(|(i, s)| {
-                    match s
-                        .get(&block_ref.get(function.block_arena()).statement_arena)
-                        .kind()
-                    {
-                        StatementKind::Call { target, args } => {
-                            if fn_is_allowlisted(*target) {
-                                Some((i, (*target, args.clone())))
-                            } else {
-                                None
-                            }
+            let mut calls = statements.iter().enumerate().filter_map(|(i, s)| {
+                match s
+                    .get(&block_ref.get(function.block_arena()).statement_arena)
+                    .kind()
+                {
+                    StatementKind::Call { target, args, .. } => {
+                        if fn_is_allowlisted(*target) {
+                            Some((i, (*target, args.clone())))
+                        } else {
+                            None
                         }
-                        _ => None,
                     }
-                })
-                .collect::<Vec<_>>();
+                    _ => None,
+                }
+            });
 
-            if let Some((index, (call_name, call_args))) = calls.first() {
+            if let Some((index, (call_name, call_args))) = calls.next() {
                 did_change = true;
 
                 log::debug!(
@@ -79,7 +74,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 let symbol_prefix = format!("inline{:x}_", Id::new());
 
                 let (pre_statements, post_statements) = {
-                    let (pre, post) = statements.split_at(*index);
+                    let (pre, post) = statements.split_at(index);
                     (pre.to_owned(), post.to_owned())
                 };
 
@@ -136,17 +131,45 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 {
                     let mut mapping = HashMap::default();
 
-                    let read_return_ref = build(
-                        post_block_ref,
-                        function.block_arena_mut(),
-                        StatementKind::ReadVariable {
-                            symbol: Symbol {
-                                name: "borealis_inline_return".into(),
-                                typ: other_fn.return_type(),
-                            },
-                        },
-                    );
-                    mapping.insert(post_statements[0], read_return_ref);
+                    if let Type::Tuple(ts) = other_fn.return_type() {
+                        let reads = ts
+                            .iter()
+                            .enumerate()
+                            .map(|(index, typ)| {
+                                Symbol::new(
+                                    format!("{symbol_prefix}_borealis_inline_return_{index}")
+                                        .into(),
+                                    typ.clone(),
+                                )
+                            })
+                            .map(|symbol| {
+                                function.add_local_variable(symbol.clone());
+                                build(
+                                    post_block_ref,
+                                    function.block_arena_mut(),
+                                    StatementKind::ReadVariable { symbol },
+                                )
+                            })
+                            .collect::<Vec<_>>();
+                        let tuple = build(
+                            post_block_ref,
+                            function.block_arena_mut(),
+                            StatementKind::CreateTuple(reads),
+                        );
+                        mapping.insert(post_statements[0], tuple);
+                    } else {
+                        let symbol = Symbol::new(
+                            format!("{symbol_prefix}_borealis_inline_return").into(),
+                            other_fn.return_type(),
+                        );
+                        function.add_local_variable(symbol.clone());
+                        let read_return_ref = build(
+                            post_block_ref,
+                            function.block_arena_mut(),
+                            StatementKind::ReadVariable { symbol },
+                        );
+                        mapping.insert(post_statements[0], read_return_ref); // replace call with read variable of return value so that future statements aren't invalidated
+                    }
 
                     // copy remaining statements from pre block to post block
                     for other_statement in &post_statements[1..] {
@@ -237,14 +260,43 @@ fn import_blocks(
         {
             let block = block_ref.get_mut(this_function.block_arena_mut());
 
-            // replace return with a write variable (not building so that future statements that reference the return value aren't invalidated)
-            *terminator.get_mut(block.arena_mut()).kind_mut() = StatementKind::WriteVariable {
-                symbol: Symbol::new(
-                    "borealis_inline_return".into(),
+            block.kill_statement(terminator);
+
+            if let Type::Tuple(ts) = value.get(block.arena()).typ(block.arena()) {
+                for (index, typ) in ts.into_iter().enumerate() {
+                    let symbol = Symbol::new(
+                        format!("{symbol_prefix}_borealis_inline_return_{index}").into(),
+                        typ,
+                    );
+                    let access = build(
+                        block_ref,
+                        this_function.block_arena_mut(),
+                        StatementKind::TupleAccess {
+                            index,
+                            source: value,
+                        },
+                    );
+                    build(
+                        block_ref,
+                        this_function.block_arena_mut(),
+                        StatementKind::WriteVariable {
+                            symbol,
+                            value: access,
+                        },
+                    );
+                }
+            } else {
+                let symbol = Symbol::new(
+                    format!("{symbol_prefix}_borealis_inline_return").into(),
                     value.get(block.arena()).typ(block.arena()),
-                ),
-                value,
-            };
+                );
+                build(
+                    block_ref,
+                    this_function.block_arena_mut(),
+                    StatementKind::WriteVariable { symbol, value },
+                );
+            }
+
             // insert a jump back to the return target block after
             build(
                 block_ref,

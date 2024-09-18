@@ -137,6 +137,7 @@ pub enum StatementKind {
     Call {
         target: InternedString, // todo: ref<function>
         args: Vec<Ref<Statement>>,
+        return_type: Type, // todo: this is really bad. necessary to avoid needing to pass a rudder model into every .typ() call, and hopefully a function return type is unlikely to change after boom, but this should really be a function lookup
     },
     Cast {
         kind: CastOperationKind,
@@ -340,7 +341,7 @@ impl StatementKind {
                     amount.get(arena).name()
                 )
             }
-            StatementKind::Call { target, args } => {
+            StatementKind::Call { target, args, .. } => {
                 format!(
                     "call {}({})",
                     target,
@@ -591,7 +592,7 @@ impl Statement {
             StatementKind::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
             StatementKind::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             StatementKind::ShiftOperation { value, .. } => value.get(arena).typ(arena),
-            StatementKind::Call { .. } => Type::Any, // todo: need rudder model
+            StatementKind::Call { return_type, .. } => return_type.clone(),
             StatementKind::Cast { typ, .. } | StatementKind::BitsCast { typ, .. } => typ.clone(),
             StatementKind::Jump { .. } => Type::void(),
             StatementKind::Branch { .. } => Type::void(),
@@ -763,7 +764,11 @@ impl Statement {
                     length,
                 };
             }
-            StatementKind::Call { target, args } => {
+            StatementKind::Call {
+                target,
+                args,
+                return_type,
+            } => {
                 let args = args
                     .iter()
                     .map(|arg| {
@@ -775,7 +780,11 @@ impl Statement {
                     })
                     .collect();
 
-                self.kind = StatementKind::Call { target, args };
+                self.kind = StatementKind::Call {
+                    target,
+                    args,
+                    return_type,
+                };
             }
             StatementKind::BitExtract {
                 value,
@@ -1441,13 +1450,21 @@ pub fn import_statement(
             value: mapping.get(&value).unwrap().clone(),
             amount: mapping.get(&amount).unwrap().clone(),
         },
-        StatementKind::Call { target, args } => {
+        StatementKind::Call {
+            target,
+            args,
+            return_type,
+        } => {
             let args = args
                 .iter()
                 .map(|stmt| mapping.get(stmt).unwrap().clone())
                 .collect();
 
-            StatementKind::Call { target, args }
+            StatementKind::Call {
+                target,
+                args,
+                return_type,
+            }
         }
         StatementKind::Cast { kind, typ, value } => StatementKind::Cast {
             kind,

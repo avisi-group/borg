@@ -199,14 +199,16 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "X_set",
         "set_R",
         "write_gpr",
-        // "__InitSystem",
         "TakeReset",
         "InitVariantImplemented",
         "InitFeatureImpl",
-        // "_get_RMR_EL3_Type_AA64",
-        // "_get_ID_AA64PFR0_EL1_Type_EL3",
-        // "SetResetVector",
-        // "Mk_RVBAR_EL1_Type",
+        "_get_RMR_EL3_Type_AA64",
+        "_get_ID_AA64PFR0_EL1_Type_EL3",
+        "SetResetVector",
+        "Mk_RVBAR_EL1_Type",
+        "Mk_RVBAR_EL2_Type",
+        "Mk_RVBAR_EL3_Type",
+        "Mk_MVBAR_Type"
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || FN_TOPLEVEL.contains(&name.as_ref())

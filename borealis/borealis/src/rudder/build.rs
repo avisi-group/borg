@@ -156,42 +156,24 @@ impl BuildContext {
     }
 
     fn build_functions(self) -> Model {
-        let BuildContext {
-            structs,
-            enums,
-            registers,
-            next_register_offset,
-            functions,
-        } = self;
-
-        let removed_fns = BuildContext {
-            functions: HashMap::default(),
-            structs,
-            enums,
-            registers,
-            next_register_offset,
-        };
-
-        let fns = functions
+        let fns = self
+            .functions
+            .clone()
             .into_iter() // todo parallel
             .map(|(name, (rudder_fn, boom_fn))| {
                 log::debug!("building function {name:?}");
                 (
                     name,
-                    FunctionBuildContext::new(&removed_fns, rudder_fn).build_fn(boom_fn.clone()),
+                    FunctionBuildContext::new(&self, rudder_fn).build_fn(boom_fn.clone()),
                 )
             })
             .collect();
 
         Model {
             fns,
-            structs: removed_fns
-                .structs
-                .into_iter()
-                .map(|(_, (typ, _))| typ)
-                .collect(),
+            structs: self.structs.into_iter().map(|(_, (typ, _))| typ).collect(),
             // register names kept for debugging
-            registers: removed_fns.registers,
+            registers: self.registers,
         }
     }
 
@@ -441,13 +423,21 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             if let Some(statement) = self.build_specialized_function(*name, &args) {
                 statement
             } else {
-                // call statement
+                let return_type = self
+                    .ctx()
+                    .functions
+                    .get(name)
+                    .unwrap_or_else(|| panic!("unknown function {name:?}"))
+                    .0
+                    .return_type();
+
                 build(
                     self.block,
                     self.block_arena_mut(),
                     StatementKind::Call {
                         target: *name,
                         args,
+                        return_type,
                     },
                 )
             }
@@ -1540,6 +1530,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         StatementKind::Call {
                             target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                             args: vec![args[0].clone(), count],
+                            return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
                         },
                     ))
                 }
@@ -2344,11 +2335,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         }
     }
 
-    fn generate_concat(
-        &mut self,
-        left: Ref<Statement>,
-        right: Ref<Statement>,
-    ) -> Ref<Statement> {
+    fn generate_concat(&mut self, left: Ref<Statement>, right: Ref<Statement>) -> Ref<Statement> {
         let arena = self.statement_arena();
 
         // todo: (zero extend original value || create new bits with runtime length)
