@@ -21,7 +21,11 @@ pub fn run(f: &mut Function) -> bool {
     changed
 }
 
-fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
+fn run_on_block(
+    symbol_ua: &analysis::dfa::SymbolUseAnalysis,
+    arena: &mut Arena<Block>,
+    block: Ref<Block>,
+) -> bool {
     // collapse multiple reads
     //
     // 1: write-var SYM
@@ -54,7 +58,10 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, arena: &mut Arena<
             trace!("considering variable write to {}", symbol.name());
             match live_writes.entry(symbol.name()) {
                 Entry::Occupied(mut e) => {
-                    trace!("already live write to symbol {}, updating live value", symbol.name(),);
+                    trace!(
+                        "already live write to symbol {}, updating live value",
+                        symbol.name(),
+                    );
                     e.insert(value.clone());
                 }
                 Entry::Vacant(e) => {
@@ -62,8 +69,10 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, arena: &mut Arena<
                     e.insert(value.clone());
                 }
             }
-        } else if let StatementKind::ReadVariable { symbol } =
-            stmt.get(block.get(stmt_ua.block_arena()).arena()).kind().clone()
+        } else if let StatementKind::ReadVariable { symbol } = stmt
+            .get(block.get(stmt_ua.block_arena()).arena())
+            .kind()
+            .clone()
         {
             if !symbol_ua.is_symbol_local(&symbol) {
                 continue;
@@ -85,7 +94,8 @@ fn run_on_block(symbol_ua: &analysis::dfa::SymbolUseAnalysis, arena: &mut Arena<
                 let arena = stmt_ua.block_arena();
                 trace!(
                     "replacing use in {}",
-                    use_.get(block.get(arena).arena()).to_string(block.get(arena).arena())
+                    use_.get(block.get(arena).arena())
+                        .to_string(block.get(arena).arena())
                 );
 
                 use_.get_mut(block.get_mut(arena).arena_mut())

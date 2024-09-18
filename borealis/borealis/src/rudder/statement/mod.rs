@@ -137,7 +137,10 @@ pub enum StatementKind {
     Call {
         target: InternedString, // todo: ref<function>
         args: Vec<Ref<Statement>>,
-        return_type: Type, // todo: this is really bad. necessary to avoid needing to pass a rudder model into every .typ() call, and hopefully a function return type is unlikely to change after boom, but this should really be a function lookup
+        return_type: Type, /* todo: this is really bad. necessary to avoid needing to pass a
+                            * rudder model into every .typ() call, and hopefully a function
+                            * return type is unlikely to change after boom, but this should
+                            * really be a function lookup */
     },
     Cast {
         kind: CastOperationKind,
@@ -517,7 +520,8 @@ pub struct Statement {
 }
 impl ToTokens for Statement {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix this?
+        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix
+                                                                    // this?
     }
 }
 

@@ -109,15 +109,24 @@ unsafe impl FromValue for Env {
         let rt = unsafe { ocaml::Runtime::recover_handle() };
 
         let mut scattered_variant_envs = vec![];
-        for (id, value) in unsafe { bindings_to_list(rt, raw_env.scattered_variant_envs).unwrap().unwrap() }
-            .into::<ListVec<(Identifier, Value)>>()
-            .into_iter()
+        for (id, value) in unsafe {
+            bindings_to_list(rt, raw_env.scattered_variant_envs)
+                .unwrap()
+                .unwrap()
+        }
+        .into::<ListVec<(Identifier, Value)>>()
+        .into_iter()
         {
             scattered_variant_envs.push((id, Env::from_value(value)));
         }
 
         Self {
-            top_val_specs: unsafe { bindings_to_list(rt, raw_env.top_val_specs).unwrap().unwrap() }.into(),
+            top_val_specs: unsafe {
+                bindings_to_list(rt, raw_env.top_val_specs)
+                    .unwrap()
+                    .unwrap()
+            }
+            .into(),
             locals: unsafe { bindings_to_list(rt, raw_env.locals).unwrap().unwrap() }.into(),
             union_ids: unsafe { bindings_to_list(rt, raw_env.union_ids).unwrap().unwrap() }.into(),
             variants: unsafe { bindings_to_list(rt, raw_env.variants).unwrap().unwrap() }.into(),
@@ -179,11 +188,24 @@ unsafe impl FromValue for SideEffectInfo {
     }
 }
 
-fn effectset_bindings_to_list(rt: &Runtime, value: Value) -> ListVec<(Identifier, ListVec<SideEffect>)> {
-    <ListVec<(Identifier, Value)>>::from_value(unsafe { bindings_to_list(rt, value) }.unwrap().unwrap())
-        .into_iter()
-        .map(|(id, value)| (id, unsafe { effectset_elements(rt, value) }.unwrap().unwrap().into()))
-        .collect()
+fn effectset_bindings_to_list(
+    rt: &Runtime,
+    value: Value,
+) -> ListVec<(Identifier, ListVec<SideEffect>)> {
+    <ListVec<(Identifier, Value)>>::from_value(
+        unsafe { bindings_to_list(rt, value) }.unwrap().unwrap(),
+    )
+    .into_iter()
+    .map(|(id, value)| {
+        (
+            id,
+            unsafe { effectset_elements(rt, value) }
+                .unwrap()
+                .unwrap()
+                .into(),
+        )
+    })
+    .collect()
 }
 
 unsafe impl ToValue for SideEffectInfo {
@@ -196,13 +218,18 @@ unsafe impl ToValue for SideEffectInfo {
     }
 }
 
-fn list_to_effectset_bindings(rt: &Runtime, list: &ListVec<(Identifier, ListVec<SideEffect>)>) -> Value {
+fn list_to_effectset_bindings(
+    rt: &Runtime,
+    list: &ListVec<(Identifier, ListVec<SideEffect>)>,
+) -> Value {
     let list = list
         .iter()
         .map(|(id, effects)| {
             (
                 id,
-                unsafe { effectset_of_list(rt, effects.to_value(rt)) }.unwrap().unwrap(),
+                unsafe { effectset_of_list(rt, effects.to_value(rt)) }
+                    .unwrap()
+                    .unwrap(),
             )
         })
         .collect::<ListVec<_>>()

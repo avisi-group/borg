@@ -1,7 +1,7 @@
 use {
     cargo_util_schemas::manifest::{
-        InheritableDependency, InheritableField, PackageName, TomlDependency, TomlDetailedDependency, TomlManifest,
-        TomlPackage,
+        InheritableDependency, InheritableField, PackageName, TomlDependency,
+        TomlDetailedDependency, TomlManifest, TomlPackage,
     },
     common::{intern::InternedString, HashMap, HashSet},
     semver::{BuildMetadata, Prerelease, Version},
@@ -40,7 +40,10 @@ fn read_fs(path: &Path) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
         .map(|entry| {
             let entry = entry.unwrap();
             let adjusted_path = entry.path().strip_prefix(path).unwrap().to_owned();
-            (adjusted_path, read_to_string(entry.path()).unwrap_or_default())
+            (
+                adjusted_path,
+                read_to_string(entry.path()).unwrap_or_default(),
+            )
         })
         .collect();
 
@@ -94,7 +97,10 @@ fn write_difference(
     }
 }
 
-pub fn create_manifest(name: InternedString, dependencies: &HashSet<InternedString>) -> TomlManifest {
+pub fn create_manifest(
+    name: InternedString,
+    dependencies: &HashSet<InternedString>,
+) -> TomlManifest {
     TomlManifest {
         cargo_features: None,
         package: Some(Box::new(TomlPackage {
@@ -151,26 +157,28 @@ pub fn create_manifest(name: InternedString, dependencies: &HashSet<InternedStri
                 .map(|(n, package_name)| {
                     (
                         package_name,
-                        InheritableDependency::Value(TomlDependency::Detailed(TomlDetailedDependency {
-                            version: None,
-                            registry: None,
-                            registry_index: None,
-                            path: Some(format!("../{n}")),
-                            git: None,
-                            branch: None,
-                            tag: None,
-                            rev: None,
-                            features: None,
-                            optional: None,
-                            default_features: None,
-                            default_features2: None,
-                            package: None,
-                            public: None,
-                            artifact: None,
-                            lib: None,
-                            target: None,
-                            _unused_keys: BTreeMap::new(),
-                        })),
+                        InheritableDependency::Value(TomlDependency::Detailed(
+                            TomlDetailedDependency {
+                                version: None,
+                                registry: None,
+                                registry_index: None,
+                                path: Some(format!("../{n}")),
+                                git: None,
+                                branch: None,
+                                tag: None,
+                                rev: None,
+                                features: None,
+                                optional: None,
+                                default_features: None,
+                                default_features2: None,
+                                package: None,
+                                public: None,
+                                artifact: None,
+                                lib: None,
+                                target: None,
+                                _unused_keys: BTreeMap::new(),
+                            },
+                        )),
                     )
                 })
                 .chain([
@@ -180,49 +188,53 @@ pub fn create_manifest(name: InternedString, dependencies: &HashSet<InternedStri
                     ),
                     (
                         PackageName::new("num-rational".to_owned()).unwrap(),
-                        InheritableDependency::Value(TomlDependency::Detailed(TomlDetailedDependency {
-                            version: Some("0.4.2".to_owned()),
-                            registry: None,
-                            registry_index: None,
-                            path: None,
-                            git: None,
-                            branch: None,
-                            tag: None,
-                            rev: None,
-                            features: None,
-                            optional: None,
-                            default_features: Some(false),
-                            default_features2: None,
-                            package: None,
-                            public: None,
-                            artifact: None,
-                            lib: None,
-                            target: None,
-                            _unused_keys: BTreeMap::new(),
-                        })),
+                        InheritableDependency::Value(TomlDependency::Detailed(
+                            TomlDetailedDependency {
+                                version: Some("0.4.2".to_owned()),
+                                registry: None,
+                                registry_index: None,
+                                path: None,
+                                git: None,
+                                branch: None,
+                                tag: None,
+                                rev: None,
+                                features: None,
+                                optional: None,
+                                default_features: Some(false),
+                                default_features2: None,
+                                package: None,
+                                public: None,
+                                artifact: None,
+                                lib: None,
+                                target: None,
+                                _unused_keys: BTreeMap::new(),
+                            },
+                        )),
                     ),
                     (
                         PackageName::new("plugins_api".to_owned()).unwrap(),
-                        InheritableDependency::Value(TomlDependency::Detailed(TomlDetailedDependency {
-                            version: None,
-                            registry: None,
-                            registry_index: None,
-                            path: Some("../../brig/plugins_api".into()),
-                            git: None,
-                            branch: None,
-                            tag: None,
-                            rev: None,
-                            features: None,
-                            optional: None,
-                            default_features: Some(false),
-                            default_features2: None,
-                            package: None,
-                            public: None,
-                            artifact: None,
-                            lib: None,
-                            target: None,
-                            _unused_keys: BTreeMap::new(),
-                        })),
+                        InheritableDependency::Value(TomlDependency::Detailed(
+                            TomlDetailedDependency {
+                                version: None,
+                                registry: None,
+                                registry_index: None,
+                                path: Some("../../brig/plugins_api".into()),
+                                git: None,
+                                branch: None,
+                                tag: None,
+                                rev: None,
+                                features: None,
+                                optional: None,
+                                default_features: Some(false),
+                                default_features2: None,
+                                package: None,
+                                public: None,
+                                artifact: None,
+                                lib: None,
+                                target: None,
+                                _unused_keys: BTreeMap::new(),
+                            },
+                        )),
                     ),
                 ])
                 .collect(),

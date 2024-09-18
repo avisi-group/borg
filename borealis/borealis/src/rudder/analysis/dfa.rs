@@ -23,20 +23,27 @@ struct SymbolUseAnalysisBuilder<'f> {
 
 impl<'f> SymbolUseAnalysisBuilder<'f> {
     fn analyse(&mut self) {
-        self.f.block_iter().collect::<Vec<_>>().into_iter().for_each(|b| {
-            let block = b.get(self.f.block_arena());
+        self.f
+            .block_iter()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|b| {
+                let block = b.get(self.f.block_arena());
 
-            block
-                .statements()
-                .into_iter()
-                .filter_map(|stmt| match stmt.get(&block.statement_arena).kind() {
-                    StatementKind::ReadVariable { symbol, .. } | StatementKind::WriteVariable { symbol, .. } => {
-                        Some((symbol.clone(), stmt))
-                    }
-                    _ => None,
-                })
-                .for_each(|(symbol, stmt)| self.insert_use(symbol, stmt, b, &block.statement_arena));
-        });
+                block
+                    .statements()
+                    .into_iter()
+                    .filter_map(|stmt| match stmt.get(&block.statement_arena).kind() {
+                        StatementKind::ReadVariable { symbol, .. }
+                        | StatementKind::WriteVariable { symbol, .. } => {
+                            Some((symbol.clone(), stmt))
+                        }
+                        _ => None,
+                    })
+                    .for_each(|(symbol, stmt)| {
+                        self.insert_use(symbol, stmt, b, &block.statement_arena)
+                    });
+            });
     }
 
     fn insert_use(
@@ -148,7 +155,11 @@ impl<'a> StatementUseAnalysis<'a> {
 
     fn analyse(&mut self) {
         for stmt in self.block.get(self.arena).statements() {
-            match stmt.get(&self.block.get(&self.arena).statement_arena).kind().clone() {
+            match stmt
+                .get(&self.block.get(&self.arena).statement_arena)
+                .kind()
+                .clone()
+            {
                 StatementKind::WriteVariable { value, .. } => {
                     self.add_use(value, stmt);
                 }
@@ -208,7 +219,11 @@ impl<'a> StatementUseAnalysis<'a> {
                     self.add_use(true_value, stmt);
                     self.add_use(false_value, stmt);
                 }
-                StatementKind::BitExtract { value, start, length } => {
+                StatementKind::BitExtract {
+                    value,
+                    start,
+                    length,
+                } => {
                     self.add_use(value, stmt);
                     self.add_use(start, stmt);
                     self.add_use(length, stmt);
@@ -228,7 +243,11 @@ impl<'a> StatementUseAnalysis<'a> {
                     self.add_use(vector, stmt);
                     self.add_use(index, stmt);
                 }
-                StatementKind::AssignElement { vector, value, index } => {
+                StatementKind::AssignElement {
+                    vector,
+                    value,
+                    index,
+                } => {
                     self.add_use(vector, stmt);
                     self.add_use(value, stmt);
                     self.add_use(index, stmt);
@@ -261,7 +280,9 @@ impl<'a> StatementUseAnalysis<'a> {
                 StatementKind::GetFlag { operation, .. } => {
                     self.add_use(operation, stmt);
                 }
-                StatementKind::CreateTuple(values) => values.into_iter().for_each(|v| self.add_use(v, stmt)),
+                StatementKind::CreateTuple(values) => {
+                    values.into_iter().for_each(|v| self.add_use(v, stmt))
+                }
             }
         }
     }

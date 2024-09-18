@@ -36,10 +36,14 @@ impl Pass for RemoveUndefinedBV {
                                 ..
                             } = &*(s.get())
                             {
-                                if name.as_ref() == "undefined_bitvector" || name.as_ref() == "undefined_vector<b>" {
+                                if name.as_ref() == "undefined_bitvector"
+                                    || name.as_ref() == "undefined_vector<b>"
+                                {
                                     Shared::new(Statement::Copy {
                                         expression: expression.clone(),
-                                        value: Shared::new(Value::Literal(Shared::new(Literal::Bits(vec![Bit::Zero])))),
+                                        value: Shared::new(Value::Literal(Shared::new(
+                                            Literal::Bits(vec![Bit::Zero]),
+                                        ))),
                                     })
                                 } else {
                                     s.clone()

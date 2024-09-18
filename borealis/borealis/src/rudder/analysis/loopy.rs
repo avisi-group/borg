@@ -6,7 +6,9 @@ pub struct LoopAnalysis {
 
 impl LoopAnalysis {
     pub fn new(f: &Function) -> Self {
-        let mut selph = Self { contains_loop: false };
+        let mut selph = Self {
+            contains_loop: false,
+        };
 
         selph.analyse(f);
 

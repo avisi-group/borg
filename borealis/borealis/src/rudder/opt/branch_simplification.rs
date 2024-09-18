@@ -20,24 +20,32 @@ pub fn run(f: &mut Function) -> bool {
             false_target,
         } = terminator_ref.get(&block.statement_arena).kind().clone()
         {
-            if let StatementKind::Constant { value, .. } = condition.get(&block.statement_arena).kind().clone() {
+            if let StatementKind::Constant { value, .. } =
+                condition.get(&block.statement_arena).kind().clone()
+            {
                 trace!("found constant branch statement {}", value);
 
                 if value.zero() {
                     terminator_ref
                         .get_mut(&mut block.statement_arena)
-                        .replace_kind(StatementKind::Jump { target: false_target });
+                        .replace_kind(StatementKind::Jump {
+                            target: false_target,
+                        });
                 } else {
                     terminator_ref
                         .get_mut(&mut block.statement_arena)
-                        .replace_kind(StatementKind::Jump { target: true_target });
+                        .replace_kind(StatementKind::Jump {
+                            target: true_target,
+                        });
                 }
 
                 changed = true;
             } else if true_target == false_target {
                 terminator_ref
                     .get_mut(&mut block.statement_arena)
-                    .replace_kind(StatementKind::Jump { target: true_target });
+                    .replace_kind(StatementKind::Jump {
+                        target: true_target,
+                    });
                 changed = true;
             }
         }

@@ -145,7 +145,9 @@ impl ControlFlowBlock {
         match &terminator {
             Terminator::Return(_) | Terminator::Panic(_) => (),
             Terminator::Conditional {
-                target, fallthrough, ..
+                target,
+                fallthrough,
+                ..
             } => {
                 target.add_parent(self);
                 fallthrough.add_parent(self);
@@ -235,7 +237,9 @@ impl Terminator {
         match self {
             Terminator::Return(_) | Terminator::Panic(_) => vec![],
             Terminator::Conditional {
-                target, fallthrough, ..
+                target,
+                fallthrough,
+                ..
             } => vec![target.clone(), fallthrough.clone()],
             Terminator::Unconditional { target } => vec![target.clone()],
         }

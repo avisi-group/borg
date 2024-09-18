@@ -136,6 +136,27 @@ impl Emitter for X86Emitter {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
+            Multiply(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value,
+                        width,
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: lhs_value * rhs_value,
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
             CompareEqual(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
                 (
                     NodeKind::Constant {

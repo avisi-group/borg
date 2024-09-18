@@ -2,7 +2,9 @@
 //!
 //! Visitor trait has overridable methods
 
-use crate::jib_ast::{Definition, Expression, Instruction, Name, Op, Type, TypeDefinition, Value, Vl};
+use crate::jib_ast::{
+    Definition, Expression, Instruction, Name, Op, Type, TypeDefinition, Value, Vl,
+};
 
 /// Visitor trait for interacting with Sail AST
 pub trait Visitor: Sized {

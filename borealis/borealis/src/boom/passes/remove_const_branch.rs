@@ -77,7 +77,9 @@ fn remove_const_branch(entry_block: ControlFlowBlock) -> bool {
         if condiiton {
             current.set_terminator(Terminator::Unconditional { target });
         } else {
-            current.set_terminator(Terminator::Unconditional { target: fallthrough });
+            current.set_terminator(Terminator::Unconditional {
+                target: fallthrough,
+            });
         }
 
         did_change = true;

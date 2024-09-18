@@ -208,7 +208,14 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "Mk_RVBAR_EL1_Type",
         "Mk_RVBAR_EL2_Type",
         "Mk_RVBAR_EL3_Type",
-        "Mk_MVBAR_Type"
+        "Mk_MVBAR_Type",
+        "HaveAArch64",
+        "IsFeatureImplemented",
+        "num_of_Feature",
+        "HaveEL",
+        // "AArch32_TakeReset",
+        // "FPEXC_read",
+        // "_update_FPEXC_Type_EN",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || FN_TOPLEVEL.contains(&name.as_ref())

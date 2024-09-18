@@ -89,7 +89,9 @@ impl Graph {
         let children = match node.terminator() {
             Terminator::Return(_) | Terminator::Panic(_) => vec![],
             Terminator::Conditional {
-                target, fallthrough, ..
+                target,
+                fallthrough,
+                ..
             } => vec![(target, "if"), (fallthrough, "else")],
             Terminator::Unconditional { target } => vec![(target, "")],
         };

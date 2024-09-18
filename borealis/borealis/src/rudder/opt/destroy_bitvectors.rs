@@ -1,9 +1,5 @@
 use crate::{
-    rudder::{
-        analysis::dfa::StatementUseAnalysis,
-        statement::Statement,
-        Block, Function,
-    },
+    rudder::{analysis::dfa::StatementUseAnalysis, statement::Statement, Block, Function},
     util::arena::{Arena, Ref},
 };
 

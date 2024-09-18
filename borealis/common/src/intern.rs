@@ -134,12 +134,17 @@ impl rkyv::Archive for InternedString {
 }
 
 impl<S: Fallible + rkyv::ser::Serializer> rkyv::Serialize<S> for InternedString {
-    fn serialize(&self, _serializer: &mut S) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+    fn serialize(
+        &self,
+        _serializer: &mut S,
+    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
         Ok(())
     }
 }
 
-impl<D: Fallible> rkyv::Deserialize<InternedString, D> for Archived<<InternedString as Archive>::Archived> {
+impl<D: Fallible> rkyv::Deserialize<InternedString, D>
+    for Archived<<InternedString as Archive>::Archived>
+{
     fn deserialize(&self, _: &mut D) -> Result<InternedString, <D as Fallible>::Error> {
         Ok(InternedString::from(
             // try from usize adds 1, -1 to bring it back down

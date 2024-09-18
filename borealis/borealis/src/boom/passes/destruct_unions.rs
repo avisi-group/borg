@@ -1,5 +1,7 @@
 use {
-    crate::boom::{control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Size, Statement, Type, Value},
+    crate::boom::{
+        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Size, Statement, Type, Value,
+    },
     common::{intern::InternedString, shared::Shared, HashMap, HashSet},
 };
 
@@ -23,7 +25,9 @@ impl Pass for DestructUnions {
     fn run(&mut self, ast: Shared<Ast>) -> bool {
         handle_registers(ast.clone());
 
-        let union_tag_type = Shared::new(Type::Integer { size: Size::Static(32) });
+        let union_tag_type = Shared::new(Type::Integer {
+            size: Size::Static(32),
+        });
 
         let union_tags = ast
             .get()
@@ -37,7 +41,9 @@ impl Pass for DestructUnions {
             .functions
             .iter()
             .map(|(_, d)| d.entry_block.clone())
-            .for_each(|entry_block| destruct_locals(&union_tags, union_tag_type.clone(), entry_block));
+            .for_each(|entry_block| {
+                destruct_locals(&union_tags, union_tag_type.clone(), entry_block)
+            });
 
         false
     }
@@ -57,9 +63,13 @@ fn handle_registers(ast: Shared<Ast>) {
 
         ast.get_mut().registers.insert(
             tag_ident(register_name),
-            Shared::new(Type::Integer { size: Size::Static(32) }),
+            Shared::new(Type::Integer {
+                size: Size::Static(32),
+            }),
         );
-        ast.get_mut().registers.insert(value_ident(register_name), typ);
+        ast.get_mut()
+            .registers
+            .insert(value_ident(register_name), typ);
     }
 }
 
@@ -142,9 +152,9 @@ fn destruct_locals(
                                 vec![
                                     Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(tag_ident(*ident)),
-                                        value: Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(
-                                            (*tag).into(),
-                                        )))),
+                                        value: Shared::new(Value::Literal(Shared::new(
+                                            crate::boom::Literal::Int((*tag).into()),
+                                        ))),
                                     }),
                                     Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(value_ident(*ident)),

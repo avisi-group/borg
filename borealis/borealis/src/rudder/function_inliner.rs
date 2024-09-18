@@ -12,12 +12,13 @@ use {
 
 /// In a function, go through all blocks, looking for function calls
 ///
-/// If a function call is found in a block (the pre block), create a new block (the post block).
+/// If a function call is found in a block (the pre block), create a new block
+/// (the post block).
 ///
-/// All statements before the call go in the pre block. All statements after the call go into the post block.
-/// Copy the blocks of the called function, pre-call block should jump to
-/// entry block, make sure all blocks taht terminate in a return unconditonally
-/// jump to the post-call block.
+/// All statements before the call go in the pre block. All statements after the
+/// call go into the post block. Copy the blocks of the called function,
+/// pre-call block should jump to entry block, make sure all blocks taht
+/// terminate in a return unconditonally jump to the post-call block.
 ///
 /// all local variables in the inlined function need to be inserted into the
 /// calling function (and mangled) parameter local variables need to be made and
@@ -98,7 +99,8 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 let entry_block_ref =
                     import_blocks(function, other_fn, post_block_ref, &symbol_prefix);
 
-                // set pre-statements and end pre block with jump to inlined function entry block
+                // set pre-statements and end pre block with jump to inlined function entry
+                // block
                 pre_block_ref
                     .get_mut(function.block_arena_mut())
                     .set_statements(pre_statements.into_iter());
@@ -216,7 +218,8 @@ fn import_blocks(
         mapping.insert(other_ref, this_ref);
     }
 
-    // this function now contains all the blocks, and we have a mapping of block refs from other to this
+    // this function now contains all the blocks, and we have a mapping of block
+    // refs from other to this
 
     // we need to apply this mapping to all statements in the imported blocks
     mapping.values().copied().for_each(|r| {

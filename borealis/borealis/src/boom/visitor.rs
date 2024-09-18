@@ -4,8 +4,9 @@
 
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, Definition, Expression, FunctionDefinition, FunctionSignature, Literal,
-        NamedType, NamedValue, Operation, Parameter, Statement, Type, Value,
+        control_flow::ControlFlowBlock, Definition, Expression, FunctionDefinition,
+        FunctionSignature, Literal, NamedType, NamedValue, Operation, Parameter, Statement, Type,
+        Value,
     },
     common::shared::Shared,
 };

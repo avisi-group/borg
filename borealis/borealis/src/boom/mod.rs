@@ -127,7 +127,6 @@ impl FunctionDefinition {
 pub struct Parameter {
     pub name: InternedString,
     pub typ: Shared<Type>,
-    pub is_ref: bool,
 }
 
 impl Walkable for Parameter {
@@ -257,9 +256,20 @@ impl Walkable for Shared<Type> {
         use Type::*;
 
         match &*self.get() {
-            Unit | Bool | String | Real | Float | Constant(_) | Integer { .. } | Bits { .. } | Bit | Union { .. } => {}
+            Unit
+            | Bool
+            | String
+            | Real
+            | Float
+            | Constant(_)
+            | Integer { .. }
+            | Bits { .. }
+            | Bit
+            | Union { .. } => {}
 
-            Struct { fields, .. } => fields.iter().for_each(|field| visitor.visit_named_type(field)),
+            Struct { fields, .. } => fields
+                .iter()
+                .for_each(|field| visitor.visit_named_type(field)),
 
             List { element_type }
             | Vector { element_type }
@@ -404,7 +414,9 @@ impl Walkable for Expression {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
             Self::Identifier(_) => (),
-            Self::Field { expression, .. } | Self::Address(expression) => visitor.visit_expression(expression),
+            Self::Field { expression, .. } | Self::Address(expression) => {
+                visitor.visit_expression(expression)
+            }
             Self::Tuple(exprs) => exprs.iter().for_each(|e| visitor.visit_expression(e)),
         }
     }
@@ -496,7 +508,9 @@ impl Walkable for Value {
             Value::Identifier(_) => (),
             Value::Literal(literal) => visitor.visit_literal(literal.clone()),
             Value::Operation(operation) => visitor.visit_operation(operation),
-            Value::Struct { fields, .. } => fields.iter().for_each(|field| visitor.visit_named_value(field)),
+            Value::Struct { fields, .. } => fields
+                .iter()
+                .for_each(|field| visitor.visit_named_value(field)),
             Value::Field { value, .. } => visitor.visit_value(value.clone()),
             Value::CtorKind { value, types, .. } | Value::CtorUnwrap { value, types, .. } => {
                 visitor.visit_value(value.clone());
@@ -570,7 +584,9 @@ pub enum Operation {
 impl Walkable for Operation {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Operation::Not(value) | Operation::Complement(value) => visitor.visit_value(value.clone()),
+            Operation::Not(value) | Operation::Complement(value) => {
+                visitor.visit_value(value.clone())
+            }
             Operation::Equal(lhs, rhs)
             | Operation::NotEqual(lhs, rhs)
             | Operation::LessThan(lhs, rhs)

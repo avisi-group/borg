@@ -38,7 +38,9 @@ impl Pass for RemoveConstantType {
                                 Type::Constant(v) => Shared::new(Statement::VariableDeclaration {
                                     name: *name,
                                     typ: Shared::new(Type::Integer {
-                                        size: Size::Static(signed_smallest_width_of_value(v).try_into().unwrap()),
+                                        size: Size::Static(
+                                            signed_smallest_width_of_value(v).try_into().unwrap(),
+                                        ),
                                     }),
                                 }),
                                 _ => s.clone(),

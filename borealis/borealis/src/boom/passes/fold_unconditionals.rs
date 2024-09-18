@@ -115,7 +115,9 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                         }
                         Terminator::Unconditional { target } => {
                             if target.id() == current.id() {
-                                Terminator::Unconditional { target: child.clone() }
+                                Terminator::Unconditional {
+                                    target: child.clone(),
+                                }
                             } else {
                                 panic!("child of parent of current node was not current node");
                             }

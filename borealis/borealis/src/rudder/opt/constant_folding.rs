@@ -38,7 +38,8 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             value,
         } => match value.get(arena).kind().clone() {
             StatementKind::Constant {
-                value: constant_value, ..
+                value: constant_value,
+                ..
             } => match unary_op_kind {
                 crate::rudder::statement::UnaryOperationKind::Not => {
                     let constant = StatementKind::Constant {
@@ -56,7 +57,10 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
         },
         StatementKind::BinaryOperation { kind, lhs, rhs } => {
             match (lhs.get(arena).kind().clone(), rhs.get(arena).kind().clone()) {
-                (StatementKind::Constant { value: lhs, .. }, StatementKind::Constant { value: rhs, .. }) => {
+                (
+                    StatementKind::Constant { value: lhs, .. },
+                    StatementKind::Constant { value: rhs, .. },
+                ) => {
                     let cv = match kind {
                         BinaryOperationKind::Add => lhs + rhs,
                         BinaryOperationKind::Sub => lhs - rhs,
@@ -67,13 +71,21 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         BinaryOperationKind::Or => todo!(),
                         BinaryOperationKind::Xor => todo!(),
                         BinaryOperationKind::PowI => lhs.powi(rhs),
-                        BinaryOperationKind::CompareEqual => ConstantValue::UnsignedInteger((lhs == rhs) as u64),
-                        BinaryOperationKind::CompareNotEqual => ConstantValue::UnsignedInteger((lhs != rhs) as u64),
-                        BinaryOperationKind::CompareLessThan => ConstantValue::UnsignedInteger((lhs < rhs) as u64),
+                        BinaryOperationKind::CompareEqual => {
+                            ConstantValue::UnsignedInteger((lhs == rhs) as u64)
+                        }
+                        BinaryOperationKind::CompareNotEqual => {
+                            ConstantValue::UnsignedInteger((lhs != rhs) as u64)
+                        }
+                        BinaryOperationKind::CompareLessThan => {
+                            ConstantValue::UnsignedInteger((lhs < rhs) as u64)
+                        }
                         BinaryOperationKind::CompareLessThanOrEqual => {
                             ConstantValue::UnsignedInteger((lhs <= rhs) as u64)
                         }
-                        BinaryOperationKind::CompareGreaterThan => ConstantValue::UnsignedInteger((lhs > rhs) as u64),
+                        BinaryOperationKind::CompareGreaterThan => {
+                            ConstantValue::UnsignedInteger((lhs > rhs) as u64)
+                        }
                         BinaryOperationKind::CompareGreaterThanOrEqual => {
                             ConstantValue::UnsignedInteger((lhs >= rhs) as u64)
                         }
@@ -167,7 +179,8 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             if let Type::Primitive(_) = &typ {
                 if let StatementKind::Constant { value, .. } = value.get(arena).kind().clone() {
                     let value = cast_integer(value, typ.clone());
-                    stmt.get_mut(arena).replace_kind(StatementKind::Constant { typ, value });
+                    stmt.get_mut(arena)
+                        .replace_kind(StatementKind::Constant { typ, value });
                     true
                 } else {
                     false
@@ -189,10 +202,12 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                             value: ConstantValue::UnsignedInteger(signed_value.try_into().unwrap()),
                         });
                     } else {
-                        stmt.get_mut(arena).replace_kind(StatementKind::Constant { typ, value });
+                        stmt.get_mut(arena)
+                            .replace_kind(StatementKind::Constant { typ, value });
                     }
                 } else {
-                    stmt.get_mut(arena).replace_kind(StatementKind::Constant { typ, value });
+                    stmt.get_mut(arena)
+                        .replace_kind(StatementKind::Constant { typ, value });
                 }
 
                 true
@@ -208,7 +223,8 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             if let StatementKind::Constant { value, .. } = value.get(arena).kind() {
                 let value = cast_integer(value.clone(), typ.clone());
 
-                stmt.get_mut(arena).replace_kind(StatementKind::Constant { typ, value });
+                stmt.get_mut(arena)
+                    .replace_kind(StatementKind::Constant { typ, value });
                 true
             } else {
                 false
@@ -228,7 +244,9 @@ fn cast_integer(value: ConstantValue, typ: Type) -> ConstantValue {
             (PrimitiveTypeClass::SignedInteger, ConstantValue::UnsignedInteger(i)) => {
                 ConstantValue::SignedInteger(i64::try_from(i).unwrap())
             }
-            (PrimitiveTypeClass::SignedInteger, ConstantValue::SignedInteger(i)) => ConstantValue::SignedInteger(i),
+            (PrimitiveTypeClass::SignedInteger, ConstantValue::SignedInteger(i)) => {
+                ConstantValue::SignedInteger(i)
+            }
             (PrimitiveTypeClass::UnsignedInteger, ConstantValue::SignedInteger(i)) => {
                 ConstantValue::UnsignedInteger(u64::try_from(i).unwrap())
             }

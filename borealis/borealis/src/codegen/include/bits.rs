@@ -27,7 +27,10 @@ impl Bits {
     }
 
     fn normalize(self) -> Self {
-        let mask = 1u128.checked_shl(u32::from(self.length())).map(|i| i - 1).unwrap_or(!0);
+        let mask = 1u128
+            .checked_shl(u32::from(self.length()))
+            .map(|i| i - 1)
+            .unwrap_or(!0);
 
         Self {
             value: self.value() & mask,
@@ -105,7 +108,10 @@ impl Bits {
         let result_value = (self.value() & mask) | shifted;
 
         // todo: increase if we've inserted higher bits?
-        let result_length = core::cmp::max(self.length(), insert.length() + u16::try_from(start).unwrap());
+        let result_length = core::cmp::max(
+            self.length(),
+            insert.length() + u16::try_from(start).unwrap(),
+        );
 
         Self::new(result_value, result_length)
     }
@@ -129,7 +135,10 @@ impl core::ops::Shl<i128> for Bits {
 
     fn shl(self, rhs: i128) -> Self::Output {
         Self {
-            value: self.value().checked_shl(u32::try_from(rhs).unwrap()).unwrap_or(0),
+            value: self
+                .value()
+                .checked_shl(u32::try_from(rhs).unwrap())
+                .unwrap_or(0),
             length: self.length(),
         }
         .normalize()
@@ -141,7 +150,10 @@ impl core::ops::Shr<i128> for Bits {
 
     fn shr(self, rhs: i128) -> Self::Output {
         Self {
-            value: self.value().checked_shr(u32::try_from(rhs).unwrap()).unwrap_or(0),
+            value: self
+                .value()
+                .checked_shr(u32::try_from(rhs).unwrap())
+                .unwrap_or(0),
             length: self.length(),
         }
         .normalize()

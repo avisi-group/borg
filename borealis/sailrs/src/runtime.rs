@@ -96,12 +96,16 @@ impl Runtime {
     }
 
     /// Execute a closure on the runtime thread
-    pub fn execute<F: FnOnce(&mut OCamlRuntime) -> RET + Send + Sync + 'static, RET: Send + Sync + 'static>(
+    pub fn execute<
+        F: FnOnce(&mut OCamlRuntime) -> RET + Send + Sync + 'static,
+        RET: Send + Sync + 'static,
+    >(
         &self,
         f: F,
     ) -> Result<RET, Error> {
         // coerce the concrete return type (RET) into `Box<dyn Any>`
-        let boxed_return: ExecutableFunction<BoxAny> = Box::new(move |rt: &mut OCamlRuntime| Box::new(f(rt)));
+        let boxed_return: ExecutableFunction<BoxAny> =
+            Box::new(move |rt: &mut OCamlRuntime| Box::new(f(rt)));
 
         // send closure
         self.request.send(boxed_return)?;

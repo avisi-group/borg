@@ -144,8 +144,7 @@ impl BuildContext {
                         .parameters
                         .get()
                         .iter()
-                        .map(|boom::Parameter { typ, name, is_ref }| {
-                            assert!(!is_ref, "no reference parameters allowed");
+                        .map(|boom::Parameter { typ, name }| {
                             Symbol::new(*name, self.resolve_type(typ.clone()))
                         })
                         .collect(),

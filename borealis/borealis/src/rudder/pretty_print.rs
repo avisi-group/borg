@@ -1,7 +1,7 @@
 use {
     crate::rudder::{
-        analysis::cfg::ControlFlowGraphAnalysis, Block, ConstantValue, Function, Model, PrimitiveTypeClass, Symbol,
-        Type,
+        analysis::cfg::ControlFlowGraphAnalysis, Block, ConstantValue, Function, Model,
+        PrimitiveTypeClass, Symbol, Type,
     },
     itertools::Itertools,
     std::fmt::{Display, Formatter, Result},
@@ -69,7 +69,8 @@ impl Display for Block {
             writeln!(
                 f,
                 "    {}",
-                stmt.get(&self.statement_arena).to_string(&self.statement_arena)
+                stmt.get(&self.statement_arena)
+                    .to_string(&self.statement_arena)
             )?;
         }
 

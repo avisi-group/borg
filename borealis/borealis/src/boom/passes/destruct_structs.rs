@@ -1,7 +1,7 @@
 use {
     crate::boom::{
-        control_flow::Terminator, passes::Pass, visitor::Visitor, Ast, Expression, FunctionDefinition, NamedType,
-        NamedValue, Parameter, Statement, Type, Value,
+        control_flow::Terminator, passes::Pass, visitor::Visitor, Ast, Expression,
+        FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type, Value,
     },
     common::{intern::InternedString, shared::Shared, HashMap},
 };
@@ -61,18 +61,21 @@ impl Pass for DestructStructs {
     }
 }
 
-fn handle_registers(registers: &mut HashMap<InternedString, Shared<Type>>) -> HashMap<InternedString, Vec<NamedType>> {
+fn handle_registers(
+    registers: &mut HashMap<InternedString, Shared<Type>>,
+) -> HashMap<InternedString, Vec<NamedType>> {
     let mut to_remove = HashMap::default();
     let mut to_add = vec![];
 
     registers.iter().for_each(|(name, typ)| {
         if let Type::Struct { fields, .. } = &*typ.get() {
             to_remove.insert(*name, fields.clone());
-            to_add.extend(
-                fields
-                    .iter()
-                    .map(|NamedType { name: field_name, typ }| (destructed_ident(*name, *field_name), typ.clone())),
-            );
+            to_add.extend(fields.iter().map(
+                |NamedType {
+                     name: field_name,
+                     typ,
+                 }| (destructed_ident(*name, *field_name), typ.clone()),
+            ));
         }
     });
 
@@ -293,11 +296,17 @@ fn split_return(fn_def: &mut FunctionDefinition) {
     };
 
     fn_def.signature.return_type = Shared::new(Type::Tuple(
-        fields.into_iter().map(|NamedType { typ, .. }| typ).collect(),
+        fields
+            .into_iter()
+            .map(|NamedType { typ, .. }| typ)
+            .collect(),
     ));
 }
 
-fn destructed_ident(local_variable_name: InternedString, field_name: InternedString) -> InternedString {
+fn destructed_ident(
+    local_variable_name: InternedString,
+    field_name: InternedString,
+) -> InternedString {
     format!("{local_variable_name}_{field_name}").into()
 }
 
@@ -373,11 +382,15 @@ fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedStrin
 
                 fields
                     .iter()
-                    .map(|NamedType { name: field_name, typ }| Parameter {
-                        name: destructed_ident(parameter.name, *field_name),
-                        typ: typ.clone(),
-                        is_ref: false,
-                    })
+                    .map(
+                        |NamedType {
+                             name: field_name,
+                             typ,
+                         }| Parameter {
+                            name: destructed_ident(parameter.name, *field_name),
+                            typ: typ.clone(),
+                        },
+                    )
                     .collect()
             } else {
                 vec![parameter.clone()]

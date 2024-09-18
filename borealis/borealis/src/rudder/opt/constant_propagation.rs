@@ -32,7 +32,8 @@ pub fn run(f: &mut Function) -> bool {
             let (statement, block) = writes.first().unwrap();
 
             let StatementKind::WriteVariable {
-                value: value_written, ..
+                value: value_written,
+                ..
             } = statement
                 .get(&block.get(f.block_arena()).statement_arena)
                 .kind()
@@ -52,8 +53,10 @@ pub fn run(f: &mut Function) -> bool {
                 // replace all reads, in all blocks, with the constant
                 if sua.symbol_has_reads(&symbol) {
                     for (read, block) in sua.get_symbol_reads(&symbol) {
-                        let StatementKind::ReadVariable { .. } =
-                            read.get(&block.get(f.block_arena()).statement_arena).kind().clone()
+                        let StatementKind::ReadVariable { .. } = read
+                            .get(&block.get(f.block_arena()).statement_arena)
+                            .kind()
+                            .clone()
                         else {
                             panic!("not a read");
                         };
@@ -86,12 +89,16 @@ fn simplify_block_local_writes(arena: &mut Arena<Block>, block: Ref<Block>) -> b
     let mut sua = StatementUseAnalysis::new(arena, block);
 
     for stmt in block.get(sua.block_arena()).statements() {
-        if let StatementKind::WriteVariable { symbol, value } =
-            stmt.get(&block.get(sua.block_arena()).statement_arena).kind().clone()
+        if let StatementKind::WriteVariable { symbol, value } = stmt
+            .get(&block.get(sua.block_arena()).statement_arena)
+            .kind()
+            .clone()
         {
             most_recent_writes.insert(symbol.name(), value);
-        } else if let StatementKind::ReadVariable { symbol } =
-            stmt.get(&block.get(sua.block_arena()).statement_arena).kind().clone()
+        } else if let StatementKind::ReadVariable { symbol } = stmt
+            .get(&block.get(sua.block_arena()).statement_arena)
+            .kind()
+            .clone()
         {
             if let Some(most_recent_write) = most_recent_writes.get(&symbol.name) {
                 if sua.has_uses(stmt) {

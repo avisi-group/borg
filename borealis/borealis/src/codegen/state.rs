@@ -16,7 +16,9 @@ pub fn codegen_state(rudder: &Model) -> TokenStream {
         .map(|(name, RegisterDescriptor { offset, .. })| {
             let name = format_ident!(
                 "REG_{}",
-                codegen_ident(name.as_ref().into()).to_string().to_ascii_uppercase()
+                codegen_ident(name.as_ref().into())
+                    .to_string()
+                    .to_ascii_uppercase()
             );
             quote!(pub const #name: usize = #offset;)
         })

@@ -17,7 +17,15 @@ use {
 };
 
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum Mut {
     Immutable,
@@ -25,7 +33,15 @@ pub enum Mut {
 }
 
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum Bit {
     B0,
@@ -36,7 +52,15 @@ pub enum Bit {
 ///
 /// **Not to be confused with `ocaml::Value`**
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum Value {
     Vector(ListVec<Value>),
@@ -100,7 +124,11 @@ pub enum Location {
     /// Generated location
     Generated(#[omit_bounds] Box<Self>),
     /// Hint
-    Hint(InternedString, #[omit_bounds] Box<Self>, #[omit_bounds] Box<Self>),
+    Hint(
+        InternedString,
+        #[omit_bounds] Box<Self>,
+        #[omit_bounds] Box<Self>,
+    ),
     /// Range between two positions
     Range(Position, Position),
 }
@@ -116,7 +144,15 @@ impl Display for Location {
 
 /// Loop kind
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum Loop {
     While,
@@ -124,12 +160,16 @@ pub enum Loop {
 }
 
 /// Annotation with generic value (ignored as unit here)
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Annot {
     pub location: Location,
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Extern {
     pure: bool,
     bindings: ListVec<(InternedString, InternedString)>,
@@ -174,7 +214,9 @@ pub struct DefinitionAnnotation {
     pub env: (),
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct ClauseAnnotation {
     pub inner: DefinitionAnnotation,
 }
@@ -206,7 +248,15 @@ pub struct KindIdentifierAux {
 
 /// Base kind
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum KindAux {
     /// Kind of types
@@ -262,7 +312,9 @@ impl Walkable for KindIdentifier {
 
 /// Base kind
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Kind {
     pub inner: KindAux,
     pub location: Location,
@@ -315,7 +367,9 @@ impl Walkable for Identifier {
 
 /// Optionally kind-annotated identifier
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct KindedIdentifierAux {
     pub kind: Kind,
     pub kind_identifier: KindIdentifier,
@@ -323,7 +377,15 @@ pub struct KindedIdentifierAux {
 
 /// Numeric expression, of kind Int
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum NumericExpressionAux {
     /// Abbreviation identifier
@@ -341,7 +403,9 @@ pub enum NumericExpressionAux {
     Negation(NumericExpression),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct NumericExpression {
     pub inner: Box<NumericExpressionAux>,
     pub location: Location,
@@ -355,7 +419,9 @@ impl Walkable for NumericExpression {
             NumericExpressionAux::Constant(_) => (),
             NumericExpressionAux::Application(id, nexps) => {
                 visitor.visit_identifier(id);
-                nexps.iter().for_each(|nexp| visitor.visit_numeric_expression(nexp))
+                nexps
+                    .iter()
+                    .for_each(|nexp| visitor.visit_numeric_expression(nexp))
             }
             NumericExpressionAux::Times(nexp0, nexp1) => {
                 visitor.visit_numeric_expression(nexp0);
@@ -376,7 +442,9 @@ impl Walkable for NumericExpression {
 }
 
 /// Optionally kind-annotated identifier
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct KindedIdentifier {
     pub inner: KindedIdentifierAux,
     pub location: Location,
@@ -390,7 +458,15 @@ impl Walkable for KindedIdentifier {
 
 /// Literal constant
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum LiteralAux {
     Unit,
@@ -413,7 +489,15 @@ pub enum LiteralAux {
 
 /// Type expressions, of kind Type
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum TypAux {
     InternalUnknown,
@@ -431,7 +515,9 @@ pub enum TypAux {
     Exist(ListVec<KindedIdentifier>, NConstraint, Typ),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Typ {
     pub inner: Box<TypAux>,
     pub annotation: Location,
@@ -452,9 +538,12 @@ impl Walkable for Typ {
                 visitor.visit_typ(typ1);
             }
             TypAux::Tuple(typs) => typs.iter().for_each(|typ| visitor.visit_typ(typ)),
-            TypAux::Application(_, typargs) => typargs.iter().for_each(|typarg| visitor.visit_typarg(typarg)),
+            TypAux::Application(_, typargs) => typargs
+                .iter()
+                .for_each(|typarg| visitor.visit_typarg(typarg)),
             TypAux::Exist(kids, nconstraint, typ) => {
-                kids.iter().for_each(|kid| visitor.visit_kinded_identifier(kid));
+                kids.iter()
+                    .for_each(|kid| visitor.visit_kinded_identifier(kid));
                 visitor.visit_nconstraint(nconstraint);
                 visitor.visit_typ(typ);
             }
@@ -464,7 +553,15 @@ impl Walkable for Typ {
 
 /// Type constructor arguments of all kinds
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum TypArgAux {
     NExp(NumericExpression),
@@ -472,7 +569,9 @@ pub enum TypArgAux {
     Bool(NConstraint),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypArg {
     pub inner: TypArgAux,
     pub location: Location,
@@ -490,7 +589,15 @@ impl Walkable for TypArg {
 
 /// Constraint over kind Int
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum NConstraintAux {
     Equal(NumericExpression, NumericExpression),
@@ -508,7 +615,9 @@ pub enum NConstraintAux {
     False,
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct NConstraint {
     pub inner: Box<NConstraintAux>,
     pub location: Location,
@@ -564,14 +673,24 @@ impl Walkable for NConstraint {
 
 /// Vector order specifications, of kind Order
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum OrderAux {
     Increasing,
     Decreasing,
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Literal {
     pub inner: LiteralAux,
     pub location: Location,
@@ -585,7 +704,15 @@ impl Walkable for Literal {
 
 /// Type pattern
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum TypPatAux {
     Wild,
@@ -593,7 +720,9 @@ pub enum TypPatAux {
     App(Identifier, ListVec<TypPat>),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypPat {
     pub inner: TypPatAux,
     pub location: Location,
@@ -606,14 +735,24 @@ impl Walkable for TypPat {
             TypPatAux::Var(kid) => visitor.visit_kind_identifier(kid),
             TypPatAux::App(ident, typpats) => {
                 visitor.visit_identifier(ident);
-                typpats.iter().for_each(|typpat| visitor.visit_typpat(typpat));
+                typpats
+                    .iter()
+                    .for_each(|typpat| visitor.visit_typpat(typpat));
             }
         }
     }
 }
 
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum FieldPatternWildcard {
     Wild(Location),
@@ -622,7 +761,15 @@ pub enum FieldPatternWildcard {
 
 /// Kinded identifier or Int constraint
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum QuantItemAux {
     /// Optionally kinded identifier
@@ -631,7 +778,9 @@ pub enum QuantItemAux {
     Constraint(NConstraint),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Order {
     pub inner: OrderAux,
     pub location: Location,
@@ -645,7 +794,15 @@ impl Walkable for Order {
 
 /// Pattern
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum PatternAux {
     /// Literal constant pattern
@@ -701,7 +858,9 @@ pub enum PatternAux {
     Struct((ListVec<(Identifier, Pattern)>, FieldPatternWildcard)),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Pattern {
     pub inner: Box<PatternAux>,
     pub annotation: Annot,
@@ -735,14 +894,18 @@ impl Walkable for Pattern {
                 pats.iter().for_each(|pat| visitor.visit_pattern(pat));
             }
             PatternAux::Vector(pats) => pats.iter().for_each(|pat| visitor.visit_pattern(pat)),
-            PatternAux::VectorConcat(pats) => pats.iter().for_each(|pat| visitor.visit_pattern(pat)),
+            PatternAux::VectorConcat(pats) => {
+                pats.iter().for_each(|pat| visitor.visit_pattern(pat))
+            }
             PatternAux::Tuple(pats) => pats.iter().for_each(|pat| visitor.visit_pattern(pat)),
             PatternAux::List(pats) => pats.iter().for_each(|pat| visitor.visit_pattern(pat)),
             PatternAux::Cons(pat0, pat1) => {
                 visitor.visit_pattern(pat0);
                 visitor.visit_pattern(pat1);
             }
-            PatternAux::StringAppend(pats) => pats.iter().for_each(|pat| visitor.visit_pattern(pat)),
+            PatternAux::StringAppend(pats) => {
+                pats.iter().for_each(|pat| visitor.visit_pattern(pat))
+            }
             PatternAux::VectorSubrange(_, _, _) => todo!(),
             PatternAux::Struct(_) => todo!(),
         }
@@ -751,7 +914,9 @@ impl Walkable for Pattern {
 
 /// Either a kinded identifier or a nexp constraint for a typquant
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct QuantItem {
     pub inner: QuantItemAux,
     pub location: Location,
@@ -766,13 +931,17 @@ impl Walkable for QuantItem {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub enum InternalLoopMeasureAux {
     None,
     Some(Box<Expression>),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct InternalLoopMeasure {
     pub inner: InternalLoopMeasureAux,
     pub location: Location,
@@ -788,7 +957,15 @@ impl Walkable for InternalLoopMeasure {
 
 /// Expression
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum ExpressionAux {
     /// Sequential block
@@ -818,7 +995,14 @@ pub enum ExpressionAux {
     Loop(Loop, InternalLoopMeasure, Expression, Expression),
 
     /// For loop
-    For(Identifier, Expression, Expression, Expression, Order, Expression),
+    For(
+        Identifier,
+        Expression,
+        Expression,
+        Expression,
+        Order,
+        Expression,
+    ),
 
     /// Vector (indexed from 0)
     Vector(ListVec<Expression>),
@@ -904,7 +1088,9 @@ pub enum ExpressionAux {
 
 /// Expression
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Expression {
     pub inner: Box<ExpressionAux>,
     pub annotation: Annot,
@@ -948,7 +1134,9 @@ impl Walkable for Expression {
                 visitor.visit_order(order);
                 visitor.visit_expression(exp3);
             }
-            ExpressionAux::Vector(exps) => exps.iter().for_each(|exp| visitor.visit_expression(exp)),
+            ExpressionAux::Vector(exps) => {
+                exps.iter().for_each(|exp| visitor.visit_expression(exp))
+            }
 
             ExpressionAux::VectorAccess(exp0, exp1) => {
                 visitor.visit_expression(exp0);
@@ -979,10 +1167,13 @@ impl Walkable for Expression {
                 visitor.visit_expression(exp0);
                 visitor.visit_expression(exp1);
             }
-            ExpressionAux::Struct(exps) => exps.iter().for_each(|exp| visitor.visit_field_expression(exp)),
+            ExpressionAux::Struct(exps) => exps
+                .iter()
+                .for_each(|exp| visitor.visit_field_expression(exp)),
             ExpressionAux::StructUpdate(exp, exps) => {
                 visitor.visit_expression(exp);
-                exps.iter().for_each(|exp| visitor.visit_field_expression(exp))
+                exps.iter()
+                    .for_each(|exp| visitor.visit_field_expression(exp))
             }
             ExpressionAux::Field(exp, id) => {
                 visitor.visit_expression(exp);
@@ -1038,7 +1229,15 @@ impl Walkable for Expression {
 
 /// l-value expression
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum LValueExpressionAux {
     Identifier(Identifier),
@@ -1057,7 +1256,9 @@ pub enum LValueExpressionAux {
     Field(LValueExpression, Identifier),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct LValueExpression {
     pub inner: Box<LValueExpressionAux>,
     pub annotation: Annot,
@@ -1109,7 +1310,9 @@ impl Walkable for LValueExpression {
 
 /// Field Expression
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct FieldExpressionAux {
     pub identifier: Identifier,
     pub expression: Expression,
@@ -1117,7 +1320,9 @@ pub struct FieldExpressionAux {
 
 /// Field Expression
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct FieldExpression {
     pub inner: FieldExpressionAux,
     pub annotation: Annot,
@@ -1134,7 +1339,15 @@ impl Walkable for FieldExpression {
 ///
 /// `pexp` in Sail source
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum PatternMatchAux {
     Expression(Pattern, Expression),
@@ -1145,7 +1358,9 @@ pub enum PatternMatchAux {
 ///
 /// `pexp` in Sail source
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct PatternMatch {
     pub inner: PatternMatchAux,
     pub annotation: Annot,
@@ -1171,13 +1386,17 @@ impl Walkable for PatternMatch {
 ///
 /// Implicit type, pattern must be total
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct LetBindAux {
     pub pattern: Pattern,
     pub expression: Expression,
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct LetBind {
     pub let_bind: LetBindAux,
     pub annotation: Annot,
@@ -1194,7 +1413,15 @@ impl Walkable for LetBind {
 ///
 /// Mostly the same as normal patterns but only constructible parts
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum MappingPatternAux {
     /// Literal
@@ -1223,7 +1450,9 @@ pub enum MappingPatternAux {
     Struct(ListVec<(Identifier, MappingPattern)>),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct MappingPattern {
     pub inner: Box<MappingPatternAux>,
     pub annotation: Annot,
@@ -1236,25 +1465,29 @@ impl Walkable for MappingPattern {
             MappingPatternAux::Identifier(ident) => visitor.visit_identifier(ident),
             MappingPatternAux::Application(ident, mappats) => {
                 visitor.visit_identifier(ident);
-                mappats.iter().for_each(|mappat| visitor.visit_mapping_pattern(mappat));
+                mappats
+                    .iter()
+                    .for_each(|mappat| visitor.visit_mapping_pattern(mappat));
             }
-            MappingPatternAux::Vector(mappats) => {
-                mappats.iter().for_each(|mappat| visitor.visit_mapping_pattern(mappat))
-            }
-            MappingPatternAux::VectorConcat(mappats) => {
-                mappats.iter().for_each(|mappat| visitor.visit_mapping_pattern(mappat))
-            }
-            MappingPatternAux::Tuple(mappats) => {
-                mappats.iter().for_each(|mappat| visitor.visit_mapping_pattern(mappat))
-            }
-            MappingPatternAux::List(mappats) => mappats.iter().for_each(|mappat| visitor.visit_mapping_pattern(mappat)),
+            MappingPatternAux::Vector(mappats) => mappats
+                .iter()
+                .for_each(|mappat| visitor.visit_mapping_pattern(mappat)),
+            MappingPatternAux::VectorConcat(mappats) => mappats
+                .iter()
+                .for_each(|mappat| visitor.visit_mapping_pattern(mappat)),
+            MappingPatternAux::Tuple(mappats) => mappats
+                .iter()
+                .for_each(|mappat| visitor.visit_mapping_pattern(mappat)),
+            MappingPatternAux::List(mappats) => mappats
+                .iter()
+                .for_each(|mappat| visitor.visit_mapping_pattern(mappat)),
             MappingPatternAux::Cons(mappat0, mappat1) => {
                 visitor.visit_mapping_pattern(mappat0);
                 visitor.visit_mapping_pattern(mappat1);
             }
-            MappingPatternAux::StringAppend(mappats) => {
-                mappats.iter().for_each(|mappat| visitor.visit_mapping_pattern(mappat))
-            }
+            MappingPatternAux::StringAppend(mappats) => mappats
+                .iter()
+                .for_each(|mappat| visitor.visit_mapping_pattern(mappat)),
             MappingPatternAux::Type(mappat, typ) => {
                 visitor.visit_mapping_pattern(mappat);
                 visitor.visit_typ(typ);
@@ -1276,7 +1509,15 @@ impl Walkable for MappingPattern {
 
 /// Type quantifiers and constraints
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum TypQuantAux {
     Tq(ListVec<QuantItem>),
@@ -1286,14 +1527,24 @@ pub enum TypQuantAux {
 
 /// Mapping pattern expression
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum MappingPatternExpressionAux {
     Pattern(MappingPattern),
     When(MappingPattern, Expression),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypQuant {
     pub inner: TypQuantAux,
     pub location: Location,
@@ -1311,7 +1562,9 @@ impl Walkable for TypQuant {
 
 type PatternExpressionFunctionClause = PatternMatch;
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct MappingPatternExpression {
     pub inner: MappingPatternExpressionAux,
     pub annotation: Annot,
@@ -1329,7 +1582,9 @@ impl Walkable for MappingPatternExpression {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypeUnionAux {
     pub typ: Typ,
     pub id: Identifier,
@@ -1337,7 +1592,15 @@ pub struct TypeUnionAux {
 
 /// Optional type annotation for functions
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum TypeAnnotationOptAux {
     None,
@@ -1346,7 +1609,15 @@ pub enum TypeAnnotationOptAux {
 
 /// Optional recursive annotation for functions
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum RecursiveAnnotationOptAux {
     /// Non-recursive
@@ -1359,7 +1630,9 @@ pub enum RecursiveAnnotationOptAux {
 
 /// Function clause
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct FunctionClauseAux {
     pub identifier: Identifier,
     pub pattern_match: PatternExpressionFunctionClause,
@@ -1367,7 +1640,15 @@ pub struct FunctionClauseAux {
 
 /// Mapping clause (bidirectional pattern-match)
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum MappingClauseAux {
     Bidirectional(MappingPatternExpression, MappingPatternExpression),
@@ -1375,7 +1656,9 @@ pub enum MappingClauseAux {
     Backwards(MappingPatternExpression, Expression),
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypeSchemeAux {
     typ_quantifier: TypQuant,
     typ: Typ,
@@ -1383,7 +1666,15 @@ pub struct TypeSchemeAux {
 
 /// Index specification, for bitfields in register types
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum IndexRangeAux {
     /// Single index
@@ -1394,7 +1685,9 @@ pub enum IndexRangeAux {
     Concat(IndexRange, IndexRange),
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct IndexRange {
     pub inner: Box<IndexRangeAux>,
     pub location: Location,
@@ -1416,7 +1709,9 @@ impl Walkable for IndexRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypeUnion {
     pub inner: TypeUnionAux,
     pub annotation: DefinitionAnnotation,
@@ -1429,7 +1724,9 @@ impl Walkable for TypeUnion {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypeAnnotationOpt {
     pub inner: TypeAnnotationOptAux,
     pub location: Location,
@@ -1447,7 +1744,9 @@ impl Walkable for TypeAnnotationOpt {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct RecursiveAnnotationOpt {
     pub inner: RecursiveAnnotationOptAux,
     pub location: Location,
@@ -1465,7 +1764,9 @@ impl Walkable for RecursiveAnnotationOpt {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct FunctionClause {
     pub inner: FunctionClauseAux,
     pub annotation: ClauseAnnotation,
@@ -1479,7 +1780,9 @@ impl Walkable for FunctionClause {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct MappingClause {
     pub inner: MappingClauseAux,
     pub annotation: ClauseAnnotation,
@@ -1504,7 +1807,9 @@ impl Walkable for MappingClause {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypeScheme {
     inner: TypeSchemeAux,
     l: Location,
@@ -1519,7 +1824,15 @@ impl Walkable for TypeScheme {
 
 /// Type definition body
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum TypeDefinitionAux {
     /// Type abbreviation
@@ -1536,7 +1849,9 @@ pub enum TypeDefinitionAux {
 
 /// Function definition
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct FunctionDefinitionAux {
     pub recursive_annotation: RecursiveAnnotationOpt,
     pub type_annotation: TypeAnnotationOpt,
@@ -1545,7 +1860,9 @@ pub struct FunctionDefinitionAux {
 
 /// Mapping definition (bidirectional pattern-match function)
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct MappingDefinitionAux {
     pub ident: Identifier,
     pub typ_annotation: TypeAnnotationOpt,
@@ -1554,7 +1871,15 @@ pub struct MappingDefinitionAux {
 
 /// Instantiation substitution
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum SubstitutionAux {
     /// Instantiate a type variable with a type
@@ -1564,21 +1889,27 @@ pub enum SubstitutionAux {
 }
 
 /// Outcome declaration
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct OutcomeSpecificationAux {
     id: Identifier,
     typschm: TypeScheme,
     kids: ListVec<KindedIdentifier>,
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct InstantiationSpecificationAux {
     id: Identifier,
 }
 
 /// Value type specification
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct ValueSpecificationAux {
     pub typ_scheme: TypeScheme,
     pub ident: Identifier,
@@ -1586,7 +1917,9 @@ pub struct ValueSpecificationAux {
 }
 
 /// Default kinding or typing assumption
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct DefaultSpecAux {
     order: Order,
 }
@@ -1594,7 +1927,15 @@ pub struct DefaultSpecAux {
 /// Function and type union definitions that can be spread across a file. Each
 /// one must end in $_$
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum ScatteredDefinitionAux {
     /// Scattered function definition header
@@ -1616,7 +1957,9 @@ pub enum ScatteredDefinitionAux {
 }
 
 /// Register declarations
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct DecSpecAux {
     typ: Typ,
     id: Identifier,
@@ -1627,19 +1970,31 @@ pub struct DecSpecAux {
 ///
 /// To define a default value for any unspecified positions in a sparse map
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum OptionalDefaultAux {
     Empty,
     Dec(Expression),
 }
 
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct ImplDefintionAux {
     inner: FunctionClause,
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct TypeDefinition {
     pub inner: TypeDefinitionAux,
     pub annotation: Annot,
@@ -1664,11 +2019,15 @@ impl Walkable for TypeDefinition {
             TypeDefinitionAux::Variant(ident, typquant, typunions, _) => {
                 visitor.visit_identifier(ident);
                 visitor.visit_typquant(typquant);
-                typunions.iter().for_each(|typunion| visitor.visit_typunion(typunion));
+                typunions
+                    .iter()
+                    .for_each(|typunion| visitor.visit_typunion(typunion));
             }
             TypeDefinitionAux::Enumeration(ident, idents, _) => {
                 visitor.visit_identifier(ident);
-                idents.iter().for_each(|ident| visitor.visit_identifier(ident));
+                idents
+                    .iter()
+                    .for_each(|ident| visitor.visit_identifier(ident));
             }
             TypeDefinitionAux::Bitfield(ident, typ, identranges) => {
                 visitor.visit_identifier(ident);
@@ -1682,7 +2041,9 @@ impl Walkable for TypeDefinition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct FunctionDefinition {
     pub inner: FunctionDefinitionAux,
     pub annotation: Annot,
@@ -1692,11 +2053,16 @@ impl Walkable for FunctionDefinition {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         visitor.visit_recursive_annotation_opt(&self.inner.recursive_annotation);
         visitor.visit_type_annotation_opt(&self.inner.type_annotation);
-        self.inner.clauses.iter().for_each(|c| visitor.visit_function_clause(c));
+        self.inner
+            .clauses
+            .iter()
+            .for_each(|c| visitor.visit_function_clause(c));
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct MappingDefinition {
     pub inner: MappingDefinitionAux,
     pub annotation: Annot,
@@ -1713,7 +2079,9 @@ impl Walkable for MappingDefinition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Substitution {
     pub inner: SubstitutionAux,
     pub location: Location,
@@ -1734,13 +2102,17 @@ impl Walkable for Substitution {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct OutcomeSpecification {
     pub inner: OutcomeSpecificationAux,
     pub location: Location,
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct InstantiationSpecification {
     pub inner: InstantiationSpecificationAux,
     pub annotation: Annot,
@@ -1752,7 +2124,9 @@ impl Walkable for InstantiationSpecification {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct ValueSpecification {
     pub inner: ValueSpecificationAux,
     pub annotation: Annot,
@@ -1764,7 +2138,9 @@ impl Walkable for ValueSpecification {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct DefaultSpec {
     pub inner: DefaultSpecAux,
     pub location: Location,
@@ -1776,7 +2152,9 @@ impl Walkable for DefaultSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct ScatteredDefinition {
     pub inner: ScatteredDefinitionAux,
     pub annotation: Annot,
@@ -1829,7 +2207,9 @@ impl Walkable for ScatteredDefinition {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct DecSpec {
     pub inner: DecSpecAux,
     pub annotation: Annot,
@@ -1847,7 +2227,15 @@ impl Walkable for DecSpec {
 }
 
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum Prec {
     Infix,
@@ -1855,7 +2243,9 @@ pub enum Prec {
     InfixRight,
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct LoopMeasure {
     pub loop0: Loop,
     pub expression: Expression,
@@ -1867,7 +2257,9 @@ impl Walkable for LoopMeasure {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct OptionalDefault {
     pub inner: OptionalDefaultAux,
     pub annotation: Annot,
@@ -1881,14 +2273,24 @@ impl Walkable for OptionalDefault {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct ImplDefintion {
     inner: ImplDefintionAux,
     l: Location,
 }
 
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum DefinitionAux {
     /// Type definition
@@ -1948,7 +2350,9 @@ pub enum DefinitionAux {
 }
 
 /// Top-level Sail2 definition
-#[derive(Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Definition {
     definition: DefinitionAux,
     annotation: DefinitionAnnotation,
@@ -1971,7 +2375,9 @@ impl Walkable for Definition {
                 ids.iter().for_each(|id| visitor.visit_identifier(id));
             }
             DefinitionAux::Default(default) => visitor.visit_default_spec(default),
-            DefinitionAux::Scattered(scattereddef) => visitor.visit_scattered_definition(scattereddef),
+            DefinitionAux::Scattered(scattereddef) => {
+                visitor.visit_scattered_definition(scattereddef)
+            }
             DefinitionAux::Measure {
                 identifier,
                 pattern,
@@ -1988,13 +2394,17 @@ impl Walkable for Definition {
                     .for_each(|loopmeasure| visitor.visit_loop_measure(loopmeasure));
             }
             DefinitionAux::Register(decspec) => visitor.visit_decspec(decspec),
-            DefinitionAux::Mutual(funcdefs) => funcdefs.iter().for_each(|f| visitor.visit_function_definition(f)),
+            DefinitionAux::Mutual(funcdefs) => funcdefs
+                .iter()
+                .for_each(|f| visitor.visit_function_definition(f)),
             DefinitionAux::Pragma(_, _, _) => (),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 pub struct Ast {
     pub defs: ListVec<Definition>,
     pub comments: ListVec<(InternedString, ListVec<Comment>)>,
@@ -2010,7 +2420,9 @@ impl Walkable for Ast {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf)]
+#[derive(
+    Debug, Clone, PartialEq, ToValue, FromValue, serde::Serialize, serde::Deserialize, DeepSizeOf,
+)]
 
 pub struct Comment {
     pub typ: CommentType,
@@ -2026,7 +2438,15 @@ impl Walkable for Comment {
 }
 
 #[derive(
-    Debug, Clone, PartialEq, FromValue, ToValue, serde::Serialize, serde::Deserialize, DeepSizeOf, IntoStaticStr,
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    DeepSizeOf,
+    IntoStaticStr,
 )]
 pub enum CommentType {
     Block,

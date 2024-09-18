@@ -42,8 +42,9 @@ static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_si
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 // static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
-// static DESTROY_BITVECTORS: FunctionPass = ("destroy-bitvectors", destroy_bitvectors::run);
-// static MATERIALISE_APINTS: FunctionPass = ("materialise-apints", materialise_apints::run);
+// static DESTROY_BITVECTORS: FunctionPass = ("destroy-bitvectors",
+// destroy_bitvectors::run); static MATERIALISE_APINTS: FunctionPass =
+// ("materialise-apints", materialise_apints::run);
 
 pub fn optimise(ctx: &mut Model, level: OptLevel) {
     let passes: Vec<FunctionPass> = match level {

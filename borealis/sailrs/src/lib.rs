@@ -23,12 +23,22 @@ pub mod types;
 /// Loads Sail files from `sail.json` model configuration.
 ///
 /// Parses supplied Sail files and returns the AST
-pub fn load_from_config<P: AsRef<Path>>(config_path: P) -> Result<ListVec<jib_ast::Definition>, Error> {
+pub fn load_from_config<P: AsRef<Path>>(
+    config_path: P,
+) -> Result<ListVec<jib_ast::Definition>, Error> {
     let ModelConfig { files } = ModelConfig::load(config_path.as_ref())?;
 
     RT.lock().execute(move |rt| {
         trace!("Compiling Sail");
-        let jib = unsafe { run_sail(rt, files.into_iter().map(|p| p.to_string_lossy().to_string()).collect()) }??;
+        let jib = unsafe {
+            run_sail(
+                rt,
+                files
+                    .into_iter()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .collect(),
+            )
+        }??;
 
         trace!("Parsing JIB AST");
         let jib = ListVec::<jib_ast::Definition>::from_value(jib);

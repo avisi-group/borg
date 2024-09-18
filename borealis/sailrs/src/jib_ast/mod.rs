@@ -104,7 +104,9 @@ impl Walkable for Type {
                     visitor.visit_type(typ);
                 });
             }
-            Self::Fvector(_, typ) | Self::Vector(typ) | Self::List(typ) | Self::Ref(typ) => visitor.visit_type(typ),
+            Self::Fvector(_, typ) | Self::Vector(typ) | Self::List(typ) | Self::Ref(typ) => {
+                visitor.visit_type(typ)
+            }
             Self::Poly(_) => (),
         }
     }
@@ -441,8 +443,12 @@ impl Walkable for Instruction {
                     }
                 }
 
-                parameter_types.iter().for_each(|typ| visitor.visit_type(typ));
-                parameters.iter().for_each(|value| visitor.visit_value(value));
+                parameter_types
+                    .iter()
+                    .for_each(|typ| visitor.visit_type(typ));
+                parameters
+                    .iter()
+                    .for_each(|value| visitor.visit_value(value));
             }
             InstructionAux::Copy(expression, value) => {
                 visitor.visit_expression(expression);
@@ -461,8 +467,12 @@ impl Walkable for Instruction {
                 else_body.iter().for_each(|i| visitor.visit_instruction(i));
                 visitor.visit_type(typ);
             }
-            InstructionAux::Block(instructions) => instructions.iter().for_each(|i| visitor.visit_instruction(i)),
-            InstructionAux::TryBlock(instructions) => instructions.iter().for_each(|i| visitor.visit_instruction(i)),
+            InstructionAux::Block(instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            InstructionAux::TryBlock(instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
             InstructionAux::Throw(value) => visitor.visit_value(value),
             InstructionAux::Comment(_) => {}
             InstructionAux::Raw(_) => {}
@@ -534,22 +544,30 @@ impl Walkable for Definition {
         match &self.def {
             DefinitionAux::Register(_, typ, instructions) => {
                 visitor.visit_type(typ);
-                instructions.iter().for_each(|i| visitor.visit_instruction(i));
+                instructions
+                    .iter()
+                    .for_each(|i| visitor.visit_instruction(i));
             }
             DefinitionAux::Type(type_definition) => visitor.visit_type_definition(type_definition),
             DefinitionAux::Let(_, types, instructions) => {
                 types.iter().for_each(|(_, typ)| visitor.visit_type(typ));
-                instructions.iter().for_each(|i| visitor.visit_instruction(i));
+                instructions
+                    .iter()
+                    .for_each(|i| visitor.visit_instruction(i));
             }
             DefinitionAux::Val(_, _, types, typ) => {
                 types.iter().for_each(|typ| visitor.visit_type(typ));
                 visitor.visit_type(typ)
             }
-            DefinitionAux::Fundef(_, _, _, instructions) => {
-                instructions.iter().for_each(|i| visitor.visit_instruction(i))
-            }
-            DefinitionAux::Startup(_, instructions) => instructions.iter().for_each(|i| visitor.visit_instruction(i)),
-            DefinitionAux::Finish(_, instructions) => instructions.iter().for_each(|i| visitor.visit_instruction(i)),
+            DefinitionAux::Fundef(_, _, _, instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            DefinitionAux::Startup(_, instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
+            DefinitionAux::Finish(_, instructions) => instructions
+                .iter()
+                .for_each(|i| visitor.visit_instruction(i)),
             DefinitionAux::Pragma(_, _) => (),
         }
     }

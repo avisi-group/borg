@@ -43,15 +43,31 @@ impl Display for ValidationMessage {
 }
 
 impl ValidationMessage {
-    pub fn stmt_msg<T: ToString>(f: InternedString, b: InternedString, s: InternedString, v: Severity, m: T) -> Self {
+    pub fn stmt_msg<T: ToString>(
+        f: InternedString,
+        b: InternedString,
+        s: InternedString,
+        v: Severity,
+        m: T,
+    ) -> Self {
         Self(v, Scope::StatementLevel(f, b, s), m.to_string())
     }
 
-    pub fn stmt_warn<T: ToString>(f: InternedString, b: InternedString, s: InternedString, m: T) -> Self {
+    pub fn stmt_warn<T: ToString>(
+        f: InternedString,
+        b: InternedString,
+        s: InternedString,
+        m: T,
+    ) -> Self {
         Self::stmt_msg(f, b, s, Severity::Warning, m)
     }
 
-    pub fn stmt_err<T: ToString>(f: InternedString, b: InternedString, s: InternedString, m: T) -> Self {
+    pub fn stmt_err<T: ToString>(
+        f: InternedString,
+        b: InternedString,
+        s: InternedString,
+        m: T,
+    ) -> Self {
         Self::stmt_msg(f, b, s, Severity::Error, m)
     }
 }
@@ -76,7 +92,9 @@ fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
         })
         .flatten()
         .filter_map(|((b, f), s)| {
-            if let StatementKind::Constant { typ, value } = s.get(&b.get(f.block_arena()).statement_arena).kind() {
+            if let StatementKind::Constant { typ, value } =
+                s.get(&b.get(f.block_arena()).statement_arena).kind()
+            {
                 Some(((s, b, f), (typ.clone(), value.clone())))
             } else {
                 None
@@ -116,7 +134,10 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 }
 
 fn validate_constant_type(
-    ((stmt, block, f), (typ, value)): ((Ref<Statement>, Ref<Block>, &Function), (Type, ConstantValue)),
+    ((stmt, block, f), (typ, value)): (
+        (Ref<Statement>, Ref<Block>, &Function),
+        (Type, ConstantValue),
+    ),
 ) -> Option<ValidationMessage> {
     match (&value, &typ) {
         (
