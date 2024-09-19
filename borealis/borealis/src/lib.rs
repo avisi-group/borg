@@ -213,9 +213,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "IsFeatureImplemented",
         "num_of_Feature",
         "HaveEL",
-        // "AArch32_TakeReset",
-        // "FPEXC_read",
-        // "_update_FPEXC_Type_EN",
+        "AArch32_TakeReset",
+        "FPEXC_read",
+        "_update_FPEXC_Type_EN",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || FN_TOPLEVEL.contains(&name.as_ref())

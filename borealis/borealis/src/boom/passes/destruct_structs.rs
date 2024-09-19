@@ -373,12 +373,8 @@ fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedStrin
     *parameters = parameters
         .iter()
         .flat_map(|parameter| {
-            if let Type::Struct {
-                name: struct_name,
-                fields,
-            } = &*parameter.typ.get()
-            {
-                removed.insert(*struct_name, fields.clone());
+            if let Type::Struct { fields, .. } = &*parameter.typ.get() {
+                removed.insert(parameter.name, fields.clone());
 
                 fields
                     .iter()
