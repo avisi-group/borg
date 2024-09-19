@@ -1,6 +1,7 @@
 use {
     crate::rudder::{Function, Model},
     log::trace,
+    rayon::iter::{IntoParallelRefMutIterator, ParallelIterator},
 };
 
 pub mod block_inliner;
@@ -68,7 +69,7 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
     };
 
     ctx.get_functions_mut()
-        .iter_mut() // todo parallel
+        .par_iter_mut()
         .for_each(|(name, function)| {
             let mut changed = true;
 

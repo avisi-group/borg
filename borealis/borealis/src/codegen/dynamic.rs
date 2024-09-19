@@ -48,7 +48,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             let block_impl = codegen_block(function.block_arena(), block.get(function.block_arena()));
 
             quote! {
-                // #[inline(always)] // enabling blows up memory usage during compilation (>1TB for 256 threads)
+                // #[inline(always)] blows up memory usage during compilation (>1TB for 256 threads)
                 fn #block_name(ctx: &mut X86TranslationContext, fn_state: &FunctionState) -> BlockResult  {
                     #block_impl
                 }

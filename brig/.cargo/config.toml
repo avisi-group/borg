@@ -8,8 +8,8 @@ rustflags = [
     "link-arg=-z",
     "-C",
     "link-arg=nostart-stop-gc",
-    # "-Z",
-    # "threads=16"
+    "-Z",
+    "threads=16"
 ]
 
 [unstable]

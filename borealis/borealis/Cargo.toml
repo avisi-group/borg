@@ -36,8 +36,8 @@ cargo-util-schemas = "0.3.1"
 toml = "0.8.19"
 semver = { version = "1.0.23", features = ["serde"] }
 walkdir = "2.5.0"
-#rayon = "1.10.0"
-dashmap = { version = "6.1.0", features = ["rayon"] }
+rayon = "1.10.0"
+#dashmap = { version = "6.1.0", features = ["rayon"] }
 num-rational = { version = "0.4.2", default-features = false }
 num-traits = { version = "0.2.19", default-features = false, features = ["i128"] }
 serde = { version = "1.0.210", features = ["derive"] }

@@ -181,7 +181,6 @@ dependencies = [
  "clap",
  "color-eyre",
  "common",
- "dashmap 6.1.0",
  "deepsize",
  "displaydoc",
  "dot",
@@ -200,6 +199,7 @@ dependencies = [
  "prettyplease",
  "proc-macro2",
  "quote",
+ "rayon",
  "regex",
  "rkyv",
  "sailrs",
@@ -464,21 +464,6 @@ dependencies = [
  "lock_api",
  "once_cell",
  "parking_lot_core",
-]
-
-[[package]]
-name = "dashmap"
-version = "6.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
-dependencies = [
- "cfg-if",
- "crossbeam-utils",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core",
- "rayon",
 ]
 
 [[package]]
@@ -755,7 +740,7 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a030549b8dfea08d7981ad0381acb4bc0cdc7a4fd616e3b9659c31dc0a3474fd"
 dependencies = [
- "dashmap 5.5.3",
+ "dashmap",
  "deepsize",
  "hashbrown 0.14.5",
  "serde",

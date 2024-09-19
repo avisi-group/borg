@@ -20,7 +20,7 @@ use {
     },
     deepsize::DeepSizeOf,
     errctx::PathCtx,
-    log::{info, trace, warn},
+    log::{debug, info, trace, warn},
     rkyv::Deserialize,
     sailrs::{
         jib_ast::{self, Definition, DefinitionAux, Instruction},
@@ -148,10 +148,17 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     info!("Validating rudder");
     let msgs = rudder.validate();
     for msg in msgs {
-        warn!("{msg}");
+        debug!("{msg}");
     }
 
     info!("Optimising rudder");
+    rudder.optimise(rudder::opt::OptLevel::Level3);
+
+    info!("Inlining");
+    rudder.function_inline(FN_TOPLEVEL);
+
+    info!("Re-optimising post-inline"); // at the time of writing this brought borealis exec time from 53 seconds to 18
+                                        // seconds
     rudder.optimise(rudder::opt::OptLevel::Level3);
 
     if let Some(path) = &dump_ir {
@@ -165,11 +172,8 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     info!("Validating rudder again");
     let msgs = rudder.validate();
     for msg in msgs {
-        warn!("{msg}");
+        debug!("{msg}");
     }
-
-    info!("Inlining");
-    rudder.function_inline(FN_TOPLEVEL);
 
     if matches!(
         &mode,
@@ -216,6 +220,17 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AArch32_TakeReset",
         "FPEXC_read",
         "_update_FPEXC_Type_EN",
+        "HSCTLR_read",
+        "_get_HSCTLR_Type_EE",
+        "_get_HSCTLR_Type_TE",
+        "SCTLR_read__2",
+        "_get_SCTLR_Type_EE",
+        "_get_SCTLR_Type_TE",
+        "SCTLR_NS_read",
+        "AArch32_WriteMode",
+        "ELFromM32",
+        "SCR_GEN_read",
+        "Mk_SCRType",
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || FN_TOPLEVEL.contains(&name.as_ref())
