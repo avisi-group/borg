@@ -94,8 +94,7 @@ fn run_on_block(
                 let arena = stmt_ua.block_arena();
                 trace!(
                     "replacing use in {}",
-                    use_.get(block.get(arena).arena())
-                        .to_string(block.get(arena).arena())
+                    use_.to_string(block.get(arena).arena())
                 );
 
                 use_.get_mut(block.get_mut(arena).arena_mut())

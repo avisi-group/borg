@@ -260,32 +260,32 @@ impl StatementKind {
                     "write-var {}:{} <= {}:{}",
                     symbol.name(),
                     symbol.typ(),
-                    value.get(arena).name(),
+                    value.to_string(arena),
                     value.get(arena).typ(arena)
                 )
             }
             StatementKind::ReadRegister { typ, offset } => {
-                format!("read-reg {}:{}", offset.get(arena).name(), typ)
+                format!("read-reg {}:{}", offset.to_string(arena), typ)
             }
             StatementKind::WriteRegister { offset, value } => {
                 format!(
                     "write-reg {} <= {}",
-                    offset.get(arena).name(),
-                    value.get(arena).name()
+                    offset.to_string(arena),
+                    value.to_string(arena)
                 )
             }
             StatementKind::ReadMemory { offset, size } => {
                 format!(
                     "read-mem {}:{}",
-                    offset.get(arena).name(),
-                    size.get(arena).name()
+                    offset.to_string(arena),
+                    size.to_string(arena)
                 )
             }
             StatementKind::WriteMemory { offset, value } => {
                 format!(
                     "write-mem {} <= {}",
-                    offset.get(arena).name(),
-                    value.get(arena).name()
+                    offset.to_string(arena),
+                    value.to_string(arena)
                 )
             }
             StatementKind::BinaryOperation { kind, lhs, rhs } => {
@@ -307,7 +307,7 @@ impl StatementKind {
                     BinaryOperationKind::PowI => "powi",
                 };
 
-                format!("{} {} {}", op, lhs.get(arena).name(), rhs.get(arena).name())
+                format!("{} {} {}", op, lhs.to_string(arena), rhs.to_string(arena))
             }
             StatementKind::UnaryOperation { kind, value } => {
                 let op = match kind {
@@ -321,7 +321,7 @@ impl StatementKind {
                     UnaryOperationKind::SquareRoot => "sqrt",
                 };
 
-                format!("{} {}", op, value.get(arena).name())
+                format!("{} {}", op, value.to_string(arena))
             }
 
             StatementKind::ShiftOperation {
@@ -340,15 +340,15 @@ impl StatementKind {
                 format!(
                     "{} {} {}",
                     op,
-                    value.get(arena).name(),
-                    amount.get(arena).name()
+                    value.to_string(arena),
+                    amount.to_string(arena)
                 )
             }
             StatementKind::Call { target, args, .. } => {
                 format!(
                     "call {}({})",
                     target,
-                    args.iter().map(|s| s.get(arena).name()).join(", ")
+                    args.iter().map(|s| s.to_string(arena)).join(", ")
                 )
             }
             StatementKind::Cast { kind, typ, value } => {
@@ -361,7 +361,7 @@ impl StatementKind {
                     CastOperationKind::Broadcast => "bcast",
                 };
 
-                format!("cast {} {} -> {}", op, value.get(arena).name(), typ)
+                format!("cast {} {} -> {}", op, value.to_string(arena), typ)
             }
             StatementKind::BitsCast {
                 kind,
@@ -381,9 +381,9 @@ impl StatementKind {
                 format!(
                     "bits-cast {} {} -> {} length {}",
                     op,
-                    value.get(arena).name(),
+                    value.to_string(arena),
                     typ,
-                    length.get(arena).name()
+                    length.to_string(arena)
                 )
             }
             StatementKind::Jump { target } => format!("jump block{:?}", target), // removed .index
@@ -394,7 +394,7 @@ impl StatementKind {
             } => {
                 format!(
                     "branch {} block{:?} block{:?}", // removed .index
-                    condition.get(arena).name(),
+                    condition.to_string(arena),
                     true_target,
                     false_target,
                 )
@@ -411,7 +411,7 @@ impl StatementKind {
             }
 
             StatementKind::Return { value } => {
-                format!("return {}", value.get(arena).name())
+                format!("return {}", value.to_string(arena))
             }
             StatementKind::Select {
                 condition,
@@ -420,27 +420,27 @@ impl StatementKind {
             } => {
                 format!(
                     "select {} {} {}",
-                    condition.get(arena).name(),
-                    true_value.get(arena).name(),
-                    false_value.get(arena).name()
+                    condition.to_string(arena),
+                    true_value.to_string(arena),
+                    false_value.to_string(arena)
                 )
             }
             StatementKind::Panic(statement) => {
-                format!("panic {}", statement.get(arena).name())
+                format!("panic {}", statement.to_string(arena))
             }
             StatementKind::Undefined => format!("undefined",),
 
             StatementKind::ReadPc => format!("read-pc"),
-            StatementKind::WritePc { value } => format!("write-pc {}", value.get(arena).name()),
+            StatementKind::WritePc { value } => format!("write-pc {}", value.to_string(arena)),
             StatementKind::BitExtract {
                 value,
                 start,
                 length,
             } => format!(
                 "bit-extract {} {} {}",
-                value.get(arena).name(),
-                start.get(arena).name(),
-                length.get(arena).name()
+                value.to_string(arena),
+                start.to_string(arena),
+                length.to_string(arena)
             ),
             StatementKind::BitInsert {
                 target: original_value,
@@ -449,16 +449,16 @@ impl StatementKind {
                 length,
             } => format!(
                 "bit-insert {} {} {} {}",
-                original_value.get(arena).name(),
-                insert_value.get(arena).name(),
-                start.get(arena).name(),
-                length.get(arena).name()
+                original_value.to_string(arena),
+                insert_value.to_string(arena),
+                start.to_string(arena),
+                length.to_string(arena)
             ),
             StatementKind::ReadElement { vector, index } => {
                 format!(
                     "read-element {}[{}]",
-                    vector.get(arena).name(),
-                    index.get(arena).name()
+                    vector.to_string(arena),
+                    index.to_string(arena)
                 )
             }
             StatementKind::AssignElement {
@@ -467,43 +467,43 @@ impl StatementKind {
                 index,
             } => format!(
                 "mutate-element {}[{}] <= {}",
-                vector.get(arena).name(),
-                index.get(arena).name(),
-                value.get(arena).name()
+                vector.to_string(arena),
+                index.to_string(arena),
+                value.to_string(arena)
             ),
 
             StatementKind::SizeOf { value } => {
-                format!("size-of {}", value.get(arena).name())
+                format!("size-of {}", value.to_string(arena))
             }
             StatementKind::Assert { condition } => {
-                format!("assert {}", condition.get(arena).name())
+                format!("assert {}", condition.to_string(arena))
             }
 
             StatementKind::CreateBits { value, length } => {
                 format!(
                     "create-bits {} {}",
-                    value.get(arena).name(),
-                    length.get(arena).name()
+                    value.to_string(arena),
+                    length.to_string(arena)
                 )
             }
             StatementKind::MatchesUnion { value, variant } => {
-                format!("matches-union {} {variant}", value.get(arena).name())
+                format!("matches-union {} {variant}", value.to_string(arena))
             }
             StatementKind::UnwrapUnion { value, variant } => {
-                format!("unwrap-union {} {variant}", value.get(arena).name())
+                format!("unwrap-union {} {variant}", value.to_string(arena))
             }
             StatementKind::TupleAccess { index, source } => {
-                format!("tuple-access {}.{index}", source.get(arena).name())
+                format!("tuple-access {}.{index}", source.to_string(arena))
             }
             StatementKind::GetFlag { flag, operation } => {
-                format!("get-flag {flag:?} {}", operation.get(arena).name())
+                format!("get-flag {flag:?} {}", operation.to_string(arena))
             }
             StatementKind::CreateTuple(values) => {
                 format!(
                     "create-tuple {:?}",
                     values
                         .iter()
-                        .map(|v| v.get(arena).name())
+                        .map(|v| v.to_string(arena))
                         .collect::<Vec<_>>()
                 )
             }
@@ -516,32 +516,31 @@ impl StatementKind {
 pub struct Statement {
     name: InternedString,
     kind: StatementKind,
-    parent: Ref<Block>,
 }
-impl ToTokens for Statement {
+impl ToTokens for Ref<Statement> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(format_ident!("{}", self.name().to_string())) //todo: fix
-                                                                    // this?
+        tokens.append(format_ident!("s{}", self.index()))
+    }
+}
+
+impl Ref<Statement> {
+    pub fn to_string(&self, arena: &Arena<Statement>) -> InternedString {
+        format!(
+            "s{}: {}",
+            self.index(),
+            self.get(arena).kind().to_string(arena)
+        )
+        .into()
     }
 }
 
 impl Statement {
-    pub fn to_string(&self, arena: &Arena<Statement>) -> InternedString {
-        format!("{}: {}", self.name(), self.kind().to_string(arena)).into()
-    }
-
     pub fn kind(&self) -> &StatementKind {
         &self.kind
     }
+
     pub fn kind_mut(&mut self) -> &mut StatementKind {
         &mut self.kind
-    }
-    pub fn name(&self) -> InternedString {
-        self.name
-    }
-
-    pub fn parent_block(&self) -> Ref<Block> {
-        self.parent
     }
 
     pub fn has_side_effects(&self) -> bool {
@@ -1113,7 +1112,6 @@ pub fn build_at(
     let r = block.get_mut(arena).arena_mut().insert(Statement {
         name: "???".into(),
         kind,
-        parent: block,
     });
     match location {
         Location::Before(before) => block.get_mut(arena).insert_statement_before(before, r),

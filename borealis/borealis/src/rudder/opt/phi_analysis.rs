@@ -54,11 +54,7 @@ pub fn run(f: &mut Function) -> bool {
         for (symbol, write) in writes {
             let arena = block.get(f.block_arena()).arena();
 
-            trace!(
-                "    write: {} = {}",
-                symbol,
-                write.get(arena).to_string(arena)
-            );
+            trace!("    write: {} = {}", symbol, write.to_string(arena));
         }
     }
 

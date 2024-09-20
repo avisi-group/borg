@@ -79,12 +79,11 @@ impl<'f> SymbolUseAnalysisBuilder<'f> {
             .symbol_blocks
             .entry(symbol.name())
             .and_modify(|u| {
-                u.insert(stmt.get(arena).parent_block());
+                u.insert(block);
             })
             .or_insert({
                 let mut h = HashSet::default();
-                h.insert(stmt.get(arena).parent_block());
-
+                h.insert(block);
                 h
             });
     }

@@ -22,10 +22,7 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
     for stmt in b.get(sua.block_arena()).statements() {
         if sua.is_dead(stmt) {
             let s_arena = &b.get(arena).statement_arena;
-            trace!(
-                "killing dead statement: {}",
-                stmt.get(s_arena).to_string(s_arena)
-            );
+            trace!("killing dead statement: {}", stmt.to_string(s_arena));
             b.get_mut(arena).kill_statement(stmt);
             return true;
         }
