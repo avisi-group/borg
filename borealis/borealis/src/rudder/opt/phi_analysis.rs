@@ -50,7 +50,7 @@ pub fn run(f: &mut Function) -> bool {
 
     trace!("live-outs in {}:", f.name());
     for (block, writes) in live_outs {
-        trace!("  block {}:", block.get(f.block_arena()).index());
+        trace!("  block {}:", block.index());
         for (symbol, write) in writes {
             let arena = block.get(f.block_arena()).arena();
 

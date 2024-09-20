@@ -171,7 +171,7 @@ pub fn codegen_workspace(
     };
 
     rudder.update_names();
-    let cfg = FunctionCallGraphAnalysis::new(&rudder);
+    // let cfg = FunctionCallGraphAnalysis::new(&rudder);
     let rudder_fns = toplevel_fns
         .iter()
         .copied()
@@ -206,9 +206,9 @@ pub fn codegen_workspace(
         .map(|(name, function)| {
             let contents = dynamic::codegen_function(&function);
 
-            let mut dependencies = cfg.get_callees_for(name);
-            dependencies.push("common".into());
-            let dependencies = dependencies.into_iter().filter(|dep| *dep != name).collect::<Vec<_>>();
+            // let mut dependencies = cfg.get_callees_for(name);
+            // dependencies.push("common".into());
+            // let dependencies = dependencies.into_iter().filter(|dep| *dep != name).collect::<Vec<_>>();
 
             // let dyn_imports: TokenStream = dependencies
             //     .iter()

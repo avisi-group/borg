@@ -249,7 +249,6 @@ impl Symbol {
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    index: usize,
     statement_arena: Arena<Statement>,
     statements: Vec<Ref<Statement>>,
 }
@@ -259,19 +258,13 @@ impl Block {
         Self::default()
     }
 
-    pub fn index(&self) -> usize {
-        self.index
-    }
-
-    pub fn update_index(&mut self, index: usize) {
-        self.index = index;
-
+    pub fn update_index(&mut self) {
         self.statements
             .iter()
             .enumerate()
             .for_each(|(statement_index, stmt)| {
                 stmt.get_mut(&mut self.statement_arena)
-                    .update_names(format!("b{}_s{}", index, statement_index).into());
+                    .update_names(format!("s{statement_index}").into());
             });
     }
 
@@ -353,7 +346,6 @@ impl Block {
 impl Default for Block {
     fn default() -> Self {
         Self {
-            index: 0,
             statements: Vec::new(),
             statement_arena: Arena::new(),
         }
@@ -456,11 +448,10 @@ impl Function {
 
     pub fn update_indices(&mut self) {
         self.block_iter()
-            .enumerate()
             .collect::<Vec<_>>()
             .into_iter()
-            .for_each(|(idx, b)| {
-                b.get_mut(self.block_arena_mut()).update_index(idx);
+            .for_each(|b| {
+                b.get_mut(self.block_arena_mut()).update_index();
             });
     }
 

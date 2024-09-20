@@ -44,7 +44,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
     let block_fns = function
         .block_iter()
         .map(|block| {
-            let block_name = get_block_fn_ident(&block.get(function.block_arena()));
+            let block_name = get_block_fn_ident(block);
             let block_impl = codegen_block(function.block_arena(), block.get(function.block_arena()));
 
             quote! {
@@ -56,14 +56,22 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         })
         .collect::<TokenStream>();
 
-    let num_blocks = function.block_iter().count();
-    let block_fn_names = function
-        .block_iter()
-        .map(|block| {
-            let fn_name = get_block_fn_ident(&block.get(function.block_arena()));
-            quote!(#fn_name, )
-        })
-        .collect::<TokenStream>();
+    let block_fn_names = {
+        let num_blocks = function.block_arena().clone().into_inner().len();
+
+        // todo: tidy this up somehow
+
+        let mut block_fns = repeat(None).take(num_blocks).collect::<Vec<_>>();
+
+        function.block_iter().for_each(|block| {
+            let fn_name = get_block_fn_ident(block);
+            block_fns[block.index()] = Some(fn_name)
+        });
+
+        block_fns
+            .into_iter()
+            .map(|e| e.unwrap_or(Ident::new("noop", proc_macro2::Span::call_site())))
+    };
 
     let parameter_writes = parameters
         .iter()
@@ -72,6 +80,8 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             quote!(ctx.emitter().write_variable(fn_state.#name.clone(), #name);)
         })
         .collect::<TokenStream>();
+
+    let entry_block_index = function.entry_block().index();
 
     let body = if fn_is_allowlisted(function.name()) {
         quote! {
@@ -82,7 +92,13 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                 #parameter_writes
             }
 
-            const BLOCK_FUNCTIONS: [fn(&mut X86TranslationContext, &FunctionState) -> BlockResult; #num_blocks] = [#block_fn_names];
+             // block ref indices that are not reachable from the entry point (likely come from leaked arena blocks)
+            fn noop(_: &mut X86TranslationContext, _: &FunctionState) -> BlockResult {
+                unreachable!()
+            }
+
+
+            const BLOCK_FUNCTIONS: &[fn(&mut X86TranslationContext, &FunctionState) -> BlockResult] = &[#(#block_fn_names,)*];
 
             fn lookup_block_idx_by_ref(block_refs: &[X86BlockRef], block: X86BlockRef) -> usize {
                 block_refs.iter().position(|r| *r == block).unwrap()
@@ -93,7 +109,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                 Dynamic(usize),
             }
 
-            let mut block_queue = alloc::vec![Block::Static(0)];
+            let mut block_queue = alloc::vec![Block::Static(#entry_block_index)];
 
             while let Some(block) = block_queue.pop() {
                 let result = match block {
@@ -225,7 +241,7 @@ pub fn codegen_block(arena: &Arena<Block>, block: &Block) -> TokenStream {
         .collect()
 }
 
-pub fn get_block_fn_ident(b: &Block) -> Ident {
+pub fn get_block_fn_ident(b: Ref<Block>) -> Ident {
     format_ident!("block_{}", b.index())
 }
 
@@ -545,7 +561,7 @@ pub fn codegen_stmt(
             quote! { ctx.emitter().cast(#value.clone(), #typ, CastOperationKind::#kind) }
         }
         StatementKind::Jump { target } => {
-            let target_index = target.get(b_arena).index();
+            let target_index = target.index();
             quote! {
                 return ctx.emitter().jump(fn_state.block_refs[#target_index].clone())
             }
@@ -557,8 +573,8 @@ pub fn codegen_stmt(
         } => {
             let condition = condition.get(s_arena);
 
-            let true_index = true_target.get(b_arena).index();
-            let false_index = false_target.get(b_arena).index();
+            let true_index = true_target.index();
+            let false_index = false_target.index();
 
             quote! {
                 return ctx.emitter().branch(#condition.clone(), fn_state.block_refs[#true_index].clone(), fn_state.block_refs[#false_index].clone())

@@ -9,7 +9,7 @@ use {
             borealis_register_init::borealis_register_init,
             common::{REG_R0, REG_R1, REG_R2, REG_SEE},
             u__DecodeA64::u__DecodeA64,
-            u__InitSystem::u__InitSystem,
+            //    u__InitSystem::u__InitSystem,
         },
     },
     alloc::boxed::Box,
@@ -27,14 +27,14 @@ fn decodea64_smoke() {
     let mut ctx = X86TranslationContext::new();
     borealis_register_init(&mut ctx);
 
-    let unit = ctx.emitter().constant(
-        0,
-        Type {
-            kind: TypeKind::Unsigned,
-            width: 0,
-        },
-    );
-    u__InitSystem(&mut ctx, unit);
+    // let unit = ctx.emitter().constant(
+    //     0,
+    //     Type {
+    //         kind: TypeKind::Unsigned,
+    //         width: 0,
+    //     },
+    // );
+    // u__InitSystem(&mut ctx, unit);
 
     let pc = ctx.emitter().constant(
         0,

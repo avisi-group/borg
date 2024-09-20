@@ -67,17 +67,21 @@ impl<T> Clone for Ref<T> {
 impl<T> Copy for Ref<T> {}
 
 impl<T> Ref<T> {
-    pub fn get_mut<'s, 'c: 's>(&self, arena: &'c mut Arena<T>) -> &'s mut T {
+    pub fn get_mut<'reph, 'arena: 'reph>(&self, arena: &'arena mut Arena<T>) -> &'reph mut T {
         #[cfg(debug_assertions)]
         assert_eq!(arena.id, self.arena);
 
         arena.vec.get_mut(self.index).unwrap()
     }
 
-    pub fn get<'s, 'c: 's>(&self, arena: &'c Arena<T>) -> &'s T {
+    pub fn get<'reph, 'arena: 'reph>(&self, arena: &'arena Arena<T>) -> &'reph T {
         #[cfg(debug_assertions)]
         assert_eq!(arena.id, self.arena);
 
         arena.vec.get(self.index).unwrap()
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
     }
 }

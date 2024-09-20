@@ -87,20 +87,20 @@ impl Display for Function {
                 .predecessors_for(block)
                 .unwrap()
                 .iter()
-                .map(|b| b.get(self.block_arena()).index())
+                .map(|b| b.index())
                 .join(", ");
 
             let succs = cfg
                 .successors_for(block)
                 .unwrap()
                 .iter()
-                .map(|b| b.get(self.block_arena()).index())
+                .map(|b| b.index())
                 .join(", ");
 
             writeln!(
                 f,
                 "  block{}: preds={{{preds}}}, succs={{{succs}}}",
-                block.get(self.block_arena()).index()
+                block.index()
             )?;
             write!(f, "{}", block.get(self.block_arena()))
         })

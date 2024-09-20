@@ -120,7 +120,7 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
                     {
                         messages.push(ValidationMessage::stmt_err(
                             f.name(),
-                            format!("{}", b.get(f.block_arena()).index()).into(),
+                            format!("{}", b.index()).into(),
                             s.get(s_arena).name(),
                             "incompatible operand types in binary operation",
                         ));
@@ -172,14 +172,11 @@ fn validate_constant_type(
         | (ConstantValue::Rational(_), Type::Rational)
         | (ConstantValue::Tuple(_), Type::Tuple(_)) => None,
 
-        _ => {
-            let block = block.get(f.block_arena());
-            Some(ValidationMessage::stmt_warn(
-                f.name(),
-                format!("{}", block.index()).into(),
-                stmt.get(&block.statement_arena).name(),
-                format!("cannot use {typ:?} type for {value:?}"),
-            ))
-        }
+        _ => Some(ValidationMessage::stmt_warn(
+            f.name(),
+            format!("{}", block.index()).into(),
+            stmt.get(&block.get(f.block_arena()).statement_arena).name(),
+            format!("cannot use {typ:?} type for {value:?}"),
+        )),
     }
 }
