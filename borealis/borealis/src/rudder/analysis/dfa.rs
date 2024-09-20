@@ -1,8 +1,9 @@
 use {
     crate::{
-        rudder::{
+        rudder::model::{
+            block::Block,
+            function::{Function, Symbol},
             statement::{Statement, StatementKind},
-            Block, Function, Symbol,
         },
         util::arena::{Arena, Ref},
     },
@@ -28,7 +29,7 @@ impl<'f> SymbolUseAnalysisBuilder<'f> {
             .collect::<Vec<_>>()
             .into_iter()
             .for_each(|b| {
-                let block = b.get(self.f.block_arena());
+                let block = b.get(self.f.arena());
 
                 block
                     .statements()

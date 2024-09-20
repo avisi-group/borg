@@ -1,7 +1,13 @@
 use {
     crate::rudder::{
-        analysis::cfg::ControlFlowGraphAnalysis, Block, ConstantValue, Function, Model,
-        PrimitiveTypeClass, Symbol, Type,
+        analysis::cfg::ControlFlowGraphAnalysis,
+        model::{
+            block::Block,
+            constant_value::ConstantValue,
+            function::{Function, Symbol},
+            types::{PrimitiveTypeClass, Type},
+            Model,
+        },
     },
     itertools::Itertools,
     std::fmt::{Display, Formatter, Result},
@@ -97,7 +103,7 @@ impl Display for Function {
                 "  block{}: preds={{{preds}}}, succs={{{succs}}}",
                 block.index()
             )?;
-            write!(f, "{}", block.get(self.block_arena()))
+            write!(f, "{}", block.get(self.arena()))
         })
     }
 }

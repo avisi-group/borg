@@ -3,8 +3,10 @@
 use {
     crate::{
         codegen::state::codegen_state,
-        fn_is_allowlisted,
-        rudder::{analysis::cfg::FunctionCallGraphAnalysis, Model, PrimitiveTypeClass, Type},
+        rudder::model::{
+            types::{PrimitiveTypeClass, Type},
+            Model,
+        },
     },
     common::{intern::InternedString, HashMap, HashSet},
     log::warn,

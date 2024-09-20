@@ -1,6 +1,6 @@
 use {
     crate::{
-        rudder::{statement::StatementKind, Block, Function, Model},
+        rudder::model::{block::Block, function::Function, statement::StatementKind, Model},
         util::arena::Ref,
     },
     common::{intern::InternedString, HashMap, HashSet},
@@ -43,7 +43,7 @@ impl ControlFlowGraphAnalysis {
 
             seen_list.insert(current.clone());
 
-            let current_block = current.get(f.block_arena());
+            let current_block = current.get(f.arena());
             let terminator = current_block.terminator_statement().unwrap();
             match terminator.get(&current_block.statement_arena).kind() {
                 StatementKind::Jump { target } => {
@@ -128,13 +128,13 @@ impl FunctionCallGraphAnalysis {
 
     fn analyse_function(&mut self, f: &Function) {
         for block_ref in f.block_iter() {
-            let block = block_ref.get(f.block_arena());
+            let block = block_ref.get(f.arena());
             let statements = block.statements();
             let call_targets =
                 statements
                     .iter()
                     .filter_map(|s| match s.get(&block.statement_arena).kind() {
-                        StatementKind::Call { target, .. } => Some(*target),
+                        StatementKind::Call { target, .. } => Some(target),
                         _ => None,
                     });
             // TODO .unique();
@@ -142,11 +142,11 @@ impl FunctionCallGraphAnalysis {
             for call_target in call_targets {
                 // Callees are functions that *this* function calls.
                 self.fn_callees.entry(f.name()).and_modify(|callees| {
-                    callees.insert(call_target);
+                    callees.insert(*call_target);
                 });
 
                 // Callers are functions that call the target function
-                self.fn_callers.entry(call_target).and_modify(|callers| {
+                self.fn_callers.entry(*call_target).and_modify(|callers| {
                     callers.insert(f.name());
                 });
             }

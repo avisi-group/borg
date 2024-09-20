@@ -1,7 +1,9 @@
 use {
     crate::{
         rudder::{
-            analysis::loopy::LoopAnalysis, statement::Statement, Block, Function, StatementKind,
+            analysis::loopy::LoopAnalysis,
+            model::statement::{Statement, StatementKind},
+            model::{block::Block, function::Function},
         },
         util::arena::Ref,
     },
@@ -24,9 +26,9 @@ pub fn run(f: &mut Function) -> bool {
         HashMap::default();
 
     for block in f.block_iter() {
-        for stmt in block.get(f.block_arena()).statements() {
+        for stmt in block.get(f.arena()).statements() {
             if let StatementKind::WriteVariable { symbol, .. } =
-                stmt.get(block.get(f.block_arena()).arena()).kind()
+                stmt.get(block.get(f.arena()).arena()).kind()
             {
                 live_outs
                     .entry(block)
@@ -52,7 +54,7 @@ pub fn run(f: &mut Function) -> bool {
     for (block, writes) in live_outs {
         trace!("  block {}:", block.index());
         for (symbol, write) in writes {
-            let arena = block.get(f.block_arena()).arena();
+            let arena = block.get(f.arena()).arena();
 
             trace!("    write: {} = {}", symbol, write.to_string(arena));
         }

@@ -1,8 +1,12 @@
 use {
     crate::{
-        rudder::{
+        rudder::model::{
+            block::Block,
+            constant_value::ConstantValue,
+            function::Function,
             statement::{Statement, StatementKind},
-            Block, ConstantValue, Function, Model, PrimitiveType, PrimitiveTypeClass, Type,
+            types::{PrimitiveType, PrimitiveTypeClass, Type},
+            Model,
         },
         util::arena::Ref,
     },
@@ -85,7 +89,7 @@ fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
         .map(|f| f.block_iter().map(move |b| (f, b)))
         .flatten()
         .map(|(f, b)| {
-            b.get(f.block_arena())
+            b.get(f.arena())
                 .statements()
                 .into_iter()
                 .map(move |s| ((b, f), s))
@@ -93,7 +97,7 @@ fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
         .flatten()
         .filter_map(|((b, f), s)| {
             if let StatementKind::Constant { typ, value } =
-                s.get(&b.get(f.block_arena()).statement_arena).kind()
+                s.get(&b.get(f.arena()).statement_arena).kind()
             {
                 Some(((s, b, f), (typ.clone(), value.clone())))
             } else {
@@ -109,9 +113,9 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 
     for (_, f) in ctx.get_functions() {
         for b in f.block_iter() {
-            let s_arena = &b.get(f.block_arena()).statement_arena;
+            let s_arena = &b.get(f.arena()).statement_arena;
 
-            for s in b.get(f.block_arena()).statements() {
+            for s in b.get(f.arena()).statements() {
                 if let StatementKind::BinaryOperation { lhs, rhs, .. } = s.get(s_arena).kind() {
                     if !lhs
                         .get(s_arena)
@@ -175,7 +179,7 @@ fn validate_constant_type(
         _ => Some(ValidationMessage::stmt_warn(
             f.name(),
             format!("{}", block.index()).into(),
-            stmt.to_string(&block.get(f.block_arena()).arena()),
+            stmt.to_string(&block.get(f.arena()).arena()),
             format!("cannot use {typ:?} type for {value:?}"),
         )),
     }

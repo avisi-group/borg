@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{analysis, Function},
+    crate::rudder::{analysis, model::function::Function},
     log::trace,
 };
 
@@ -21,7 +21,7 @@ pub fn run(f: &mut Function) -> bool {
             }
 
             for (write, block) in dfa.get_symbol_writes(&sym) {
-                block.get_mut(f.block_arena_mut()).kill_statement(*write);
+                block.get_mut(f.arena_mut()).kill_statement(*write);
                 changed |= true;
             }
         }

@@ -1,10 +1,10 @@
 use {
     crate::{
         rudder::{
-            statement::{build, import_statement, Statement, StatementKind},
-            Block, Function,
+            model::statement::{import_statement, StatementKind},
+            model::{block::Block, function::Function},
         },
-        util::arena::{Arena, Ref},
+        util::arena::Ref,
     },
     common::HashMap,
 };
@@ -24,37 +24,34 @@ pub fn run(f: &mut Function) -> bool {
 fn run_inliner_block(f: &mut Function, source_block: Ref<Block>) -> bool {
     // if a block ends in a jump statement, and the target block is "small", inline
     // it.
-    let terminator = source_block
-        .get(f.block_arena())
-        .terminator_statement()
-        .unwrap();
+    let terminator = source_block.get(f.arena()).terminator_statement().unwrap();
 
     let StatementKind::Jump {
         target: target_block,
     } = terminator
-        .get(&source_block.get(f.block_arena()).statement_arena)
+        .get(&source_block.get(f.arena()).statement_arena)
         .kind()
         .clone()
     else {
         return false;
     };
 
-    if target_block.get(f.block_arena()).size() > INLINE_SIZE_THRESHOLD {
+    if target_block.get(f.arena()).size() > INLINE_SIZE_THRESHOLD {
         return false;
     }
 
     // kill the jump statement, copy target block statements in.
     source_block
-        .get_mut(f.block_arena_mut())
+        .get_mut(f.arena_mut())
         .kill_statement(terminator);
 
     let mut mapping = HashMap::default();
 
-    for target_statement in target_block.get(f.block_arena()).statements() {
+    for target_statement in target_block.get(f.arena()).statements() {
         let source_statement = import_statement(
             source_block,
             target_block,
-            f.block_arena_mut(),
+            f.arena_mut(),
             target_statement,
             &mapping,
         );

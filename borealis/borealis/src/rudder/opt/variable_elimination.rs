@@ -1,6 +1,10 @@
 use {
     crate::{
-        rudder::{analysis, Block, Function, StatementKind},
+        rudder::{
+            analysis,
+            model::statement::StatementKind,
+            model::{block::Block, function::Function},
+        },
         util::arena::{Arena, Ref},
     },
     common::HashMap,
@@ -15,7 +19,7 @@ pub fn run(f: &mut Function) -> bool {
 
     trace!("running on function {}", f.name());
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
-        changed |= run_on_block(&symbol_ua, f.block_arena_mut(), block);
+        changed |= run_on_block(&symbol_ua, f.arena_mut(), block);
     }
 
     changed

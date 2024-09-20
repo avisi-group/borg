@@ -1,15 +1,19 @@
 use {
     crate::{
-        boom::{self, bits_to_int, control_flow::ControlFlowBlock, FunctionSignature},
+        boom::{self, bits_to_int, control_flow::ControlFlowBlock},
         rudder::{
-            self,
             internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
-            statement::{
-                build, cast, BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind,
-                Statement, StatementKind, UnaryOperationKind,
+            model::{
+                block::Block,
+                constant_value::ConstantValue,
+                function::{Function, Symbol},
+                statement::{
+                    build, cast, BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind,
+                    Statement, StatementKind, UnaryOperationKind,
+                },
+                types::{PrimitiveType, PrimitiveTypeClass, Type},
+                Model, RegisterDescriptor,
             },
-            Block, ConstantValue, Function, Model, PrimitiveType, PrimitiveTypeClass,
-            RegisterDescriptor, Symbol, Type,
         },
         util::{
             arena::{Arena, Ref},
@@ -51,13 +55,13 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
         REPLICATE_BITS_BOREALIS_INTERNAL.name(),
         (
             // have to make a new function here or `build_functions` will overwrite it
-            rudder::Function::new(
+            Function::new(
                 REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                 REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
                 REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
             ),
             boom::FunctionDefinition {
-                signature: FunctionSignature {
+                signature: boom::FunctionSignature {
                     name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                     parameters: Shared::new(vec![]),
                     return_type: Shared::new(boom::Type::Unit),
@@ -84,11 +88,11 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 struct BuildContext {
     /// Name of struct maps to the rudder type and a map of field names to field
     /// indices
-    structs: HashMap<InternedString, (rudder::Type, HashMap<InternedString, usize>)>,
+    structs: HashMap<InternedString, (Type, HashMap<InternedString, usize>)>,
 
     /// Name of enum maps to the rudder type and a map of enum variants to the
     /// integer discriminant of that variant
-    enums: HashMap<InternedString, (rudder::Type, HashMap<InternedString, u32>)>,
+    enums: HashMap<InternedString, (Type, HashMap<InternedString, u32>)>,
 
     /// Register name to type and offset mapping
     registers: HashMap<InternedString, RegisterDescriptor>,
@@ -137,7 +141,7 @@ impl BuildContext {
         self.functions.insert(
             name,
             (
-                rudder::Function::new(
+                Function::new(
                     name,
                     self.resolve_type(definition.signature.return_type.clone()),
                     definition
@@ -177,15 +181,15 @@ impl BuildContext {
         }
     }
 
-    fn resolve_type(&self, typ: Shared<boom::Type>) -> rudder::Type {
+    fn resolve_type(&self, typ: Shared<boom::Type>) -> Type {
         match &*typ.get() {
-            boom::Type::Unit => rudder::Type::unit(),
-            boom::Type::String => rudder::Type::String,
+            boom::Type::Unit => Type::unit(),
+            boom::Type::String => Type::String,
             // value
-            boom::Type::Bool | boom::Type::Bit => rudder::Type::u1(),
-            boom::Type::Float => rudder::Type::f64(),
-            boom::Type::Real => rudder::Type::Rational,
-            boom::Type::Union { width } => rudder::Type::Union { width: *width },
+            boom::Type::Bool | boom::Type::Bit => Type::u1(),
+            boom::Type::Float => Type::f64(),
+            boom::Type::Real => Type::Rational,
+            boom::Type::Union { width } => Type::Union { width: *width },
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
             boom::Type::List { .. } => todo!(),
             boom::Type::Vector { element_type } => {
@@ -208,26 +212,26 @@ impl BuildContext {
             }
             boom::Type::Integer { size } => match size {
                 boom::Size::Static(size) => {
-                    rudder::Type::new_primitive(rudder::PrimitiveTypeClass::SignedInteger, *size)
+                    Type::new_primitive(PrimitiveTypeClass::SignedInteger, *size)
                 }
-                boom::Size::Unknown => rudder::Type::ArbitraryLengthInteger,
+                boom::Size::Unknown => Type::ArbitraryLengthInteger,
             },
             boom::Type::Bits { size } => match size {
                 boom::Size::Static(size) => {
-                    rudder::Type::new_primitive(rudder::PrimitiveTypeClass::UnsignedInteger, *size)
+                    Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, *size)
                 }
-                boom::Size::Unknown => rudder::Type::Bits,
+                boom::Size::Unknown => Type::Bits,
             },
             boom::Type::Constant(c) => {
                 // todo: this should be a panic, but because structs/unions can have constant
                 // type fields we do the following
-                rudder::Type::new_primitive(
-                    rudder::PrimitiveTypeClass::SignedInteger,
+                Type::new_primitive(
+                    PrimitiveTypeClass::SignedInteger,
                     signed_smallest_width_of_value(*c).into(),
                 )
             }
             boom::Type::Tuple(ts) => {
-                rudder::Type::Tuple(ts.iter().cloned().map(|t| self.resolve_type(t)).collect())
+                Type::Tuple(ts.iter().cloned().map(|t| self.resolve_type(t)).collect())
             }
         }
     }
@@ -236,7 +240,7 @@ impl BuildContext {
 struct FunctionBuildContext<'ctx> {
     build_context: &'ctx BuildContext,
     rudder_fn: Function,
-    blocks: HashMap<Id, Ref<rudder::Block>>,
+    blocks: HashMap<Id, Ref<Block>>,
 }
 
 impl<'ctx> FunctionBuildContext<'ctx> {
@@ -248,19 +252,21 @@ impl<'ctx> FunctionBuildContext<'ctx> {
         }
     }
 
-    pub fn build_fn(mut self, boom_fn: boom::FunctionDefinition) -> rudder::Function {
+    pub fn build_fn(mut self, boom_fn: boom::FunctionDefinition) -> Function {
         trace!(
             "converting function {:?} from boom to rudder",
             boom_fn.signature.name
         );
-        self.rudder_fn.entry_block = self.resolve_block(boom_fn.entry_block);
+        let entry = self.resolve_block(boom_fn.entry_block);
+        self.rudder_fn.set_entry_block(entry);
+
         self.rudder_fn
     }
 
     pub fn resolve_block(
         &mut self,
         boom_block: boom::control_flow::ControlFlowBlock,
-    ) -> Ref<rudder::Block> {
+    ) -> Ref<Block> {
         trace!("resolving: {:x}", boom_block.id());
 
         if let Some(block) = self.blocks.get(&boom_block.id()) {
@@ -275,7 +281,7 @@ impl<'ctx> FunctionBuildContext<'ctx> {
 
 struct BlockBuildContext<'ctx, 'fn_ctx> {
     function_build_context: &'fn_ctx mut FunctionBuildContext<'ctx>,
-    block: Ref<rudder::Block>,
+    block: Ref<Block>,
 }
 
 impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
@@ -301,13 +307,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     fn block_arena_mut(&mut self) -> &mut Arena<Block> {
-        self.fn_ctx_mut().rudder_fn.block_arena_mut()
+        self.fn_ctx_mut().rudder_fn.arena_mut()
     }
 
-    fn build_block(
-        mut self,
-        boom_block: boom::control_flow::ControlFlowBlock,
-    ) -> Ref<rudder::Block> {
+    fn build_block(mut self, boom_block: boom::control_flow::ControlFlowBlock) -> Ref<Block> {
         // pre-insert empty rudder block to avoid infinite recursion with cyclic blocks
         {
             let rudder_block = self.block.clone();
@@ -324,7 +327,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         // check terminator, insert final rudder statement
         let kind = match boom_block.terminator() {
-            boom::control_flow::Terminator::Return(value) => rudder::StatementKind::Return {
+            boom::control_flow::Terminator::Return(value) => StatementKind::Return {
                 value: self.build_value(Shared::new(value)),
             },
 
@@ -557,7 +560,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::s64()),
-                            value: rudder::ConstantValue::SignedInteger(1),
+                            value: ConstantValue::SignedInteger(1),
                         },
                     );
 
@@ -981,7 +984,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u64()),
-                            value: rudder::ConstantValue::UnsignedInteger(1),
+                            value: ConstantValue::UnsignedInteger(1),
                         },
                     );
                     let bitex = build(
@@ -1032,7 +1035,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u64()),
-                            value: rudder::ConstantValue::UnsignedInteger(1),
+                            value: ConstantValue::UnsignedInteger(1),
                         },
                     );
 
@@ -1222,7 +1225,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u8()),
-                            value: rudder::ConstantValue::UnsignedInteger(0),
+                            value: ConstantValue::UnsignedInteger(0),
                         },
                     );
 
@@ -1262,7 +1265,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u64()),
-                            value: rudder::ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
+                            value: ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                         },
                     );
 
@@ -1271,7 +1274,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u64()),
-                            value: rudder::ConstantValue::UnsignedInteger(8),
+                            value: ConstantValue::UnsignedInteger(8),
                         },
                     );
 
@@ -1318,7 +1321,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u64()),
-                            value: rudder::ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
+                            value: ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                         },
                     );
 
@@ -1327,7 +1330,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u64()),
-                            value: rudder::ConstantValue::UnsignedInteger(8),
+                            value: ConstantValue::UnsignedInteger(8),
                         },
                     );
 
@@ -1799,7 +1802,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     StatementKind::Constant {
-                        typ: (rudder::Type::u1()),
+                        typ: (Type::u1()),
                         value: ConstantValue::UnsignedInteger(1),
                     },
                 )),
@@ -1819,7 +1822,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     StatementKind::Constant {
-                        typ: (rudder::Type::String),
+                        typ: (Type::String),
                         value: ConstantValue::String("fix me in build_specialized_function".into()),
                     },
                 )),
@@ -1828,7 +1831,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     StatementKind::Constant {
-                        typ: (rudder::Type::u64()),
+                        typ: (Type::u64()),
                         value: ConstantValue::UnsignedInteger(0),
                     },
                 )),
@@ -1837,7 +1840,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     StatementKind::Constant {
-                        typ: (rudder::Type::ArbitraryLengthInteger),
+                        typ: (Type::ArbitraryLengthInteger),
                         value: ConstantValue::SignedInteger(0),
                     },
                 )),
@@ -1847,7 +1850,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     StatementKind::Constant {
-                        typ: (rudder::Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
+                        typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
                         value: ConstantValue::UnsignedInteger(0),
                     },
                 )),
@@ -1955,9 +1958,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     StatementKind::Constant {
                         typ: (Type::u32()),
-                        value: rudder::ConstantValue::UnsignedInteger(
-                            u64::try_from(offset).unwrap(),
-                        ),
+                        value: ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
                     },
                 );
 
@@ -2018,9 +2019,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         StatementKind::Constant {
                             typ: (Type::u32()),
-                            value: rudder::ConstantValue::UnsignedInteger(
-                                u64::try_from(offset).unwrap(),
-                            ),
+                            value: ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
                         },
                     );
 
@@ -2134,31 +2133,29 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     PrimitiveTypeClass::SignedInteger,
                     signed_smallest_width_of_value(i.try_into().unwrap()).into(),
                 )),
-                value: rudder::ConstantValue::SignedInteger(
+                value: ConstantValue::SignedInteger(
                     i.try_into().unwrap_or_else(|_| panic!("{i:x?}")),
                 ),
             },
             boom::Literal::Bits(bits) => StatementKind::Constant {
-                typ: (Type::new_primitive(rudder::PrimitiveTypeClass::UnsignedInteger, bits.len())),
-                value: rudder::ConstantValue::UnsignedInteger(
-                    bits_to_int(bits).try_into().unwrap(),
-                ),
+                typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, bits.len())),
+                value: ConstantValue::UnsignedInteger(bits_to_int(bits).try_into().unwrap()),
             },
             boom::Literal::Bit(bit) => StatementKind::Constant {
                 typ: (Type::u1()),
-                value: rudder::ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
+                value: ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
             },
             boom::Literal::Bool(b) => StatementKind::Constant {
                 typ: (Type::u1()),
-                value: rudder::ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
+                value: ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
             },
             boom::Literal::String(str) => StatementKind::Constant {
                 typ: (Type::String),
-                value: rudder::ConstantValue::String(*str),
+                value: ConstantValue::String(*str),
             },
             boom::Literal::Unit => StatementKind::Constant {
                 typ: (Type::unit()),
-                value: rudder::ConstantValue::Unit,
+                value: ConstantValue::Unit,
             },
             boom::Literal::Reference(_) => todo!(),
             boom::Literal::Undefined => StatementKind::Undefined,
@@ -2466,7 +2463,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     fn statement_arena(&self) -> &Arena<Statement> {
         &self
             .block
-            .get(self.fn_ctx().rudder_fn.block_arena())
+            .get(self.fn_ctx().rudder_fn.arena())
             .statement_arena
     }
 }

@@ -1,7 +1,7 @@
 use {
     crate::{
         codegen::codegen_ident,
-        rudder::{Model, RegisterDescriptor},
+        rudder::model::{self, Model},
     },
     proc_macro2::TokenStream,
     quote::{format_ident, quote},
@@ -13,7 +13,7 @@ pub fn codegen_state(rudder: &Model) -> TokenStream {
     let register_offsets = rudder
         .get_registers()
         .into_iter()
-        .map(|(name, RegisterDescriptor { offset, .. })| {
+        .map(|(name, model::RegisterDescriptor { offset, .. })| {
             let name = format_ident!(
                 "REG_{}",
                 codegen_ident(name.as_ref().into())
@@ -29,7 +29,7 @@ pub fn codegen_state(rudder: &Model) -> TokenStream {
         let mut offset_names = rudder
             .get_registers()
             .into_iter()
-            .map(|(name, RegisterDescriptor { offset, .. })| (offset, name))
+            .map(|(name, model::RegisterDescriptor { offset, .. })| (offset, name))
             .collect::<Vec<_>>();
 
         offset_names.sort_by_key(|(offset, _)| *offset);
@@ -46,7 +46,7 @@ pub fn codegen_state(rudder: &Model) -> TokenStream {
     let registers_len = rudder
         .get_registers()
         .into_values()
-        .map(|RegisterDescriptor { typ, offset, .. }| offset + typ.width_bytes())
+        .map(|model::RegisterDescriptor { typ, offset, .. }| offset + typ.width_bytes())
         .max()
         .unwrap();
 

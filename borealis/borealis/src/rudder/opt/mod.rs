@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{Function, Model},
+    crate::rudder::model::{function::Function, Model},
     log::trace,
     rayon::iter::{IntoParallelRefMutIterator, ParallelIterator},
 };
@@ -11,7 +11,6 @@ pub mod constant_propagation;
 pub mod dead_stmt_elimination;
 pub mod dead_symbol_elimination;
 pub mod dead_write_elimination;
-pub mod destroy_bitvectors;
 pub mod jump_threading;
 pub mod materialise_apints;
 pub mod phi_analysis;

@@ -1,7 +1,12 @@
 use crate::{
-    rudder::{
-        statement::{BinaryOperationKind, CastOperationKind, Statement, StatementKind},
-        Block, ConstantValue, Function, PrimitiveTypeClass, Type,
+    rudder::model::{
+        block::Block,
+        constant_value::ConstantValue,
+        function::Function,
+        statement::{
+            BinaryOperationKind, CastOperationKind, Statement, StatementKind, UnaryOperationKind,
+        },
+        types::{PrimitiveTypeClass, Type},
     },
     util::arena::{Arena, Ref},
 };
@@ -11,7 +16,7 @@ pub fn run(f: &mut Function) -> bool {
 
     //trace!("constant folding {}", f.name());
     for block in f.block_iter().collect::<Vec<_>>() {
-        changed |= run_on_block(block, f.block_arena_mut());
+        changed |= run_on_block(block, f.arena_mut());
     }
 
     changed
@@ -41,7 +46,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 value: constant_value,
                 ..
             } => match unary_op_kind {
-                crate::rudder::statement::UnaryOperationKind::Not => {
+                UnaryOperationKind::Not => {
                     let constant = StatementKind::Constant {
                         typ: stmt.get(arena).typ(arena),
                         value: !constant_value,
@@ -261,7 +266,7 @@ fn cast_integer(value: ConstantValue, typ: Type) -> ConstantValue {
             }
         },
         // do nothing, todo: check width
-        Type::Union { width } => value,
+        Type::Union { .. } => value,
         _ => panic!("failed to cast {value:x?} to type {typ:?}"),
     }
 }

@@ -20,7 +20,7 @@ use {
     },
     deepsize::DeepSizeOf,
     errctx::PathCtx,
-    log::{debug, info, trace, warn},
+    log::{debug, info, trace},
     rkyv::Deserialize,
     sailrs::{
         jib_ast::{self, Definition, DefinitionAux, Instruction},

@@ -1,4 +1,4 @@
-use {crate::rudder::Function, common::HashSet, std::collections::VecDeque};
+use {crate::rudder::model::function::Function, common::HashSet, std::collections::VecDeque};
 
 pub struct LoopAnalysis {
     contains_loop: bool,
@@ -29,7 +29,7 @@ impl LoopAnalysis {
                 break;
             }
 
-            work_list.extend(current.get(f.block_arena()).targets());
+            work_list.extend(current.get(f.arena()).targets());
             seen_list.insert(current);
         }
     }

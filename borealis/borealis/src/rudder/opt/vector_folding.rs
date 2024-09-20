@@ -1,8 +1,9 @@
 use crate::{
     rudder::{
-        constant_value::ConstantValue,
-        statement::{build_at, cast_at, BinaryOperationKind, Location, StatementKind},
-        Block, Function, Type,
+        model::constant_value::ConstantValue,
+        model::statement::{build_at, cast_at, BinaryOperationKind, Location, StatementKind},
+        model::types::Type,
+        model::{block::Block, function::Function},
     },
     util::arena::{Arena, Ref},
 };
@@ -10,7 +11,7 @@ use crate::{
 pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
-        changed |= run_on_block(f.block_arena_mut(), block);
+        changed |= run_on_block(f.arena_mut(), block);
     }
 
     changed
@@ -37,7 +38,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
             {
                 if let StatementKind::ReadRegister {
                     typ: _read_type,
-                    offset: read_offset,
+                    offset: _read_offset,
                 } = assign_vector.get(block.get(arena).arena()).kind().clone()
                 {
                     // write-register

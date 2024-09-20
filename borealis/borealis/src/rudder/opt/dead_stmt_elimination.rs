@@ -1,6 +1,9 @@
 use {
     crate::{
-        rudder::{analysis::dfa::StatementUseAnalysis, Block, Function},
+        rudder::{
+            analysis::dfa::StatementUseAnalysis,
+            model::{block::Block, function::Function},
+        },
         util::arena::{Arena, Ref},
     },
     log::trace,
@@ -10,7 +13,7 @@ pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
-        changed |= run_on_block(f.block_arena_mut(), block);
+        changed |= run_on_block(f.arena_mut(), block);
     }
 
     changed

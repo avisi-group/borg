@@ -2,7 +2,8 @@ use {
     crate::{
         rudder::{
             analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
-            Block, Function, StatementKind,
+            model::statement::StatementKind,
+            model::{block::Block, function::Function},
         },
         util::arena::{Arena, Ref},
     },
@@ -35,7 +36,7 @@ pub fn run(f: &mut Function) -> bool {
                 value: value_written,
                 ..
             } = statement
-                .get(&block.get(f.block_arena()).statement_arena)
+                .get(&block.get(f.arena()).statement_arena)
                 .kind()
                 .clone()
             else {
@@ -43,7 +44,7 @@ pub fn run(f: &mut Function) -> bool {
             };
 
             if let StatementKind::Constant { typ, value } = value_written
-                .get(&block.get(f.block_arena()).statement_arena)
+                .get(&block.get(f.arena()).statement_arena)
                 .kind()
                 .clone()
             {
@@ -54,14 +55,14 @@ pub fn run(f: &mut Function) -> bool {
                 if sua.symbol_has_reads(&symbol) {
                     for (read, block) in sua.get_symbol_reads(&symbol) {
                         let StatementKind::ReadVariable { .. } = read
-                            .get(&block.get(f.block_arena()).statement_arena)
+                            .get(&block.get(f.arena()).statement_arena)
                             .kind()
                             .clone()
                         else {
                             panic!("not a read");
                         };
 
-                        read.get_mut(&mut block.get_mut(f.block_arena_mut()).statement_arena)
+                        read.get_mut(&mut block.get_mut(f.arena_mut()).statement_arena)
                             .replace_kind(StatementKind::Constant {
                                 typ: typ.clone(),
                                 value: value.clone(),
@@ -75,7 +76,7 @@ pub fn run(f: &mut Function) -> bool {
     }
 
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
-        changed |= simplify_block_local_writes(f.block_arena_mut(), block);
+        changed |= simplify_block_local_writes(f.arena_mut(), block);
     }
 
     changed
@@ -100,7 +101,7 @@ fn simplify_block_local_writes(arena: &mut Arena<Block>, block: Ref<Block>) -> b
             .kind()
             .clone()
         {
-            if let Some(most_recent_write) = most_recent_writes.get(&symbol.name) {
+            if let Some(most_recent_write) = most_recent_writes.get(&symbol.name()) {
                 if sua.has_uses(stmt) {
                     let uses_of_read_variable = sua.get_uses(stmt).clone();
                     for stmt_use in uses_of_read_variable {

@@ -1,7 +1,10 @@
 use {
     crate::{
-        rudder::{
-            constant_value::ConstantValue, Block, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
+        rudder::model::{
+            block::Block,
+            constant_value::ConstantValue,
+            function::Symbol,
+            types::{PrimitiveType, PrimitiveTypeClass, Type},
         },
         util::arena::{Arena, Ref},
     },
@@ -399,7 +402,7 @@ impl StatementKind {
                     false_target,
                 )
             }
-            StatementKind::PhiNode { members } => {
+            StatementKind::PhiNode { .. } => {
                 // format!( "phi ")?;
 
                 // for member in members {
@@ -631,7 +634,7 @@ impl Statement {
             StatementKind::Assert { .. } => Type::unit(),
             StatementKind::CreateBits { .. } => Type::Bits,
             StatementKind::MatchesUnion { .. } => Type::u1(),
-            StatementKind::UnwrapUnion { value, variant } => {
+            StatementKind::UnwrapUnion { .. } => {
                 // let Type::Enum(variants) = &*value.get(arena).typ(arena) else {
                 //     panic!("cannot unwrap non sum type");
                 // };

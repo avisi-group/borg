@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{Function, StatementKind},
+    crate::rudder::{model::function::Function, model::statement::StatementKind},
     log::trace,
 };
 
@@ -9,7 +9,7 @@ pub fn run(f: &mut Function) -> bool {
 
     let mut changed = false;
     for block_ref in f.block_iter().collect::<Vec<_>>() {
-        let block = block_ref.get_mut(f.block_arena_mut());
+        let block = block_ref.get_mut(f.arena_mut());
         let Some(terminator_ref) = block.terminator_statement() else {
             continue;
         };

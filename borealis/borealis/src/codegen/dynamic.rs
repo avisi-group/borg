@@ -7,13 +7,15 @@ use {
     crate::{
         codegen::{codegen_ident, codegen_type},
         fn_is_allowlisted,
-        rudder::{
+        rudder::model::{
+            block::Block,
             constant_value::ConstantValue,
+            function::{Function, Symbol},
             statement::{
                 BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind, Statement,
                 StatementKind, UnaryOperationKind,
             },
-            Block, Function, PrimitiveType, PrimitiveTypeClass, Symbol, Type,
+            types::{PrimitiveType, PrimitiveTypeClass, Type},
         },
         util::{
             arena::{Arena, Ref},
@@ -45,7 +47,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         .block_iter()
         .map(|block| {
             let block_name = get_block_fn_ident(block);
-            let block_impl = codegen_block(function.block_arena(), block.get(function.block_arena()));
+            let block_impl = codegen_block(block.get(function.arena()));
 
             quote! {
                 // #[inline(always)] blows up memory usage during compilation (>1TB for 256 threads)
@@ -57,7 +59,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         .collect::<TokenStream>();
 
     let block_fn_names = {
-        let num_blocks = function.block_arena().clone().into_inner().len();
+        let num_blocks = function.arena().clone().into_inner().len();
 
         // todo: tidy this up somehow
 
@@ -232,12 +234,12 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
     }
 }
 
-pub fn codegen_block(arena: &Arena<Block>, block: &Block) -> TokenStream {
+pub fn codegen_block(block: &Block) -> TokenStream {
     block
         .statements()
         .iter()
         .cloned()
-        .map(|s| codegen_stmt(arena, s, block.arena()))
+        .map(|s| codegen_stmt(s, block.arena()))
         .collect()
 }
 
@@ -301,7 +303,7 @@ fn codegen_type_instance(rudder: Type) -> TokenStream {
                 }
             }
         }
-        Type::Union { width } => {
+        Type::Union { .. } => {
             quote! {
                   todo!()
             }
@@ -385,11 +387,7 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStre
 }
 
 //
-pub fn codegen_stmt(
-    b_arena: &Arena<Block>,
-    stmt: Ref<Statement>,
-    s_arena: &Arena<Statement>,
-) -> TokenStream {
+pub fn codegen_stmt(stmt: Ref<Statement>, s_arena: &Arena<Statement>) -> TokenStream {
     let statement_tokens = match stmt.get(s_arena).kind().clone() {
         StatementKind::Constant { value, typ } => codegen_constant_value(value, typ),
         StatementKind::ReadVariable { symbol } => {

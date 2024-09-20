@@ -1,8 +1,9 @@
 use crate::{
     rudder::{
         analysis::dfa::StatementUseAnalysis,
-        statement::{CastOperationKind, Statement, StatementKind},
-        Block, Function, Type,
+        model::statement::{CastOperationKind, Statement, StatementKind},
+        model::types::Type,
+        model::{block::Block, function::Function, types::PrimitiveTypeClass},
     },
     util::arena::{Arena, Ref},
 };
@@ -11,7 +12,7 @@ pub fn run(f: &mut Function) -> bool {
     let mut changed = false;
 
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
-        changed |= run_on_block(f.block_arena_mut(), block);
+        changed |= run_on_block(f.arena_mut(), block);
     }
 
     changed
@@ -40,7 +41,7 @@ fn run_on_stmt(stmt: Ref<Statement>, block: Ref<Block>, sua: &mut StatementUseAn
                 stmt.get_mut(&mut block.get_mut(sua.block_arena()).statement_arena)
                     .replace_kind(StatementKind::Constant {
                         typ: Type::new_primitive(
-                            crate::rudder::PrimitiveTypeClass::SignedInteger,
+                            PrimitiveTypeClass::SignedInteger,
                             value.smallest_width(),
                         ),
                         value,

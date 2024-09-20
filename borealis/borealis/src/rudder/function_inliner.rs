@@ -1,11 +1,14 @@
 use {
     crate::{
         fn_is_allowlisted,
-        rudder::{
+        rudder::model::{
+            block::Block,
+            function::{Function, Symbol},
             statement::{build, import_statement, StatementKind},
-            Block, Function, Model, Symbol, Type,
+            types::Type,
+            Model,
         },
-        util::arena::{Arena, Ref},
+        util::arena::Ref,
     },
     common::{identifiable::Id, intern::InternedString, HashMap},
 };
@@ -46,11 +49,11 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
         .collect::<Vec<_>>()
         .into_iter()
         .for_each(|block_ref| {
-            let statements = block_ref.get(function.block_arena()).statements();
+            let statements = block_ref.get(function.arena()).statements();
 
             let mut calls = statements.iter().enumerate().filter_map(|(i, s)| {
                 match s
-                    .get(&block_ref.get(function.block_arena()).statement_arena)
+                    .get(&block_ref.get(function.arena()).statement_arena)
                     .kind()
                 {
                     StatementKind::Call { target, args, .. } => {
@@ -69,7 +72,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
 
                 log::debug!(
                     "inlining call {call_name:?} in \n{}",
-                    block_ref.get(function.block_arena())
+                    block_ref.get(function.arena())
                 );
 
                 let symbol_prefix = format!("inline{:x}_", Id::new());
@@ -80,7 +83,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 };
 
                 let pre_block_ref = block_ref;
-                let post_block_ref = function.block_arena_mut().insert(Block::new());
+                let post_block_ref = function.arena_mut().insert(Block::new());
 
                 let other_fn = functions.get(&call_name).unwrap();
 
@@ -102,7 +105,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 // set pre-statements and end pre block with jump to inlined function entry
                 // block
                 pre_block_ref
-                    .get_mut(function.block_arena_mut())
+                    .get_mut(function.arena_mut())
                     .set_statements(pre_statements.into_iter());
 
                 for (symbol, value) in other_fn
@@ -113,21 +116,18 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 {
                     build(
                         pre_block_ref,
-                        function.block_arena_mut(),
+                        function.arena_mut(),
                         StatementKind::WriteVariable { symbol, value },
                     );
                 }
                 build(
                     pre_block_ref,
-                    function.block_arena_mut(),
+                    function.arena_mut(),
                     StatementKind::Jump {
                         target: entry_block_ref,
                     },
                 );
-                log::debug!(
-                    "new pre block\n{}",
-                    pre_block_ref.get(function.block_arena())
-                );
+                log::debug!("new pre block\n{}", pre_block_ref.get(function.arena()));
 
                 // import post statenents to new block, replacing call with read variable
                 {
@@ -148,14 +148,14 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                                 function.add_local_variable(symbol.clone());
                                 build(
                                     post_block_ref,
-                                    function.block_arena_mut(),
+                                    function.arena_mut(),
                                     StatementKind::ReadVariable { symbol },
                                 )
                             })
                             .collect::<Vec<_>>();
                         let tuple = build(
                             post_block_ref,
-                            function.block_arena_mut(),
+                            function.arena_mut(),
                             StatementKind::CreateTuple(reads),
                         );
                         mapping.insert(post_statements[0], tuple);
@@ -167,7 +167,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                         function.add_local_variable(symbol.clone());
                         let read_return_ref = build(
                             post_block_ref,
-                            function.block_arena_mut(),
+                            function.arena_mut(),
                             StatementKind::ReadVariable { symbol },
                         );
                         mapping.insert(post_statements[0], read_return_ref); // replace call with read variable of return value so that future statements aren't invalidated
@@ -178,7 +178,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                         let this_statement = import_statement(
                             post_block_ref,
                             pre_block_ref,
-                            function.block_arena_mut(),
+                            function.arena_mut(),
                             *other_statement,
                             &mapping,
                         );
@@ -187,10 +187,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                     }
                 }
 
-                log::debug!(
-                    "new post block\n{}",
-                    post_block_ref.get(function.block_arena())
-                );
+                log::debug!("new post block\n{}", post_block_ref.get(function.arena()));
             }
         });
 
@@ -206,7 +203,7 @@ fn import_blocks(
 ) -> Ref<Block> {
     let other_refs = other_function.block_iter().collect::<Vec<_>>();
 
-    let other_arena = other_function.block_arena();
+    let other_arena = other_function.arena();
     let other_entry = other_function.entry_block();
 
     let mut mapping = HashMap::default();
@@ -214,7 +211,7 @@ fn import_blocks(
     // import each block in the other function
     for other_ref in other_refs {
         let other_block = other_ref.get(other_arena).clone();
-        let this_ref = this_function.block_arena_mut().insert(other_block);
+        let this_ref = this_function.arena_mut().insert(other_block);
         mapping.insert(other_ref, this_ref);
     }
 
@@ -223,7 +220,7 @@ fn import_blocks(
 
     // we need to apply this mapping to all statements in the imported blocks
     mapping.values().copied().for_each(|r| {
-        let block = r.get_mut(this_function.block_arena_mut());
+        let block = r.get_mut(this_function.arena_mut());
         for statement in block.statements() {
             let kind = statement.get_mut(block.arena_mut()).kind_mut();
             match kind {
@@ -252,16 +249,16 @@ fn import_blocks(
     // fix returns to point to the supplied target block
     mapping.values().copied().for_each(|block_ref| {
         let terminator = block_ref
-            .get(this_function.block_arena())
+            .get(this_function.arena())
             .terminator_statement()
             .unwrap();
 
         if let StatementKind::Return { value } = terminator
-            .get(block_ref.get(this_function.block_arena()).arena())
+            .get(block_ref.get(this_function.arena()).arena())
             .kind()
             .clone()
         {
-            let block = block_ref.get_mut(this_function.block_arena_mut());
+            let block = block_ref.get_mut(this_function.arena_mut());
 
             block.kill_statement(terminator);
 
@@ -273,7 +270,7 @@ fn import_blocks(
                     );
                     let access = build(
                         block_ref,
-                        this_function.block_arena_mut(),
+                        this_function.arena_mut(),
                         StatementKind::TupleAccess {
                             index,
                             source: value,
@@ -281,7 +278,7 @@ fn import_blocks(
                     );
                     build(
                         block_ref,
-                        this_function.block_arena_mut(),
+                        this_function.arena_mut(),
                         StatementKind::WriteVariable {
                             symbol,
                             value: access,
@@ -295,7 +292,7 @@ fn import_blocks(
                 );
                 build(
                     block_ref,
-                    this_function.block_arena_mut(),
+                    this_function.arena_mut(),
                     StatementKind::WriteVariable { symbol, value },
                 );
             }
@@ -303,7 +300,7 @@ fn import_blocks(
             // insert a jump back to the return target block after
             build(
                 block_ref,
-                this_function.block_arena_mut(),
+                this_function.arena_mut(),
                 StatementKind::Jump {
                     target: return_target_block,
                 },

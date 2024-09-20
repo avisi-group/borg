@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{analysis, Function},
+    crate::rudder::{analysis, model::function::Function},
     log::trace,
 };
 

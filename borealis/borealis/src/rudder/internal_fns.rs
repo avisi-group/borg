@@ -1,10 +1,11 @@
 use {
-    crate::rudder::{
+    crate::rudder::model::{
         constant_value::ConstantValue,
+        function::{Function, Symbol},
         statement::{
             build, BinaryOperationKind, CastOperationKind, ShiftOperationKind, StatementKind,
         },
-        Function, Symbol, Type,
+        types::Type,
     },
     once_cell::sync::Lazy,
 };
@@ -18,23 +19,10 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     //     acc |= bits;
     // }
 
-    let bits_symbol = Symbol {
-        name: "bits".into(),
-        typ: (Type::Bits),
-    };
-    let count_symbol = Symbol {
-        name: "count".into(),
-        typ: (Type::u64()),
-    };
-
-    let local_count_symbol = Symbol {
-        name: "local_count".into(),
-        typ: (Type::u64()),
-    };
-    let result_symbol = Symbol {
-        name: "result".into(),
-        typ: (Type::Bits),
-    };
+    let bits_symbol = Symbol::new("bits".into(), Type::Bits);
+    let count_symbol = Symbol::new("count".into(), Type::u64());
+    let local_count_symbol = Symbol::new("local_count".into(), Type::u64());
+    let result_symbol = Symbol::new("result".into(), Type::Bits);
 
     let mut function = Function::new(
         "replicate_bits_borealis_internal".into(),
@@ -49,7 +37,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let read_result = build(
             end_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ReadVariable {
                 symbol: result_symbol.clone(),
             },
@@ -57,7 +45,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         build(
             end_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Return { value: read_result },
         );
 
@@ -72,7 +60,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     {
         let _0 = build(
             check_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Constant {
                 typ: (Type::u64()),
                 value: ConstantValue::UnsignedInteger(0),
@@ -81,7 +69,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let read_count = build(
             check_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ReadVariable {
                 symbol: local_count_symbol.clone(),
             },
@@ -89,7 +77,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let count_is_zero = build(
             check_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
                 lhs: read_count.clone(),
@@ -99,7 +87,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         build(
             check_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Branch {
                 condition: count_is_zero,
                 true_target: end_block_ref,
@@ -112,7 +100,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     {
         let read_count = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ReadVariable {
                 symbol: local_count_symbol.clone(),
             },
@@ -120,7 +108,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let _1 = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Constant {
                 typ: (Type::u64()),
                 value: ConstantValue::UnsignedInteger(1),
@@ -129,7 +117,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let decrement = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::Sub,
                 lhs: read_count.clone(),
@@ -139,7 +127,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::WriteVariable {
                 symbol: local_count_symbol.clone(),
                 value: decrement.clone(),
@@ -149,7 +137,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // read result and bits variables
         let read_result = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ReadVariable {
                 symbol: result_symbol.clone(),
             },
@@ -157,7 +145,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let read_bits = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ReadVariable {
                 symbol: bits_symbol.clone(),
             },
@@ -166,7 +154,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // get the length of bits, then cast from u8 to bundle
         let len = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::SizeOf {
                 value: read_bits.clone(),
             },
@@ -174,7 +162,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let _8 = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Constant {
                 typ: (Type::u8()),
                 value: ConstantValue::UnsignedInteger(8),
@@ -183,7 +171,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let cast_len = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Cast {
                 kind: CastOperationKind::ZeroExtend,
                 typ: (Type::u8()),
@@ -193,7 +181,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let bundle_len = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Cast {
                 kind: CastOperationKind::Convert,
                 typ: (Type::Bits),
@@ -204,7 +192,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // shift result
         let shift_result = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ShiftOperation {
                 kind: ShiftOperationKind::LogicalShiftLeft,
                 value: read_result.clone(),
@@ -215,7 +203,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // or result with bits
         let or_result = build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::Or,
                 lhs: shift_result.clone(),
@@ -226,7 +214,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // write result
         build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::WriteVariable {
                 symbol: result_symbol.clone(),
                 value: or_result.clone(),
@@ -236,7 +224,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // jump
         build(
             shift_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Jump {
                 target: check_block_ref,
             },
@@ -250,7 +238,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // jump to check block
         let read_count = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ReadVariable {
                 symbol: count_symbol.clone(),
             },
@@ -258,7 +246,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::WriteVariable {
                 symbol: local_count_symbol.clone(),
                 value: read_count.clone(),
@@ -267,7 +255,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let zero = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Constant {
                 typ: (Type::u128()),
                 value: ConstantValue::UnsignedInteger(0),
@@ -276,7 +264,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let bits = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::ReadVariable {
                 symbol: bits_symbol.clone(),
             },
@@ -284,7 +272,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let bits_length = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::SizeOf {
                 value: bits.clone(),
             },
@@ -292,7 +280,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let read_count_cast = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Cast {
                 kind: CastOperationKind::Truncate,
                 typ: (Type::u16()),
@@ -302,7 +290,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let bits_length_cast = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Cast {
                 kind: CastOperationKind::Truncate,
                 typ: (Type::u16()),
@@ -312,7 +300,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let length = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::BinaryOperation {
                 kind: BinaryOperationKind::Multiply,
                 lhs: read_count_cast.clone(),
@@ -322,7 +310,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         let result_bits = build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::CreateBits {
                 value: zero.clone(),
                 length: length.clone(),
@@ -332,7 +320,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         // write result
         build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::WriteVariable {
                 symbol: result_symbol.clone(),
                 value: result_bits.clone(),
@@ -341,7 +329,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
         build(
             entry_block_ref,
-            function.block_arena_mut(),
+            function.arena_mut(),
             StatementKind::Jump {
                 target: check_block_ref,
             },
@@ -350,7 +338,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         entry_block_ref
     };
 
-    function.entry_block = entry_block;
+    function.set_entry_block(entry_block);
 
     function
 });
