@@ -3,9 +3,7 @@ use crate::{
         block::Block,
         constant_value::ConstantValue,
         function::Function,
-        statement::{
-            BinaryOperationKind, CastOperationKind, Statement, StatementKind, UnaryOperationKind,
-        },
+        statement::{BinaryOperationKind, CastOperationKind, Statement, UnaryOperationKind},
         types::{PrimitiveTypeClass, Type},
     },
     util::arena::{Arena, Ref},
@@ -25,29 +23,35 @@ pub fn run(f: &mut Function) -> bool {
 fn run_on_block(b: Ref<Block>, arena: &mut Arena<Block>) -> bool {
     let mut changed = false;
 
-    for stmt in b.get(arena).statements() {
-        changed |= run_on_stmt(stmt, &mut b.get_mut(arena).statement_arena);
+    for stmt in b
+        .get(arena)
+        .statements()
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+    {
+        changed |= run_on_stmt(stmt, b.get_mut(arena).arena_mut());
     }
 
     changed
 }
 
 fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
-    if matches!(stmt.get(arena).kind(), StatementKind::Constant { .. }) {
+    if matches!(stmt.get(arena), Statement::Constant { .. }) {
         return false;
     }
 
-    match stmt.get(arena).kind().clone() {
-        StatementKind::UnaryOperation {
+    match stmt.get(arena).clone() {
+        Statement::UnaryOperation {
             kind: unary_op_kind,
             value,
-        } => match value.get(arena).kind().clone() {
-            StatementKind::Constant {
+        } => match value.get(arena).clone() {
+            Statement::Constant {
                 value: constant_value,
                 ..
             } => match unary_op_kind {
                 UnaryOperationKind::Not => {
-                    let constant = StatementKind::Constant {
+                    let constant = Statement::Constant {
                         typ: stmt.get(arena).typ(arena),
                         value: !constant_value,
                     };
@@ -60,11 +64,11 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             },
             _ => false,
         },
-        StatementKind::BinaryOperation { kind, lhs, rhs } => {
-            match (lhs.get(arena).kind().clone(), rhs.get(arena).kind().clone()) {
+        Statement::BinaryOperation { kind, lhs, rhs } => {
+            match (lhs.get(arena).clone(), rhs.get(arena).clone()) {
                 (
-                    StatementKind::Constant { value: lhs, .. },
-                    StatementKind::Constant { value: rhs, .. },
+                    Statement::Constant { value: lhs, .. },
+                    Statement::Constant { value: rhs, .. },
                 ) => {
                     let cv = match kind {
                         BinaryOperationKind::Add => lhs + rhs,
@@ -96,7 +100,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         }
                     };
 
-                    let constant = StatementKind::Constant {
+                    let constant = Statement::Constant {
                         typ: stmt.get(arena).typ(arena),
                         value: cv,
                     };
@@ -105,33 +109,33 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                     true
                 }
                 /*(
-                    StatementKind::Bundle {
+                    Statement::Bundle {
                         value: lv,
                         length: ll,
                     },
-                    StatementKind::Bundle {
+                    Statement::Bundle {
                         value: rv,
                         length: rl,
                     },
                 ) => {
                     let (
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: lvt,
                             value: lvv,
                         },
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: llt,
                             value: llv,
                         },
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: rvt,
                             value: rvv,
                         },
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: rlt,
                             value: rlv,
                         },
-                    ) = (lv.kind(), ll.kind(), rv.kind(), rl.kind())
+                    ) = (lv, ll, rv, rl)
                     else {
                         return false;
                     };
@@ -164,7 +168,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
                     };
 
-                    stmt.replace_kind(StatementKind::Constant {
+                    stmt.replace_kind(Statement::Constant {
                         typ: lhs.typ().clone(),
                         value: cv,
                     });
@@ -174,7 +178,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 _ => false,
             }
         }
-        StatementKind::Cast {
+        Statement::Cast {
             kind: CastOperationKind::ZeroExtend,
             typ,
             value,
@@ -182,10 +186,10 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             // watch out! if you cast a constant primitive to an arbitrary bits you lose
             // length information
             if let Type::Primitive(_) = &typ {
-                if let StatementKind::Constant { value, .. } = value.get(arena).kind().clone() {
+                if let Statement::Constant { value, .. } = value.get(arena).clone() {
                     let value = cast_integer(value, typ.clone());
                     stmt.get_mut(arena)
-                        .replace_kind(StatementKind::Constant { typ, value });
+                        .replace_kind(Statement::Constant { typ, value });
                     true
                 } else {
                     false
@@ -194,25 +198,25 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 false
             }
         }
-        StatementKind::Cast {
+        Statement::Cast {
             kind: CastOperationKind::Truncate,
             typ,
             value,
         } => {
-            if let StatementKind::Constant { value, .. } = value.get(arena).kind().clone() {
+            if let Statement::Constant { value, .. } = value.get(arena).clone() {
                 if typ.is_u1() {
                     if let ConstantValue::SignedInteger(signed_value) = value {
-                        stmt.get_mut(arena).replace_kind(StatementKind::Constant {
+                        stmt.get_mut(arena).replace_kind(Statement::Constant {
                             typ,
                             value: ConstantValue::UnsignedInteger(signed_value.try_into().unwrap()),
                         });
                     } else {
                         stmt.get_mut(arena)
-                            .replace_kind(StatementKind::Constant { typ, value });
+                            .replace_kind(Statement::Constant { typ, value });
                     }
                 } else {
                     stmt.get_mut(arena)
-                        .replace_kind(StatementKind::Constant { typ, value });
+                        .replace_kind(Statement::Constant { typ, value });
                 }
 
                 true
@@ -220,16 +224,16 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 false
             }
         }
-        StatementKind::Cast {
+        Statement::Cast {
             kind: CastOperationKind::Reinterpret,
             typ,
             value,
         } => {
-            if let StatementKind::Constant { value, .. } = value.get(arena).kind() {
+            if let Statement::Constant { value, .. } = value.get(arena) {
                 let value = cast_integer(value.clone(), typ.clone());
 
                 stmt.get_mut(arena)
-                    .replace_kind(StatementKind::Constant { typ, value });
+                    .replace_kind(Statement::Constant { typ, value });
                 true
             } else {
                 false

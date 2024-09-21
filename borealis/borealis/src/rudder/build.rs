@@ -9,7 +9,7 @@ use {
                 function::{Function, Symbol},
                 statement::{
                     build, cast, BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind,
-                    Statement, StatementKind, UnaryOperationKind,
+                    Statement, UnaryOperationKind,
                 },
                 types::{PrimitiveType, PrimitiveTypeClass, Type},
                 Model, RegisterDescriptor,
@@ -327,7 +327,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         // check terminator, insert final rudder statement
         let kind = match boom_block.terminator() {
-            boom::control_flow::Terminator::Return(value) => StatementKind::Return {
+            boom::control_flow::Terminator::Return(value) => Statement::Return {
                 value: self.build_value(Shared::new(value)),
             },
 
@@ -342,7 +342,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let rudder_true_target = self.fn_ctx_mut().resolve_block(boom_target);
                 let rudder_false_target = self.fn_ctx_mut().resolve_block(boom_fallthrough);
 
-                StatementKind::Branch {
+                Statement::Branch {
                     condition,
                     true_target: rudder_true_target,
                     false_target: rudder_false_target,
@@ -352,12 +352,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 target: boom_target,
             } => {
                 let rudder_target = self.fn_ctx_mut().resolve_block(boom_target);
-                StatementKind::Jump {
+                Statement::Jump {
                     target: rudder_target,
                 }
             }
             boom::control_flow::Terminator::Panic(value) => {
-                StatementKind::Panic(self.build_value(Shared::new(value.clone())))
+                Statement::Panic(self.build_value(Shared::new(value.clone())))
             }
         };
 
@@ -396,11 +396,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Statement::Exit(_) | boom::Statement::Comment(_) => (),
             boom::Statement::Panic(value) => {
                 let value = self.build_value(value.clone());
-                build(
-                    self.block,
-                    self.block_arena_mut(),
-                    StatementKind::Panic(value),
-                );
+                build(self.block, self.block_arena_mut(), Statement::Panic(value));
             }
         }
     }
@@ -437,7 +433,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Call {
+                    Statement::Call {
                         target: *name,
                         args,
                         return_type,
@@ -453,7 +449,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         let tuple_field = build(
                             self.block,
                             self.block_arena_mut(),
-                            StatementKind::TupleAccess {
+                            Statement::TupleAccess {
                                 index,
                                 source: fn_statement.clone(),
                             },
@@ -479,7 +475,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             Some(build(
                 self.block,
                 self.block_arena_mut(),
-                StatementKind::BinaryOperation {
+                Statement::BinaryOperation {
                     kind: BinaryOperationKind::CompareEqual,
                     lhs: args[0].clone(),
                     rhs: args[1].clone(),
@@ -492,7 +488,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             Some(build(
                 self.block,
                 self.block_arena_mut(),
-                StatementKind::AssignElement {
+                Statement::AssignElement {
                     vector: args[0].clone(),
                     value: args[2].clone(),
                     index: args[1].clone(),
@@ -505,7 +501,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             Some(build(
                 self.block,
                 self.block_arena_mut(),
-                StatementKind::ReadElement {
+                Statement::ReadElement {
                     vector: args[0].clone(),
                     index: args[1].clone(),
                 },
@@ -531,7 +527,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "%string->%real" => {
-                    let StatementKind::Constant { value, .. } = args[0].get(self.statement_arena()).kind() else {
+                    let Statement::Constant { value, .. } = args[0].get(self.statement_arena()) else {
                         panic!();
                     };
 
@@ -544,7 +540,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::Rational),
                             value: ConstantValue::Rational(r),
                         },
@@ -558,7 +554,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let one = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::s64()),
                             value: ConstantValue::SignedInteger(1),
                         },
@@ -572,7 +568,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let diff = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Sub,
                             lhs: args[1].clone(),
                             rhs: args[2].clone(),
@@ -581,7 +577,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let len = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: diff.clone(),
                             rhs: one.clone(),
@@ -591,7 +587,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitExtract {
+                        Statement::BitExtract {
                             value: args[0].clone(),
                             start: args[2].clone(),
                             length: len,
@@ -602,7 +598,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "eq_bit" | "eq_bits" | "eq_int" | "eq_bool" | "eq_string" | "eq_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::CompareEqual,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -612,7 +608,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "neq_bits" | "neq_any<ESecurityState%>" | "neq_any<EFault%>" | "neq_bool" | "neq_int" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::CompareNotEqual,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -625,7 +621,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "add_atom" | "add_bits" | "add_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Add,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -638,7 +634,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: args[0].clone(),
                             rhs,
@@ -652,7 +648,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Sub,
                             lhs: args[0].clone(),
                             rhs,
@@ -663,7 +659,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sub_bits" | "sub_atom" | "sub_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Sub,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -673,7 +669,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "mult_atom" | "mult_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Multiply,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -683,7 +679,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "tdiv_int" | "ediv_int" | "ediv_nat" | "div_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Divide,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -693,7 +689,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "emod_nat" | "_builtin_mod_nat" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Modulo,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -703,7 +699,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "negate_atom" | "neg_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::UnaryOperation {
+                    Statement::UnaryOperation {
                         kind: UnaryOperationKind::Negate,
                         value: args[0].clone(),
                     },
@@ -711,7 +707,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "abs_int_atom" | "abs_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::UnaryOperation {
+                    Statement::UnaryOperation {
                         kind: UnaryOperationKind::Absolute,
                         value: args[0].clone(),
                     },
@@ -723,7 +719,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let condition = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::CompareLessThan,
                             lhs: true_value.clone(),
                             rhs: false_value.clone(),
@@ -733,7 +729,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Select {
+                        Statement::Select {
                             condition,
                             true_value,
                             false_value,
@@ -748,7 +744,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let condition = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::CompareGreaterThan,
                             lhs: true_value.clone(),
                             rhs: false_value.clone(),
@@ -758,7 +754,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Select {
+                        Statement::Select {
                             condition,
                             true_value,
                             false_value,
@@ -771,7 +767,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let ceil = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::UnaryOperation {
+                        Statement::UnaryOperation {
                             kind: UnaryOperationKind::Ceil,
                             value: args[0].clone(),
                         },
@@ -789,7 +785,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let floor = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::UnaryOperation {
+                        Statement::UnaryOperation {
                             kind: UnaryOperationKind::Floor,
                             value: args[0].clone(),
                         },
@@ -814,7 +810,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val _builtin_pow2 : (%i) -> %i
                 "pow2" | "_builtin_pow2" => {
                     // WRONG!! pow2(n) is 2^n not n^2
-                    // Some(build(   self.block, self.block_arena_mut(),StatementKind::UnaryOperation {
+                    // Some(build(   self.block, self.block_arena_mut(),Statement::UnaryOperation {
                     //     kind: UnaryOperationKind::Power2,
                     //     value: args[0].clone(),
                     // }))
@@ -824,7 +820,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let const_1 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::ArbitraryLengthInteger),
                             value: ConstantValue::SignedInteger(1),
                         },
@@ -832,7 +828,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::ShiftOperation {
+                        Statement::ShiftOperation {
                             kind: ShiftOperationKind::LogicalShiftLeft,
                             value: const_1,
                             amount: args[0].clone(),
@@ -848,7 +844,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::PowI,
                             lhs: args[0].clone(),
                             rhs: i,
@@ -859,7 +855,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sqrt" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::UnaryOperation {
+                    Statement::UnaryOperation {
                         kind: UnaryOperationKind::SquareRoot,
                         value: args[0].clone(),
                     },
@@ -868,7 +864,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "lt_int" | "lt_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::CompareLessThan,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -877,7 +873,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "lteq_int" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::CompareLessThanOrEqual,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -886,7 +882,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "gt_int" | "gt_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::CompareGreaterThan,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -895,7 +891,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "gteq_int" | "gteq_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::CompareGreaterThanOrEqual,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -904,7 +900,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "not_vec" | "not_bool" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::UnaryOperation {
+                    Statement::UnaryOperation {
                         kind: UnaryOperationKind::Not,
                         value: args[0].clone(),
                     },
@@ -912,7 +908,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "and_vec" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::And,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -921,7 +917,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "xor_vec" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Xor,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -930,7 +926,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "or_vec" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Or,
                         lhs: args[0].clone(),
                         rhs: args[1].clone(),
@@ -940,7 +936,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sail_shiftright" | "_shr_int" | "_shr32" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::ShiftOperation {
+                    Statement::ShiftOperation {
                         kind: ShiftOperationKind::LogicalShiftRight,
                         value: args[0].clone(),
                         amount: args[1].clone(),
@@ -949,7 +945,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sail_arith_shiftright" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::ShiftOperation {
+                    Statement::ShiftOperation {
                         kind: ShiftOperationKind::ArithmeticShiftRight,
                         value: args[0].clone(),
                         amount: args[1].clone(),
@@ -958,7 +954,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sail_shiftleft" | "_shl_int" | "_shl8" | "_shl32" | "_shl1" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::ShiftOperation {
+                    Statement::ShiftOperation {
                         kind: ShiftOperationKind::LogicalShiftLeft,
                         value: args[0].clone(),
                         amount: args[1].clone(),
@@ -970,7 +966,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitExtract {
+                        Statement::BitExtract {
                             value: args[0].clone(),
                             start: args[1].clone(),
                             length: args[2].clone(),
@@ -982,7 +978,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let length = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(1),
                         },
@@ -990,7 +986,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let bitex = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitExtract {
+                        Statement::BitExtract {
                             value: args[0].clone(),
                             start: args[1].clone(),
                             length,
@@ -1007,7 +1003,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::SizeOf { value: args[0].clone() },
+                        Statement::SizeOf { value: args[0].clone() },
                     ))
                 }
 
@@ -1022,7 +1018,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let bit = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Cast {
+                        Statement::Cast {
                             kind: CastOperationKind::ZeroExtend,
                             typ: (Type::u64()),
                             value: args[2].clone(),
@@ -1033,7 +1029,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let one = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(1),
                         },
@@ -1043,7 +1039,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let and = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::And,
                             lhs: bit.clone(),
                             rhs: one.clone(),
@@ -1054,7 +1050,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let condition = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::CompareEqual,
                             lhs: and,
                             rhs: one,
@@ -1065,7 +1061,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let shift = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::ShiftOperation {
+                        Statement::ShiftOperation {
                             kind: ShiftOperationKind::LogicalShiftLeft,
                             value: bit.clone(),
                             amount: n,
@@ -1076,7 +1072,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let true_value = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Or,
                             lhs: op.clone(),
                             rhs: shift.clone(),
@@ -1087,7 +1083,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let inverse = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::UnaryOperation {
+                        Statement::UnaryOperation {
                             kind: UnaryOperationKind::Complement,
                             value: shift,
                         },
@@ -1097,7 +1093,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let false_value = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::And,
                             lhs: op,
                             rhs: inverse,
@@ -1107,7 +1103,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Select {
+                        Statement::Select {
                             condition,
                             true_value,
                             false_value,
@@ -1122,7 +1118,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Cast {
+                        Statement::Cast {
                             kind: CastOperationKind::ZeroExtend,
                             typ: (Type::ArbitraryLengthInteger),
                             value: args[0].clone(),
@@ -1151,7 +1147,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Cast {
+                        Statement::Cast {
                             kind: CastOperationKind::SignExtend,
                             typ: (Type::ArbitraryLengthInteger),
                             value: args[0].clone(),
@@ -1163,7 +1159,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // val sail_zero_extend : (%bv, %i) -> %bv
                 "ZeroExtend0" | "sail_zero_extend" => {
                     let length = args[1].get(self.statement_arena());
-                    if let StatementKind::Constant { value, .. } = length.kind() {
+                    if let Statement::Constant { value, .. } = length {
                         let width = match value {
                             ConstantValue::UnsignedInteger(u) => usize::try_from(*u).unwrap(),
                             ConstantValue::SignedInteger(i) => usize::try_from(*i).unwrap(),
@@ -1172,7 +1168,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         Some(build(
                             self.block,
                             self.block_arena_mut(),
-                            StatementKind::Cast {
+                            Statement::Cast {
                                 kind: CastOperationKind::ZeroExtend,
                                 typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, width)),
                                 value: args[0].clone(),
@@ -1182,7 +1178,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         Some(build(
                             self.block,
                             self.block_arena_mut(),
-                            StatementKind::BitsCast {
+                            Statement::BitsCast {
                                 kind: CastOperationKind::ZeroExtend,
                                 typ: (Type::Bits),
                                 value: args[0],
@@ -1197,7 +1193,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "SignExtend0" | "sail_sign_extend" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BitsCast {
+                    Statement::BitsCast {
                         kind: CastOperationKind::SignExtend,
                         typ: (Type::Bits),
                         value: args[0].clone(),
@@ -1209,7 +1205,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "truncate" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BitsCast {
+                    Statement::BitsCast {
                         kind: CastOperationKind::Truncate,
                         typ: (Type::Bits),
                         value: args[0].clone(),
@@ -1223,7 +1219,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let const_0 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u8()),
                             value: ConstantValue::UnsignedInteger(0),
                         },
@@ -1234,7 +1230,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitsCast {
+                        Statement::BitsCast {
                             kind: CastOperationKind::ZeroExtend,
                             typ: (Type::Bits),
                             value,
@@ -1246,7 +1242,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "sail_assert" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Assert {
+                    Statement::Assert {
                         condition: args[0].clone(),
                     },
                 )),
@@ -1263,7 +1259,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let base = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                         },
@@ -1272,7 +1268,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let eight = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(8),
                         },
@@ -1281,7 +1277,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Multiply,
                             lhs: n,
                             rhs: eight,
@@ -1291,7 +1287,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: base,
                             rhs: offset,
@@ -1301,7 +1297,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::WriteRegister {
+                        Statement::WriteRegister {
                             offset,
                             value: args[1].clone(),
                         },
@@ -1319,7 +1315,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let base = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
                         },
@@ -1328,7 +1324,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let eight = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(8),
                         },
@@ -1337,7 +1333,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Multiply,
                             lhs: n,
                             rhs: eight,
@@ -1347,7 +1343,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: base,
                             rhs: offset,
@@ -1357,7 +1353,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::ReadRegister {
+                        Statement::ReadRegister {
                             typ: (Type::u64()),
                             offset,
                         },
@@ -1373,7 +1369,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let const_1 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(1),
                         },
@@ -1382,7 +1378,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target,
                             source: bit,
                             start: i,
@@ -1415,7 +1411,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target: n,
                             source: slice,
                             start,
@@ -1429,7 +1425,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let extract = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitExtract {
+                        Statement::BitExtract {
                             value: args[1].clone(),
                             start: args[2].clone(),
                             length: args[0].clone(),
@@ -1443,7 +1439,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::CreateBits { value, length },
+                        Statement::CreateBits { value, length },
                     ))
                 }
 
@@ -1460,7 +1456,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target: destination,
                             source,
                             start,
@@ -1478,7 +1474,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let sum = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Sub,
                             lhs: end,
                             rhs: start.clone(),
@@ -1489,7 +1485,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         let _u1 = build(
                             self.block,
                             self.block_arena_mut(),
-                            StatementKind::Constant {
+                            Statement::Constant {
                                 typ: (Type::u64()),
                                 value: ConstantValue::UnsignedInteger(1),
                             },
@@ -1505,7 +1501,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let source_length = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: sum,
                             rhs: const_1,
@@ -1515,7 +1511,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target: destination,
                             source,
                             start,
@@ -1530,7 +1526,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Call {
+                        Statement::Call {
                             target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
                             args: vec![args[0].clone(), count],
                             return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
@@ -1547,7 +1543,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let _0 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u8()),
                             value: ConstantValue::UnsignedInteger(0),
                         },
@@ -1555,7 +1551,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let _1 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u8()),
                             value: ConstantValue::UnsignedInteger(1),
                         },
@@ -1563,7 +1559,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let _2 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u8()),
                             value: ConstantValue::UnsignedInteger(2),
                         },
@@ -1571,7 +1567,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let _3 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u8()),
                             value: ConstantValue::UnsignedInteger(3),
                         },
@@ -1580,7 +1576,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let partial_sum = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: x,
                             rhs: y,
@@ -1589,7 +1585,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let sum = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: partial_sum,
                             rhs: carry_in,
@@ -1599,7 +1595,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let n = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::GetFlag {
+                        Statement::GetFlag {
                             flag: Flag::N,
                             operation: sum.clone(),
                         },
@@ -1607,7 +1603,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let z = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::GetFlag {
+                        Statement::GetFlag {
                             flag: Flag::Z,
                             operation: sum.clone(),
                         },
@@ -1615,7 +1611,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let c = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::GetFlag {
+                        Statement::GetFlag {
                             flag: Flag::C,
                             operation: sum.clone(),
                         },
@@ -1623,7 +1619,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let v = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::GetFlag {
+                        Statement::GetFlag {
                             flag: Flag::V,
                             operation: sum.clone(),
                         },
@@ -1632,7 +1628,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let empty_flags = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4)),
                             value: ConstantValue::UnsignedInteger(0),
                         },
@@ -1640,7 +1636,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let inserted_n = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target: empty_flags,
                             source: n,
                             start: _0,
@@ -1650,7 +1646,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let inserted_z = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target: inserted_n,
                             source: z,
                             start: _1.clone(),
@@ -1660,7 +1656,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let inserted_c = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target: inserted_z,
                             source: c,
                             start: _2,
@@ -1670,7 +1666,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let flags = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitInsert {
+                        Statement::BitInsert {
                             target: inserted_c,
                             source: v,
                             start: _3,
@@ -1681,7 +1677,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::CreateTuple(vec![sum, flags]),
+                        Statement::CreateTuple(vec![sum, flags]),
                     ))
                 }
 
@@ -1699,7 +1695,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let const_8 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(8),
                         },
@@ -1707,7 +1703,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let size_bits = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Multiply,
                             lhs: size_bytes,
                             rhs: const_8,
@@ -1719,7 +1715,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::ReadMemory {
+                        Statement::ReadMemory {
                             offset,
                             size: size_bits,
                         },
@@ -1739,7 +1735,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let const_8 = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u64()),
                             value: ConstantValue::UnsignedInteger(8),
                         },
@@ -1747,7 +1743,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let size_bits = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Multiply,
                             lhs: size_bytes,
                             rhs: const_8,
@@ -1764,7 +1760,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let value = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::BitsCast {
+                        Statement::BitsCast {
                             kind: CastOperationKind::Truncate,
                             typ: (Type::Bits),
                             value: data,
@@ -1776,14 +1772,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::WriteMemory { offset, value },
+                        Statement::WriteMemory { offset, value },
                     );
 
                     // return value also appears to be always ignored
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u1()),
                             value: ConstantValue::UnsignedInteger(0),
                         },
@@ -1801,7 +1797,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "read_tag#" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::u1()),
                         value: ConstantValue::UnsignedInteger(1),
                     },
@@ -1810,18 +1806,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let msg = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::String),
                             value: ConstantValue::String("write_tag panic".into()),
                         },
                     );
-                    Some(build(self.block, self.block_arena_mut(), StatementKind::Panic(msg)))
+                    Some(build(self.block, self.block_arena_mut(), Statement::Panic(msg)))
                 }
 
                 "DecStr" | "bits_str" | "HexStr" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::String),
                         value: ConstantValue::String("fix me in build_specialized_function".into()),
                     },
@@ -1830,7 +1826,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "__GetVerbosity" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::u64()),
                         value: ConstantValue::UnsignedInteger(0),
                     },
@@ -1839,7 +1835,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "get_cycle_count" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::ArbitraryLengthInteger),
                         value: ConstantValue::SignedInteger(0),
                     },
@@ -1849,7 +1845,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "SHA256hash" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
                         value: ConstantValue::UnsignedInteger(0),
                     },
@@ -1859,7 +1855,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "putchar" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Panic(args[0].clone()),
+                    Statement::Panic(args[0].clone()),
                 )),
 
                 "AArch64_DC"
@@ -1880,7 +1876,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 | "sail_take_exception" => Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::unit()),
                         value: ConstantValue::Unit,
                     },
@@ -1903,7 +1899,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     //         .cloned()
     //         .map(|typ| {
     //             build(   self.block,
-    // self.block_arena_mut(),StatementKind::CreateEnum {                 typ,
+    // self.block_arena_mut(),Statement::CreateEnum {                 typ,
     //                 variant: name,
     //                 value: args[0].clone(),
     //             })
@@ -1930,7 +1926,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::WriteVariable { symbol, value },
+                    Statement::WriteVariable { symbol, value },
                 );
             }
             None => {
@@ -1956,7 +1952,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let offset = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::u32()),
                         value: ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
                     },
@@ -1965,7 +1961,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::WriteRegister {
+                    Statement::WriteRegister {
                         offset,
                         value: cast,
                     },
@@ -1989,7 +1985,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     return build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::ReadVariable { symbol },
+                        Statement::ReadVariable { symbol },
                     );
                 }
 
@@ -1998,7 +1994,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     return build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::ReadVariable { symbol },
+                        Statement::ReadVariable { symbol },
                     );
                 }
 
@@ -2017,7 +2013,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u32()),
                             value: ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
                         },
@@ -2026,7 +2022,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     return build(
                         self.block,
                         self.block_arena_mut(),
-                        StatementKind::ReadRegister {
+                        Statement::ReadRegister {
                             typ: outer_type,
                             offset,
                         },
@@ -2060,7 +2056,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 return build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::CreateTuple(values),
+                    Statement::CreateTuple(values),
                 );
             }
             boom::Value::Struct { name, fields } => {
@@ -2089,11 +2085,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // // todo: investigate this further
                 // let matches = build(   self.block,
-                // self.block_arena_mut(),StatementKind::MatchesUnion {
+                // self.block_arena_mut(),Statement::MatchesUnion {
                 //     value,
                 //     variant: *identifier,
                 // });
-                // build(   self.block,   self.block_arena_mut(),StatementKind::UnaryOperation {
+                // build(   self.block,   self.block_arena_mut(),Statement::UnaryOperation {
                 //     kind: UnaryOperationKind::Not,
                 //     value: matches,
                 // })
@@ -2115,7 +2111,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // assert_eq!(value.typ(), typ);
 
                 // let unwrap_sum = build(   self.block,
-                // self.block_arena_mut(),StatementKind::UnwrapUnion {
+                // self.block_arena_mut(),Statement::UnwrapUnion {
                 //     value,
                 //     variant: *identifier,
                 // });
@@ -2128,7 +2124,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
     fn build_literal(&mut self, literal: &boom::Literal) -> Ref<Statement> {
         let kind = match literal {
-            boom::Literal::Int(i) => StatementKind::Constant {
+            boom::Literal::Int(i) => Statement::Constant {
                 typ: (Type::new_primitive(
                     PrimitiveTypeClass::SignedInteger,
                     signed_smallest_width_of_value(i.try_into().unwrap()).into(),
@@ -2137,28 +2133,28 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     i.try_into().unwrap_or_else(|_| panic!("{i:x?}")),
                 ),
             },
-            boom::Literal::Bits(bits) => StatementKind::Constant {
+            boom::Literal::Bits(bits) => Statement::Constant {
                 typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, bits.len())),
                 value: ConstantValue::UnsignedInteger(bits_to_int(bits).try_into().unwrap()),
             },
-            boom::Literal::Bit(bit) => StatementKind::Constant {
+            boom::Literal::Bit(bit) => Statement::Constant {
                 typ: (Type::u1()),
                 value: ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
             },
-            boom::Literal::Bool(b) => StatementKind::Constant {
+            boom::Literal::Bool(b) => Statement::Constant {
                 typ: (Type::u1()),
                 value: ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
             },
-            boom::Literal::String(str) => StatementKind::Constant {
+            boom::Literal::String(str) => Statement::Constant {
                 typ: (Type::String),
                 value: ConstantValue::String(*str),
             },
-            boom::Literal::Unit => StatementKind::Constant {
+            boom::Literal::Unit => Statement::Constant {
                 typ: (Type::unit()),
                 value: ConstantValue::Unit,
             },
             boom::Literal::Reference(_) => todo!(),
-            boom::Literal::Undefined => StatementKind::Undefined,
+            boom::Literal::Undefined => Statement::Undefined,
         };
 
         build(self.block, self.block_arena_mut(), kind)
@@ -2171,7 +2167,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::UnaryOperation {
+                    Statement::UnaryOperation {
                         kind: UnaryOperationKind::Not,
                         value,
                     },
@@ -2182,7 +2178,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::UnaryOperation {
+                    Statement::UnaryOperation {
                         kind: UnaryOperationKind::Complement,
                         value,
                     },
@@ -2217,7 +2213,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Cast {
+                    Statement::Cast {
                         kind,
                         typ: target_type,
                         value,
@@ -2247,7 +2243,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::ShiftOperation {
+                    Statement::ShiftOperation {
                         kind,
                         value,
                         amount,
@@ -2300,7 +2296,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: match op {
                             boom::Operation::Equal(_, _) => BinaryOperationKind::CompareEqual,
                             boom::Operation::NotEqual(_, _) => BinaryOperationKind::CompareNotEqual,
@@ -2348,7 +2344,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let l_length = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::SizeOf { value: left },
+                    Statement::SizeOf { value: left },
                 );
 
                 let r_value = cast(
@@ -2360,13 +2356,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let r_length = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::SizeOf { value: right },
+                    Statement::SizeOf { value: right },
                 );
 
                 let shift = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::ShiftOperation {
+                    Statement::ShiftOperation {
                         kind: ShiftOperationKind::LogicalShiftLeft,
                         value: l_value,
                         amount: r_length.clone(),
@@ -2376,7 +2372,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let value = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Or,
                         lhs: shift,
                         rhs: r_value,
@@ -2385,7 +2381,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let length = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Add,
                         lhs: l_length,
                         rhs: r_length,
@@ -2397,7 +2393,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::CreateBits { value, length },
+                    Statement::CreateBits { value, length },
                 )
             }
             (
@@ -2417,7 +2413,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let left_cast = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Cast {
+                    Statement::Cast {
                         kind: CastOperationKind::ZeroExtend,
                         typ: (Type::Primitive(PrimitiveType {
                             tc: PrimitiveTypeClass::UnsignedInteger,
@@ -2430,7 +2426,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let right_width_constant = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::u16()),
                         value: ConstantValue::UnsignedInteger(u64::try_from(right_width).unwrap()),
                     },
@@ -2439,7 +2435,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let left_shift = build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::ShiftOperation {
+                    Statement::ShiftOperation {
                         kind: ShiftOperationKind::LogicalShiftLeft,
                         value: left_cast,
                         amount: right_width_constant,
@@ -2449,7 +2445,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Or,
                         lhs: left_shift,
                         rhs: right,
@@ -2461,10 +2457,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     fn statement_arena(&self) -> &Arena<Statement> {
-        &self
-            .block
-            .get(self.fn_ctx().rudder_fn.arena())
-            .statement_arena
+        self.block.get(self.fn_ctx().rudder_fn.arena()).arena()
     }
 }
 

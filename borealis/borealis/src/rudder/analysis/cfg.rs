@@ -1,6 +1,6 @@
 use {
     crate::{
-        rudder::model::{block::Block, function::Function, statement::StatementKind, Model},
+        rudder::model::{block::Block, function::Function, statement::Statement, Model},
         util::arena::Ref,
     },
     common::{intern::InternedString, HashMap, HashSet},
@@ -45,14 +45,14 @@ impl ControlFlowGraphAnalysis {
 
             let current_block = current.get(f.arena());
             let terminator = current_block.terminator_statement().unwrap();
-            match terminator.get(&current_block.statement_arena).kind() {
-                StatementKind::Jump { target } => {
+            match terminator.get(current_block.arena()) {
+                Statement::Jump { target } => {
                     self.insert_successor(current, *target);
                     self.insert_predecessor(*target, current);
 
                     work_list.push_back(*target);
                 }
-                StatementKind::Branch {
+                Statement::Branch {
                     true_target,
                     false_target,
                     ..
@@ -65,7 +65,7 @@ impl ControlFlowGraphAnalysis {
                     work_list.push_back(*true_target);
                     work_list.push_back(*false_target);
                 }
-                StatementKind::Return { .. } | StatementKind::Panic { .. } => {
+                Statement::Return { .. } | Statement::Panic { .. } => {
                     self.block_succs.insert(current.clone(), Vec::new());
                 }
                 _ => panic!("invalid terminator statement for block"),
@@ -130,13 +130,12 @@ impl FunctionCallGraphAnalysis {
         for block_ref in f.block_iter() {
             let block = block_ref.get(f.arena());
             let statements = block.statements();
-            let call_targets =
-                statements
-                    .iter()
-                    .filter_map(|s| match s.get(&block.statement_arena).kind() {
-                        StatementKind::Call { target, .. } => Some(target),
-                        _ => None,
-                    });
+            let call_targets = statements
+                .iter()
+                .filter_map(|s| match s.get(block.arena()) {
+                    Statement::Call { target, .. } => Some(target),
+                    _ => None,
+                });
             // TODO .unique();
 
             for call_target in call_targets {

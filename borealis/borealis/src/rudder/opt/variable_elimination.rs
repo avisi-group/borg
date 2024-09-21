@@ -2,7 +2,7 @@ use {
     crate::{
         rudder::{
             analysis,
-            model::statement::StatementKind,
+            model::statement::Statement,
             model::{block::Block, function::Function},
         },
         util::arena::{Arena, Ref},
@@ -50,9 +50,15 @@ fn run_on_block(
     let mut live_writes = HashMap::default();
 
     let mut changed = false;
-    for stmt in block.get(stmt_ua.block_arena()).statements() {
-        if let StatementKind::WriteVariable { symbol, value } =
-            stmt.get(block.get(stmt_ua.block_arena()).arena()).kind()
+    for stmt in block
+        .get(stmt_ua.block_arena())
+        .statements()
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+    {
+        if let Statement::WriteVariable { symbol, value } =
+            stmt.get(block.get(stmt_ua.block_arena()).arena())
         {
             // Ignore global symbols (for now)
             if !symbol_ua.is_symbol_local(&symbol) {
@@ -73,10 +79,8 @@ fn run_on_block(
                     e.insert(value.clone());
                 }
             }
-        } else if let StatementKind::ReadVariable { symbol } = stmt
-            .get(block.get(stmt_ua.block_arena()).arena())
-            .kind()
-            .clone()
+        } else if let Statement::ReadVariable { symbol } =
+            stmt.get(block.get(stmt_ua.block_arena()).arena()).clone()
         {
             if !symbol_ua.is_symbol_local(&symbol) {
                 continue;

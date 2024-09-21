@@ -147,7 +147,7 @@ pub fn codegen_type(typ: Type) -> TokenStream {
 }
 
 pub fn codegen_workspace(
-    mut rudder: Model,
+    rudder: Model,
     toplevel_fns: &[&'static str],
 ) -> (HashMap<PathBuf, String>, HashSet<PathBuf>) {
     // common module depended on by all containing bundle, tracer, state, and
@@ -172,7 +172,6 @@ pub fn codegen_workspace(
         )
     };
 
-    rudder.update_names();
     // let cfg = FunctionCallGraphAnalysis::new(&rudder);
     let rudder_fns = toplevel_fns
         .iter()

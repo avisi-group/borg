@@ -1,7 +1,7 @@
 use crate::{
     rudder::{
         analysis::dfa::StatementUseAnalysis,
-        model::statement::{CastOperationKind, Statement, StatementKind},
+        model::statement::{CastOperationKind, Statement},
         model::types::Type,
         model::{block::Block, function::Function, types::PrimitiveTypeClass},
     },
@@ -23,7 +23,13 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
 
     let mut sua = StatementUseAnalysis::new(arena, b);
 
-    for stmt in b.get(sua.block_arena()).statements() {
+    for stmt in b
+        .get(sua.block_arena())
+        .statements()
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+    {
         changed |= run_on_stmt(stmt, b, &mut sua);
     }
 
@@ -31,15 +37,11 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
 }
 
 fn run_on_stmt(stmt: Ref<Statement>, block: Ref<Block>, sua: &mut StatementUseAnalysis) -> bool {
-    match stmt
-        .get(&block.get(sua.block_arena()).statement_arena)
-        .kind()
-        .clone()
-    {
-        StatementKind::Constant { typ, value } => {
+    match stmt.get(block.get(sua.block_arena()).arena()).clone() {
+        Statement::Constant { typ, value } => {
             if typ.is_apint() {
-                stmt.get_mut(&mut block.get_mut(sua.block_arena()).statement_arena)
-                    .replace_kind(StatementKind::Constant {
+                stmt.get_mut(block.get_mut(sua.block_arena()).arena_mut())
+                    .replace_kind(Statement::Constant {
                         typ: Type::new_primitive(
                             PrimitiveTypeClass::SignedInteger,
                             value.smallest_width(),
@@ -52,7 +54,7 @@ fn run_on_stmt(stmt: Ref<Statement>, block: Ref<Block>, sua: &mut StatementUseAn
                 false
             }
         }
-        StatementKind::Cast {
+        Statement::Cast {
             kind: CastOperationKind::ZeroExtend,
             typ,
             value,
@@ -64,7 +66,7 @@ fn run_on_stmt(stmt: Ref<Statement>, block: Ref<Block>, sua: &mut StatementUseAn
 
                 if sua.has_uses(stmt) {
                     for u in sua.get_uses(stmt).clone() {
-                        u.get_mut(&mut block.get_mut(sua.block_arena()).statement_arena)
+                        u.get_mut(block.get_mut(sua.block_arena()).arena_mut())
                             .replace_use(stmt.clone(), value.clone());
                         changed = true;
                     }

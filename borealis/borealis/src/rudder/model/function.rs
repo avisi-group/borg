@@ -65,21 +65,8 @@ impl Function {
         self.name
     }
 
-    pub fn weight(&self) -> u64 {
-        0 //self.inner.borrow().entry_block().iter().
-    }
-
     pub fn signature(&self) -> (Type, Vec<Symbol>) {
         (self.return_type(), self.parameters())
-    }
-
-    pub fn update_indices(&mut self) {
-        self.block_iter()
-            .collect::<Vec<_>>()
-            .into_iter()
-            .for_each(|b| {
-                b.get_mut(self.arena_mut()).update_index();
-            });
     }
 
     pub fn add_local_variable(&mut self, symbol: Symbol) {

@@ -1,6 +1,6 @@
 use crate::{
     rudder::{
-        model::statement::StatementKind,
+        model::statement::Statement,
         model::{block::Block, function::Function},
     },
     util::arena::Ref,
@@ -19,11 +19,7 @@ pub fn run(f: &mut Function) -> bool {
 fn target_for_threadable(f: &Function, block_ref: Ref<Block>) -> Option<Ref<Block>> {
     let block = block_ref.get(f.arena());
     if block.size() == 1 {
-        if let StatementKind::Jump { target } = block
-            .terminator_statement()
-            .unwrap()
-            .get(&block.statement_arena)
-            .kind()
+        if let Statement::Jump { target } = block.terminator_statement().unwrap().get(block.arena())
         {
             Some(*target)
         } else {
@@ -38,18 +34,18 @@ fn run_on_block(f: &mut Function, block_ref: Ref<Block>) -> bool {
     let block = block_ref.get(f.arena());
     let terminator_ref = block.terminator_statement().unwrap();
 
-    match terminator_ref.get(&block.statement_arena).kind().clone() {
-        StatementKind::Jump { target } => {
+    match terminator_ref.get(block.arena()).clone() {
+        Statement::Jump { target } => {
             if let Some(thread_to) = target_for_threadable(f, target) {
                 terminator_ref
-                    .get_mut(&mut block_ref.get_mut(f.arena_mut()).statement_arena)
-                    .replace_kind(StatementKind::Jump { target: thread_to });
+                    .get_mut(block_ref.get_mut(f.arena_mut()).arena_mut())
+                    .replace_kind(Statement::Jump { target: thread_to });
                 true
             } else {
                 false
             }
         }
-        StatementKind::Branch {
+        Statement::Branch {
             condition,
             true_target,
             false_target,
@@ -73,8 +69,8 @@ fn run_on_block(f: &mut Function, block_ref: Ref<Block>) -> bool {
 
             if changed {
                 terminator_ref
-                    .get_mut(&mut block_ref.get_mut(f.arena_mut()).statement_arena)
-                    .replace_kind(StatementKind::Branch {
+                    .get_mut(block_ref.get_mut(f.arena_mut()).arena_mut())
+                    .replace_kind(Statement::Branch {
                         condition,
                         true_target,
                         false_target,

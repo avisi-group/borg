@@ -2,7 +2,7 @@ use {
     crate::{
         rudder::{
             analysis::loopy::LoopAnalysis,
-            model::statement::{Statement, StatementKind},
+            model::statement::Statement,
             model::{block::Block, function::Function},
         },
         util::arena::Ref,
@@ -27,8 +27,7 @@ pub fn run(f: &mut Function) -> bool {
 
     for block in f.block_iter() {
         for stmt in block.get(f.arena()).statements() {
-            if let StatementKind::WriteVariable { symbol, .. } =
-                stmt.get(block.get(f.arena()).arena()).kind()
+            if let Statement::WriteVariable { symbol, .. } = stmt.get(block.get(f.arena()).arena())
             {
                 live_outs
                     .entry(block)

@@ -79,7 +79,6 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
                 for pass in &passes {
                     trace!("running pass {}", pass.0);
 
-                    function.update_indices();
                     while pass.1(function) {
                         changed = true;
                     }

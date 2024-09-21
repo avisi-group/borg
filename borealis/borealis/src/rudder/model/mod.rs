@@ -36,12 +36,6 @@ impl Model {
         self.fns.insert(name, func);
     }
 
-    pub fn update_names(&mut self) {
-        for func in self.fns.values_mut() {
-            func.update_indices();
-        }
-    }
-
     pub fn optimise(&mut self, level: opt::OptLevel) {
         opt::optimise(self, level);
     }

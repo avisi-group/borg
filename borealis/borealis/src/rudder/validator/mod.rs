@@ -4,7 +4,7 @@ use {
             block::Block,
             constant_value::ConstantValue,
             function::Function,
-            statement::{Statement, StatementKind},
+            statement::Statement,
             types::{PrimitiveType, PrimitiveTypeClass, Type},
             Model,
         },
@@ -92,13 +92,11 @@ fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
             b.get(f.arena())
                 .statements()
                 .into_iter()
-                .map(move |s| ((b, f), s))
+                .map(move |s| ((b, f), *s))
         })
         .flatten()
         .filter_map(|((b, f), s)| {
-            if let StatementKind::Constant { typ, value } =
-                s.get(&b.get(f.arena()).statement_arena).kind()
-            {
+            if let Statement::Constant { typ, value } = s.get(b.get(f.arena()).arena()) {
                 Some(((s, b, f), (typ.clone(), value.clone())))
             } else {
                 None
@@ -113,10 +111,10 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 
     for (_, f) in ctx.get_functions() {
         for b in f.block_iter() {
-            let s_arena = &b.get(f.arena()).statement_arena;
+            let s_arena = b.get(f.arena()).arena();
 
             for s in b.get(f.arena()).statements() {
-                if let StatementKind::BinaryOperation { lhs, rhs, .. } = s.get(s_arena).kind() {
+                if let Statement::BinaryOperation { lhs, rhs, .. } = s.get(s_arena) {
                     if !lhs
                         .get(s_arena)
                         .typ(s_arena)

@@ -1,7 +1,7 @@
 use {
     crate::{
         rudder::{
-            model::statement::{import_statement, StatementKind},
+            model::statement::{import_statement, Statement},
             model::{block::Block, function::Function},
         },
         util::arena::Ref,
@@ -26,12 +26,9 @@ fn run_inliner_block(f: &mut Function, source_block: Ref<Block>) -> bool {
     // it.
     let terminator = source_block.get(f.arena()).terminator_statement().unwrap();
 
-    let StatementKind::Jump {
+    let Statement::Jump {
         target: target_block,
-    } = terminator
-        .get(&source_block.get(f.arena()).statement_arena)
-        .kind()
-        .clone()
+    } = terminator.get(source_block.get(f.arena()).arena()).clone()
     else {
         return false;
     };
@@ -47,7 +44,13 @@ fn run_inliner_block(f: &mut Function, source_block: Ref<Block>) -> bool {
 
     let mut mapping = HashMap::default();
 
-    for target_statement in target_block.get(f.arena()).statements() {
+    for target_statement in target_block
+        .get(f.arena())
+        .statements()
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+    {
         let source_statement = import_statement(
             source_block,
             target_block,

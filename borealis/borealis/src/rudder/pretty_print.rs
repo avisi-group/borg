@@ -71,8 +71,8 @@ impl Display for Symbol {
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        for stmt in &self.statements {
-            writeln!(f, "    {}", stmt.to_string(&self.statement_arena))?;
+        for stmt in self.statements() {
+            writeln!(f, "    {}", stmt.to_string(self.arena()))?;
         }
 
         Ok(())

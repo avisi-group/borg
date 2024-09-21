@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{model::function::Function, model::statement::StatementKind},
+    crate::rudder::{model::function::Function, model::statement::Statement},
     log::trace,
 };
 
@@ -14,27 +14,25 @@ pub fn run(f: &mut Function) -> bool {
             continue;
         };
 
-        if let StatementKind::Branch {
+        if let Statement::Branch {
             condition,
             true_target,
             false_target,
-        } = terminator_ref.get(&block.statement_arena).kind().clone()
+        } = terminator_ref.get(block.arena()).clone()
         {
-            if let StatementKind::Constant { value, .. } =
-                condition.get(&block.statement_arena).kind().clone()
-            {
+            if let Statement::Constant { value, .. } = condition.get(block.arena()).clone() {
                 trace!("found constant branch statement {}", value);
 
                 if value.zero() {
                     terminator_ref
-                        .get_mut(&mut block.statement_arena)
-                        .replace_kind(StatementKind::Jump {
+                        .get_mut(block.arena_mut())
+                        .replace_kind(Statement::Jump {
                             target: false_target,
                         });
                 } else {
                     terminator_ref
-                        .get_mut(&mut block.statement_arena)
-                        .replace_kind(StatementKind::Jump {
+                        .get_mut(block.arena_mut())
+                        .replace_kind(Statement::Jump {
                             target: true_target,
                         });
                 }
@@ -42,8 +40,8 @@ pub fn run(f: &mut Function) -> bool {
                 changed = true;
             } else if true_target == false_target {
                 terminator_ref
-                    .get_mut(&mut block.statement_arena)
-                    .replace_kind(StatementKind::Jump {
+                    .get_mut(block.arena_mut())
+                    .replace_kind(Statement::Jump {
                         target: true_target,
                     });
                 changed = true;

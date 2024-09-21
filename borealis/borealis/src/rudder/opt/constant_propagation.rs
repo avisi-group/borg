@@ -2,7 +2,7 @@ use {
     crate::{
         rudder::{
             analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
-            model::statement::StatementKind,
+            model::statement::Statement,
             model::{block::Block, function::Function},
         },
         util::arena::{Arena, Ref},
@@ -32,21 +32,16 @@ pub fn run(f: &mut Function) -> bool {
         if writes.len() == 1 {
             let (statement, block) = writes.first().unwrap();
 
-            let StatementKind::WriteVariable {
+            let Statement::WriteVariable {
                 value: value_written,
                 ..
-            } = statement
-                .get(&block.get(f.arena()).statement_arena)
-                .kind()
-                .clone()
+            } = statement.get(block.get(f.arena()).arena()).clone()
             else {
                 panic!("not a write")
             };
 
-            if let StatementKind::Constant { typ, value } = value_written
-                .get(&block.get(f.arena()).statement_arena)
-                .kind()
-                .clone()
+            if let Statement::Constant { typ, value } =
+                value_written.get(block.get(f.arena()).arena()).clone()
             {
                 trace!("identified candidate symbol: {}", symbol);
 
@@ -54,16 +49,14 @@ pub fn run(f: &mut Function) -> bool {
                 // replace all reads, in all blocks, with the constant
                 if sua.symbol_has_reads(&symbol) {
                     for (read, block) in sua.get_symbol_reads(&symbol) {
-                        let StatementKind::ReadVariable { .. } = read
-                            .get(&block.get(f.arena()).statement_arena)
-                            .kind()
-                            .clone()
+                        let Statement::ReadVariable { .. } =
+                            read.get(block.get(f.arena()).arena()).clone()
                         else {
                             panic!("not a read");
                         };
 
-                        read.get_mut(&mut block.get_mut(f.arena_mut()).statement_arena)
-                            .replace_kind(StatementKind::Constant {
+                        read.get_mut(block.get_mut(f.arena_mut()).arena_mut())
+                            .replace_kind(Statement::Constant {
                                 typ: typ.clone(),
                                 value: value.clone(),
                             });
@@ -89,24 +82,26 @@ fn simplify_block_local_writes(arena: &mut Arena<Block>, block: Ref<Block>) -> b
 
     let mut sua = StatementUseAnalysis::new(arena, block);
 
-    for stmt in block.get(sua.block_arena()).statements() {
-        if let StatementKind::WriteVariable { symbol, value } = stmt
-            .get(&block.get(sua.block_arena()).statement_arena)
-            .kind()
-            .clone()
+    for stmt in block
+        .get(sua.block_arena())
+        .statements()
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+    {
+        if let Statement::WriteVariable { symbol, value } =
+            stmt.get(block.get(sua.block_arena()).arena()).clone()
         {
             most_recent_writes.insert(symbol.name(), value);
-        } else if let StatementKind::ReadVariable { symbol } = stmt
-            .get(&block.get(sua.block_arena()).statement_arena)
-            .kind()
-            .clone()
+        } else if let Statement::ReadVariable { symbol } =
+            stmt.get(block.get(sua.block_arena()).arena()).clone()
         {
             if let Some(most_recent_write) = most_recent_writes.get(&symbol.name()) {
                 if sua.has_uses(stmt) {
                     let uses_of_read_variable = sua.get_uses(stmt).clone();
                     for stmt_use in uses_of_read_variable {
                         stmt_use
-                            .get_mut(&mut block.get_mut(sua.block_arena()).statement_arena)
+                            .get_mut(block.get_mut(sua.block_arena()).arena_mut())
                             .replace_use(stmt.clone(), most_recent_write.clone());
                     }
 

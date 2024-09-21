@@ -4,7 +4,7 @@ use {
         rudder::model::{
             block::Block,
             function::{Function, Symbol},
-            statement::{build, import_statement, StatementKind},
+            statement::{build, import_statement, Statement},
             types::Type,
             Model,
         },
@@ -37,7 +37,6 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
 
             while run_inliner(&mut function, &model.fns) {}
 
-            function.update_indices();
             model.fns.insert(name, function);
         });
 }
@@ -52,11 +51,8 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
             let statements = block_ref.get(function.arena()).statements();
 
             let mut calls = statements.iter().enumerate().filter_map(|(i, s)| {
-                match s
-                    .get(&block_ref.get(function.arena()).statement_arena)
-                    .kind()
-                {
-                    StatementKind::Call { target, args, .. } => {
+                match s.get(block_ref.get(function.arena()).arena()) {
+                    Statement::Call { target, args, .. } => {
                         if fn_is_allowlisted(*target) {
                             Some((i, (*target, args.clone())))
                         } else {
@@ -117,13 +113,13 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                     build(
                         pre_block_ref,
                         function.arena_mut(),
-                        StatementKind::WriteVariable { symbol, value },
+                        Statement::WriteVariable { symbol, value },
                     );
                 }
                 build(
                     pre_block_ref,
                     function.arena_mut(),
-                    StatementKind::Jump {
+                    Statement::Jump {
                         target: entry_block_ref,
                     },
                 );
@@ -149,14 +145,14 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                                 build(
                                     post_block_ref,
                                     function.arena_mut(),
-                                    StatementKind::ReadVariable { symbol },
+                                    Statement::ReadVariable { symbol },
                                 )
                             })
                             .collect::<Vec<_>>();
                         let tuple = build(
                             post_block_ref,
                             function.arena_mut(),
-                            StatementKind::CreateTuple(reads),
+                            Statement::CreateTuple(reads),
                         );
                         mapping.insert(post_statements[0], tuple);
                     } else {
@@ -168,7 +164,7 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                         let read_return_ref = build(
                             post_block_ref,
                             function.arena_mut(),
-                            StatementKind::ReadVariable { symbol },
+                            Statement::ReadVariable { symbol },
                         );
                         mapping.insert(post_statements[0], read_return_ref); // replace call with read variable of return value so that future statements aren't invalidated
                     }
@@ -221,11 +217,11 @@ fn import_blocks(
     // we need to apply this mapping to all statements in the imported blocks
     mapping.values().copied().for_each(|r| {
         let block = r.get_mut(this_function.arena_mut());
-        for statement in block.statements() {
-            let kind = statement.get_mut(block.arena_mut()).kind_mut();
+        for statement in block.statements().iter().copied().collect::<Vec<_>>() {
+            let kind = statement.get_mut(block.arena_mut());
             match kind {
-                StatementKind::Jump { target } => *target = *mapping.get(target).unwrap(),
-                StatementKind::Branch {
+                Statement::Jump { target } => *target = *mapping.get(target).unwrap(),
+                Statement::Branch {
                     true_target,
                     false_target,
                     ..
@@ -233,12 +229,12 @@ fn import_blocks(
                     *true_target = *mapping.get(true_target).unwrap();
                     *false_target = *mapping.get(false_target).unwrap();
                 }
-                StatementKind::PhiNode { .. } => todo!(),
+                Statement::PhiNode { .. } => todo!(),
 
-                StatementKind::ReadVariable { symbol } => {
+                Statement::ReadVariable { symbol } => {
                     *symbol = symbol_add_prefix(symbol, symbol_prefix)
                 }
-                StatementKind::WriteVariable { symbol, .. } => {
+                Statement::WriteVariable { symbol, .. } => {
                     *symbol = symbol_add_prefix(symbol, symbol_prefix)
                 }
                 _ => (),
@@ -253,9 +249,8 @@ fn import_blocks(
             .terminator_statement()
             .unwrap();
 
-        if let StatementKind::Return { value } = terminator
+        if let Statement::Return { value } = terminator
             .get(block_ref.get(this_function.arena()).arena())
-            .kind()
             .clone()
         {
             let block = block_ref.get_mut(this_function.arena_mut());
@@ -271,7 +266,7 @@ fn import_blocks(
                     let access = build(
                         block_ref,
                         this_function.arena_mut(),
-                        StatementKind::TupleAccess {
+                        Statement::TupleAccess {
                             index,
                             source: value,
                         },
@@ -279,7 +274,7 @@ fn import_blocks(
                     build(
                         block_ref,
                         this_function.arena_mut(),
-                        StatementKind::WriteVariable {
+                        Statement::WriteVariable {
                             symbol,
                             value: access,
                         },
@@ -293,7 +288,7 @@ fn import_blocks(
                 build(
                     block_ref,
                     this_function.arena_mut(),
-                    StatementKind::WriteVariable { symbol, value },
+                    Statement::WriteVariable { symbol, value },
                 );
             }
 
@@ -301,7 +296,7 @@ fn import_blocks(
             build(
                 block_ref,
                 this_function.arena_mut(),
-                StatementKind::Jump {
+                Statement::Jump {
                     target: return_target_block,
                 },
             );

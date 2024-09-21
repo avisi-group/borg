@@ -1,9 +1,10 @@
 use crate::{
-    rudder::{
-        model::constant_value::ConstantValue,
-        model::statement::{build_at, cast_at, BinaryOperationKind, Location, StatementKind},
-        model::types::Type,
-        model::{block::Block, function::Function},
+    rudder::model::{
+        block::Block,
+        constant_value::ConstantValue,
+        function::Function,
+        statement::{build_at, cast_at, BinaryOperationKind, Location, Statement},
+        types::Type,
     },
     util::arena::{Arena, Ref},
 };
@@ -22,24 +23,30 @@ pub fn run(f: &mut Function) -> bool {
 fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
     let mut did_change = false;
 
-    for stmt in block.get(arena).statements() {
+    for stmt in block
+        .get(arena)
+        .statements()
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+    {
         // if we have a write reg of an assign element of a read reg
         // replace with single write reg to element
-        if let StatementKind::WriteRegister {
+        if let Statement::WriteRegister {
             offset: write_offset,
             value: write_value,
-        } = stmt.get(block.get(arena).arena()).kind().clone()
+        } = stmt.get(block.get(arena).arena()).clone()
         {
-            if let StatementKind::AssignElement {
+            if let Statement::AssignElement {
                 vector: assign_vector,
                 value: assign_value,
                 index: assign_index,
-            } = write_value.get(block.get(arena).arena()).kind().clone()
+            } = write_value.get(block.get(arena).arena()).clone()
             {
-                if let StatementKind::ReadRegister {
+                if let Statement::ReadRegister {
                     typ: _read_type,
                     offset: _read_offset,
-                } = assign_vector.get(block.get(arena).arena()).kind().clone()
+                } = assign_vector.get(block.get(arena).arena()).clone()
                 {
                     // write-register
                     // offset = write_offset + index * element type width bytes
@@ -50,7 +57,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     let vector_width = build_at(
                         block,
                         arena,
-                        StatementKind::Constant {
+                        Statement::Constant {
                             typ: (Type::u16()),
                             value: ConstantValue::UnsignedInteger(
                                 assign_value
@@ -66,7 +73,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     let vector_offset = build_at(
                         block,
                         arena,
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Multiply,
                             lhs: assign_index,
                             rhs: vector_width,
@@ -76,7 +83,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     let offset = build_at(
                         block,
                         arena,
-                        StatementKind::BinaryOperation {
+                        Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: write_offset,
                             rhs: vector_offset,
@@ -89,7 +96,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     // replace kind to make sure future uses aren't invalidated
                     // todo: actually this is a write, we can just delete it and build it again
                     stmt.get_mut(block.get_mut(arena).arena_mut()).replace_kind(
-                        StatementKind::WriteRegister {
+                        Statement::WriteRegister {
                             offset,
                             value: assign_value,
                         },
@@ -104,11 +111,10 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
         // see if index is constant (check if the bundle is constant)
         // if vector is a register read, add index to offset
         // todo: if vector is a local variable read, add index to indices
-        if let StatementKind::ReadElement { vector, index } =
-            stmt.get(block.get(arena).arena()).kind().clone()
+        if let Statement::ReadElement { vector, index } = stmt.get(block.get(arena).arena()).clone()
         {
-            if let StatementKind::ReadRegister { offset, .. } =
-                vector.get(block.get(arena).arena()).kind().clone()
+            if let Statement::ReadRegister { offset, .. } =
+                vector.get(block.get(arena).arena()).clone()
             {
                 let element_type = stmt
                     .get(block.get(arena).arena())
@@ -121,7 +127,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                 let typ_width = build_at(
                     block,
                     arena,
-                    StatementKind::Constant {
+                    Statement::Constant {
                         typ: (Type::s64()),
                         value: ConstantValue::SignedInteger(
                             i64::try_from(element_type.width_bytes()).unwrap(),
@@ -133,7 +139,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                 let index_scaled = build_at(
                     block,
                     arena,
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Multiply,
                         lhs: index,
                         rhs: typ_width,
@@ -144,7 +150,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                 let new_offset = build_at(
                     block,
                     arena,
-                    StatementKind::BinaryOperation {
+                    Statement::BinaryOperation {
                         kind: BinaryOperationKind::Add,
                         lhs: index_scaled,
                         rhs: offset,
@@ -157,7 +163,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                 // replace kind to make sure future uses aren't invalidated
                 // todo: actually this is a write, we can just delete it and build it again
                 stmt.get_mut(block.get_mut(arena).arena_mut()).replace_kind(
-                    StatementKind::ReadRegister {
+                    Statement::ReadRegister {
                         typ: element_type,
                         offset: new_offset,
                     },

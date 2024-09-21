@@ -1,6 +1,6 @@
 use {
     crate::{
-        rudder::model::statement::{Statement, StatementKind},
+        rudder::model::statement::Statement,
         util::arena::{Arena, Ref},
     },
     common::HashSet,
@@ -8,8 +8,8 @@ use {
 
 #[derive(Clone, Debug)]
 pub struct Block {
-    pub(crate) statement_arena: Arena<Statement>,
-    pub(crate) statements: Vec<Ref<Statement>>,
+    statement_arena: Arena<Statement>,
+    statements: Vec<Ref<Statement>>,
 }
 
 impl Block {
@@ -17,18 +17,8 @@ impl Block {
         Self::default()
     }
 
-    pub fn update_index(&mut self) {
-        self.statements
-            .iter()
-            .enumerate()
-            .for_each(|(statement_index, stmt)| {
-                stmt.get_mut(&mut self.statement_arena)
-                    .update_names(format!("s{statement_index}").into());
-            });
-    }
-
-    pub fn statements(&self) -> Vec<Ref<Statement>> {
-        self.statements.clone()
+    pub fn statements(&self) -> &[Ref<Statement>] {
+        self.statements.as_slice()
     }
 
     pub fn terminator_statement(&self) -> Option<Ref<Statement>> {
@@ -43,7 +33,7 @@ impl Block {
         self.statements.extend(stmts)
     }
 
-    pub(crate) fn index_of_statement(&self, reference: Ref<Statement>) -> usize {
+    pub fn index_of_statement(&self, reference: Ref<Statement>) -> usize {
         self.statements
             .iter()
             .enumerate()
@@ -74,15 +64,14 @@ impl Block {
             .terminator_statement()
             .unwrap()
             .get(&self.statement_arena)
-            .kind()
         {
-            StatementKind::Jump { target } => vec![*target],
-            StatementKind::Branch {
+            Statement::Jump { target } => vec![*target],
+            Statement::Branch {
                 true_target,
                 false_target,
                 ..
             } => vec![*true_target, *false_target],
-            StatementKind::Return { .. } | StatementKind::Panic(_) => {
+            Statement::Return { .. } | Statement::Panic(_) => {
                 vec![]
             }
             k => panic!("invalid terminator for block: {k:?}"),
