@@ -231,6 +231,11 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "ELFromM32",
         "SCR_GEN_read",
         "Mk_SCRType",
+        "BadMode",
+        "HaveAArch32EL",
+        "EffectiveSCR_EL3_NSE",
+        "HaveRME",
+        //"_get_SCR_EL3_Type_NSE", takes too long:(
     ];
 
     FN_ALLOWLIST.contains(&name.as_ref()) || FN_TOPLEVEL.contains(&name.as_ref())

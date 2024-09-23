@@ -70,6 +70,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             block_fns[block.index()] = Some(fn_name)
         });
 
+        log::warn!(
+            "{} sparsity: {:.2}% none",
+            function.name(),
+            (block_fns.iter().filter(|o| o.is_none()).count() as f32 * 100.0) / num_blocks as f32
+        );
+
         block_fns
             .into_iter()
             .map(|e| e.unwrap_or(Ident::new("noop", proc_macro2::Span::call_site())))
@@ -210,12 +216,11 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
         })
         .collect::<TokenStream>();
 
-    let block_ref_inits = function
-        .block_iter()
-        .map(|_| quote!(ctx.create_block(),))
-        .collect::<TokenStream>();
+    let num_blocks = function.arena().clone().into_inner().len();
 
-    let num_blocks = function.block_iter().count();
+    let block_ref_inits = repeat(quote!(ctx.create_block(),))
+        .take(num_blocks)
+        .collect::<TokenStream>();
 
     quote! {
         struct FunctionState {
