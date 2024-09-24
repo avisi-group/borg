@@ -64,8 +64,8 @@ fn run_on_stmt(stmt: Ref<Statement>, block: Ref<Block>, sua: &mut StatementUseAn
 
                 let mut changed = false;
 
-                if sua.has_uses(stmt) {
-                    for u in sua.get_uses(stmt).clone() {
+                if let Some(uses) = sua.get_uses(stmt).cloned() {
+                    for u in uses {
                         u.get_mut(block.get_mut(sua.block_arena()).arena_mut())
                             .replace_use(stmt.clone(), value.clone());
                         changed = true;

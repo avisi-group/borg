@@ -98,16 +98,15 @@ fn run_on_block(
             }
 
             // replace uses of read with live value
-            for use_ in stmt_ua.get_uses(stmt).clone() {
-                let arena = stmt_ua.block_arena();
-                trace!(
-                    "replacing use in {}",
-                    use_.to_string(block.get(arena).arena())
-                );
+            if let Some(uses) = stmt_ua.get_uses(stmt).cloned() {
+                for u in uses {
+                    let arena = stmt_ua.block_arena();
+                    trace!("replacing use in {}", u.to_string(block.get(arena).arena()));
 
-                use_.get_mut(block.get_mut(arena).arena_mut())
-                    .replace_use(stmt.clone(), live_value.clone());
-                changed = true;
+                    u.get_mut(block.get_mut(arena).arena_mut())
+                        .replace_use(stmt.clone(), live_value.clone());
+                    changed = true;
+                }
             }
         }
     }

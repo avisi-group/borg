@@ -313,8 +313,8 @@ impl<'a> StatementUseAnalysis<'a> {
         self.stmt_uses.contains_key(&stmt)
     }
 
-    pub fn get_uses(&self, stmt: Ref<Statement>) -> &HashSet<Ref<Statement>> {
-        self.stmt_uses.get(&stmt).unwrap()
+    pub fn get_uses(&self, stmt: Ref<Statement>) -> Option<&HashSet<Ref<Statement>>> {
+        self.stmt_uses.get(&stmt)
     }
 
     pub fn is_used_in_write_var(&self, stmt: Ref<Statement>) -> bool {

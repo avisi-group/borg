@@ -1,12 +1,15 @@
 use {
     crate::{
         fn_is_allowlisted,
-        rudder::model::{
-            block::{Block, BlockIterator},
-            function::{Function, Symbol},
-            statement::{build, import_statement, Statement},
-            types::Type,
-            Model,
+        rudder::{
+            analysis::dfa::StatementUseAnalysis,
+            model::{
+                block::Block,
+                function::{Function, Symbol},
+                statement::{build, build_at, import_statement, Location, Statement},
+                types::Type,
+                Model,
+            },
         },
         util::arena::Ref,
     },
@@ -35,12 +38,28 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
             log::warn!("inlining {name}");
             let mut function = model.fns.remove(&name).unwrap();
 
-            // map of function name to imported entry block, used to avoid importing an inlined function more than once
+            // map of function name to imported entry block and exit block, used to avoid importing an inlined function more than once
             let mut inlined = HashMap::default();
+
+            // EnterInlineCall statements have to reference the exit block of the inlined function, in order to set up the mapping in the DBT from exit block to the call site post block
+            // ExitInlineCall statements lookup the current block index in that mapping and jump back to whereever the inline call started
+            //
+            // However, if we have a block that contains calls and ends with an ExitInlineCall, after inlining the ExitInlineCall statement will be in a different block, invalidating those references
+            //
+            // This is a map of old block refs to new exitinlinecall block refs
+            let mut exit_inline_call_rewrites = HashMap::default();
 
             loop {
                 log::warn!("running inliner pass");
-                let did_change = run_inliner(&mut function, &model.fns, &mut inlined);
+                let did_change = run_inliner(
+                    &mut function,
+                    &model.fns,
+                    &mut inlined,
+                    &mut exit_inline_call_rewrites,
+                );
+
+                fix_exit_refs(&mut function, &mut inlined, &exit_inline_call_rewrites);
+
                 if !did_change {
                     break;
                 }
@@ -50,10 +69,17 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
         });
 }
 
+struct ImportedFunction {
+    symbol_prefix: String,
+    entry_block: Ref<Block>,
+    exit_block: Ref<Block>,
+}
+
 fn run_inliner(
     function: &mut Function,
     functions: &HashMap<InternedString, Function>,
-    inlined: &mut HashMap<InternedString, (Ref<Block>, Ref<Block>)>,
+    inlined: &mut HashMap<InternedString, ImportedFunction>,
+    exit_inline_call_rewrites: &mut HashMap<Ref<Block>, Ref<Block>>,
 ) -> bool {
     let mut did_change = false;
     function
@@ -61,22 +87,26 @@ fn run_inliner(
         .collect::<Vec<_>>()
         .into_iter()
         .for_each(|block_ref| {
-            let statements = block_ref.get(function.arena()).statements();
-
-            let mut calls = statements.iter().enumerate().filter_map(|(i, s)| {
-                match s.get(block_ref.get(function.arena()).arena()) {
-                    Statement::Call { target, args, .. } => {
-                        if fn_is_allowlisted(*target) {
-                            Some((i, (*target, args.clone())))
-                        } else {
-                            None
+            let mut calls = block_ref
+                .get(function.arena())
+                .statements()
+                .iter()
+                .enumerate()
+                .filter_map(
+                    |(i, s)| match s.get(block_ref.get(function.arena()).arena()) {
+                        Statement::Call { target, args, .. } => {
+                            if fn_is_allowlisted(*target) {
+                                Some((i, (*target, args.clone())))
+                            } else {
+                                None
+                            }
                         }
-                    }
-                    _ => None,
-                }
-            });
+                        _ => None,
+                    },
+                );
 
-            if let Some((index, (call_name, call_args))) = calls.next() {
+            // we only do one call at a time for simplicity, todo: make this more efficient
+            if let Some((mut index, (call_name, call_args))) = calls.next() {
                 did_change = true;
 
                 log::debug!(
@@ -84,35 +114,116 @@ fn run_inliner(
                     block_ref.get(function.arena())
                 );
 
-                let symbol_prefix = format!("inline{:x}_", Id::new());
+                // if the block we're about to split contains an exit inline call, we'll need to replace any EnterInlineCall's that reference this exit block to the new exit block (the post call block)
+                let needs_exit_rewrite = if let Statement::ExitInlineCall = block_ref
+                    .get(function.arena())
+                    .terminator_statement()
+                    .unwrap()
+                    .get(block_ref.get(function.arena()).arena())
+                {
+                    Some(block_ref)
+                } else {
+                    None
+                };
 
+                // determine if there are dependencies between pre and post, and write-read to a new local variable if so
+                {
+                    let (pre_statements, post_statements) = {
+                        let (pre, post) =
+                            block_ref.get(function.arena()).statements().split_at(index);
+                        (pre.to_owned(), post.to_owned())
+                    };
+
+                    let mut dependencies = vec![];
+                    let sua = StatementUseAnalysis::new(function.arena_mut(), block_ref);
+                    for pre_statement in &pre_statements {
+                        if let Some(uses) = sua.get_uses(*pre_statement) {
+                            // ignoring the call statement itself
+                            for post_statement in &post_statements[1..] {
+                                if uses.contains(post_statement) {
+                                    //  panic!("{pre_statement} uses {post_statement}")
+                                    dependencies.push((*pre_statement, *post_statement));
+                                }
+                            }
+                        }
+                    }
+
+                    // to account for the additional writes
+                    index += dependencies.len();
+
+                    for (pre, post) in dependencies {
+                        let arena = block_ref.get(function.arena()).arena();
+                        let symbol = Symbol::new(
+                            format!("bridged_{:x}", Id::new()).into(),
+                            pre.get(arena).typ(arena),
+                        );
+                        function.add_local_variable(symbol.clone());
+
+                        // todo: add a Location::After
+                        build_at(
+                            block_ref,
+                            function.arena_mut(),
+                            Statement::WriteVariable {
+                                symbol: symbol.clone(),
+                                value: pre,
+                            },
+                            Location::Before(post_statements[0]),
+                        );
+
+                        let read_var = build_at(
+                            block_ref,
+                            function.arena_mut(),
+                            Statement::ReadVariable { symbol },
+                            Location::Before(post),
+                        );
+                        post.get_mut(block_ref.get_mut(function.arena_mut()).arena_mut())
+                            .replace_use(pre, read_var);
+                    }
+                };
+
+                log::debug!(
+                    "after bridging statement dependencies in \n{}",
+                    block_ref.get(function.arena())
+                );
+
+                // split statements at the supplied index
                 let (pre_statements, post_statements) = {
-                    let (pre, post) = statements.split_at(index);
+                    let (pre, post) = block_ref.get(function.arena()).statements().split_at(index);
                     (pre.to_owned(), post.to_owned())
                 };
 
+                // the pre block is the current block which will be trimmed to only contain statements before the call
                 let pre_block_ref = block_ref;
+
+                // post block is a new block containing all statements after the call
                 let post_block_ref = function.arena_mut().insert(Block::new());
 
                 let other_fn = functions.get(&call_name).unwrap();
 
                 log::debug!("other entry block: {:?}", other_fn.entry_block());
 
-                // import local variables
-                other_fn
-                    .local_variables()
-                    .iter()
-                    .chain(other_fn.parameters().iter())
-                    .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
-                    .for_each(|sym| function.add_local_variable(sym));
-
                 // import the target's blocks, assigning new blockrefs, and replacing returns
                 // with jumps to post_block_ref
+                let imported_function = inlined.entry(call_name).or_insert_with(|| {
+                    let symbol_prefix = format!("inline{:x}_", Id::new());
 
-                let (entry_block_ref, exit_block_ref) = inlined
-                    .entry(call_name)
-                    .or_insert_with(|| import_blocks(function, other_fn, &symbol_prefix))
-                    .clone();
+                    // import local variables and the parameters as new local variables in the current function (namespaced using the unique prefix)
+                    other_fn
+                        .local_variables()
+                        .iter()
+                        .chain(other_fn.parameters().iter())
+                        .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
+                        .for_each(|sym| function.add_local_variable(sym));
+
+                    let (entry_block, exit_block) =
+                        import_blocks(function, other_fn, &symbol_prefix);
+
+                    ImportedFunction {
+                        symbol_prefix,
+                        entry_block,
+                        exit_block,
+                    }
+                });
 
                 // set pre-statements and end pre block with jump to inlined function entry
                 // block
@@ -120,10 +231,11 @@ fn run_inliner(
                     .get_mut(function.arena_mut())
                     .set_statements(pre_statements.into_iter());
 
+                // write arguments into the parameter local vars
                 for (symbol, value) in other_fn
                     .parameters()
                     .iter()
-                    .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
+                    .map(|sym| symbol_add_prefix(sym, &imported_function.symbol_prefix))
                     .zip(call_args.iter().copied())
                 {
                     build(
@@ -132,13 +244,15 @@ fn run_inliner(
                         Statement::WriteVariable { symbol, value },
                     );
                 }
+
+                // finish the pre-block with the call to the imported entry block
                 build(
                     pre_block_ref,
                     function.arena_mut(),
                     Statement::EnterInlineCall {
                         pre_call_block: pre_block_ref,
-                        inline_entry_block: entry_block_ref,
-                        inline_exit_block: exit_block_ref,
+                        inline_entry_block: imported_function.entry_block,
+                        inline_exit_block: imported_function.exit_block,
                         post_call_block: post_block_ref,
                     },
                 );
@@ -148,14 +262,18 @@ fn run_inliner(
                 {
                     let mut mapping = HashMap::default();
 
-                    if let Type::Tuple(ts) = other_fn.return_type() {
+                    // return value constructed by reading the `borealis_inline_return` local variable(s)
+                    let return_value = if let Type::Tuple(ts) = other_fn.return_type() {
                         let reads = ts
                             .iter()
                             .enumerate()
                             .map(|(index, typ)| {
                                 Symbol::new(
-                                    format!("{symbol_prefix}_borealis_inline_return_{index}")
-                                        .into(),
+                                    format!(
+                                        "{}_borealis_inline_return_{index}",
+                                        imported_function.symbol_prefix
+                                    )
+                                    .into(),
                                     typ.clone(),
                                 )
                             })
@@ -168,25 +286,27 @@ fn run_inliner(
                                 )
                             })
                             .collect::<Vec<_>>();
-                        let tuple = build(
+                        build(
                             post_block_ref,
                             function.arena_mut(),
                             Statement::CreateTuple(reads),
-                        );
-                        mapping.insert(post_statements[0], tuple);
+                        )
                     } else {
                         let symbol = Symbol::new(
-                            format!("{symbol_prefix}_borealis_inline_return").into(),
+                            format!("{}_borealis_inline_return", imported_function.symbol_prefix)
+                                .into(),
                             other_fn.return_type(),
                         );
                         function.add_local_variable(symbol.clone());
-                        let read_return_ref = build(
+                        build(
                             post_block_ref,
                             function.arena_mut(),
                             Statement::ReadVariable { symbol },
-                        );
-                        mapping.insert(post_statements[0], read_return_ref); // replace call with read variable of return value so that future statements aren't invalidated
-                    }
+                        )
+                    };
+
+                    // replace call with read variable of return value so that future statements aren't invalidated
+                    mapping.insert(post_statements[0], return_value);
 
                     // copy remaining statements from pre block to post block
                     for other_statement in &post_statements[1..] {
@@ -203,6 +323,10 @@ fn run_inliner(
                 }
 
                 log::debug!("new post block\n{}", post_block_ref.get(function.arena()));
+
+                if let Some(old) = needs_exit_rewrite {
+                    exit_inline_call_rewrites.insert(old, post_block_ref);
+                }
             }
         });
 
@@ -332,4 +456,39 @@ fn import_blocks(
 
 fn symbol_add_prefix(symbol: &Symbol, prefix: &str) -> Symbol {
     Symbol::new(format!("{prefix}{}", symbol.name()).into(), symbol.typ())
+}
+
+fn fix_exit_refs(
+    function: &mut Function,
+    inlined: &mut HashMap<InternedString, ImportedFunction>,
+    rewrites: &HashMap<Ref<Block>, Ref<Block>>,
+) {
+    inlined
+        .values_mut()
+        .for_each(|ImportedFunction { exit_block, .. }| {
+            if let Some(new) = rewrites.get(exit_block) {
+                *exit_block = *new;
+            }
+        });
+    function
+        .block_iter()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .for_each(|block_ref| {
+            block_ref
+                .get_mut(function.arena_mut())
+                .statements()
+                .to_owned()
+                .into_iter()
+                .for_each(|r| {
+                    if let Statement::EnterInlineCall {
+                        inline_exit_block, ..
+                    } = r.get_mut(block_ref.get_mut(function.arena_mut()).arena_mut())
+                    {
+                        if let Some(new) = rewrites.get(inline_exit_block) {
+                            *inline_exit_block = *new;
+                        }
+                    }
+                });
+        });
 }

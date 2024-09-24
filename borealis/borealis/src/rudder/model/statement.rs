@@ -8,11 +8,15 @@ use {
         },
         util::arena::{Arena, Ref},
     },
-    common::{identifiable::Id, intern::InternedString, HashMap},
+    common::{intern::InternedString, HashMap},
+    core::fmt,
     itertools::Itertools,
     proc_macro2::TokenStream,
     quote::{format_ident, ToTokens, TokenStreamExt},
-    std::{cmp::Ordering, fmt::Debug},
+    std::{
+        cmp::Ordering,
+        fmt::{Debug, Display},
+    },
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -268,9 +272,15 @@ impl ToTokens for Ref<Statement> {
     }
 }
 
+impl Display for Ref<Statement> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "s{}", self.index())
+    }
+}
+
 impl Ref<Statement> {
-    pub fn to_string(&self, arena: &Arena<Statement>) -> InternedString {
-        format!("s{}: {}", self.index(), self.get(arena).to_string(arena)).into()
+    pub fn to_string(&self, arena: &Arena<Statement>) -> String {
+        format!("{self}: {}", self.get(arena).to_string(arena))
     }
 }
 
@@ -827,7 +837,7 @@ impl Statement {
         }
     }
 
-    pub fn to_string(&self, arena: &Arena<Statement>) -> InternedString {
+    pub fn to_string(&self, arena: &Arena<Statement>) -> String {
         match &self {
             Self::Constant { typ, value } => format!("const #{} : {}", value, typ),
             Self::ReadVariable { symbol } => {
@@ -838,33 +848,21 @@ impl Statement {
                     "write-var {}:{} <= {}:{}",
                     symbol.name(),
                     symbol.typ(),
-                    value.to_string(arena),
+                    value,
                     value.get(arena).typ(arena)
                 )
             }
             Self::ReadRegister { typ, offset } => {
-                format!("read-reg {}:{}", offset.to_string(arena), typ)
+                format!("read-reg {}:{}", offset, typ)
             }
             Self::WriteRegister { offset, value } => {
-                format!(
-                    "write-reg {} <= {}",
-                    offset.to_string(arena),
-                    value.to_string(arena)
-                )
+                format!("write-reg {} <= {}", offset, value)
             }
             Self::ReadMemory { offset, size } => {
-                format!(
-                    "read-mem {}:{}",
-                    offset.to_string(arena),
-                    size.to_string(arena)
-                )
+                format!("read-mem {}:{}", offset, size)
             }
             Self::WriteMemory { offset, value } => {
-                format!(
-                    "write-mem {} <= {}",
-                    offset.to_string(arena),
-                    value.to_string(arena)
-                )
+                format!("write-mem {} <= {}", offset, value)
             }
             Self::BinaryOperation { kind, lhs, rhs } => {
                 let op = match kind {
@@ -885,7 +883,7 @@ impl Statement {
                     BinaryOperationKind::PowI => "powi",
                 };
 
-                format!("{} {} {}", op, lhs.to_string(arena), rhs.to_string(arena))
+                format!("{} {} {}", op, lhs, rhs)
             }
             Self::UnaryOperation { kind, value } => {
                 let op = match kind {
@@ -899,7 +897,7 @@ impl Statement {
                     UnaryOperationKind::SquareRoot => "sqrt",
                 };
 
-                format!("{} {}", op, value.to_string(arena))
+                format!("{} {}", op, value)
             }
 
             Self::ShiftOperation {
@@ -915,19 +913,10 @@ impl Statement {
                     ShiftOperationKind::RotateLeft => "rol",
                 };
 
-                format!(
-                    "{} {} {}",
-                    op,
-                    value.to_string(arena),
-                    amount.to_string(arena)
-                )
+                format!("{} {} {}", op, value, amount)
             }
             Self::Call { target, args, .. } => {
-                format!(
-                    "call {}({})",
-                    target,
-                    args.iter().map(|s| s.to_string(arena)).join(", ")
-                )
+                format!("call {}({})", target, args.iter().map(|s| s).join(", "))
             }
             Self::Cast { kind, typ, value } => {
                 let op = match kind {
@@ -939,7 +928,7 @@ impl Statement {
                     CastOperationKind::Broadcast => "bcast",
                 };
 
-                format!("cast {} {} -> {}", op, value.to_string(arena), typ)
+                format!("cast {} {} -> {}", op, value, typ)
             }
             Self::BitsCast {
                 kind,
@@ -956,25 +945,19 @@ impl Statement {
                     CastOperationKind::Broadcast => "bcast",
                 };
 
-                format!(
-                    "bits-cast {} {} -> {} length {}",
-                    op,
-                    value.to_string(arena),
-                    typ,
-                    length.to_string(arena)
-                )
+                format!("bits-cast {} {} -> {} length {}", op, value, typ, length)
             }
-            Self::Jump { target } => format!("jump block{:?}", target), // removed .index
+            Self::Jump { target } => format!("jump block{}", target.index()),
             Self::Branch {
                 condition,
                 true_target,
                 false_target,
             } => {
                 format!(
-                    "branch {} block{:?} block{:?}", // removed .index
-                    condition.to_string(arena),
-                    true_target,
-                    false_target,
+                    "branch {} block{} block{}",
+                    condition,
+                    true_target.index(),
+                    false_target.index(),
                 )
             }
             Self::PhiNode { .. } => {
@@ -989,37 +972,27 @@ impl Statement {
             }
 
             Self::Return { value } => {
-                format!("return {}", value.to_string(arena))
+                format!("return {}", value)
             }
             Self::Select {
                 condition,
                 true_value,
                 false_value,
             } => {
-                format!(
-                    "select {} {} {}",
-                    condition.to_string(arena),
-                    true_value.to_string(arena),
-                    false_value.to_string(arena)
-                )
+                format!("select {} {} {}", condition, true_value, false_value)
             }
             Self::Panic(statement) => {
-                format!("panic {}", statement.to_string(arena))
+                format!("panic {}", statement)
             }
             Self::Undefined => format!("undefined",),
 
             Self::ReadPc => format!("read-pc"),
-            Self::WritePc { value } => format!("write-pc {}", value.to_string(arena)),
+            Self::WritePc { value } => format!("write-pc {}", value),
             Self::BitExtract {
                 value,
                 start,
                 length,
-            } => format!(
-                "bit-extract {} {} {}",
-                value.to_string(arena),
-                start.to_string(arena),
-                length.to_string(arena)
-            ),
+            } => format!("bit-extract {} {} {}", value, start, length),
             Self::BitInsert {
                 target: original_value,
                 source: insert_value,
@@ -1027,62 +1000,43 @@ impl Statement {
                 length,
             } => format!(
                 "bit-insert {} {} {} {}",
-                original_value.to_string(arena),
-                insert_value.to_string(arena),
-                start.to_string(arena),
-                length.to_string(arena)
+                original_value, insert_value, start, length
             ),
             Self::ReadElement { vector, index } => {
-                format!(
-                    "read-element {}[{}]",
-                    vector.to_string(arena),
-                    index.to_string(arena)
-                )
+                format!("read-element {}[{}]", vector, index)
             }
             Self::AssignElement {
                 vector,
                 value,
                 index,
-            } => format!(
-                "mutate-element {}[{}] <= {}",
-                vector.to_string(arena),
-                index.to_string(arena),
-                value.to_string(arena)
-            ),
+            } => format!("mutate-element {}[{}] <= {}", vector, index, value),
 
             Self::SizeOf { value } => {
-                format!("size-of {}", value.to_string(arena))
+                format!("size-of {}", value)
             }
             Self::Assert { condition } => {
-                format!("assert {}", condition.to_string(arena))
+                format!("assert {}", condition)
             }
 
             Self::CreateBits { value, length } => {
-                format!(
-                    "create-bits {} {}",
-                    value.to_string(arena),
-                    length.to_string(arena)
-                )
+                format!("create-bits {} {}", value, length)
             }
             Self::MatchesUnion { value, variant } => {
-                format!("matches-union {} {variant}", value.to_string(arena))
+                format!("matches-union {} {variant}", value)
             }
             Self::UnwrapUnion { value, variant } => {
-                format!("unwrap-union {} {variant}", value.to_string(arena))
+                format!("unwrap-union {} {variant}", value)
             }
             Self::TupleAccess { index, source } => {
-                format!("tuple-access {}.{index}", source.to_string(arena))
+                format!("tuple-access {}.{index}", source)
             }
             Self::GetFlag { flag, operation } => {
-                format!("get-flag {flag:?} {}", operation.to_string(arena))
+                format!("get-flag {flag:?} {}", operation)
             }
             Self::CreateTuple(values) => {
                 format!(
                     "create-tuple {:?}",
-                    values
-                        .iter()
-                        .map(|v| v.to_string(arena))
-                        .collect::<Vec<_>>()
+                    values.iter().map(|v| v).collect::<Vec<_>>()
                 )
             }
 
@@ -1102,7 +1056,6 @@ impl Statement {
                 format!("exit inline call")
             }
         }
-        .into()
     }
 }
 
@@ -1111,8 +1064,7 @@ pub enum Location {
     Before(Ref<Statement>),
 }
 
-/// Creates a new statement in the block's arena, and pushes it to the end of
-/// the block's statements
+/// Creates a new statement in the block's arena, and inserts it at the supplied location
 pub fn build_at(
     block: Ref<Block>,
     arena: &mut Arena<Block>,
@@ -1476,7 +1428,17 @@ pub fn import_statement(
         Statement::Cast { kind, typ, value } => Statement::Cast {
             kind,
             typ: typ.clone(),
-            value: mapping.get(&value).unwrap().clone(),
+            value: mapping
+                .get(&value)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "{mapping:?}, {:?}",
+                        target_statement
+                            .get(target_block.get(&block_arena).arena())
+                            .clone()
+                    )
+                })
+                .clone(),
         },
         Statement::BitsCast {
             kind,

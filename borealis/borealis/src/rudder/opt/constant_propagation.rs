@@ -97,8 +97,7 @@ fn simplify_block_local_writes(arena: &mut Arena<Block>, block: Ref<Block>) -> b
             stmt.get(block.get(sua.block_arena()).arena()).clone()
         {
             if let Some(most_recent_write) = most_recent_writes.get(&symbol.name()) {
-                if sua.has_uses(stmt) {
-                    let uses_of_read_variable = sua.get_uses(stmt).clone();
+                if let Some(uses_of_read_variable) = sua.get_uses(stmt).cloned() {
                     for stmt_use in uses_of_read_variable {
                         stmt_use
                             .get_mut(block.get_mut(sua.block_arena()).arena_mut())

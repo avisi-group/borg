@@ -55,7 +55,7 @@ impl ControlFlowGraphAnalysis {
                 Statement::EnterInlineCall {
                     pre_call_block,
                     inline_entry_block,
-                    inline_exit_block,
+                    inline_exit_block: _,
                     post_call_block,
                 } => {
                     assert_eq!(*pre_call_block, current);
