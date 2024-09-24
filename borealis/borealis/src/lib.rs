@@ -154,16 +154,20 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     info!("Optimising rudder");
     rudder.optimise(rudder::opt::OptLevel::Level3);
 
-    info!("Inlining");
-    rudder.function_inline(FN_TOPLEVEL);
-
-    info!("Re-optimising post-inline"); // at the time of writing this brought borealis exec time from 53 seconds to 18
-                                        // seconds
-    rudder.optimise(rudder::opt::OptLevel::Level3);
-
     if let Some(path) = &dump_ir {
         writeln!(
             &mut create_file_buffered(path.join("ast.opt.rudder")).unwrap(),
+            "{rudder}"
+        )
+        .unwrap();
+    }
+
+    info!("Inlining");
+    rudder.function_inline(FN_TOPLEVEL);
+
+    if let Some(path) = &dump_ir {
+        writeln!(
+            &mut create_file_buffered(path.join("ast.inlined.rudder")).unwrap(),
             "{rudder}"
         )
         .unwrap();
@@ -198,43 +202,44 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "__id",
         "X_read",
         "get_R",
+        // enabling read_gpr causes an exit inline call with no corresponing enter?
         "read_gpr",
-        "ShiftReg",
-        "X_set",
-        "set_R",
-        "write_gpr",
-        "TakeReset",
-        "InitVariantImplemented",
-        "InitFeatureImpl",
-        "_get_RMR_EL3_Type_AA64",
-        "_get_ID_AA64PFR0_EL1_Type_EL3",
-        "SetResetVector",
-        "Mk_RVBAR_EL1_Type",
-        "Mk_RVBAR_EL2_Type",
-        "Mk_RVBAR_EL3_Type",
-        "Mk_MVBAR_Type",
-        "HaveAArch64",
-        "IsFeatureImplemented",
-        "num_of_Feature",
-        "HaveEL",
-        "AArch32_TakeReset",
-        "FPEXC_read",
-        "_update_FPEXC_Type_EN",
-        "HSCTLR_read",
-        "_get_HSCTLR_Type_EE",
-        "_get_HSCTLR_Type_TE",
-        "SCTLR_read__2",
-        "_get_SCTLR_Type_EE",
-        "_get_SCTLR_Type_TE",
-        "SCTLR_NS_read",
-        "AArch32_WriteMode",
-        "ELFromM32",
-        "SCR_GEN_read",
-        "Mk_SCRType",
-        "BadMode",
-        "HaveAArch32EL",
-        "EffectiveSCR_EL3_NSE",
-        "HaveRME",
+        // "ShiftReg",
+        // "X_set",
+        // "set_R",
+        // "write_gpr",
+        // "TakeReset",
+        // "InitVariantImplemented",
+        // "InitFeatureImpl",
+        // "_get_RMR_EL3_Type_AA64",
+        // "_get_ID_AA64PFR0_EL1_Type_EL3",
+        // "SetResetVector",
+        // "Mk_RVBAR_EL1_Type",
+        // "Mk_RVBAR_EL2_Type",
+        // "Mk_RVBAR_EL3_Type",
+        // "Mk_MVBAR_Type",
+        // "HaveAArch64",
+        // "IsFeatureImplemented",
+        // "num_of_Feature",
+        // "HaveEL",
+        // "AArch32_TakeReset",
+        // "FPEXC_read",
+        // "_update_FPEXC_Type_EN",
+        // "HSCTLR_read",
+        // "_get_HSCTLR_Type_EE",
+        // "_get_HSCTLR_Type_TE",
+        //  "SCTLR_read__2",
+        // "_get_SCTLR_Type_EE",
+        // "_get_SCTLR_Type_TE",
+        //  "SCTLR_NS_read",
+        // "AArch32_WriteMode",
+        // "ELFromM32",
+        // "SCR_GEN_read",
+        // "Mk_SCRType",
+        // "BadMode",
+        // "HaveAArch32EL",
+        // "EffectiveSCR_EL3_NSE",
+        // "HaveRME",
         //"_get_SCR_EL3_Type_NSE", takes too long:(
     ];
 

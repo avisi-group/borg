@@ -86,14 +86,14 @@ impl Display for Function {
         self.block_iter().try_for_each(|block| {
             let preds = cfg
                 .predecessors_for(block)
-                .unwrap()
+                .unwrap_or(&vec![])
                 .iter()
                 .map(|b| b.index())
                 .join(", ");
 
             let succs = cfg
                 .successors_for(block)
-                .unwrap()
+                .unwrap_or(&vec![])
                 .iter()
                 .map(|b| b.index())
                 .join(", ");

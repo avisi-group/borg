@@ -60,22 +60,36 @@ impl Block {
     }
 
     pub fn targets(&self) -> Vec<Ref<Block>> {
-        match self
-            .terminator_statement()
-            .unwrap()
-            .get(&self.statement_arena)
-        {
-            Statement::Jump { target } => vec![*target],
-            Statement::Branch {
-                true_target,
-                false_target,
-                ..
-            } => vec![*true_target, *false_target],
-            Statement::Return { .. } | Statement::Panic(_) => {
-                vec![]
-            }
-            k => panic!("invalid terminator for block: {k:?}"),
-        }
+        self.statements()
+            .iter()
+            .map(|s| s.get(self.arena()))
+            .flat_map(|s| {
+                match s {
+                    Statement::Jump { target } => vec![*target],
+                    Statement::Branch {
+                        true_target,
+                        false_target,
+                        ..
+                    } => vec![*true_target, *false_target],
+
+                    Statement::EnterInlineCall {
+                        post_call_block, // not a true target of this block, it will be a target of the matching `ExitInlineCall`! but good enough to fix block iterator
+                        inline_entry_block,
+                        ..
+                    } => vec![*inline_entry_block, *post_call_block],
+
+                    // should probably still check that these are the last statement
+                    Statement::Return { .. }
+                    | Statement::Panic(_)
+                    | Statement::ExitInlineCall { .. } => {
+                        vec![]
+                    }
+
+                    // non terminators
+                    _ => vec![],
+                }
+            })
+            .collect()
     }
 
     pub fn size(&self) -> usize {
@@ -101,13 +115,13 @@ impl Default for Block {
 }
 
 pub struct BlockIterator<'arena> {
-    pub(crate) visited: HashSet<Ref<Block>>,
-    pub(crate) remaining: Vec<Ref<Block>>,
-    pub(crate) arena: &'arena Arena<Block>,
+    visited: HashSet<Ref<Block>>,
+    remaining: Vec<Ref<Block>>,
+    arena: &'arena Arena<Block>,
 }
 
 impl<'arena> BlockIterator<'arena> {
-    pub(crate) fn new(arena: &'arena Arena<Block>, start_block: Ref<Block>) -> Self {
+    pub fn new(arena: &'arena Arena<Block>, start_block: Ref<Block>) -> Self {
         Self {
             visited: HashSet::default(),
             remaining: vec![start_block],
