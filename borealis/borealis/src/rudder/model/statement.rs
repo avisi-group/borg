@@ -8,7 +8,7 @@ use {
         },
         util::arena::{Arena, Ref},
     },
-    common::{intern::InternedString, HashMap},
+    common::{identifiable::Id, intern::InternedString, HashMap},
     itertools::Itertools,
     proc_macro2::TokenStream,
     quote::{format_ident, ToTokens, TokenStreamExt},
@@ -249,6 +249,17 @@ pub enum Statement {
         index: usize,
         source: Ref<Statement>,
     },
+
+    /// Experimenting
+    EnterInlineCall {
+        pre_call_block: Ref<Block>,
+        /// Entry block of the inlined call
+        inline_entry_block: Ref<Block>,
+        /// Block in which the inlined call exits
+        inline_exit_block: Ref<Block>,
+        post_call_block: Ref<Block>,
+    },
+    ExitInlineCall,
 }
 
 impl ToTokens for Ref<Statement> {
@@ -379,6 +390,8 @@ impl Statement {
             Self::CreateTuple(values) => {
                 Type::Tuple(values.iter().map(|v| v.get(arena).typ(arena)).collect())
             }
+            Statement::ExitInlineCall { .. } => Type::void(),
+            Statement::EnterInlineCall { .. } => Type::void(),
         }
     }
 
@@ -809,6 +822,8 @@ impl Statement {
                         .collect(),
                 )
             }
+            Statement::ExitInlineCall { .. } => (),
+            Statement::EnterInlineCall { .. } => (),
         }
     }
 
@@ -1069,6 +1084,22 @@ impl Statement {
                         .map(|v| v.to_string(arena))
                         .collect::<Vec<_>>()
                 )
+            }
+
+            Self::EnterInlineCall {
+                pre_call_block,
+                inline_entry_block,
+                inline_exit_block,
+                post_call_block,
+            } => format!(
+                "enter inline call: pre: {}, entry: {}, exit: {}, post: {}",
+                pre_call_block.index(),
+                inline_entry_block.index(),
+                inline_exit_block.index(),
+                post_call_block.index()
+            ),
+            Self::ExitInlineCall => {
+                format!("exit inline call")
             }
         }
         .into()
@@ -1552,6 +1583,19 @@ pub fn import_statement(
                 .cloned()
                 .collect(),
         ),
+        Statement::ExitInlineCall => Statement::ExitInlineCall,
+
+        Statement::EnterInlineCall {
+            pre_call_block,
+            inline_entry_block,
+            inline_exit_block,
+            post_call_block,
+        } => Statement::EnterInlineCall {
+            pre_call_block,
+            inline_entry_block,
+            inline_exit_block,
+            post_call_block,
+        },
     };
 
     build(source_block, block_arena, mapped_kind)

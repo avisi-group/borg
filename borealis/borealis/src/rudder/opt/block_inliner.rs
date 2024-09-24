@@ -33,7 +33,17 @@ fn run_inliner_block(f: &mut Function, source_block: Ref<Block>) -> bool {
         return false;
     };
 
-    if target_block.get(f.arena()).size() > INLINE_SIZE_THRESHOLD {
+    if target_block.get(f.arena()).size() > INLINE_SIZE_THRESHOLD
+        || target_block // don't inline return statements, we only want one per function when inlining functions
+            .get(f.arena())
+            .terminator_statement()
+            .is_some_and(|r| {
+                matches!(
+                    r.get(target_block.get(f.arena()).arena()),
+                    Statement::Return { .. }
+                )
+            })
+    {
         return false;
     }
 

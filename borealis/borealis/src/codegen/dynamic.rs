@@ -48,10 +48,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
         .map(|block| {
             let block_name = get_block_fn_ident(block);
             let block_impl = codegen_block(block.get(function.arena()));
+            let index = block.index();
 
             quote! {
                 // #[inline(always)] blows up memory usage during compilation (>1TB for 256 threads)
-                fn #block_name(ctx: &mut X86TranslationContext, fn_state: &FunctionState) -> BlockResult  {
+                fn #block_name(ctx: &mut X86TranslationContext, fn_state: &mut FunctionState) -> BlockResult  {
+                    const THIS_BLOCK_INDEX: usize = #index;
                     #block_impl
                 }
             }
@@ -101,12 +103,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             }
 
              // block ref indices that are not reachable from the entry point (likely come from leaked arena blocks)
-            fn noop(_: &mut X86TranslationContext, _: &FunctionState) -> BlockResult {
+            fn noop(_: &mut X86TranslationContext, _: &mut FunctionState) -> BlockResult {
                 unreachable!()
             }
 
 
-            const BLOCK_FUNCTIONS: &[fn(&mut X86TranslationContext, &FunctionState) -> BlockResult] = &[#(#block_fn_names,)*];
+            const BLOCK_FUNCTIONS: &[fn(&mut X86TranslationContext, &mut FunctionState) -> BlockResult] = &[#(#block_fn_names,)*];
 
             fn lookup_block_idx_by_ref(block_refs: &[X86BlockRef], block: X86BlockRef) -> usize {
                 block_refs.iter().position(|r| *r == block).unwrap()
@@ -123,12 +125,12 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                 let result = match block {
                     Block::Static(i) => {
                         log::debug!("static block {i}");
-                        BLOCK_FUNCTIONS[i](ctx, &fn_state)
+                        BLOCK_FUNCTIONS[i](ctx, &mut fn_state)
                     }
                     Block::Dynamic(i) => {
                         log::debug!("dynamic block {i}");
                         ctx.emitter().set_current_block(fn_state.block_refs[i].clone());
-                        BLOCK_FUNCTIONS[i](ctx, &fn_state)
+                        BLOCK_FUNCTIONS[i](ctx, &mut fn_state)
                     }
                 };
 
@@ -228,13 +230,15 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
             borealis_fn_return_value: X86SymbolRef,
             block_refs: [X86BlockRef; #num_blocks],
             exit_block_ref: X86BlockRef,
+            inline_return_targets: alloc::collections::BTreeMap<usize, usize>,
         }
 
-        let fn_state = FunctionState {
+        let mut fn_state = FunctionState {
             #field_inits
             borealis_fn_return_value: ctx.create_symbol(),
             block_refs: [#block_ref_inits],
             exit_block_ref: ctx.create_block(),
+            inline_return_targets: alloc::collections::BTreeMap::new(),
         };
     }
 }
@@ -704,6 +708,35 @@ pub fn codegen_stmt(stmt: Ref<Statement>, s_arena: &Arena<Statement>) -> TokenSt
         }
         Statement::CreateTuple(values) => {
             quote!((#(#values,)*))
+        }
+
+        Statement::EnterInlineCall {
+            pre_call_block,
+            inline_entry_block,
+            inline_exit_block,
+            post_call_block,
+        } => {
+            let pre_call_block = pre_call_block.index();
+            let inline_entry_block = inline_entry_block.index();
+            let inline_exit_block = inline_exit_block.index();
+            let post_call_block = post_call_block.index();
+            quote! {
+                {
+                    log::warn!("entering inline call @ {}, jumping to entry block {}, exit at {}, returning to {}", #pre_call_block, #inline_entry_block, #inline_exit_block, #post_call_block);
+                    fn_state.inline_return_targets.insert(#inline_exit_block, #post_call_block);
+                    return ctx.emitter().jump(fn_state.block_refs[#inline_entry_block].clone());
+                }
+
+            }
+        }
+        Statement::ExitInlineCall => {
+            quote! {
+                {
+                    let target = *fn_state.inline_return_targets.get(&THIS_BLOCK_INDEX).unwrap();
+                    log::warn!("exiting inline call @ {THIS_BLOCK_INDEX}, returning to {target}");
+                    return ctx.emitter().jump(fn_state.block_refs[target].clone())
+                }
+            }
         }
     };
 

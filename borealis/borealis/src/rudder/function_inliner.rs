@@ -2,7 +2,7 @@ use {
     crate::{
         fn_is_allowlisted,
         rudder::model::{
-            block::Block,
+            block::{Block, BlockIterator},
             function::{Function, Symbol},
             statement::{build, import_statement, Statement},
             types::Type,
@@ -35,13 +35,26 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
             log::warn!("inlining {name}");
             let mut function = model.fns.remove(&name).unwrap();
 
-            while run_inliner(&mut function, &model.fns) {}
+            // map of function name to imported entry block, used to avoid importing an inlined function more than once
+            let mut inlined = HashMap::default();
+
+            loop {
+                log::warn!("running inliner pass");
+                let did_change = run_inliner(&mut function, &model.fns, &mut inlined);
+                if !did_change {
+                    break;
+                }
+            }
 
             model.fns.insert(name, function);
         });
 }
 
-fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Function>) -> bool {
+fn run_inliner(
+    function: &mut Function,
+    functions: &HashMap<InternedString, Function>,
+    inlined: &mut HashMap<InternedString, (Ref<Block>, Ref<Block>)>,
+) -> bool {
     let mut did_change = false;
     function
         .block_iter()
@@ -95,8 +108,11 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
 
                 // import the target's blocks, assigning new blockrefs, and replacing returns
                 // with jumps to post_block_ref
-                let entry_block_ref =
-                    import_blocks(function, other_fn, post_block_ref, &symbol_prefix);
+
+                let (entry_block_ref, exit_block_ref) = inlined
+                    .entry(call_name)
+                    .or_insert_with(|| import_blocks(function, other_fn, &symbol_prefix))
+                    .clone();
 
                 // set pre-statements and end pre block with jump to inlined function entry
                 // block
@@ -119,8 +135,11 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
                 build(
                     pre_block_ref,
                     function.arena_mut(),
-                    Statement::Jump {
-                        target: entry_block_ref,
+                    Statement::EnterInlineCall {
+                        pre_call_block: pre_block_ref,
+                        inline_entry_block: entry_block_ref,
+                        inline_exit_block: exit_block_ref,
+                        post_call_block: post_block_ref,
                     },
                 );
                 log::debug!("new pre block\n{}", pre_block_ref.get(function.arena()));
@@ -194,9 +213,8 @@ fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Func
 fn import_blocks(
     this_function: &mut Function,
     other_function: &Function,
-    return_target_block: Ref<Block>, // replace returns with jumps to this block
-    symbol_prefix: &str,             // insert this prefix into symbol names
-) -> Ref<Block> {
+    symbol_prefix: &str, // insert this prefix into symbol names
+) -> (Ref<Block>, Ref<Block>) {
     let other_refs = other_function.block_iter().collect::<Vec<_>>();
 
     let other_arena = other_function.arena();
@@ -241,6 +259,8 @@ fn import_blocks(
             }
         }
     });
+
+    let mut maybe_exit_block = None;
 
     // fix returns to point to the supplied target block
     mapping.values().copied().for_each(|block_ref| {
@@ -296,14 +316,18 @@ fn import_blocks(
             build(
                 block_ref,
                 this_function.arena_mut(),
-                Statement::Jump {
-                    target: return_target_block,
-                },
+                Statement::ExitInlineCall,
             );
+
+            // we only want one exit block
+            assert!(maybe_exit_block.replace(block_ref).is_none())
         }
     });
 
-    *mapping.get(&other_entry).unwrap()
+    let entry_block = *mapping.get(&other_entry).unwrap();
+    let exit_block = maybe_exit_block.unwrap();
+
+    (entry_block, exit_block)
 }
 
 fn symbol_add_prefix(symbol: &Symbol, prefix: &str) -> Symbol {
