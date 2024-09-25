@@ -446,6 +446,10 @@ pub enum Value {
         types: Vec<Shared<Type>>,
     },
     Tuple(Vec<Shared<Self>>),
+    VectorAccess {
+        value: Shared<Self>,
+        index: Shared<Self>,
+    },
 }
 
 impl Value {
@@ -517,6 +521,10 @@ impl Walkable for Value {
                 types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
             Value::Tuple(values) => values.iter().for_each(|v| visitor.visit_value(v.clone())),
+            Value::VectorAccess { value, index } => {
+                visitor.visit_value(value.clone());
+                visitor.visit_value(index.clone());
+            }
         }
     }
 }

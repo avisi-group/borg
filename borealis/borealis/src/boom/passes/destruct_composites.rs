@@ -7,18 +7,18 @@ use {
 };
 
 #[derive(Debug, Default)]
-pub struct DestructStructs;
+pub struct DestructComposites;
 
-impl DestructStructs {
+impl DestructComposites {
     /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::<Self>::default()
     }
 }
 
-impl Pass for DestructStructs {
+impl Pass for DestructComposites {
     fn name(&self) -> &'static str {
-        "DestructStructs"
+        "DestructComposites"
     }
 
     fn reset(&mut self) {}
@@ -26,7 +26,8 @@ impl Pass for DestructStructs {
     fn run(&mut self, ast: Shared<Ast>) -> bool {
         // split struct registers into a register per field, returning the names and
         // types of the *removed* registers
-        let struct_registers = handle_registers(&mut ast.get_mut().registers);
+        let mut removed_registers = HashMap::default();
+        handle_registers(&mut ast.get_mut().registers, &mut removed_registers);
 
         // replace all field expressions and values with identifiers of the future
         // register/local var (1 layer only, do not handle nested field exprs yet)
@@ -51,9 +52,9 @@ impl Pass for DestructStructs {
             functions.iter().for_each(|(_, def)| {
                 // replace struct parameters in function signatures with individual fields,
                 // returning the identifies and types of the removed parameters
-                let mut removed_structs = split_parameters(def.signature.parameters.clone());
-                removed_structs.extend(struct_registers.clone());
-                destruct_local_structs(functions, removed_structs, def)
+                let mut removed_items = split_parameters(def.signature.parameters.clone());
+                removed_items.extend(removed_registers.clone());
+                destruct_local_structs(functions, removed_items, def)
             });
         }
 
@@ -63,13 +64,13 @@ impl Pass for DestructStructs {
 
 fn handle_registers(
     registers: &mut HashMap<InternedString, Shared<Type>>,
-) -> HashMap<InternedString, Vec<NamedType>> {
-    let mut to_remove = HashMap::default();
+    removed: &mut HashMap<InternedString, Shared<Type>>,
+) {
     let mut to_add = vec![];
 
-    registers.iter().for_each(|(name, typ)| {
-        if let Type::Struct { fields, .. } = &*typ.get() {
-            to_remove.insert(*name, fields.clone());
+    registers.iter().for_each(|(name, typ)| match &*typ.get() {
+        Type::Struct { fields, .. } => {
+            removed.insert(*name, typ.clone());
             to_add.extend(fields.iter().map(
                 |NamedType {
                      name: field_name,
@@ -77,19 +78,40 @@ fn handle_registers(
                  }| (destructed_ident(*name, *field_name), typ.clone()),
             ));
         }
+        Type::FixedVector {
+            element_type,
+            length,
+        } => {
+            if let Type::Struct { fields, .. } = &*element_type.get() {
+                removed.insert(*name, typ.clone());
+                to_add.extend(fields.iter().map(
+                    |NamedType {
+                         name: field_name,
+                         typ,
+                     }| {
+                        (
+                            destructed_ident(*name, *field_name),
+                            Shared::new(Type::FixedVector {
+                                length: *length,
+                                element_type: typ.clone(),
+                            }),
+                        )
+                    },
+                ));
+            }
+        }
+        _ => (),
     });
 
-    for name in to_remove.keys() {
+    for name in removed.keys() {
         registers.remove(name).unwrap();
     }
     registers.extend(to_add);
-
-    to_remove
 }
 
 fn destruct_local_structs(
     functions: &HashMap<InternedString, FunctionDefinition>,
-    mut structs: HashMap<InternedString, Vec<NamedType>>,
+    mut removed_items: HashMap<InternedString, Shared<Type>>,
     fn_def: &FunctionDefinition,
 ) {
     // go through each statement in the function
@@ -114,7 +136,7 @@ fn destruct_local_structs(
                             return vec![clone];
                         };
 
-                        structs.insert(*variable_name, fields.clone());
+                        removed_items.insert(*variable_name, typ.clone());
 
                         fields
                             .iter()
@@ -165,8 +187,12 @@ fn destruct_local_structs(
                             return vec![clone];
                         };
 
-                        let Some(fields) = structs.get(dest) else {
+                        let Some(typ) = removed_items.get(dest) else {
                             return vec![clone];
+                        };
+
+                        let Type::Struct {  fields,.. } = &*typ.get() else {
+                            panic!("not a struct?");
                         };
 
                         // names of the fields to be copied into
@@ -179,9 +205,14 @@ fn destruct_local_structs(
                             // if the value is an identifier, look up fields in structs map, and get
                             // list of values from that
                             Value::Identifier(ident) => {
-                                let fields = structs.get(ident).unwrap_or_else(|| {
-                                    panic!("attempting to assign non struct value identifier {ident:?}")
+                                let typ = removed_items.get(ident).unwrap_or_else(|| {
+                                    panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
                                 });
+
+                                let Type::Struct {  fields,.. } = &*typ.get() else {
+                                    panic!("not a struct?");
+                                };
+
 
                                 fields
                                     .iter()
@@ -195,7 +226,32 @@ fn destruct_local_structs(
                                 .map(|NamedValue { value, .. }| value)
                                 .cloned()
                                 .collect::<Vec<_>>(),
-                            _ => todo!(),
+
+                            Value::VectorAccess { value, index } => {
+                                let Value::Identifier(ident) = &*value.get() else {
+                                    todo!()
+                                };
+                                let typ = removed_items.get(ident).unwrap_or_else(|| {
+                                    panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
+                                });
+
+                                let Type::FixedVector{  element_type,..   } = &*typ.get() else {
+                                    panic!("not a fixed vector?");
+                                };
+
+                                let Type::Struct {  fields,.. } = &*element_type.get() else {
+                                    panic!("not a struct?");
+                                };
+
+                                fields
+                                    .iter()
+                                    .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name)))
+                                    .map(Shared::new)
+                                    .map(|value| Value::VectorAccess { value, index: index.clone() })
+                                    .map(Shared::new)
+                                    .collect::<Vec<_>>()
+                            }
+                            _ => panic!("value is a struct in {clone:?} in {}", fn_def.signature.name),
                         };
 
                         local_fields
@@ -216,6 +272,8 @@ fn destruct_local_structs(
                             let Some(def) = functions.get(name) else {
                                 // should properly handle built-ins here (but none return structs so this should
                                 // be fine)
+                                //
+                                // 2024-09-25: this was a lie :(
                                 return vec![clone];
                             };
 
@@ -226,7 +284,10 @@ fn destruct_local_structs(
                                     panic!();
                                 };
 
-                                let fields = structs.get(dest).unwrap();
+                                let typ = removed_items.get(dest).unwrap();
+                                let Type::Struct {  fields,.. } = &*typ.get() else {
+                                    panic!("not a struct?");
+                                };
 
                                 assert_eq!(fields.len(), return_types.len()); //todo: validate the types too
 
@@ -247,7 +308,10 @@ fn destruct_local_structs(
                             .iter()
                             .flat_map(|v| {
                                 if let Value::Identifier(ident) = &*v.get() {
-                                    if let Some(fields) = structs.get(ident) {
+                                    if let Some(typ) = removed_items.get(ident) {
+                                        let Type::Struct {  fields,.. } = &*typ.get() else {
+                                            panic!("not a struct?");
+                                        };
                                         fields
                                             .iter()
                                             .map(|NamedType { name, .. }| {
@@ -277,7 +341,10 @@ fn destruct_local_structs(
         block.set_statements(destructed);
 
         if let Terminator::Return(Value::Identifier(return_value_ident)) = block.terminator() {
-            if let Some(fields) = structs.get(&return_value_ident) {
+            if let Some(typ) = removed_items.get(&return_value_ident) {
+                let Type::Struct {  fields,.. } = &*typ.get() else {
+                    panic!("not a struct?");
+                };
                 block.set_terminator(Terminator::Return(Value::Tuple(
                     fields
                         .iter()
@@ -366,7 +433,7 @@ fn remove_field_values(def: &FunctionDefinition) {
     FieldVisitor.visit_function_definition(def);
 }
 
-fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedString, Vec<NamedType>> {
+fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedString, Shared<Type>> {
     let mut removed = HashMap::default();
 
     let mut parameters = parameters.get_mut();
@@ -374,7 +441,7 @@ fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedStrin
         .iter()
         .flat_map(|parameter| {
             if let Type::Struct { fields, .. } = &*parameter.typ.get() {
-                removed.insert(parameter.name, fields.clone());
+                removed.insert(parameter.name, parameter.typ.clone());
 
                 fields
                     .iter()

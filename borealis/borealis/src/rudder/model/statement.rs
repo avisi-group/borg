@@ -1036,7 +1036,7 @@ impl Statement {
             Self::CreateTuple(values) => {
                 format!(
                     "create-tuple {:?}",
-                    values.iter().map(|v| v).collect::<Vec<_>>()
+                    values.iter().map(|v| v.index()).collect::<Vec<_>>()
                 )
             }
 

@@ -472,15 +472,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .unwrap()
             .is_match(name.as_ref())
         {
-            Some(build(
-                self.block,
-                self.block_arena_mut(),
-                Statement::BinaryOperation {
-                    kind: BinaryOperationKind::CompareEqual,
-                    lhs: args[0].clone(),
-                    rhs: args[1].clone(),
-                },
-            ))
+            panic!("removed");
         } else if Regex::new(r"^plain_vector_update<([0-9a-zA-Z_%<>]+)>$")
             .unwrap()
             .is_match(name.as_ref())
@@ -498,14 +490,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .unwrap()
             .is_match(name.as_ref())
         {
-            Some(build(
-                self.block,
-                self.block_arena_mut(),
-                Statement::ReadElement {
-                    vector: args[0].clone(),
-                    index: args[1].clone(),
-                },
-            ))
+            panic!("removed");
         } else {
             match name.as_ref() {
                 "%i64->%i" => {
@@ -1937,7 +1922,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     ..
                 }) = self.ctx().registers.get(root).cloned()
                 else {
-                    panic!("wtf is {root}");
+                    panic!("wtf is {root} in {}", self.fn_ctx().rudder_fn.name());
                 };
 
                 let (field_offsets, outer_type) =
@@ -2119,20 +2104,33 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 // unwrap_sum
                 todo!()
             }
+            boom::Value::VectorAccess { value, index } => {
+                let vector = self.build_value(value.clone());
+                let index = self.build_value(index.clone());
+                return build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ReadElement { vector, index },
+                );
+            }
         }
     }
 
     fn build_literal(&mut self, literal: &boom::Literal) -> Ref<Statement> {
         let kind = match literal {
-            boom::Literal::Int(i) => Statement::Constant {
-                typ: (Type::new_primitive(
-                    PrimitiveTypeClass::SignedInteger,
-                    signed_smallest_width_of_value(i.try_into().unwrap()).into(),
-                )),
-                value: ConstantValue::SignedInteger(
-                    i.try_into().unwrap_or_else(|_| panic!("{i:x?}")),
-                ),
-            },
+            boom::Literal::Int(i) => {
+                let value = i.try_into().unwrap_or_else(|_| {
+                    log::error!("failed to convert {i} to i64");
+                    i64::MAX
+                });
+                Statement::Constant {
+                    typ: (Type::new_primitive(
+                        PrimitiveTypeClass::SignedInteger,
+                        signed_smallest_width_of_value(value).into(),
+                    )),
+                    value: ConstantValue::SignedInteger(value),
+                }
+            }
             boom::Literal::Bits(bits) => Statement::Constant {
                 typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, bits.len())),
                 value: ConstantValue::UnsignedInteger(bits_to_int(bits).try_into().unwrap()),

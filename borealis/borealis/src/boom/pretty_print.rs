@@ -429,6 +429,12 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
                 write!(self.writer, ")").unwrap();
             }
+            Value::VectorAccess { value, index } => {
+                self.visit_value(value.clone());
+                write!(self.writer, "[").unwrap();
+                self.visit_value(index.clone());
+                write!(self.writer, "]").unwrap();
+            }
         }
     }
 

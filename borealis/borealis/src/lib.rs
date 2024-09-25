@@ -4,10 +4,10 @@ use {
     crate::{
         boom::{
             passes::{
-                cycle_finder::CycleFinder, destruct_structs::DestructStructs,
-                destruct_unions::DestructUnions, fix_exceptions::FixExceptions,
-                fold_unconditionals::FoldUnconditionals, remove_const_branch::RemoveConstBranch,
-                remove_constant_type::RemoveConstantType, remove_undefined_bv::RemoveUndefinedBV,
+                builtin_fns::HandleBuiltinFunctions, cycle_finder::CycleFinder,
+                destruct_composites::DestructComposites, destruct_unions::DestructUnions,
+                fix_exceptions::FixExceptions, fold_unconditionals::FoldUnconditionals,
+                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
             },
             Ast,
         },
@@ -106,9 +106,9 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     info!("Running passes on BOOM");
     [
-        RemoveUndefinedBV::new_boxed(),
+        HandleBuiltinFunctions::new_boxed(),
         RemoveConstantType::new_boxed(),
-        DestructStructs::new_boxed(),
+        DestructComposites::new_boxed(),
         DestructUnions::new_boxed(),
         FixExceptions::new_boxed(),
     ]
@@ -242,9 +242,49 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "_get_SCR_EL3_Type_NSE",
         "EffectiveSCR_EL3_NS",
         "HaveSecureState",
+        "_get_SCR_EL3_Type_NS",
+        "AArch32_ResetControlRegisters",
+        "ResetControlRegisters",
+        "AArch32_AutoGen_ArchitectureReset",
+        "Mk_VDISR_Type",
+        "VDISR_read",
+        "VDISR_write",
+        "Mk_VDFSR_Type",
+        "VDFSR_read",
+        "VDFSR_write",
+        "FPSCR_read__1",
+        "CPACR_read__1",
+        "CNTKCTL_read__1",
+        "ELUsingAArch32",
     ];
 
-    FN_ALLOWLIST.contains(&name.as_ref()) || FN_TOPLEVEL.contains(&name.as_ref())
+    const FN_DENYLIST: &[&'static str] = &[
+        "AArch64_MemTag_read",
+        "MemSingleNF_read",
+        "ICV_AP1R_read",
+        "ICC_AP1R_S_read",
+        "ICC_AP1R_NS_read",
+        "sail_mem_write",
+        "sail_mem_read",
+        "DBGBCR_read",
+        "DBGBXVR_read",
+        "ICH_LRC_read",
+        "ICC_AP1R_EL1_read",
+        "AMEVCNTR0_EL0_read",
+        "AMEVTYPER0_read",
+        "DBGWCR_read",
+    ];
+
+    if FN_DENYLIST.contains(&name.as_ref()) {
+        return false;
+    }
+
+    FN_ALLOWLIST.contains(&name.as_ref())
+        || FN_TOPLEVEL.contains(&name.as_ref())
+        || name.as_ref().ends_with("_read")
+        || name.as_ref().ends_with("_write")
+        || name.as_ref().starts_with("Mk")
+        || name.as_ref().starts_with("_update_")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

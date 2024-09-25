@@ -50,7 +50,6 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
             let mut exit_inline_call_rewrites = HashMap::default();
 
             loop {
-                log::warn!("running inliner pass");
                 let did_change = run_inliner(
                     &mut function,
                     &model.fns,
