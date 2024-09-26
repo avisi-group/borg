@@ -124,11 +124,11 @@ pub fn codegen_function(function: &Function) -> TokenStream {
             while let Some(block) = block_queue.pop() {
                 let result = match block {
                     Block::Static(i) => {
-                        log::debug!("static block {i}");
+                       // log::debug!("static block {i}");
                         BLOCK_FUNCTIONS[i](ctx, &mut fn_state)
                     }
                     Block::Dynamic(i) => {
-                        log::debug!("dynamic block {i}");
+                       // log::debug!("dynamic block {i}");
                         ctx.emitter().set_current_block(fn_state.block_refs[i].clone());
                         BLOCK_FUNCTIONS[i](ctx, &mut fn_state)
                     }
@@ -137,22 +137,22 @@ pub fn codegen_function(function: &Function) -> TokenStream {
                 match result {
                     BlockResult::Static(block) => {
                         let idx = lookup_block_idx_by_ref(&fn_state.block_refs, block);
-                        log::debug!("block result: static({idx})");
+                       // log::debug!("block result: static({idx})");
                         block_queue.push(Block::Static(idx));
                     }
                     BlockResult::Dynamic(b0, b1) => {
                         let i0 = lookup_block_idx_by_ref(&fn_state.block_refs, b0);
                         let i1 = lookup_block_idx_by_ref(&fn_state.block_refs, b1);
-                        log::debug!("block result: dynamic({i0}, {i1})");
+                      //  log::debug!("block result: dynamic({i0}, {i1})");
                         block_queue.push(Block::Dynamic(i0));
                         block_queue.push(Block::Dynamic(i1));
                     },
                     BlockResult::Return => {
-                        log::debug!("block result: return");
+                       // log::debug!("block result: return");
                         ctx.emitter().jump(fn_state.exit_block_ref.clone());
                     }
                     BlockResult::Panic => {
-                        log::debug!("block result: panic");
+                      //  log::debug!("block result: panic");
                         // unreachable but inserted just to make sure *every* block has a path to the exit block
                         ctx.emitter().jump(fn_state.exit_block_ref.clone());
                     }
@@ -262,39 +262,11 @@ fn codegen_type_instance(rudder: Type) -> TokenStream {
         Type::Primitive(primitive) => {
             let width = Literal::usize_unsuffixed(primitive.width());
             match primitive.tc {
-                PrimitiveTypeClass::UnsignedInteger => quote! { Type {
-                    kind: TypeKind::Unsigned,
-                    width: #width,
-                } },
-                PrimitiveTypeClass::Void => todo!(),
-                PrimitiveTypeClass::Unit => quote! { Type {
-                    kind: TypeKind::Unsigned,
-                    width: 0,
-                } },
-                PrimitiveTypeClass::SignedInteger => quote! { Type {
-                    kind: TypeKind::Signed,
-                    width: #width,
-                } },
-                PrimitiveTypeClass::FloatingPoint => quote! { Type {
-                    kind: TypeKind::Floating,
-                    width: #width,
-                } },
-            }
-        }
-        Type::ArbitraryLengthInteger => {
-            quote! {
-                Type {
-                    kind: TypeKind::Signed,
-                    width: 64, // bad! bad!
-                }
-            }
-        }
-        Type::Bits => {
-            quote! {
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,// todo: bad
-                }
+                PrimitiveTypeClass::UnsignedInteger => quote! { Type::Unsigned(#width) },
+                PrimitiveTypeClass::Void => panic!(),
+                PrimitiveTypeClass::Unit => quote! { Type::Unsigned(0) },
+                PrimitiveTypeClass::SignedInteger => quote! { Type::Signed(#width) },
+                PrimitiveTypeClass::FloatingPoint => quote! { Type::Floating(#width) },
             }
         }
         Type::Vector {
@@ -327,23 +299,11 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStre
         Type::Primitive(primitive) => {
             let width = Literal::usize_unsuffixed(primitive.width());
             match primitive.tc {
-                PrimitiveTypeClass::UnsignedInteger => quote! { Type {
-                    kind: TypeKind::Unsigned,
-                    width: #width,
-                } },
+                PrimitiveTypeClass::UnsignedInteger => quote! { Type::Unsigned(#width) },
                 PrimitiveTypeClass::Void => todo!(),
-                PrimitiveTypeClass::Unit => quote! { Type {
-                    kind: TypeKind::Unsigned,
-                    width: 0,
-                } },
-                PrimitiveTypeClass::SignedInteger => quote! { Type {
-                    kind: TypeKind::Signed,
-                    width: #width,
-                } },
-                PrimitiveTypeClass::FloatingPoint => quote! { Type {
-                    kind: TypeKind::Floating,
-                    width: #width,
-                } },
+                PrimitiveTypeClass::Unit => quote! { Type::Unsigned(0) },
+                PrimitiveTypeClass::SignedInteger => quote! { Type::Signed(#width) },
+                PrimitiveTypeClass::FloatingPoint => quote! { Type::Floating(#width) },
             }
         }
         Type::ArbitraryLengthInteger => {
@@ -376,19 +336,13 @@ fn codegen_constant_type_instance(value: &ConstantValue, typ: Type) -> TokenStre
         }
         Type::String => {
             quote! {
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 0,
-                }
+                Type::Unsigned(0)
             }
         }
         Type::Union { width } => {
             let width = u16::try_from(*width).unwrap();
             quote! {
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: #width,
-                }
+                Type::Unsigned(#width)
             }
         }
         t => panic!("todo codegen type instance: {t:?}"),
@@ -722,7 +676,7 @@ pub fn codegen_stmt(stmt: Ref<Statement>, s_arena: &Arena<Statement>) -> TokenSt
             let post_call_block = post_call_block.index();
             quote! {
                 {
-                    log::warn!("entering inline call @ {}, jumping to entry block {}, exit at {}, returning to {}", #pre_call_block, #inline_entry_block, #inline_exit_block, #post_call_block);
+                    //log::warn!("entering inline call @ {}, jumping to entry block {}, exit at {}, returning to {}", #pre_call_block, #inline_entry_block, #inline_exit_block, #post_call_block);
                     fn_state.inline_return_targets.insert(#inline_exit_block, #post_call_block);
                     return ctx.emitter().jump(fn_state.block_refs[#inline_entry_block].clone());
                 }
@@ -733,7 +687,7 @@ pub fn codegen_stmt(stmt: Ref<Statement>, s_arena: &Arena<Statement>) -> TokenSt
             quote! {
                 {
                     let target = *fn_state.inline_return_targets.get(&THIS_BLOCK_INDEX).unwrap();
-                    log::warn!("exiting inline call @ {THIS_BLOCK_INDEX}, returning to {target}");
+                    //log::warn!("exiting inline call @ {THIS_BLOCK_INDEX}, returning to {target}");
                     return ctx.emitter().jump(fn_state.block_refs[target].clone())
                 }
             }

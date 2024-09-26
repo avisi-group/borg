@@ -77,6 +77,16 @@ impl Pass for HandleBuiltinFunctions {
                                             arguments[1].clone(),
                                         ))),
                                     })
+                                } else if name.as_ref() == "IsZero" {
+                                    Shared::new(Statement::Copy {
+                                        expression: expression.clone(),
+                                        value: Shared::new(Value::Operation(Operation::Equal(
+                                            arguments[0].clone(),
+                                            Shared::new(Value::Literal(Shared::new(Literal::Int(
+                                                0.into(),
+                                            )))),
+                                        ))),
+                                    })
                                 } else if name.as_ref() == "undefined_bitvector"
                                     || name.as_ref() == "undefined_vector<b>"
                                 {

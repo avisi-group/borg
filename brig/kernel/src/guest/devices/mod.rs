@@ -1,7 +1,7 @@
 use {
     crate::{
         dbt::{
-            emitter::{Emitter, Type, TypeKind},
+            emitter::{Emitter, Type},
             x86::X86TranslationContext,
             TranslationContext,
         },
@@ -27,32 +27,14 @@ fn decodea64_smoke() {
     let mut ctx = X86TranslationContext::new();
     borealis_register_init(&mut ctx);
 
-    let unit = ctx.emitter().constant(
-        0,
-        Type {
-            kind: TypeKind::Unsigned,
-            width: 0,
-        },
-    );
+    let unit = ctx.emitter().constant(0, Type::Unsigned(0));
     u__InitSystem(&mut ctx, unit);
 
-    let pc = ctx.emitter().constant(
-        0,
-        Type {
-            kind: TypeKind::Unsigned,
-            width: 64,
-        },
-    );
+    let pc = ctx.emitter().constant(0, Type::Unsigned(64));
 
     // add x0,x1,x2
     // (x0 = x1 + x2)
-    let opcode = ctx.emitter().constant(
-        0x8b020020,
-        Type {
-            kind: TypeKind::Unsigned,
-            width: 64,
-        },
-    );
+    let opcode = ctx.emitter().constant(0x8b020020, Type::Unsigned(64));
 
     u__DecodeA64(&mut ctx, pc, opcode);
 

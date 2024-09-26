@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        emitter::{BlockResult, Flag, Type, TypeKind},
+        emitter::{BlockResult, Flag, Type},
         x86::{
             encoder::{Instruction, Operand, OperandKind, PhysicalRegister, Register},
             register_allocator::RegisterAllocator,
@@ -45,7 +45,7 @@ impl Emitter for X86Emitter {
     }
 
     fn constant(&mut self, value: u64, typ: Type) -> Self::NodeRef {
-        let width = typ.width;
+        let width = typ.width();
         Self::NodeRef::from(X86Node {
             typ,
             kind: NodeKind::Constant { value, width },
@@ -194,10 +194,7 @@ impl Emitter for X86Emitter {
                     },
                 }),
                 _ => Self::NodeRef::from(X86Node {
-                    typ: Type {
-                        kind: TypeKind::Unsigned,
-                        width: 1,
-                    },
+                    typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
@@ -217,10 +214,7 @@ impl Emitter for X86Emitter {
                     },
                 }),
                 _ => Self::NodeRef::from(X86Node {
-                    typ: Type {
-                        kind: TypeKind::Unsigned,
-                        width: 1,
-                    },
+                    typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
@@ -240,10 +234,7 @@ impl Emitter for X86Emitter {
                     },
                 }),
                 _ => Self::NodeRef::from(X86Node {
-                    typ: Type {
-                        kind: TypeKind::Unsigned,
-                        width: 1,
-                    },
+                    typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
@@ -263,10 +254,7 @@ impl Emitter for X86Emitter {
                     },
                 }),
                 _ => Self::NodeRef::from(X86Node {
-                    typ: Type {
-                        kind: TypeKind::Unsigned,
-                        width: 1,
-                    },
+                    typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
@@ -286,10 +274,7 @@ impl Emitter for X86Emitter {
                     },
                 }),
                 _ => Self::NodeRef::from(X86Node {
-                    typ: Type {
-                        kind: TypeKind::Unsigned,
-                        width: 1,
-                    },
+                    typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
@@ -311,8 +296,8 @@ impl Emitter for X86Emitter {
                 value: constant_value,
                 ..
             } => {
-                let original_width = value.typ().width;
-                let target_width = target_type.width;
+                let original_width = value.typ().width();
+                let target_width = target_type.width();
 
                 let casted_value = match cast_kind {
                     CastOperationKind::ZeroExtend => {
@@ -342,7 +327,7 @@ impl Emitter for X86Emitter {
                     typ: target_type.clone(),
                     kind: NodeKind::Constant {
                         value: casted_value,
-                        width: target_type.width,
+                        width: target_type.width(),
                     },
                 })
             }
@@ -546,20 +531,14 @@ impl Emitter for X86Emitter {
 
     fn get_flag(&mut self, flag: Flag, operation: Self::NodeRef) -> Self::NodeRef {
         Self::NodeRef::from(X86Node {
-            typ: Type {
-                kind: TypeKind::Unsigned,
-                width: 1,
-            },
+            typ: Type::Unsigned(1),
             kind: NodeKind::GetFlag { flag, operation },
         })
     }
 
     fn panic(&mut self, msg: &'static str) {
         let n = Self::NodeRef::from(X86Node {
-            typ: Type {
-                kind: TypeKind::Unsigned,
-                width: 8,
-            },
+            typ: Type::Unsigned(8),
             kind: NodeKind::Constant {
                 value: match msg {
                     "undefined terminator" => 0x50,
@@ -733,7 +712,7 @@ impl X86NodeRef {
                 dst
             }
             NodeKind::Cast { value, kind } => {
-                let target_width = canonicalize_width(self.typ().width);
+                let target_width = canonicalize_width(self.typ().width());
                 let dst = Operand::vreg(target_width, emitter.next_vreg());
                 let src = value.to_operand(emitter);
 
@@ -763,7 +742,14 @@ impl X86NodeRef {
                                 .current_block
                                 .append(Instruction::mov(src, dst.clone()));
                         }
-                        _ => todo!("{kind:?}: {value:?}"),
+                        // todo: actually reinterpret
+                        CastOperationKind::Reinterpret => {
+                            assert!(src.width_in_bits > dst.width_in_bits);
+                            emitter
+                                .current_block
+                                .append(Instruction::mov(src, dst.clone()));
+                        }
+                        _ => todo!("{kind:?} to {:?}\n{value:#?}", self.typ()),
                     }
                 }
 

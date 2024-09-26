@@ -75,17 +75,19 @@ pub trait Emitter {
     fn set_current_block(&mut self, block: Self::BlockRef);
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Type {
-    pub kind: TypeKind,
-    pub width: u16,
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type {
+    Unsigned(u16),
+    Signed(u16),
+    Floating(u16),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TypeKind {
-    Unsigned,
-    Signed,
-    Floating,
+impl Type {
+    pub fn width(&self) -> u16 {
+        match self {
+            Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => *w,
+        }
+    }
 }
 
 pub struct WrappedEmitter<E: Emitter> {

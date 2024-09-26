@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        emitter::{Emitter, Type, TypeKind},
+        emitter::{Emitter, Type},
         x86::{emitter::BinaryOperationKind, X86TranslationContext},
         TranslationContext,
     },
@@ -39,139 +39,49 @@ impl Device for DemoArch {
         let emitter = ctx.emitter();
 
         {
-            let _5 = emitter.constant(
-                5,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
-            let _0 = emitter.constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _5 = emitter.constant(5, Type::Unsigned(64));
+            let _0 = emitter.constant(0, Type::Unsigned(64));
             emitter.write_register(_0, _5);
         }
 
         {
-            let _10 = emitter.constant(
-                10,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
-            let _8 = emitter.constant(
-                8,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _10 = emitter.constant(10, Type::Unsigned(64));
+            let _8 = emitter.constant(8, Type::Unsigned(64));
             emitter.write_register(_8, _10);
         }
 
         {
-            let _0 = emitter.constant(
-                0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
-            let read_0 = emitter.read_register(
-                _0,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _0 = emitter.constant(0, Type::Unsigned(64));
+            let read_0 = emitter.read_register(_0, Type::Unsigned(64));
 
-            let _8 = emitter.constant(
-                8,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
-            let read_8 = emitter.read_register(
-                _8,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _8 = emitter.constant(8, Type::Unsigned(64));
+            let read_8 = emitter.read_register(_8, Type::Unsigned(64));
 
             let sum = emitter.binary_operation(BinaryOperationKind::Add(read_0, read_8));
 
-            let _16 = emitter.constant(
-                16,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _16 = emitter.constant(16, Type::Unsigned(64));
 
             emitter.write_register(_16, sum);
         }
         {
-            let _16 = emitter.constant(
-                16,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
-            let read_16 = emitter.read_register(
-                _16,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _16 = emitter.constant(16, Type::Unsigned(64));
+            let read_16 = emitter.read_register(_16, Type::Unsigned(64));
 
             emitter.branch(read_16, b1.clone(), b2.clone());
         }
 
         {
             emitter.set_current_block(b1);
-            let _20 = emitter.constant(
-                20,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
-            let _32 = emitter.constant(
-                32,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _20 = emitter.constant(20, Type::Unsigned(64));
+            let _32 = emitter.constant(32, Type::Unsigned(64));
             emitter.write_register(_32, _20);
             emitter.jump(b3.clone());
         }
 
         {
             emitter.set_current_block(b2);
-            let _30 = emitter.constant(
-                30,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
-            let _32 = emitter.constant(
-                32,
-                Type {
-                    kind: TypeKind::Unsigned,
-                    width: 64,
-                },
-            );
+            let _30 = emitter.constant(30, Type::Unsigned(64));
+            let _32 = emitter.constant(32, Type::Unsigned(64));
             emitter.write_register(_32, _30);
             emitter.jump(b3.clone());
         }

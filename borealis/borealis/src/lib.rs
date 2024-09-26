@@ -256,6 +256,18 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "CPACR_read__1",
         "CNTKCTL_read__1",
         "ELUsingAArch32",
+        "IsSecureBelowEL3",
+        "_get_SCRType_NS",
+        "ELStateUsingAArch32",
+        "ELStateUsingAArch32K",
+        "HaveSecureEL2Ext",
+        "_get_SCR_EL3_Type_EEL2",
+        "VBAR_read__2",
+        "Bit",
+        "_get_GICD_CTLR_Type_DS",
+        "AArch32_IMPDEFResets",
+        "_get_PMCR_Type_IMP",
+        "integer_subrange",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

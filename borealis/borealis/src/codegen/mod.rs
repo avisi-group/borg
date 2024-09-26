@@ -227,7 +227,7 @@ pub fn codegen_workspace(
                     #header
 
                     use crate::dbt::{
-                        emitter::{Emitter, Type, TypeKind, BlockResult, Flag},
+                        emitter::{Emitter, Type, BlockResult, Flag},
                         x86::{
                             emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef, },
                             X86TranslationContext,
