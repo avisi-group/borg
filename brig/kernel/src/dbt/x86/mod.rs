@@ -1,5 +1,4 @@
 use {
-    super::emitter::WrappedEmitter,
     crate::{
         arch::x86::memory::ExecutableAllocator,
         dbt::{

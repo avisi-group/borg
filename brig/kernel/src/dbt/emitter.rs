@@ -1,6 +1,5 @@
 use crate::dbt::x86::emitter::{
     BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
-    X86NodeRef,
 };
 
 pub trait Emitter {
@@ -9,6 +8,7 @@ pub trait Emitter {
     type SymbolRef;
 
     fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
+    fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
 
     fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
     fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
@@ -80,12 +80,14 @@ pub enum Type {
     Unsigned(u16),
     Signed(u16),
     Floating(u16),
+    Bits,
 }
 
 impl Type {
     pub fn width(&self) -> u16 {
         match self {
             Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => *w,
+            Type::Bits => 64, // todo: should this be the runtime length?
         }
     }
 }

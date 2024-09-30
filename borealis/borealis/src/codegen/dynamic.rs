@@ -273,20 +273,31 @@ fn codegen_type_instance(rudder: Type) -> TokenStream {
             element_count,
             element_type,
         } => {
-            let element_width = u16::try_from(element_type.width_bits()).unwrap();
+            let _element_width = u16::try_from(element_type.width_bits()).unwrap();
             let element_type = codegen_type_instance((**element_type).clone());
             let element_count = Literal::u16_suffixed(u16::try_from(*element_count).unwrap());
 
             quote! {
-                Type {
-                    kind: TypeKind::Vector { length: #element_count, element: alloc::boxed::Box::new(#element_type) },
-                    width: #element_count * #element_width,
-                }
+                // Type {
+                //     kind: TypeKind::Vector { length: #element_count, element: alloc::boxed::Box::new(#element_type) },
+                //     width: #element_count * #element_width,
+                // }
+                todo!("[{}; {}]", #element_type, #element_count)
             }
         }
         Type::Union { .. } => {
             quote! {
-                  todo!()
+                todo!()
+            }
+        }
+        Type::ArbitraryLengthInteger => {
+            quote! {
+                Type::Signed(64)
+            }
+        }
+        Type::Bits => {
+            quote! {
+                Type::Bits
             }
         }
         t => panic!("todo codegen type instance: {t:?}"),
@@ -565,7 +576,7 @@ pub fn codegen_stmt(stmt: Ref<Statement>, s_arena: &Arena<Statement>) -> TokenSt
         }
 
         Statement::CreateBits { value, length } => {
-            quote!(Bits::new(#value, #length))
+            quote!(ctx.emitter().create_bits(#value, #length))
         }
         Statement::Assert { condition } => {
             quote!(ctx.emitter().assert(#condition))
@@ -670,7 +681,7 @@ pub fn codegen_stmt(stmt: Ref<Statement>, s_arena: &Arena<Statement>) -> TokenSt
             inline_exit_block,
             post_call_block,
         } => {
-            let pre_call_block = pre_call_block.index();
+            let _pre_call_block = pre_call_block.index();
             let inline_entry_block = inline_entry_block.index();
             let inline_exit_block = inline_exit_block.index();
             let post_call_block = post_call_block.index();

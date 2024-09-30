@@ -1,9 +1,6 @@
 use {
     crate::dbt::x86::{
-        encoder::{
-            Instruction, MemoryScale, Opcode, Operand, OperandDirection, OperandKind,
-            PhysicalRegister, Register,
-        },
+        encoder::{Instruction, Opcode, Operand, PhysicalRegister, Register},
         register_allocator::solid_state::SolidStateRegisterAllocator,
     },
     proc_macro_lib::ktest,

@@ -981,6 +981,17 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(cast(self.block, self.block_arena_mut(), bitex, Type::u1()))
                 }
 
+                // val undefined_bitvector : (%i) -> %bv
+                "undefined_bitvector" => {
+                    let zero = build( self.block,
+                        self.block_arena_mut(),Statement::Constant { typ: Type::u64(), value: ConstantValue::UnsignedInteger(0) });
+                  Some(  build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::CreateBits { value:zero , length:args[0].clone() },
+                    ))
+                }
+
                 "bitvector_length" => {
                     let arena = self.statement_arena();
                     assert!(matches!(args[0].get(arena).typ(arena), Type::Bits));
@@ -1374,8 +1385,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val append_64 : (%bv, %bv64) -> %bv
                 "append_64" => {
-                    let rhs = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::Bits);
-                    Some(self.generate_concat(args[0].clone(), rhs))
+                    Some(self.generate_concat(args[0].clone(),args[1].clone()))
                 }
 
                 "bitvector_concat" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
@@ -1417,14 +1427,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         },
                     );
 
-                    let value = cast(self.block, self.block_arena_mut(), extract, Type::u128());
-
-                    let length = cast(self.block, self.block_arena_mut(), args[0].clone(), Type::u16());
-
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::CreateBits { value, length },
+                        Statement::CreateBits { value:extract, length:args[0].clone() },
                     ))
                 }
 
@@ -1466,22 +1472,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         },
                     );
 
-                    let const_1 = {
-                        let _u1 = build(
-                            self.block,
-                            self.block_arena_mut(),
-                            Statement::Constant {
-                                typ: (Type::u64()),
-                                value: ConstantValue::UnsignedInteger(1),
-                            },
-                        );
+                    let const_1 =build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::Constant {
+                            typ: (Type::u64()),
+                            value: ConstantValue::UnsignedInteger(1),
+                        },
+                    );
 
-                        let typ = {
-                            let arena = self.statement_arena();
-                            sum.get(arena).typ(arena)
-                        };
-                        cast(self.block, self.block_arena_mut(), _u1, typ)
-                    };
 
                     let source_length = build(
                         self.block,
@@ -1506,14 +1505,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 "replicate_bits" => {
-                    // // bundle length = bits_length * count
-                    let count = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::u64());
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
                         Statement::Call {
                             target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-                            args: vec![args[0].clone(), count],
+                            args: vec![args[0].clone(), args[1].clone()],
                             return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
                         },
                     ))
@@ -1735,21 +1732,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         },
                     );
 
-                    let size_bits_cast = cast(
-                        self.block,
-                        self.block_arena_mut(),
-                        size_bits,
-                        Type::ArbitraryLengthInteger,
-                    );
-
                     let value = build(
                         self.block,
                         self.block_arena_mut(),
                         Statement::BitsCast {
                             kind: CastOperationKind::Truncate,
-                            typ: (Type::Bits),
+                            typ: Type::Bits,
                             value: data,
-                            length: size_bits_cast,
+                            length: size_bits,
                         },
                     );
                     let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());

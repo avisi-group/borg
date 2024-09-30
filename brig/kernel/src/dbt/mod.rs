@@ -1,11 +1,5 @@
 use {
-    crate::{
-        arch::{
-            x86::memory::{AlignedAllocator, ExecutableAllocator},
-            PAGE_SIZE,
-        },
-        dbt::emitter::Emitter,
-    },
+    crate::{arch::x86::memory::ExecutableAllocator, dbt::emitter::Emitter},
     alloc::{collections::BTreeMap, string::String, vec::Vec},
     core::fmt::{self, Debug},
     iced_x86::{Formatter, Instruction},
@@ -20,11 +14,11 @@ pub struct TranslationManager {
 }
 
 impl TranslationManager {
-    pub fn register_translation(gpa: usize, txln: Translation) {
+    pub fn register_translation(_gpa: usize, _txln: Translation) {
         todo!()
     }
 
-    pub fn lookup_translation(gpa: usize) -> Option<Translation> {
+    pub fn lookup_translation(_gpa: usize) -> Option<Translation> {
         todo!()
     }
 
@@ -32,7 +26,7 @@ impl TranslationManager {
         todo!()
     }
 
-    pub fn invalidate_region(gpa: usize) {
+    pub fn invalidate_region(_gpa: usize) {
         todo!()
     }
 

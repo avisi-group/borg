@@ -52,6 +52,16 @@ impl Emitter for X86Emitter {
         })
     }
 
+    fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef {
+        // nasty pretend bits that's really a fixed unsigned
+        if let NodeKind::Constant { value: length, .. } = length.kind() {
+            assert_eq!(u64::from(value.typ().width()), *length);
+            value
+        } else {
+            todo!("actual real bits {value:?}\n{length:?}")
+        }
+    }
+
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef {
         match offset.kind() {
             NodeKind::Constant { value, .. } => Self::NodeRef::from(X86Node {
@@ -744,7 +754,7 @@ impl X86NodeRef {
                         }
                         // todo: actually reinterpret
                         CastOperationKind::Reinterpret => {
-                            assert!(src.width_in_bits > dst.width_in_bits);
+                            assert!(src.width_in_bits == dst.width_in_bits);
                             emitter
                                 .current_block
                                 .append(Instruction::mov(src, dst.clone()));

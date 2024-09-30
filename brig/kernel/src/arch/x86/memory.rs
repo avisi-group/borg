@@ -6,7 +6,7 @@ use {
     byte_unit::{Byte, UnitType},
     core::{
         alloc::{AllocError, Allocator, Layout},
-        ops::{Add, Deref, Range},
+        ops::{Deref, Range},
         ptr::NonNull,
     },
     x86_64::{

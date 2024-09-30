@@ -10,7 +10,7 @@ use {
     std::fmt::Debug,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Symbol {
     name: InternedString,
     typ: Type,
@@ -30,7 +30,7 @@ impl Symbol {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Function {
     // return type and parameters are read only, so do not need to exist behind a `Shared`
     return_type: Type,

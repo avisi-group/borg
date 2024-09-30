@@ -1,36 +1,17 @@
-// if Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$")
-// .unwrap()
-// .is_match(name.as_ref())
-// {
-// Some(build(
-//     self.block,
-//     self.block_arena_mut(),
-//     Statement::BinaryOperation {
-//         kind: BinaryOperationKind::CompareEqual,
-//         lhs: args[0].clone(),
-//         rhs: args[1].clone(),
-//     },
-// ))
-// } else if Regex::new(r"^plain_vector_update<([0-9a-zA-Z_%<>]+)>$")
-// .unwrap()
-// .is_match(name.as_ref())
-// {
-// Some(build(
-//     self.block,
-//     self.block_arena_mut(),
-//     Statement::AssignElement {
-//         vector: args[0].clone(),
-//         value: args[2].clone(),
-//         index: args[1].clone(),
-//     },
-// ))
-// }
+// Although some builtin fns are handled in rudder, we handle some basic ones here to make the destruct_composites pass
 
 use {
-    crate::boom::{passes::Pass, Ast, Bit, Literal, Operation, Statement, Value},
+    crate::boom::{passes::Pass, Ast, Expression, Literal, Operation, Statement, Value},
     common::shared::Shared,
+    once_cell::sync::Lazy,
     regex::Regex,
 };
+
+const EQ_ANY_GENERIC: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$").unwrap());
+
+const VECTOR_ACCESS: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^plain_vector_access<([0-9a-zA-Z_%<>]+)>$").unwrap());
 
 #[derive(Debug, Default)]
 pub struct HandleBuiltinFunctions;
@@ -65,41 +46,30 @@ impl Pass for HandleBuiltinFunctions {
                                 arguments,
                             } = &*(s.get())
                             {
-                                if Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$")
-                                    .unwrap()
-                                    .is_match(name.as_ref())
+                                // replace all eq functions with an equal operation
+                                if EQ_ANY_GENERIC.is_match(name.as_ref())
+                                    || name.as_ref() == "eq_int"
+                                    || name.as_ref() == "eq_bits"
                                 {
                                     assert_eq!(2, arguments.len());
-                                    Shared::new(Statement::Copy {
-                                        expression: expression.clone(),
-                                        value: Shared::new(Value::Operation(Operation::Equal(
+                                    op(
+                                        expression,
+                                        Operation::Equal(
                                             arguments[0].clone(),
                                             arguments[1].clone(),
-                                        ))),
-                                    })
+                                        ),
+                                    )
                                 } else if name.as_ref() == "IsZero" {
-                                    Shared::new(Statement::Copy {
-                                        expression: expression.clone(),
-                                        value: Shared::new(Value::Operation(Operation::Equal(
+                                    op(
+                                        expression,
+                                        Operation::Equal(
                                             arguments[0].clone(),
                                             Shared::new(Value::Literal(Shared::new(Literal::Int(
                                                 0.into(),
                                             )))),
-                                        ))),
-                                    })
-                                } else if name.as_ref() == "undefined_bitvector"
-                                    || name.as_ref() == "undefined_vector<b>"
-                                {
-                                    Shared::new(Statement::Copy {
-                                        expression: expression.clone(),
-                                        value: Shared::new(Value::Literal(Shared::new(
-                                            Literal::Bits(vec![Bit::Zero]),
-                                        ))),
-                                    })
-                                } else if Regex::new(r"^plain_vector_access<([0-9a-zA-Z_%<>]+)>$")
-                                    .unwrap()
-                                    .is_match(name.as_ref())
-                                {
+                                        ),
+                                    )
+                                } else if VECTOR_ACCESS.is_match(name.as_ref()) {
                                     Shared::new(Statement::Copy {
                                         expression: expression.clone(),
                                         value: Shared::new(Value::VectorAccess {
@@ -120,4 +90,11 @@ impl Pass for HandleBuiltinFunctions {
 
         false
     }
+}
+
+fn op(expression: &Expression, op: Operation) -> Shared<Statement> {
+    Shared::new(Statement::Copy {
+        expression: expression.clone(),
+        value: Shared::new(Value::Operation(op)),
+    })
 }
