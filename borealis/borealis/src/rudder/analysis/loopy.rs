@@ -1,4 +1,4 @@
-use {crate::rudder::model::function::Function, common::HashSet, std::collections::VecDeque};
+use {crate::rudder::model::function::Function, sailrs::HashSet, std::collections::VecDeque};
 
 pub struct LoopAnalysis {
     contains_loop: bool,

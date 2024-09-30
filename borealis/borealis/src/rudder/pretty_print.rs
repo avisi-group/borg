@@ -112,7 +112,7 @@ impl Display for Model {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         writeln!(f, "rudder context:")?;
 
-        for (name, func) in self.fns.iter() {
+        for (name, func) in self.get_functions().iter() {
             writeln!(f, "function {}:", name,)?;
 
             write!(f, "{}", func)?;

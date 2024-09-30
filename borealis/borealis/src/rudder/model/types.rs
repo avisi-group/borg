@@ -1,6 +1,6 @@
-use common::intern::InternedString;
+use sailrs::intern::InternedString;
 
-#[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PrimitiveTypeClass {
     Void,
     Unit,
@@ -9,7 +9,7 @@ pub enum PrimitiveTypeClass {
     FloatingPoint,
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PrimitiveType {
     pub tc: PrimitiveTypeClass,
     pub element_width_in_bits: usize,
@@ -25,7 +25,7 @@ impl PrimitiveType {
     }
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Type {
     Primitive(PrimitiveType),
     Struct(Vec<(InternedString, Type)>),

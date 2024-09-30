@@ -13,7 +13,7 @@ use {
         },
         util::arena::Ref,
     },
-    common::{identifiable::Id, intern::InternedString, HashMap},
+    sailrs::{id::Id, intern::InternedString, HashMap},
 };
 
 /// In a function, go through all blocks, looking for function calls
@@ -36,7 +36,7 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
         .map(InternedString::from_static)
         .for_each(|name| {
             log::warn!("inlining {name}");
-            let mut function = model.fns.remove(&name).unwrap();
+            let mut function = model.get_functions_mut().remove(&name).unwrap();
 
             // map of function name to imported entry block and exit block, used to avoid importing an inlined function more than once
             let mut inlined = HashMap::default();
@@ -52,7 +52,7 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
             loop {
                 let did_change = run_inliner(
                     &mut function,
-                    &model.fns,
+                    model.get_functions(),
                     &mut inlined,
                     &mut exit_inline_call_rewrites,
                 );
@@ -64,7 +64,7 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
                 }
             }
 
-            model.fns.insert(name, function);
+            model.get_functions_mut().insert(name, function);
         });
 }
 

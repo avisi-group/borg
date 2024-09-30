@@ -20,12 +20,12 @@ use {
             signed_smallest_width_of_value,
         },
     },
-    common::{identifiable::Id, intern::InternedString, shared::Shared, HashMap},
     log::trace,
     num_rational::Ratio,
     num_traits::cast::FromPrimitive,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
+    sailrs::{id::Id, intern::InternedString, shared::Shared, HashMap},
     std::cmp::Ordering,
 };
 
@@ -76,7 +76,7 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
     log::warn!("done build functions");
 
     // insert again to overwrite empty boom generated rudder
-    model.fns.insert(
+    model.get_functions_mut().insert(
         REPLICATE_BITS_BOREALIS_INTERNAL.name(),
         REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
     );
@@ -173,12 +173,11 @@ impl BuildContext {
             })
             .collect();
 
-        Model {
+        Model::new(
             fns,
-            structs: self.structs.into_iter().map(|(_, (typ, _))| typ).collect(),
             // register names kept for debugging
-            registers: self.registers,
-        }
+            self.registers,
+        )
     }
 
     fn resolve_type(&self, typ: Shared<boom::Type>) -> Type {
@@ -985,7 +984,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "undefined_bitvector" => {
                     let zero = build( self.block,
                         self.block_arena_mut(),Statement::Constant { typ: Type::u64(), value: ConstantValue::UnsignedInteger(0) });
-                  Some(  build(
+
+                    Some(build(
                         self.block,
                         self.block_arena_mut(),
                         Statement::CreateBits { value:zero , length:args[0].clone() },

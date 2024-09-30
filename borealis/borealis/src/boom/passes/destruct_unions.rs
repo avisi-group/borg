@@ -2,7 +2,7 @@ use {
     crate::boom::{
         control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Size, Statement, Type, Value,
     },
-    common::{intern::InternedString, shared::Shared, HashMap, HashSet},
+    sailrs::{intern::InternedString, shared::Shared, HashMap, HashSet},
 };
 
 #[derive(Debug, Default)]

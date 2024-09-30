@@ -8,13 +8,13 @@
 //! Do *not* just read https://ocaml.org/p/libsail/latest/doc/Libsail/Jib/index.html, I have lost hours of debugging because of minor differences between the generated JIB file and the rendered docs.
 
 use {
+    crate::intern::InternedString,
     crate::{
         jib_ast::visitor::{Visitor, Walkable},
         num::BigInt,
         sail_ast::{DefinitionAnnotation, Identifier, KindIdentifier, Location},
         types::ListVec,
     },
-    common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
 };

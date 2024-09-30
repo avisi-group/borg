@@ -8,7 +8,7 @@ use {
         FunctionSignature, Literal, NamedType, NamedValue, Operation, Parameter, Statement, Type,
         Value,
     },
-    common::shared::Shared,
+    sailrs::shared::Shared,
 };
 
 /// Visitor trait for interacting with the BOOM AST

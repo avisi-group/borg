@@ -8,7 +8,7 @@ use {
             Model,
         },
     },
-    common::{intern::InternedString, HashMap, HashSet},
+    sailrs::{intern::InternedString, HashMap, HashSet},
     log::warn,
     once_cell::sync::Lazy,
     proc_macro2::{Span, TokenStream},

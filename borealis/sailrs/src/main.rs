@@ -1,15 +1,15 @@
 use {
     clap::Parser,
     color_eyre::Result,
-    common::{
-        bytes, create_file_buffered, init_logger,
-        intern::{get_interner_state, init_interner, interner},
-        HashMap,
-    },
     deepsize::DeepSizeOf,
     log::info,
     rkyv::ser::{serializers::AllocSerializer, Serializer},
     sailrs::load_from_config,
+    sailrs::{
+        bytes, create_file_buffered, init_logger,
+        intern::{get_interner_state, init_interner, interner},
+        HashMap,
+    },
     std::{io::Write, path::PathBuf},
 };
 

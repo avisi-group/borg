@@ -2,8 +2,8 @@
 //! `parse_ast.ml`, which itself is generated from `l2_parse.ott`.
 
 use {
+    crate::intern::InternedString,
     crate::{sail_ast::Location, types::ListVec},
-    common::intern::InternedString,
     ocaml::{FromValue, ToValue, Value},
     strum::IntoStaticStr,
 };

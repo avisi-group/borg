@@ -3,7 +3,7 @@
 use {
     crate::HashMap,
     deepsize::DeepSizeOf,
-    lasso2::{Key, Spur, ThreadedRodeo},
+    lasso::{Key, Spur, ThreadedRodeo},
     ocaml::{FromValue, ToValue, Value},
     rkyv::{Archive, Archived, Fallible},
     std::hash::BuildHasherDefault,

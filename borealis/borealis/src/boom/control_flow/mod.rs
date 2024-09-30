@@ -13,8 +13,8 @@ use {
         visitor::{Visitor, Walkable},
         Literal, Statement, Value,
     },
-    common::{
-        identifiable::Id,
+    sailrs::{
+        id::Id,
         intern::InternedString,
         shared::{Shared, Weak},
         HashSet,

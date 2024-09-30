@@ -2,8 +2,8 @@ use {
     borealis::{load_model, sail_to_brig, GenerationMode},
     clap::Parser,
     color_eyre::eyre::Result,
-    common::init_logger,
     log::info,
+    sailrs::init_logger,
     std::path::PathBuf,
 };
 

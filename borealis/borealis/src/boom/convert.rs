@@ -8,7 +8,7 @@ use {
         },
         util::signed_smallest_width_of_value,
     },
-    common::{intern::InternedString, shared::Shared, HashMap},
+    sailrs::{intern::InternedString, shared::Shared, HashMap},
     itertools::Itertools,
     sailrs::{
         jib_ast::{self, CReturn},

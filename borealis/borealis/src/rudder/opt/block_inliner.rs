@@ -6,7 +6,7 @@ use {
         },
         util::arena::Ref,
     },
-    common::HashMap,
+    sailrs::HashMap,
 };
 
 const INLINE_SIZE_THRESHOLD: usize = 5;

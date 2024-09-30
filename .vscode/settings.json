@@ -4,6 +4,7 @@
   "rust-analyzer.linkedProjects": [
     "borealis/Cargo.toml",
     "brig-cli/Cargo.toml",
-    "brig/Cargo.toml"
+    "brig/Cargo.toml",
+    "common/Cargo.toml"
   ]
 }

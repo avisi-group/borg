@@ -1,10 +1,10 @@
 use std::{hash::Hash, marker::PhantomData};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Arena<T> {
     vec: Vec<T>,
     #[cfg(debug_assertions)]
-    id: common::identifiable::Id,
+    id: sailrs::id::Id,
 }
 
 impl<T> Arena<T> {
@@ -12,7 +12,7 @@ impl<T> Arena<T> {
         Self {
             vec: Vec::new(),
             #[cfg(debug_assertions)]
-            id: common::identifiable::Id::new(),
+            id: sailrs::id::Id::new(),
         }
     }
 
@@ -31,11 +31,11 @@ impl<T> Arena<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Ref<T> {
     index: usize,
     #[cfg(debug_assertions)]
-    arena: common::identifiable::Id,
+    arena: sailrs::id::Id,
     _phantom: PhantomData<T>,
 }
 
@@ -55,12 +55,7 @@ impl<T> Eq for Ref<T> {}
 
 impl<T> Clone for Ref<T> {
     fn clone(&self) -> Self {
-        Self {
-            index: self.index,
-            #[cfg(debug_assertions)]
-            arena: self.arena,
-            _phantom: PhantomData,
-        }
+        *self
     }
 }
 

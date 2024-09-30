@@ -1,12 +1,12 @@
 //! Trait and derive macro for uniquely identifying nodes
 
-use std::{
+use core::{
     fmt::{self, Debug, LowerHex},
     sync::atomic::{AtomicU32, Ordering},
 };
 
 /// Unique identifier
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Id(u32);
 
 impl Default for Id {

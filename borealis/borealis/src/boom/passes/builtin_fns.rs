@@ -2,7 +2,7 @@
 
 use {
     crate::boom::{passes::Pass, Ast, Expression, Literal, Operation, Statement, Value},
-    common::shared::Shared,
+    sailrs::shared::Shared,
     once_cell::sync::Lazy,
     regex::Regex,
 };

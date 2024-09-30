@@ -3,8 +3,8 @@ use {
         self,
         control_flow::{ControlFlowBlock, Terminator},
     },
-    common::{identifiable::Id, shared::Shared, HashMap},
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
+    sailrs::{id::Id, shared::Shared, HashMap},
     std::io,
 };
 

@@ -9,7 +9,7 @@ use {
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
     },
-    common::{intern::InternedString, shared::Shared, HashMap},
+    sailrs::{intern::InternedString, shared::Shared, HashMap},
     kinded::Kinded,
     num_bigint::BigInt,
     sailrs::jib_ast,

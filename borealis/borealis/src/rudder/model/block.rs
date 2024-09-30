@@ -3,10 +3,10 @@ use {
         rudder::model::statement::Statement,
         util::arena::{Arena, Ref},
     },
-    common::HashSet,
+    sailrs::HashSet,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Block {
     statement_arena: Arena<Statement>,
     statements: Vec<Ref<Statement>>,

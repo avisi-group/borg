@@ -8,7 +8,7 @@ use {
         },
         util::arena::{Arena, Ref},
     },
-    common::{intern::InternedString, HashMap},
+    sailrs::{intern::InternedString, HashMap},
     core::fmt,
     itertools::Itertools,
     proc_macro2::TokenStream,
@@ -19,7 +19,7 @@ use {
     },
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum UnaryOperationKind {
     Not,
     Negate,
@@ -31,7 +31,7 @@ pub enum UnaryOperationKind {
     SquareRoot,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BinaryOperationKind {
     Add,
     Sub,
@@ -50,12 +50,12 @@ pub enum BinaryOperationKind {
     CompareGreaterThanOrEqual,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TernaryOperationKind {
     AddWithCarry,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum CastOperationKind {
     ZeroExtend,
     SignExtend,
@@ -65,7 +65,7 @@ pub enum CastOperationKind {
     Broadcast,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ShiftOperationKind {
     LogicalShiftLeft,
     LogicalShiftRight,
@@ -74,7 +74,7 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Flag {
     N,
     Z,
@@ -82,7 +82,7 @@ pub enum Flag {
     V,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Statement {
     Constant {
         typ: Type,
@@ -337,7 +337,11 @@ impl Statement {
             Self::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
             Self::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             Self::ShiftOperation { value, .. } => value.get(arena).typ(arena),
+
             Self::Call { return_type, .. } => return_type.clone(),
+            Self::EnterInlineCall { .. } => Type::void(),
+            Self::ExitInlineCall { .. } => Type::void(),
+
             Self::Cast { typ, .. } | Self::BitsCast { typ, .. } => typ.clone(),
             Self::Jump { .. } => Type::void(),
             Self::Branch { .. } => Type::void(),
@@ -352,7 +356,23 @@ impl Statement {
             Self::ReadPc => Type::u64(),
             Self::WritePc { .. } => Type::void(),
             // todo: this is a simplification, be more precise about lengths?
-            Self::BitExtract { value, .. } => value.get(arena).typ(arena),
+            Self::BitExtract { value, length, .. } => {
+                if let Self::Constant { value: length, .. } = length.get(arena) {
+                    match length {
+                        ConstantValue::UnsignedInteger(l) => Type::new_primitive(
+                            PrimitiveTypeClass::UnsignedInteger,
+                            usize::try_from(*l).unwrap(),
+                        ),
+                        ConstantValue::SignedInteger(l) => Type::new_primitive(
+                            PrimitiveTypeClass::UnsignedInteger,
+                            usize::try_from(*l).unwrap(),
+                        ),
+                        _ => panic!("non unsigned integer length: {length:#?}"),
+                    }
+                } else {
+                    value.get(arena).typ(arena) // potentially should be Bits, but this type will always be wide enough (for example, extracted 32 bits from a u64, not the end of the world to store those 32 bits in a u64, but ideally a u32)
+                }
+            }
             Self::BitInsert {
                 target: original_value,
                 ..
@@ -400,8 +420,6 @@ impl Statement {
             Self::CreateTuple(values) => {
                 Type::Tuple(values.iter().map(|v| v.get(arena).typ(arena)).collect())
             }
-            Statement::ExitInlineCall { .. } => Type::void(),
-            Statement::EnterInlineCall { .. } => Type::void(),
         }
     }
 

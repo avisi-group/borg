@@ -11,7 +11,7 @@ use {
 pub fn codegen_state(rudder: &Model) -> TokenStream {
     // generate constant for each register offset
     let register_offsets = rudder
-        .get_registers()
+        .registers()
         .into_iter()
         .map(|(name, model::RegisterDescriptor { offset, .. })| {
             let name = format_ident!(
@@ -27,7 +27,7 @@ pub fn codegen_state(rudder: &Model) -> TokenStream {
     // generate mapping from offset to name
     let register_name_map_contents = {
         let mut offset_names = rudder
-            .get_registers()
+            .registers()
             .into_iter()
             .map(|(name, model::RegisterDescriptor { offset, .. })| (offset, name))
             .collect::<Vec<_>>();
@@ -44,8 +44,8 @@ pub fn codegen_state(rudder: &Model) -> TokenStream {
     };
 
     let registers_len = rudder
-        .get_registers()
-        .into_values()
+        .registers()
+        .values()
         .map(|model::RegisterDescriptor { typ, offset, .. }| offset + typ.width_bytes())
         .max()
         .unwrap();

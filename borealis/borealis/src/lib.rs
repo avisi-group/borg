@@ -13,15 +13,15 @@ use {
         },
         codegen::{codegen_workspace, workspace::write_workspace},
     },
-    common::{
-        bytes, create_file_buffered,
-        intern::{init_interner, interner, InternedString},
-        HashMap,
-    },
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{debug, info, trace},
     rkyv::Deserialize,
+    sailrs::{
+        bytes, create_file_buffered,
+        intern::{init_interner, interner, InternedString},
+        HashMap,
+    },
     sailrs::{
         jib_ast::{self, Definition, DefinitionAux, Instruction},
         sail_ast::Location,

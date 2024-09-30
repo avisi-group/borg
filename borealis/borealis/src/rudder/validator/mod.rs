@@ -10,7 +10,7 @@ use {
         },
         util::arena::Ref,
     },
-    common::intern::InternedString,
+    sailrs::intern::InternedString,
     std::fmt::Display,
 };
 

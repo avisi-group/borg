@@ -1,7 +1,7 @@
 //! Types and functions for interfacing with OCaml
 
 use {
-    common::intern::InternedString,
+    crate::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
     rayon::{iter::IntoParallelIterator, vec::IntoIter},

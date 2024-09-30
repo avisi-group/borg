@@ -1,5 +1,5 @@
 use {
-    common::intern::InternedString,
+    sailrs::intern::InternedString,
     num_rational::Ratio,
     num_traits::CheckedMul,
     std::{
@@ -8,7 +8,7 @@ use {
     },
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ConstantValue {
     UnsignedInteger(u64),
     SignedInteger(i64),

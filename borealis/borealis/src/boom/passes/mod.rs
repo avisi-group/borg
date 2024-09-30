@@ -7,7 +7,7 @@
 
 use {
     crate::boom::Ast,
-    common::shared::Shared,
+    sailrs::shared::Shared,
     log::info,
     std::{
         fs::{create_dir_all, File},

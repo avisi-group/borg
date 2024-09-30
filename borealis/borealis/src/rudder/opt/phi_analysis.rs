@@ -7,7 +7,7 @@ use {
         },
         util::arena::Ref,
     },
-    common::{intern::InternedString, HashMap},
+    sailrs::{intern::InternedString, HashMap},
     log::trace,
 };
 

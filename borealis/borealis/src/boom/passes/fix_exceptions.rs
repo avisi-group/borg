@@ -2,7 +2,7 @@
 
 use {
     crate::boom::{passes::Pass, Ast, Size, Type},
-    common::shared::Shared,
+    sailrs::shared::Shared,
 };
 
 /// Adds registers needed for exceptions

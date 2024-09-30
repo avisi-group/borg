@@ -3,7 +3,7 @@ use {
         rudder::model::{block::Block, function::Function, statement::Statement, Model},
         util::arena::Ref,
     },
-    common::{intern::InternedString, HashMap, HashSet},
+    sailrs::{intern::InternedString, HashMap, HashSet},
     dot::{GraphWalk, Labeller},
     log::trace,
     std::{collections::VecDeque, io},

@@ -3,7 +3,7 @@ use {
         boom::{passes::Pass, Ast, Size, Statement, Type},
         util::signed_smallest_width_of_value,
     },
-    common::shared::Shared,
+    sailrs::shared::Shared,
 };
 
 #[derive(Debug, Default)]

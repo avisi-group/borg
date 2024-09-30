@@ -4,7 +4,7 @@ use {
         model::{function::Function, types::Type},
         opt, validator,
     },
-    common::{intern::InternedString, HashMap, HashSet},
+    sailrs::{intern::InternedString, HashMap},
 };
 
 pub mod block;
@@ -13,23 +13,25 @@ pub mod function;
 pub mod statement;
 pub mod types;
 
-#[derive(Default)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Model {
-    pub(crate) fns: HashMap<InternedString, Function>,
+    fns: HashMap<InternedString, Function>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
-    pub(crate) registers: HashMap<InternedString, RegisterDescriptor>,
-    pub(crate) structs: HashSet<Type>,
+    registers: HashMap<InternedString, RegisterDescriptor>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDescriptor {
     pub typ: Type,
     pub offset: usize,
 }
 
 impl Model {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(
+        fns: HashMap<InternedString, Function>,
+        registers: HashMap<InternedString, RegisterDescriptor>,
+    ) -> Self {
+        Self { fns, registers }
     }
 
     pub fn add_function(&mut self, name: InternedString, func: Function) {
@@ -56,11 +58,7 @@ impl Model {
         &mut self.fns
     }
 
-    pub fn get_registers(&self) -> HashMap<InternedString, RegisterDescriptor> {
-        self.registers.clone()
-    }
-
-    pub fn get_structs(&self) -> HashSet<Type> {
-        self.structs.clone()
+    pub fn registers(&self) -> &HashMap<InternedString, RegisterDescriptor> {
+        &self.registers
     }
 }

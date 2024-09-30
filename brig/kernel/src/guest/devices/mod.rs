@@ -27,8 +27,8 @@ fn decodea64_smoke() {
     let mut ctx = X86TranslationContext::new();
     borealis_register_init(&mut ctx);
 
-    let unit = ctx.emitter().constant(0, Type::Unsigned(0));
-    u__InitSystem(&mut ctx, unit);
+    // let unit = ctx.emitter().constant(0, Type::Unsigned(0));
+    // u__InitSystem(&mut ctx, unit);
 
     let pc = ctx.emitter().constant(0, Type::Unsigned(64));
 
