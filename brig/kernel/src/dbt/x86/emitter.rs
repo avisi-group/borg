@@ -52,10 +52,13 @@ impl Emitter for X86Emitter {
         })
     }
 
+    // may not return a bits if `length` is a constant?
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef {
-        // nasty pretend bits that's really a fixed unsigned
+        // evil bits that's really a fixed unsigned pretending to be a bitvector
         if let NodeKind::Constant { value: length, .. } = length.kind() {
-            assert_eq!(u64::from(value.typ().width()), *length);
+            if u64::from(value.typ().width()) != *length {
+                panic!("{length}\n{value:?}\n{:?}", value.typ());
+            }
             value
         } else {
             todo!("actual real bits {value:?}\n{length:?}")
@@ -386,6 +389,7 @@ impl Emitter for X86Emitter {
                     width: u16::try_from(*length).unwrap(),
                 },
             }),
+            // todo: constant start and length with non-constant value can still be specialized?
             _ => Self::NodeRef::from(X86Node {
                 typ,
                 kind: NodeKind::BitExtract {
@@ -752,9 +756,12 @@ impl X86NodeRef {
                                 .current_block
                                 .append(Instruction::mov(src, dst.clone()));
                         }
-                        // todo: actually reinterpret
+
                         CastOperationKind::Reinterpret => {
-                            assert!(src.width_in_bits == dst.width_in_bits);
+                            // todo: actually reinterpret and fix the following:
+                            // if src.width_in_bits != dst.width_in_bits {
+                            //     panic!("failed to reinterpret\n{value:#?}\n as {:?}",
+                            // self.typ()); }
                             emitter
                                 .current_block
                                 .append(Instruction::mov(src, dst.clone()));
