@@ -1,21 +1,29 @@
-//! String interning
+use crate::HashMap;
+use alloc::borrow::ToOwned;
+use alloc::string::{String, ToString};
+use core::cell::OnceCell;
+use core::hash::BuildHasherDefault;
+use deepsize::DeepSizeOf;
+use lasso::{Key, Spur};
+use rkyv::{Archive, Archived, Fallible};
+use twox_hash::XxHash64;
 
-use {
-    common::HashMap,
-    deepsize::DeepSizeOf,
-    lasso::{Key, Spur, ThreadedRodeo},
-    ocaml::{FromValue, ToValue, Value},
-    rkyv::{Archive, Archived, Fallible},
-    std::hash::BuildHasherDefault,
-    twox_hash::XxHash64,
-};
+#[cfg(feature = "no-std")]
+type Interner = lasso::Rodeo<Spur, BuildHasherDefault<XxHash64>>;
 
-/// String interner instance
-static mut INTERNER: Option<ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>>> = None;
+#[cfg(feature = "std")]
+type Interner = lasso::ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>>;
 
-/// Gets the current interner
-pub fn interner() -> &'static ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>> {
-    unsafe { INTERNER.as_ref() }.unwrap()
+static mut INTERNER: OnceCell<Interner> = OnceCell::new();
+
+pub(crate) fn interner() -> &'static mut Interner {
+    unsafe { INTERNER.get_mut() }.unwrap()
+}
+
+/// Initializes the interner with an initial state
+pub fn init(state: HashMap<String, u32>) {
+    let interner = bincode::deserialize(&bincode::serialize(&state).unwrap()).unwrap();
+    assert!(unsafe { INTERNER.set(interner) }.is_ok())
 }
 
 /// Gets the strings and associated keys of the current interner
@@ -33,7 +41,7 @@ pub struct InternedString(Spur);
 impl InternedString {
     /// Create a new interned string
     pub fn new<A: AsRef<str>>(str: A) -> Self {
-        Self(interner().get_or_intern(str))
+        Self(interner().get_or_intern(str.as_ref()))
     }
 
     /// Create a new interned string from a static str
@@ -71,15 +79,15 @@ impl From<&'_ str> for InternedString {
     }
 }
 
-impl std::fmt::Debug for InternedString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        interner().resolve(&self.0).fmt(f)
+impl core::fmt::Debug for InternedString {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Debug::fmt(interner().resolve(&self.0), f)
     }
 }
 
-impl std::fmt::Display for InternedString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        interner().resolve(&self.0).fmt(f)
+impl core::fmt::Display for InternedString {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::fmt::Display::fmt(interner().resolve(&self.0), f)
     }
 }
 
@@ -101,14 +109,16 @@ impl serde::Serialize for InternedString {
     }
 }
 
-unsafe impl FromValue for InternedString {
-    fn from_value(v: Value) -> Self {
+#[cfg(feature = "std")]
+unsafe impl ocaml::FromValue for InternedString {
+    fn from_value(v: ocaml::Value) -> Self {
         Self::new(String::from_value(v))
     }
 }
 
-unsafe impl ToValue for InternedString {
-    fn to_value(&self, rt: &ocaml::Runtime) -> Value {
+#[cfg(feature = "std")]
+unsafe impl ocaml::ToValue for InternedString {
+    fn to_value(&self, rt: &ocaml::Runtime) -> ocaml::Value {
         self.to_string().to_value(rt)
     }
 }
@@ -119,7 +129,7 @@ impl DeepSizeOf for InternedString {
     }
 
     fn deep_size_of(&self) -> usize {
-        std::mem::size_of_val(self)
+        core::mem::size_of_val(self)
     }
 }
 
@@ -148,12 +158,8 @@ impl<D: Fallible> rkyv::Deserialize<InternedString, D>
     fn deserialize(&self, _: &mut D) -> Result<InternedString, <D as Fallible>::Error> {
         Ok(InternedString::from(
             // try from usize adds 1, -1 to bring it back down
+            // todo: why???
             Spur::try_from_usize(usize::try_from(*self).unwrap() - 1).unwrap(),
         ))
     }
-}
-
-/// Initializes the interner with an initial state
-pub fn init_interner(state: &HashMap<String, u32>) {
-    unsafe { INTERNER = Some(bincode::deserialize(&bincode::serialize(state).unwrap()).unwrap()) };
 }

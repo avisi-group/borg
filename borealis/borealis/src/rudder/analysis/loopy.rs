@@ -1,5 +1,5 @@
 use {
-    crate::rudder::model::function::Function,
+    common::rudder::function::Function,
     common::{HashMap, HashSet},
     std::collections::VecDeque,
 };

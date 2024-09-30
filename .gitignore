@@ -9,4 +9,4 @@
 **/target
 **/_build
 
-/brig/kernel/src/guest/devices/aarch64
+/brig-cli/guest_data/aarch64.bin

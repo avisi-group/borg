@@ -1,5 +1,5 @@
 use {
-    crate::rudder::model::{
+    common::rudder::{
         constant_value::ConstantValue,
         function::{Function, Symbol},
         statement::{build, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement},

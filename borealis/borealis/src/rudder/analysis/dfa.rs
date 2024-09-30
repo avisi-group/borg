@@ -1,14 +1,12 @@
-use {
-    crate::{
-        rudder::model::{
-            block::Block,
-            function::{Function, Symbol},
-            statement::Statement,
-        },
-        util::arena::{Arena, Ref},
+use common::{
+    arena::{Arena, Ref},
+    intern::InternedString,
+    rudder::{
+        block::Block,
+        function::{Function, Symbol},
+        statement::Statement,
     },
-    common::{HashMap, HashSet},
-    sailrs::intern::InternedString,
+    HashMap, HashSet,
 };
 
 pub struct SymbolUseAnalysis {

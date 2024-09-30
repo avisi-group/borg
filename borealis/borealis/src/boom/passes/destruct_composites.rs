@@ -3,8 +3,9 @@ use {
         control_flow::Terminator, passes::Pass, visitor::Visitor, Ast, Expression,
         FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type, Value,
     },
+    common::intern::InternedString,
     common::{HashMap, HashSet},
-    sailrs::{intern::InternedString, shared::Shared},
+    sailrs::shared::Shared,
 };
 
 #[derive(Debug, Default)]

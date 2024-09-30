@@ -1,12 +1,15 @@
-use crate::{
-    rudder::model::{
+use {
+    common::rudder::{
         block::Block,
         constant_value::ConstantValue,
         function::Function,
         statement::{build_at, cast_at, BinaryOperationKind, Location, Statement},
         types::Type,
     },
-    util::arena::{Arena, Ref},
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
+    },
 };
 
 pub fn run(f: &mut Function) -> bool {

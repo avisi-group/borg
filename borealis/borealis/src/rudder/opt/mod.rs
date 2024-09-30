@@ -1,5 +1,5 @@
 use {
-    crate::rudder::model::{function::Function, Model},
+    common::rudder::{function::Function, Model},
     log::trace,
     rayon::iter::{IntoParallelRefMutIterator, ParallelIterator},
 };

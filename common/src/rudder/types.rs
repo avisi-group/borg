@@ -1,4 +1,8 @@
-use sailrs::intern::InternedString;
+use {
+    crate::intern::InternedString,
+    alloc::{boxed::Box, vec::Vec},
+    core::fmt::{self, Display, Formatter},
+};
 
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PrimitiveTypeClass {
@@ -195,5 +199,37 @@ impl Type {
 
     pub fn is_compatible_with(&self, other: &Self) -> bool {
         self == other
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match &self {
+            Type::Primitive(p) => match &p.tc {
+                PrimitiveTypeClass::Void => write!(f, "void"),
+                PrimitiveTypeClass::Unit => write!(f, "()"),
+                PrimitiveTypeClass::UnsignedInteger => write!(f, "u{}", self.width_bits()),
+                PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width_bits()),
+                PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
+            },
+            Type::Struct(_) => write!(f, "struct"),
+            Type::Union { width } => write!(f, "union({width})"),
+            Type::Vector {
+                element_count,
+                element_type,
+            } => write!(f, "[{element_type}; {element_count:?}]"),
+            Type::Bits => write!(f, "bv"),
+            Type::ArbitraryLengthInteger => write!(f, "i"),
+            Type::String => write!(f, "str"),
+            Type::Rational => write!(f, "rational"),
+            Type::Any => write!(f, "any"),
+            Type::Tuple(ts) => {
+                write!(f, "(").unwrap();
+                for t in ts {
+                    write!(f, "{t}, ").unwrap();
+                }
+                write!(f, ")")
+            }
+        }
     }
 }

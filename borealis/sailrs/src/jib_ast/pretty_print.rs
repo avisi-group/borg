@@ -1,7 +1,7 @@
 //! JIB AST pretty printing
 
 use {
-    crate::intern::InternedString,
+    common::intern::InternedString,
     crate::{
         jib_ast::{
             visitor::Visitor, CReturn, Definition, DefinitionAux, Expression, Instruction,

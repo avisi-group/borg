@@ -1,20 +1,18 @@
 use {
-    crate::{
-        fn_is_allowlisted,
+    crate::{fn_is_allowlisted, rudder::analysis::dfa::StatementUseAnalysis},
+    common::intern::InternedString,
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
         rudder::{
-            analysis::dfa::StatementUseAnalysis,
-            model::{
-                block::Block,
-                function::{Function, Symbol},
-                statement::{build, build_at, import_statement, Location, Statement},
-                types::Type,
-                Model,
-            },
+            block::Block,
+            function::{Function, Symbol},
+            statement::{build, build_at, import_statement, Location, Statement},
+            types::Type,
+            Model,
         },
-        util::arena::Ref,
     },
     common::{HashMap, HashSet},
-    sailrs::{id::Id, intern::InternedString},
 };
 
 /// In a function, go through all blocks, looking for function calls

@@ -3,11 +3,9 @@ use {
         control_flow::{ControlFlowBlock, Terminator},
         Literal, Statement, Value,
     },
+    common::intern::InternedString,
     common::HashMap,
-    sailrs::{
-        intern::InternedString,
-        shared::{Shared, SharedKey},
-    },
+    sailrs::shared::{Shared, SharedKey},
 };
 
 /// Builder structure for a control flow graph

@@ -1,9 +1,11 @@
 use {
     crate::{
-        rudder::model::statement::Statement,
-        util::arena::{Arena, Ref},
+        arena::{Arena, Ref},
+        rudder::statement::Statement,
+        HashSet,
     },
-    common::{HashMap, HashSet},
+    alloc::vec::Vec,
+    core::fmt::{self, Display, Formatter},
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -65,28 +67,30 @@ impl Block {
             .map(|s| s.get(self.arena()))
             .flat_map(|s| {
                 match s {
-                    Statement::Jump { target } => vec![*target],
+                    Statement::Jump { target } => alloc::vec![*target],
                     Statement::Branch {
                         true_target,
                         false_target,
                         ..
-                    } => vec![*true_target, *false_target],
+                    } => alloc::vec![*true_target, *false_target],
 
                     Statement::EnterInlineCall {
-                        post_call_block, // not a true target of this block, it will be a target of the matching `ExitInlineCall`! but good enough to fix block iterator
+                        post_call_block, /* not a true target of this block, it will be a target
+                                          * of the matching `ExitInlineCall`! but good enough to
+                                          * fix block iterator */
                         inline_entry_block,
                         ..
-                    } => vec![*inline_entry_block, *post_call_block],
+                    } => alloc::vec![*inline_entry_block, *post_call_block],
 
                     // should probably still check that these are the last statement
                     Statement::Return { .. }
                     | Statement::Panic(_)
                     | Statement::ExitInlineCall { .. } => {
-                        vec![]
+                        alloc::vec![]
                     }
 
                     // non terminators
-                    _ => vec![],
+                    _ => alloc::vec![],
                 }
             })
             .collect()
@@ -124,7 +128,7 @@ impl<'arena> BlockIterator<'arena> {
     pub fn new(arena: &'arena Arena<Block>, start_block: Ref<Block>) -> Self {
         Self {
             visited: HashSet::default(),
-            remaining: vec![start_block],
+            remaining: alloc::vec![start_block],
             arena,
         }
     }
@@ -156,5 +160,15 @@ impl<'arena> Iterator for BlockIterator<'arena> {
         self.remaining.extend(current.get(&self.arena).targets());
 
         Some(current)
+    }
+}
+
+impl Display for Block {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for stmt in self.statements() {
+            writeln!(f, "    {}", stmt.to_string(self.arena()))?;
+        }
+
+        Ok(())
     }
 }

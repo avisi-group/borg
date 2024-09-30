@@ -17,8 +17,6 @@ use {
 
 pub mod error;
 pub mod ffi;
-pub mod id;
-pub mod intern;
 pub mod jib_ast;
 pub mod json;
 pub mod num;

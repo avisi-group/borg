@@ -1,15 +1,18 @@
 use {
-    crate::{
+    crate::rudder::analysis::loopy::LoopAnalysis,
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
+    },
+    common::{
+        intern::InternedString,
         rudder::{
-            analysis::loopy::LoopAnalysis,
-            model::statement::Statement,
-            model::{block::Block, function::Function},
+            statement::Statement,
+            {block::Block, function::Function},
         },
-        util::arena::Ref,
     },
     common::{HashMap, HashSet},
     log::trace,
-    sailrs::intern::InternedString,
 };
 
 pub fn run(f: &mut Function) -> bool {

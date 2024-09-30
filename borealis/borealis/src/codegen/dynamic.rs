@@ -18,7 +18,7 @@ use {
             types::{PrimitiveType, PrimitiveTypeClass, Type},
         },
         util::{
-            arena::{Arena, Ref},
+
             signed_smallest_width_of_value, unsigned_smallest_width_of_value,
         },
     },
@@ -26,6 +26,7 @@ use {
     quote::{format_ident, quote},
     std::iter::repeat,
     syn::Ident,
+    common::arena::{Arena, Ref}
 };
 
 pub fn codegen_function(function: &Function) -> TokenStream {

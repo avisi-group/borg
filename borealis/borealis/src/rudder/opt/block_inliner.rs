@@ -1,10 +1,11 @@
 use {
-    crate::{
-        rudder::{
-            model::statement::{import_statement, Statement},
-            model::{block::Block, function::Function},
-        },
-        util::arena::Ref,
+    common::rudder::{
+        statement::{import_statement, Statement},
+        {block::Block, function::Function},
+    },
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
     },
     common::{HashMap, HashSet},
 };

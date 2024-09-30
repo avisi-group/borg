@@ -1,16 +1,17 @@
 use {
-    crate::{
-        rudder::model::{
-            block::Block,
-            constant_value::ConstantValue,
-            function::Function,
-            statement::Statement,
-            types::{PrimitiveType, PrimitiveTypeClass, Type},
-            Model,
-        },
-        util::arena::Ref,
+    common::intern::InternedString,
+    common::rudder::{
+        block::Block,
+        constant_value::ConstantValue,
+        function::Function,
+        statement::Statement,
+        types::{PrimitiveType, PrimitiveTypeClass, Type},
+        Model,
     },
-    sailrs::intern::InternedString,
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
+    },
     std::fmt::Display,
 };
 

@@ -1,10 +1,16 @@
-use std::{hash::Hash, marker::PhantomData};
+use {
+    alloc::vec::Vec,
+    core::{
+        hash::{Hash, Hasher},
+        marker::PhantomData,
+    },
+};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Arena<T> {
     vec: Vec<T>,
     #[cfg(debug_assertions)]
-    id: sailrs::id::Id,
+    id: crate::id::Id,
 }
 
 impl<T> Arena<T> {
@@ -12,7 +18,7 @@ impl<T> Arena<T> {
         Self {
             vec: Vec::new(),
             #[cfg(debug_assertions)]
-            id: sailrs::id::Id::new(),
+            id: crate::id::Id::new(),
         }
     }
 
@@ -35,7 +41,7 @@ impl<T> Arena<T> {
 pub struct Ref<T> {
     index: usize,
     #[cfg(debug_assertions)]
-    arena: sailrs::id::Id,
+    arena: crate::id::Id,
     _phantom: PhantomData<T>,
 }
 
@@ -60,7 +66,7 @@ impl<T> Ref<T> {
 }
 
 impl<T> Hash for Ref<T> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         self.index.hash(state);
     }
 }

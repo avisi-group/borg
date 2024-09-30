@@ -1,11 +1,12 @@
 use {
-    crate::{
-        rudder::{
-            analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
-            model::statement::Statement,
-            model::{block::Block, function::Function},
-        },
-        util::arena::{Arena, Ref},
+    crate::rudder::analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
+    common::rudder::{
+        statement::Statement,
+        {block::Block, function::Function},
+    },
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
     },
     common::{HashMap, HashSet},
     log::trace,

@@ -7,7 +7,8 @@ use {
         Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
         NamedValue, Operation, Parameter, Size, Statement, Type, Value,
     },
-    sailrs::{intern::InternedString, shared::Shared},
+    common::intern::InternedString,
+    sailrs::shared::Shared,
     std::{
         io::Write,
         rc::Rc,

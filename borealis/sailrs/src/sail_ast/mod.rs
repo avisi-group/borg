@@ -4,12 +4,12 @@
 //! which itself is generated from `ast.lem` and `sail.ott`.
 
 use {
-    crate::intern::InternedString,
     crate::{
         num::{BigInt, Num},
         sail_ast::visitor::{Visitor, Walkable},
         types::{ListVec, Position},
     },
+    common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
     std::fmt::Display,

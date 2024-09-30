@@ -11,18 +11,22 @@ use {
             },
             Ast,
         },
-        codegen::{codegen_workspace, workspace::write_workspace},
+        rudder::{
+            function_inliner,
+            opt::{self, OptLevel},
+            validator,
+        },
     },
-    common::HashMap,
+    common::{
+        intern::{self, InternedString},
+        HashMap,
+    },
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{debug, info, trace},
     rkyv::Deserialize,
     sailrs::{
         bytes, create_file_buffered,
-        intern::{init_interner, interner, InternedString},
-    },
-    sailrs::{
         jib_ast::{self, Definition, DefinitionAux, Instruction},
         sail_ast::Location,
         types::ListVec,
@@ -35,7 +39,7 @@ use {
 };
 
 pub mod boom;
-pub mod codegen;
+//pub mod codegen;
 pub mod rudder;
 pub mod util;
 
@@ -56,14 +60,9 @@ pub fn load_model(path: &Path) -> ListVec<Definition> {
 
     trace!("initializing interner");
 
-    init_interner(&strs);
+    intern::init(strs);
 
     info!("JIB size: {:.2}", bytes(jib.deep_size_of()));
-    info!(
-        "INTERNER size: {:.2}, {} strings",
-        bytes(interner().current_memory_usage()),
-        interner().len()
-    );
 
     jib
 }
@@ -146,13 +145,13 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Validating rudder");
-    let msgs = rudder.validate();
+    let msgs = validator::validate(&rudder);
     for msg in msgs {
         debug!("{msg}");
     }
 
     info!("Optimising rudder");
-    rudder.optimise(rudder::opt::OptLevel::Level3);
+    opt::optimise(&mut rudder, OptLevel::Level3);
 
     if let Some(path) = &dump_ir {
         writeln!(
@@ -163,7 +162,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Inlining");
-    rudder.function_inline(FN_TOPLEVEL);
+    function_inliner::inline(&mut rudder, FN_TOPLEVEL);
 
     if let Some(path) = &dump_ir {
         writeln!(
@@ -174,7 +173,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Validating rudder again");
-    let msgs = rudder.validate();
+    let msgs = validator::validate(&rudder);
     for msg in msgs {
         debug!("{msg}");
     }
@@ -183,11 +182,13 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         &mode,
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
     ) {
-        info!("Generating Rust");
-        let ws = codegen_workspace(rudder, FN_TOPLEVEL);
+        // let ws = codegen_workspace(rudder, FN_TOPLEVEL);
 
-        info!("Writing workspace to {:?}", &path);
-        write_workspace(ws, path);
+        info!("Serializing Rudder");
+        let buf = bincode::serialize(&rudder).unwrap();
+
+        info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);
+        File::create(path).unwrap().write_all(&buf).unwrap();
     }
 }
 

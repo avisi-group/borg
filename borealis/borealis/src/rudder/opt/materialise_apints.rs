@@ -1,11 +1,14 @@
-use crate::{
-    rudder::{
-        analysis::dfa::StatementUseAnalysis,
-        model::statement::{CastOperationKind, Statement},
-        model::types::Type,
-        model::{block::Block, function::Function, types::PrimitiveTypeClass},
+use {
+    crate::rudder::analysis::dfa::StatementUseAnalysis,
+    common::rudder::{
+        statement::{CastOperationKind, Statement},
+        types::Type,
+        {block::Block, function::Function, types::PrimitiveTypeClass},
     },
-    util::arena::{Arena, Ref},
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
+    },
 };
 
 pub fn run(f: &mut Function) -> bool {

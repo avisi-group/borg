@@ -1,11 +1,13 @@
 use {
-    sailrs::intern::InternedString,
-    num_rational::Ratio,
-    num_traits::CheckedMul,
-    std::{
+    crate::intern::InternedString,
+    alloc::vec::Vec,
+    core::{
         cmp::Ordering,
+        fmt::{self, Display, Formatter},
         ops::{Add, Div, Mul, Not, Sub},
     },
+    num_rational::Ratio,
+    num_traits::{float::FloatCore as _, CheckedMul},
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -201,6 +203,24 @@ impl PartialOrd for ConstantValue {
             (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => l.partial_cmp(r),
             (ConstantValue::Unit, ConstantValue::Unit) => Some(Ordering::Equal),
             _ => None,
+        }
+    }
+}
+
+impl Display for ConstantValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ConstantValue::UnsignedInteger(v) => write!(f, "{v}u"),
+            ConstantValue::SignedInteger(v) => write!(f, "{v}s"),
+            ConstantValue::FloatingPoint(v) => write!(f, "{v}f"),
+            ConstantValue::Unit => write!(f, "()"),
+            ConstantValue::String(str) => write!(f, "{str:?}"),
+            ConstantValue::Rational(r) => write!(f, "{r:?}"),
+            ConstantValue::Tuple(vs) => {
+                write!(f, "(").unwrap();
+                vs.iter().for_each(|v| write!(f, "{v},  ").unwrap());
+                write!(f, ")")
+            }
         }
     }
 }

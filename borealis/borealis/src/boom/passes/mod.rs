@@ -7,8 +7,9 @@
 
 use {
     crate::boom::Ast,
+    common::intern::InternedString,
     log::info,
-    sailrs::{intern::InternedString, shared::Shared},
+    sailrs::shared::Shared,
     std::{
         fs::{create_dir_all, File},
         path::PathBuf,

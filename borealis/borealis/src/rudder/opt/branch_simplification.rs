@@ -1,5 +1,5 @@
 use {
-    crate::rudder::{model::function::Function, model::statement::Statement},
+    common::rudder::{function::Function, statement::Statement},
     log::trace,
 };
 

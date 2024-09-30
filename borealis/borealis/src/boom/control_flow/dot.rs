@@ -3,9 +3,11 @@ use {
         self,
         control_flow::{ControlFlowBlock, Terminator},
     },
+    common::id::Id,
+    common::HashMap,
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
-    sailrs::{id::Id, shared::Shared, },
-    std::io, common::HashMap,
+    sailrs::shared::Shared,
+    std::io,
 };
 
 pub fn render<W: io::Write>(w: &mut W, block: &ControlFlowBlock) -> io::Result<()> {

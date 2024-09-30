@@ -1,23 +1,21 @@
 use {
     crate::{
-        rudder::model::{
+        arena::{Arena, Ref},
+        intern::InternedString,
+        rudder::{
             block::Block,
             constant_value::ConstantValue,
             function::Symbol,
             types::{PrimitiveType, PrimitiveTypeClass, Type},
         },
-        util::arena::{Arena, Ref},
+        HashMap,
     },
-    common::{HashMap, HashSet},
-    core::fmt,
-    itertools::Itertools,
-    proc_macro2::TokenStream,
-    quote::{format_ident, ToTokens, TokenStreamExt},
-    sailrs::intern::InternedString,
-    std::{
+    alloc::{format, string::String, vec::Vec},
+    core::{
         cmp::Ordering,
-        fmt::{Debug, Display},
+        fmt::{self, Debug, Display},
     },
+    itertools::Itertools,
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -267,11 +265,11 @@ pub enum Statement {
     ExitInlineCall,
 }
 
-impl ToTokens for Ref<Statement> {
-    fn to_tokens(&self, tokens: &mut TokenStream) {
-        tokens.append(format_ident!("s{}", self.index()))
-    }
-}
+// impl ToTokens for Ref<Statement> {
+//     fn to_tokens(&self, tokens: &mut TokenStream) {
+//         tokens.append(format_ident!("s{}", self.index()))
+//     }
+// }
 
 impl Display for Ref<Statement> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -371,7 +369,13 @@ impl Statement {
                         _ => panic!("non unsigned integer length: {length:#?}"),
                     }
                 } else {
-                    value.get(arena).typ(arena) // potentially should be Bits, but this type will always be wide enough (for example, extracted 32 bits from a u64, not the end of the world to store those 32 bits in a u64, but ideally a u32)
+                    value.get(arena).typ(arena) // potentially should be Bits,
+                                                // but this type will always be
+                                                // wide enough (for example,
+                                                // extracted 32 bits from a u64,
+                                                // not the end of the world to
+                                                // store those 32 bits in a u64,
+                                                // but ideally a u32)
                 }
             }
             Self::BitInsert {
@@ -1083,7 +1087,8 @@ pub enum Location {
     Before(Ref<Statement>),
 }
 
-/// Creates a new statement in the block's arena, and inserts it at the supplied location
+/// Creates a new statement in the block's arena, and inserts it at the supplied
+/// location
 pub fn build_at(
     block: Ref<Block>,
     arena: &mut Arena<Block>,
@@ -1364,7 +1369,7 @@ pub fn cast_at(
         ),
 
         (src, dst) => {
-            println!("current block: {:?}", block.get(arena));
+            log::error!("current block: {:?}", block.get(arena));
             panic!(
                 "cannot cast {:?} from {src:?} to {dst:?}",
                 source.get(s_arena)

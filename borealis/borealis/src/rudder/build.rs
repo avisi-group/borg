@@ -1,24 +1,24 @@
 use {
     crate::{
         boom::{self, bits_to_int, control_flow::ControlFlowBlock},
-        rudder::{
-            internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
-            model::{
-                block::Block,
-                constant_value::ConstantValue,
-                function::{Function, Symbol},
-                statement::{
-                    build, cast, BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind,
-                    Statement, UnaryOperationKind,
-                },
-                types::{PrimitiveType, PrimitiveTypeClass, Type},
-                Model, RegisterDescriptor,
-            },
+        rudder::internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
+        util::signed_smallest_width_of_value,
+    },
+    common::intern::InternedString,
+    common::rudder::{
+        block::Block,
+        constant_value::ConstantValue,
+        function::{Function, Symbol},
+        statement::{
+            build, cast, BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind,
+            Statement, UnaryOperationKind,
         },
-        util::{
-            arena::{Arena, Ref},
-            signed_smallest_width_of_value,
-        },
+        types::{PrimitiveType, PrimitiveTypeClass, Type},
+        Model, RegisterDescriptor,
+    },
+    common::{
+        arena::{Arena, Ref},
+        id::Id,
     },
     common::{HashMap, HashSet},
     log::trace,
@@ -26,7 +26,7 @@ use {
     num_traits::cast::FromPrimitive,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
-    sailrs::{id::Id, intern::InternedString, shared::Shared},
+    sailrs::shared::Shared,
     std::cmp::Ordering,
 };
 

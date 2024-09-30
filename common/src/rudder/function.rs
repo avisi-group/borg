@@ -1,14 +1,15 @@
 use {
     crate::{
-        rudder::model::{
+        arena::{Arena, Ref},
+        intern::InternedString,
+        rudder::{
             block::{Block, BlockIterator},
             types::Type,
         },
-        util::arena::{Arena, Ref},
+        HashMap,
     },
-    common::{HashMap, HashSet},
-    sailrs::intern::InternedString,
-    std::fmt::Debug,
+    alloc::vec::Vec,
+    core::fmt::{self, Debug, Display, Formatter},
 };
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -31,6 +32,12 @@ impl Symbol {
     }
 }
 
+impl Display for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name())
+    }
+}
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Function {
     // return type and parameters are read only, so do not need to exist behind a `Shared`
@@ -43,7 +50,7 @@ pub struct Function {
 }
 
 impl Debug for Function {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.name)
     }
 }

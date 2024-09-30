@@ -1,11 +1,9 @@
-use {
-    crate::rudder::{
-        function_inliner,
-        model::{function::Function, types::Type},
-        opt, validator,
-    },
-    common::{HashMap, HashSet},
-    sailrs::intern::InternedString,
+use core::fmt::{self, Display, Formatter};
+
+use crate::{
+    intern::InternedString,
+    rudder::{function::Function, types::Type},
+    HashMap,
 };
 
 pub mod block;
@@ -39,18 +37,6 @@ impl Model {
         self.fns.insert(name, func);
     }
 
-    pub fn optimise(&mut self, level: opt::OptLevel) {
-        opt::optimise(self, level);
-    }
-
-    pub fn validate(&mut self) -> Vec<validator::ValidationMessage> {
-        validator::validate(self)
-    }
-
-    pub fn function_inline(&mut self, top_level_fns: &[&'static str]) {
-        function_inliner::inline(self, top_level_fns);
-    }
-
     pub fn get_functions(&self) -> &HashMap<InternedString, Function> {
         &self.fns
     }
@@ -61,5 +47,29 @@ impl Model {
 
     pub fn registers(&self) -> &HashMap<InternedString, RegisterDescriptor> {
         &self.registers
+    }
+}
+
+impl Display for Model {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        writeln!(f, "rudder context:")?;
+
+        for (name, func) in self.get_functions().iter() {
+            writeln!(f, "function {}:", name,)?;
+
+            write!(f, "{}", func)?;
+            writeln!(f)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Display for Function {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.block_iter().try_for_each(|block| {
+            writeln!(f, "  block{}:", block.index())?;
+            write!(f, "{}", block.get(self.arena()))
+        })
     }
 }

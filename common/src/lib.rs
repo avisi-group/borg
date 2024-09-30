@@ -1,8 +1,14 @@
 #![no_std]
 
-use {core::hash::BuildHasherDefault, twox_hash::XxHash64};
+extern crate alloc;
 
 pub use hashbrown::hash_map::Entry;
+use {core::hash::BuildHasherDefault, twox_hash::XxHash64};
+
+pub mod arena;
+pub mod id;
+pub mod intern;
+pub mod rudder;
 
 /// HashMap with non-default hasher
 pub type HashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<XxHash64>>;

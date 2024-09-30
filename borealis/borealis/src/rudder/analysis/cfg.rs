@@ -1,12 +1,12 @@
 use {
-    crate::{
-        rudder::model::{block::Block, function::Function, statement::Statement, Model},
-        util::arena::Ref,
+    common::{
+        arena::Ref,
+        intern::InternedString,
+        rudder::{block::Block, function::Function, statement::Statement, Model},
     },
     common::{HashMap, HashSet},
     dot::{GraphWalk, Labeller},
     log::trace,
-    sailrs::intern::InternedString,
     std::{collections::VecDeque, io},
 };
 
@@ -203,7 +203,6 @@ impl<'ast> GraphWalk<'ast, NodeId, EdgeId> for FunctionCallGraphAnalysis {
         self.fn_callees
             .keys()
             .cloned()
-            .map(|n| crate::codegen::codegen_ident(n).to_string().into())
             .collect::<Vec<InternedString>>()
             .into()
     }

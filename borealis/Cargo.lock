@@ -177,6 +177,7 @@ dependencies = [
 name = "borealis"
 version = "0.3.0"
 dependencies = [
+ "bincode",
  "cargo-util-schemas",
  "clap",
  "color-eyre",
@@ -395,8 +396,17 @@ checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 name = "common"
 version = "0.0.0"
 dependencies = [
+ "bincode",
+ "deepsize",
  "hashbrown 0.14.5",
+ "itertools",
+ "lasso",
+ "log",
+ "num-rational",
+ "num-traits",
+ "ocaml",
  "rkyv",
+ "serde",
  "twox-hash",
 ]
 
