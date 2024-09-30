@@ -7,8 +7,9 @@ use {
         },
         util::arena::Ref,
     },
-    sailrs::{intern::InternedString, HashMap},
+    common::{HashMap, HashSet},
     log::trace,
+    sailrs::intern::InternedString,
 };
 
 pub fn run(f: &mut Function) -> bool {

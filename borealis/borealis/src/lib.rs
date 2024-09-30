@@ -13,6 +13,7 @@ use {
         },
         codegen::{codegen_workspace, workspace::write_workspace},
     },
+    common::HashMap,
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{debug, info, trace},
@@ -20,7 +21,6 @@ use {
     sailrs::{
         bytes, create_file_buffered,
         intern::{init_interner, interner, InternedString},
-        HashMap,
     },
     sailrs::{
         jib_ast::{self, Definition, DefinitionAux, Instruction},

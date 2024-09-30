@@ -20,12 +20,13 @@ use {
             signed_smallest_width_of_value,
         },
     },
+    common::{HashMap, HashSet},
     log::trace,
     num_rational::Ratio,
     num_traits::cast::FromPrimitive,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
-    sailrs::{id::Id, intern::InternedString, shared::Shared, HashMap},
+    sailrs::{id::Id, intern::InternedString, shared::Shared},
     std::cmp::Ordering,
 };
 
@@ -1243,118 +1244,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 )),
 
-                "write_gpr_from_vector" => {
-                    // todo assert args[2] is always "GPRs"
-                    // assuming GPRs are contiguoous
-
-                    // %i argument to unsigned
-                    let n = cast(self.block, self.block_arena_mut(), args[0].clone(), Type::u64());
-
-                    let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
-
-                    let base = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u64()),
-                            value: ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
-                        },
-                    );
-
-                    let eight = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u64()),
-                            value: ConstantValue::UnsignedInteger(8),
-                        },
-                    );
-
-                    let offset = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BinaryOperation {
-                            kind: BinaryOperationKind::Multiply,
-                            lhs: n,
-                            rhs: eight,
-                        },
-                    );
-
-                    let offset = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BinaryOperation {
-                            kind: BinaryOperationKind::Add,
-                            lhs: base,
-                            rhs: offset,
-                        },
-                    );
-
-                    Some(build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::WriteRegister {
-                            offset,
-                            value: args[1].clone(),
-                        },
-                    ))
-                }
-                "read_gpr_from_vector" => {
-                    // todo assert args[1] is always "GPRs"
-                    // assuming GPRs are contiguoous
-
-                    // %i argument to unsigned
-                    let n = cast(self.block, self.block_arena_mut(), args[0].clone(), Type::u64());
-
-                    let base = self.ctx().registers.get(&"R0".into()).unwrap().offset;
-
-                    let base = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u64()),
-                            value: ConstantValue::UnsignedInteger(u64::try_from(base).unwrap()),
-                        },
-                    );
-
-                    let eight = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u64()),
-                            value: ConstantValue::UnsignedInteger(8),
-                        },
-                    );
-
-                    let offset = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BinaryOperation {
-                            kind: BinaryOperationKind::Multiply,
-                            lhs: n,
-                            rhs: eight,
-                        },
-                    );
-
-                    let offset = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BinaryOperation {
-                            kind: BinaryOperationKind::Add,
-                            lhs: base,
-                            rhs: offset,
-                        },
-                    );
-
-                    Some(build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::ReadRegister {
-                            typ: (Type::u64()),
-                            offset,
-                        },
-                    ))
-                }
 
                 // val bitvector_update : (%bv, %i, %bit) -> %bv
                 "bitvector_update" => {

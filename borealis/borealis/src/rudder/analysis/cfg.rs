@@ -3,9 +3,10 @@ use {
         rudder::model::{block::Block, function::Function, statement::Statement, Model},
         util::arena::Ref,
     },
-    sailrs::{intern::InternedString, HashMap, HashSet},
+    common::{HashMap, HashSet},
     dot::{GraphWalk, Labeller},
     log::trace,
+    sailrs::intern::InternedString,
     std::{collections::VecDeque, io},
 };
 

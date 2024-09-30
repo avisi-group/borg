@@ -3,7 +3,8 @@ use {
         InheritableDependency, InheritableField, PackageName, TomlDependency,
         TomlDetailedDependency, TomlManifest, TomlPackage,
     },
-    sailrs::{intern::InternedString, HashMap, HashSet},
+    common::{HashMap, HashSet},
+    sailrs::intern::InternedString,
     semver::{BuildMetadata, Prerelease, Version},
     std::{
         collections::{BTreeMap, BTreeSet},

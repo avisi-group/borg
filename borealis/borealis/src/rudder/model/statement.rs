@@ -8,11 +8,12 @@ use {
         },
         util::arena::{Arena, Ref},
     },
-    sailrs::{intern::InternedString, HashMap},
+    common::{HashMap, HashSet},
     core::fmt,
     itertools::Itertools,
     proc_macro2::TokenStream,
     quote::{format_ident, ToTokens, TokenStreamExt},
+    sailrs::intern::InternedString,
     std::{
         cmp::Ordering,
         fmt::{Debug, Display},
@@ -1559,7 +1560,7 @@ pub fn import_statement(
         Statement::CreateTuple(values) => Statement::CreateTuple(
             values
                 .iter()
-                .map(|v| mapping.get(&v).unwrap())
+                .map(|v| mapping.get(v).unwrap())
                 .cloned()
                 .collect(),
         ),

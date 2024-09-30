@@ -4,8 +4,8 @@ use {
         control_flow::{ControlFlowBlock, Terminator},
     },
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
-    sailrs::{id::Id, shared::Shared, HashMap},
-    std::io,
+    sailrs::{id::Id, shared::Shared, },
+    std::io, common::HashMap,
 };
 
 pub fn render<W: io::Write>(w: &mut W, block: &ControlFlowBlock) -> io::Result<()> {

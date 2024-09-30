@@ -7,7 +7,8 @@ use {
         },
         util::arena::{Arena, Ref},
     },
-    sailrs::{intern::InternedString, HashMap, HashSet},
+    common::{HashMap, HashSet},
+    sailrs::intern::InternedString,
 };
 
 pub struct SymbolUseAnalysis {

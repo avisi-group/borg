@@ -13,7 +13,8 @@ use {
         },
         util::arena::Ref,
     },
-    sailrs::{id::Id, intern::InternedString, HashMap},
+    common::{HashMap, HashSet},
+    sailrs::{id::Id, intern::InternedString},
 };
 
 /// In a function, go through all blocks, looking for function calls

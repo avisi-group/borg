@@ -1,7 +1,7 @@
 //! String interning
 
 use {
-    crate::HashMap,
+    common::HashMap,
     deepsize::DeepSizeOf,
     lasso::{Key, Spur, ThreadedRodeo},
     ocaml::{FromValue, ToValue, Value},

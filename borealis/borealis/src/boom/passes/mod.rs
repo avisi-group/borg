@@ -7,8 +7,8 @@
 
 use {
     crate::boom::Ast,
-    sailrs::shared::Shared,
     log::info,
+    sailrs::{intern::InternedString, shared::Shared},
     std::{
         fs::{create_dir_all, File},
         path::PathBuf,
@@ -65,7 +65,7 @@ fn _dump_func_dot(ast: Shared<Ast>, func: &'static str, filename: Option<&'stati
 
     ast.get()
         .functions
-        .get(&func.into())
+        .get(&InternedString::from_static(func))
         .unwrap()
         .entry_block
         .as_dot(&mut File::create(path).unwrap())

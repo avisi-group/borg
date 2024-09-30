@@ -3,10 +3,10 @@ use {
         control_flow::{ControlFlowBlock, Terminator},
         Literal, Statement, Value,
     },
+    common::HashMap,
     sailrs::{
         intern::InternedString,
         shared::{Shared, SharedKey},
-        HashMap,
     },
 };
 
@@ -170,7 +170,10 @@ impl ControlFlowGraphBuilder {
         unresolved: Shared<MaybeUnresolvedControlFlowBlock>,
     ) -> ControlFlowBlock {
         // if block is already resolved, return that
-        if let Some(resolved) = self.resolved_blocks.get(&unresolved.clone().into()) {
+        if let Some(resolved) = self
+            .resolved_blocks
+            .get(&SharedKey::from(unresolved.clone()))
+        {
             return resolved.clone();
         }
 

@@ -5,9 +5,10 @@ use {
         control_flow::{dot, ControlFlowBlock},
         Expression, Statement, Value,
     },
-    sailrs::{intern::InternedString, shared::Shared, HashSet},
+    common::{HashMap, HashSet},
     itertools::Itertools,
     log::trace,
+    sailrs::{intern::InternedString, shared::Shared},
     std::{
         collections::LinkedList,
         io::{self, Write},

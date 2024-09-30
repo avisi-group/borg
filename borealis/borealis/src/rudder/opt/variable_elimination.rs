@@ -2,14 +2,12 @@ use {
     crate::{
         rudder::{
             analysis,
-            model::statement::Statement,
-            model::{block::Block, function::Function},
+            model::{block::Block, function::Function, statement::Statement},
         },
         util::arena::{Arena, Ref},
     },
-    sailrs::HashMap,
+    common::{Entry, HashMap, HashSet},
     log::trace,
-    std::collections::hash_map::Entry,
 };
 
 pub fn run(f: &mut Function) -> bool {

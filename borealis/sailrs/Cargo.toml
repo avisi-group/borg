@@ -8,6 +8,8 @@ homepage = "https://avisi.org.uk"
 repository = "https://github.com/avisi-group/borealis"
 
 [dependencies]
+common = { path = "../../common" }
+
 ocaml = { version = "1.0.1", features = ["no-panic-hook"] }
 once_cell = "1.19.0"
 parking_lot = "0.12.3"

@@ -12,8 +12,7 @@ use {
     byte_unit::{AdjustedByte, Byte},
     color_eyre::{eyre::WrapErr, Result},
     errctx::PathCtx,
-    std::{fs::File, hash::BuildHasherDefault, io::BufWriter},
-    twox_hash::XxHash64,
+    std::{fs::File, io::BufWriter},
 };
 
 pub mod error;
@@ -29,12 +28,6 @@ pub mod sail_ast;
 pub mod shared;
 pub mod type_check;
 pub mod types;
-
-/// HashMap with non-default hasher
-pub type HashMap<K, V> = std::collections::HashMap<K, V, BuildHasherDefault<XxHash64>>;
-
-/// HashSet with non-default hasher
-pub type HashSet<T> = std::collections::HashSet<T, BuildHasherDefault<XxHash64>>;
 
 /// Loads Sail files from `sail.json` model configuration.
 ///

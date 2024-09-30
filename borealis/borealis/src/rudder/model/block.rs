@@ -3,7 +3,7 @@ use {
         rudder::model::statement::Statement,
         util::arena::{Arena, Ref},
     },
-    sailrs::HashSet,
+    common::{HashMap, HashSet},
 };
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

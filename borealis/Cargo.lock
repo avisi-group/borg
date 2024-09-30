@@ -180,10 +180,12 @@ dependencies = [
  "cargo-util-schemas",
  "clap",
  "color-eyre",
+ "common",
  "deepsize",
  "displaydoc",
  "dot",
  "errctx",
+ "hashbrown 0.14.5",
  "itertools",
  "kinded",
  "log",
@@ -388,6 +390,15 @@ name = "colorchoice"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
+
+[[package]]
+name = "common"
+version = "0.0.0"
+dependencies = [
+ "hashbrown 0.14.5",
+ "rkyv",
+ "twox-hash",
+]
 
 [[package]]
 name = "convert_case"
@@ -611,6 +622,8 @@ checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash 0.8.11",
  "allocator-api2",
+ "rayon",
+ "rkyv",
  "serde",
 ]
 
@@ -1279,6 +1292,7 @@ dependencies = [
  "cc",
  "clap",
  "color-eyre",
+ "common",
  "deepsize",
  "displaydoc",
  "errctx",

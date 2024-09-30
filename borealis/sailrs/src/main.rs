@@ -1,6 +1,7 @@
 use {
     clap::Parser,
     color_eyre::Result,
+    common::HashMap,
     deepsize::DeepSizeOf,
     log::info,
     rkyv::ser::{serializers::AllocSerializer, Serializer},
@@ -8,7 +9,6 @@ use {
     sailrs::{
         bytes, create_file_buffered, init_logger,
         intern::{get_interner_state, init_interner, interner},
-        HashMap,
     },
     std::{io::Write, path::PathBuf},
 };

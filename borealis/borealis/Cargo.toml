@@ -7,7 +7,7 @@ description = "Sail frontend for GenSim"
 
 [dependencies]
 sailrs = { path = "../sailrs" }
-
+common = { path = "../../common" }
 
 displaydoc = "0.2.5"
 thiserror = "1.0.64"
@@ -39,3 +39,4 @@ rayon = "1.10.0"
 num-rational = { version = "0.4.2", default-features = false, features = ["serde"]}
 num-traits = { version = "0.2.19", default-features = false, features = ["i128"] }
 serde = { version = "1.0.210", features = ["derive"] }
+hashbrown = { version = "0.14.5", features = ["rkyv", "serde", "rayon"] }

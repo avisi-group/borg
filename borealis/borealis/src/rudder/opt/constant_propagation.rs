@@ -7,7 +7,7 @@ use {
         },
         util::arena::{Arena, Ref},
     },
-    sailrs::HashMap,
+    common::{HashMap, HashSet},
     log::trace,
 };
 

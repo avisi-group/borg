@@ -2,7 +2,7 @@
 
 use {
     crate::boom::{passes::Pass, Ast, Size, Type},
-    sailrs::shared::Shared,
+    sailrs::{intern::InternedString, shared::Shared},
 };
 
 /// Adds registers needed for exceptions
@@ -23,7 +23,11 @@ impl Pass for FixExceptions {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        let (width, _) = *ast.get().unions.get(&("exception".into())).unwrap();
+        let (width, _) = *ast
+            .get()
+            .unions
+            .get(&InternedString::from_static("exception"))
+            .unwrap();
 
         let registers = &mut ast.get_mut().registers;
 

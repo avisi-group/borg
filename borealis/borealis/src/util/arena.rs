@@ -39,6 +39,26 @@ pub struct Ref<T> {
     _phantom: PhantomData<T>,
 }
 
+impl<T> Ref<T> {
+    pub fn get_mut<'reph, 'arena: 'reph>(&self, arena: &'arena mut Arena<T>) -> &'reph mut T {
+        #[cfg(debug_assertions)]
+        assert_eq!(arena.id, self.arena);
+
+        arena.vec.get_mut(self.index).unwrap()
+    }
+
+    pub fn get<'reph, 'arena: 'reph>(&self, arena: &'arena Arena<T>) -> &'reph T {
+        #[cfg(debug_assertions)]
+        assert_eq!(arena.id, self.arena);
+
+        arena.vec.get(self.index).unwrap()
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+}
+
 impl<T> Hash for Ref<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.index.hash(state);
@@ -60,23 +80,3 @@ impl<T> Clone for Ref<T> {
 }
 
 impl<T> Copy for Ref<T> {}
-
-impl<T> Ref<T> {
-    pub fn get_mut<'reph, 'arena: 'reph>(&self, arena: &'arena mut Arena<T>) -> &'reph mut T {
-        #[cfg(debug_assertions)]
-        assert_eq!(arena.id, self.arena);
-
-        arena.vec.get_mut(self.index).unwrap()
-    }
-
-    pub fn get<'reph, 'arena: 'reph>(&self, arena: &'arena Arena<T>) -> &'reph T {
-        #[cfg(debug_assertions)]
-        assert_eq!(arena.id, self.arena);
-
-        arena.vec.get(self.index).unwrap()
-    }
-
-    pub fn index(&self) -> usize {
-        self.index
-    }
-}

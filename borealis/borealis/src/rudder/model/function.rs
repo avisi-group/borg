@@ -6,7 +6,8 @@ use {
         },
         util::arena::{Arena, Ref},
     },
-    sailrs::{intern::InternedString, HashMap},
+    common::{HashMap, HashSet},
+    sailrs::intern::InternedString,
     std::fmt::Debug,
 };
 

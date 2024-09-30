@@ -6,8 +6,9 @@ use {
         passes::{any::AnyExt, Pass},
         Ast,
     },
-    sailrs::{shared::Shared, HashSet},
+    common::{HashMap, HashSet},
     log::{debug, trace},
+    sailrs::shared::Shared,
 };
 
 /// Branches with a constant condition can be removed

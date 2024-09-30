@@ -13,11 +13,11 @@ use {
         visitor::{Visitor, Walkable},
         Literal, Statement, Value,
     },
+    common::{HashMap, HashSet},
     sailrs::{
         id::Id,
         intern::InternedString,
         shared::{Shared, Weak},
-        HashSet,
     },
     std::{
         fmt::{self, Display, Formatter},

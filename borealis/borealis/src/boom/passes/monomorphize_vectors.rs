@@ -11,7 +11,8 @@ use {
         passes::{any::AnyExt, Pass},
         Ast, Expression, Statement, Type, Value,
     },
-    sailrs::{shared::Shared, HashMap},
+    common::{HashMap, HashSet},
+    sailrs::shared::Shared,
 };
 
 #[derive(Debug, Default)]

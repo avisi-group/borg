@@ -6,9 +6,10 @@ use {
         passes::{any::AnyExt, Pass},
         Ast,
     },
-    sailrs::{shared::Shared, HashSet},
+    common::{HashMap, HashSet},
     log::{debug, trace},
     pretty_assertions::assert_eq,
+    sailrs::shared::Shared,
 };
 
 /// Control flow blocks with only one parent and one child (unconditional jump
