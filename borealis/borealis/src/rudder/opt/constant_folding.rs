@@ -1,14 +1,11 @@
-use {
-    common::rudder::{
+use common::{
+    arena::{Arena, Ref},
+    rudder::{
         block::Block,
         constant_value::ConstantValue,
         function::Function,
         statement::{BinaryOperationKind, CastOperationKind, Statement, UnaryOperationKind},
         types::{PrimitiveTypeClass, Type},
-    },
-    common::{
-        arena::{Arena, Ref},
-        id::Id,
     },
 };
 

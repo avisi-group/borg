@@ -1,14 +1,10 @@
 use {
     crate::rudder::analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
-    common::rudder::{
-        statement::Statement,
-        {block::Block, function::Function},
-    },
     common::{
         arena::{Arena, Ref},
-        id::Id,
+        rudder::{block::Block, function::Function, statement::Statement},
+        HashMap,
     },
-    common::{HashMap, HashSet},
     log::trace,
 };
 

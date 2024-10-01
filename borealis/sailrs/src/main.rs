@@ -1,8 +1,7 @@
 use {
     clap::Parser,
     color_eyre::Result,
-    common::intern,
-    common::{intern::get_interner_state, HashMap},
+    common::{intern, intern::get_interner_state, HashMap},
     deepsize::DeepSizeOf,
     log::info,
     rkyv::ser::{serializers::AllocSerializer, Serializer},

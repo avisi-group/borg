@@ -1,16 +1,15 @@
 use {
-    common::intern::InternedString,
-    common::rudder::{
-        block::Block,
-        constant_value::ConstantValue,
-        function::Function,
-        statement::Statement,
-        types::{PrimitiveType, PrimitiveTypeClass, Type},
-        Model,
-    },
     common::{
-        arena::{Arena, Ref},
-        id::Id,
+        arena::Ref,
+        intern::InternedString,
+        rudder::{
+            block::Block,
+            constant_value::ConstantValue,
+            function::Function,
+            statement::Statement,
+            types::{PrimitiveType, PrimitiveTypeClass, Type},
+            Model,
+        },
     },
     std::fmt::Display,
 };

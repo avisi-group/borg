@@ -1,11 +1,10 @@
 use {
     crate::rudder::analysis,
-    common::rudder::{block::Block, function::Function, statement::Statement},
     common::{
         arena::{Arena, Ref},
-        id::Id,
+        rudder::{block::Block, function::Function, statement::Statement},
+        Entry, HashMap,
     },
-    common::{Entry, HashMap, HashSet},
     log::trace,
 };
 

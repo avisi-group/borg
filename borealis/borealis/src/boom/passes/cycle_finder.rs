@@ -2,8 +2,8 @@
 
 use {
     crate::boom::{passes::Pass, Ast},
-    sailrs::shared::Shared,
     log::warn,
+    sailrs::shared::Shared,
 };
 /// Finds cycles in the control flow graph
 #[derive(Debug, Default)]

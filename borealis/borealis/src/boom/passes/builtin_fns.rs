@@ -1,10 +1,11 @@
-// Although some builtin fns are handled in rudder, we handle some basic ones here to make the destruct_composites pass
+// Although some builtin fns are handled in rudder, we handle some basic ones
+// here to make the destruct_composites pass
 
 use {
     crate::boom::{passes::Pass, Ast, Expression, Literal, Operation, Statement, Value},
-    sailrs::shared::Shared,
     once_cell::sync::Lazy,
     regex::Regex,
+    sailrs::shared::Shared,
 };
 
 const EQ_ANY_GENERIC: Lazy<Regex> =

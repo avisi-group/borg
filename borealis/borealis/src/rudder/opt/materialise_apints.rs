@@ -1,13 +1,13 @@
 use {
     crate::rudder::analysis::dfa::StatementUseAnalysis,
-    common::rudder::{
-        statement::{CastOperationKind, Statement},
-        types::Type,
-        {block::Block, function::Function, types::PrimitiveTypeClass},
-    },
     common::{
         arena::{Arena, Ref},
-        id::Id,
+        rudder::{
+            block::Block,
+            function::Function,
+            statement::{CastOperationKind, Statement},
+            types::{PrimitiveTypeClass, Type},
+        },
     },
 };
 

@@ -5,14 +5,12 @@ use {
         self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionDefinition,
         FunctionSignature, NamedType, Parameter, Size, Type,
     },
-    common::intern::InternedString,
-    common::width_helpers::signed_smallest_width_of_value,
-    common::HashMap,
+    common::{intern::InternedString, width_helpers::signed_smallest_width_of_value, HashMap},
     itertools::Itertools,
-    sailrs::shared::Shared,
     sailrs::{
         jib_ast::{self, CReturn},
         sail_ast,
+        shared::Shared,
     },
     std::borrow::Borrow,
 };

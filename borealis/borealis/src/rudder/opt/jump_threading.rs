@@ -1,12 +1,6 @@
-use {
-    common::rudder::{
-        statement::Statement,
-        {block::Block, function::Function},
-    },
-    common::{
-        arena::{Arena, Ref},
-        id::Id,
-    },
+use common::{
+    arena::Ref,
+    rudder::{block::Block, function::Function, statement::Statement},
 };
 
 pub fn run(f: &mut Function) -> bool {

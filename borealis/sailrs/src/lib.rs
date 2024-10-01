@@ -4,15 +4,12 @@
 
 use {
     crate::{error::Error, ffi::run_sail, json::ModelConfig, runtime::RT, types::ListVec},
-    log::trace,
-    ocaml::FromValue,
-    std::path::Path,
-};
-use {
     byte_unit::{AdjustedByte, Byte},
     color_eyre::{eyre::WrapErr, Result},
     errctx::PathCtx,
-    std::{fs::File, io::BufWriter},
+    log::trace,
+    ocaml::FromValue,
+    std::{fs::File, io::BufWriter, path::Path},
 };
 
 pub mod error;

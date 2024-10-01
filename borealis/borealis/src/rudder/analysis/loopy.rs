@@ -1,6 +1,5 @@
 use {
-    common::rudder::function::Function,
-    common::{HashMap, HashSet},
+    common::{rudder::function::Function, HashSet},
     std::collections::VecDeque,
 };
 

@@ -3,8 +3,7 @@ use {
         control_flow::{ControlFlowBlock, Terminator},
         Literal, Statement, Value,
     },
-    common::intern::InternedString,
-    common::HashMap,
+    common::{intern::InternedString, HashMap},
     sailrs::shared::{Shared, SharedKey},
 };
 

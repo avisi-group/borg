@@ -13,9 +13,7 @@ use {
         visitor::{Visitor, Walkable},
         Literal, Statement, Value,
     },
-    common::id::Id,
-    common::intern::InternedString,
-    common::{HashMap, HashSet},
+    common::{id::Id, intern::InternedString, HashSet},
     sailrs::shared::{Shared, Weak},
     std::{
         fmt::{self, Display, Formatter},

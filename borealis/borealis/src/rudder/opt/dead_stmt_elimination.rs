@@ -1,9 +1,8 @@
 use {
     crate::rudder::analysis::dfa::StatementUseAnalysis,
-    common::rudder::{block::Block, function::Function},
     common::{
         arena::{Arena, Ref},
-        id::Id,
+        rudder::{block::Block, function::Function},
     },
     log::trace,
 };

@@ -19,7 +19,7 @@ use {
             Model, RegisterDescriptor,
         },
         width_helpers::signed_smallest_width_of_value,
-        HashMap, HashSet,
+        HashMap,
     },
     log::trace,
     num_rational::Ratio,

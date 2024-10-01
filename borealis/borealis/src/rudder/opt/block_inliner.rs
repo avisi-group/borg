@@ -1,13 +1,11 @@
-use {
-    common::rudder::{
+use common::{
+    arena::Ref,
+    rudder::{
+        block::Block,
+        function::Function,
         statement::{import_statement, Statement},
-        {block::Block, function::Function},
     },
-    common::{
-        arena::{Arena, Ref},
-        id::Id,
-    },
-    common::{HashMap, HashSet},
+    HashMap,
 };
 
 const INLINE_SIZE_THRESHOLD: usize = 5;

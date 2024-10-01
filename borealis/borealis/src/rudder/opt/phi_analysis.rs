@@ -1,17 +1,11 @@
 use {
     crate::rudder::analysis::loopy::LoopAnalysis,
     common::{
-        arena::{Arena, Ref},
-        id::Id,
-    },
-    common::{
+        arena::Ref,
         intern::InternedString,
-        rudder::{
-            statement::Statement,
-            {block::Block, function::Function},
-        },
+        rudder::{block::Block, function::Function, statement::Statement},
+        HashMap,
     },
-    common::{HashMap, HashSet},
     log::trace,
 };
 

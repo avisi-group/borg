@@ -1,7 +1,6 @@
 //! JIB AST pretty printing
 
 use {
-    common::intern::InternedString,
     crate::{
         jib_ast::{
             visitor::Visitor, CReturn, Definition, DefinitionAux, Expression, Instruction,
@@ -9,7 +8,7 @@ use {
         },
         sail_ast::Identifier,
     },
-    common::HashSet,
+    common::{intern::InternedString, HashSet},
     std::{
         io::Write,
         rc::Rc,

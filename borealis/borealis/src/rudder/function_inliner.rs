@@ -1,9 +1,9 @@
 use {
     crate::{fn_is_allowlisted, rudder::analysis::dfa::StatementUseAnalysis},
-    common::intern::InternedString,
     common::{
-        arena::{Arena, Ref},
+        arena::Ref,
         id::Id,
+        intern::InternedString,
         rudder::{
             block::Block,
             function::{Function, Symbol},
@@ -11,8 +11,8 @@ use {
             types::Type,
             Model,
         },
+        HashMap,
     },
-    common::{HashMap, HashSet},
 };
 
 /// In a function, go through all blocks, looking for function calls
@@ -37,13 +37,19 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
             log::warn!("inlining {name}");
             let mut function = model.get_functions_mut().remove(&name).unwrap();
 
-            // map of function name to imported entry block and exit block, used to avoid importing an inlined function more than once
+            // map of function name to imported entry block and exit block, used to avoid
+            // importing an inlined function more than once
             let mut inlined = HashMap::default();
 
-            // EnterInlineCall statements have to reference the exit block of the inlined function, in order to set up the mapping in the DBT from exit block to the call site post block
-            // ExitInlineCall statements lookup the current block index in that mapping and jump back to whereever the inline call started
+            // EnterInlineCall statements have to reference the exit block of the inlined
+            // function, in order to set up the mapping in the DBT from exit block to the
+            // call site post block ExitInlineCall statements lookup the current
+            // block index in that mapping and jump back to whereever the inline call
+            // started
             //
-            // However, if we have a block that contains calls and ends with an ExitInlineCall, after inlining the ExitInlineCall statement will be in a different block, invalidating those references
+            // However, if we have a block that contains calls and ends with an
+            // ExitInlineCall, after inlining the ExitInlineCall statement will be in a
+            // different block, invalidating those references
             //
             // This is a map of old block refs to new exitinlinecall block refs
             let mut exit_inline_call_rewrites = HashMap::default();
@@ -112,7 +118,9 @@ fn run_inliner(
                     block_ref.get(function.arena())
                 );
 
-                // if the block we're about to split contains an exit inline call, we'll need to replace any EnterInlineCall's that reference this exit block to the new exit block (the post call block)
+                // if the block we're about to split contains an exit inline call, we'll need to
+                // replace any EnterInlineCall's that reference this exit block to the new exit
+                // block (the post call block)
                 let needs_exit_rewrite = if let Statement::ExitInlineCall = block_ref
                     .get(function.arena())
                     .terminator_statement()
@@ -124,7 +132,8 @@ fn run_inliner(
                     None
                 };
 
-                // determine if there are dependencies between pre and post, and write-read to a new local variable if so
+                // determine if there are dependencies between pre and post, and write-read to a
+                // new local variable if so
                 {
                     let (pre_statements, post_statements) = {
                         let (pre, post) =
@@ -190,7 +199,8 @@ fn run_inliner(
                     (pre.to_owned(), post.to_owned())
                 };
 
-                // the pre block is the current block which will be trimmed to only contain statements before the call
+                // the pre block is the current block which will be trimmed to only contain
+                // statements before the call
                 let pre_block_ref = block_ref;
 
                 // post block is a new block containing all statements after the call
@@ -205,7 +215,8 @@ fn run_inliner(
                 let imported_function = inlined.entry(call_name).or_insert_with(|| {
                     let symbol_prefix = format!("inline{:x}_", Id::new());
 
-                    // import local variables and the parameters as new local variables in the current function (namespaced using the unique prefix)
+                    // import local variables and the parameters as new local variables in the
+                    // current function (namespaced using the unique prefix)
                     other_fn
                         .local_variables()
                         .iter()
@@ -260,7 +271,8 @@ fn run_inliner(
                 {
                     let mut mapping = HashMap::default();
 
-                    // return value constructed by reading the `borealis_inline_return` local variable(s)
+                    // return value constructed by reading the `borealis_inline_return` local
+                    // variable(s)
                     let return_value = if let Type::Tuple(ts) = other_fn.return_type() {
                         let reads = ts
                             .iter()
@@ -303,7 +315,8 @@ fn run_inliner(
                         )
                     };
 
-                    // replace call with read variable of return value so that future statements aren't invalidated
+                    // replace call with read variable of return value so that future statements
+                    // aren't invalidated
                     mapping.insert(post_statements[0], return_value);
 
                     // copy remaining statements from pre block to post block

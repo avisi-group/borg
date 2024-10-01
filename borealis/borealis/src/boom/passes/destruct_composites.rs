@@ -3,8 +3,7 @@ use {
         control_flow::Terminator, passes::Pass, visitor::Visitor, Ast, Expression,
         FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type, Value,
     },
-    common::intern::InternedString,
-    common::{HashMap, HashSet},
+    common::{intern::InternedString, HashMap},
     sailrs::shared::Shared,
 };
 

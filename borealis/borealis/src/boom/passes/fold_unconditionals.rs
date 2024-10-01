@@ -6,7 +6,7 @@ use {
         passes::{any::AnyExt, Pass},
         Ast,
     },
-    common::{HashMap, HashSet},
+    common::HashSet,
     log::{debug, trace},
     pretty_assertions::assert_eq,
     sailrs::shared::Shared,

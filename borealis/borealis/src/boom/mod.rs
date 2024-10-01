@@ -9,12 +9,10 @@ use {
         convert::BoomEmitter,
         visitor::{Visitor, Walkable},
     },
-    common::intern::InternedString,
-    common::{HashMap, HashSet},
+    common::{intern::InternedString, HashMap},
     kinded::Kinded,
     num_bigint::BigInt,
-    sailrs::jib_ast,
-    sailrs::shared::Shared,
+    sailrs::{jib_ast, shared::Shared},
     std::{fmt::Debug, ops::Add},
 };
 
