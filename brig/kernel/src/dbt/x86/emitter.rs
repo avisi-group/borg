@@ -11,6 +11,7 @@ use {
     core::{
         cell::RefCell,
         fmt::{Debug, LowerHex},
+        hash::{Hash, Hasher},
         panic,
     },
     proc_macro_lib::ktest,
@@ -1008,6 +1009,12 @@ impl Debug for X86BlockRef {
         }
 
         Ok(())
+    }
+}
+
+impl Hash for X86BlockRef {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (self.0.as_ptr() as usize).hash(state)
     }
 }
 

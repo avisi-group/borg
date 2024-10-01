@@ -9,4 +9,4 @@
 **/target
 **/_build
 
-/brig-cli/guest_data/aarch64.bin
+/brig-cli/guest_data/aarch64.postcard

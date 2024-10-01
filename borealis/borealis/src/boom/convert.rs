@@ -1,15 +1,13 @@
 //! JIB to BOOM conversion
 
 use {
-    crate::{
-        boom::{
-            self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionDefinition,
-            FunctionSignature, NamedType, Parameter, Size, Type,
-        },
-        util::signed_smallest_width_of_value,
+    crate::boom::{
+        self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionDefinition,
+        FunctionSignature, NamedType, Parameter, Size, Type,
     },
     common::intern::InternedString,
-    common::{HashMap, HashSet},
+    common::width_helpers::signed_smallest_width_of_value,
+    common::HashMap,
     itertools::Itertools,
     sailrs::shared::Shared,
     sailrs::{

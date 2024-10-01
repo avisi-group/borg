@@ -48,6 +48,13 @@ impl Model {
     pub fn registers(&self) -> &HashMap<InternedString, RegisterDescriptor> {
         &self.registers
     }
+
+    pub fn reg_offset(&self, name: &'static str) -> usize {
+        self.registers
+            .get(&InternedString::from_static(name))
+            .unwrap_or_else(|| panic!("no register found with name {name:?}"))
+            .offset
+    }
 }
 
 impl Display for Model {

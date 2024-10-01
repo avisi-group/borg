@@ -1,12 +1,15 @@
-use crate::HashMap;
-use alloc::borrow::ToOwned;
-use alloc::string::{String, ToString};
-use core::cell::OnceCell;
-use core::hash::BuildHasherDefault;
-use deepsize::DeepSizeOf;
-use lasso::{Key, Spur};
-use rkyv::{Archive, Archived, Fallible};
-use twox_hash::XxHash64;
+use {
+    crate::HashMap,
+    alloc::{
+        borrow::ToOwned,
+        string::{String, ToString},
+    },
+    core::{cell::OnceCell, hash::BuildHasherDefault},
+    deepsize::DeepSizeOf,
+    lasso::{Key, Spur},
+    rkyv::{Archive, Archived, Fallible},
+    twox_hash::XxHash64,
+};
 
 #[cfg(feature = "no-std")]
 type Interner = lasso::Rodeo<Spur, BuildHasherDefault<XxHash64>>;
@@ -22,7 +25,7 @@ pub(crate) fn interner() -> &'static mut Interner {
 
 /// Initializes the interner with an initial state
 pub fn init(state: HashMap<String, u32>) {
-    let interner = bincode::deserialize(&bincode::serialize(&state).unwrap()).unwrap();
+    let interner = postcard::from_bytes(&postcard::to_allocvec(&state).unwrap()).unwrap();
     assert!(unsafe { INTERNER.set(interner) }.is_ok())
 }
 

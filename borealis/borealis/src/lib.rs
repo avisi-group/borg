@@ -185,7 +185,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         // let ws = codegen_workspace(rudder, FN_TOPLEVEL);
 
         info!("Serializing Rudder");
-        let buf = bincode::serialize(&rudder).unwrap();
+        let buf = postcard::to_allocvec(&rudder).unwrap();
 
         info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);
         File::create(path).unwrap().write_all(&buf).unwrap();

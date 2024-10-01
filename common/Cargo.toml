@@ -15,8 +15,8 @@ num-traits = { version = "0.2.19", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 lasso = { version = "0.7.3", default-features = false, features = ["deepsize", "serialize"] }
 deepsize = { version = "0.2.0", default-features = false, features = ["derive"] }
-bincode = "1.3.3"
 ocaml = { version = "1.0.1", optional = true }
+postcard = { version = "1.0.10", features = ["alloc"] }
 
 [features]
 no-std = ["lasso/no-std"]

@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common = { path = "../../common", features = ["no-std"] }
+
 proc_macro_lib.workspace = true
 plugins_api.workspace = true
 
@@ -50,3 +52,4 @@ bitset-core = { version = "0.1.1", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 linkme = "0.3.28"
 num-rational = { version = "0.4.2", default-features = false }
+postcard = "1.0.10"

@@ -9,6 +9,7 @@ pub mod arena;
 pub mod id;
 pub mod intern;
 pub mod rudder;
+pub mod width_helpers;
 
 /// HashMap with non-default hasher
 pub type HashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<XxHash64>>;

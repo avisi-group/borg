@@ -6,6 +6,7 @@ use {
 };
 
 pub mod emitter;
+pub mod models;
 mod trampoline;
 pub mod x86;
 
