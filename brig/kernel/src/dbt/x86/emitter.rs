@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        emitter::{BlockResult, Flag, Type},
+        emitter::{BlockResult, Type},
         x86::{
             encoder::{Instruction, Operand, OperandKind, PhysicalRegister, Register},
             register_allocator::RegisterAllocator,
@@ -8,6 +8,7 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
+    common::rudder::statement::Flag,
     core::{
         cell::RefCell,
         fmt::{Debug, LowerHex},
@@ -551,7 +552,7 @@ impl Emitter for X86Emitter {
         })
     }
 
-    fn panic(&mut self, msg: &'static str) {
+    fn panic(&mut self, msg: &str) {
         let n = Self::NodeRef::from(X86Node {
             typ: Type::Unsigned(8),
             kind: NodeKind::Constant {
@@ -566,6 +567,21 @@ impl Emitter for X86Emitter {
         .to_operand(self);
 
         self.current_block.append(Instruction::int(n));
+    }
+
+    fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef {
+        Self::NodeRef::from(X86Node {
+            typ: Type::Tuple,
+            kind: NodeKind::Tuple(values),
+        })
+    }
+
+    fn acess_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef {
+        let NodeKind::Tuple(values) = tuple.kind() else {
+            unreachable!()
+        };
+
+        values[index].clone()
     }
 }
 
@@ -861,6 +877,7 @@ impl X86NodeRef {
                 masked_target
             }
             NodeKind::GetFlag { flag, operation } => todo!(),
+            NodeKind::Tuple(vec) => unreachable!(),
         }
     }
 }
@@ -915,6 +932,7 @@ pub enum NodeKind {
         flag: Flag,
         operation: X86NodeRef,
     },
+    Tuple(Vec<X86NodeRef>),
 }
 
 #[derive(Debug)]

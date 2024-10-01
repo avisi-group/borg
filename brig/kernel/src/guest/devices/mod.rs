@@ -34,7 +34,7 @@ fn decodea64_smoke() {
     // // (x0 = x1 + x2)
     let opcode = ctx.emitter().constant(0x8b020020, Type::Unsigned(64));
 
-    execute(&*model, "u__DecodeA64", &[pc, opcode], &mut ctx);
+    execute(&*model, "__DecodeA64", &[pc, opcode], &mut ctx);
 
     ctx.emitter().leave();
     let translation = ctx.compile();

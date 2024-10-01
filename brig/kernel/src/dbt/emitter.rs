@@ -1,3 +1,5 @@
+use {alloc::vec::Vec, common::rudder::statement::Flag};
+
 use crate::dbt::x86::emitter::{
     BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
 };
@@ -9,6 +11,8 @@ pub trait Emitter {
 
     fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
+    fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef;
+    fn acess_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
 
     fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
     fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
@@ -60,7 +64,7 @@ pub trait Emitter {
         value: Self::NodeRef,
     ) -> Self::NodeRef;
 
-    fn panic(&mut self, msg: &'static str);
+    fn panic(&mut self, msg: &str);
 
     fn branch(
         &mut self,
@@ -81,6 +85,7 @@ pub enum Type {
     Signed(u16),
     Floating(u16),
     Bits,
+    Tuple,
 }
 
 impl Type {
@@ -88,6 +93,7 @@ impl Type {
         match self {
             Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => *w,
             Type::Bits => 64, // todo: should this be the runtime length?
+            Type::Tuple => todo!(),
         }
     }
 }
@@ -100,14 +106,6 @@ impl<E: Emitter> WrappedEmitter<E> {
     pub fn new(subemitter: E) -> Self {
         Self { subemitter }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Flag {
-    N,
-    Z,
-    C,
-    V,
 }
 
 // impl<E: Emitter> Emitter for WrappedEmitter<E> {
