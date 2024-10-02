@@ -58,10 +58,14 @@ impl Emitter for X86Emitter {
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef {
         // evil bits that's really a fixed unsigned pretending to be a bitvector
         if let NodeKind::Constant { value: length, .. } = length.kind() {
-            if u64::from(value.typ().width()) != *length {
-                panic!("{length}\n{value:?}\n{:?}", value.typ());
-            }
-            value
+            let length = u16::try_from(*length).unwrap();
+            let target_type = match value.typ() {
+                Type::Unsigned(_) => Type::Unsigned(length),
+                Type::Signed(_) => Type::Signed(length),
+                _ => todo!(),
+            };
+
+            self.cast(value, target_type, CastOperationKind::Truncate)
         } else {
             todo!("actual real bits {value:?}\n{length:?}")
         }
@@ -185,6 +189,27 @@ impl Emitter for X86Emitter {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value | rhs_value,
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            And(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value,
+                        width,
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: lhs_value & rhs_value,
                         width: *width,
                     },
                 }),
@@ -583,6 +608,72 @@ impl Emitter for X86Emitter {
 
         values[index].clone()
     }
+
+    fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef {
+        match value.typ() {
+            Type::Unsigned(w) | Type::Signed(w) | Type::Floating(w) => {
+                self.constant(u64::from(*w), Type::Unsigned(16))
+            }
+
+            Type::Bits => {
+                if let NodeKind::Constant { width, .. } = value.kind() {
+                    self.constant(u64::from(*width), Type::Unsigned(16))
+                } else {
+                    todo!("size of {value:#?}")
+                }
+            }
+            Type::Tuple => todo!(),
+        }
+    }
+
+    fn bits_cast(
+        &mut self,
+        value: Self::NodeRef,
+        length: Self::NodeRef,
+        typ: Type,
+        kind: CastOperationKind,
+    ) -> Self::NodeRef {
+        match (value.kind(), length.kind()) {
+            (
+                NodeKind::Constant {
+                    value: value_value,
+                    width: value_width,
+                },
+                NodeKind::Constant {
+                    value: length_value,
+                    width: length_width,
+                },
+            ) => {
+                let length = u16::try_from(*length_value).unwrap();
+
+                let typ = match value.typ() {
+                    Type::Unsigned(_) | Type::Bits => Type::Unsigned(length),
+                    Type::Signed(_) => Type::Signed(length),
+                    _ => todo!(),
+                };
+
+                self.constant(*value_value, typ)
+            }
+            (
+                _,
+                NodeKind::Constant {
+                    value: length_value,
+                    width: length_width,
+                },
+            ) => {
+                let length = u16::try_from(*length_value).unwrap();
+
+                let typ = match value.typ() {
+                    Type::Unsigned(_) => Type::Unsigned(length),
+                    Type::Signed(_) => Type::Signed(length),
+                    _ => todo!(),
+                };
+
+                self.cast(value, typ, kind)
+            }
+            (_, _) => todo!(),
+        }
+    }
 }
 
 fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {
@@ -640,17 +731,59 @@ impl X86NodeRef {
                 dst
             }
             NodeKind::BinaryOperation(kind) => match kind {
-                BinaryOperationKind::Add(lhs, rhs) => {
+                BinaryOperationKind::Add(left, right) => {
                     let dst = Operand::vreg(64, emitter.next_vreg());
 
-                    let lhs = lhs.to_operand(emitter);
-                    let rhs = rhs.to_operand(emitter);
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
                     emitter
                         .current_block
-                        .append(Instruction::mov(lhs, dst.clone()));
+                        .append(Instruction::mov(left, dst.clone()));
                     emitter
                         .current_block
-                        .append(Instruction::add(rhs, dst.clone()));
+                        .append(Instruction::add(right, dst.clone()));
+
+                    dst
+                }
+                BinaryOperationKind::Sub(left, right) => {
+                    let dst = Operand::vreg(64, emitter.next_vreg());
+
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
+                    emitter
+                        .current_block
+                        .append(Instruction::mov(left, dst.clone()));
+                    emitter
+                        .current_block
+                        .append(Instruction::sub(right, dst.clone()));
+
+                    dst
+                }
+                BinaryOperationKind::Or(left, right) => {
+                    let dst = Operand::vreg(64, emitter.next_vreg());
+
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
+                    emitter
+                        .current_block
+                        .append(Instruction::mov(left, dst.clone()));
+                    emitter
+                        .current_block
+                        .append(Instruction::or(right, dst.clone()));
+
+                    dst
+                }
+                BinaryOperationKind::And(left, right) => {
+                    let dst = Operand::vreg(64, emitter.next_vreg());
+
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
+                    emitter
+                        .current_block
+                        .append(Instruction::mov(left, dst.clone()));
+                    emitter
+                        .current_block
+                        .append(Instruction::and(right, dst.clone()));
 
                     dst
                 }
@@ -1052,11 +1185,6 @@ impl X86BlockRef {
 
     pub fn instructions(&self) -> Vec<Instruction> {
         self.0.borrow().instructions.clone()
-    }
-
-    /// Host address of the translated machine code block
-    pub fn host_address(&self) -> u64 {
-        0xffff8000000a82b0
     }
 
     pub fn get_next_0(&self) -> Option<X86BlockRef> {

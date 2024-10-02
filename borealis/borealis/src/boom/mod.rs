@@ -450,6 +450,11 @@ pub enum Value {
         value: Shared<Self>,
         index: Shared<Self>,
     },
+    VectorMutate {
+        vector: Shared<Self>,
+        element: Shared<Self>,
+        index: Shared<Self>,
+    },
 }
 
 impl Value {
@@ -523,6 +528,15 @@ impl Walkable for Value {
             Value::Tuple(values) => values.iter().for_each(|v| visitor.visit_value(v.clone())),
             Value::VectorAccess { value, index } => {
                 visitor.visit_value(value.clone());
+                visitor.visit_value(index.clone());
+            }
+            Value::VectorMutate {
+                vector,
+                element,
+                index,
+            } => {
+                visitor.visit_value(vector.clone());
+                visitor.visit_value(element.clone());
                 visitor.visit_value(index.clone());
             }
         }

@@ -1992,6 +1992,24 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::ReadElement { vector, index },
                 );
             }
+            boom::Value::VectorMutate {
+                vector,
+                element,
+                index,
+            } => {
+                let vector = self.build_value(vector.clone());
+                let index = self.build_value(index.clone());
+                let element = self.build_value(element.clone());
+                return build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::AssignElement {
+                        vector,
+                        value: element,
+                        index,
+                    },
+                );
+            }
         }
     }
 

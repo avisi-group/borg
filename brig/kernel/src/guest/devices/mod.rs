@@ -21,12 +21,12 @@ fn decodea64_smoke() {
 
     execute(&*model, "borealis_register_init", &[], &mut ctx);
 
-    // execute(
-    //     &*model,
-    //     "u__InitSystem",
-    //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
-    //     &mut ctx,
-    // )
+    execute(
+        &*model,
+        "__InitSystem",
+        &[ctx.emitter().constant(0, Type::Unsigned(0))],
+        &mut ctx,
+    );
 
     let pc = ctx.emitter().constant(0, Type::Unsigned(64));
 

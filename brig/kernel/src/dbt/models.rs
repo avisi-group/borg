@@ -388,7 +388,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     Some(self.ctx.emitter().shift(value, amount, op))
                 }
 
-                Statement::Call { target, .. } => unreachable!("call to {target:?}"),
+                Statement::Call { target, .. } => panic!("call to {target:?}"),
                 Statement::EnterInlineCall {
                     pre_call_block,
                     inline_entry_block,
@@ -466,7 +466,27 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     typ,
                     value,
                     length,
-                } => todo!(),
+                } => {
+                    use {
+                        crate::dbt::x86::emitter::CastOperationKind as EmitterOp,
+                        rudder::statement::CastOperationKind as RudderOp,
+                    };
+
+                    let value = statement_values.get(value).unwrap().clone();
+                    let length = statement_values.get(length).unwrap().clone();
+                    let typ = emit_rudder_type(typ);
+
+                    let kind = match kind {
+                        RudderOp::ZeroExtend => EmitterOp::ZeroExtend,
+                        RudderOp::SignExtend => EmitterOp::SignExtend,
+                        RudderOp::Truncate => EmitterOp::Truncate,
+                        RudderOp::Reinterpret => EmitterOp::Reinterpret,
+                        RudderOp::Convert => EmitterOp::Convert,
+                        RudderOp::Broadcast => EmitterOp::Broadcast,
+                    };
+
+                    Some(self.ctx.emitter().bits_cast(value, length, typ, kind))
+                }
 
                 Statement::PhiNode { members } => todo!(),
 
@@ -542,7 +562,10 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     let length = statement_values.get(length).unwrap().clone();
                     Some(self.ctx.emitter().create_bits(value, length))
                 }
-                Statement::SizeOf { value } => todo!(),
+                Statement::SizeOf { value } => {
+                    let value = statement_values.get(value).unwrap().clone();
+                    Some(self.ctx.emitter().size_of(value))
+                }
                 Statement::MatchesUnion { value, variant } => todo!(),
                 Statement::UnwrapUnion { value, variant } => todo!(),
                 Statement::CreateTuple(values) => {

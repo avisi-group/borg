@@ -269,6 +269,16 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AArch32_IMPDEFResets",
         "_get_PMCR_Type_IMP",
         "integer_subrange",
+        "set_subrange_zeros",
+        "set_slice_zeros",
+        "slice_mask",
+        "sail_mask",
+        "_get_ID_DFR0_Type_CopDbg",
+        "_get_ID_DFR0_EL1_Type_CopDbg",
+        "_get_Configuration_Type_ExceptInit",
+        "_get_Configuration_Type_CFGEND",
+        "_get_PMCR_Type_N",
+        "AArch64_IMPDEFResets",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

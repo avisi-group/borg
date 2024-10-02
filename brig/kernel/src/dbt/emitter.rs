@@ -11,12 +11,20 @@ pub trait Emitter {
 
     fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
+    fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef;
     fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef;
     fn acess_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
 
     fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
     fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
     fn cast(&mut self, value: Self::NodeRef, typ: Type, kind: CastOperationKind) -> Self::NodeRef;
+    fn bits_cast(
+        &mut self,
+        value: Self::NodeRef,
+        length: Self::NodeRef,
+        typ: Type,
+        kind: CastOperationKind,
+    ) -> Self::NodeRef;
     fn shift(
         &mut self,
         value: Self::NodeRef,

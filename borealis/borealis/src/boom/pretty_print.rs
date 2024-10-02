@@ -436,6 +436,19 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_value(index.clone());
                 write!(self.writer, "]").unwrap();
             }
+            Value::VectorMutate {
+                vector,
+                element,
+                index,
+            } => {
+                write!(self.writer, "(").unwrap();
+                self.visit_value(vector.clone());
+                write!(self.writer, "[").unwrap();
+                self.visit_value(index.clone());
+                write!(self.writer, "] = ").unwrap();
+                self.visit_value(element.clone());
+                write!(self.writer, ")").unwrap();
+            }
         }
     }
 

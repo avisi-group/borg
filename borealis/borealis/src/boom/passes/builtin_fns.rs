@@ -14,6 +14,9 @@ const EQ_ANY_GENERIC: Lazy<Regex> =
 const VECTOR_ACCESS: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^plain_vector_access<([0-9a-zA-Z_%<>]+)>$").unwrap());
 
+const VECTOR_UPDATE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^plain_vector_update<([0-9a-zA-Z_%<>]+)>$").unwrap());
+
 #[derive(Debug, Default)]
 pub struct HandleBuiltinFunctions;
 
@@ -75,6 +78,15 @@ impl Pass for HandleBuiltinFunctions {
                                         expression: expression.clone(),
                                         value: Shared::new(Value::VectorAccess {
                                             value: arguments[0].clone(),
+                                            index: arguments[1].clone(),
+                                        }),
+                                    })
+                                } else if VECTOR_UPDATE.is_match(name.as_ref()) {
+                                    Shared::new(Statement::Copy {
+                                        expression: expression.clone(),
+                                        value: Shared::new(Value::VectorMutate {
+                                            vector: arguments[0].clone(),
+                                            element: arguments[2].clone(),
                                             index: arguments[1].clone(),
                                         }),
                                     })

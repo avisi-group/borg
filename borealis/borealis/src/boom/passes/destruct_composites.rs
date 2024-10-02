@@ -192,75 +192,114 @@ fn destruct_local_structs(
                             return vec![clone];
                         };
 
-                        let Type::Struct {  fields,.. } = &*typ.get() else {
-                            panic!("not a struct?");
-                        };
-
-                        // names of the fields to be copied into
-                        let local_fields = fields
-                            .iter()
-                            .map(|NamedType { name, .. }| Expression::Identifier(destructed_ident(*dest, *name)))
-                            .collect::<Vec<_>>();
-
-                        let values = match &*value.get() {
-                            // if the value is an identifier, look up fields in structs map, and get
-                            // list of values from that
-                            Value::Identifier(ident) => {
-                                let typ = removed_items.get(ident).unwrap_or_else(|| {
-                                    panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
-                                });
-
-                                let Type::Struct {  fields,.. } = &*typ.get() else {
-                                    panic!("not a struct?");
-                                };
-
-
-                                fields
-                                    .iter()
-                                    .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name)))
-                                    .map(Shared::new)
-                                    .collect::<Vec<_>>()
-                            }
-                            // if the value is a struct, use those fields
-                            Value::Struct { fields, .. } => fields
+                        if let Type::Struct { fields,.. } = &*typ.get() {
+                            // names of the fields to be copied into
+                            let local_fields = fields
                                 .iter()
-                                .map(|NamedValue { value, .. }| value)
-                                .cloned()
-                                .collect::<Vec<_>>(),
+                                .map(|NamedType { name, .. }| Expression::Identifier(destructed_ident(*dest, *name)))
+                                .collect::<Vec<_>>();
 
-                            Value::VectorAccess { value, index } => {
-                                let Value::Identifier(ident) = &*value.get() else {
-                                    todo!()
-                                };
-                                let typ = removed_items.get(ident).unwrap_or_else(|| {
-                                    panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
-                                });
+                            let values = match &*value.get() {
+                                // if the value is an identifier, look up fields in structs map, and get
+                                // list of values from that
+                                Value::Identifier(ident) => {
+                                    let typ = removed_items.get(ident).unwrap_or_else(|| {
+                                        panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
+                                    });
 
-                                let Type::FixedVector{  element_type,..   } = &*typ.get() else {
-                                    panic!("not a fixed vector?");
-                                };
+                                    let Type::Struct {  fields,.. } = &*typ.get() else {
+                                        panic!("not a struct?");
+                                    };
 
-                                let Type::Struct {  fields,.. } = &*element_type.get() else {
-                                    panic!("not a struct?");
-                                };
 
-                                fields
+                                    fields
+                                        .iter()
+                                        .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name)))
+                                        .map(Shared::new)
+                                        .collect::<Vec<_>>()
+                                }
+                                // if the value is a struct, use those fields
+                                Value::Struct { fields, .. } => fields
                                     .iter()
-                                    .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name)))
-                                    .map(Shared::new)
-                                    .map(|value| Value::VectorAccess { value, index: index.clone() })
-                                    .map(Shared::new)
-                                    .collect::<Vec<_>>()
-                            }
-                            _ => panic!("value is a struct in {clone:?} in {}", fn_def.signature.name),
-                        };
+                                    .map(|NamedValue { value, .. }| value)
+                                    .cloned()
+                                    .collect::<Vec<_>>(),
 
-                        local_fields
-                            .into_iter()
-                            .zip(values)
-                            .map(|(expression, value)| Statement::Copy { expression, value })
-                            .map(Shared::new)
-                            .collect()
+                                Value::VectorAccess { value, index } => {
+                                    let Value::Identifier(ident) = &*value.get() else {
+                                        todo!()
+                                    };
+                                    let typ = removed_items.get(ident).unwrap_or_else(|| {
+                                        panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
+                                    });
+
+                                    let Type::FixedVector{  element_type,..   } = &*typ.get() else {
+                                        panic!("not a fixed vector?");
+                                    };
+
+                                    let Type::Struct {  fields,.. } = &*element_type.get() else {
+                                        panic!("not a struct?");
+                                    };
+
+                                    fields
+                                        .iter()
+                                        .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name)))
+                                        .map(Shared::new)
+                                        .map(|value| Value::VectorAccess { value, index: index.clone() })
+                                        .map(Shared::new)
+                                        .collect::<Vec<_>>()
+                                }
+                                _ => panic!("value is a struct in {clone:?} in {}", fn_def.signature.name),
+                            };
+
+                            local_fields
+                                .into_iter()
+                                .zip(values)
+                                .map(|(expression, value)| Statement::Copy { expression, value })
+                                .map(Shared::new)
+                                .collect()
+                        } else {
+                            let Value::VectorMutate { vector, element, index } = &*value.get() else {
+                                todo!()
+                            };
+
+                            let Value::Identifier(element) = &*element.get() else {
+                                todo!();
+                            };
+
+                            let Value::Identifier(source) = &*vector.get() else {
+                                todo!();
+                            };
+
+                            assert_eq!(*source, *dest);
+
+                            let Type::FixedVector { length, element_type } = &*typ.get() else {
+                                todo!();
+                            };
+
+
+                            let Type::Struct { fields: dest_fields,.. } = &*element_type.get() else {
+                                todo!();
+                            };
+
+                            // names of the fields to be copied into
+                           dest_fields
+                                  .iter()
+                                  .map(|NamedType { name, .. }| *name)
+                                  .map(|field_name| {
+                                    let field_vec = destructed_ident(*dest, field_name);
+                                    let element = destructed_ident(*element, field_name);
+
+                                   Shared::new(Statement::Copy {
+                                        expression: Expression::Identifier(field_vec),
+                                        value: Shared::new(Value::VectorMutate {
+                                            vector: Shared::new(Value::Identifier(field_vec)),
+                                            element: Shared::new(Value::Identifier(element)),
+                                            index: index.clone()})
+                         }) }).collect()
+
+
+                        }
                     }
 
                     // if we return a struct from a function call, assign it to the individual field variables
