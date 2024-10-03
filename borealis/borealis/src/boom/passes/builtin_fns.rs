@@ -2,7 +2,8 @@
 // here to make the destruct_composites pass
 
 use {
-    crate::boom::{passes::Pass, Ast, Expression, Literal, Operation, Statement, Value},
+    crate::boom::{passes::Pass, Ast, Bit, Expression, Literal, Operation, Statement, Value},
+    common::intern::InternedString,
     once_cell::sync::Lazy,
     regex::Regex,
     sailrs::shared::Shared,
@@ -16,6 +17,8 @@ const VECTOR_ACCESS: Lazy<Regex> =
 
 const VECTOR_UPDATE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^plain_vector_update<([0-9a-zA-Z_%<>]+)>$").unwrap());
+
+const UNDEFINED: Lazy<Regex> = Lazy::new(|| Regex::new(r"^undefined_([0-9a-zA-Z_%<>]+)$").unwrap());
 
 #[derive(Debug, Default)]
 pub struct HandleBuiltinFunctions;
@@ -90,6 +93,23 @@ impl Pass for HandleBuiltinFunctions {
                                             index: arguments[1].clone(),
                                         }),
                                     })
+                                } else if let Some(captures) = UNDEFINED.captures(name.as_ref()) {
+                                    let typ_name = captures.get(1).unwrap();
+                                    if ast
+                                        .get()
+                                        .enums
+                                        .get(&InternedString::from(typ_name.as_str()))
+                                        .is_some()
+                                    {
+                                        Shared::new(Statement::Copy {
+                                            expression: expression.clone(),
+                                            value: Shared::new(Value::Literal(Shared::new(
+                                                Literal::Bits(vec![Bit::Zero; 32]),
+                                            ))),
+                                        })
+                                    } else {
+                                        s.clone()
+                                    }
                                 } else {
                                     s.clone()
                                 }

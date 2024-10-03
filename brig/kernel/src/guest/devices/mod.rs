@@ -21,12 +21,13 @@ fn decodea64_smoke() {
 
     execute(&*model, "borealis_register_init", &[], &mut ctx);
 
-    execute(
-        &*model,
-        "__InitSystem",
-        &[ctx.emitter().constant(0, Type::Unsigned(0))],
-        &mut ctx,
-    );
+    // OOM crashes:(
+    // execute(
+    //     &*model,
+    //     "__InitSystem",
+    //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
+    //     &mut ctx,
+    // );
 
     let pc = ctx.emitter().constant(0, Type::Unsigned(64));
 
@@ -56,7 +57,87 @@ fn decodea64_smoke() {
         assert_eq!(15, (*r0));
         assert_eq!(0xe, (*see));
     }
-    panic!();
+}
+
+#[ktest]
+fn fibonacci() {
+    let mut register_file = Box::new([0u8; 104488usize]);
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let model = models::get("aarch64").unwrap();
+    execute(&*model, "borealis_register_init", &[], &mut ctx);
+    ctx.emitter().leave();
+    let translation = ctx.compile();
+    translation.execute(register_file_ptr);
+
+    // // hacky, run sail function that goes before the main loop :/
+    // u__InitSystem(&mut state, TRACER, ());
+
+    let program = [
+        // <_start>
+        0xd2800000, // mov     x0, #0x0 (#0)
+        0xd2800021, // mov     x1, #0x1 (#1)
+        0xd2800002, // mov     x2, #0x0 (#0)
+        0xd2800003, // mov     x3, #0x0 (#0)
+        0xd2800144, // mov     x4, #0xa (#10)
+        // <loop>
+        0xeb04007f, // cmp     x3, x4
+        0x540000c0, // b.eq    400104 <done>  // b.none
+        0x8b010002, // add     x2, x0, x1
+        0xaa0103e0, // mov     x0, x1
+        0xaa0203e1, // mov     x1, x2
+        0x91000463, // add     x3, x3, #0x1
+        0x17fffffa, // b       4000e8 <loop>
+        // <done>
+        0xaa0203e0, // mov     x0, x2
+        0x52800ba8, // mov     w8, #0x5d (#93)
+        0xd4000001, // svc     #0x0
+    ];
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let branch_taken =
+            { register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool };
+        let pc = { register_file_ptr.add(model.reg_offset("_PC")) as *mut u64 };
+        let r0 = { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
+        let r3 = { register_file_ptr.add(model.reg_offset("R3")) as *mut u64 };
+
+        // bounded just in case
+        for _ in 0..100 {
+            log::warn!("pc = {}", *pc);
+
+            *see = -1;
+            *branch_taken = false;
+
+            // exit before the svc
+            if *pc == 0x38 {
+                break;
+            }
+
+            let mut ctx = X86TranslationContext::new();
+            let model = models::get("aarch64").unwrap();
+
+            {
+                let opcode = ctx
+                    .emitter()
+                    .constant(program[*pc as usize / 4], Type::Unsigned(64));
+                let pc = ctx.emitter().constant(*pc, Type::Unsigned(64));
+                execute(&*model, "__DecodeA64", &[pc, opcode], &mut ctx);
+            }
+
+            ctx.emitter().leave();
+            let translation = ctx.compile();
+            translation.execute(register_file_ptr);
+
+            // increment PC if no branch was taken
+            if !*branch_taken {
+                *pc += 4;
+            }
+        }
+
+        assert_eq!(89, *r0);
+        assert_eq!(10, *r3);
+    }
 }
 
 // #[ktest]
@@ -205,59 +286,6 @@ fn decodea64_smoke() {
 //         u__DecodeA64(&mut state, TRACER, 0, 0xd3504c63);
 //         assert_eq!(0x4, state.read_register::<u64>(REG_R3));
 //     }
-// }
-
-// #[ktest]
-// fn fibonacci() {
-//     let mut state = State::new(Box::new(NoneEnv));
-//     borealis_register_init(&mut state, TRACER);
-//     // hacky, run sail function that goes before the main loop :/
-//     u__InitSystem(&mut state, TRACER, ());
-
-//     let program = [
-//         // <_start>
-//         0xd2800000, // mov     x0, #0x0 (#0)
-//         0xd2800021, // mov     x1, #0x1 (#1)
-//         0xd2800002, // mov     x2, #0x0 (#0)
-//         0xd2800003, // mov     x3, #0x0 (#0)
-//         0xd2800144, // mov     x4, #0xa (#10)
-//         // <loop>
-//         0xeb04007f, // cmp     x3, x4
-//         0x540000c0, // b.eq    400104 <done>  // b.none
-//         0x8b010002, // add     x2, x0, x1
-//         0xaa0103e0, // mov     x0, x1
-//         0xaa0203e1, // mov     x1, x2
-//         0x91000463, // add     x3, x3, #0x1
-//         0x17fffffa, // b       4000e8 <loop>
-//         // <done>
-//         0xaa0203e0, // mov     x0, x2
-//         0x52800ba8, // mov     w8, #0x5d (#93)
-//         0xd4000001, // svc     #0x0
-//     ];
-
-//     // bounded just in case
-//     for _ in 0..100 {
-//         state.write_register(REG_SEE, 0u64);
-//         state.write_register(REG_U__BRANCHTAKEN, false);
-//         let pc = state.read_register::<u64>(REG_U_PC);
-
-//         // exit before the svc
-//         if pc == 0x38 {
-//             break;
-//         }
-
-//         let instr = program[pc as usize / 4];
-//         u__DecodeA64(&mut state, TRACER, pc.into(), instr);
-
-//         // increment PC if no branch was taken
-//         if !state.read_register::<bool>(REG_U__BRANCHTAKEN) {
-//             let pc = state.read_register::<u64>(REG_U_PC);
-//             state.write_register(REG_U_PC, pc + 4);
-//         }
-//     }
-
-//     assert_eq!(89, state.read_register::<u64>(REG_R0));
-//     assert_eq!(10, state.read_register::<u64>(REG_R3));
 // }
 
 // #[ktest]

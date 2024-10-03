@@ -286,7 +286,7 @@ fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
     }
 
     cmd.arg("-m");
-    cmd.arg("24g");
+    cmd.arg("16g");
     cmd.arg("-device");
     cmd.arg("virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4");
     cmd.arg("-drive");

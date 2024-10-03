@@ -1,5 +1,6 @@
 //! JIB to BOOM conversion
 
+use crate::boom::convert::sail_ast::Identifier;
 use {
     crate::boom::{
         self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionDefinition,
@@ -87,13 +88,18 @@ impl BoomEmitter {
             }
             jib_ast::DefinitionAux::Type(type_def) => {
                 match type_def {
-                    jib_ast::TypeDefinition::Enum(_, _) => (), /* type is u32 but don't need to */
+                    jib_ast::TypeDefinition::Enum(name, variants) => {
+                        self.ast.enums.insert(
+                            name.as_interned(),
+                            variants.iter().map(Identifier::as_interned).collect(),
+                        );
+                    } /* type is u32 but don't need to */
                     // define it
                     jib_ast::TypeDefinition::Struct(name, fields) => {
                         self.ast.definitions.push(boom::Definition::Struct {
                             name: name.as_interned(),
                             fields: convert_fields(fields.iter()),
-                        })
+                        });
                     }
                     jib_ast::TypeDefinition::Variant(name, fields) => {
                         let width =

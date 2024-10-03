@@ -8,6 +8,7 @@ use {core::hash::BuildHasherDefault, twox_hash::XxHash64};
 pub mod arena;
 pub mod id;
 pub mod intern;
+pub mod mask;
 pub mod rudder;
 pub mod width_helpers;
 

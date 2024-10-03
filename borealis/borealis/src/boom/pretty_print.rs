@@ -26,6 +26,7 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         functions,
         constants,
         unions,
+        enums,
     } = &*ast.get();
 
     let mut visitor = PrettyPrinter::new(w);
@@ -53,6 +54,14 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         writeln!(visitor.writer, "}}").unwrap();
     });
     writeln!(visitor.writer).unwrap();
+
+    enums.iter().for_each(|(name, variants)| {
+        writeln!(visitor.writer, "enum {name} {{").unwrap();
+        for (i, variant) in variants.iter().enumerate() {
+            writeln!(visitor.writer, "\t{variant} = {i},").unwrap();
+        }
+        writeln!(visitor.writer, "}}").unwrap();
+    });
 
     functions
         .iter()

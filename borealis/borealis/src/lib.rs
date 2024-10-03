@@ -279,6 +279,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "_get_Configuration_Type_CFGEND",
         "_get_PMCR_Type_N",
         "AArch64_IMPDEFResets",
+        "_get_ERRIDR_EL1_Type_NUM",
+        "__DecodeA64_DataProcImm",
+        "decode_movz_aarch64_instrs_integer_ins_ext_insert_movewide",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

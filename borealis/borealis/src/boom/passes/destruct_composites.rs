@@ -273,7 +273,7 @@ fn destruct_local_structs(
 
                             assert_eq!(*source, *dest);
 
-                            let Type::FixedVector { length, element_type } = &*typ.get() else {
+                            let Type::FixedVector { element_type,.. } = &*typ.get() else {
                                 todo!();
                             };
 

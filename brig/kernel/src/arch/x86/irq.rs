@@ -123,6 +123,11 @@ impl IrqManager {
             self.avail.insert(i);
         }
 
+        for i in 0x50..0x60 {
+            self.avail.remove(&i);
+            self.assign_irq(i, dbt_handler);
+        }
+
         self.idt.load();
     }
 
@@ -191,4 +196,9 @@ fn gpf_exception(machine_context: *mut MachineContext) {
     );
 
     crate::qemu_exit();
+}
+
+#[irq_handler(with_code = true)]
+fn dbt_handler(machine_context: *mut MachineContext) {
+    panic!("DBT interrupt")
 }

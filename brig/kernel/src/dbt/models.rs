@@ -162,6 +162,8 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
         let mut block_queue = alloc::vec![BlockKind::Static(function.entry_block())];
 
         while let Some(block) = block_queue.pop() {
+            log::trace!("block_queue len: {}", block_queue.len());
+
             let result = match block {
                 BlockKind::Static(b) => {
                     log::trace!("static block {}", b.index());

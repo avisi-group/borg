@@ -8,7 +8,7 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::rudder::statement::Flag,
+    common::{mask::mask, rudder::statement::Flag},
     core::{
         cell::RefCell,
         fmt::{Debug, LowerHex},
@@ -19,13 +19,15 @@ use {
 };
 pub struct X86Emitter {
     current_block: X86BlockRef,
+    panic_block: X86BlockRef,
     next_vreg: usize,
 }
 
 impl X86Emitter {
-    pub fn new(initial_block: X86BlockRef) -> Self {
+    pub fn new(initial_block: X86BlockRef, panic_block: X86BlockRef) -> Self {
         Self {
             current_block: initial_block,
+            panic_block,
             next_vreg: 0,
         }
     }
@@ -298,6 +300,26 @@ impl Emitter for X86Emitter {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
+            CompareGreaterThan(left, right) => match (left.kind(), right.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: left_value, ..
+                    },
+                    NodeKind::Constant {
+                        value: right_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: left.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: if left_value > right_value { 1 } else { 0 },
+                        width: 1,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: Type::Unsigned(1),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
             CompareGreaterThanOrEqual(left, right) => match (left.kind(), right.kind()) {
                 (
                     NodeKind::Constant {
@@ -346,7 +368,7 @@ impl Emitter for X86Emitter {
                         } else {
                             // extending from the incoming value type - so can clear
                             // all upper bits.
-                            let mask = (1 << original_width) - 1;
+                            let mask = mask(original_width);
                             *constant_value & mask
                         }
                     }
@@ -355,7 +377,7 @@ impl Emitter for X86Emitter {
                     }
                     CastOperationKind::Truncate => {
                         // truncating to the target width - just clear all irrelevant bits
-                        let mask = (1 << target_width) - 1;
+                        let mask = mask(target_width);
                         *constant_value & mask
                     }
                     CastOperationKind::Reinterpret => *constant_value,
@@ -553,10 +575,18 @@ impl Emitter for X86Emitter {
 
     fn assert(&mut self, condition: Self::NodeRef) {
         match condition.kind() {
-            NodeKind::Constant { value, .. } => assert!(*value != 0),
+            NodeKind::Constant { value, .. } => {
+                if *value == 0 {
+                    self.panic("constant assert failed");
+                }
+            }
             _ => {
-                // current todo: NOP
-                // future todo: emit INTO
+                let not_condition = self.unary_operation(UnaryOperationKind::Not(condition));
+                let op = not_condition.to_operand(self);
+
+                self.current_block.append(Instruction::test(op.clone(), op));
+                self.current_block
+                    .append(Instruction::jne(self.panic_block.clone()));
             }
         }
     }
@@ -584,6 +614,8 @@ impl Emitter for X86Emitter {
                 value: match msg {
                     "undefined terminator" => 0x50,
                     "default terminator" => 0x51,
+                    "constant assert failed" => 0x52,
+                    "panic block" => 0x53,
                     _ => todo!("{msg}"),
                 },
                 width: 8,

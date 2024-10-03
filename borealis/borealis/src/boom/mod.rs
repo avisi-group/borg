@@ -34,6 +34,8 @@ pub struct Ast {
     pub constants: HashMap<InternedString, i32>,
     /// name -> (width, variant -> tag)
     pub unions: HashMap<InternedString, (usize, HashMap<InternedString, usize>)>,
+    /// name -> fields (implicit indices)
+    pub enums: HashMap<InternedString, Vec<InternedString>>,
 }
 
 impl Ast {

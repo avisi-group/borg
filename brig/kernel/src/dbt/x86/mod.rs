@@ -5,6 +5,7 @@ use {
             emitter::Emitter,
             x86::{
                 emitter::{X86Block, X86BlockRef, X86Emitter, X86SymbolRef},
+                encoder::{Instruction, Operand},
                 register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
             },
             Translation, TranslationContext,
@@ -61,9 +62,17 @@ impl X86TranslationContext {
     pub fn new() -> Self {
         let initial_block = X86BlockRef::from(X86Block::new());
 
+        let panic_block = {
+            let block = X86BlockRef::from(X86Block::new());
+            X86Emitter::new(block.clone(), block.clone()).panic("panic block");
+            // this does nothing but maybe prevents crash?
+            block.set_next_0(initial_block.clone());
+            block
+        };
+
         Self {
             initial_block: initial_block.clone(),
-            emitter: X86Emitter::new(initial_block),
+            emitter: X86Emitter::new(initial_block, panic_block),
             next_symbol_id: 0,
         }
     }

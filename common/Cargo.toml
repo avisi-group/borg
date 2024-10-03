@@ -19,5 +19,6 @@ ocaml = { version = "1.0.1", optional = true }
 postcard = { version = "1.0.10", features = ["alloc"] }
 
 [features]
+default = ["no-std"]
 no-std = ["lasso/no-std"]
 std = ["dep:ocaml", "lasso/multi-threaded"]
