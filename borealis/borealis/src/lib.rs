@@ -282,6 +282,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "_get_ERRIDR_EL1_Type_NUM",
         "__DecodeA64_DataProcImm",
         "decode_movz_aarch64_instrs_integer_ins_ext_insert_movewide",
+        "execute_aarch64_instrs_integer_ins_ext_insert_movewide",
+        "Zeros",
+        "decode_subs_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

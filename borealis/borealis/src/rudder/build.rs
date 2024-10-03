@@ -12,8 +12,8 @@ use {
             constant_value::ConstantValue,
             function::{Function, Symbol},
             statement::{
-                build, cast, BinaryOperationKind, CastOperationKind, Flag, ShiftOperationKind,
-                Statement, UnaryOperationKind,
+                build, cast, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
+                UnaryOperationKind,
             },
             types::{PrimitiveType, PrimitiveTypeClass, Type},
             Model, RegisterDescriptor,
@@ -1411,39 +1411,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let y = args[1].clone();
                     let carry_in = args[2].clone();
 
-                    let _0 = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u8()),
-                            value: ConstantValue::UnsignedInteger(0),
-                        },
-                    );
-                    let _1 = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u8()),
-                            value: ConstantValue::UnsignedInteger(1),
-                        },
-                    );
-                    let _2 = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u8()),
-                            value: ConstantValue::UnsignedInteger(2),
-                        },
-                    );
-                    let _3 = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u8()),
-                            value: ConstantValue::UnsignedInteger(3),
-                        },
-                    );
-
                     let partial_sum = build(
                         self.block,
                         self.block_arena_mut(),
@@ -1463,87 +1430,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         },
                     );
 
-                    let n = build(
+                    // nzcv bv4
+                    let flags = build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::GetFlag {
-                            flag: Flag::N,
-                            operation: sum.clone(),
-                        },
-                    );
-                    let z = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::GetFlag {
-                            flag: Flag::Z,
-                            operation: sum.clone(),
-                        },
-                    );
-                    let c = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::GetFlag {
-                            flag: Flag::C,
-                            operation: sum.clone(),
-                        },
-                    );
-                    let v = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::GetFlag {
-                            flag: Flag::V,
+                        Statement::GetFlags {
                             operation: sum.clone(),
                         },
                     );
 
-                    let empty_flags = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4)),
-                            value: ConstantValue::UnsignedInteger(0),
-                        },
-                    );
-                    let inserted_n = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BitInsert {
-                            target: empty_flags,
-                            source: n,
-                            start: _0,
-                            length: _1.clone(),
-                        },
-                    );
-                    let inserted_z = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BitInsert {
-                            target: inserted_n,
-                            source: z,
-                            start: _1.clone(),
-                            length: _1.clone(),
-                        },
-                    );
-                    let inserted_c = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BitInsert {
-                            target: inserted_z,
-                            source: c,
-                            start: _2,
-                            length: _1.clone(),
-                        },
-                    );
-                    let flags = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BitInsert {
-                            target: inserted_c,
-                            source: v,
-                            start: _3,
-                            length: _1,
-                        },
-                    );
 
                     Some(build(
                         self.block,

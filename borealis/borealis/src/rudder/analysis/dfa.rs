@@ -278,7 +278,7 @@ impl<'a> StatementUseAnalysis<'a> {
                 | Statement::ExitInlineCall { .. } => {}
 
                 Statement::TupleAccess { source, .. } => self.add_use(source, stmt),
-                Statement::GetFlag { operation, .. } => {
+                Statement::GetFlags { operation, .. } => {
                     self.add_use(operation, stmt);
                 }
                 Statement::CreateTuple(values) => {

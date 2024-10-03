@@ -8,7 +8,7 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::{mask::mask, rudder::statement::Flag},
+    common::mask::mask,
     core::{
         cell::RefCell,
         fmt::{Debug, LowerHex},
@@ -95,7 +95,9 @@ impl Emitter for X86Emitter {
                     } => Self::NodeRef::from(X86Node {
                         typ: value.typ().clone(),
                         kind: NodeKind::Constant {
-                            value: constant_value ^ ((1 << *width) - 1), /* only NOT the bits that are part of the size of the datatype */
+                            value: constant_value ^ mask(*width), /* only NOT the bits that are
+                                                                   * part of the size of the
+                                                                   * datatype */
                             width: *width,
                         },
                     }),
@@ -340,7 +342,6 @@ impl Emitter for X86Emitter {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
-
             op => {
                 todo!("{op:?}")
             }
@@ -409,14 +410,30 @@ impl Emitter for X86Emitter {
         amount: Self::NodeRef,
         kind: ShiftOperationKind,
     ) -> Self::NodeRef {
-        Self::NodeRef::from(X86Node {
-            typ: value.typ().clone(),
-            kind: NodeKind::Shift {
-                value,
-                amount,
-                kind,
-            },
-        })
+        let typ = value.typ().clone();
+        match (value.kind(), amount.kind()) {
+            (
+                NodeKind::Constant {
+                    value: value_value,
+                    width: value_width,
+                },
+                NodeKind::Constant {
+                    value: amount_value,
+                    ..
+                },
+            ) => {
+                // mask to width of value
+                self.constant((value_value << amount_value) & mask(*value_width), typ)
+            }
+            (_, _) => Self::NodeRef::from(X86Node {
+                typ,
+                kind: NodeKind::Shift {
+                    value,
+                    amount,
+                    kind,
+                },
+            }),
+        }
     }
 
     fn bit_extract(
@@ -600,10 +617,10 @@ impl Emitter for X86Emitter {
         todo!()
     }
 
-    fn get_flag(&mut self, flag: Flag, operation: Self::NodeRef) -> Self::NodeRef {
+    fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef {
         Self::NodeRef::from(X86Node {
             typ: Type::Unsigned(1),
-            kind: NodeKind::GetFlag { flag, operation },
+            kind: NodeKind::GetFlags { operation },
         })
     }
 
@@ -1041,7 +1058,42 @@ impl X86NodeRef {
 
                 masked_target
             }
-            NodeKind::GetFlag { flag, operation } => todo!(),
+            NodeKind::GetFlags { operation: _ } => {
+                //  todo: assert that the operation comes right before this emitted instruction
+
+                let dest = Operand::vreg(8, emitter.next_vreg());
+
+                emitter
+                    .current_block
+                    .append(Instruction::seto(dest.clone()));
+
+                emitter
+                    .current_block
+                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+
+                emitter
+                    .current_block
+                    .append(Instruction::setc(dest.clone()));
+
+                emitter
+                    .current_block
+                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+
+                emitter
+                    .current_block
+                    .append(Instruction::sete(dest.clone()));
+
+                emitter
+                    .current_block
+                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+
+                emitter
+                    .current_block
+                    .append(Instruction::sets(dest.clone()));
+
+                // nzcv
+                dest
+            }
             NodeKind::Tuple(vec) => unreachable!(),
         }
     }
@@ -1093,8 +1145,7 @@ pub enum NodeKind {
         start: X86NodeRef,
         length: X86NodeRef,
     },
-    GetFlag {
-        flag: Flag,
+    GetFlags {
         operation: X86NodeRef,
     },
     Tuple(Vec<X86NodeRef>),

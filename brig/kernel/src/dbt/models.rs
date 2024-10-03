@@ -308,9 +308,9 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                 }
                 Statement::ReadPc => todo!(),
                 Statement::WritePc { .. } => todo!(),
-                Statement::GetFlag { flag, operation } => {
+                Statement::GetFlags { operation } => {
                     let operation = statement_values.get(operation).unwrap().clone();
-                    Some(self.ctx.emitter().get_flag(*flag, operation))
+                    Some(self.ctx.emitter().get_flags(operation))
                 }
                 Statement::UnaryOperation { kind, value } => {
                     use {

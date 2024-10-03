@@ -1,7 +1,8 @@
-use {alloc::vec::Vec, common::rudder::statement::Flag};
-
-use crate::dbt::x86::emitter::{
-    BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
+use {
+    crate::dbt::x86::emitter::{
+        BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
+    },
+    alloc::vec::Vec,
 };
 
 pub trait Emitter {
@@ -56,7 +57,7 @@ pub trait Emitter {
 
     fn assert(&mut self, condition: Self::NodeRef);
 
-    fn get_flag(&mut self, flag: Flag, operation: Self::NodeRef) -> Self::NodeRef;
+    fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef;
 
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);

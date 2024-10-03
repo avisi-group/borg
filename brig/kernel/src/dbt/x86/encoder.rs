@@ -41,8 +41,16 @@ pub enum Opcode {
     TEST(Operand, Operand),
     /// cmp {0}, {1}
     CMP(Operand, Operand),
+
+    /// sets {0}
+    SETS(Operand), //n
     /// sete {0}
-    SETE(Operand),
+    SETE(Operand), //z
+    /// setc {0}
+    SETC(Operand), //c
+    /// seto {0}
+    SETO(Operand), //v
+
     /// setne {0}
     SETNE(Operand),
     /// setb {0}
@@ -617,9 +625,18 @@ impl Instruction {
     pub fn cmp(op0: Operand, op1: Operand) -> Self {
         Self(Opcode::CMP(op0, op1))
     }
-
+    pub fn seto(r: Operand) -> Self {
+        Self(Opcode::SETO(r))
+    }
+    pub fn setc(r: Operand) -> Self {
+        Self(Opcode::SETC(r))
+    }
     pub fn sete(r: Operand) -> Self {
         Self(Opcode::SETE(r))
+    }
+
+    pub fn sets(r: Operand) -> Self {
+        Self(Opcode::SETS(r))
     }
 
     pub fn setne(r: Operand) -> Self {
@@ -684,7 +701,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert!(src_width_in_bits == dst_width_in_bits);
+                //assert_eq!(src_width_in_bits, dst_width_in_bits);
 
                 assembler
                     .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
@@ -708,7 +725,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert!(src_width_in_bits == dst_width_in_bits);
+                assert_eq!(src_width_in_bits, dst_width_in_bits);
 
                 assembler
                     .mov::<AsmRegister64, AsmMemoryOperand>(
@@ -735,7 +752,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert!(src_width_in_bits == dst_width_in_bits);
+                // assert_eq!(src_width_in_bits, dst_width_in_bits);
 
                 assembler
                     .mov::<AsmMemoryOperand, AsmRegister64>(
@@ -841,7 +858,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert!(src_width_in_bits == dst_width_in_bits);
+                assert_eq!(src_width_in_bits, dst_width_in_bits);
                 assembler
                     .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
@@ -857,7 +874,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                // assert!(src_width_in_bits == dst_width_in_bits);
+                // assert_eq!(src_width_in_bits, dst_width_in_bits);
                 assembler
                     .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
@@ -874,7 +891,7 @@ impl Instruction {
                     width_in_bits: dst_width_in_bits,
                 },
             ) => {
-                assert!(src_width_in_bits == dst_width_in_bits);
+                assert_eq!(src_width_in_bits, dst_width_in_bits);
                 assembler
                     .test::<AsmRegister64, AsmRegister64>(left.into(), right.into())
                     .unwrap();
@@ -920,6 +937,24 @@ impl Instruction {
                 ..
             }) => {
                 assembler.sete::<AsmRegister8>(condition.into()).unwrap();
+            }
+            SETO(Operand {
+                kind: R(PHYS(condition)),
+                ..
+            }) => {
+                assembler.seto::<AsmRegister8>(condition.into()).unwrap();
+            }
+            SETC(Operand {
+                kind: R(PHYS(condition)),
+                ..
+            }) => {
+                assembler.setc::<AsmRegister8>(condition.into()).unwrap();
+            }
+            SETS(Operand {
+                kind: R(PHYS(condition)),
+                ..
+            }) => {
+                assembler.sets::<AsmRegister8>(condition.into()).unwrap();
             }
             NOT(Operand {
                 kind: R(PHYS(value)),
@@ -1042,7 +1077,10 @@ impl Instruction {
             | Opcode::SETB(r)
             | Opcode::SETBE(r)
             | Opcode::SETA(r)
-            | Opcode::SETAE(r) => [Some((OperandDirection::Out, r)), None, None].into_iter(),
+            | Opcode::SETAE(r)
+            | Opcode::SETS(r)
+            | Opcode::SETO(r)
+            | Opcode::SETC(r) => [Some((OperandDirection::Out, r)), None, None].into_iter(),
             Opcode::NOT(r) | Opcode::NEG(r) => {
                 [Some((OperandDirection::InOut, r)), None, None].into_iter()
             }

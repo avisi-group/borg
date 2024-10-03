@@ -17,16 +17,13 @@ use {
             },
             types::{PrimitiveType, PrimitiveTypeClass, Type},
         },
-        util::{
-
-            signed_smallest_width_of_value, unsigned_smallest_width_of_value,
-        },
+        util::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
     },
+    common::arena::{Arena, Ref},
     proc_macro2::{Literal, TokenStream},
     quote::{format_ident, quote},
     std::iter::repeat,
     syn::Ident,
-    common::arena::{Arena, Ref}
 };
 
 pub fn codegen_function(function: &Function) -> TokenStream {
@@ -658,14 +655,8 @@ pub fn codegen_stmt(stmt: Ref<Statement>, s_arena: &Arena<Statement>) -> TokenSt
 
         Statement::Undefined => quote!(Default::default()),
 
-        Statement::GetFlag { flag, operation } => {
-            let flag = match flag {
-                Flag::N => quote!(N),
-                Flag::Z => quote!(Z),
-                Flag::C => quote!(C),
-                Flag::V => quote!(V),
-            };
-            quote!(ctx.emitter().get_flag(Flag::#flag, #operation.clone()))
+        Statement::GetFlags { operation } => {
+            quote!(ctx.emitter().get_flags( #operation.clone()))
         }
         // tuples only exist in Rust, not in the DBT
         Statement::TupleAccess { index, source } => {

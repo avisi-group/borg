@@ -73,14 +73,6 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum Flag {
-    N,
-    Z,
-    C,
-    V,
-}
-
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Statement {
     Constant {
@@ -129,8 +121,7 @@ pub enum Statement {
         value: Ref<Statement>,
     },
 
-    GetFlag {
-        flag: Flag,
+    GetFlags {
         operation: Ref<Statement>,
     },
 
@@ -421,7 +412,7 @@ impl Statement {
                 ts[*index].clone()
             }
 
-            Self::GetFlag { .. } => Type::u1(),
+            Self::GetFlags { .. } => Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4),
             Self::CreateTuple(values) => {
                 Type::Tuple(values.iter().map(|v| v.get(arena).typ(arena)).collect())
             }
@@ -833,13 +824,13 @@ impl Statement {
                 *self = Self::TupleAccess { index, source };
             }
 
-            Self::GetFlag { flag, operation } => {
+            Self::GetFlags { operation } => {
                 let operation = if operation == use_of {
                     with.clone()
                 } else {
                     operation.clone()
                 };
-                *self = Self::GetFlag { flag, operation };
+                *self = Self::GetFlags { operation };
             }
             Self::CreateTuple(values) => {
                 *self = Self::CreateTuple(
@@ -1053,8 +1044,8 @@ impl Statement {
             Self::TupleAccess { index, source } => {
                 format!("tuple-access {}.{index}", source)
             }
-            Self::GetFlag { flag, operation } => {
-                format!("get-flag {flag:?} {}", operation)
+            Self::GetFlags { operation } => {
+                format!("get-flags {}", operation)
             }
             Self::CreateTuple(values) => {
                 format!(
@@ -1558,8 +1549,7 @@ pub fn import_statement(
             source: mapping.get(&source).unwrap().clone(),
             index,
         },
-        Statement::GetFlag { flag, operation } => Statement::GetFlag {
-            flag,
+        Statement::GetFlags { operation } => Statement::GetFlags {
             operation: mapping.get(&operation).unwrap().clone(),
         },
         Statement::CreateTuple(values) => Statement::CreateTuple(
