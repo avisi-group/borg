@@ -35,7 +35,7 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
         .map(InternedString::from_static)
         .for_each(|name| {
             log::warn!("inlining {name}");
-            let mut function = model.get_functions_mut().remove(&name).unwrap();
+            let mut function = model.functions_mut().remove(&name).unwrap();
 
             // map of function name to imported entry block and exit block, used to avoid
             // importing an inlined function more than once
@@ -57,7 +57,7 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
             loop {
                 let did_change = run_inliner(
                     &mut function,
-                    model.get_functions(),
+                    model.functions(),
                     &mut inlined,
                     &mut exit_inline_call_rewrites,
                 );
@@ -69,7 +69,7 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
                 }
             }
 
-            model.get_functions_mut().insert(name, function);
+            model.functions_mut().insert(name, function);
         });
 }
 

@@ -130,14 +130,14 @@ impl FunctionCallGraphAnalysis {
     }
 
     fn analyse(&mut self, ctx: &Model) {
-        for (fname, f) in ctx.get_functions() {
+        for (fname, f) in ctx.functions() {
             assert!(*fname == f.name());
 
             self.fn_callees.insert(f.name(), HashSet::default());
             self.fn_callers.insert(f.name(), HashSet::default());
         }
 
-        for (_, f) in ctx.get_functions() {
+        for (_, f) in ctx.functions() {
             self.analyse_function(&f);
         }
     }

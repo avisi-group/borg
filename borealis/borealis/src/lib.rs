@@ -183,14 +183,14 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
     ) {
         rudder
-            .get_functions()
+            .functions()
             .keys()
             .copied()
             .collect::<Vec<_>>()
             .into_iter()
             .for_each(|name| {
                 if !FN_TOPLEVEL.contains(&name.as_ref()) {
-                    rudder.get_functions_mut().remove(&name);
+                    rudder.functions_mut().remove(&name);
                 }
             });
 
@@ -207,6 +207,7 @@ const FN_TOPLEVEL: &[&'static str] = &[
     "__DecodeA64",
     "__InitSystem",
     "add_with_carry_test",
+    "num_of_Feature",
 ];
 
 fn fn_is_allowlisted(name: InternedString) -> bool {

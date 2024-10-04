@@ -84,7 +84,7 @@ pub fn validate(ctx: &Model) -> Vec<ValidationMessage> {
 
 fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
     // iterate over every statement in every function, passing
-    ctx.get_functions()
+    ctx.functions()
         .values()
         .map(|f| f.block_iter().map(move |b| (f, b)))
         .flatten()
@@ -109,7 +109,7 @@ fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
 fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
     let mut messages = Vec::new();
 
-    for (_, f) in ctx.get_functions() {
+    for (_, f) in ctx.functions() {
         for b in f.block_iter() {
             let s_arena = b.get(f.arena()).arena();
 

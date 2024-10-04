@@ -612,7 +612,12 @@ impl Emitter for X86Emitter {
     }
 
     fn read_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef {
-        symbol.0.borrow().as_ref().unwrap().clone()
+        symbol
+            .0
+            .borrow()
+            .as_ref()
+            .unwrap_or_else(|| panic!("tried to read from {symbol:?} but it was never written to"))
+            .clone()
     }
 
     fn write_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef) {
@@ -646,10 +651,11 @@ impl Emitter for X86Emitter {
         todo!()
     }
 
-    fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef {
+    // returns a tuple of (operation_result, flags)
+    fn get_flags(&mut self) -> Self::NodeRef {
         Self::NodeRef::from(X86Node {
-            typ: Type::Unsigned(1),
-            kind: NodeKind::GetFlags { operation },
+            typ: Type::Unsigned(4),
+            kind: NodeKind::GetFlags,
         })
     }
 
@@ -679,7 +685,7 @@ impl Emitter for X86Emitter {
         })
     }
 
-    fn acess_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef {
+    fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef {
         let NodeKind::Tuple(values) = tuple.kind() else {
             unreachable!()
         };
@@ -1105,7 +1111,7 @@ impl X86NodeRef {
 
                 masked_target
             }
-            NodeKind::GetFlags { operation } => {
+            NodeKind::GetFlags => {
                 //  todo: assert that the operation comes right before this emitted instruction
 
                 let n = Operand::vreg(8, emitter.next_vreg());
@@ -1113,10 +1119,6 @@ impl X86NodeRef {
                 let c = Operand::vreg(8, emitter.next_vreg());
                 let v = Operand::vreg(8, emitter.next_vreg());
                 let dest = Operand::vreg(8, emitter.next_vreg());
-
-                // do math operation here todo: tuple return of getflags
-                //let _ = operation.to_operand(emitter);
-                // ADC
 
                 emitter.current_block.append(Instruction::sets(n.clone()));
                 emitter.current_block.append(Instruction::sete(z.clone()));
@@ -1203,9 +1205,7 @@ pub enum NodeKind {
         start: X86NodeRef,
         length: X86NodeRef,
     },
-    GetFlags {
-        operation: X86NodeRef,
-    },
+    GetFlags,
     Tuple(Vec<X86NodeRef>),
 }
 

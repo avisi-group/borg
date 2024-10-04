@@ -37,16 +37,24 @@ impl Model {
         self.fns.insert(name, func);
     }
 
-    pub fn get_functions(&self) -> &HashMap<InternedString, Function> {
+    pub fn functions(&self) -> &HashMap<InternedString, Function> {
         &self.fns
     }
 
-    pub fn get_functions_mut(&mut self) -> &mut HashMap<InternedString, Function> {
+    pub fn functions_mut(&mut self) -> &mut HashMap<InternedString, Function> {
         &mut self.fns
     }
 
     pub fn registers(&self) -> &HashMap<InternedString, RegisterDescriptor> {
         &self.registers
+    }
+
+    pub fn register_file_size(&self) -> usize {
+        self.registers
+            .values()
+            .map(|d| d.offset + d.typ.width_bytes())
+            .max()
+            .unwrap()
     }
 
     pub fn reg_offset(&self, name: &'static str) -> usize {
@@ -61,7 +69,7 @@ impl Display for Model {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "rudder context:")?;
 
-        for (name, func) in self.get_functions().iter() {
+        for (name, func) in self.functions().iter() {
             writeln!(f, "function {}:", name,)?;
 
             write!(f, "{}", func)?;

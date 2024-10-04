@@ -67,7 +67,7 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
         ],
     };
 
-    ctx.get_functions_mut()
+    ctx.functions_mut()
         .par_iter_mut()
         .for_each(|(name, function)| {
             let mut changed = true;

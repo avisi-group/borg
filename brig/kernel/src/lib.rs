@@ -14,12 +14,10 @@ use {
         },
         dbt::models,
         devices::manager::SharedDeviceManager,
-        fs::{tar::TarFilesystem, File, Filesystem},
         logger::WRITER,
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
-    common::{rudder::Model, HashMap},
     core::panic::PanicInfo,
     x86::io::outw,
 };

@@ -1149,7 +1149,9 @@ impl Instruction {
                 },
             ) => {
                 // sets the carry flag
-                assembler.add::<AsmRegister8, _>(carry.into(), 0).unwrap();
+                assembler
+                    .add::<AsmRegister8, _>(carry.into(), 0xffff_ffffu32 as i32)
+                    .unwrap();
 
                 assembler
                     .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
@@ -1169,17 +1171,20 @@ impl Instruction {
                     kind: I(carry_in),
                     width_in_bits: 1,
                 },
-            ) => {
-                match carry_in {
-                    0 => assembler.clc().unwrap(),
-                    1 => assembler.stc().unwrap(),
-                    _ => panic!(),
+            ) => match carry_in {
+                0 => {
+                    assembler
+                        .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                        .unwrap();
                 }
-
-                assembler
-                    .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
-                    .unwrap();
-            }
+                1 => {
+                    assembler.stc().unwrap();
+                    assembler
+                        .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                        .unwrap();
+                }
+                _ => panic!(),
+            },
 
             _ => panic!("cannot encode this instruction {}", self),
         }

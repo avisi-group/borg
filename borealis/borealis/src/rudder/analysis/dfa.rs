@@ -268,7 +268,8 @@ impl<'a> StatementUseAnalysis<'a> {
                 Statement::MatchesUnion { value, .. } => self.add_use(value, stmt),
                 Statement::UnwrapUnion { value, .. } => self.add_use(value, stmt),
 
-                Statement::ReadVariable { .. }
+                Statement::GetFlags
+                | Statement::ReadVariable { .. }
                 | Statement::ReadPc
                 | Statement::Jump { .. }
                 | Statement::PhiNode { .. }
@@ -278,9 +279,7 @@ impl<'a> StatementUseAnalysis<'a> {
                 | Statement::ExitInlineCall { .. } => {}
 
                 Statement::TupleAccess { source, .. } => self.add_use(source, stmt),
-                Statement::GetFlags { operation, .. } => {
-                    self.add_use(operation, stmt);
-                }
+
                 Statement::CreateTuple(values) => {
                     values.into_iter().for_each(|v| self.add_use(v, stmt))
                 }

@@ -13,6 +13,44 @@ pub mod demoarch;
 pub mod virtio;
 
 #[ktest]
+fn static_dynamic_chaos_smoke() {
+    let mut ctx = X86TranslationContext::new();
+    let model = models::get("aarch64").unwrap();
+    let mut register_file = alloc::vec![0u8;model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    ctx.emitter().leave();
+    let translation = ctx.compile();
+    log::debug!("{:?}", translation);
+    translation.execute(register_file_ptr);
+}
+
+#[ktest]
+fn num_of_feature() {
+    let mut ctx = X86TranslationContext::new();
+    let model = models::get("aarch64").unwrap();
+    let mut register_file = alloc::vec![0u8;model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    execute(&*model, "borealis_register_init", &[], &mut ctx);
+
+    let r0_offset = ctx
+        .emitter()
+        .constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+
+    let feature = ctx
+        .emitter()
+        .read_register(r0_offset.clone(), Type::Unsigned(0x20));
+
+    //  execute(&*model, "num_of_Feature", &[feature], &mut ctx);
+
+    ctx.emitter().leave();
+    let translation = ctx.compile();
+    log::debug!("{:?}", translation);
+    translation.execute(register_file_ptr);
+}
+
+#[ktest]
 fn decodea64_smoke() {
     let mut register_file = Box::new([0u8; 104488usize]);
     let register_file_ptr = register_file.as_mut_ptr();
@@ -21,13 +59,13 @@ fn decodea64_smoke() {
 
     execute(&*model, "borealis_register_init", &[], &mut ctx);
 
-    // // OOM crashes:(
-    // execute(
-    //     &*model,
-    //     "__InitSystem",
-    //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
-    //     &mut ctx,
-    // );
+    // OOM crashes:(
+    execute(
+        &*model,
+        "__InitSystem",
+        &[ctx.emitter().constant(0, Type::Unsigned(0))],
+        &mut ctx,
+    );
 
     let pc = ctx.emitter().constant(0, Type::Unsigned(64));
 
@@ -259,12 +297,12 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let res = execute(&*model, "add_with_carry_test", &[x, y, carry_in], &mut ctx);
 
     {
-        let sum = ctx.emitter().acess_tuple(res.clone(), 0);
+        let sum = ctx.emitter().access_tuple(res.clone(), 0);
         ctx.emitter().write_register(r0_offset, sum);
     }
 
     {
-        let flags = ctx.emitter().acess_tuple(res.clone(), 1);
+        let flags = ctx.emitter().access_tuple(res.clone(), 1);
 
         // zero extend flags to 64
         ctx.emitter().write_register(r1_offset, flags);

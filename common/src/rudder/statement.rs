@@ -121,9 +121,7 @@ pub enum Statement {
         value: Ref<Statement>,
     },
 
-    GetFlags {
-        operation: Ref<Statement>,
-    },
+    GetFlags,
 
     UnaryOperation {
         kind: UnaryOperationKind,
@@ -419,7 +417,7 @@ impl Statement {
                 ts[*index].clone()
             }
 
-            Self::GetFlags { .. } => Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4),
+            Self::GetFlags => Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4),
             Self::CreateTuple(values) => {
                 Type::Tuple(values.iter().map(|v| v.get(arena).typ(arena)).collect())
             }
@@ -838,14 +836,6 @@ impl Statement {
                 *self = Self::TupleAccess { index, source };
             }
 
-            Self::GetFlags { operation } => {
-                let operation = if operation == use_of {
-                    with.clone()
-                } else {
-                    operation.clone()
-                };
-                *self = Self::GetFlags { operation };
-            }
             Self::CreateTuple(values) => {
                 *self = Self::CreateTuple(
                     values
@@ -860,8 +850,7 @@ impl Statement {
                         .collect(),
                 )
             }
-            Statement::ExitInlineCall { .. } => (),
-            Statement::EnterInlineCall { .. } => (),
+            Self::GetFlags | Self::EnterInlineCall { .. } | Self::ExitInlineCall { .. } => (),
         }
     }
 
@@ -1065,8 +1054,8 @@ impl Statement {
             Self::TupleAccess { index, source } => {
                 format!("tuple-access {}.{index}", source)
             }
-            Self::GetFlags { operation } => {
-                format!("get-flags {}", operation)
+            Self::GetFlags => {
+                format!("get-flags")
             }
             Self::CreateTuple(values) => {
                 format!(
@@ -1576,9 +1565,7 @@ pub fn import_statement(
             source: mapping.get(&source).unwrap().clone(),
             index,
         },
-        Statement::GetFlags { operation } => Statement::GetFlags {
-            operation: mapping.get(&operation).unwrap().clone(),
-        },
+        Statement::GetFlags => Statement::GetFlags,
         Statement::CreateTuple(values) => Statement::CreateTuple(
             values
                 .iter()

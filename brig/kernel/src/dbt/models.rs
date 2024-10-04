@@ -25,7 +25,7 @@ use {
             Model,
         },
         width_helpers::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
-        HashMap,
+        HashMap, HashSet,
     },
     spin::Mutex,
 };
@@ -73,7 +73,7 @@ pub fn execute(
     arguments: &[X86NodeRef],
     ctx: &mut X86TranslationContext,
 ) -> X86NodeRef {
-    FunctionExecutor::new(model, function, arguments, ctx).execute()
+    FunctionExecutor::new(model, function, arguments, ctx).translate()
 }
 
 struct FunctionExecutor<'m, 'c> {
@@ -109,7 +109,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
 
         let function = celf
             .model
-            .get_functions()
+            .functions()
             .get(&celf.function_name)
             .unwrap_or_else(|| panic!("function named {function:?} not found"));
 
@@ -147,10 +147,10 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
         celf
     }
 
-    fn execute(&mut self) -> X86NodeRef {
+    fn translate(&mut self) -> X86NodeRef {
         let function = self
             .model
-            .get_functions()
+            .functions()
             .get(&self.function_name)
             .unwrap_or_else(|| panic!("failed to find function {:?} in model", self.function_name));
 
@@ -163,6 +163,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
         }
 
         let mut block_queue = alloc::vec![BlockKind::Static(function.entry_block())];
+        let mut visited_dynamic_blocks = HashSet::default();
 
         while let Some(block) = block_queue.pop() {
             if block_queue.len() > BLOCK_QUEUE_LIMIT {
@@ -175,14 +176,21 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             let result = match block {
                 BlockKind::Static(b) => {
                     log::trace!("static block {}", b.index());
-                    self.execute_block(function, b)
+                    self.translate_block(function, b)
                 }
                 BlockKind::Dynamic(b) => {
+                    if visited_dynamic_blocks.contains(&b) {
+                        continue;
+                    }
+
                     log::trace!("dynamic block {}", b.index());
                     self.ctx
                         .emitter()
                         .set_current_block(self.x86_blocks.get(&b).unwrap().clone());
-                    self.execute_block(function, b)
+
+                    let res = self.translate_block(function, b);
+                    visited_dynamic_blocks.insert(b);
+                    res
                 }
             };
 
@@ -220,6 +228,8 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             .emitter()
             .set_current_block(self.exit_block_ref.clone());
 
+        log::trace!("queue empty, reading return value and exiting");
+
         return self.ctx.emitter().read_variable(
             self.local_variables
                 .get(&InternedString::from_static("borealis_fn_return_value"))
@@ -228,7 +238,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
         );
     }
 
-    fn execute_block(&mut self, function: &Function, block_ref: Ref<Block>) -> BlockResult {
+    fn translate_block(&mut self, function: &Function, block_ref: Ref<Block>) -> BlockResult {
         let block = block_ref.get(function.arena());
 
         let mut statement_values = HashMap::<Ref<Statement>, X86NodeRef>::default();
@@ -265,10 +275,12 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     })
                 }
                 Statement::ReadVariable { symbol } => {
+                    log::debug!("reading from {symbol:?}");
                     let symbol = self.lookup_symbol(symbol);
                     Some(self.ctx.emitter().read_variable(symbol))
                 }
                 Statement::WriteVariable { symbol, value } => {
+                    log::debug!("writing to {symbol:?}");
                     let symbol = self.lookup_symbol(symbol);
                     let value = statement_values
                         .get(value)
@@ -324,10 +336,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                 }
                 Statement::ReadPc => todo!(),
                 Statement::WritePc { .. } => todo!(),
-                Statement::GetFlags { operation } => {
-                    let operation = statement_values.get(operation).unwrap().clone();
-                    Some(self.ctx.emitter().get_flags(operation))
-                }
+                Statement::GetFlags => Some(self.ctx.emitter().get_flags()),
                 Statement::UnaryOperation { kind, value } => {
                     use {
                         crate::dbt::x86::emitter::UnaryOperationKind as EmitterOp,
@@ -612,7 +621,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                 }
                 Statement::TupleAccess { index, source } => {
                     let source = statement_values.get(source).unwrap().clone();
-                    Some(self.ctx.emitter().acess_tuple(source, *index))
+                    Some(self.ctx.emitter().access_tuple(source, *index))
                 }
             };
 

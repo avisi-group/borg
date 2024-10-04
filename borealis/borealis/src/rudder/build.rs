@@ -55,7 +55,7 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
     internal_fns::insert_stub(&mut build_ctx.functions, &*REPLICATE_BITS_BOREALIS_INTERNAL);
 
     log::warn!("starting build functions");
-    let mut model = build_ctx.build_functions();
+    let model = build_ctx.build_functions();
     log::warn!("done build functions");
 
     // // insert again to overwrite empty boom generated rudder
@@ -1403,11 +1403,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let flags = build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::GetFlags {
-                            operation: sum.clone(),
-                        },
+                        Statement::GetFlags ,
                     );
-
 
                     Some(build(
                         self.block,

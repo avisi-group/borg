@@ -15,7 +15,7 @@ pub trait Emitter {
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef;
     fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef;
-    fn acess_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
+    fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
 
     fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
     fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
@@ -59,7 +59,7 @@ pub trait Emitter {
 
     fn assert(&mut self, condition: Self::NodeRef);
 
-    fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef;
+    fn get_flags(&mut self) -> Self::NodeRef;
 
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);
