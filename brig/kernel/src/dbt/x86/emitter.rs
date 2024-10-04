@@ -87,7 +87,23 @@ impl Emitter for X86Emitter {
         use UnaryOperationKind::*;
 
         match &op {
-            Not(value) => {
+            Not(value) => match value.kind() {
+                NodeKind::Constant {
+                    value: constant_value,
+                    width,
+                } => Self::NodeRef::from(X86Node {
+                    typ: value.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: (*constant_value == 0) as u64,
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: value.typ().clone(),
+                    kind: NodeKind::UnaryOperation(op),
+                }),
+            },
+            Complement(value) => {
                 match value.kind() {
                     NodeKind::Constant {
                         value: constant_value,
@@ -95,9 +111,10 @@ impl Emitter for X86Emitter {
                     } => Self::NodeRef::from(X86Node {
                         typ: value.typ().clone(),
                         kind: NodeKind::Constant {
-                            value: constant_value ^ mask(*width), /* only NOT the bits that are
-                                                                   * part of the size of the
-                                                                   * datatype */
+                            value: (!constant_value) & mask(*width), /* only invert the bits that
+                                                                      * are
+                                                                      * part of the size of the
+                                                                      * datatype */
                             width: *width,
                         },
                     }),
@@ -108,7 +125,7 @@ impl Emitter for X86Emitter {
                 }
             }
             _ => {
-                todo!()
+                todo!("{op:?}")
             }
         }
     }
@@ -525,10 +542,12 @@ impl Emitter for X86Emitter {
         };
         let value = value.to_operand(self);
 
+        let width = value.width_in_bits;
+
         self.current_block.append(Instruction::mov(
             value,
             Operand::mem_base_displ(
-                64,
+                width,
                 Register::PhysicalRegister(PhysicalRegister::RBP),
                 offset,
             ),
@@ -1058,39 +1077,49 @@ impl X86NodeRef {
 
                 masked_target
             }
-            NodeKind::GetFlags { operation: _ } => {
+            NodeKind::GetFlags { operation } => {
                 //  todo: assert that the operation comes right before this emitted instruction
 
+                let n = Operand::vreg(8, emitter.next_vreg());
+                let z = Operand::vreg(8, emitter.next_vreg());
+                let c = Operand::vreg(8, emitter.next_vreg());
+                let v = Operand::vreg(8, emitter.next_vreg());
                 let dest = Operand::vreg(8, emitter.next_vreg());
 
-                emitter
-                    .current_block
-                    .append(Instruction::seto(dest.clone()));
+                // do math operation here todo: tuple return of getflags
+                //let _ = operation.to_operand(emitter);
+                // ADC
+
+                emitter.current_block.append(Instruction::sets(n.clone()));
+                emitter.current_block.append(Instruction::sete(z.clone()));
+                emitter.current_block.append(Instruction::setc(c.clone()));
+                emitter.current_block.append(Instruction::seto(v.clone()));
 
                 emitter
                     .current_block
-                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+                    .append(Instruction::xor(dest.clone(), dest.clone()));
 
                 emitter
                     .current_block
-                    .append(Instruction::setc(dest.clone()));
-
-                emitter
-                    .current_block
-                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-
-                emitter
-                    .current_block
-                    .append(Instruction::sete(dest.clone()));
-
+                    .append(Instruction::or(n.clone(), dest.clone()));
                 emitter
                     .current_block
                     .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-
                 emitter
                     .current_block
-                    .append(Instruction::sets(dest.clone()));
-
+                    .append(Instruction::or(z.clone(), dest.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::or(c.clone(), dest.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::or(v.clone(), dest.clone()));
                 // nzcv
                 dest
             }

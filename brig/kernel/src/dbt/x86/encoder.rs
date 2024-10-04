@@ -25,6 +25,8 @@ pub enum Opcode {
     SUB(Operand, Operand),
     /// or {0}, {1},
     OR(Operand, Operand),
+    /// xor {0}, {1},
+    XOR(Operand, Operand),
     /// and {0}, {1},
     AND(Operand, Operand),
     /// not {0}
@@ -677,6 +679,7 @@ impl Instruction {
     alu_op!(add, ADD);
     alu_op!(sub, SUB);
     alu_op!(or, OR);
+    alu_op!(xor, XOR);
 
     pub fn encode(
         &self,
@@ -738,7 +741,7 @@ impl Instruction {
             MOV(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: 8,
                 },
                 Operand {
                     kind:
@@ -749,11 +752,34 @@ impl Instruction {
                             displacement,
                             ..
                         },
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: 8,
                 },
             ) => {
-                // assert_eq!(src_width_in_bits, dst_width_in_bits);
-
+                assembler
+                    .mov::<AsmMemoryOperand, AsmRegister8>(
+                        memory_operand_to_iced(base, index, scale, displacement),
+                        src.into(),
+                    )
+                    .unwrap();
+            }
+            // MOV R -> M
+            MOV(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: 64,
+                },
+            ) => {
                 assembler
                     .mov::<AsmMemoryOperand, AsmRegister64>(
                         memory_operand_to_iced(base, index, scale, displacement),
@@ -819,7 +845,10 @@ impl Instruction {
                 (16, 32) => assembler
                     .movzx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
                     .unwrap(),
-                _ => todo!(),
+                (8, 64) => assembler
+                    .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
+                    .unwrap(),
+                (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
             },
 
             LEA(
@@ -970,7 +999,20 @@ impl Instruction {
                 },
                 Operand {
                     kind: R(PHYS(value)),
-                    ..
+                    width_in_bits: 8,
+                },
+            ) => {
+                assembler
+                    .shl::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
+                    .unwrap();
+            }
+            SHL(
+                Operand {
+                    kind: I(amount), ..
+                },
+                Operand {
+                    kind: R(PHYS(value)),
+                    width_in_bits: 64,
                 },
             ) => {
                 assembler
@@ -981,20 +1023,67 @@ impl Instruction {
                 Operand { kind: I(left), .. },
                 Operand {
                     kind: R(PHYS(right)),
-                    ..
+                    width_in_bits: 8,
                 },
             ) => {
                 //assert_eq!(left_width, right_width);
                 assembler
-                    .or::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
+                    .or::<AsmRegister8, i32>(right.into(), i32::try_from(*left).unwrap())
+                    .unwrap();
+            }
+            XOR(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
+                },
+            ) => {
+                //assert_eq!(src_width, dst_width);
+                assembler
+                    .xor::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+            XOR(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 8,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 8,
+                },
+            ) => {
+                //assert_eq!(src_width, dst_width);
+                assembler
+                    .xor::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
                     .unwrap();
             }
             OR(
                 Operand {
-                    kind: R(PHYS(src)), ..
+                    kind: R(PHYS(src)),
+                    width_in_bits: 8,
                 },
                 Operand {
-                    kind: R(PHYS(dst)), ..
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 8,
+                },
+            ) => {
+                //assert_eq!(src_width, dst_width);
+                assembler
+                    .or::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
+                    .unwrap();
+            }
+            OR(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
                 },
             ) => {
                 //assert_eq!(src_width, dst_width);
@@ -1055,6 +1144,7 @@ impl Instruction {
             .into_iter(),
             Opcode::SHL(src, dst)
             | Opcode::OR(src, dst)
+            | Opcode::XOR(src, dst)
             | Opcode::ADD(src, dst)
             | Opcode::SUB(src, dst)
             | Opcode::AND(src, dst) => [

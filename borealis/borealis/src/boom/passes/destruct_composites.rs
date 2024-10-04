@@ -324,7 +324,11 @@ fn destruct_local_structs(
                                     panic!();
                                 };
 
-                                let typ = removed_items.get(dest).unwrap();
+                                let Some(typ) = removed_items.get(dest) else {
+                                    // tuple return type already removed
+                                    return vec![clone];
+                                };
+
                                 let Type::Struct {  fields,.. } = &*typ.get() else {
                                     panic!("not a struct?");
                                 };

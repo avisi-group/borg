@@ -1,7 +1,7 @@
 use {
     crate::{
-        boom::{self, bits_to_int, control_flow::ControlFlowBlock},
-        rudder::internal_fns::REPLICATE_BITS_BOREALIS_INTERNAL,
+        boom::{self, bits_to_int},
+        rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
     },
     common::{
         arena::{Arena, Ref},
@@ -52,25 +52,7 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 
     // insert replicate bits signature
 
-    build_ctx.functions.insert(
-        REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-        (
-            // have to make a new function here or `build_functions` will overwrite it
-            Function::new(
-                REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-                REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
-                REPLICATE_BITS_BOREALIS_INTERNAL.parameters(),
-            ),
-            boom::FunctionDefinition {
-                signature: boom::FunctionSignature {
-                    name: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-                    parameters: Shared::new(vec![]),
-                    return_type: Shared::new(boom::Type::Unit),
-                },
-                entry_block: ControlFlowBlock::new(),
-            },
-        ),
-    );
+    internal_fns::insert_stub(&mut build_ctx.functions, &*REPLICATE_BITS_BOREALIS_INTERNAL);
 
     log::warn!("starting build functions");
     let mut model = build_ctx.build_functions();
@@ -1417,7 +1399,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: x,
-                            rhs: y,
+                            rhs: carry_in,
                         },
                     );
                     let sum = build(
@@ -1426,7 +1408,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         Statement::BinaryOperation {
                             kind: BinaryOperationKind::Add,
                             lhs: partial_sum,
-                            rhs: carry_in,
+                            rhs: y,
                         },
                     );
 

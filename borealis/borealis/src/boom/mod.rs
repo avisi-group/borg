@@ -44,7 +44,67 @@ impl Ast {
         let mut emitter = BoomEmitter::new();
         emitter.process(iter);
 
-        let ast = emitter.finish();
+        let mut ast = emitter.finish();
+
+        {
+            let return_type = Shared::new(Type::Tuple(vec![
+                Shared::new(Type::Bits {
+                    size: Size::Static(64),
+                }),
+                Shared::new(Type::Bits {
+                    size: Size::Static(4),
+                }),
+            ]));
+            let entry_block = ControlFlowBlock::new();
+            entry_block.set_statements(vec![
+                Shared::new(Statement::VariableDeclaration {
+                    name: "return".into(),
+                    typ: return_type.clone(),
+                }),
+                Shared::new(Statement::FunctionCall {
+                    expression: Some(Expression::Identifier("return".into())),
+                    name: "AddWithCarry".into(),
+                    arguments: vec![
+                        Shared::new(Value::Identifier("x".into())),
+                        Shared::new(Value::Identifier("y".into())),
+                        Shared::new(Value::Identifier("carry_in".into())),
+                    ],
+                }),
+            ]);
+            entry_block.set_terminator(control_flow::Terminator::Return(Value::Identifier(
+                "return".into(),
+            )));
+            ast.functions.insert(
+                "add_with_carry_test".into(),
+                FunctionDefinition {
+                    signature: FunctionSignature {
+                        name: "add_with_carry_test".into(),
+                        parameters: Shared::new(vec![
+                            Parameter {
+                                name: "x".into(),
+                                typ: Shared::new(Type::Bits {
+                                    size: Size::Static(64),
+                                }),
+                            },
+                            Parameter {
+                                name: "y".into(),
+                                typ: Shared::new(Type::Bits {
+                                    size: Size::Static(64),
+                                }),
+                            },
+                            Parameter {
+                                name: "carry_in".into(),
+                                typ: Shared::new(Type::Bits {
+                                    size: Size::Static(1),
+                                }),
+                            },
+                        ]),
+                        return_type,
+                    },
+                    entry_block,
+                },
+            );
+        }
 
         Shared::new(ast)
     }

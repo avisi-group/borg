@@ -21,7 +21,7 @@ fn decodea64_smoke() {
 
     execute(&*model, "borealis_register_init", &[], &mut ctx);
 
-    // OOM crashes:(
+    // // OOM crashes:(
     // execute(
     //     &*model,
     //     "__InitSystem",
@@ -67,12 +67,18 @@ fn fibonacci() {
     let mut ctx = X86TranslationContext::new();
     let model = models::get("aarch64").unwrap();
     execute(&*model, "borealis_register_init", &[], &mut ctx);
+    // OOM crashes:(
+    // execute(
+    //     &*model,
+    //     "__InitSystem",
+    //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
+    //     &mut ctx,
+    // );
     ctx.emitter().leave();
     let translation = ctx.compile();
     translation.execute(register_file_ptr);
 
     // // hacky, run sail function that goes before the main loop :/
-    // u__InitSystem(&mut state, TRACER, ());
 
     let program = [
         // <_start>
@@ -140,22 +146,74 @@ fn fibonacci() {
     }
 }
 
-// #[ktest]
-// fn addwithcarry_negative() {
-//     let mut state = State::new(Box::new(NoneEnv));
+#[ktest]
+fn addwithcarry_negative() {
+    let mut register_file = Box::new([0u8; 104488usize]);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new();
+    let model = models::get("aarch64").unwrap();
 
-//     let x = Bits::new(0x0, 0x40);
-//     let y = Bits::new(-5i128 as u128, 0x40);
-//     let carry_in = false;
+    execute(&*model, "borealis_register_init", &[], &mut ctx);
+    let r0 = unsafe { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
+    let r1 = unsafe { register_file_ptr.add(model.reg_offset("R1")) as *mut u64 };
 
-//     assert_eq!(
-//         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-//         ProductType188a1c3bf231c64b {
-//             tuple__pcnt_bv__pcnt_bv40: Bits::new(-5i64 as u128, 0x40),
-//             tuple__pcnt_bv__pcnt_bv41: 0b1000
-//         }
-//     );
-// }
+    unsafe {
+        *r0 = 0x0u64;
+        *r1 = -5i64 as u64;
+    }
+
+    let r0_offset = ctx
+        .emitter()
+        .constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    let r1_offset = ctx
+        .emitter()
+        .constant(model.reg_offset("R1") as u64, Type::Unsigned(0x40));
+
+    let x = ctx
+        .emitter()
+        .read_register(r0_offset.clone(), Type::Unsigned(0x40));
+    let y = ctx
+        .emitter()
+        .read_register(r1_offset.clone(), Type::Unsigned(0x40));
+    let carry_in = ctx.emitter().constant(false as u64, Type::Unsigned(1));
+
+    let res = execute(&*model, "add_with_carry_test", &[x, y, carry_in], &mut ctx);
+
+    {
+        let sum = ctx.emitter().acess_tuple(res.clone(), 0);
+        ctx.emitter().write_register(r0_offset, sum);
+    }
+
+    {
+        let flags = ctx.emitter().acess_tuple(res.clone(), 1);
+
+        // zero extend flags to 64
+        ctx.emitter().write_register(r1_offset, flags);
+    }
+
+    ctx.emitter().leave();
+    let translation = ctx.compile();
+    log::debug!("\n{:?}", translation);
+    translation.execute(register_file_ptr);
+
+    unsafe {
+        assert_eq!(*r0, -5i64 as u64);
+        assert_eq!(
+            *(register_file_ptr.add(model.reg_offset("R1")) as *mut u8),
+            0b1000
+        );
+    };
+
+    panic!()
+
+    // assert_eq!(
+    //     add_with_carry_test(&mut state, TRACER, x, y, carry_in),
+    //     ProductType188a1c3bf231c64b {
+    //         tuple__pcnt_bv__pcnt_bv40: Bits::new(-5i64 as u128, 0x40),
+    //         tuple__pcnt_bv__pcnt_bv41: 0b1000
+    //     }
+    // );
+}
 
 // #[ktest]
 // fn addwithcarry_zero() {

@@ -1,12 +1,41 @@
 use {
-    common::rudder::{
-        constant_value::ConstantValue,
-        function::{Function, Symbol},
-        statement::{build, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement},
-        types::Type,
+    crate::boom::{self, control_flow::ControlFlowBlock},
+    common::{
+        intern::InternedString,
+        rudder::{
+            constant_value::ConstantValue,
+            function::{Function, Symbol},
+            statement::{
+                build, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
+            },
+            types::{PrimitiveTypeClass, Type},
+        },
+        HashMap,
     },
     once_cell::sync::Lazy,
+    sailrs::shared::Shared,
 };
+
+pub fn insert_stub(
+    functions: &mut HashMap<InternedString, (Function, boom::FunctionDefinition)>,
+    f: &Function,
+) {
+    functions.insert(
+        f.name(),
+        (
+            // have to make a new function here or `build_functions` will overwrite it
+            Function::new(f.name(), f.return_type(), f.parameters()),
+            boom::FunctionDefinition {
+                signature: boom::FunctionSignature {
+                    name: f.name(),
+                    parameters: Shared::new(vec![]),
+                    return_type: Shared::new(boom::Type::Unit),
+                },
+                entry_block: ControlFlowBlock::new(),
+            },
+        ),
+    );
+}
 
 pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     // // bits << (bits.len() * 0) | bits << (bits.len() * 1) | bits << (bits.len()
@@ -337,6 +366,79 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     };
 
     function.set_entry_block(entry_block);
+
+    function
+});
+
+pub static ADD_WITH_CARRY_TEST: Lazy<Function> = Lazy::new(|| {
+    let x_sym = Symbol::new("x".into(), Type::u64());
+    let y_sym = Symbol::new("y".into(), Type::u64());
+    let carry_sym = Symbol::new("carry_in".into(), Type::u64());
+
+    let mut function = Function::new(
+        "add_with_carry_test".into(),
+        Type::Tuple(vec![
+            Type::u64(),
+            Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4),
+        ]),
+        vec![x_sym.clone(), y_sym.clone(), carry_sym.clone()],
+    );
+
+    let block_ref = function.new_block();
+
+    let x = build(
+        block_ref,
+        function.arena_mut(),
+        Statement::ReadVariable { symbol: x_sym },
+    );
+    let y = build(
+        block_ref,
+        function.arena_mut(),
+        Statement::ReadVariable { symbol: y_sym },
+    );
+    let carry = build(
+        block_ref,
+        function.arena_mut(),
+        Statement::ReadVariable { symbol: carry_sym },
+    );
+
+    let partial_sum = build(
+        block_ref,
+        function.arena_mut(),
+        Statement::BinaryOperation {
+            kind: BinaryOperationKind::Add,
+            lhs: x,
+            rhs: carry,
+        },
+    );
+    let sum = build(
+        block_ref,
+        function.arena_mut(),
+        Statement::BinaryOperation {
+            kind: BinaryOperationKind::Add,
+            lhs: partial_sum,
+            rhs: y,
+        },
+    );
+
+    // nzcv bv4
+    let flags = build(
+        block_ref,
+        function.arena_mut(),
+        Statement::GetFlags {
+            operation: sum.clone(),
+        },
+    );
+
+    let value = build(
+        block_ref,
+        function.arena_mut(),
+        Statement::CreateTuple(vec![sum, flags]),
+    );
+
+    build(block_ref, function.arena_mut(), Statement::Return { value });
+
+    function.set_entry_block(block_ref);
 
     function
 });

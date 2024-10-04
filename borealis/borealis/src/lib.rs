@@ -182,7 +182,17 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         &mode,
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
     ) {
-        // let ws = codegen_workspace(rudder, FN_TOPLEVEL);
+        rudder
+            .get_functions()
+            .keys()
+            .copied()
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|name| {
+                if !FN_TOPLEVEL.contains(&name.as_ref()) {
+                    rudder.get_functions_mut().remove(&name);
+                }
+            });
 
         info!("Serializing Rudder");
         let buf = postcard::to_allocvec(&rudder).unwrap();
@@ -192,7 +202,12 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 }
 
-const FN_TOPLEVEL: &[&'static str] = &["borealis_register_init", "__DecodeA64", "__InitSystem"];
+const FN_TOPLEVEL: &[&'static str] = &[
+    "borealis_register_init",
+    "__DecodeA64",
+    "__InitSystem",
+    "add_with_carry_test",
+];
 
 fn fn_is_allowlisted(name: InternedString) -> bool {
     const FN_ALLOWLIST: &[&'static str] = &[
@@ -211,8 +226,6 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "TakeReset",
         "InitVariantImplemented",
         "InitFeatureImpl",
-        "_get_RMR_EL3_Type_AA64",
-        "_get_ID_AA64PFR0_EL1_Type_EL3",
         "SetResetVector",
         "Mk_RVBAR_EL1_Type",
         "Mk_RVBAR_EL2_Type",
@@ -226,11 +239,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "FPEXC_read",
         "_update_FPEXC_Type_EN",
         "HSCTLR_read",
-        "_get_HSCTLR_Type_EE",
-        "_get_HSCTLR_Type_TE",
         "SCTLR_read__2",
-        "_get_SCTLR_Type_EE",
-        "_get_SCTLR_Type_TE",
         "SCTLR_NS_read",
         "AArch32_WriteMode",
         "ELFromM32",
@@ -240,10 +249,8 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "HaveAArch32EL",
         "EffectiveSCR_EL3_NSE",
         "HaveRME",
-        "_get_SCR_EL3_Type_NSE",
         "EffectiveSCR_EL3_NS",
         "HaveSecureState",
-        "_get_SCR_EL3_Type_NS",
         "AArch32_ResetControlRegisters",
         "ResetControlRegisters",
         "AArch32_AutoGen_ArchitectureReset",
@@ -258,33 +265,41 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "CNTKCTL_read__1",
         "ELUsingAArch32",
         "IsSecureBelowEL3",
-        "_get_SCRType_NS",
         "ELStateUsingAArch32",
         "ELStateUsingAArch32K",
         "HaveSecureEL2Ext",
-        "_get_SCR_EL3_Type_EEL2",
         "VBAR_read__2",
         "Bit",
-        "_get_GICD_CTLR_Type_DS",
         "AArch32_IMPDEFResets",
-        "_get_PMCR_Type_IMP",
         "integer_subrange",
         "set_subrange_zeros",
         "set_slice_zeros",
         "slice_mask",
         "sail_mask",
-        "_get_ID_DFR0_Type_CopDbg",
-        "_get_ID_DFR0_EL1_Type_CopDbg",
-        "_get_Configuration_Type_ExceptInit",
-        "_get_Configuration_Type_CFGEND",
-        "_get_PMCR_Type_N",
         "AArch64_IMPDEFResets",
-        "_get_ERRIDR_EL1_Type_NUM",
         "__DecodeA64_DataProcImm",
         "decode_movz_aarch64_instrs_integer_ins_ext_insert_movewide",
         "execute_aarch64_instrs_integer_ins_ext_insert_movewide",
         "Zeros",
         "decode_subs_addsub_shift_aarch64_instrs_integer_arithmetic_add_sub_shiftedreg",
+        "__DecodeA64_BranchExcSys",
+        "decode_b_cond_aarch64_instrs_branch_conditional_cond",
+        "execute_aarch64_instrs_branch_conditional_cond",
+        "ConditionHolds",
+        "BranchNotTaken",
+        "HaveStatisticalProfiling",
+        "SPEBranch",
+        "SPEBranch__1",
+        "StatisticalProfilingEnabled",
+        "StatisticalProfilingEnabled__1",
+        "UsingAArch32",
+        "ProfilingBufferEnabled",
+        "ProfilingBufferOwner",
+        "IsSecureEL2Enabled",
+        "EL2Enabled",
+        "SecurityStateAtEL",
+        "Unreachable",
+        "HaveVirtHostExt",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -314,6 +329,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().ends_with("_write")
         || name.as_ref().starts_with("Mk")
         || name.as_ref().starts_with("_update_")
+        || name.as_ref().starts_with("_get_")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

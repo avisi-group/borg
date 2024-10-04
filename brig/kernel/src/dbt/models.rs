@@ -30,6 +30,8 @@ use {
     spin::Mutex,
 };
 
+const BLOCK_QUEUE_LIMIT: usize = 1000;
+
 static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub fn register_model(name: &str, model: Model) {
@@ -154,6 +156,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
 
         // todo: write arguments
 
+        #[derive(Debug)]
         enum BlockKind {
             Static(Ref<Block>),
             Dynamic(Ref<Block>),
@@ -162,7 +165,12 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
         let mut block_queue = alloc::vec![BlockKind::Static(function.entry_block())];
 
         while let Some(block) = block_queue.pop() {
-            log::trace!("block_queue len: {}", block_queue.len());
+            if block_queue.len() > BLOCK_QUEUE_LIMIT {
+                panic!(
+                    "block queue exceeded limit, head: {:?}",
+                    &block_queue[BLOCK_QUEUE_LIMIT - 10..]
+                )
+            }
 
             let result = match block {
                 BlockKind::Static(b) => {
@@ -262,7 +270,15 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                 }
                 Statement::WriteVariable { symbol, value } => {
                     let symbol = self.lookup_symbol(symbol);
-                    let value = statement_values.get(value).unwrap().clone();
+                    let value = statement_values
+                        .get(value)
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "no value for {value} when writing to {symbol:?} in {} {block_ref:?}",
+                                function.name()
+                            )
+                        })
+                        .clone();
                     self.ctx.emitter().write_variable(symbol, value);
                     None
                 }
@@ -584,9 +600,10 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                 }
             };
 
-            if let Some(value) = value {
-                statement_values.insert(*s, value);
-            }
+            statement_values.insert(
+                *s,
+                value.unwrap_or(self.ctx.emitter().constant(0, emitter::Type::Unsigned(0))), // insert unit for statements that return no values
+            );
         }
 
         unreachable!()
