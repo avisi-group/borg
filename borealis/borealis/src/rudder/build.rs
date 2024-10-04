@@ -13,7 +13,7 @@ use {
             function::{Function, Symbol},
             statement::{
                 build, cast, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
-                UnaryOperationKind,
+                TernaryOperationKind, UnaryOperationKind,
             },
             types::{PrimitiveType, PrimitiveTypeClass, Type},
             Model, RegisterDescriptor,
@@ -58,11 +58,11 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
     let mut model = build_ctx.build_functions();
     log::warn!("done build functions");
 
-    // insert again to overwrite empty boom generated rudder
-    model.get_functions_mut().insert(
-        REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-        REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
-    );
+    // // insert again to overwrite empty boom generated rudder
+    // model.get_functions_mut().insert(
+    //     REPLICATE_BITS_BOREALIS_INTERNAL.name(),
+    //     REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
+    // );
 
     model
 }
@@ -1393,23 +1393,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let y = args[1].clone();
                     let carry_in = args[2].clone();
 
-                    let partial_sum = build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::BinaryOperation {
-                            kind: BinaryOperationKind::Add,
-                            lhs: x,
-                            rhs: carry_in,
-                        },
-                    );
                     let sum = build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::BinaryOperation {
-                            kind: BinaryOperationKind::Add,
-                            lhs: partial_sum,
-                            rhs: y,
-                        },
+                        Statement::TernaryOperation { kind: TernaryOperationKind::AddWithCarry, a: x, b: y, c: carry_in},
                     );
 
                     // nzcv bv4

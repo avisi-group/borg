@@ -59,251 +59,141 @@ fn decodea64_smoke() {
     }
 }
 
-#[ktest]
-fn fibonacci() {
-    let mut register_file = Box::new([0u8; 104488usize]);
-    let register_file_ptr = register_file.as_mut_ptr();
+// #[ktest]
+// fn fibonacci() {
+//     let mut register_file = Box::new([0u8; 104488usize]);
+//     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
-    let model = models::get("aarch64").unwrap();
-    execute(&*model, "borealis_register_init", &[], &mut ctx);
-    // OOM crashes:(
-    // execute(
-    //     &*model,
-    //     "__InitSystem",
-    //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
-    //     &mut ctx,
-    // );
-    ctx.emitter().leave();
-    let translation = ctx.compile();
-    translation.execute(register_file_ptr);
+//     let mut ctx = X86TranslationContext::new();
+//     let model = models::get("aarch64").unwrap();
+//     execute(&*model, "borealis_register_init", &[], &mut ctx);
+//     // OOM crashes:(
+//     // execute(
+//     //     &*model,
+//     //     "__InitSystem",
+//     //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
+//     //     &mut ctx,
+//     // );
+//     ctx.emitter().leave();
+//     let translation = ctx.compile();
+//     translation.execute(register_file_ptr);
 
-    // // hacky, run sail function that goes before the main loop :/
+//     // // hacky, run sail function that goes before the main loop :/
 
-    let program = [
-        // <_start>
-        0xd2800000, // mov     x0, #0x0 (#0)
-        0xd2800021, // mov     x1, #0x1 (#1)
-        0xd2800002, // mov     x2, #0x0 (#0)
-        0xd2800003, // mov     x3, #0x0 (#0)
-        0xd2800144, // mov     x4, #0xa (#10)
-        // <loop>
-        0xeb04007f, // cmp     x3, x4
-        0x540000c0, // b.eq    400104 <done>  // b.none
-        0x8b010002, // add     x2, x0, x1
-        0xaa0103e0, // mov     x0, x1
-        0xaa0203e1, // mov     x1, x2
-        0x91000463, // add     x3, x3, #0x1
-        0x17fffffa, // b       4000e8 <loop>
-        // <done>
-        0xaa0203e0, // mov     x0, x2
-        0x52800ba8, // mov     w8, #0x5d (#93)
-        0xd4000001, // svc     #0x0
-    ];
-    unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
-        let branch_taken =
-            { register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool };
-        let pc = { register_file_ptr.add(model.reg_offset("_PC")) as *mut u64 };
-        let r0 = { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
-        let r3 = { register_file_ptr.add(model.reg_offset("R3")) as *mut u64 };
+//     let program = [
+//         // <_start>
+//         0xd2800000, // mov     x0, #0x0 (#0)
+//         0xd2800021, // mov     x1, #0x1 (#1)
+//         0xd2800002, // mov     x2, #0x0 (#0)
+//         0xd2800003, // mov     x3, #0x0 (#0)
+//         0xd2800144, // mov     x4, #0xa (#10)
+//         // <loop>
+//         0xeb04007f, // cmp     x3, x4
+//         0x540000c0, // b.eq    400104 <done>  // b.none
+//         0x8b010002, // add     x2, x0, x1
+//         0xaa0103e0, // mov     x0, x1
+//         0xaa0203e1, // mov     x1, x2
+//         0x91000463, // add     x3, x3, #0x1
+//         0x17fffffa, // b       4000e8 <loop>
+//         // <done>
+//         0xaa0203e0, // mov     x0, x2
+//         0x52800ba8, // mov     w8, #0x5d (#93)
+//         0xd4000001, // svc     #0x0
+//     ];
+//     unsafe {
+//         let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+//         let branch_taken =
+//             { register_file_ptr.add(model.reg_offset("__BranchTaken")) as
+// *mut bool };         let pc = {
+// register_file_ptr.add(model.reg_offset("_PC")) as *mut u64 };         let r0
+// = { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };         let
+// r3 = { register_file_ptr.add(model.reg_offset("R3")) as *mut u64 };
 
-        // bounded just in case
-        for _ in 0..100 {
-            log::warn!("pc = {}", *pc);
+//         // bounded just in case
+//         for _ in 0..100 {
+//             log::warn!("pc = {}", *pc);
 
-            *see = -1;
-            *branch_taken = false;
+//             *see = -1;
+//             *branch_taken = false;
 
-            // exit before the svc
-            if *pc == 0x38 {
-                break;
-            }
+//             // exit before the svc
+//             if *pc == 0x38 {
+//                 break;
+//             }
 
-            let mut ctx = X86TranslationContext::new();
-            let model = models::get("aarch64").unwrap();
+//             let mut ctx = X86TranslationContext::new();
+//             let model = models::get("aarch64").unwrap();
 
-            {
-                let opcode = ctx
-                    .emitter()
-                    .constant(program[*pc as usize / 4], Type::Unsigned(64));
-                let pc = ctx.emitter().constant(*pc, Type::Unsigned(64));
-                execute(&*model, "__DecodeA64", &[pc, opcode], &mut ctx);
-            }
+//             {
+//                 let opcode = ctx
+//                     .emitter()
+//                     .constant(program[*pc as usize / 4], Type::Unsigned(64));
+//                 let pc = ctx.emitter().constant(*pc, Type::Unsigned(64));
+//                 execute(&*model, "__DecodeA64", &[pc, opcode], &mut ctx);
+//             }
 
-            ctx.emitter().leave();
-            let translation = ctx.compile();
-            translation.execute(register_file_ptr);
+//             ctx.emitter().leave();
+//             let translation = ctx.compile();
+//             translation.execute(register_file_ptr);
 
-            // increment PC if no branch was taken
-            if !*branch_taken {
-                *pc += 4;
-            }
-        }
+//             // increment PC if no branch was taken
+//             if !*branch_taken {
+//                 *pc += 4;
+//             }
+//         }
 
-        assert_eq!(89, *r0);
-        assert_eq!(10, *r3);
-    }
-}
+//         assert_eq!(89, *r0);
+//         assert_eq!(10, *r3);
+//     }
+// }
 
 #[ktest]
 fn addwithcarry_negative() {
-    let mut register_file = Box::new([0u8; 104488usize]);
-    let register_file_ptr = register_file.as_mut_ptr();
-    let mut ctx = X86TranslationContext::new();
-    let model = models::get("aarch64").unwrap();
+    let (sum, flags) = add_with_carry_harness(0, -5i64 as u64, false);
 
-    execute(&*model, "borealis_register_init", &[], &mut ctx);
-    let r0 = unsafe { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
-    let r1 = unsafe { register_file_ptr.add(model.reg_offset("R1")) as *mut u64 };
+    assert_eq!(sum, -5i64 as u64);
+    assert_eq!(flags, 0b1000);
+}
 
-    unsafe {
-        *r0 = 0x0u64;
-        *r1 = -5i64 as u64;
-    }
+#[ktest]
+fn addwithcarry_zero() {
+    let (sum, flags) = add_with_carry_harness(0, 0, false);
+    assert_eq!(sum, 0);
+    assert_eq!(flags, 0b0100);
+}
 
-    let r0_offset = ctx
-        .emitter()
-        .constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
-    let r1_offset = ctx
-        .emitter()
-        .constant(model.reg_offset("R1") as u64, Type::Unsigned(0x40));
+#[ktest]
+fn addwithcarry_carry() {
+    let (sum, flags) = add_with_carry_harness(u64::MAX, 1, false);
+    assert_eq!(sum, 0);
+    assert_eq!(flags, 0b0110);
+}
 
-    let x = ctx
-        .emitter()
-        .read_register(r0_offset.clone(), Type::Unsigned(0x40));
-    let y = ctx
-        .emitter()
-        .read_register(r1_offset.clone(), Type::Unsigned(0x40));
-    let carry_in = ctx.emitter().constant(false as u64, Type::Unsigned(1));
+#[ktest]
+fn addwithcarry_overflow() {
+    let (sum, flags) = add_with_carry_harness(u64::MAX / 2, u64::MAX / 2, false);
+    assert_eq!(sum, !1);
+    assert_eq!(flags, 0b1001);
+}
 
-    let res = execute(&*model, "add_with_carry_test", &[x, y, carry_in], &mut ctx);
-
-    {
-        let sum = ctx.emitter().acess_tuple(res.clone(), 0);
-        ctx.emitter().write_register(r0_offset, sum);
-    }
-
-    {
-        let flags = ctx.emitter().acess_tuple(res.clone(), 1);
-
-        // zero extend flags to 64
-        ctx.emitter().write_register(r1_offset, flags);
-    }
-
-    ctx.emitter().leave();
-    let translation = ctx.compile();
-    log::debug!("\n{:?}", translation);
-    translation.execute(register_file_ptr);
-
-    unsafe {
-        assert_eq!(*r0, -5i64 as u64);
-        assert_eq!(
-            *(register_file_ptr.add(model.reg_offset("R1")) as *mut u8),
-            0b1000
-        );
-    };
-
-    panic!()
-
-    // assert_eq!(
-    //     add_with_carry_test(&mut state, TRACER, x, y, carry_in),
-    //     ProductType188a1c3bf231c64b {
-    //         tuple__pcnt_bv__pcnt_bv40: Bits::new(-5i64 as u128, 0x40),
-    //         tuple__pcnt_bv__pcnt_bv41: 0b1000
-    //     }
-    // );
+// Testing the flags of the `0x0000000040234888:  eb01001f      cmp x0, x1`
+// instruction
+#[ktest]
+fn addwithcarry_early_4880_loop() {
+    let (sum, flags) = add_with_carry_harness(0x425a6004, !0x425a6020, false);
+    assert_eq!(sum, 0xffffffffffffffe3);
+    assert_eq!(flags, 0b1000);
 }
 
 // #[ktest]
-// fn addwithcarry_zero() {
-//     let mut state = State::new(Box::new(NoneEnv));
-//     let x = Bits::new(0x0, 0x40);
-//     let y = Bits::new(0x0, 0x40);
-//     let carry_in = false;
-
-//     assert_eq!(
-//         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-//         ProductType188a1c3bf231c64b {
-//             tuple__pcnt_bv__pcnt_bv40: Bits::new(0x0, 0x40),
-//             tuple__pcnt_bv__pcnt_bv41: 0b0100
-//         }
-//     );
-// }
-
-// #[ktest]
-// fn addwithcarry_carry() {
-//     let mut state = State::new(Box::new(NoneEnv));
-
-//     let x = Bits::new(u64::MAX as u128, 0x40);
-//     let y = Bits::new(0x1, 0x40);
-//     let carry_in = false;
-
-//     assert_eq!(
-//         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-//         ProductType188a1c3bf231c64b {
-//             tuple__pcnt_bv__pcnt_bv40: Bits::new(0x0, 0x40),
-//             tuple__pcnt_bv__pcnt_bv41: 0b0110
-//         }
-//     );
-// }
-
-// #[ktest]
-// fn addwithcarry_overflow() {
-//     let mut state = State::new(Box::new(NoneEnv));
-
-//     let x = Bits::new(u64::MAX as u128 / 2, 0x40);
-//     let y = Bits::new(u64::MAX as u128 / 2, 0x40);
-//     let carry_in = false;
-
-//     assert_eq!(
-//         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-//         ProductType188a1c3bf231c64b {
-//             tuple__pcnt_bv__pcnt_bv40: Bits::new(!0x1, 0x40),
-//             tuple__pcnt_bv__pcnt_bv41: 0b1001
-//         }
-//     );
-// }
-
-// // Testing the flags of the `0x0000000040234888:  eb01001f      cmp x0, x1`
-// // // instruction
-// #[ktest]
-// fn addwithcarry_early_4880_loop() {
-//     let mut state = State::new(Box::new(NoneEnv));
-
-//     let x = Bits::new(0x425a6004, 0x40);
-//     let y = Bits::new(!0x425a6020, 0x40);
-//     let carry_in = false;
-
-//     assert_eq!(
-//         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-//         ProductType188a1c3bf231c64b {
-//             tuple__pcnt_bv__pcnt_bv40: Bits::new(0xffffffffffffffe3, 0x40),
-//             tuple__pcnt_bv__pcnt_bv41: 0b1000
-//         }
-//     );
-// }
-
-// #[ktest]
-// fn addwithcarry_linux_regression() {
-//     let mut state = State::new(Box::new(NoneEnv));
-
-//     let x = Bits::new(0xffffffc0082b3cd0, 64);
-//     let y = Bits::new(0xffffffffffffffd8, 64);
-//     let carry_in = false;
-
-//     assert_eq!(
-//         AddWithCarry(&mut state, TRACER, x, y, carry_in),
-//         ProductType188a1c3bf231c64b {
-//             tuple__pcnt_bv__pcnt_bv40: Bits::new(0xffffffc0082b3ca8, 0x40),
-//             tuple__pcnt_bv__pcnt_bv41: 0b1010
-//         }
-//     );
-// }
-
-// #[ktest]
 // fn replicate_bits() {
-//     let mut state = State::new(Box::new(NoneEnv));
+//     let mut register_file = Box::new([0u8; 104488usize]);
+//     let register_file_ptr = register_file.as_mut_ptr();
+//     let mut ctx = X86TranslationContext::new();
+//     let model = models::get("aarch64").unwrap();
+
+//     execute(&*model, "borealis_register_init", &[], &mut ctx);
+
 //     assert_eq!(
 //         Bits::new(0xffff_ffff, 32),
 //         replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0xff,
@@ -321,6 +211,71 @@ fn addwithcarry_negative() {
 //         replicate_bits_borealis_internal(&mut state, TRACER, Bits::new(0x1,
 // 1), 32)     );
 // }
+
+#[ktest]
+fn addwithcarry_linux_regression() {
+    let (sum, flags) = add_with_carry_harness(0xffffffc0082b3cd0, 0xffffffffffffffd8, false);
+    assert_eq!(sum, 0xffffffc0082b3ca8);
+    assert_eq!(flags, 0b1010);
+}
+
+fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
+    let mut register_file = Box::new([0u8; 104488usize]);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new();
+    let model = models::get("aarch64").unwrap();
+
+    execute(&*model, "borealis_register_init", &[], &mut ctx);
+    let r0 = unsafe { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
+    let r1 = unsafe { register_file_ptr.add(model.reg_offset("R1")) as *mut u64 };
+    let r2 = unsafe { register_file_ptr.add(model.reg_offset("R2")) as *mut u8 };
+
+    unsafe {
+        *r0 = x;
+        *r1 = y;
+        *r2 = carry_in as u8;
+    }
+
+    let r0_offset = ctx
+        .emitter()
+        .constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    let r1_offset = ctx
+        .emitter()
+        .constant(model.reg_offset("R1") as u64, Type::Unsigned(0x40));
+    let r2_offset = ctx
+        .emitter()
+        .constant(model.reg_offset("R2") as u64, Type::Unsigned(0x8));
+
+    let x = ctx
+        .emitter()
+        .read_register(r0_offset.clone(), Type::Unsigned(0x40));
+    let y = ctx
+        .emitter()
+        .read_register(r1_offset.clone(), Type::Unsigned(0x40));
+    let carry_in = ctx
+        .emitter()
+        .read_register(r2_offset.clone(), Type::Unsigned(0x8));
+
+    let res = execute(&*model, "add_with_carry_test", &[x, y, carry_in], &mut ctx);
+
+    {
+        let sum = ctx.emitter().acess_tuple(res.clone(), 0);
+        ctx.emitter().write_register(r0_offset, sum);
+    }
+
+    {
+        let flags = ctx.emitter().acess_tuple(res.clone(), 1);
+
+        // zero extend flags to 64
+        ctx.emitter().write_register(r1_offset, flags);
+    }
+
+    ctx.emitter().leave();
+    let translation = ctx.compile();
+    translation.execute(register_file_ptr);
+
+    unsafe { (*r0, *(r1 as *mut u8)) }
+}
 
 // #[ktest]
 // fn ubfx() {

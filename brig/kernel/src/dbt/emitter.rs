@@ -1,6 +1,7 @@
 use {
     crate::dbt::x86::emitter::{
-        BinaryOperationKind, CastOperationKind, ShiftOperationKind, UnaryOperationKind, X86BlockRef,
+        BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
+        UnaryOperationKind, X86BlockRef,
     },
     alloc::vec::Vec,
 };
@@ -18,6 +19,7 @@ pub trait Emitter {
 
     fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
     fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
+    fn ternary_operation(&mut self, op: TernaryOperationKind) -> Self::NodeRef;
     fn cast(&mut self, value: Self::NodeRef, typ: Type, kind: CastOperationKind) -> Self::NodeRef;
     fn bits_cast(
         &mut self,

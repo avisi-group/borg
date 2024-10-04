@@ -21,6 +21,8 @@ pub enum Opcode {
     SHL(Operand, Operand),
     /// add {0}, {1}
     ADD(Operand, Operand),
+    /// adc {0}, {1}, {2}
+    ADC(Operand, Operand, Operand),
     /// sub {0}, {1}
     SUB(Operand, Operand),
     /// or {0}, {1},
@@ -584,6 +586,10 @@ fn memory_operand_to_iced(
 }
 
 impl Instruction {
+    pub fn adc(a: Operand, b: Operand, c: Operand) -> Self {
+        Self(Opcode::ADC(a, b, c))
+    }
+
     pub fn mov(src: Operand, dst: Operand) -> Self {
         Self(Opcode::MOV(src, dst))
     }
@@ -1128,6 +1134,53 @@ impl Instruction {
                 assembler.int(i32::try_from(*n).unwrap()).unwrap();
             }
 
+            ADC(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(carry)),
+                    width_in_bits: 64,
+                },
+            ) => {
+                // sets the carry flag
+                assembler.add::<AsmRegister8, _>(carry.into(), 0).unwrap();
+
+                assembler
+                    .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+
+            ADC(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: I(carry_in),
+                    width_in_bits: 1,
+                },
+            ) => {
+                match carry_in {
+                    0 => assembler.clc().unwrap(),
+                    1 => assembler.stc().unwrap(),
+                    _ => panic!(),
+                }
+
+                assembler
+                    .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1182,6 +1235,12 @@ impl Instruction {
             ]
             .into_iter(),
             Opcode::INT(n) => [Some((OperandDirection::In, n)), None, None].into_iter(),
+            Opcode::ADC(a, b, c) => [
+                Some((OperandDirection::In, a)),
+                Some((OperandDirection::In, b)),
+                Some((OperandDirection::InOut, c)),
+            ]
+            .into_iter(),
         }
     }
 

@@ -382,6 +382,22 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
 
                     Some(self.ctx.emitter().binary_operation(op))
                 }
+                Statement::TernaryOperation { kind, a, b, c } => {
+                    use {
+                        crate::dbt::x86::emitter::TernaryOperationKind as EmitterOp,
+                        rudder::statement::TernaryOperationKind as RudderOp,
+                    };
+
+                    let a = statement_values.get(a).unwrap().clone();
+                    let b = statement_values.get(b).unwrap().clone();
+                    let c = statement_values.get(c).unwrap().clone();
+
+                    let op = match kind {
+                        RudderOp::AddWithCarry => EmitterOp::AddWithCarry(a, b, c),
+                    };
+
+                    Some(self.ctx.emitter().ternary_operation(op))
+                }
                 Statement::ShiftOperation {
                     kind,
                     value,

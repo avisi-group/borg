@@ -27,7 +27,6 @@ pub mod register_allocator;
 pub struct X86TranslationContext {
     initial_block: X86BlockRef,
     emitter: X86Emitter,
-    next_symbol_id: u64,
 }
 
 impl Debug for X86TranslationContext {
@@ -73,7 +72,6 @@ impl X86TranslationContext {
         Self {
             initial_block: initial_block.clone(),
             emitter: X86Emitter::new(initial_block, panic_block),
-            next_symbol_id: 0,
         }
     }
 

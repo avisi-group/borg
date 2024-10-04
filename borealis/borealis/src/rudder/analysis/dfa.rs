@@ -284,6 +284,11 @@ impl<'a> StatementUseAnalysis<'a> {
                 Statement::CreateTuple(values) => {
                     values.into_iter().for_each(|v| self.add_use(v, stmt))
                 }
+                Statement::TernaryOperation { a, b, c, .. } => {
+                    self.add_use(a, stmt);
+                    self.add_use(b, stmt);
+                    self.add_use(c, stmt);
+                }
             }
         }
     }

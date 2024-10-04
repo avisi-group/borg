@@ -365,6 +365,16 @@ impl Emitter for X86Emitter {
         }
     }
 
+    fn ternary_operation(&mut self, op: TernaryOperationKind) -> Self::NodeRef {
+        use TernaryOperationKind::*;
+        match &op {
+            AddWithCarry(src, dst, carry) => Self::NodeRef::from(X86Node {
+                typ: src.typ().clone(),
+                kind: NodeKind::TernaryOperation(op),
+            }),
+        }
+    }
+
     fn cast(
         &mut self,
         value: Self::NodeRef,
@@ -866,6 +876,24 @@ impl X86NodeRef {
 
                 op => todo!("{op:?}"),
             },
+            NodeKind::TernaryOperation(kind) => match kind {
+                TernaryOperationKind::AddWithCarry(a, b, carry) => {
+                    let dst = Operand::vreg(64, emitter.next_vreg());
+
+                    let a = a.to_operand(emitter);
+                    let b = b.to_operand(emitter);
+                    let carry = carry.to_operand(emitter);
+                    emitter
+                        .current_block
+                        .append(Instruction::mov(b.clone(), dst.clone()));
+
+                    emitter
+                        .current_block
+                        .append(Instruction::adc(a, dst.clone(), carry));
+
+                    dst
+                }
+            },
             NodeKind::ReadVariable { symbol } => symbol
                 .0
                 .borrow()
@@ -1151,6 +1179,7 @@ pub enum NodeKind {
     },
     UnaryOperation(UnaryOperationKind),
     BinaryOperation(BinaryOperationKind),
+    TernaryOperation(TernaryOperationKind),
     Cast {
         value: X86NodeRef,
         kind: CastOperationKind,

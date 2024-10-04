@@ -134,6 +134,12 @@ pub enum Statement {
         lhs: Ref<Statement>,
         rhs: Ref<Statement>,
     },
+    TernaryOperation {
+        kind: TernaryOperationKind,
+        a: Ref<Statement>,
+        b: Ref<Statement>,
+        c: Ref<Statement>,
+    },
     ShiftOperation {
         kind: ShiftOperationKind,
         value: Ref<Statement>,
@@ -325,6 +331,7 @@ impl Statement {
                 ..
             } => Type::u1(),
             Self::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
+            Self::TernaryOperation { a, .. } => a.get(arena).typ(arena),
             Self::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             Self::ShiftOperation { value, .. } => value.get(arena).typ(arena),
 
@@ -476,6 +483,13 @@ impl Statement {
                 } else {
                     panic!("should not get here");
                 }
+            }
+            Self::TernaryOperation { kind, a, b, c } => {
+                let a = if a == use_of { with.clone() } else { a.clone() };
+                let b = if b == use_of { with.clone() } else { b.clone() };
+                let c = if c == use_of { with.clone() } else { c.clone() };
+
+                *self = Self::TernaryOperation { kind, a, b, c };
             }
             Self::UnaryOperation { kind, value } => {
                 let value = if value == use_of {
@@ -898,6 +912,13 @@ impl Statement {
                 };
 
                 format!("{} {} {}", op, lhs, rhs)
+            }
+            Self::TernaryOperation { kind, a, b, c } => {
+                let op = match kind {
+                    TernaryOperationKind::AddWithCarry => "add-with-carry",
+                };
+
+                format!("{} {} {} {}", op, a, b, c)
             }
             Self::UnaryOperation { kind, value } => {
                 let op = match kind {
@@ -1384,6 +1405,12 @@ pub fn import_statement(
             kind,
             lhs: mapping.get(&lhs).unwrap().clone(),
             rhs: mapping.get(&rhs).unwrap().clone(),
+        },
+        Statement::TernaryOperation { kind, a, b, c } => Statement::TernaryOperation {
+            kind,
+            a: mapping.get(&a).unwrap().clone(),
+            b: mapping.get(&b).unwrap().clone(),
+            c: mapping.get(&c).unwrap().clone(),
         },
         Statement::Constant { typ, value } => Statement::Constant { typ, value },
         Statement::ReadVariable { symbol } => Statement::ReadVariable { symbol },
