@@ -1311,6 +1311,10 @@ impl Hash for X86BlockRef {
 }
 
 impl X86BlockRef {
+    pub fn id(&self) -> u32 {
+        self.0.borrow().id
+    }
+
     pub fn append(&self, instruction: Instruction) {
         self.0.borrow_mut().instructions.push(instruction);
     }
@@ -1352,14 +1356,16 @@ impl From<X86Block> for X86BlockRef {
 }
 
 pub struct X86Block {
+    id: u32,
     instructions: Vec<Instruction>,
     next_0: Option<X86BlockRef>,
     next_1: Option<X86BlockRef>,
 }
 
 impl X86Block {
-    pub fn new() -> Self {
+    pub fn new(id: u32) -> Self {
         Self {
+            id,
             instructions: alloc::vec![],
             next_0: None,
             next_1: None,

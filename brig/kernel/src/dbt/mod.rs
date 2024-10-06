@@ -73,7 +73,10 @@ pub trait TranslationContext {
     type Emitter: Emitter;
 
     fn emitter(&mut self) -> &mut Self::Emitter;
-    fn create_block(&mut self) -> <<Self as TranslationContext>::Emitter as Emitter>::BlockRef;
+    fn create_block(
+        &mut self,
+        id: u32,
+    ) -> <<Self as TranslationContext>::Emitter as Emitter>::BlockRef;
     fn create_symbol(&mut self) -> <<Self as TranslationContext>::Emitter as Emitter>::SymbolRef;
     fn compile(self) -> Translation;
 

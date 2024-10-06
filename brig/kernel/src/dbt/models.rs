@@ -11,7 +11,9 @@ use {
         devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
     },
-    alloc::{borrow::ToOwned, collections::btree_map::BTreeMap, string::String, sync::Arc},
+    alloc::{
+        borrow::ToOwned, collections::btree_map::BTreeMap, string::String, sync::Arc, vec::Vec,
+    },
     common::{
         arena::Ref,
         intern::InternedString,
@@ -102,7 +104,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             x86_blocks: HashMap::default(),
             rudder_blocks: HashMap::default(),
             local_variables: HashMap::default(),
-            exit_block_ref: ctx.create_block(),
+            exit_block_ref: ctx.create_block(0xee),
             inline_return_targets: HashMap::default(),
             ctx,
         };
@@ -139,7 +141,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
 
         // set up block maps
         function.block_iter().for_each(|rudder_block| {
-            let x86_block = celf.ctx.create_block();
+            let x86_block = celf.ctx.create_block(rudder_block.index() as u32);
             celf.rudder_blocks.insert(x86_block.clone(), rudder_block);
             celf.x86_blocks.insert(rudder_block, x86_block);
         });
@@ -431,7 +433,15 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     Some(self.ctx.emitter().shift(value, amount, op))
                 }
 
-                Statement::Call { target, .. } => panic!("call to {target:?}"),
+                Statement::Call { target, args, .. } => {
+                    let args = args
+                        .iter()
+                        .map(|a| statement_values.get(a).unwrap())
+                        .cloned()
+                        .collect::<Vec<_>>();
+
+                    Some(execute(self.model, target.as_ref(), &args, self.ctx))
+                }
                 Statement::EnterInlineCall {
                     pre_call_block,
                     inline_entry_block,

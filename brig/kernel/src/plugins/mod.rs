@@ -3,7 +3,7 @@ use {
         alloc::borrow::ToOwned,
         devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
-        guest::{devices::demoarch::DemoArchFactory, register_device_factory},
+        guest::register_device_factory,
         plugins::{host::Host, shared_object::SharedObject},
     },
     alloc::{boxed::Box, collections::BTreeMap},
@@ -60,7 +60,7 @@ pub fn load_all(device: &SharedDevice) {
     let mut fs = TarFilesystem::mount(device.as_block());
 
     // loading statically linked arch
-    register_device_factory("demoarch".to_owned(), Box::new(DemoArchFactory));
+    //   register_device_factory("demoarch".to_owned(), Box::new(DemoArchFactory));
 
     log::info!("loading plugins");
     // todo: don't hardcode this, load everything in plugins directory

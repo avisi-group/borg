@@ -16,7 +16,7 @@ use {
         rc::Rc,
         vec::Vec,
     },
-    core::{cell::RefCell, fmt::Debug},
+    core::{borrow::Borrow, cell::RefCell, fmt::Debug},
     iced_x86::code_asm::{qword_ptr, rax, AsmMemoryOperand, AsmRegister64, CodeAssembler},
 };
 
@@ -59,10 +59,10 @@ impl Debug for X86TranslationContext {
 
 impl X86TranslationContext {
     pub fn new() -> Self {
-        let initial_block = X86BlockRef::from(X86Block::new());
+        let initial_block = X86BlockRef::from(X86Block::new(0xff));
 
         let panic_block = {
-            let block = X86BlockRef::from(X86Block::new());
+            let block = X86BlockRef::from(X86Block::new(0xee));
             X86Emitter::new(block.clone(), block.clone()).panic("panic block");
             // this does nothing but maybe prevents crash?
             block.set_next_0(initial_block.clone());
@@ -108,8 +108,11 @@ impl TranslationContext for X86TranslationContext {
         &mut self.emitter
     }
 
-    fn create_block(&mut self) -> <<Self as TranslationContext>::Emitter as Emitter>::BlockRef {
-        X86BlockRef::from(X86Block::new())
+    fn create_block(
+        &mut self,
+        id: u32,
+    ) -> <<Self as TranslationContext>::Emitter as Emitter>::BlockRef {
+        X86BlockRef::from(X86Block::new(id))
     }
 
     fn compile(mut self) -> Translation {
@@ -147,7 +150,7 @@ impl TranslationContext for X86TranslationContext {
                 .unwrap();
             assembler
                 .nop_1::<AsmMemoryOperand>(qword_ptr(
-                    AsmRegister64::from(rax) + i32::try_from(visited.len()).unwrap(),
+                    AsmRegister64::from(rax) + i32::try_from(next.id()).unwrap(),
                 ))
                 .unwrap();
             for instr in next.instructions() {
