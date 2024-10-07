@@ -37,32 +37,8 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
             log::warn!("inlining {name}");
             let mut function = model.functions_mut().remove(&name).unwrap();
 
-            // map of function name to imported entry block and exit block, used to avoid
-            // importing an inlined function more than once
-            let mut inlined = HashMap::default();
-
-            // EnterInlineCall statements have to reference the exit block of the inlined
-            // function, in order to set up the mapping in the DBT from exit block to the
-            // call site post block ExitInlineCall statements lookup the current
-            // block index in that mapping and jump back to whereever the inline call
-            // started
-            //
-            // However, if we have a block that contains calls and ends with an
-            // ExitInlineCall, after inlining the ExitInlineCall statement will be in a
-            // different block, invalidating those references
-            //
-            // This is a map of old block refs to new exitinlinecall block refs
-            let mut exit_inline_call_rewrites = HashMap::default();
-
             loop {
-                let did_change = run_inliner(
-                    &mut function,
-                    model.functions(),
-                    &mut inlined,
-                    &mut exit_inline_call_rewrites,
-                );
-
-                fix_exit_refs(&mut function, &mut inlined, &exit_inline_call_rewrites);
+                let did_change = run_inliner(&mut function, model.functions());
 
                 if !did_change {
                     break;
@@ -73,18 +49,7 @@ pub fn inline(model: &mut Model, top_level_fns: &[&'static str]) {
         });
 }
 
-struct ImportedFunction {
-    symbol_prefix: String,
-    entry_block: Ref<Block>,
-    exit_block: Ref<Block>,
-}
-
-fn run_inliner(
-    function: &mut Function,
-    functions: &HashMap<InternedString, Function>,
-    inlined: &mut HashMap<InternedString, ImportedFunction>,
-    exit_inline_call_rewrites: &mut HashMap<Ref<Block>, Ref<Block>>,
-) -> bool {
+fn run_inliner(function: &mut Function, functions: &HashMap<InternedString, Function>) -> bool {
     let mut did_change = false;
     function
         .block_iter()
@@ -117,20 +82,6 @@ fn run_inliner(
                     "inlining call {call_name:?} in \n{}",
                     block_ref.get(function.arena())
                 );
-
-                // if the block we're about to split contains an exit inline call, we'll need to
-                // replace any EnterInlineCall's that reference this exit block to the new exit
-                // block (the post call block)
-                let needs_exit_rewrite = if let Statement::ExitInlineCall = block_ref
-                    .get(function.arena())
-                    .terminator_statement()
-                    .unwrap()
-                    .get(block_ref.get(function.arena()).arena())
-                {
-                    Some(block_ref)
-                } else {
-                    None
-                };
 
                 // determine if there are dependencies between pre and post, and write-read to a
                 // new local variable if so
@@ -212,27 +163,19 @@ fn run_inliner(
 
                 // import the target's blocks, assigning new blockrefs, and replacing returns
                 // with jumps to post_block_ref
-                let imported_function = inlined.entry(call_name).or_insert_with(|| {
-                    let symbol_prefix = format!("inline{:x}_", Id::new());
+                let symbol_prefix = format!("inline{:x}_", Id::new());
 
-                    // import local variables and the parameters as new local variables in the
-                    // current function (namespaced using the unique prefix)
-                    other_fn
-                        .local_variables()
-                        .iter()
-                        .chain(other_fn.parameters().iter())
-                        .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
-                        .for_each(|sym| function.add_local_variable(sym));
+                // import local variables and the parameters as new local variables in the
+                // current function (namespaced using the unique prefix)
+                other_fn
+                    .local_variables()
+                    .iter()
+                    .chain(other_fn.parameters().iter())
+                    .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
+                    .for_each(|sym| function.add_local_variable(sym));
 
-                    let (entry_block, exit_block) =
-                        import_blocks(function, other_fn, &symbol_prefix);
-
-                    ImportedFunction {
-                        symbol_prefix,
-                        entry_block,
-                        exit_block,
-                    }
-                });
+                let imported_entry_block =
+                    import_blocks(function, other_fn, &symbol_prefix, post_block_ref);
 
                 // set pre-statements and end pre block with jump to inlined function entry
                 // block
@@ -244,7 +187,7 @@ fn run_inliner(
                 for (symbol, value) in other_fn
                     .parameters()
                     .iter()
-                    .map(|sym| symbol_add_prefix(sym, &imported_function.symbol_prefix))
+                    .map(|sym| symbol_add_prefix(sym, &symbol_prefix))
                     .zip(call_args.iter().copied())
                 {
                     build(
@@ -258,11 +201,8 @@ fn run_inliner(
                 build(
                     pre_block_ref,
                     function.arena_mut(),
-                    Statement::EnterInlineCall {
-                        pre_call_block: pre_block_ref,
-                        inline_entry_block: imported_function.entry_block,
-                        inline_exit_block: imported_function.exit_block,
-                        post_call_block: post_block_ref,
+                    Statement::Jump {
+                        target: imported_entry_block,
                     },
                 );
                 log::debug!("new pre block\n{}", pre_block_ref.get(function.arena()));
@@ -279,11 +219,8 @@ fn run_inliner(
                             .enumerate()
                             .map(|(index, typ)| {
                                 Symbol::new(
-                                    format!(
-                                        "{}_borealis_inline_return_{index}",
-                                        imported_function.symbol_prefix
-                                    )
-                                    .into(),
+                                    format!("{symbol_prefix}_borealis_inline_return_{index}",)
+                                        .into(),
                                     typ.clone(),
                                 )
                             })
@@ -303,8 +240,7 @@ fn run_inliner(
                         )
                     } else {
                         let symbol = Symbol::new(
-                            format!("{}_borealis_inline_return", imported_function.symbol_prefix)
-                                .into(),
+                            format!("{symbol_prefix}_borealis_inline_return").into(),
                             other_fn.return_type(),
                         );
                         function.add_local_variable(symbol.clone());
@@ -334,10 +270,6 @@ fn run_inliner(
                 }
 
                 log::debug!("new post block\n{}", post_block_ref.get(function.arena()));
-
-                if let Some(old) = needs_exit_rewrite {
-                    exit_inline_call_rewrites.insert(old, post_block_ref);
-                }
             }
         });
 
@@ -349,7 +281,8 @@ fn import_blocks(
     this_function: &mut Function,
     other_function: &Function,
     symbol_prefix: &str, // insert this prefix into symbol names
-) -> (Ref<Block>, Ref<Block>) {
+    exit_block: Ref<Block>,
+) -> Ref<Block> {
     let other_refs = other_function.block_iter().collect::<Vec<_>>();
 
     let other_arena = other_function.arena();
@@ -451,7 +384,7 @@ fn import_blocks(
             build(
                 block_ref,
                 this_function.arena_mut(),
-                Statement::ExitInlineCall,
+                Statement::Jump { target: exit_block },
             );
 
             // we only want one exit block
@@ -460,46 +393,10 @@ fn import_blocks(
     });
 
     let entry_block = *mapping.get(&other_entry).unwrap();
-    let exit_block = maybe_exit_block.unwrap();
 
-    (entry_block, exit_block)
+    entry_block
 }
 
 fn symbol_add_prefix(symbol: &Symbol, prefix: &str) -> Symbol {
     Symbol::new(format!("{prefix}{}", symbol.name()).into(), symbol.typ())
-}
-
-fn fix_exit_refs(
-    function: &mut Function,
-    inlined: &mut HashMap<InternedString, ImportedFunction>,
-    rewrites: &HashMap<Ref<Block>, Ref<Block>>,
-) {
-    inlined
-        .values_mut()
-        .for_each(|ImportedFunction { exit_block, .. }| {
-            if let Some(new) = rewrites.get(exit_block) {
-                *exit_block = *new;
-            }
-        });
-    function
-        .block_iter()
-        .collect::<Vec<_>>()
-        .into_iter()
-        .for_each(|block_ref| {
-            block_ref
-                .get_mut(function.arena_mut())
-                .statements()
-                .to_owned()
-                .into_iter()
-                .for_each(|r| {
-                    if let Statement::EnterInlineCall {
-                        inline_exit_block, ..
-                    } = r.get_mut(block_ref.get_mut(function.arena_mut()).arena_mut())
-                    {
-                        if let Some(new) = rewrites.get(inline_exit_block) {
-                            *inline_exit_block = *new;
-                        }
-                    }
-                });
-        });
 }

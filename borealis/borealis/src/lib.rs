@@ -93,109 +93,109 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         create_dir_all(path).unwrap()
     }
 
-    // if let Some(path) = &dump_ir {
-    //     sailrs::jib_ast::pretty_print::print_ast(
-    //         &mut create_file_buffered(path.join("ast.jib")).unwrap(),
-    //         jib_ast.iter(),
-    //     );
-    // }
+    if let Some(path) = &dump_ir {
+        sailrs::jib_ast::pretty_print::print_ast(
+            &mut create_file_buffered(path.join("ast.jib")).unwrap(),
+            jib_ast.iter(),
+        );
+    }
 
-    // info!("Converting JIB to BOOM");
-    // let ast = Ast::from_jib(jib_wip_filter(jib_ast));
+    info!("Converting JIB to BOOM");
+    let ast = Ast::from_jib(jib_wip_filter(jib_ast));
 
-    // // // useful for debugging
-    // if let Some(path) = &dump_ir {
-    //     boom::pretty_print::print_ast(
-    //         &mut create_file_buffered(path.join("ast.boom")).unwrap(),
-    //         ast.clone(),
-    //     );
-    // }
+    // // useful for debugging
+    if let Some(path) = &dump_ir {
+        boom::pretty_print::print_ast(
+            &mut create_file_buffered(path.join("ast.boom")).unwrap(),
+            ast.clone(),
+        );
+    }
 
-    // info!("Running passes on BOOM");
-    // [
-    //     HandleBuiltinFunctions::new_boxed(),
-    //     RemoveConstantType::new_boxed(),
-    //     DestructComposites::new_boxed(),
-    //     DestructUnions::new_boxed(),
-    //     FixExceptions::new_boxed(),
-    // ]
-    // .into_iter()
-    // .for_each(|mut pass| {
-    //     pass.run(ast.clone());
-    // });
-    // boom::passes::run_fixed_point(
-    //     ast.clone(),
-    //     &mut [
-    //         FoldUnconditionals::new_boxed(),
-    //         RemoveConstBranch::new_boxed(),
-    //         // MonomorphizeVectors::new_boxed(),
-    //         CycleFinder::new_boxed(),
-    //     ],
-    // );
+    info!("Running passes on BOOM");
+    [
+        HandleBuiltinFunctions::new_boxed(),
+        RemoveConstantType::new_boxed(),
+        DestructComposites::new_boxed(),
+        DestructUnions::new_boxed(),
+        FixExceptions::new_boxed(),
+    ]
+    .into_iter()
+    .for_each(|mut pass| {
+        pass.run(ast.clone());
+    });
+    boom::passes::run_fixed_point(
+        ast.clone(),
+        &mut [
+            FoldUnconditionals::new_boxed(),
+            RemoveConstBranch::new_boxed(),
+            // MonomorphizeVectors::new_boxed(),
+            CycleFinder::new_boxed(),
+        ],
+    );
 
-    // if let Some(path) = &dump_ir {
-    //     boom::pretty_print::print_ast(
-    //         &mut create_file_buffered(path.join("ast.processed.boom")).unwrap(),
-    //         ast.clone(),
-    //     );
-    // }
+    if let Some(path) = &dump_ir {
+        boom::pretty_print::print_ast(
+            &mut create_file_buffered(path.join("ast.processed.boom")).unwrap(),
+            ast.clone(),
+        );
+    }
 
-    // info!("Building rudder");
+    info!("Building rudder");
 
-    // let mut rudder = rudder::build::from_boom(&ast.get());
+    let mut rudder = rudder::build::from_boom(&ast.get());
 
-    // if let Some(path) = &dump_ir {
-    //     writeln!(
-    //         &mut create_file_buffered(path.join("ast.rudder")).unwrap(),
-    //         "{rudder}"
-    //     )
-    //     .unwrap();
-    // }
+    if let Some(path) = &dump_ir {
+        writeln!(
+            &mut create_file_buffered(path.join("ast.rudder")).unwrap(),
+            "{rudder}"
+        )
+        .unwrap();
+    }
 
-    // info!("Validating rudder");
-    // let msgs = validator::validate(&rudder);
-    // for msg in msgs {
-    //     debug!("{msg}");
-    // }
+    info!("Validating rudder");
+    let msgs = validator::validate(&rudder);
+    for msg in msgs {
+        debug!("{msg}");
+    }
 
-    // info!("Optimising rudder");
-    // opt::optimise(&mut rudder, OptLevel::Level3);
+    info!("Optimising rudder");
+    opt::optimise(&mut rudder, OptLevel::Level3);
 
-    // if let Some(path) = &dump_ir {
-    //     writeln!(
-    //         &mut create_file_buffered(path.join("ast.opt.rudder")).unwrap(),
-    //         "{rudder}"
-    //     )
-    //     .unwrap();
-    // }
+    if let Some(path) = &dump_ir {
+        writeln!(
+            &mut create_file_buffered(path.join("ast.opt.rudder")).unwrap(),
+            "{rudder}"
+        )
+        .unwrap();
+    }
 
-    // // info!("Inlining");
-    // // function_inliner::inline(&mut rudder, FN_TOPLEVEL);
+    info!("Inlining");
+    function_inliner::inline(&mut rudder, &["__InitSystem", "__DecodeA64"]);
 
-    // if let Some(path) = &dump_ir {
-    //     writeln!(
-    //         &mut create_file_buffered(path.join("ast.inlined.rudder")).unwrap(),
-    //         "{rudder}"
-    //     )
-    //     .unwrap();
-    // }
+    if let Some(path) = &dump_ir {
+        writeln!(
+            &mut create_file_buffered(path.join("ast.inlined.rudder")).unwrap(),
+            "{rudder}"
+        )
+        .unwrap();
+    }
 
-    // info!("Validating rudder again");
-    // let msgs = validator::validate(&rudder);
-    // for msg in msgs {
-    //     debug!("{msg}");
-    // }
+    info!("Validating rudder again");
+    let msgs = validator::validate(&rudder);
+    for msg in msgs {
+        debug!("{msg}");
+    }
 
-    // if matches!(
-    //     &mode,
-    //     GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
-    // ) {
-    //     info!("Serializing Rudder");
-    //     let buf = postcard::to_allocvec(&rudder).unwrap();
+    if matches!(
+        &mode,
+        GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
+    ) {
+        info!("Serializing Rudder");
+        let buf = postcard::to_allocvec(&rudder).unwrap();
 
-    //     info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);
-    //     File::create(path).unwrap().write_all(&buf).unwrap();
-    // }
+        info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);
+        File::create(path).unwrap().write_all(&buf).unwrap();
+    }
 
     // let mut fns = HashMap::default();
     // let mut f1 = Function::new("f1".into(), Type::unit(), vec![]);
@@ -294,146 +294,146 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     // info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);
     // File::create(path).unwrap().write_all(&buf).unwrap();
 
-    let mut fns = HashMap::default();
-    let mut f1 = Function::new("f1".into(), Type::u64(), vec![]);
-    let ret_val = Symbol::new("return".into(), Type::u64());
-    f1.add_local_variable(ret_val.clone());
+    // let mut fns = HashMap::default();
+    // let mut f1 = Function::new("f1".into(), Type::u64(), vec![]);
+    // let ret_val = Symbol::new("return".into(), Type::u64());
+    // f1.add_local_variable(ret_val.clone());
 
-    {
-        let a = f1.arena_mut().insert(Block::new());
-        let b = f1.arena_mut().insert(Block::new());
-        let c = f1.arena_mut().insert(Block::new());
-        let d = f1.arena_mut().insert(Block::new());
-        let e = f1.arena_mut().insert(Block::new());
-        let f = f1.arena_mut().insert(Block::new());
-        let g = f1.arena_mut().insert(Block::new());
+    // {
+    //     let a = f1.arena_mut().insert(Block::new());
+    //     let b = f1.arena_mut().insert(Block::new());
+    //     let c = f1.arena_mut().insert(Block::new());
+    //     let d = f1.arena_mut().insert(Block::new());
+    //     let e = f1.arena_mut().insert(Block::new());
+    //     let f = f1.arena_mut().insert(Block::new());
+    //     let g = f1.arena_mut().insert(Block::new());
 
-        {
-            let entry_block = f1.entry_block().get_mut(f1.arena_mut());
-            let s_arena = entry_block.arena_mut();
-            let jump = s_arena.insert(Statement::Jump { target: a });
-            entry_block.set_statements([jump].into_iter());
-        }
+    //     {
+    //         let entry_block = f1.entry_block().get_mut(f1.arena_mut());
+    //         let s_arena = entry_block.arena_mut();
+    //         let jump = s_arena.insert(Statement::Jump { target: a });
+    //         entry_block.set_statements([jump].into_iter());
+    //     }
 
-        {
-            let a = a.get_mut(f1.arena_mut());
-            let s_arena = a.arena_mut();
-            let _0 = s_arena.insert(Statement::Constant {
-                typ: Type::u64(),
-                value: common::rudder::constant_value::ConstantValue::UnsignedInteger(0),
-            });
-            let read = s_arena.insert(Statement::ReadRegister {
-                typ: Type::u64(),
-                offset: _0,
-            });
-            let branch = s_arena.insert(Statement::Branch {
-                condition: read,
-                true_target: b,
-                false_target: c,
-            });
-            a.set_statements([_0, read, branch].into_iter());
-        }
+    //     {
+    //         let a = a.get_mut(f1.arena_mut());
+    //         let s_arena = a.arena_mut();
+    //         let _0 = s_arena.insert(Statement::Constant {
+    //             typ: Type::u64(),
+    //             value: common::rudder::constant_value::ConstantValue::UnsignedInteger(0),
+    //         });
+    //         let read = s_arena.insert(Statement::ReadRegister {
+    //             typ: Type::u64(),
+    //             offset: _0,
+    //         });
+    //         let branch = s_arena.insert(Statement::Branch {
+    //             condition: read,
+    //             true_target: b,
+    //             false_target: c,
+    //         });
+    //         a.set_statements([_0, read, branch].into_iter());
+    //     }
 
-        {
-            let b = b.get_mut(f1.arena_mut());
-            let s_arena = b.arena_mut();
-            let _5 = s_arena.insert(Statement::Constant {
-                typ: Type::u64(),
-                value: common::rudder::constant_value::ConstantValue::UnsignedInteger(5),
-            });
-            let w = s_arena.insert(Statement::WriteVariable {
-                symbol: ret_val.clone(),
-                value: _5,
-            });
-            let jump = s_arena.insert(Statement::Jump { target: d });
-            b.set_statements([_5, w, jump].into_iter());
-        }
+    //     {
+    //         let b = b.get_mut(f1.arena_mut());
+    //         let s_arena = b.arena_mut();
+    //         let _5 = s_arena.insert(Statement::Constant {
+    //             typ: Type::u64(),
+    //             value: common::rudder::constant_value::ConstantValue::UnsignedInteger(5),
+    //         });
+    //         let w = s_arena.insert(Statement::WriteVariable {
+    //             symbol: ret_val.clone(),
+    //             value: _5,
+    //         });
+    //         let jump = s_arena.insert(Statement::Jump { target: d });
+    //         b.set_statements([_5, w, jump].into_iter());
+    //     }
 
-        {
-            let c = c.get_mut(f1.arena_mut());
-            let s_arena = c.arena_mut();
-            let _10 = s_arena.insert(Statement::Constant {
-                typ: Type::u64(),
-                value: common::rudder::constant_value::ConstantValue::UnsignedInteger(10),
-            });
-            let w = s_arena.insert(Statement::WriteVariable {
-                symbol: ret_val.clone(),
-                value: _10,
-            });
-            let jump = s_arena.insert(Statement::Jump { target: d });
-            c.set_statements([_10, w, jump].into_iter());
-        }
+    //     {
+    //         let c = c.get_mut(f1.arena_mut());
+    //         let s_arena = c.arena_mut();
+    //         let _10 = s_arena.insert(Statement::Constant {
+    //             typ: Type::u64(),
+    //             value: common::rudder::constant_value::ConstantValue::UnsignedInteger(10),
+    //         });
+    //         let w = s_arena.insert(Statement::WriteVariable {
+    //             symbol: ret_val.clone(),
+    //             value: _10,
+    //         });
+    //         let jump = s_arena.insert(Statement::Jump { target: d });
+    //         c.set_statements([_10, w, jump].into_iter());
+    //     }
 
-        {
-            let d = d.get_mut(f1.arena_mut());
-            let s_arena = d.arena_mut();
-            let _8 = s_arena.insert(Statement::Constant {
-                typ: Type::u64(),
-                value: common::rudder::constant_value::ConstantValue::UnsignedInteger(8),
-            });
-            let read = s_arena.insert(Statement::ReadRegister {
-                typ: Type::u64(),
-                offset: _8,
-            });
-            let branch = s_arena.insert(Statement::Branch {
-                condition: read,
-                true_target: e,
-                false_target: f,
-            });
-            d.set_statements([_8, read, branch].into_iter());
-        }
+    //     {
+    //         let d = d.get_mut(f1.arena_mut());
+    //         let s_arena = d.arena_mut();
+    //         let _8 = s_arena.insert(Statement::Constant {
+    //             typ: Type::u64(),
+    //             value: common::rudder::constant_value::ConstantValue::UnsignedInteger(8),
+    //         });
+    //         let read = s_arena.insert(Statement::ReadRegister {
+    //             typ: Type::u64(),
+    //             offset: _8,
+    //         });
+    //         let branch = s_arena.insert(Statement::Branch {
+    //             condition: read,
+    //             true_target: e,
+    //             false_target: f,
+    //         });
+    //         d.set_statements([_8, read, branch].into_iter());
+    //     }
 
-        {
-            let e = e.get_mut(f1.arena_mut());
-            let s_arena = e.arena_mut();
-            let jump = s_arena.insert(Statement::Jump { target: g });
-            e.set_statements([jump].into_iter());
-        }
+    //     {
+    //         let e = e.get_mut(f1.arena_mut());
+    //         let s_arena = e.arena_mut();
+    //         let jump = s_arena.insert(Statement::Jump { target: g });
+    //         e.set_statements([jump].into_iter());
+    //     }
 
-        {
-            let f = f.get_mut(f1.arena_mut());
-            let s_arena = f.arena_mut();
-            let jump = s_arena.insert(Statement::Jump { target: g });
-            f.set_statements([jump].into_iter());
-        }
+    //     {
+    //         let f = f.get_mut(f1.arena_mut());
+    //         let s_arena = f.arena_mut();
+    //         let jump = s_arena.insert(Statement::Jump { target: g });
+    //         f.set_statements([jump].into_iter());
+    //     }
 
-        {
-            let g = g.get_mut(f1.arena_mut());
-            let s_arena = g.arena_mut();
-            let read = s_arena.insert(Statement::ReadVariable {
-                symbol: ret_val.clone(),
-            });
-            let _16 = s_arena.insert(Statement::Constant {
-                typ: Type::u64(),
-                value: common::rudder::constant_value::ConstantValue::UnsignedInteger(16),
-            });
-            let w = s_arena.insert(Statement::WriteRegister {
-                offset: _16,
-                value: read,
-            });
-            let ret = s_arena.insert(Statement::Return { value: read });
-            g.set_statements([read, _16, w, ret].into_iter());
-        }
-    }
+    //     {
+    //         let g = g.get_mut(f1.arena_mut());
+    //         let s_arena = g.arena_mut();
+    //         let read = s_arena.insert(Statement::ReadVariable {
+    //             symbol: ret_val.clone(),
+    //         });
+    //         let _16 = s_arena.insert(Statement::Constant {
+    //             typ: Type::u64(),
+    //             value: common::rudder::constant_value::ConstantValue::UnsignedInteger(16),
+    //         });
+    //         let w = s_arena.insert(Statement::WriteRegister {
+    //             offset: _16,
+    //             value: read,
+    //         });
+    //         let ret = s_arena.insert(Statement::Return { value: read });
+    //         g.set_statements([read, _16, w, ret].into_iter());
+    //     }
+    // }
 
-    fns.insert("f1".into(), f1);
+    // fns.insert("f1".into(), f1);
 
-    let registers = HashMap::default();
-    let rudder = Model::new(fns, registers);
+    // let registers = HashMap::default();
+    // let rudder = Model::new(fns, registers);
 
-    if let Some(path) = &dump_ir {
-        writeln!(
-            &mut create_file_buffered(path.join("ast.rudder")).unwrap(),
-            "{rudder}"
-        )
-        .unwrap();
-    }
+    // if let Some(path) = &dump_ir {
+    //     writeln!(
+    //         &mut create_file_buffered(path.join("ast.rudder")).unwrap(),
+    //         "{rudder}"
+    //     )
+    //     .unwrap();
+    // }
 
-    info!("Serializing Rudder");
-    let buf = postcard::to_allocvec(&rudder).unwrap();
+    // info!("Serializing Rudder");
+    // let buf = postcard::to_allocvec(&rudder).unwrap();
 
-    info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);
-    File::create(path).unwrap().write_all(&buf).unwrap();
+    // info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);
+    // File::create(path).unwrap().write_all(&buf).unwrap();
 }
 
 fn fn_is_allowlisted(name: InternedString) -> bool {
