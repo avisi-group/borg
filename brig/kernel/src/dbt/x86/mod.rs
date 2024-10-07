@@ -5,7 +5,6 @@ use {
             emitter::Emitter,
             x86::{
                 emitter::{X86Block, X86BlockRef, X86Emitter, X86SymbolRef},
-                encoder::{Instruction, Operand},
                 register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
             },
             Translation, TranslationContext,
@@ -16,7 +15,7 @@ use {
         rc::Rc,
         vec::Vec,
     },
-    core::{borrow::Borrow, cell::RefCell, fmt::Debug},
+    core::{cell::RefCell, fmt::Debug},
     iced_x86::code_asm::{qword_ptr, rax, AsmMemoryOperand, AsmRegister64, CodeAssembler},
 };
 
@@ -144,7 +143,6 @@ impl TranslationContext for X86TranslationContext {
             }
 
             // lower block
-
             assembler
                 .set_label(label_map.get_mut(&next).unwrap())
                 .unwrap();

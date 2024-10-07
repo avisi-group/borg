@@ -548,8 +548,11 @@ impl Emitter for X86Emitter {
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef) {
         let offset = match offset.kind() {
             NodeKind::Constant { value, .. } => (*value).try_into().unwrap(),
-            _ => panic!("not supported"),
+            _ => panic!("register's have constant offsets"),
         };
+
+        // todo: validate offset + width is within register file
+
         let value = value.to_operand(self);
 
         let width = value.width_in_bits;
@@ -558,7 +561,7 @@ impl Emitter for X86Emitter {
             value,
             Operand::mem_base_displ(
                 width,
-                Register::PhysicalRegister(PhysicalRegister::RBP),
+                Register::PhysicalRegister(PhysicalRegister::R15),
                 offset,
             ),
         ));
@@ -611,17 +614,28 @@ impl Emitter for X86Emitter {
         self.current_block.append(Instruction::ret());
     }
 
-    fn read_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef {
-        symbol
-            .0
-            .borrow()
-            .as_ref()
-            .unwrap_or_else(|| panic!("tried to read from {symbol:?} but it was never written to"))
-            .clone()
+    fn read_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
+        let width = u8::try_from(typ.width()).unwrap();
+
+        Self::NodeRef::from(X86Node {
+            typ,
+            kind: NodeKind::ReadStackVariable { offset, width },
+        })
     }
 
-    fn write_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef) {
-        *symbol.0.borrow_mut() = Some(value);
+    fn write_variable(&mut self, offset: usize, value: Self::NodeRef) {
+        let value = value.to_operand(self);
+
+        let width = value.width_in_bits;
+
+        self.current_block.append(Instruction::mov(
+            value,
+            Operand::mem_base_displ(
+                width,
+                Register::PhysicalRegister(PhysicalRegister::RBP),
+                -(i32::try_from(offset).unwrap()),
+            ),
+        ));
     }
 
     fn assert(&mut self, condition: Self::NodeRef) {
@@ -806,8 +820,22 @@ impl X86NodeRef {
                 emitter.current_block.append(Instruction::mov(
                     Operand::mem_base_displ(
                         64,
-                        Register::PhysicalRegister(PhysicalRegister::RBP),
+                        Register::PhysicalRegister(PhysicalRegister::R15),
                         (*offset).try_into().unwrap(),
+                    ),
+                    dst.clone(),
+                ));
+
+                dst
+            }
+            NodeKind::ReadStackVariable { offset, width } => {
+                let dst = Operand::vreg(*width, emitter.next_vreg());
+
+                emitter.current_block.append(Instruction::mov(
+                    Operand::mem_base_displ(
+                        *width,
+                        Register::PhysicalRegister(PhysicalRegister::RBP),
+                        -(i32::try_from(*offset).unwrap()),
                     ),
                     dst.clone(),
                 ));
@@ -1193,6 +1221,11 @@ pub enum NodeKind {
     },
     ReadVariable {
         symbol: X86SymbolRef,
+    },
+    ReadStackVariable {
+        // positive offset here (will be subtracted from RBP)
+        offset: usize,
+        width: u8,
     },
     BitExtract {
         value: X86NodeRef,

@@ -20,7 +20,7 @@ global_asm!(
         push %r14
         push %r15
 
-        mov %rsi, %rbp
+        mov %rsi, %r15
         call *%rdi
 
         pop %r15
