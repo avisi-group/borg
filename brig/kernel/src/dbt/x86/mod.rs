@@ -23,6 +23,10 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
+pub const ENTRY_BLOCK_ID: i32 = 0xeeee;
+pub const PANIC_BLOCK_ID: i32 = 0xff00;
+pub const EXIT_BLOCK_ID: i32 = 0x00ff;
+
 pub struct X86TranslationContext {
     initial_block: X86BlockRef,
     emitter: X86Emitter,
@@ -58,10 +62,10 @@ impl Debug for X86TranslationContext {
 
 impl X86TranslationContext {
     pub fn new() -> Self {
-        let initial_block = X86BlockRef::from(X86Block::new(0xff));
+        let initial_block = X86BlockRef::from(X86Block::new(ENTRY_BLOCK_ID));
 
         let panic_block = {
-            let block = X86BlockRef::from(X86Block::new(0xee));
+            let block = X86BlockRef::from(X86Block::new(PANIC_BLOCK_ID));
             X86Emitter::new(block.clone(), block.clone()).panic("panic block");
             // this does nothing but maybe prevents crash?
             block.set_next_0(initial_block.clone());
@@ -72,6 +76,10 @@ impl X86TranslationContext {
             initial_block: initial_block.clone(),
             emitter: X86Emitter::new(initial_block, panic_block),
         }
+    }
+
+    pub fn initial_block(&self) -> X86BlockRef {
+        self.initial_block.clone()
     }
 
     fn allocate_registers<R: RegisterAllocator>(&self, mut allocator: R) {
@@ -109,7 +117,7 @@ impl TranslationContext for X86TranslationContext {
 
     fn create_block(
         &mut self,
-        id: u32,
+        id: i32,
     ) -> <<Self as TranslationContext>::Emitter as Emitter>::BlockRef {
         X86BlockRef::from(X86Block::new(id))
     }
@@ -147,9 +155,7 @@ impl TranslationContext for X86TranslationContext {
                 .set_label(label_map.get_mut(&next).unwrap())
                 .unwrap();
             assembler
-                .nop_1::<AsmMemoryOperand>(qword_ptr(
-                    AsmRegister64::from(rax) + i32::try_from(next.id()).unwrap(),
-                ))
+                .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + next.id()))
                 .unwrap();
             for instr in next.instructions() {
                 instr.encode(&mut assembler, &label_map);

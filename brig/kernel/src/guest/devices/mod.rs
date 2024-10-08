@@ -15,15 +15,17 @@ pub mod virtio;
 fn static_dynamic_chaos_smoke() {
     let mut ctx = X86TranslationContext::new();
     let model = models::get("aarch64").unwrap();
-    let mut register_file = alloc::vec![0u8;24];
-    let register_file_ptr = register_file.as_mut_ptr();
+    let mut register_file = alloc::vec![0u64, 1u64, 0u64];
+    let register_file_ptr = register_file.as_mut_ptr() as *mut u8;
 
-    let val = execute(&*model, "f1", &[], &mut ctx);
+    let _val = execute(&*model, "f1", &[], &mut ctx);
 
     ctx.emitter().leave();
     let translation = ctx.compile();
     log::debug!("{:?}", translation);
     translation.execute(register_file_ptr);
+
+    log::debug!("{register_file:?}");
     panic!();
 }
 

@@ -247,24 +247,7 @@ pub enum Statement {
         index: usize,
         source: Ref<Statement>,
     },
-
-    /// Experimenting
-    EnterInlineCall {
-        pre_call_block: Ref<Block>,
-        /// Entry block of the inlined call
-        inline_entry_block: Ref<Block>,
-        /// Block in which the inlined call exits
-        inline_exit_block: Ref<Block>,
-        post_call_block: Ref<Block>,
-    },
-    ExitInlineCall,
 }
-
-// impl ToTokens for Ref<Statement> {
-//     fn to_tokens(&self, tokens: &mut TokenStream) {
-//         tokens.append(format_ident!("s{}", self.index()))
-//     }
-// }
 
 impl Display for Ref<Statement> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -334,8 +317,6 @@ impl Statement {
             Self::ShiftOperation { value, .. } => value.get(arena).typ(arena),
 
             Self::Call { return_type, .. } => return_type.clone(),
-            Self::EnterInlineCall { .. } => Type::void(),
-            Self::ExitInlineCall { .. } => Type::void(),
 
             Self::Cast { typ, .. } | Self::BitsCast { typ, .. } => typ.clone(),
             Self::Jump { .. } => Type::void(),
@@ -850,7 +831,7 @@ impl Statement {
                         .collect(),
                 )
             }
-            Self::GetFlags | Self::EnterInlineCall { .. } | Self::ExitInlineCall { .. } => (),
+            Self::GetFlags => (),
         }
     }
 
@@ -1062,22 +1043,6 @@ impl Statement {
                     "create-tuple {:?}",
                     values.iter().map(|v| v.index()).collect::<Vec<_>>()
                 )
-            }
-
-            Self::EnterInlineCall {
-                pre_call_block,
-                inline_entry_block,
-                inline_exit_block,
-                post_call_block,
-            } => format!(
-                "enter inline call: pre: {}, entry: {}, exit: {}, post: {}",
-                pre_call_block.index(),
-                inline_entry_block.index(),
-                inline_exit_block.index(),
-                post_call_block.index()
-            ),
-            Self::ExitInlineCall => {
-                format!("exit inline call")
             }
         }
     }
@@ -1573,19 +1538,6 @@ pub fn import_statement(
                 .cloned()
                 .collect(),
         ),
-        Statement::ExitInlineCall => Statement::ExitInlineCall,
-
-        Statement::EnterInlineCall {
-            pre_call_block,
-            inline_entry_block,
-            inline_exit_block,
-            post_call_block,
-        } => Statement::EnterInlineCall {
-            pre_call_block,
-            inline_entry_block,
-            inline_exit_block,
-            post_call_block,
-        },
     };
 
     build(source_block, block_arena, mapped_kind)

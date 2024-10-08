@@ -74,18 +74,8 @@ impl Block {
                         ..
                     } => alloc::vec![*true_target, *false_target],
 
-                    Statement::EnterInlineCall {
-                        post_call_block, /* not a true target of this block, it will be a target
-                                          * of the matching `ExitInlineCall`! but good enough to
-                                          * fix block iterator */
-                        inline_entry_block,
-                        ..
-                    } => alloc::vec![*inline_entry_block, *post_call_block],
-
                     // should probably still check that these are the last statement
-                    Statement::Return { .. }
-                    | Statement::Panic(_)
-                    | Statement::ExitInlineCall { .. } => {
+                    Statement::Return { .. } | Statement::Panic(_) => {
                         alloc::vec![]
                     }
 

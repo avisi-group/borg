@@ -4,7 +4,8 @@ use {
             emitter::{self, BlockResult, Emitter},
             x86::{
                 emitter::{X86BlockRef, X86NodeRef, X86SymbolRef},
-                X86TranslationContext,
+                encoder::{Instruction, Operand, PhysicalRegister},
+                X86TranslationContext, ENTRY_BLOCK_ID, EXIT_BLOCK_ID,
             },
             TranslationContext,
         },
@@ -87,7 +88,6 @@ struct FunctionExecutor<'m, 'c> {
     stack_variables: HashMap<InternedString, (emitter::Type, usize)>, // type and stack offset
     stack_size: usize,
     exit_block_ref: X86BlockRef,
-    inline_return_targets: HashMap<Ref<Block>, Ref<Block>>,
     ctx: &'c mut X86TranslationContext,
 }
 
@@ -106,8 +106,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             // local_variables: HashMap::default(),
             stack_variables: HashMap::default(),
             stack_size: 0,
-            exit_block_ref: ctx.create_block(0xee),
-            inline_return_targets: HashMap::default(),
+            exit_block_ref: ctx.create_block(EXIT_BLOCK_ID),
             ctx,
         };
 
@@ -154,9 +153,13 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             celf.stack_size += function.return_type().width_bytes();
         }
 
+        log::debug!("stack_variables: {:?}", celf.stack_variables);
+
         // set up block maps
         function.block_iter().for_each(|rudder_block| {
-            let x86_block = celf.ctx.create_block(rudder_block.index() as u32);
+            let x86_block = celf
+                .ctx
+                .create_block(i32::try_from(rudder_block.index()).unwrap());
             celf.rudder_blocks.insert(x86_block.clone(), rudder_block);
             celf.x86_blocks.insert(rudder_block, x86_block);
         });
@@ -179,12 +182,24 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             Dynamic(Ref<Block>),
         }
 
-        // insert stack setup prologue to entry block and stack teardown epilogue to
-        // exit block
-        //
-        // push rbp
-        // mov  rbp, rsp
-        // sub  rsp, TOTAL_SIZE
+        {
+            // insert stack setup prologue to entry block and stack teardown epilogue to
+            // exit block
+            //
+            // push rbp
+            // mov  rbp, rsp
+            // sub  rsp, TOTAL_SIZE
+            let x86_entry_block = self.ctx.initial_block();
+            x86_entry_block.append(Instruction::push(Operand::preg(64, PhysicalRegister::RBP)));
+            x86_entry_block.append(Instruction::mov(
+                Operand::preg(64, PhysicalRegister::RSP),
+                Operand::preg(64, PhysicalRegister::RBP),
+            ));
+            x86_entry_block.append(Instruction::sub(
+                Operand::imm(32, self.stack_size as u64),
+                Operand::preg(64, PhysicalRegister::RSP),
+            ));
+        }
 
         let mut block_queue = alloc::vec![BlockKind::Static(function.entry_block())];
         let mut visited_dynamic_blocks = HashSet::default();
@@ -232,8 +247,9 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         block0.index(),
                         block1.index()
                     );
-                    block_queue.push(BlockKind::Dynamic(block0));
+                    // will be popped in order 0,1
                     block_queue.push(BlockKind::Dynamic(block1));
+                    block_queue.push(BlockKind::Dynamic(block0));
                 }
                 BlockResult::Return => {
                     log::trace!("block result: return");
@@ -252,8 +268,18 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             .emitter()
             .set_current_block(self.exit_block_ref.clone());
 
-        // mov     rsp, rbp
-        // pop     rbp
+        {
+            // insert stack teardown epilogue to exit block
+            //
+            // mov     rsp, rbp
+            // pop     rbp
+            self.exit_block_ref.append(Instruction::mov(
+                Operand::preg(64, PhysicalRegister::RBP),
+                Operand::preg(64, PhysicalRegister::RSP),
+            ));
+            self.exit_block_ref
+                .append(Instruction::pop(Operand::preg(64, PhysicalRegister::RBP)));
+        }
 
         log::trace!("queue empty, reading return value and exiting");
 
@@ -290,7 +316,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                             .constant(s.key().into(), emitter::Type::Unsigned(32)),
                         ConstantValue::Rational(_) => todo!(),
 
-                        ConstantValue::Tuple(values) => {
+                        ConstantValue::Tuple(_) => {
                             // let Type::Tuple(types) = &typ else { panic!() };
                             // let values = values
                             //     .iter()
@@ -303,13 +329,11 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     })
                 }
                 Statement::ReadVariable { symbol } => {
-                    log::debug!("reading from {symbol:?}");
                     let (typ, offset) = self.lookup_symbol(symbol);
                     Some(self.ctx.emitter().read_variable(offset, typ))
                 }
                 Statement::WriteVariable { symbol, value } => {
-                    log::debug!("writing to {symbol:?}");
-                    let (typ, offset) = self.lookup_symbol(symbol);
+                    let (_, offset) = self.lookup_symbol(symbol);
                     let value = statement_values
                         .get(value)
                         .unwrap_or_else(|| {
@@ -468,29 +492,6 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
 
                     Some(execute(self.model, target.as_ref(), &args, self.ctx))
                 }
-                Statement::EnterInlineCall {
-                    pre_call_block,
-                    inline_entry_block,
-                    inline_exit_block,
-                    post_call_block,
-                } => {
-                    log::trace!("entering inline call @ {}, jumping to entry block {}, exit at {}, returning to {}", pre_call_block.index(), inline_entry_block.index(), inline_exit_block.index(), post_call_block.index());
-                    self.inline_return_targets
-                        .insert(*inline_exit_block, *post_call_block);
-                    let entry = self.lookup_x86_block(inline_entry_block);
-                    return self.ctx.emitter().jump(entry);
-                }
-                Statement::ExitInlineCall => {
-                    let target = self.inline_return_targets.get(&block_ref).unwrap();
-                    log::trace!(
-                        "exiting inline call @ {}, returning to {}",
-                        block_ref.index(),
-                        target.index(),
-                    );
-                    let target = self.lookup_x86_block(target);
-                    return self.ctx.emitter().jump(target);
-                }
-
                 Statement::Jump { target } => {
                     let target = self.lookup_x86_block(target);
                     return self.ctx.emitter().jump(target);

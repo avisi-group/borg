@@ -368,7 +368,7 @@ impl Emitter for X86Emitter {
     fn ternary_operation(&mut self, op: TernaryOperationKind) -> Self::NodeRef {
         use TernaryOperationKind::*;
         match &op {
-            AddWithCarry(src, dst, carry) => Self::NodeRef::from(X86Node {
+            AddWithCarry(src, _dst, _carry) => Self::NodeRef::from(X86Node {
                 typ: src.typ().clone(),
                 kind: NodeKind::TernaryOperation(op),
             }),
@@ -628,14 +628,22 @@ impl Emitter for X86Emitter {
 
         let width = value.width_in_bits;
 
-        self.current_block.append(Instruction::mov(
-            value,
-            Operand::mem_base_displ(
-                width,
-                Register::PhysicalRegister(PhysicalRegister::RBP),
-                -(i32::try_from(offset).unwrap()),
-            ),
-        ));
+        let mem = Operand::mem_base_displ(
+            width,
+            Register::PhysicalRegister(PhysicalRegister::RBP),
+            -(i32::try_from(offset).unwrap()),
+        );
+
+        // can't mov 64-bit imm to memory
+        if width == 64 {
+            let intermediate = Operand::vreg(64, self.next_vreg());
+            self.current_block
+                .append(Instruction::mov(value, intermediate.clone()));
+            self.current_block
+                .append(Instruction::mov(intermediate, mem));
+        } else {
+            self.current_block.append(Instruction::mov(value, mem));
+        }
     }
 
     fn assert(&mut self, condition: Self::NodeRef) {
@@ -1344,7 +1352,7 @@ impl Hash for X86BlockRef {
 }
 
 impl X86BlockRef {
-    pub fn id(&self) -> u32 {
+    pub fn id(&self) -> i32 {
         self.0.borrow().id
     }
 
@@ -1389,14 +1397,14 @@ impl From<X86Block> for X86BlockRef {
 }
 
 pub struct X86Block {
-    id: u32,
+    id: i32,
     instructions: Vec<Instruction>,
     next_0: Option<X86BlockRef>,
     next_1: Option<X86BlockRef>,
 }
 
 impl X86Block {
-    pub fn new(id: u32) -> Self {
+    pub fn new(id: i32) -> Self {
         Self {
             id,
             instructions: alloc::vec![],

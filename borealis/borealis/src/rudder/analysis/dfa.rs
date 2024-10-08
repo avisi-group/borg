@@ -274,9 +274,7 @@ impl<'a> StatementUseAnalysis<'a> {
                 | Statement::Jump { .. }
                 | Statement::PhiNode { .. }
                 | Statement::Constant { .. }
-                | Statement::Undefined
-                | Statement::EnterInlineCall { .. }
-                | Statement::ExitInlineCall { .. } => {}
+                | Statement::Undefined => {}
 
                 Statement::TupleAccess { source, .. } => self.add_use(source, stmt),
 

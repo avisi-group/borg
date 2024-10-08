@@ -53,19 +53,6 @@ impl ControlFlowGraphAnalysis {
 
                     work_list.push_back(*target);
                 }
-                Statement::EnterInlineCall {
-                    pre_call_block,
-                    inline_entry_block,
-                    inline_exit_block: _,
-                    post_call_block,
-                } => {
-                    assert_eq!(*pre_call_block, current);
-                    self.insert_successor(current, *inline_entry_block);
-                    self.insert_predecessor(*inline_entry_block, current);
-
-                    work_list.push_back(*inline_entry_block);
-                    work_list.push_back(*post_call_block);
-                }
                 Statement::Branch {
                     true_target,
                     false_target,
@@ -79,9 +66,7 @@ impl ControlFlowGraphAnalysis {
                     work_list.push_back(*true_target);
                     work_list.push_back(*false_target);
                 }
-                Statement::Return { .. }
-                | Statement::Panic { .. }
-                | Statement::ExitInlineCall { .. } => {
+                Statement::Return { .. } | Statement::Panic { .. } => {
                     self.block_succs.insert(current.clone(), Vec::new());
                 }
                 _ => panic!("invalid terminator statement for block"),

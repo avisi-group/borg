@@ -4,8 +4,8 @@ use {
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
-        dword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8,
-        CodeAssembler, CodeLabel,
+        dword_ptr, qword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64,
+        AsmRegister8, CodeAssembler, CodeLabel,
     },
 };
 
@@ -39,6 +39,10 @@ pub enum Opcode {
     BEXTR(Operand, Operand, Operand),
     /// jmp {0}
     JMP(Operand),
+    /// push {0}
+    PUSH(Operand),
+    /// pop {0}
+    POP(Operand),
     /// ret
     RET,
     /// test {0}, {1}
@@ -618,6 +622,14 @@ impl Instruction {
         Self(Opcode::JMP(Operand::target(block)))
     }
 
+    pub fn push(src: Operand) -> Self {
+        Self(Opcode::PUSH(src))
+    }
+
+    pub fn pop(dest: Operand) -> Self {
+        Self(Opcode::POP(dest))
+    }
+
     pub fn ret() -> Self {
         Self(Opcode::RET)
     }
@@ -727,15 +739,13 @@ impl Instruction {
                             displacement,
                             ..
                         },
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: 64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: 64,
                 },
             ) => {
-                assert_eq!(src_width_in_bits, dst_width_in_bits);
-
                 assembler
                     .mov::<AsmRegister64, AsmMemoryOperand>(
                         dst.into(),
@@ -797,7 +807,7 @@ impl Instruction {
             MOV(
                 Operand {
                     kind: I(src),
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: 32,
                 },
                 Operand {
                     kind:
@@ -824,15 +834,13 @@ impl Instruction {
             MOV(
                 Operand {
                     kind: I(src),
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: 64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: 64,
                 },
             ) => {
-                //assert_eq!(src_width_in_bits, dst_width_in_bits);
-
                 assembler
                     .mov::<AsmRegister64, u64>(dst.into(), *src)
                     .unwrap();
@@ -912,6 +920,22 @@ impl Instruction {
                 // assert_eq!(src_width_in_bits, dst_width_in_bits);
                 assembler
                     .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
+                    .unwrap();
+            }
+
+            // ADD IMM -> R
+            SUB(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: 32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
+                },
+            ) => {
+                assembler
+                    .sub::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
             }
 
@@ -1185,6 +1209,18 @@ impl Instruction {
                 }
                 _ => panic!(),
             },
+            PUSH(Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: 64,
+            }) => {
+                assembler.push::<AsmRegister64>(src.into()).unwrap();
+            }
+            POP(Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: 64,
+            }) => {
+                assembler.pop::<AsmRegister64>(dst.into()).unwrap();
+            }
 
             _ => panic!("cannot encode this instruction {}", self),
         }
@@ -1246,6 +1282,8 @@ impl Instruction {
                 Some((OperandDirection::InOut, c)),
             ]
             .into_iter(),
+            Opcode::PUSH(src) => [Some((OperandDirection::In, src)), None, None].into_iter(),
+            Opcode::POP(dest) => [Some((OperandDirection::Out, dest)), None, None].into_iter(),
         }
     }
 

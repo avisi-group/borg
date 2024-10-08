@@ -7,8 +7,12 @@ use {
         ops::{Add, Div, Mul, Not, Sub},
     },
     num_rational::Ratio,
-    num_traits::{float::FloatCore as _, CheckedMul},
+    num_traits::CheckedMul,
 };
+
+// idk why this is necessary
+#[allow(unused_imports)]
+use num_traits::float::FloatCore as _;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ConstantValue {
