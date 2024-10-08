@@ -27,6 +27,7 @@ static LOGGER: Logger<3> = Logger {
         ("virtio_drivers", LevelFilter::Warn),
         ("tar_no_std", LevelFilter::Warn),
         ("elfloader", LevelFilter::Info),
+        //   ("kernel::dbt::x86", LevelFilter::Debug),
         //("kernel::dbt::models", LevelFilter::Info),
     ],
 };

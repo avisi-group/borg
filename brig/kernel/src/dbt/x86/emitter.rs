@@ -69,7 +69,8 @@ impl Emitter for X86Emitter {
 
             self.cast(value, target_type, CastOperationKind::Truncate)
         } else {
-            todo!("actual real bits {value:?}\n{length:?}")
+            // todo: attach length information
+            value
         }
     }
 
@@ -541,7 +542,14 @@ impl Emitter for X86Emitter {
                     true_value
                 }
             }
-            _ => todo!(),
+            _ => Self::NodeRef::from(X86Node {
+                typ: true_value.typ().clone(),
+                kind: NodeKind::Select {
+                    condition,
+                    true_value,
+                    false_value,
+                },
+            }),
         }
     }
 
@@ -634,16 +642,7 @@ impl Emitter for X86Emitter {
             -(i32::try_from(offset).unwrap()),
         );
 
-        // can't mov 64-bit imm to memory
-        if width == 64 {
-            let intermediate = Operand::vreg(64, self.next_vreg());
-            self.current_block
-                .append(Instruction::mov(value, intermediate.clone()));
-            self.current_block
-                .append(Instruction::mov(intermediate, mem));
-        } else {
-            self.current_block.append(Instruction::mov(value, mem));
-        }
+        self.current_block.append(Instruction::mov(value, mem));
     }
 
     fn assert(&mut self, condition: Self::NodeRef) {
@@ -777,7 +776,10 @@ impl Emitter for X86Emitter {
 
                 self.cast(value, typ, kind)
             }
-            (_, _) => todo!(),
+            (_, _) => {
+                // todo: attach length information
+                value
+            }
         }
     }
 }
@@ -944,7 +946,8 @@ impl X86NodeRef {
                 .clone()
                 .to_operand(emitter),
             NodeKind::UnaryOperation(kind) => match &kind {
-                UnaryOperationKind::Not(value) => {
+                // todo: not might be wrong here (output 0 or 1?)
+                UnaryOperationKind::Complement(value) | UnaryOperationKind::Not(value) => {
                     let dst = Operand::vreg(64, emitter.next_vreg());
                     let value = value.to_operand(emitter);
                     emitter
@@ -1035,6 +1038,17 @@ impl X86NodeRef {
                                     .append(Instruction::movzx(src, dst.clone()));
                             }
                         }
+                        CastOperationKind::SignExtend => {
+                            if src.width_in_bits == dst.width_in_bits {
+                                emitter
+                                    .current_block
+                                    .append(Instruction::mov(src, dst.clone()));
+                            } else {
+                                emitter
+                                    .current_block
+                                    .append(Instruction::movsx(src, dst.clone()));
+                            }
+                        }
                         CastOperationKind::Convert => {
                             panic!("{:?}\n{:#?}", self.typ(), value);
                         }
@@ -1074,7 +1088,19 @@ impl X86NodeRef {
                             .current_block
                             .append(Instruction::shl(amount, op0.clone()));
                     }
-                    _ => todo!(),
+
+                    ShiftOperationKind::LogicalShiftRight => {
+                        emitter
+                            .current_block
+                            .append(Instruction::shr(amount, op0.clone()));
+                    }
+
+                    ShiftOperationKind::ArithmeticShiftRight => {
+                        emitter
+                            .current_block
+                            .append(Instruction::sar(amount, op0.clone()));
+                    }
+                    _ => todo!("{kind:?}"),
                 }
 
                 op0
@@ -1190,6 +1216,32 @@ impl X86NodeRef {
                 dest
             }
             NodeKind::Tuple(vec) => unreachable!(),
+            NodeKind::Select {
+                condition,
+                true_value,
+                false_value,
+            } => {
+                let dest = Operand::vreg(
+                    u8::try_from(true_value.typ().width()).unwrap(),
+                    emitter.next_vreg(),
+                );
+
+                let condition = condition.to_operand(emitter);
+                let true_value = true_value.to_operand(emitter);
+                let false_value = false_value.to_operand(emitter);
+
+                emitter
+                    .current_block
+                    .append(Instruction::test(condition.clone(), condition.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::cmove(false_value, dest.clone()));
+                emitter
+                    .current_block
+                    .append(Instruction::cmovne(true_value, dest.clone()));
+
+                dest
+            }
         }
     }
 }
@@ -1248,6 +1300,11 @@ pub enum NodeKind {
     },
     GetFlags,
     Tuple(Vec<X86NodeRef>),
+    Select {
+        condition: X86NodeRef,
+        true_value: X86NodeRef,
+        false_value: X86NodeRef,
+    },
 }
 
 #[derive(Debug)]

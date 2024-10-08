@@ -4,8 +4,8 @@ use {
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
-        dword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8,
-        CodeAssembler, CodeLabel,
+        byte_ptr, dword_ptr, qword_ptr, word_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32,
+        AsmRegister64, AsmRegister8, CodeAssembler, CodeLabel,
     },
 };
 
@@ -15,10 +15,20 @@ pub enum Opcode {
     MOV(Operand, Operand),
     /// movzx {0}, {1}
     MOVZX(Operand, Operand),
+    /// movsx {0}, {1}
+    MOVSX(Operand, Operand),
+    /// cmove {0}, {1}
+    CMOVE(Operand, Operand),
+    /// cmovne {0}, {1}
+    CMOVNE(Operand, Operand),
     /// lea {0}, {1}
     LEA(Operand, Operand),
     /// shl {0}, {1}
     SHL(Operand, Operand),
+    /// shr {0}, {1}
+    SHR(Operand, Operand),
+    /// sar {0}, {1}
+    SAR(Operand, Operand),
     /// add {0}, {1}
     ADD(Operand, Operand),
     /// adc {0}, {1}, {2}
@@ -77,7 +87,7 @@ pub enum Opcode {
     INT(Operand),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum PhysicalRegister {
     /// rax
     RAX,
@@ -298,7 +308,7 @@ pub enum SegmentRegister {
     GS,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Register {
     PhysicalRegister(PhysicalRegister),
     VirtualRegister(usize),
@@ -322,7 +332,7 @@ impl Into<iced_x86::Register> for PhysicalRegister {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum MemoryScale {
     /// * 1
     S1,
@@ -567,12 +577,12 @@ impl Display for Instruction {
 }
 
 fn memory_operand_to_iced(
-    base: &PhysicalRegister,
-    index: &Option<Register>,
-    scale: &MemoryScale,
-    displacement: &i32,
+    base: PhysicalRegister,
+    index: Option<Register>,
+    scale: MemoryScale,
+    displacement: i32,
 ) -> AsmMemoryOperand {
-    let mut mem = AsmRegister64::from(base) + *displacement;
+    let mut mem = AsmRegister64::from(base) + displacement;
 
     if let Some(Register::PhysicalRegister(index)) = index {
         let scale: i32 = match scale {
@@ -602,6 +612,10 @@ impl Instruction {
         Self(Opcode::MOVZX(src, dst))
     }
 
+    pub fn movsx(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::MOVSX(src, dst))
+    }
+
     pub fn lea(src: Operand, dst: Operand) -> Self {
         Self(Opcode::LEA(src, dst))
     }
@@ -612,6 +626,14 @@ impl Instruction {
 
     pub fn shl(amount: Operand, op0: Operand) -> Self {
         Self(Opcode::SHL(amount, op0))
+    }
+
+    pub fn shr(amount: Operand, op0: Operand) -> Self {
+        Self(Opcode::SHR(amount, op0))
+    }
+
+    pub fn sar(amount: Operand, op0: Operand) -> Self {
+        Self(Opcode::SAR(amount, op0))
     }
 
     pub fn bextr(ctrl: Operand, src: Operand, dst: Operand) -> Self {
@@ -694,6 +716,14 @@ impl Instruction {
         Self(Opcode::INT(n))
     }
 
+    pub fn cmove(src: Operand, dest: Operand) -> Self {
+        Self(Opcode::CMOVE(src, dest))
+    }
+
+    pub fn cmovne(src: Operand, dest: Operand) -> Self {
+        Self(Opcode::CMOVNE(src, dest))
+    }
+
     alu_op!(add, ADD);
     alu_op!(sub, SUB);
     alu_op!(or, OR);
@@ -749,7 +779,7 @@ impl Instruction {
                 assembler
                     .mov::<AsmRegister64, AsmMemoryOperand>(
                         dst.into(),
-                        memory_operand_to_iced(base, index, scale, displacement),
+                        memory_operand_to_iced(*base, *index, *scale, *displacement),
                     )
                     .unwrap();
             }
@@ -773,7 +803,7 @@ impl Instruction {
             ) => {
                 assembler
                     .mov::<AsmMemoryOperand, AsmRegister8>(
-                        memory_operand_to_iced(base, index, scale, displacement),
+                        memory_operand_to_iced(*base, *index, *scale, *displacement),
                         src.into(),
                     )
                     .unwrap();
@@ -798,7 +828,7 @@ impl Instruction {
             ) => {
                 assembler
                     .mov::<AsmMemoryOperand, AsmRegister64>(
-                        memory_operand_to_iced(base, index, scale, displacement),
+                        memory_operand_to_iced(*base, *index, *scale, *displacement),
                         src.into(),
                     )
                     .unwrap();
@@ -818,18 +848,187 @@ impl Instruction {
                             displacement,
                             ..
                         },
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: 32,
                 },
             ) => {
                 // assert_eq!(src_width_in_bits, dst_width_in_bits);
 
                 assembler
                     .mov::<AsmMemoryOperand, u32>(
-                        dword_ptr(memory_operand_to_iced(base, index, scale, displacement)),
+                        dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
                         *src as u32,
                     )
                     .unwrap();
             }
+            // MOV I -> M
+            MOV(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: 1..=8,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: 1..=8,
+                },
+            ) => {
+                // assert_eq!(src_width_in_bits, dst_width_in_bits);
+
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                        u32::try_from(*src).unwrap(),
+                    )
+                    .unwrap();
+            }
+            // MOV I -> M
+            MOV(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: 9..=16,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: 9..=16,
+                },
+            ) => {
+                // assert_eq!(src_width_in_bits, dst_width_in_bits);
+
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        word_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                        u32::try_from(*src).unwrap(),
+                    )
+                    .unwrap();
+            }
+            // MOV I -> M
+            MOV(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: 33..=64,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: 33..=64,
+                },
+            ) => {
+                // lo
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                        u32::try_from(*src & u64::from(u32::MAX)).unwrap(),
+                    )
+                    .unwrap();
+                // hi
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        dword_ptr(memory_operand_to_iced(
+                            *base,
+                            *index,
+                            *scale,
+                            *displacement + 4,
+                        )),
+                        u32::try_from((*src >> 32) & u64::from(u32::MAX)).unwrap(),
+                    )
+                    .unwrap();
+            }
+            // MOV I -> M
+            MOV(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: 65..=128,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: 65..=128,
+                },
+            ) => {
+                // lolo
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                        u32::try_from(*src & u64::from(u32::MAX)).unwrap(),
+                    )
+                    .unwrap();
+                // lohi
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        dword_ptr(memory_operand_to_iced(
+                            *base,
+                            *index,
+                            *scale,
+                            *displacement + 4,
+                        )),
+                        u32::try_from((*src >> 32) & u64::from(u32::MAX)).unwrap(),
+                    )
+                    .unwrap();
+                // hilo
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        dword_ptr(memory_operand_to_iced(
+                            *base,
+                            *index,
+                            *scale,
+                            *displacement + 8,
+                        )),
+                        0,
+                    )
+                    .unwrap();
+                // hihi
+                assembler
+                    .mov::<AsmMemoryOperand, u32>(
+                        dword_ptr(memory_operand_to_iced(
+                            *base,
+                            *index,
+                            *scale,
+                            *displacement + 12,
+                        )),
+                        0,
+                    )
+                    .unwrap();
+            }
+            // MOV I -> M
+            MOV(
+                Operand {
+                    kind: I(_src),
+                    width_in_bits: 0,
+                },
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(_base)),
+                            ..
+                        },
+                    width_in_bits: 0,
+                },
+            ) => {}
             // MOV I -> R
             MOV(
                 Operand {
@@ -885,7 +1084,7 @@ impl Instruction {
                 assembler
                     .lea::<AsmRegister64, AsmMemoryOperand>(
                         dst.into(),
-                        memory_operand_to_iced(base, index, scale, displacement),
+                        memory_operand_to_iced(*base, *index, *scale, *displacement),
                     )
                     .unwrap();
             }
@@ -1236,13 +1435,20 @@ impl Instruction {
         &mut self,
     ) -> impl Iterator<Item = Option<(OperandDirection, &mut Operand)>> + '_ {
         match &mut self.0 {
-            Opcode::MOV(src, dst) | Opcode::MOVZX(src, dst) | Opcode::LEA(src, dst) => [
+            Opcode::MOV(src, dst)
+            | Opcode::MOVZX(src, dst)
+            | Opcode::MOVSX(src, dst)
+            | Opcode::LEA(src, dst)
+            | Opcode::CMOVE(src, dst)
+            | Opcode::CMOVNE(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::Out, dst)),
                 None,
             ]
             .into_iter(),
             Opcode::SHL(src, dst)
+            | Opcode::SHR(src, dst)
+            | Opcode::SAR(src, dst)
             | Opcode::OR(src, dst)
             | Opcode::XOR(src, dst)
             | Opcode::ADD(src, dst)

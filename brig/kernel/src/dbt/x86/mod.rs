@@ -145,7 +145,7 @@ impl TranslationContext for X86TranslationContext {
 
         {
             let initial_label = assembler.create_label();
-            log::debug!(
+            log::trace!(
                 "initial_block ({initial_label:?}) {:?}",
                 self.initial_block()
             );
@@ -154,30 +154,30 @@ impl TranslationContext for X86TranslationContext {
 
         {
             let exit_label = assembler.create_label();
-            log::debug!("exit_block ({exit_label:?}) {:?}", self.exit_block());
+            log::trace!("exit_block ({exit_label:?}) {:?}", self.exit_block());
             label_map.insert(self.exit_block(), exit_label);
         }
 
         while let Some(next) = to_visit.pop() {
-            log::debug!("assembling {next:?}");
+            log::trace!("assembling {next:?}");
 
             visited.push(next.clone());
 
             if let Some(next_0) = next.get_next_0() {
-                log::debug!("next_0: {next_0:x}");
+                log::trace!("next_0: {next_0:x}");
                 if !visited.contains(&next_0) {
                     let label = assembler.create_label();
-                    log::debug!("next_0: {label:?}");
+                    log::trace!("next_0: {label:?}");
                     label_map.insert(next_0.clone(), label);
                     to_visit.push(next_0)
                 }
             }
 
             if let Some(next_1) = next.get_next_1() {
-                log::debug!("next_1: {next_1:x}");
+                log::trace!("next_1: {next_1:x}");
                 if !visited.contains(&next_1) {
                     let label = assembler.create_label();
-                    log::debug!("next_1: {label:?}");
+                    log::trace!("next_1: {label:?}");
                     label_map.insert(next_1.clone(), label);
                     to_visit.push(next_1)
                 }

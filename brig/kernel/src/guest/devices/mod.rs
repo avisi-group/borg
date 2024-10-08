@@ -26,7 +26,6 @@ fn static_dynamic_chaos_smoke() {
     translation.execute(register_file_ptr);
 
     log::debug!("{register_file:?}");
-    panic!();
 }
 
 // #[ktest]
@@ -54,52 +53,54 @@ fn static_dynamic_chaos_smoke() {
 //     translation.execute(register_file_ptr);
 // }
 
-// #[ktest]
-// fn decodea64_smoke() {
-//     let mut register_file = Box::new([0u8; 104488usize]);
-//     let register_file_ptr = register_file.as_mut_ptr();
-//     let mut ctx = X86TranslationContext::new();
-//     let model = models::get("aarch64").unwrap();
+#[ktest]
+fn decodea64_smoke() {
+    let mut register_file = Box::new([0u8; 104488usize]);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new();
+    let model = models::get("aarch64").unwrap();
 
-//     execute(&*model, "borealis_register_init", &[], &mut ctx);
+    execute(&*model, "borealis_register_init", &[], &mut ctx);
 
-//     // OOM crashes:(
-//     execute(
-//         &*model,
-//         "__InitSystem",
-//         &[ctx.emitter().constant(0, Type::Unsigned(0))],
-//         &mut ctx,
-//     );
+    // OOM crashes:(
+    // execute(
+    //     &*model,
+    //     "__InitSystem",
+    //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
+    //     &mut ctx,
+    // );
 
-//     let pc = ctx.emitter().constant(0, Type::Unsigned(64));
+    let pc = ctx.emitter().constant(0, Type::Unsigned(64));
 
-//     // // add x0,x1,x2
-//     // // (x0 = x1 + x2)
-//     let opcode = ctx.emitter().constant(0x8b020020, Type::Unsigned(64));
+    // // add x0,x1,x2
+    // // (x0 = x1 + x2)
+    let opcode = ctx.emitter().constant(0x8b020020, Type::Unsigned(64));
 
-//     execute(&*model, "__DecodeA64", &[pc, opcode], &mut ctx);
+    execute(&*model, "__DecodeA64", &[pc, opcode], &mut ctx);
 
-//     ctx.emitter().leave();
-//     let translation = ctx.compile();
-//     log::debug!("\n{:?}", translation);
+    ctx.emitter().leave();
+    let translation = ctx.compile();
+    log::debug!("\n{:?}", translation);
 
-//     unsafe {
-//         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
-//         let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u32;
-//         let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u32;
-//         let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+    unsafe {
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
+        let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u32;
+        let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u32;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
 
-//         *see = -1;
-//         *r0 = 2;
-//         *r1 = 5;
-//         *r2 = 10;
+        *see = -1;
+        *r0 = 2;
+        *r1 = 5;
+        *r2 = 10;
 
-//         translation.execute(register_file_ptr);
+        translation.execute(register_file_ptr);
 
-//         assert_eq!(15, (*r0));
-//         assert_eq!(0xe, (*see));
-//     }
-// }
+        assert_eq!(15, (*r0));
+        assert_eq!(0xe, (*see));
+    }
+
+    panic!();
+}
 
 // // // #[ktest]
 // // // fn fibonacci() {

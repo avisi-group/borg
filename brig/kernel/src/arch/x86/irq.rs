@@ -199,6 +199,6 @@ fn gpf_exception(machine_context: *mut MachineContext) {
 }
 
 #[irq_handler(with_code = true)]
-fn dbt_handler(machine_context: *mut MachineContext) {
+fn dbt_handler(_machine_context: *mut MachineContext) {
     panic!("DBT interrupt")
 }
