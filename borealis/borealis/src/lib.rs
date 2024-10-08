@@ -167,19 +167,18 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         .unwrap();
     }
 
-    if let Some(path) = &dump_ir {
-        writeln!(
-            &mut create_file_buffered(path.join("ast.inlined.rudder")).unwrap(),
-            "{rudder}"
-        )
-        .unwrap();
-    }
-
     info!("Validating rudder again");
     let msgs = validator::validate(&rudder);
     for msg in msgs {
         debug!("{msg}");
     }
+
+    rudder
+        .functions_mut()
+        .extend(example_functions().into_iter());
+    rudder
+        .functions_mut()
+        .extend(variable_corrupted_example().into_iter());
 
     if matches!(
         &mode,
@@ -343,10 +342,9 @@ fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast:
     })
 }
 
-#[allow(unused)]
 fn example_functions() -> HashMap<InternedString, Function> {
     let mut fns = HashMap::default();
-    let mut f1 = Function::new("f1".into(), Type::unit(), vec![]);
+    let mut f1 = Function::new("example_f1".into(), Type::unit(), vec![]);
 
     {
         let entry_block = f1.entry_block().get_mut(f1.arena_mut());
@@ -382,7 +380,7 @@ fn example_functions() -> HashMap<InternedString, Function> {
             offset: _8,
         });
         let call1 = s_arena.insert(Statement::Call {
-            target: "f2".into(),
+            target: "example_f2".into(),
             args: vec![r0, r1],
             return_type: Type::u64(),
         });
@@ -391,7 +389,7 @@ fn example_functions() -> HashMap<InternedString, Function> {
             offset: _16,
         });
         let call2 = s_arena.insert(Statement::Call {
-            target: "f2".into(),
+            target: "example_f2".into(),
             args: vec![call1, r2],
             return_type: Type::u64(),
         });
@@ -407,7 +405,11 @@ fn example_functions() -> HashMap<InternedString, Function> {
 
     let left = Symbol::new("left".into(), Type::u64());
     let right = Symbol::new("right".into(), Type::u64());
-    let mut f2 = Function::new("f2".into(), Type::u64(), vec![left.clone(), right.clone()]);
+    let mut f2 = Function::new(
+        "example_f2".into(),
+        Type::u64(),
+        vec![left.clone(), right.clone()],
+    );
     {
         let entry_block = f2.entry_block().get_mut(f2.arena_mut());
         let s_arena = entry_block.arena_mut();
@@ -422,37 +424,36 @@ fn example_functions() -> HashMap<InternedString, Function> {
         let ret = s_arena.insert(Statement::Return { value: add });
         entry_block.set_statements([left, right, add, ret].into_iter());
     }
-    fns.insert("f1".into(), f1);
-    fns.insert("f2".into(), f2);
+    fns.insert(f1.name(), f1);
+    fns.insert(f2.name(), f2);
 
     fns
 }
 
-#[allow(unused)]
 fn variable_corrupted_example() -> HashMap<InternedString, Function> {
     let mut fns = HashMap::default();
-    let mut f1 = Function::new("f1".into(), Type::u64(), vec![]);
+    let mut func = Function::new("func_corrupted_var".into(), Type::u64(), vec![]);
     let ret_val = Symbol::new("return".into(), Type::u64());
-    f1.add_local_variable(ret_val.clone());
+    func.add_local_variable(ret_val.clone());
 
     {
-        let a = f1.arena_mut().insert(Block::new());
-        let b = f1.arena_mut().insert(Block::new());
-        let c = f1.arena_mut().insert(Block::new());
-        let d = f1.arena_mut().insert(Block::new());
-        let e = f1.arena_mut().insert(Block::new());
-        let f = f1.arena_mut().insert(Block::new());
-        let g = f1.arena_mut().insert(Block::new());
+        let a = func.arena_mut().insert(Block::new());
+        let b = func.arena_mut().insert(Block::new());
+        let c = func.arena_mut().insert(Block::new());
+        let d = func.arena_mut().insert(Block::new());
+        let e = func.arena_mut().insert(Block::new());
+        let f = func.arena_mut().insert(Block::new());
+        let g = func.arena_mut().insert(Block::new());
 
         {
-            let entry_block = f1.entry_block().get_mut(f1.arena_mut());
+            let entry_block = func.entry_block().get_mut(func.arena_mut());
             let s_arena = entry_block.arena_mut();
             let jump = s_arena.insert(Statement::Jump { target: a });
             entry_block.set_statements([jump].into_iter());
         }
 
         {
-            let a = a.get_mut(f1.arena_mut());
+            let a = a.get_mut(func.arena_mut());
             let s_arena = a.arena_mut();
             let _0 = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
@@ -471,7 +472,7 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
         }
 
         {
-            let b = b.get_mut(f1.arena_mut());
+            let b = b.get_mut(func.arena_mut());
             let s_arena = b.arena_mut();
             let _5 = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
@@ -486,7 +487,7 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
         }
 
         {
-            let c = c.get_mut(f1.arena_mut());
+            let c = c.get_mut(func.arena_mut());
             let s_arena = c.arena_mut();
             let _10 = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
@@ -501,7 +502,7 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
         }
 
         {
-            let d = d.get_mut(f1.arena_mut());
+            let d = d.get_mut(func.arena_mut());
             let s_arena = d.arena_mut();
             let _8 = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
@@ -520,21 +521,21 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
         }
 
         {
-            let e = e.get_mut(f1.arena_mut());
+            let e = e.get_mut(func.arena_mut());
             let s_arena = e.arena_mut();
             let jump = s_arena.insert(Statement::Jump { target: g });
             e.set_statements([jump].into_iter());
         }
 
         {
-            let f = f.get_mut(f1.arena_mut());
+            let f = f.get_mut(func.arena_mut());
             let s_arena = f.arena_mut();
             let jump = s_arena.insert(Statement::Jump { target: g });
             f.set_statements([jump].into_iter());
         }
 
         {
-            let g = g.get_mut(f1.arena_mut());
+            let g = g.get_mut(func.arena_mut());
             let s_arena = g.arena_mut();
             let read = s_arena.insert(Statement::ReadVariable {
                 symbol: ret_val.clone(),
@@ -552,6 +553,6 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
         }
     }
 
-    fns.insert("f1".into(), f1);
+    fns.insert(func.name(), func);
     fns
 }

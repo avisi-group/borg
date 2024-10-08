@@ -79,14 +79,25 @@ pub fn execute(
     FunctionExecutor::new(model, function, arguments, ctx).translate()
 }
 
+#[derive(Debug, Clone)]
+enum LocalVariable {
+    Virtual(X86SymbolRef),
+    Stack {
+        typ: emitter::Type,
+        stack_offset: usize,
+    },
+}
+
 struct FunctionExecutor<'m, 'c> {
     model: &'m Model,
     function_name: InternedString,
     x86_blocks: HashMap<Ref<Block>, X86BlockRef>,
     rudder_blocks: HashMap<X86BlockRef, Ref<Block>>,
-    //local_variables: HashMap<InternedString, X86SymbolRef>,
-    stack_variables: HashMap<InternedString, (emitter::Type, usize)>, // type and stack offset
+
+    variables: HashMap<InternedString, LocalVariable>,
+
     stack_size: usize,
+
     ctx: &'c mut X86TranslationContext,
 }
 
@@ -102,8 +113,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             function_name: InternedString::from(function),
             x86_blocks: HashMap::default(),
             rudder_blocks: HashMap::default(),
-            // local_variables: HashMap::default(),
-            stack_variables: HashMap::default(),
+            variables: HashMap::default(),
             stack_size: 0,
             ctx,
         };
@@ -121,9 +131,8 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             .iter()
             .map(|sym| (sym.name(), sym.typ()))
             .for_each(|(name, typ)| {
-                celf.stack_variables
-                    .insert(name, (emit_rudder_type(&typ), celf.stack_size));
-                celf.stack_size += typ.width_bytes();
+                celf.variables
+                    .insert(name, LocalVariable::Virtual(celf.ctx.create_symbol()));
             });
 
         // set up symbols for parameters, and write arguments into them
@@ -132,26 +141,16 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             .iter()
             .zip(arguments)
             .for_each(|(parameter, argument)| {
-                celf.stack_variables.insert(
-                    parameter.name(),
-                    (emit_rudder_type(&parameter.typ()), celf.stack_size),
-                );
-                celf.ctx
-                    .emitter()
-                    .write_variable(celf.stack_size, argument.clone());
-                celf.stack_size += parameter.typ().width_bytes();
+                let var = LocalVariable::Virtual(celf.ctx.create_symbol());
+                celf.variables.insert(parameter.name(), var.clone());
+                celf.write_variable(var, argument.clone());
             });
 
         // and the return value
-        {
-            celf.stack_variables.insert(
-                "borealis_fn_return_value".into(),
-                (emit_rudder_type(&function.return_type()), celf.stack_size),
-            );
-            celf.stack_size += function.return_type().width_bytes();
-        }
-
-        log::debug!("stack_variables: {:?}", celf.stack_variables);
+        celf.variables.insert(
+            "borealis_fn_return_value".into(),
+            LocalVariable::Virtual(celf.ctx.create_symbol()),
+        );
 
         // set up block maps
         function.block_iter().for_each(|rudder_block| {
@@ -215,7 +214,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             let result = match block {
                 BlockKind::Static(b) => {
                     log::trace!("static block {}", b.index());
-                    self.translate_block(function, b)
+                    self.translate_block(function, b, false)
                 }
                 BlockKind::Dynamic(b) => {
                     if visited_dynamic_blocks.contains(&b) {
@@ -227,7 +226,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         .emitter()
                         .set_current_block(self.x86_blocks.get(&b).unwrap().clone());
 
-                    let res = self.translate_block(function, b);
+                    let res = self.translate_block(function, b, true);
                     visited_dynamic_blocks.insert(b);
                     res
                 }
@@ -287,16 +286,20 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
 
         log::trace!("queue empty, reading return value and exiting");
 
-        // well damn I can't return a value on the stack that I just invalidated
-        let (typ, offset) = self
-            .stack_variables
-            .get(&InternedString::from_static("borealis_fn_return_value"))
-            .unwrap()
-            .clone();
-        return self.ctx.emitter().read_variable(offset, typ);
+        return self.read_variable(
+            self.variables
+                .get(&InternedString::from_static("borealis_fn_return_value"))
+                .unwrap()
+                .clone(),
+        );
     }
 
-    fn translate_block(&mut self, function: &Function, block_ref: Ref<Block>) -> BlockResult {
+    fn translate_block(
+        &mut self,
+        function: &Function,
+        block_ref: Ref<Block>,
+        is_dynamic: bool,
+    ) -> BlockResult {
         let block = block_ref.get(function.arena());
 
         let mut statement_values = HashMap::<Ref<Statement>, X86NodeRef>::default();
@@ -333,21 +336,42 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     })
                 }
                 Statement::ReadVariable { symbol } => {
-                    let (typ, offset) = self.lookup_symbol(symbol);
-                    Some(self.ctx.emitter().read_variable(offset, typ))
+                    let var = self.variables.get(&symbol.name()).unwrap().clone();
+                    Some(self.read_variable(var))
                 }
                 Statement::WriteVariable { symbol, value } => {
-                    let (_, offset) = self.lookup_symbol(symbol);
+                    if is_dynamic {
+                        // if we're in a dynamic block and the local variable is not on the stack,
+                        // put it there
+                        if let LocalVariable::Virtual(_) =
+                            self.variables.get(&symbol.name()).unwrap()
+                        {
+                            log::debug!("upgrading {:?} from virtual to stack", symbol.name());
+                            self.variables.insert(
+                                symbol.name(),
+                                LocalVariable::Stack {
+                                    typ: emit_rudder_type(&symbol.typ()),
+                                    stack_offset: self.stack_size,
+                                },
+                            );
+                            self.stack_size += symbol.typ().width_bytes();
+                        }
+                    }
+
+                    let var = self.variables.get(&symbol.name()).unwrap().clone();
+
                     let value = statement_values
                         .get(value)
                         .unwrap_or_else(|| {
                             panic!(
-                                "no value for {value} when writing to {symbol:?} in {} {block_ref:?}",
-                                function.name()
-                            )
+                            "no value for {value} when writing to {symbol:?} in {} {block_ref:?}",
+                            function.name()
+                        )
                         })
                         .clone();
-                    self.ctx.emitter().write_variable(offset, value);
+
+                    self.write_variable(var, value);
+
                     None
                 }
                 Statement::ReadRegister { typ, offset } => {
@@ -515,13 +539,15 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         .branch(condition, true_target, false_target);
                 }
                 Statement::Return { value } => {
-                    let value = statement_values.get(value).unwrap().clone();
-                    let (_, offset) = self
-                        .stack_variables
+                    let var = self
+                        .variables
                         .get(&InternedString::from_static("borealis_fn_return_value"))
                         .unwrap()
                         .clone();
-                    self.ctx.emitter().write_variable(offset, value);
+
+                    let value = statement_values.get(value).unwrap().clone();
+
+                    self.write_variable(var, value);
                     return BlockResult::Return;
                 }
 
@@ -683,8 +709,28 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
         *self.rudder_blocks.get(x86).unwrap()
     }
 
-    fn lookup_symbol(&self, symbol: &Symbol) -> (emitter::Type, usize) {
-        self.stack_variables.get(&symbol.name()).unwrap().clone()
+    fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
+        match variable {
+            LocalVariable::Virtual(x86_symbol_ref) => {
+                self.ctx.emitter().read_virt_variable(x86_symbol_ref)
+            }
+            LocalVariable::Stack { typ, stack_offset } => {
+                self.ctx.emitter().read_stack_variable(stack_offset, typ)
+            }
+        }
+    }
+
+    fn write_variable(&mut self, variable: LocalVariable, value: X86NodeRef) {
+        match variable {
+            LocalVariable::Virtual(x86_symbol_ref) => self
+                .ctx
+                .emitter()
+                .write_virt_variable(x86_symbol_ref, value),
+            LocalVariable::Stack {
+                typ: _,
+                stack_offset,
+            } => self.ctx.emitter().write_stack_variable(stack_offset, value),
+        }
     }
 }
 

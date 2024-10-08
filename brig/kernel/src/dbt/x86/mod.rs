@@ -15,6 +15,7 @@ use {
         rc::Rc,
         vec::Vec,
     },
+    common::{HashMap, HashSet},
     core::{cell::RefCell, fmt::Debug},
     iced_x86::code_asm::{qword_ptr, rax, AsmMemoryOperand, AsmRegister64, CodeAssembler},
 };
@@ -139,9 +140,9 @@ impl TranslationContext for X86TranslationContext {
         self.allocate_registers(SolidStateRegisterAllocator::new(num_virtual_registers));
 
         let mut assembler = CodeAssembler::new(64).unwrap();
-        let mut label_map = BTreeMap::new();
-        let mut visited = alloc::vec![];
-        let mut to_visit = alloc::vec![self.initial_block()];
+        let mut label_map = HashMap::default();
+        let mut visited = HashSet::default();
+        let mut to_visit = alloc::vec![];
 
         {
             let initial_label = assembler.create_label();
@@ -150,18 +151,13 @@ impl TranslationContext for X86TranslationContext {
                 self.initial_block()
             );
             label_map.insert(self.initial_block(), initial_label);
-        }
-
-        {
-            let exit_label = assembler.create_label();
-            log::trace!("exit_block ({exit_label:?}) {:?}", self.exit_block());
-            label_map.insert(self.exit_block(), exit_label);
+            to_visit.push(self.initial_block())
         }
 
         while let Some(next) = to_visit.pop() {
             log::trace!("assembling {next:?}");
 
-            visited.push(next.clone());
+            visited.insert(next.clone());
 
             if let Some(next_0) = next.get_next_0() {
                 log::trace!("next_0: {next_0:x}");

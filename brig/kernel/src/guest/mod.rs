@@ -3,6 +3,7 @@ use {
         devices::manager::SharedDeviceManager,
         fs::{tar::TarFilesystem, File, Filesystem},
         guest::memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
+        qemu_exit,
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::ptr,
@@ -54,7 +55,8 @@ impl GuestExecutionContext {
 
 /// Start guest emulation
 pub fn start() {
-    log::info!("starting guest");
+    log::info!("DONE");
+    qemu_exit();
 
     //check each connected block device for guest config
     let device_manager = SharedDeviceManager::get();

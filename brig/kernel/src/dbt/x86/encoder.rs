@@ -1,6 +1,7 @@
 use {
     crate::{dbt::x86::emitter::X86BlockRef, fs::tar},
     alloc::collections::btree_map::BTreeMap,
+    common::HashMap,
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
@@ -732,7 +733,7 @@ impl Instruction {
     pub fn encode(
         &self,
         assembler: &mut CodeAssembler,
-        label_map: &BTreeMap<X86BlockRef, CodeLabel>,
+        label_map: &HashMap<X86BlockRef, CodeLabel>,
     ) {
         use {
             Opcode::*,
@@ -1034,6 +1035,21 @@ impl Instruction {
                 Operand {
                     kind: I(src),
                     width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
+                },
+            ) => {
+                assembler
+                    .mov::<AsmRegister64, u64>(dst.into(), *src)
+                    .unwrap();
+            }
+            // MOV I -> R
+            MOV(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: 1, // todo: fix this
                 },
                 Operand {
                     kind: R(PHYS(dst)),

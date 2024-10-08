@@ -8,7 +8,7 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::mask::mask,
+    common::{intern::InternedString, mask::mask},
     core::{
         cell::RefCell,
         fmt::{Debug, LowerHex},
@@ -622,7 +622,19 @@ impl Emitter for X86Emitter {
         self.current_block.append(Instruction::ret());
     }
 
-    fn read_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
+    fn read_virt_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef {
+        symbol
+            .0
+            .borrow()
+            .as_ref()
+            .unwrap_or_else(|| panic!("tried to read from {symbol:?} but it was never written to"))
+            .clone()
+    }
+    fn write_virt_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef) {
+        *symbol.0.borrow_mut() = Some(value);
+    }
+
+    fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
         let width = u8::try_from(typ.width()).unwrap();
 
         Self::NodeRef::from(X86Node {
@@ -630,8 +642,7 @@ impl Emitter for X86Emitter {
             kind: NodeKind::ReadStackVariable { offset, width },
         })
     }
-
-    fn write_variable(&mut self, offset: usize, value: Self::NodeRef) {
+    fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef) {
         let value = value.to_operand(self);
 
         let width = value.width_in_bits;

@@ -64,8 +64,10 @@ pub trait Emitter {
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);
 
-    fn read_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef;
-    fn write_variable(&mut self, offset: usize, value: Self::NodeRef);
+    fn read_virt_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef;
+    fn write_virt_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef);
+    fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef;
+    fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef);
 
     // todo: change this to mutate `vector` in place without returning?
     fn mutate_element(
