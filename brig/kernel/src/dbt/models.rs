@@ -5,7 +5,7 @@ use {
             x86::{
                 emitter::{X86BlockRef, X86NodeRef, X86SymbolRef},
                 encoder::{Instruction, Operand, PhysicalRegister},
-                X86TranslationContext, ENTRY_BLOCK_ID, EXIT_BLOCK_ID,
+                X86TranslationContext,
             },
             TranslationContext,
         },
@@ -87,7 +87,6 @@ struct FunctionExecutor<'m, 'c> {
     //local_variables: HashMap<InternedString, X86SymbolRef>,
     stack_variables: HashMap<InternedString, (emitter::Type, usize)>, // type and stack offset
     stack_size: usize,
-    exit_block_ref: X86BlockRef,
     ctx: &'c mut X86TranslationContext,
 }
 
@@ -106,7 +105,6 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             // local_variables: HashMap::default(),
             stack_variables: HashMap::default(),
             stack_size: 0,
-            exit_block_ref: ctx.create_block(EXIT_BLOCK_ID),
             ctx,
         };
 
@@ -163,6 +161,8 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             celf.rudder_blocks.insert(x86_block.clone(), rudder_block);
             celf.x86_blocks.insert(rudder_block, x86_block);
         });
+
+        log::debug!("{:x?}", celf.rudder_blocks);
 
         celf
     }
@@ -252,32 +252,36 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     block_queue.push(BlockKind::Dynamic(block0));
                 }
                 BlockResult::Return => {
-                    log::trace!("block result: return");
-                    self.ctx.emitter().jump(self.exit_block_ref.clone());
+                    let exit = self.ctx.exit_block();
+                    log::trace!("block result: return ({exit:x})");
+                    self.ctx.emitter().jump(exit);
                 }
                 BlockResult::Panic => {
-                    log::trace!("block result: panic");
+                    let panic = self.ctx.panic_block();
+                    log::trace!("block result: panic ({panic:x})");
                     // unreachable but inserted just to make sure *every* block has a path to the
                     // exit block
-                    self.ctx.emitter().jump(self.exit_block_ref.clone());
+                    self.ctx.emitter().jump(panic);
                 }
             }
         }
 
-        self.ctx
-            .emitter()
-            .set_current_block(self.exit_block_ref.clone());
+        {
+            let exit = self.ctx.exit_block();
+            self.ctx.emitter().set_current_block(exit);
+        }
 
         {
             // insert stack teardown epilogue to exit block
             //
             // mov     rsp, rbp
             // pop     rbp
-            self.exit_block_ref.append(Instruction::mov(
+            self.ctx.exit_block().append(Instruction::mov(
                 Operand::preg(64, PhysicalRegister::RBP),
                 Operand::preg(64, PhysicalRegister::RSP),
             ));
-            self.exit_block_ref
+            self.ctx
+                .exit_block()
                 .append(Instruction::pop(Operand::preg(64, PhysicalRegister::RBP)));
         }
 

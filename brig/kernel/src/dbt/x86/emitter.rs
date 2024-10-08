@@ -605,7 +605,7 @@ impl Emitter for X86Emitter {
     }
 
     fn jump(&mut self, target: Self::BlockRef) -> BlockResult {
-        //self.current_block.append(Instruction::jmp(target.clone()));
+        self.current_block.append(Instruction::jmp(target.clone()));
         self.current_block.set_next_0(target.clone());
         BlockResult::Static(target)
     }
@@ -1338,7 +1338,7 @@ impl Debug for X86BlockRef {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "block {:p}:", self.0.as_ptr())?;
         for instr in &self.0.borrow().instructions {
-            writeln!(f, "\t{instr:x?}")?;
+            writeln!(f, "\t{instr}")?;
         }
 
         Ok(())

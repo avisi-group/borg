@@ -23,12 +23,14 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
-pub const ENTRY_BLOCK_ID: i32 = 0xeeee;
-pub const PANIC_BLOCK_ID: i32 = 0xff00;
-pub const EXIT_BLOCK_ID: i32 = 0x00ff;
+const ENTRY_BLOCK_ID: i32 = 0xeeee;
+const EXIT_BLOCK_ID: i32 = 0xffff;
+const PANIC_BLOCK_ID: i32 = 0xaaaa; // aaaaa! a panic!
 
 pub struct X86TranslationContext {
     initial_block: X86BlockRef,
+    exit_block: X86BlockRef,
+    panic_block: X86BlockRef,
     emitter: X86Emitter,
 }
 
@@ -63,7 +65,7 @@ impl Debug for X86TranslationContext {
 impl X86TranslationContext {
     pub fn new() -> Self {
         let initial_block = X86BlockRef::from(X86Block::new(ENTRY_BLOCK_ID));
-
+        let exit_block = X86BlockRef::from(X86Block::new(EXIT_BLOCK_ID));
         let panic_block = {
             let block = X86BlockRef::from(X86Block::new(PANIC_BLOCK_ID));
             X86Emitter::new(block.clone(), block.clone()).panic("panic block");
@@ -74,12 +76,22 @@ impl X86TranslationContext {
 
         Self {
             initial_block: initial_block.clone(),
+            exit_block,
+            panic_block: panic_block.clone(),
             emitter: X86Emitter::new(initial_block, panic_block),
         }
     }
 
     pub fn initial_block(&self) -> X86BlockRef {
         self.initial_block.clone()
+    }
+
+    pub fn exit_block(&self) -> X86BlockRef {
+        self.exit_block.clone()
+    }
+
+    pub fn panic_block(&self) -> X86BlockRef {
+        self.panic_block.clone()
     }
 
     fn allocate_registers<R: RegisterAllocator>(&self, mut allocator: R) {
@@ -127,25 +139,46 @@ impl TranslationContext for X86TranslationContext {
         self.allocate_registers(SolidStateRegisterAllocator::new(num_virtual_registers));
 
         let mut assembler = CodeAssembler::new(64).unwrap();
-
         let mut label_map = BTreeMap::new();
         let mut visited = alloc::vec![];
-        let mut to_visit = alloc::vec![self.initial_block.clone()];
-        label_map.insert(self.initial_block.clone(), assembler.create_label());
+        let mut to_visit = alloc::vec![self.initial_block()];
+
+        {
+            let initial_label = assembler.create_label();
+            log::debug!(
+                "initial_block ({initial_label:?}) {:?}",
+                self.initial_block()
+            );
+            label_map.insert(self.initial_block(), initial_label);
+        }
+
+        {
+            let exit_label = assembler.create_label();
+            log::debug!("exit_block ({exit_label:?}) {:?}", self.exit_block());
+            label_map.insert(self.exit_block(), exit_label);
+        }
 
         while let Some(next) = to_visit.pop() {
+            log::debug!("assembling {next:?}");
+
             visited.push(next.clone());
 
             if let Some(next_0) = next.get_next_0() {
+                log::debug!("next_0: {next_0:x}");
                 if !visited.contains(&next_0) {
-                    label_map.insert(next_0.clone(), assembler.create_label());
+                    let label = assembler.create_label();
+                    log::debug!("next_0: {label:?}");
+                    label_map.insert(next_0.clone(), label);
                     to_visit.push(next_0)
                 }
             }
 
             if let Some(next_1) = next.get_next_1() {
+                log::debug!("next_1: {next_1:x}");
                 if !visited.contains(&next_1) {
-                    label_map.insert(next_1.clone(), assembler.create_label());
+                    let label = assembler.create_label();
+                    log::debug!("next_1: {label:?}");
+                    label_map.insert(next_1.clone(), label);
                     to_visit.push(next_1)
                 }
             }

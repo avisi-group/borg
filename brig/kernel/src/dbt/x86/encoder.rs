@@ -1,11 +1,11 @@
 use {
-    crate::dbt::x86::emitter::X86BlockRef,
+    crate::{dbt::x86::emitter::X86BlockRef, fs::tar},
     alloc::collections::btree_map::BTreeMap,
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
-        dword_ptr, qword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64,
-        AsmRegister8, CodeAssembler, CodeLabel,
+        dword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8,
+        CodeAssembler, CodeLabel,
     },
 };
 
@@ -958,14 +958,20 @@ impl Instruction {
             JNE(Operand {
                 kind: T(target), ..
             }) => {
-                let label = label_map.get(target).unwrap().clone();
+                let label = label_map
+                    .get(target)
+                    .unwrap_or_else(|| panic!("no label for {target:x} found"))
+                    .clone();
                 assembler.jne(label).unwrap();
             }
             JMP(Operand {
                 kind: T(target), ..
             }) => {
-                let label = label_map.get(target).unwrap().clone();
-                assembler.jmp(label).unwrap();
+                if let Some(label) = label_map.get(target) {
+                    assembler.jmp(label.clone()).unwrap();
+                } else {
+                    log::warn!("no label for {target:x} found, assuming static fallthrough")
+                }
             }
             RET => {
                 assembler.ret().unwrap();
