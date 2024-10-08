@@ -149,7 +149,7 @@ pub fn irq_handler(args: TokenStream, input: TokenStream) -> TokenStream {
             // original user-supplied function definition
             #inner_fn
 
-            core::arch::asm!(#asm, options(att_syntax, noreturn));
+            core::arch::naked_asm!(#asm, options(att_syntax));
         }
     );
 
