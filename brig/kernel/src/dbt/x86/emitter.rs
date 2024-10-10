@@ -8,13 +8,8 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::{arena::Ref, intern::InternedString, mask::mask},
-    core::{
-        cell::RefCell,
-        fmt::{Debug, LowerHex},
-        hash::{Hash, Hasher},
-        panic,
-    },
+    common::{arena::Ref, mask::mask},
+    core::{cell::RefCell, fmt::Debug, panic},
     proc_macro_lib::ktest,
 };
 pub struct X86Emitter<'ctx> {
@@ -691,9 +686,9 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
     fn mutate_element(
         &mut self,
-        vector: Self::NodeRef,
-        index: Self::NodeRef,
-        value: Self::NodeRef,
+        _vector: Self::NodeRef,
+        _index: Self::NodeRef,
+        _value: Self::NodeRef,
     ) -> Self::NodeRef {
         todo!()
     }
@@ -761,18 +756,18 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         &mut self,
         value: Self::NodeRef,
         length: Self::NodeRef,
-        typ: Type,
+        _typ: Type,
         kind: CastOperationKind,
     ) -> Self::NodeRef {
         match (value.kind(), length.kind()) {
             (
                 NodeKind::Constant {
                     value: value_value,
-                    width: value_width,
+                    width: _value_width,
                 },
                 NodeKind::Constant {
                     value: length_value,
-                    width: length_width,
+                    width: _length_width,
                 },
             ) => {
                 let length = u16::try_from(*length_value).unwrap();
@@ -789,7 +784,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 _,
                 NodeKind::Constant {
                     value: length_value,
-                    width: length_width,
+                    width: _length_width,
                 },
             ) => {
                 let length = u16::try_from(*length_value).unwrap();
@@ -944,13 +939,6 @@ impl X86NodeRef {
                     dst
                 }
             },
-            NodeKind::ReadVariable { symbol } => symbol
-                .0
-                .borrow()
-                .as_ref()
-                .unwrap()
-                .clone()
-                .to_operand(emitter),
             NodeKind::UnaryOperation(kind) => match &kind {
                 // todo: not might be wrong here (output 0 or 1?)
                 UnaryOperationKind::Complement(value) | UnaryOperationKind::Not(value) => {
@@ -1147,7 +1135,7 @@ impl X86NodeRef {
                 // nzcv
                 dest
             }
-            NodeKind::Tuple(vec) => unreachable!(),
+            NodeKind::Tuple(_vec) => unreachable!(),
             NodeKind::Select {
                 condition,
                 true_value,
@@ -1204,9 +1192,6 @@ pub enum NodeKind {
         value: X86NodeRef,
         amount: X86NodeRef,
         kind: ShiftOperationKind,
-    },
-    ReadVariable {
-        symbol: X86SymbolRef,
     },
     ReadStackVariable {
         // positive offset here (will be subtracted from RBP)
@@ -1288,97 +1273,6 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
-// #[derive(Clone)]
-// pub struct Ref<X86Block>(Rc<RefCell<X86Block>>);
-
-// impl Eq for Ref<X86Block> {}
-
-// impl PartialEq for Ref<X86Block> {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.0.as_ptr().eq(&other.0.as_ptr())
-//     }
-// }
-
-// impl Ord for Ref<X86Block> {
-//     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-//         self.0.as_ptr().cmp(&other.0.as_ptr())
-//     }
-// }
-
-// impl PartialOrd for Ref<X86Block> {
-//     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-//         self.0.as_ptr().partial_cmp(&other.0.as_ptr())
-//     }
-// }
-
-// impl LowerHex for Ref<X86Block> {
-//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-//         write!(f, "blockref {:p}", self.0.as_ptr())
-//     }
-// }
-
-// impl Debug for Ref<X86Block> {
-//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-//         writeln!(f, "block {:p}:", self.0.as_ptr())?;
-//         for instr in &self.0.borrow().instructions {
-//             writeln!(f, "\t{instr}")?;
-//         }
-
-//         Ok(())
-//     }
-// }
-
-// impl Hash for Ref<X86Block> {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         (self.0.as_ptr() as usize).hash(state)
-//     }
-// }
-
-// impl Ref<X86Block> {
-//     pub fn id(&self) -> i32 {
-//         self.0.borrow().id
-//     }
-
-//     pub fn append(&self, instruction: Instruction) {
-//         self.0.borrow_mut().instructions.push(instruction);
-//     }
-
-//     pub fn allocate_registers<R: RegisterAllocator>(&self, allocator: &mut R)
-// {         self.0
-//             .borrow_mut()
-//             .instructions
-//             .iter_mut()
-//             .rev()
-//             .for_each(|i| allocator.process(i));
-//     }
-
-//     pub fn instructions(&self) -> Vec<Instruction> {
-//         self.0.borrow().instructions.clone()
-//     }
-
-//     pub fn get_next_0(&self) -> Option<Ref<X86Block>> {
-//         self.0.borrow().next_0.clone()
-//     }
-
-//     pub fn get_next_1(&self) -> Option<Ref<X86Block>> {
-//         self.0.borrow().next_1.clone()
-//     }
-
-//     pub fn set_next_0(&self, target: Ref<X86Block>) {
-//         self.0.borrow_mut().next_0 = Some(target);
-//     }
-
-//     pub fn set_next_1(&self, target: Ref<X86Block>) {
-//         self.0.borrow_mut().next_1 = Some(target);
-//     }
-// }
-
-// impl From<X86Block> for Ref<X86Block> {
-//     fn from(block: X86Block) -> Self {
-//         Self(Rc::new(RefCell::new(block)))
-//     }
-// }
-
 pub struct X86Block {
     instructions: Vec<Instruction>,
     next: Vec<Ref<X86Block>>,
@@ -1419,6 +1313,7 @@ impl X86Block {
             //
             // the first static-static jump is never materialised, and should
             // maybe be overwritten by the two dynamic targets?
+            log::warn!("more than two targets?")
         }
     }
 }

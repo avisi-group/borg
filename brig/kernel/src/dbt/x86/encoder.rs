@@ -1,11 +1,10 @@
 use {
-    crate::{dbt::x86::emitter::X86Block, fs::tar},
-    alloc::collections::btree_map::BTreeMap,
+    crate::dbt::x86::emitter::X86Block,
     common::{arena::Ref, HashMap},
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
-        byte_ptr, dword_ptr, qword_ptr, word_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32,
+        byte_ptr, dword_ptr, word_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32,
         AsmRegister64, AsmRegister8, CodeAssembler, CodeLabel,
     },
 };

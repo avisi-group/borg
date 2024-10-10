@@ -1,7 +1,7 @@
 use {
     alloc::vec::Vec,
     core::{
-        fmt::{Debug, Display, LowerHex},
+        fmt::Debug,
         hash::{Hash, Hasher},
         marker::PhantomData,
     },

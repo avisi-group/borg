@@ -5,7 +5,6 @@ use {
             x86::{
                 emitter::{X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
                 encoder::{Instruction, Operand, PhysicalRegister},
-                X86TranslationContext,
             },
         },
         devices::SharedDevice,
@@ -18,18 +17,12 @@ use {
         arena::Ref,
         intern::InternedString,
         rudder::{
-            self,
-            block::Block,
-            constant_value::ConstantValue,
-            function::{Function, Symbol},
-            statement::Statement,
-            types::PrimitiveTypeClass,
-            Model,
+            self, block::Block, constant_value::ConstantValue, function::Function,
+            statement::Statement, types::PrimitiveTypeClass, Model,
         },
         width_helpers::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
         HashMap, HashSet,
     },
-    iced_x86::code_asm::bl,
     spin::Mutex,
 };
 
@@ -90,7 +83,9 @@ pub fn execute(
 
 #[derive(Debug, Clone)]
 enum LocalVariable {
-    Virtual(X86SymbolRef),
+    Virtual {
+        symbol: X86SymbolRef,
+    },
     Stack {
         typ: emitter::Type,
         stack_offset: usize,
@@ -136,15 +131,14 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
         // set up symbols for local variables
         let locals = function.local_variables();
 
-        locals
-            .iter()
-            .map(|sym| (sym.name(), sym.typ()))
-            .for_each(|(name, typ)| {
-                celf.variables.insert(
-                    name,
-                    LocalVariable::Virtual(celf.emitter.ctx().create_symbol()),
-                );
-            });
+        locals.iter().map(|sym| sym.name()).for_each(|name| {
+            celf.variables.insert(
+                name,
+                LocalVariable::Virtual {
+                    symbol: celf.emitter.ctx().create_symbol(),
+                },
+            );
+        });
 
         // set up symbols for parameters, and write arguments into them
         function
@@ -152,7 +146,9 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
             .iter()
             .zip(arguments)
             .for_each(|(parameter, argument)| {
-                let var = LocalVariable::Virtual(celf.emitter.ctx().create_symbol());
+                let var = LocalVariable::Virtual {
+                    symbol: celf.emitter.ctx().create_symbol(),
+                };
                 celf.variables.insert(parameter.name(), var.clone());
                 celf.write_variable(var, argument.clone());
             });
@@ -160,7 +156,9 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
         // and the return value
         celf.variables.insert(
             "borealis_fn_return_value".into(),
-            LocalVariable::Virtual(celf.emitter.ctx().create_symbol()),
+            LocalVariable::Virtual {
+                symbol: celf.emitter.ctx().create_symbol(),
+            },
         );
 
         // set up block maps
@@ -215,12 +213,9 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
         let mut visited_dynamic_blocks = HashSet::default();
 
         while let Some(block) = block_queue.pop_front() {
-            // if block_queue.len() > BLOCK_QUEUE_LIMIT {
-            //     panic!(
-            //         "block queue exceeded limit, head: {:?}",
-            //         &block_queue[BLOCK_QUEUE_LIMIT - 10..]
-            //     )
-            // }
+            if block_queue.len() > BLOCK_QUEUE_LIMIT {
+                panic!("block queue exceeded limit")
+            }
 
             let result = match block {
                 JumpKind::Static(rudder_block, x86_block) => {
@@ -252,13 +247,13 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
 
             match result {
                 BlockResult::Static(x86) => {
-                    let rudder = *self.rudder_blocks.get(&x86).unwrap();
+                    let rudder = self.lookup_rudder_block(x86);
                     log::trace!("block result: static(rudder={rudder:?},x86={x86:?})",);
                     block_queue.push_front(JumpKind::Static(rudder, x86));
                 }
                 BlockResult::Dynamic(b0, b1) => {
-                    let block0 = *self.rudder_blocks.get(&b0).unwrap();
-                    let block1 = *self.rudder_blocks.get(&b1).unwrap();
+                    let block0 = self.lookup_rudder_block(b0);
+                    let block1 = self.lookup_rudder_block(b1);
                     log::trace!(
                         "block result: dynamic({}, {})",
                         block0.index(),
@@ -359,7 +354,7 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                         if is_dynamic {
                             // if we're in a dynamic block and the local variable is not on the
                             // stack, put it there
-                            if let LocalVariable::Virtual(_) =
+                            if let LocalVariable::Virtual { .. } =
                                 self.variables.get(&symbol.name()).unwrap()
                             {
                                 log::debug!("upgrading {:?} from virtual to stack", symbol.name());
@@ -402,7 +397,7 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     self.emitter.write_register(offset, value);
                     None
                 }
-                Statement::ReadMemory { offset, size } => {
+                Statement::ReadMemory { .. } => {
                     // {
                     //     let mut buf = alloc::vec![0; #size as usize / 8];
                     //     state.read_memory(#offset, &mut buf);
@@ -414,7 +409,7 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     // }
                     todo!()
                 }
-                Statement::WriteMemory { offset, value } => {
+                Statement::WriteMemory { .. } => {
                     // match &value.get(s_arena).typ(s_arena) {
                     //     Type::Primitive(PrimitiveType { .. }) => {
                     //         quote! {
@@ -615,7 +610,7 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     Some(self.emitter.bits_cast(value, length, typ, kind))
                 }
 
-                Statement::PhiNode { members } => todo!(),
+                Statement::PhiNode { .. } => todo!(),
 
                 Statement::Select {
                     condition,
@@ -649,7 +644,7 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     let length = statement_values.get(length).unwrap().clone();
                     Some(self.emitter.bit_insert(target, source, start, length))
                 }
-                Statement::ReadElement { vector, index } => {
+                Statement::ReadElement { .. } => {
                     todo!()
                 }
                 Statement::AssignElement {
@@ -689,8 +684,8 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     let value = statement_values.get(value).unwrap().clone();
                     Some(self.emitter.size_of(value))
                 }
-                Statement::MatchesUnion { value, variant } => todo!(),
-                Statement::UnwrapUnion { value, variant } => todo!(),
+                Statement::MatchesUnion { .. } => todo!(),
+                Statement::UnwrapUnion { .. } => todo!(),
                 Statement::CreateTuple(values) => {
                     let values = values
                         .iter()
@@ -724,10 +719,8 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
 
     fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
         match variable {
-            LocalVariable::Virtual(x86_symbol_ref) => {
-                self.emitter.read_virt_variable(x86_symbol_ref)
-            }
-            LocalVariable::Stack { typ, stack_offset } => {
+            LocalVariable::Virtual { symbol } => self.emitter.read_virt_variable(symbol),
+            LocalVariable::Stack { stack_offset, typ } => {
                 self.emitter.read_stack_variable(stack_offset, typ)
             }
         }
@@ -735,9 +728,7 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
 
     fn write_variable(&mut self, variable: LocalVariable, value: X86NodeRef) {
         match variable {
-            LocalVariable::Virtual(x86_symbol_ref) => {
-                self.emitter.write_virt_variable(x86_symbol_ref, value)
-            }
+            LocalVariable::Virtual { symbol } => self.emitter.write_virt_variable(symbol, value),
             LocalVariable::Stack {
                 typ: _,
                 stack_offset,
@@ -791,6 +782,7 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
         }
         rudder::types::Type::ArbitraryLengthInteger => emitter::Type::Signed(64),
         rudder::types::Type::Bits => emitter::Type::Bits,
+        rudder::types::Type::Tuple(_) => emitter::Type::Tuple,
         t => panic!("todo codegen type instance: {t:?}"),
     }
 }

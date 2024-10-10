@@ -4,17 +4,13 @@ use {
         dbt::{
             emitter::Emitter,
             x86::{
-                emitter::{X86Block, X86Emitter, X86Node, X86SymbolRef},
+                emitter::{X86Block, X86Emitter, X86SymbolRef},
                 register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
             },
             Translation,
         },
     },
-    alloc::{
-        collections::{btree_map::BTreeMap, btree_set::BTreeSet},
-        rc::Rc,
-        vec::Vec,
-    },
+    alloc::{rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
         HashMap, HashSet,

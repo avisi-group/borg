@@ -1,6 +1,6 @@
 use {
-    crate::{arch::x86::memory::ExecutableAllocator, dbt::emitter::Emitter},
-    alloc::{collections::BTreeMap, string::String, vec::Vec},
+    crate::arch::x86::memory::ExecutableAllocator,
+    alloc::{string::String, vec::Vec},
     core::fmt::{self, Debug},
     iced_x86::{Formatter, Instruction},
 };
@@ -9,32 +9,6 @@ pub mod emitter;
 pub mod models;
 mod trampoline;
 pub mod x86;
-
-pub struct TranslationManager {
-    translations: BTreeMap<usize, BTreeMap<usize, Translation>>,
-}
-
-impl TranslationManager {
-    pub fn register_translation(_gpa: usize, _txln: Translation) {
-        todo!()
-    }
-
-    pub fn lookup_translation(_gpa: usize) -> Option<Translation> {
-        todo!()
-    }
-
-    pub fn invalidate_all() {
-        todo!()
-    }
-
-    pub fn invalidate_region(_gpa: usize) {
-        todo!()
-    }
-
-    pub fn collect_garbage() {
-        todo!()
-    }
-}
 
 pub struct Translation {
     pub code: Vec<u8, ExecutableAllocator>,

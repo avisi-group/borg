@@ -112,15 +112,15 @@ impl Type {
     }
 }
 
-pub struct WrappedEmitter<E: Emitter> {
-    subemitter: E,
-}
+// pub struct WrappedEmitter<E: Emitter> {
+//     subemitter: E,
+// }
 
-impl<E: Emitter> WrappedEmitter<E> {
-    pub fn new(subemitter: E) -> Self {
-        Self { subemitter }
-    }
-}
+// impl<E: Emitter> WrappedEmitter<E> {
+//     pub fn new(subemitter: E) -> Self {
+//         Self { subemitter }
+//     }
+// }
 
 // impl<E: Emitter> Emitter for WrappedEmitter<E> {
 //     type BlockRef = E::BlockRef;
