@@ -20,7 +20,6 @@ use {
         path::PathBuf,
     },
     syn::Ident,
-
 };
 
 pub mod dynamic;
@@ -231,7 +230,7 @@ pub fn codegen_workspace(
                     use crate::dbt::{
                         emitter::{Emitter, Type, BlockResult, Flag},
                         x86::{
-                            emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, X86BlockRef, X86Emitter, X86NodeRef, X86SymbolRef, },
+                            emitter::{UnaryOperationKind, BinaryOperationKind,CastOperationKind, ShiftOperationKind, Ref<X86Block>, X86Emitter, X86NodeRef, X86SymbolRef, },
                             X86TranslationContext,
                         },
                         TranslationContext,

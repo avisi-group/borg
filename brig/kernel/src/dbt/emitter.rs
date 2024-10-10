@@ -1,9 +1,10 @@
 use {
     crate::dbt::x86::emitter::{
         BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
-        UnaryOperationKind, X86BlockRef,
+        UnaryOperationKind, X86Block,
     },
     alloc::vec::Vec,
+    common::arena::Ref,
 };
 
 pub trait Emitter {
@@ -228,8 +229,8 @@ impl<E: Emitter> WrappedEmitter<E> {
 
 #[derive(Debug, Clone)]
 pub enum BlockResult {
-    Static(X86BlockRef),
-    Dynamic(X86BlockRef, X86BlockRef),
+    Static(Ref<X86Block>),
+    Dynamic(Ref<X86Block>, Ref<X86Block>),
     Return,
     Panic,
 }

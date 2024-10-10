@@ -1,6 +1,7 @@
 use {
     alloc::vec::Vec,
     core::{
+        fmt::{Debug, Display, LowerHex},
         hash::{Hash, Hasher},
         marker::PhantomData,
     },
@@ -37,7 +38,7 @@ impl<T> Arena<T> {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Ref<T> {
     index: usize,
     #[cfg(debug_assertions)]
@@ -86,3 +87,13 @@ impl<T> Clone for Ref<T> {
 }
 
 impl<T> Copy for Ref<T> {}
+
+impl<T> Debug for Ref<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if cfg!(debug_assertions) {
+            write!(f, "ref{} (arena {})", self.index(), self.arena)
+        } else {
+            write!(f, "ref{}", self.index())
+        }
+    }
+}

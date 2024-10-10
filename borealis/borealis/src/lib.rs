@@ -433,7 +433,7 @@ fn example_functions() -> HashMap<InternedString, Function> {
 fn variable_corrupted_example() -> HashMap<InternedString, Function> {
     let mut fns = HashMap::default();
     let mut func = Function::new("func_corrupted_var".into(), Type::u64(), vec![]);
-    let ret_val = Symbol::new("return".into(), Type::u64());
+    let ret_val = Symbol::new("x".into(), Type::u64());
     func.add_local_variable(ret_val.clone());
 
     {

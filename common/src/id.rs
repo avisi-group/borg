@@ -1,7 +1,7 @@
 //! Trait and derive macro for uniquely identifying nodes
 
 use core::{
-    fmt::{self, Debug, LowerHex},
+    fmt::{self, Debug, Display, LowerHex},
     sync::atomic::{AtomicU32, Ordering},
 };
 
@@ -33,5 +33,11 @@ impl Id {
 impl LowerHex for Id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:x}", self.0)
+    }
+}
+
+impl Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

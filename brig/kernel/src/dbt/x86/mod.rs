@@ -4,10 +4,10 @@ use {
         dbt::{
             emitter::Emitter,
             x86::{
-                emitter::{X86Block, X86BlockRef, X86Emitter, X86SymbolRef},
+                emitter::{X86Block, X86Emitter, X86Node, X86SymbolRef},
                 register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
             },
-            Translation, TranslationContext,
+            Translation,
         },
     },
     alloc::{
@@ -15,7 +15,10 @@ use {
         rc::Rc,
         vec::Vec,
     },
-    common::{HashMap, HashSet},
+    common::{
+        arena::{Arena, Ref},
+        HashMap, HashSet,
+    },
     core::{cell::RefCell, fmt::Debug},
     iced_x86::code_asm::{qword_ptr, rax, AsmMemoryOperand, AsmRegister64, CodeAssembler},
 };
@@ -24,119 +27,107 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
-const ENTRY_BLOCK_ID: i32 = 0xeeee;
-const EXIT_BLOCK_ID: i32 = 0xffff;
-const PANIC_BLOCK_ID: i32 = 0xaaaa; // aaaaa! a panic!
-
 pub struct X86TranslationContext {
-    initial_block: X86BlockRef,
-    exit_block: X86BlockRef,
-    panic_block: X86BlockRef,
-    emitter: X86Emitter,
+    blocks: Arena<X86Block>,
+    initial_block: Ref<X86Block>,
+    panic_block: Ref<X86Block>,
 }
 
 impl Debug for X86TranslationContext {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        {
-            let mut visited = BTreeSet::new();
-            let mut to_visit = alloc::vec![self.initial_block.clone()];
+        writeln!(f, "X86TranslationContext:")?;
+        writeln!(f, "\tinitial: {:?}", self.initial_block())?;
+        writeln!(f, "\tpanic: {:?}", self.panic_block())?;
+        writeln!(f)?;
 
-            while let Some(next) = to_visit.pop() {
-                writeln!(f, "{next:x?}")?;
-                visited.insert(next.clone());
+        let mut visited = HashSet::default();
+        let mut to_visit = alloc::vec![self.initial_block()];
 
-                if let Some(next_0) = next.get_next_0() {
-                    if !visited.contains(&next_0) {
-                        to_visit.push(next_0)
-                    }
-                }
-
-                if let Some(next_1) = next.get_next_1() {
-                    if !visited.contains(&next_1) {
-                        to_visit.push(next_1)
-                    }
-                }
+        while let Some(next) = to_visit.pop() {
+            writeln!(f, "{next:x?}:")?;
+            for instr in next.get(self.arena()).instructions() {
+                writeln!(f, "\t{instr}")?;
             }
 
-            Ok(())
+            visited.insert(next);
+
+            to_visit.extend(
+                next.get(self.arena())
+                    .next_blocks()
+                    .iter()
+                    .filter(|b| !visited.contains(*b)),
+            );
         }
+
+        Ok(())
     }
 }
 
 impl X86TranslationContext {
     pub fn new() -> Self {
-        let initial_block = X86BlockRef::from(X86Block::new(ENTRY_BLOCK_ID));
-        let exit_block = X86BlockRef::from(X86Block::new(EXIT_BLOCK_ID));
-        let panic_block = {
-            let block = X86BlockRef::from(X86Block::new(PANIC_BLOCK_ID));
-            X86Emitter::new(block.clone(), block.clone()).panic("panic block");
-            // this does nothing but maybe prevents crash?
-            block.set_next_0(initial_block.clone());
-            block
+        let mut arena = Arena::new();
+
+        let initial_block = arena.insert(X86Block::new());
+        let panic_block = arena.insert(X86Block::new());
+
+        let mut celf = Self {
+            blocks: arena,
+            initial_block,
+            panic_block,
         };
 
-        Self {
-            initial_block: initial_block.clone(),
-            exit_block,
-            panic_block: panic_block.clone(),
-            emitter: X86Emitter::new(initial_block, panic_block),
+        // add panic to the panic block
+        {
+            let mut emitter = X86Emitter::new(&mut celf);
+            emitter.set_current_block(panic_block);
+            emitter.panic("panic block");
         }
+
+        celf
     }
 
-    pub fn initial_block(&self) -> X86BlockRef {
-        self.initial_block.clone()
+    pub fn arena(&self) -> &Arena<X86Block> {
+        &self.blocks
     }
 
-    pub fn exit_block(&self) -> X86BlockRef {
-        self.exit_block.clone()
+    pub fn arena_mut(&mut self) -> &mut Arena<X86Block> {
+        &mut self.blocks
     }
 
-    pub fn panic_block(&self) -> X86BlockRef {
-        self.panic_block.clone()
+    fn initial_block(&self) -> Ref<X86Block> {
+        self.initial_block
     }
 
-    fn allocate_registers<R: RegisterAllocator>(&self, mut allocator: R) {
+    pub fn panic_block(&self) -> Ref<X86Block> {
+        self.panic_block
+    }
+
+    fn allocate_registers<R: RegisterAllocator>(&mut self, mut allocator: R) {
         let mut visited = alloc::vec![];
-        let mut to_visit = alloc::vec![self.initial_block.clone()];
+        let mut to_visit = alloc::vec![self.initial_block()];
 
         while let Some(next) = to_visit.pop() {
-            visited.push(next.clone());
+            visited.push(next);
 
-            if let Some(next_0) = next.get_next_0() {
-                if !visited.contains(&next_0) {
-                    to_visit.push(next_0)
-                }
-            }
-
-            if let Some(next_1) = next.get_next_1() {
-                if !visited.contains(&next_1) {
-                    to_visit.push(next_1)
-                }
-            }
+            to_visit.extend(
+                next.get(self.arena())
+                    .next_blocks()
+                    .iter()
+                    .filter(|next| !visited.contains(next))
+                    .copied(),
+            );
         }
 
         visited.into_iter().rev().for_each(|block| {
-            block.allocate_registers(&mut allocator);
+            block
+                .get_mut(self.arena_mut())
+                .allocate_registers(&mut allocator);
         });
     }
-}
 
-impl TranslationContext for X86TranslationContext {
-    type Emitter = X86Emitter;
+    pub fn compile(mut self, num_virtual_registers: usize) -> Translation {
+        log::debug!("{self:?}");
 
-    fn emitter(&mut self) -> &mut Self::Emitter {
-        &mut self.emitter
-    }
-
-    fn create_block(
-        &mut self,
-        id: i32,
-    ) -> <<Self as TranslationContext>::Emitter as Emitter>::BlockRef {
-        X86BlockRef::from(X86Block::new(id))
-    }
-
-    fn compile(mut self) -> Translation {
-        let num_virtual_registers = self.emitter.next_vreg();
         self.allocate_registers(SolidStateRegisterAllocator::new(num_virtual_registers));
 
         let mut assembler = CodeAssembler::new(64).unwrap();
@@ -155,38 +146,31 @@ impl TranslationContext for X86TranslationContext {
         }
 
         while let Some(next) = to_visit.pop() {
-            log::trace!("assembling {next:?}");
+            log::trace!("assembling {next:?}:");
 
             visited.insert(next.clone());
 
-            if let Some(next_0) = next.get_next_0() {
-                log::trace!("next_0: {next_0:x}");
-                if !visited.contains(&next_0) {
+            next.get(self.arena())
+                .next_blocks()
+                .iter()
+                .filter(|next| !visited.contains(*next))
+                .copied()
+                .for_each(|next| {
                     let label = assembler.create_label();
-                    log::trace!("next_0: {label:?}");
-                    label_map.insert(next_0.clone(), label);
-                    to_visit.push(next_0)
-                }
-            }
-
-            if let Some(next_1) = next.get_next_1() {
-                log::trace!("next_1: {next_1:x}");
-                if !visited.contains(&next_1) {
-                    let label = assembler.create_label();
-                    log::trace!("next_1: {label:?}");
-                    label_map.insert(next_1.clone(), label);
-                    to_visit.push(next_1)
-                }
-            }
+                    log::trace!("next: {label:?}");
+                    label_map.insert(next, label);
+                    to_visit.push(next);
+                });
 
             // lower block
             assembler
                 .set_label(label_map.get_mut(&next).unwrap())
                 .unwrap();
             assembler
-                .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + next.id()))
+                .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + next.index()))
                 .unwrap();
-            for instr in next.instructions() {
+            for instr in next.get(self.arena()).instructions() {
+                log::debug!("\t{instr}");
                 instr.encode(&mut assembler, &label_map);
             }
         }
@@ -206,11 +190,11 @@ impl TranslationContext for X86TranslationContext {
         Translation { code }
     }
 
-    fn create_symbol(&mut self) -> <<Self as TranslationContext>::Emitter as Emitter>::SymbolRef {
-        X86SymbolRef(Rc::new(RefCell::new(None)))
+    pub fn create_block(&mut self) -> Ref<X86Block> {
+        self.arena_mut().insert(X86Block::new())
     }
 
-    fn dump(&self) {
-        todo!()
+    pub fn create_symbol(&mut self) -> X86SymbolRef {
+        X86SymbolRef(Rc::new(RefCell::new(None)))
     }
 }

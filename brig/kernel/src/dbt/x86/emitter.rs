@@ -4,11 +4,11 @@ use {
         x86::{
             encoder::{Instruction, Operand, OperandKind, PhysicalRegister, Register},
             register_allocator::RegisterAllocator,
-            Emitter,
+            Emitter, X86TranslationContext,
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::{intern::InternedString, mask::mask},
+    common::{arena::Ref, intern::InternedString, mask::mask},
     core::{
         cell::RefCell,
         fmt::{Debug, LowerHex},
@@ -17,19 +17,25 @@ use {
     },
     proc_macro_lib::ktest,
 };
-pub struct X86Emitter {
-    current_block: X86BlockRef,
-    panic_block: X86BlockRef,
+pub struct X86Emitter<'ctx> {
+    current_block: Ref<X86Block>,
+    panic_block: Ref<X86Block>,
     next_vreg: usize,
+    ctx: &'ctx mut X86TranslationContext,
 }
 
-impl X86Emitter {
-    pub fn new(initial_block: X86BlockRef, panic_block: X86BlockRef) -> Self {
+impl<'ctx> X86Emitter<'ctx> {
+    pub fn new(ctx: &'ctx mut X86TranslationContext) -> Self {
         Self {
-            current_block: initial_block,
-            panic_block,
+            current_block: ctx.initial_block(),
+            panic_block: ctx.panic_block(),
             next_vreg: 0,
+            ctx,
         }
+    }
+
+    pub fn ctx(&mut self) -> &mut X86TranslationContext {
+        &mut self.ctx
     }
 
     pub fn next_vreg(&mut self) -> usize {
@@ -37,11 +43,24 @@ impl X86Emitter {
         self.next_vreg += 1;
         vreg
     }
+
+    pub fn append(&mut self, instr: Instruction) {
+        self.current_block
+            .get_mut(self.ctx.arena_mut())
+            .append(instr);
+    }
+
+    pub fn add_target(&mut self, target: Ref<X86Block>) {
+        log::debug!("adding target {target:?} to {:?}", self.current_block);
+        self.current_block
+            .get_mut(self.ctx.arena_mut())
+            .push_next(target);
+    }
 }
 
-impl Emitter for X86Emitter {
+impl<'ctx> Emitter for X86Emitter<'ctx> {
     type NodeRef = X86NodeRef;
-    type BlockRef = X86BlockRef;
+    type BlockRef = Ref<X86Block>;
     type SymbolRef = X86SymbolRef;
 
     fn set_current_block(&mut self, block: Self::BlockRef) {
@@ -565,7 +584,7 @@ impl Emitter for X86Emitter {
 
         let width = value.width_in_bits;
 
-        self.current_block.append(Instruction::mov(
+        self.append(Instruction::mov(
             value,
             Operand::mem_base_displ(
                 width,
@@ -584,26 +603,23 @@ impl Emitter for X86Emitter {
         match condition.kind() {
             NodeKind::Constant { value, .. } => {
                 if *value == 0 {
-                    self.current_block.set_next_0(false_target.clone());
+                    self.add_target(false_target.clone());
                     BlockResult::Static(false_target)
                 } else {
-                    self.current_block.set_next_0(true_target.clone());
+                    self.add_target(true_target.clone());
                     BlockResult::Static(true_target)
                 }
             }
             _ => {
                 let condition = condition.to_operand(self);
 
-                self.current_block
-                    .append(Instruction::test(condition.clone(), condition));
+                self.append(Instruction::test(condition.clone(), condition));
 
-                self.current_block
-                    .append(Instruction::jne(true_target.clone()));
-                self.current_block.set_next_0(true_target.clone());
+                self.append(Instruction::jne(true_target.clone()));
+                self.add_target(true_target.clone());
 
-                self.current_block
-                    .append(Instruction::jmp(false_target.clone()));
-                self.current_block.set_next_1(false_target.clone());
+                self.append(Instruction::jmp(false_target.clone()));
+                self.add_target(false_target.clone());
 
                 // if condition is static, return BlockResult::Static
                 // else
@@ -613,13 +629,13 @@ impl Emitter for X86Emitter {
     }
 
     fn jump(&mut self, target: Self::BlockRef) -> BlockResult {
-        self.current_block.append(Instruction::jmp(target.clone()));
-        self.current_block.set_next_0(target.clone());
+        self.append(Instruction::jmp(target.clone()));
+        self.add_target(target.clone());
         BlockResult::Static(target)
     }
 
     fn leave(&mut self) {
-        self.current_block.append(Instruction::ret());
+        self.append(Instruction::ret());
     }
 
     fn read_virt_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef {
@@ -653,7 +669,7 @@ impl Emitter for X86Emitter {
             -(i32::try_from(offset).unwrap()),
         );
 
-        self.current_block.append(Instruction::mov(value, mem));
+        self.append(Instruction::mov(value, mem));
     }
 
     fn assert(&mut self, condition: Self::NodeRef) {
@@ -667,9 +683,8 @@ impl Emitter for X86Emitter {
                 let not_condition = self.unary_operation(UnaryOperationKind::Not(condition));
                 let op = not_condition.to_operand(self);
 
-                self.current_block.append(Instruction::test(op.clone(), op));
-                self.current_block
-                    .append(Instruction::jne(self.panic_block.clone()));
+                self.append(Instruction::test(op.clone(), op));
+                self.append(Instruction::jne(self.panic_block.clone()));
             }
         }
     }
@@ -707,7 +722,7 @@ impl Emitter for X86Emitter {
         })
         .to_operand(self);
 
-        self.current_block.append(Instruction::int(n));
+        self.append(Instruction::int(n));
     }
 
     fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef {
@@ -838,7 +853,7 @@ impl X86NodeRef {
             NodeKind::GuestRegister { offset } => {
                 let dst = Operand::vreg(64, emitter.next_vreg());
 
-                emitter.current_block.append(Instruction::mov(
+                emitter.append(Instruction::mov(
                     Operand::mem_base_displ(
                         64,
                         Register::PhysicalRegister(PhysicalRegister::R15),
@@ -852,7 +867,7 @@ impl X86NodeRef {
             NodeKind::ReadStackVariable { offset, width } => {
                 let dst = Operand::vreg(*width, emitter.next_vreg());
 
-                emitter.current_block.append(Instruction::mov(
+                emitter.append(Instruction::mov(
                     Operand::mem_base_displ(
                         *width,
                         Register::PhysicalRegister(PhysicalRegister::RBP),
@@ -869,12 +884,8 @@ impl X86NodeRef {
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(left, dst.clone()));
-                    emitter
-                        .current_block
-                        .append(Instruction::add(right, dst.clone()));
+                    emitter.append(Instruction::mov(left, dst.clone()));
+                    emitter.append(Instruction::add(right, dst.clone()));
 
                     dst
                 }
@@ -883,12 +894,8 @@ impl X86NodeRef {
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(left, dst.clone()));
-                    emitter
-                        .current_block
-                        .append(Instruction::sub(right, dst.clone()));
+                    emitter.append(Instruction::mov(left, dst.clone()));
+                    emitter.append(Instruction::sub(right, dst.clone()));
 
                     dst
                 }
@@ -897,12 +904,8 @@ impl X86NodeRef {
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(left, dst.clone()));
-                    emitter
-                        .current_block
-                        .append(Instruction::or(right, dst.clone()));
+                    emitter.append(Instruction::mov(left, dst.clone()));
+                    emitter.append(Instruction::or(right, dst.clone()));
 
                     dst
                 }
@@ -911,12 +914,8 @@ impl X86NodeRef {
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(left, dst.clone()));
-                    emitter
-                        .current_block
-                        .append(Instruction::and(right, dst.clone()));
+                    emitter.append(Instruction::mov(left, dst.clone()));
+                    emitter.append(Instruction::and(right, dst.clone()));
 
                     dst
                 }
@@ -938,13 +937,9 @@ impl X86NodeRef {
                     let a = a.to_operand(emitter);
                     let b = b.to_operand(emitter);
                     let carry = carry.to_operand(emitter);
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(b.clone(), dst.clone()));
+                    emitter.append(Instruction::mov(b.clone(), dst.clone()));
 
-                    emitter
-                        .current_block
-                        .append(Instruction::adc(a, dst.clone(), carry));
+                    emitter.append(Instruction::adc(a, dst.clone(), carry));
 
                     dst
                 }
@@ -961,10 +956,8 @@ impl X86NodeRef {
                 UnaryOperationKind::Complement(value) | UnaryOperationKind::Not(value) => {
                     let dst = Operand::vreg(64, emitter.next_vreg());
                     let value = value.to_operand(emitter);
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(value, dst.clone()));
-                    emitter.current_block.append(Instruction::not(dst.clone()));
+                    emitter.append(Instruction::mov(value, dst.clone()));
+                    emitter.append(Instruction::not(dst.clone()));
                     dst
                 }
                 kind => todo!("{kind:?}"),
@@ -984,46 +977,30 @@ impl X86NodeRef {
 
                     let start = {
                         let dst = Operand::vreg(64, emitter.next_vreg());
-                        emitter
-                            .current_block
-                            .append(Instruction::mov(start, dst.clone()));
-                        emitter
-                            .current_block
-                            .append(Instruction::and(mask.clone(), dst.clone()));
+                        emitter.append(Instruction::mov(start, dst.clone()));
+                        emitter.append(Instruction::and(mask.clone(), dst.clone()));
                         dst
                     };
 
                     let length = {
                         let dst = Operand::vreg(64, emitter.next_vreg());
-                        emitter
-                            .current_block
-                            .append(Instruction::mov(length, dst.clone()));
-                        emitter
-                            .current_block
-                            .append(Instruction::and(mask.clone(), dst.clone()));
-                        emitter
-                            .current_block
-                            .append(Instruction::shl(Operand::imm(8, 8), dst.clone()));
+                        emitter.append(Instruction::mov(length, dst.clone()));
+                        emitter.append(Instruction::and(mask.clone(), dst.clone()));
+                        emitter.append(Instruction::shl(Operand::imm(8, 8), dst.clone()));
                         dst
                     };
 
                     let dst = Operand::vreg(64, emitter.next_vreg());
 
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(start, dst.clone()));
-                    emitter
-                        .current_block
-                        .append(Instruction::or(length, dst.clone()));
+                    emitter.append(Instruction::mov(start, dst.clone()));
+                    emitter.append(Instruction::or(length, dst.clone()));
 
                     dst
                 };
 
                 let dst = Operand::vreg(64, emitter.next_vreg());
 
-                emitter
-                    .current_block
-                    .append(Instruction::bextr(control_byte, value, dst.clone()));
+                emitter.append(Instruction::bextr(control_byte, value, dst.clone()));
 
                 dst
             }
@@ -1033,31 +1010,21 @@ impl X86NodeRef {
                 let src = value.to_operand(emitter);
 
                 if self.typ() == value.typ() {
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(src, dst.clone()));
+                    emitter.append(Instruction::mov(src, dst.clone()));
                 } else {
                     match kind {
                         CastOperationKind::ZeroExtend => {
                             if src.width_in_bits == dst.width_in_bits {
-                                emitter
-                                    .current_block
-                                    .append(Instruction::mov(src, dst.clone()));
+                                emitter.append(Instruction::mov(src, dst.clone()));
                             } else {
-                                emitter
-                                    .current_block
-                                    .append(Instruction::movzx(src, dst.clone()));
+                                emitter.append(Instruction::movzx(src, dst.clone()));
                             }
                         }
                         CastOperationKind::SignExtend => {
                             if src.width_in_bits == dst.width_in_bits {
-                                emitter
-                                    .current_block
-                                    .append(Instruction::mov(src, dst.clone()));
+                                emitter.append(Instruction::mov(src, dst.clone()));
                             } else {
-                                emitter
-                                    .current_block
-                                    .append(Instruction::movsx(src, dst.clone()));
+                                emitter.append(Instruction::movsx(src, dst.clone()));
                             }
                         }
                         CastOperationKind::Convert => {
@@ -1065,9 +1032,7 @@ impl X86NodeRef {
                         }
                         CastOperationKind::Truncate => {
                             assert!(src.width_in_bits > dst.width_in_bits);
-                            emitter
-                                .current_block
-                                .append(Instruction::mov(src, dst.clone()));
+                            emitter.append(Instruction::mov(src, dst.clone()));
                         }
 
                         CastOperationKind::Reinterpret => {
@@ -1075,9 +1040,7 @@ impl X86NodeRef {
                             // if src.width_in_bits != dst.width_in_bits {
                             //     panic!("failed to reinterpret\n{value:#?}\n as {:?}",
                             // self.typ()); }
-                            emitter
-                                .current_block
-                                .append(Instruction::mov(src, dst.clone()));
+                            emitter.append(Instruction::mov(src, dst.clone()));
                         }
                         _ => todo!("{kind:?} to {:?}\n{value:#?}", self.typ()),
                     }
@@ -1095,21 +1058,15 @@ impl X86NodeRef {
 
                 match kind {
                     ShiftOperationKind::LogicalShiftLeft => {
-                        emitter
-                            .current_block
-                            .append(Instruction::shl(amount, op0.clone()));
+                        emitter.append(Instruction::shl(amount, op0.clone()));
                     }
 
                     ShiftOperationKind::LogicalShiftRight => {
-                        emitter
-                            .current_block
-                            .append(Instruction::shr(amount, op0.clone()));
+                        emitter.append(Instruction::shr(amount, op0.clone()));
                     }
 
                     ShiftOperationKind::ArithmeticShiftRight => {
-                        emitter
-                            .current_block
-                            .append(Instruction::sar(amount, op0.clone()));
+                        emitter.append(Instruction::sar(amount, op0.clone()));
                     }
                     _ => todo!("{kind:?}"),
                 }
@@ -1129,45 +1086,25 @@ impl X86NodeRef {
                 let length = length.to_operand(emitter);
 
                 let mask = Operand::vreg(64, emitter.next_vreg());
-                emitter
-                    .current_block
-                    .append(Instruction::mov(Operand::imm(64, 1), mask.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::shl(length.clone(), mask.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::sub(Operand::imm(64, 1), mask.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::shl(start, mask.clone()));
+                emitter.append(Instruction::mov(Operand::imm(64, 1), mask.clone()));
+                emitter.append(Instruction::shl(length.clone(), mask.clone()));
+                emitter.append(Instruction::sub(Operand::imm(64, 1), mask.clone()));
+                emitter.append(Instruction::shl(start, mask.clone()));
 
                 let masked_target = Operand::vreg(64, emitter.next_vreg());
-                emitter
-                    .current_block
-                    .append(Instruction::mov(target, masked_target.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::and(mask.clone(), masked_target.clone()));
+                emitter.append(Instruction::mov(target, masked_target.clone()));
+                emitter.append(Instruction::and(mask.clone(), masked_target.clone()));
 
                 let shifted_source = Operand::vreg(64, emitter.next_vreg());
-                emitter
-                    .current_block
-                    .append(Instruction::mov(source, shifted_source.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::shl(length.clone(), shifted_source.clone()));
+                emitter.append(Instruction::mov(source, shifted_source.clone()));
+                emitter.append(Instruction::shl(length.clone(), shifted_source.clone()));
 
                 {
                     // not strictly necessary but may avoid issues if there is junk data
                     let invert_mask = Operand::vreg(64, emitter.next_vreg());
-                    emitter
-                        .current_block
-                        .append(Instruction::mov(mask.clone(), invert_mask.clone()));
-                    emitter
-                        .current_block
-                        .append(Instruction::not(invert_mask.clone()));
-                    emitter.current_block.append(Instruction::and(
+                    emitter.append(Instruction::mov(mask.clone(), invert_mask.clone()));
+                    emitter.append(Instruction::not(invert_mask.clone()));
+                    emitter.append(Instruction::and(
                         invert_mask.clone(),
                         shifted_source.clone(),
                     ));
@@ -1177,7 +1114,7 @@ impl X86NodeRef {
                 // shift source by start
                 // apply ~mask to source
                 // OR source and target
-                emitter.current_block.append(Instruction::or(
+                emitter.append(Instruction::or(
                     shifted_source.clone(),
                     masked_target.clone(),
                 ));
@@ -1193,36 +1130,20 @@ impl X86NodeRef {
                 let v = Operand::vreg(8, emitter.next_vreg());
                 let dest = Operand::vreg(8, emitter.next_vreg());
 
-                emitter.current_block.append(Instruction::sets(n.clone()));
-                emitter.current_block.append(Instruction::sete(z.clone()));
-                emitter.current_block.append(Instruction::setc(c.clone()));
-                emitter.current_block.append(Instruction::seto(v.clone()));
+                emitter.append(Instruction::sets(n.clone()));
+                emitter.append(Instruction::sete(z.clone()));
+                emitter.append(Instruction::setc(c.clone()));
+                emitter.append(Instruction::seto(v.clone()));
 
-                emitter
-                    .current_block
-                    .append(Instruction::xor(dest.clone(), dest.clone()));
+                emitter.append(Instruction::xor(dest.clone(), dest.clone()));
 
-                emitter
-                    .current_block
-                    .append(Instruction::or(n.clone(), dest.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::or(z.clone(), dest.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::or(c.clone(), dest.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::or(v.clone(), dest.clone()));
+                emitter.append(Instruction::or(n.clone(), dest.clone()));
+                emitter.append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+                emitter.append(Instruction::or(z.clone(), dest.clone()));
+                emitter.append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+                emitter.append(Instruction::or(c.clone(), dest.clone()));
+                emitter.append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
+                emitter.append(Instruction::or(v.clone(), dest.clone()));
                 // nzcv
                 dest
             }
@@ -1241,15 +1162,9 @@ impl X86NodeRef {
                 let true_value = true_value.to_operand(emitter);
                 let false_value = false_value.to_operand(emitter);
 
-                emitter
-                    .current_block
-                    .append(Instruction::test(condition.clone(), condition.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::cmove(false_value, dest.clone()));
-                emitter
-                    .current_block
-                    .append(Instruction::cmovne(true_value, dest.clone()));
+                emitter.append(Instruction::test(condition.clone(), condition.clone()));
+                emitter.append(Instruction::cmove(false_value, dest.clone()));
+                emitter.append(Instruction::cmovne(true_value, dest.clone()));
 
                 dest
             }
@@ -1373,112 +1288,148 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
-#[derive(Clone)]
-pub struct X86BlockRef(Rc<RefCell<X86Block>>);
+// #[derive(Clone)]
+// pub struct Ref<X86Block>(Rc<RefCell<X86Block>>);
 
-impl Eq for X86BlockRef {}
+// impl Eq for Ref<X86Block> {}
 
-impl PartialEq for X86BlockRef {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.as_ptr().eq(&other.0.as_ptr())
-    }
+// impl PartialEq for Ref<X86Block> {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.0.as_ptr().eq(&other.0.as_ptr())
+//     }
+// }
+
+// impl Ord for Ref<X86Block> {
+//     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+//         self.0.as_ptr().cmp(&other.0.as_ptr())
+//     }
+// }
+
+// impl PartialOrd for Ref<X86Block> {
+//     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+//         self.0.as_ptr().partial_cmp(&other.0.as_ptr())
+//     }
+// }
+
+// impl LowerHex for Ref<X86Block> {
+//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//         write!(f, "blockref {:p}", self.0.as_ptr())
+//     }
+// }
+
+// impl Debug for Ref<X86Block> {
+//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//         writeln!(f, "block {:p}:", self.0.as_ptr())?;
+//         for instr in &self.0.borrow().instructions {
+//             writeln!(f, "\t{instr}")?;
+//         }
+
+//         Ok(())
+//     }
+// }
+
+// impl Hash for Ref<X86Block> {
+//     fn hash<H: Hasher>(&self, state: &mut H) {
+//         (self.0.as_ptr() as usize).hash(state)
+//     }
+// }
+
+// impl Ref<X86Block> {
+//     pub fn id(&self) -> i32 {
+//         self.0.borrow().id
+//     }
+
+//     pub fn append(&self, instruction: Instruction) {
+//         self.0.borrow_mut().instructions.push(instruction);
+//     }
+
+//     pub fn allocate_registers<R: RegisterAllocator>(&self, allocator: &mut R)
+// {         self.0
+//             .borrow_mut()
+//             .instructions
+//             .iter_mut()
+//             .rev()
+//             .for_each(|i| allocator.process(i));
+//     }
+
+//     pub fn instructions(&self) -> Vec<Instruction> {
+//         self.0.borrow().instructions.clone()
+//     }
+
+//     pub fn get_next_0(&self) -> Option<Ref<X86Block>> {
+//         self.0.borrow().next_0.clone()
+//     }
+
+//     pub fn get_next_1(&self) -> Option<Ref<X86Block>> {
+//         self.0.borrow().next_1.clone()
+//     }
+
+//     pub fn set_next_0(&self, target: Ref<X86Block>) {
+//         self.0.borrow_mut().next_0 = Some(target);
+//     }
+
+//     pub fn set_next_1(&self, target: Ref<X86Block>) {
+//         self.0.borrow_mut().next_1 = Some(target);
+//     }
+// }
+
+// impl From<X86Block> for Ref<X86Block> {
+//     fn from(block: X86Block) -> Self {
+//         Self(Rc::new(RefCell::new(block)))
+//     }
+// }
+
+pub struct X86Block {
+    instructions: Vec<Instruction>,
+    next: Vec<Ref<X86Block>>,
 }
 
-impl Ord for X86BlockRef {
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.0.as_ptr().cmp(&other.0.as_ptr())
-    }
-}
-
-impl PartialOrd for X86BlockRef {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        self.0.as_ptr().partial_cmp(&other.0.as_ptr())
-    }
-}
-
-impl LowerHex for X86BlockRef {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "blockref {:p}", self.0.as_ptr())
-    }
-}
-
-impl Debug for X86BlockRef {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        writeln!(f, "block {:p}:", self.0.as_ptr())?;
-        for instr in &self.0.borrow().instructions {
-            writeln!(f, "\t{instr}")?;
+impl X86Block {
+    pub fn new() -> Self {
+        Self {
+            instructions: alloc::vec![],
+            next: alloc::vec![],
         }
-
-        Ok(())
-    }
-}
-
-impl Hash for X86BlockRef {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        (self.0.as_ptr() as usize).hash(state)
-    }
-}
-
-impl X86BlockRef {
-    pub fn id(&self) -> i32 {
-        self.0.borrow().id
     }
 
-    pub fn append(&self, instruction: Instruction) {
-        self.0.borrow_mut().instructions.push(instruction);
+    pub fn append(&mut self, instruction: Instruction) {
+        self.instructions.push(instruction);
     }
 
-    pub fn allocate_registers<R: RegisterAllocator>(&self, allocator: &mut R) {
-        self.0
-            .borrow_mut()
-            .instructions
+    pub fn allocate_registers<R: RegisterAllocator>(&mut self, allocator: &mut R) {
+        self.instructions
             .iter_mut()
             .rev()
             .for_each(|i| allocator.process(i));
     }
 
     pub fn instructions(&self) -> Vec<Instruction> {
-        self.0.borrow().instructions.clone()
+        self.instructions.clone()
     }
 
-    pub fn get_next_0(&self) -> Option<X86BlockRef> {
-        self.0.borrow().next_0.clone()
+    pub fn next_blocks(&self) -> &[Ref<X86Block>] {
+        &self.next
     }
 
-    pub fn get_next_1(&self) -> Option<X86BlockRef> {
-        self.0.borrow().next_1.clone()
-    }
-
-    pub fn set_next_0(&self, target: X86BlockRef) {
-        self.0.borrow_mut().next_0 = Some(target);
-    }
-
-    pub fn set_next_1(&self, target: X86BlockRef) {
-        self.0.borrow_mut().next_1 = Some(target);
-    }
-}
-
-impl From<X86Block> for X86BlockRef {
-    fn from(block: X86Block) -> Self {
-        Self(Rc::new(RefCell::new(block)))
-    }
-}
-
-pub struct X86Block {
-    id: i32,
-    instructions: Vec<Instruction>,
-    next_0: Option<X86BlockRef>,
-    next_1: Option<X86BlockRef>,
-}
-
-impl X86Block {
-    pub fn new(id: i32) -> Self {
-        Self {
-            id,
-            instructions: alloc::vec![],
-            next_0: None,
-            next_1: None,
+    pub fn push_next(&mut self, target: Ref<X86Block>) {
+        self.next.push(target);
+        if self.next.len() > 2 {
+            // sort this out, this happens if we have a static jump to another
+            // static, which contains two dynamic jumps
+            //
+            // the first static-static jump is never materialised, and should
+            // maybe be overwritten by the two dynamic targets?
         }
+    }
+}
+
+impl Debug for X86Block {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        for instr in &self.instructions {
+            writeln!(f, "\t{instr}")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1513,21 +1464,19 @@ fn emit_compare(
         | (Memory { .. }, Memory { .. }) => {
             let left = if let (Memory { .. }, Memory { .. }) = (&left.kind, &right.kind) {
                 let dst = Operand::vreg(64, emitter.next_vreg());
-                emitter
-                    .current_block
-                    .append(Instruction::mov(left, dst.clone()));
+                emitter.append(Instruction::mov(left, dst.clone()));
                 dst
             } else {
                 left
             };
 
-            emitter.current_block.append(Instruction::cmp(left, right));
+            emitter.append(Instruction::cmp(left, right));
 
             // setCC only sets the lowest bit
 
             let dst = Operand::vreg(64, emitter.next_vreg());
 
-            emitter.current_block.append(match kind {
+            emitter.append(match kind {
                 BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
                 BinaryOperationKind::CompareLessThan(_, _) => Instruction::setb(dst.clone()),
                 BinaryOperationKind::CompareNotEqual(_, _) => Instruction::setne(dst.clone()),
@@ -1545,10 +1494,10 @@ fn emit_compare(
         }
 
         (Memory { .. }, Immediate(_)) | (Register(_), Immediate(_)) => {
-            emitter.current_block.append(Instruction::cmp(right, left));
+            emitter.append(Instruction::cmp(right, left));
             let dst = Operand::vreg(64, emitter.next_vreg());
 
-            emitter.current_block.append(match kind {
+            emitter.append(match kind {
                 BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
                 BinaryOperationKind::CompareNotEqual(_, _) => Instruction::setne(dst.clone()),
                 BinaryOperationKind::CompareLessThan(_, _) => Instruction::setae(dst.clone()),
@@ -1569,14 +1518,14 @@ fn emit_compare(
 
     // setCC instructions only set the least significant byte to 0x00 or 0x01, we
     // need to clear or set the other 63 bits
-    emitter.current_block.append(Instruction::and(
+    emitter.append(Instruction::and(
         Operand {
             kind: OperandKind::Immediate(0b1),
             width_in_bits: 64,
         },
         dst.clone(),
     ));
-    emitter.current_block.append(Instruction::neg(dst.clone()));
+    emitter.append(Instruction::neg(dst.clone()));
 
     dst
 

@@ -1,7 +1,7 @@
 use {
-    crate::{dbt::x86::emitter::X86BlockRef, fs::tar},
+    crate::{dbt::x86::emitter::X86Block, fs::tar},
     alloc::collections::btree_map::BTreeMap,
-    common::HashMap,
+    common::{arena::Ref, HashMap},
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
@@ -367,7 +367,7 @@ pub enum OperandKind {
         segment_override: Option<SegmentRegister>,
     },
     Register(Register),
-    Target(X86BlockRef),
+    Target(Ref<X86Block>),
 }
 
 impl Display for Operand {
@@ -406,7 +406,7 @@ impl Display for OperandKind {
                 write!(f, ")")
             }
             OperandKind::Register(reg) => write!(f, "{reg}"),
-            OperandKind::Target(tgt) => write!(f, ">LBL"),
+            OperandKind::Target(tgt) => write!(f, "{tgt:?}"),
         }
     }
 }
@@ -430,7 +430,7 @@ impl Debug for OperandKind {
                 .field("segment_override", segment_override)
                 .finish(),
             Self::Register(arg0) => f.debug_tuple("Register").field(arg0).finish(),
-            Self::Target(arg0) => write!(f, "{arg0:x}"),
+            Self::Target(arg0) => write!(f, "{arg0:?}"),
         }
     }
 }
@@ -525,7 +525,7 @@ impl Operand {
         }
     }
 
-    pub fn target(target: X86BlockRef) -> Self {
+    pub fn target(target: Ref<X86Block>) -> Self {
         Self {
             kind: OperandKind::Target(target),
             width_in_bits: 0,
@@ -641,7 +641,7 @@ impl Instruction {
         Self(Opcode::BEXTR(ctrl, src, dst))
     }
 
-    pub fn jmp(block: X86BlockRef) -> Self {
+    pub fn jmp(block: Ref<X86Block>) -> Self {
         Self(Opcode::JMP(Operand::target(block)))
     }
 
@@ -701,7 +701,7 @@ impl Instruction {
         Self(Opcode::SETAE(r))
     }
 
-    pub fn jne(block: X86BlockRef) -> Self {
+    pub fn jne(block: Ref<X86Block>) -> Self {
         Self(Opcode::JNE(Operand::target(block)))
     }
 
@@ -733,7 +733,7 @@ impl Instruction {
     pub fn encode(
         &self,
         assembler: &mut CodeAssembler,
-        label_map: &HashMap<X86BlockRef, CodeLabel>,
+        label_map: &HashMap<Ref<X86Block>, CodeLabel>,
     ) {
         use {
             Opcode::*,
@@ -1175,7 +1175,7 @@ impl Instruction {
             }) => {
                 let label = label_map
                     .get(target)
-                    .unwrap_or_else(|| panic!("no label for {target:x} found"))
+                    .unwrap_or_else(|| panic!("no label for {target:?} found"))
                     .clone();
                 assembler.jne(label).unwrap();
             }
@@ -1185,7 +1185,7 @@ impl Instruction {
                 if let Some(label) = label_map.get(target) {
                     assembler.jmp(label.clone()).unwrap();
                 } else {
-                    log::warn!("no label for {target:x} found, assuming static fallthrough")
+                    log::warn!("no label for {target:?} found, assuming static fallthrough")
                 }
             }
             RET => {

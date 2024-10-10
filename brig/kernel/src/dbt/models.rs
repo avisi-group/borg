@@ -3,11 +3,10 @@ use {
         dbt::{
             emitter::{self, BlockResult, Emitter},
             x86::{
-                emitter::{X86BlockRef, X86NodeRef, X86SymbolRef},
+                emitter::{X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
                 encoder::{Instruction, Operand, PhysicalRegister},
                 X86TranslationContext,
             },
-            TranslationContext,
         },
         devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
@@ -30,12 +29,22 @@ use {
         width_helpers::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
         HashMap, HashSet,
     },
+    iced_x86::code_asm::bl,
     spin::Mutex,
 };
 
 const BLOCK_QUEUE_LIMIT: usize = 1000;
 
 static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
+
+/// Kind of jump to a target block
+#[derive(Debug)]
+enum JumpKind {
+    // static jump (jump or branch with constant condition)
+    Static(Ref<Block>, Ref<X86Block>),
+    // branch with non-constant condition
+    Dynamic(Ref<Block>),
+}
 
 pub fn register_model(name: &str, model: Model) {
     log::info!("registering {name:?} ISA model");
@@ -74,9 +83,9 @@ pub fn execute(
     model: &Model,
     function: &str,
     arguments: &[X86NodeRef],
-    ctx: &mut X86TranslationContext,
+    emitter: &mut X86Emitter,
 ) -> X86NodeRef {
-    FunctionExecutor::new(model, function, arguments, ctx).translate()
+    FunctionExecutor::new(model, function, arguments, emitter).translate()
 }
 
 #[derive(Debug, Clone)]
@@ -88,25 +97,25 @@ enum LocalVariable {
     },
 }
 
-struct FunctionExecutor<'m, 'c> {
+struct FunctionExecutor<'m, 'e, 'c> {
     model: &'m Model,
     function_name: InternedString,
-    x86_blocks: HashMap<Ref<Block>, X86BlockRef>,
-    rudder_blocks: HashMap<X86BlockRef, Ref<Block>>,
+    x86_blocks: HashMap<Ref<Block>, Ref<X86Block>>,
+    rudder_blocks: HashMap<Ref<X86Block>, Ref<Block>>,
 
     variables: HashMap<InternedString, LocalVariable>,
 
     stack_size: usize,
 
-    ctx: &'c mut X86TranslationContext,
+    emitter: &'e mut X86Emitter<'c>,
 }
 
-impl<'m, 'c> FunctionExecutor<'m, 'c> {
+impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
     fn new(
         model: &'m Model,
         function: &str,
         arguments: &[X86NodeRef],
-        ctx: &'c mut X86TranslationContext,
+        emitter: &'e mut X86Emitter<'c>,
     ) -> Self {
         let mut celf = Self {
             model,
@@ -115,7 +124,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             rudder_blocks: HashMap::default(),
             variables: HashMap::default(),
             stack_size: 0,
-            ctx,
+            emitter,
         };
 
         let function = celf
@@ -131,8 +140,10 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             .iter()
             .map(|sym| (sym.name(), sym.typ()))
             .for_each(|(name, typ)| {
-                celf.variables
-                    .insert(name, LocalVariable::Virtual(celf.ctx.create_symbol()));
+                celf.variables.insert(
+                    name,
+                    LocalVariable::Virtual(celf.emitter.ctx().create_symbol()),
+                );
             });
 
         // set up symbols for parameters, and write arguments into them
@@ -141,7 +152,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             .iter()
             .zip(arguments)
             .for_each(|(parameter, argument)| {
-                let var = LocalVariable::Virtual(celf.ctx.create_symbol());
+                let var = LocalVariable::Virtual(celf.emitter.ctx().create_symbol());
                 celf.variables.insert(parameter.name(), var.clone());
                 celf.write_variable(var, argument.clone());
             });
@@ -149,19 +160,17 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
         // and the return value
         celf.variables.insert(
             "borealis_fn_return_value".into(),
-            LocalVariable::Virtual(celf.ctx.create_symbol()),
+            LocalVariable::Virtual(celf.emitter.ctx().create_symbol()),
         );
 
         // set up block maps
         function.block_iter().for_each(|rudder_block| {
-            let x86_block = celf
-                .ctx
-                .create_block(i32::try_from(rudder_block.index()).unwrap());
+            let x86_block = celf.emitter.ctx().create_block();
             celf.rudder_blocks.insert(x86_block.clone(), rudder_block);
             celf.x86_blocks.insert(rudder_block, x86_block);
         });
 
-        log::debug!("{:x?}", celf.rudder_blocks);
+        log::debug!("{:#?}", celf.x86_blocks);
 
         celf
     }
@@ -173,70 +182,79 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
             .get(&self.function_name)
             .unwrap_or_else(|| panic!("failed to find function {:?} in model", self.function_name));
 
-        // todo: write arguments
+        let exit_block = self.emitter.ctx().arena_mut().insert(X86Block::new());
 
-        #[derive(Debug)]
-        enum BlockKind {
-            Static(Ref<Block>),
-            Dynamic(Ref<Block>),
-        }
+        let entry_x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
 
+        // insert stack setup prologue to current block and stack teardown epilogue to
+        // exit block
+        //
+        // push rbp
+        // mov  rbp, rsp
+        // sub  rsp, TOTAL_SIZE
         {
-            // insert stack setup prologue to entry block and stack teardown epilogue to
-            // exit block
-            //
-            // push rbp
-            // mov  rbp, rsp
-            // sub  rsp, TOTAL_SIZE
-            let x86_entry_block = self.ctx.initial_block();
-            x86_entry_block.append(Instruction::push(Operand::preg(64, PhysicalRegister::RBP)));
-            x86_entry_block.append(Instruction::mov(
+            self.emitter
+                .append(Instruction::push(Operand::preg(64, PhysicalRegister::RBP)));
+            self.emitter.append(Instruction::mov(
                 Operand::preg(64, PhysicalRegister::RSP),
                 Operand::preg(64, PhysicalRegister::RBP),
             ));
-            x86_entry_block.append(Instruction::sub(
+            self.emitter.append(Instruction::sub(
                 Operand::imm(32, self.stack_size as u64),
                 Operand::preg(64, PhysicalRegister::RSP),
             ));
+
+            self.emitter.append(Instruction::jmp(entry_x86));
+            self.emitter.add_target(entry_x86);
         }
 
-        let mut block_queue = alloc::vec![BlockKind::Static(function.entry_block())];
+        let mut block_queue = alloc::collections::VecDeque::new();
+
+        block_queue.push_front(JumpKind::Static(function.entry_block(), entry_x86));
+
         let mut visited_dynamic_blocks = HashSet::default();
 
-        while let Some(block) = block_queue.pop() {
-            if block_queue.len() > BLOCK_QUEUE_LIMIT {
-                panic!(
-                    "block queue exceeded limit, head: {:?}",
-                    &block_queue[BLOCK_QUEUE_LIMIT - 10..]
-                )
-            }
+        while let Some(block) = block_queue.pop_front() {
+            // if block_queue.len() > BLOCK_QUEUE_LIMIT {
+            //     panic!(
+            //         "block queue exceeded limit, head: {:?}",
+            //         &block_queue[BLOCK_QUEUE_LIMIT - 10..]
+            //     )
+            // }
 
             let result = match block {
-                BlockKind::Static(b) => {
-                    log::trace!("static block {}", b.index());
-                    self.translate_block(function, b, false)
+                JumpKind::Static(rudder_block, x86_block) => {
+                    self.emitter.set_current_block(x86_block);
+                    log::trace!(
+                        "translating static block rudder={rudder_block:?}, x86={x86_block:?}",
+                    );
+                    let res = self.translate_block(function, rudder_block, false);
+                    log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
+                    res
                 }
-                BlockKind::Dynamic(b) => {
+                JumpKind::Dynamic(b) => {
+                    log::trace!("dynamic block {}", b.index());
+
                     if visited_dynamic_blocks.contains(&b) {
+                        log::trace!("already visited");
                         continue;
                     }
 
-                    log::trace!("dynamic block {}", b.index());
-                    self.ctx
-                        .emitter()
-                        .set_current_block(self.x86_blocks.get(&b).unwrap().clone());
+                    let x86_block = *self.x86_blocks.get(&b).unwrap();
+                    self.emitter.set_current_block(x86_block);
 
                     let res = self.translate_block(function, b, true);
+                    log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
                     visited_dynamic_blocks.insert(b);
                     res
                 }
             };
 
             match result {
-                BlockResult::Static(block) => {
-                    let block = *self.rudder_blocks.get(&block).unwrap();
-                    log::trace!("block result: static({})", block.index());
-                    block_queue.push(BlockKind::Static(block));
+                BlockResult::Static(x86) => {
+                    let rudder = *self.rudder_blocks.get(&x86).unwrap();
+                    log::trace!("block result: static(rudder={rudder:?},x86={x86:?})",);
+                    block_queue.push_front(JumpKind::Static(rudder, x86));
                 }
                 BlockResult::Dynamic(b0, b1) => {
                     let block0 = *self.rudder_blocks.get(&b0).unwrap();
@@ -246,41 +264,39 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         block0.index(),
                         block1.index()
                     );
-                    // will be popped in order 0,1
-                    block_queue.push(BlockKind::Dynamic(block1));
-                    block_queue.push(BlockKind::Dynamic(block0));
+                    block_queue.push_back(JumpKind::Dynamic(block0));
+                    block_queue.push_back(JumpKind::Dynamic(block1));
                 }
                 BlockResult::Return => {
-                    let exit = self.ctx.exit_block();
-                    log::trace!("block result: return ({exit:x})");
-                    self.ctx.emitter().jump(exit);
+                    log::trace!("block result: return ({exit_block:?})");
+                    self.emitter.jump(exit_block);
                 }
                 BlockResult::Panic => {
-                    let panic = self.ctx.panic_block();
-                    log::trace!("block result: panic ({panic:x})");
+                    let panic = self.emitter.ctx().panic_block();
+                    log::trace!("block result: panic ({panic:?})");
                     // unreachable but inserted just to make sure *every* block has a path to the
                     // exit block
-                    self.ctx.emitter().jump(panic);
+                    self.emitter.jump(panic);
                 }
             }
         }
 
-        {
-            let exit = self.ctx.exit_block();
-            self.ctx.emitter().set_current_block(exit);
-        }
+        // finish translation with current block set to the exit block
+        self.emitter.set_current_block(exit_block);
 
         {
             // insert stack teardown epilogue to exit block
             //
             // mov     rsp, rbp
             // pop     rbp
-            self.ctx.exit_block().append(Instruction::mov(
-                Operand::preg(64, PhysicalRegister::RBP),
-                Operand::preg(64, PhysicalRegister::RSP),
-            ));
-            self.ctx
-                .exit_block()
+            exit_block
+                .get_mut(self.emitter.ctx().arena_mut())
+                .append(Instruction::mov(
+                    Operand::preg(64, PhysicalRegister::RBP),
+                    Operand::preg(64, PhysicalRegister::RSP),
+                ));
+            exit_block
+                .get_mut(self.emitter.ctx().arena_mut())
                 .append(Instruction::pop(Operand::preg(64, PhysicalRegister::RBP)));
         }
 
@@ -309,17 +325,12 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                 Statement::Constant { typ, value } => {
                     let typ = emit_rudder_constant_type(value, typ);
                     Some(match value {
-                        ConstantValue::UnsignedInteger(v) => self.ctx.emitter().constant(*v, typ),
-                        ConstantValue::SignedInteger(v) => {
-                            self.ctx.emitter().constant(*v as u64, typ)
-                        }
-                        ConstantValue::FloatingPoint(v) => {
-                            self.ctx.emitter().constant(*v as u64, typ)
-                        }
-                        ConstantValue::Unit => self.ctx.emitter().constant(0, typ),
+                        ConstantValue::UnsignedInteger(v) => self.emitter.constant(*v, typ),
+                        ConstantValue::SignedInteger(v) => self.emitter.constant(*v as u64, typ),
+                        ConstantValue::FloatingPoint(v) => self.emitter.constant(*v as u64, typ),
+                        ConstantValue::Unit => self.emitter.constant(0, typ),
                         ConstantValue::String(s) => self
-                            .ctx
-                            .emitter()
+                            .emitter
                             .constant(s.key().into(), emitter::Type::Unsigned(32)),
                         ConstantValue::Rational(_) => todo!(),
 
@@ -336,53 +347,59 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     })
                 }
                 Statement::ReadVariable { symbol } => {
-                    let var = self.variables.get(&symbol.name()).unwrap().clone();
-                    Some(self.read_variable(var))
+                    if symbol.typ().is_unit() {
+                        Some(self.emitter.constant(0, emitter::Type::Unsigned(0)))
+                    } else {
+                        let var = self.variables.get(&symbol.name()).unwrap().clone();
+                        Some(self.read_variable(var))
+                    }
                 }
                 Statement::WriteVariable { symbol, value } => {
-                    if is_dynamic {
-                        // if we're in a dynamic block and the local variable is not on the stack,
-                        // put it there
-                        if let LocalVariable::Virtual(_) =
-                            self.variables.get(&symbol.name()).unwrap()
-                        {
-                            log::debug!("upgrading {:?} from virtual to stack", symbol.name());
-                            self.variables.insert(
-                                symbol.name(),
-                                LocalVariable::Stack {
-                                    typ: emit_rudder_type(&symbol.typ()),
-                                    stack_offset: self.stack_size,
-                                },
-                            );
-                            self.stack_size += symbol.typ().width_bytes();
+                    if !symbol.typ().is_unit() {
+                        if is_dynamic {
+                            // if we're in a dynamic block and the local variable is not on the
+                            // stack, put it there
+                            if let LocalVariable::Virtual(_) =
+                                self.variables.get(&symbol.name()).unwrap()
+                            {
+                                log::debug!("upgrading {:?} from virtual to stack", symbol.name());
+                                self.variables.insert(
+                                    symbol.name(),
+                                    LocalVariable::Stack {
+                                        typ: emit_rudder_type(&symbol.typ()),
+                                        stack_offset: self.stack_size,
+                                    },
+                                );
+                                self.stack_size += symbol.typ().width_bytes();
+                            }
                         }
-                    }
 
-                    let var = self.variables.get(&symbol.name()).unwrap().clone();
+                        let var = self.variables.get(&symbol.name()).unwrap().clone();
 
-                    let value = statement_values
-                        .get(value)
-                        .unwrap_or_else(|| {
-                            panic!(
+                        let value = statement_values
+                            .get(value)
+                            .unwrap_or_else(|| {
+                                panic!(
                             "no value for {value} when writing to {symbol:?} in {} {block_ref:?}",
                             function.name()
                         )
-                        })
-                        .clone();
+                            })
+                            .clone();
 
-                    self.write_variable(var, value);
+                        self.write_variable(var, value);
+                    }
 
                     None
                 }
                 Statement::ReadRegister { typ, offset } => {
                     let offset = statement_values.get(offset).unwrap().clone();
                     let typ = emit_rudder_type(typ);
-                    Some(self.ctx.emitter().read_register(offset, typ))
+                    Some(self.emitter.read_register(offset, typ))
                 }
                 Statement::WriteRegister { offset, value } => {
                     let offset = statement_values.get(offset).unwrap().clone();
                     let value = statement_values.get(value).unwrap().clone();
-                    self.ctx.emitter().write_register(offset, value);
+                    self.emitter.write_register(offset, value);
                     None
                 }
                 Statement::ReadMemory { offset, size } => {
@@ -416,7 +433,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                 }
                 Statement::ReadPc => todo!(),
                 Statement::WritePc { .. } => todo!(),
-                Statement::GetFlags => Some(self.ctx.emitter().get_flags()),
+                Statement::GetFlags => Some(self.emitter.get_flags()),
                 Statement::UnaryOperation { kind, value } => {
                     use {
                         crate::dbt::x86::emitter::UnaryOperationKind as EmitterOp,
@@ -436,7 +453,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         RudderOp::SquareRoot => EmitterOp::SquareRoot(value),
                     };
 
-                    Some(self.ctx.emitter().unary_operation(op))
+                    Some(self.emitter.unary_operation(op))
                 }
                 Statement::BinaryOperation { kind, lhs, rhs } => {
                     use {
@@ -469,7 +486,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         }
                     };
 
-                    Some(self.ctx.emitter().binary_operation(op))
+                    Some(self.emitter.binary_operation(op))
                 }
                 Statement::TernaryOperation { kind, a, b, c } => {
                     use {
@@ -485,7 +502,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         RudderOp::AddWithCarry => EmitterOp::AddWithCarry(a, b, c),
                     };
 
-                    Some(self.ctx.emitter().ternary_operation(op))
+                    Some(self.emitter.ternary_operation(op))
                 }
                 Statement::ShiftOperation {
                     kind,
@@ -508,7 +525,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         RudderOp::RotateLeft => EmitterOp::RotateLeft,
                     };
 
-                    Some(self.ctx.emitter().shift(value, amount, op))
+                    Some(self.emitter.shift(value, amount, op))
                 }
 
                 Statement::Call { target, args, .. } => {
@@ -518,11 +535,14 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         .cloned()
                         .collect::<Vec<_>>();
 
-                    Some(execute(self.model, target.as_ref(), &args, self.ctx))
+                    Some(execute(self.model, target.as_ref(), &args, self.emitter))
                 }
                 Statement::Jump { target } => {
-                    let target = self.lookup_x86_block(target);
-                    return self.ctx.emitter().jump(target);
+                    // make new empty x86 block
+                    let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
+                    self.rudder_blocks.insert(x86, *target);
+
+                    return self.emitter.jump(x86);
                 }
                 Statement::Branch {
                     condition,
@@ -530,13 +550,10 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     false_target,
                 } => {
                     let condition = statement_values.get(condition).unwrap().clone();
-                    let true_target = self.lookup_x86_block(true_target);
-                    let false_target = self.lookup_x86_block(false_target);
+                    let true_target = self.lookup_x86_block(*true_target);
+                    let false_target = self.lookup_x86_block(*false_target);
 
-                    return self
-                        .ctx
-                        .emitter()
-                        .branch(condition, true_target, false_target);
+                    return self.emitter.branch(condition, true_target, false_target);
                 }
                 Statement::Return { value } => {
                     let var = self
@@ -569,7 +586,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         RudderOp::Broadcast => EmitterOp::Broadcast,
                     };
 
-                    Some(self.ctx.emitter().cast(value, typ, kind))
+                    Some(self.emitter.cast(value, typ, kind))
                 }
                 Statement::BitsCast {
                     kind,
@@ -595,7 +612,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         RudderOp::Broadcast => EmitterOp::Broadcast,
                     };
 
-                    Some(self.ctx.emitter().bits_cast(value, length, typ, kind))
+                    Some(self.emitter.bits_cast(value, length, typ, kind))
                 }
 
                 Statement::PhiNode { members } => todo!(),
@@ -608,11 +625,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     let condition = statement_values.get(condition).unwrap().clone();
                     let true_value = statement_values.get(true_value).unwrap().clone();
                     let false_value = statement_values.get(false_value).unwrap().clone();
-                    Some(
-                        self.ctx
-                            .emitter()
-                            .select(condition, true_value, false_value),
-                    )
+                    Some(self.emitter.select(condition, true_value, false_value))
                 }
                 Statement::BitExtract {
                     value,
@@ -622,7 +635,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     let value = statement_values.get(value).unwrap().clone();
                     let start = statement_values.get(start).unwrap().clone();
                     let length = statement_values.get(length).unwrap().clone();
-                    Some(self.ctx.emitter().bit_extract(value, start, length))
+                    Some(self.emitter.bit_extract(value, start, length))
                 }
                 Statement::BitInsert {
                     target,
@@ -634,7 +647,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     let source = statement_values.get(source).unwrap().clone();
                     let start = statement_values.get(start).unwrap().clone();
                     let length = statement_values.get(length).unwrap().clone();
-                    Some(self.ctx.emitter().bit_insert(target, source, start, length))
+                    Some(self.emitter.bit_insert(target, source, start, length))
                 }
                 Statement::ReadElement { vector, index } => {
                     todo!()
@@ -647,7 +660,7 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                     let vector = statement_values.get(vector).unwrap().clone();
                     let value = statement_values.get(value).unwrap().clone();
                     let index = statement_values.get(index).unwrap().clone();
-                    Some(self.ctx.emitter().mutate_element(vector, index, value))
+                    Some(self.emitter.mutate_element(vector, index, value))
                 }
                 Statement::Panic(value) => {
                     let Statement::Constant {
@@ -658,23 +671,23 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         todo!();
                     };
 
-                    self.ctx.emitter().panic(msg.as_ref());
+                    self.emitter.panic(msg.as_ref());
                     return BlockResult::Panic;
                 }
                 Statement::Undefined => todo!(),
                 Statement::Assert { condition } => {
                     let condition = statement_values.get(condition).unwrap().clone();
-                    self.ctx.emitter().assert(condition);
+                    self.emitter.assert(condition);
                     None
                 }
                 Statement::CreateBits { value, length } => {
                     let value = statement_values.get(value).unwrap().clone();
                     let length = statement_values.get(length).unwrap().clone();
-                    Some(self.ctx.emitter().create_bits(value, length))
+                    Some(self.emitter.create_bits(value, length))
                 }
                 Statement::SizeOf { value } => {
                     let value = statement_values.get(value).unwrap().clone();
-                    Some(self.ctx.emitter().size_of(value))
+                    Some(self.emitter.size_of(value))
                 }
                 Statement::MatchesUnion { value, variant } => todo!(),
                 Statement::UnwrapUnion { value, variant } => todo!(),
@@ -684,52 +697,51 @@ impl<'m, 'c> FunctionExecutor<'m, 'c> {
                         .map(|v| statement_values.get(v).unwrap())
                         .cloned()
                         .collect();
-                    Some(self.ctx.emitter().create_tuple(values))
+                    Some(self.emitter.create_tuple(values))
                 }
                 Statement::TupleAccess { index, source } => {
                     let source = statement_values.get(source).unwrap().clone();
-                    Some(self.ctx.emitter().access_tuple(source, *index))
+                    Some(self.emitter.access_tuple(source, *index))
                 }
             };
 
             statement_values.insert(
                 *s,
-                value.unwrap_or(self.ctx.emitter().constant(0, emitter::Type::Unsigned(0))), // insert unit for statements that return no values
+                value.unwrap_or(self.emitter.constant(0, emitter::Type::Unsigned(0))), // insert unit for statements that return no values
             );
         }
 
         unreachable!()
     }
 
-    fn lookup_x86_block(&self, rudder: &Ref<Block>) -> X86BlockRef {
-        self.x86_blocks.get(rudder).unwrap().clone()
+    fn lookup_x86_block(&self, rudder: Ref<Block>) -> Ref<X86Block> {
+        self.x86_blocks.get(&rudder).unwrap().clone()
     }
 
-    fn lookup_rudder_block(&self, x86: &X86BlockRef) -> Ref<Block> {
-        *self.rudder_blocks.get(x86).unwrap()
+    fn lookup_rudder_block(&self, x86: Ref<X86Block>) -> Ref<Block> {
+        *self.rudder_blocks.get(&x86).unwrap()
     }
 
     fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
         match variable {
             LocalVariable::Virtual(x86_symbol_ref) => {
-                self.ctx.emitter().read_virt_variable(x86_symbol_ref)
+                self.emitter.read_virt_variable(x86_symbol_ref)
             }
             LocalVariable::Stack { typ, stack_offset } => {
-                self.ctx.emitter().read_stack_variable(stack_offset, typ)
+                self.emitter.read_stack_variable(stack_offset, typ)
             }
         }
     }
 
     fn write_variable(&mut self, variable: LocalVariable, value: X86NodeRef) {
         match variable {
-            LocalVariable::Virtual(x86_symbol_ref) => self
-                .ctx
-                .emitter()
-                .write_virt_variable(x86_symbol_ref, value),
+            LocalVariable::Virtual(x86_symbol_ref) => {
+                self.emitter.write_virt_variable(x86_symbol_ref, value)
+            }
             LocalVariable::Stack {
                 typ: _,
                 stack_offset,
-            } => self.ctx.emitter().write_stack_variable(stack_offset, value),
+            } => self.emitter.write_stack_variable(stack_offset, value),
         }
     }
 }

@@ -108,7 +108,7 @@ pub fn codegen_function(function: &Function) -> TokenStream {
 
             const BLOCK_FUNCTIONS: &[fn(&mut X86TranslationContext, &mut FunctionState) -> BlockResult] = &[#(#block_fn_names,)*];
 
-            fn lookup_block_idx_by_ref(block_refs: &[X86BlockRef], block: X86BlockRef) -> usize {
+            fn lookup_block_idx_by_ref(block_refs: &[Ref<X86Block>], block: Ref<X86Block>) -> usize {
                 block_refs.iter().position(|r| *r == block).unwrap()
             }
 
@@ -226,8 +226,8 @@ pub fn codegen_fn_state(function: &Function, parameters: Vec<Symbol>) -> TokenSt
         struct FunctionState {
             #fields
             borealis_fn_return_value: X86SymbolRef,
-            block_refs: [X86BlockRef; #num_blocks],
-            exit_block_ref: X86BlockRef,
+            block_refs: [Ref<X86Block>; #num_blocks],
+            exit_block_ref: Ref<X86Block>,
             inline_return_targets: alloc::collections::BTreeMap<usize, usize>,
         }
 
