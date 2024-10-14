@@ -583,7 +583,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             value,
             Operand::mem_base_displ(
                 width,
-                Register::PhysicalRegister(PhysicalRegister::R15),
+                Register::PhysicalRegister(PhysicalRegister::RBP),
                 offset,
             ),
         ));
@@ -654,7 +654,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
         let mem = Operand::mem_base_displ(
             width,
-            Register::PhysicalRegister(PhysicalRegister::RBP),
+            Register::PhysicalRegister(PhysicalRegister::RSP),
             -(i32::try_from(offset).unwrap()),
         );
 
@@ -845,7 +845,7 @@ impl X86NodeRef {
                 emitter.append(Instruction::mov(
                     Operand::mem_base_displ(
                         64,
-                        Register::PhysicalRegister(PhysicalRegister::R15),
+                        Register::PhysicalRegister(PhysicalRegister::RBP),
                         (*offset).try_into().unwrap(),
                     ),
                     dst.clone(),
@@ -859,7 +859,7 @@ impl X86NodeRef {
                 emitter.append(Instruction::mov(
                     Operand::mem_base_displ(
                         *width,
-                        Register::PhysicalRegister(PhysicalRegister::RBP),
+                        Register::PhysicalRegister(PhysicalRegister::RSP),
                         -(i32::try_from(*offset).unwrap()),
                     ),
                     dst.clone(),
@@ -1188,7 +1188,7 @@ pub enum NodeKind {
         kind: ShiftOperationKind,
     },
     ReadStackVariable {
-        // positive offset here (will be subtracted from RBP)
+        // positive offset here (will be subtracted from RSP)
         offset: usize,
         width: u8,
     },

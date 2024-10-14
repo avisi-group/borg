@@ -21,7 +21,7 @@ impl fmt::Write for QemuWriter {
 /// Global console writer
 pub static mut WRITER: Once<UART16550Device> = Once::INIT;
 
-static LOGGER: Logger<5> = Logger {
+static LOGGER: &'static dyn Log = &Logger {
     default_level: LevelFilter::Trace,
     module_levels: [
         ("virtio_drivers", LevelFilter::Warn),

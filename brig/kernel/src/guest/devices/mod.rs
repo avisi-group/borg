@@ -1,11 +1,10 @@
 use {
     crate::dbt::{
-        emitter::{self, Emitter, Type},
-        models::{self, execute},
+        emitter::{Emitter, Type},
+        models::{self, translate},
         x86::{emitter::X86Emitter, X86TranslationContext},
     },
     alloc::boxed::Box,
-    core::num,
     proc_macro_lib::ktest,
 };
 
@@ -28,7 +27,7 @@ fn init_system() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let unit = emitter.constant(0, Type::Unsigned(0));
-    execute(&*model, "__InitSystem", &[unit], &mut emitter);
+    translate(&*model, "__InitSystem", &[unit], &mut emitter);
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -48,7 +47,7 @@ fn static_dynamic_chaos_smoke() {
             let mut ctx = X86TranslationContext::new();
             let mut emitter = X86Emitter::new(&mut ctx);
 
-            execute(&*model, "func_corrupted_var", &[], &mut emitter);
+            translate(&*model, "func_corrupted_var", &[], &mut emitter);
 
             emitter.leave();
             let num_regs = emitter.next_vreg();
@@ -75,12 +74,12 @@ fn num_of_feature() {
     let mut ctx = X86TranslationContext::new();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    execute(&*model, "borealis_register_init", &[], &mut emitter);
+    translate(&*model, "borealis_register_init", &[], &mut emitter);
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     let feature = emitter.read_register(r0_offset.clone(), Type::Unsigned(0x20));
 
-    execute(&*model, "num_of_Feature", &[feature], &mut emitter);
+    translate(&*model, "num_of_Feature", &[feature], &mut emitter);
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -98,14 +97,14 @@ fn decodea64_smoke() {
     let mut ctx = X86TranslationContext::new();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    execute(&*model, "borealis_register_init", &[], &mut emitter);
+    translate(&*model, "borealis_register_init", &[], &mut emitter);
 
     // let unit = emitter.constant(0, Type::Unsigned(0));
     // execute(&*model, "__InitSystem", &[unit], &mut emitter);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x8b020020, Type::Unsigned(64));
-    execute(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
     emitter.leave();
 
@@ -137,7 +136,7 @@ fn decodea64_smoke() {
 
 // // //     let mut ctx = X86TranslationContext::new();
 // // //     let model = models::get("aarch64").unwrap();
-// // //     execute(&*model, "borealis_register_init", &[], &mut ctx);
+// // // translate(&*model, "borealis_register_init", &[], &mut ctx);
 // // //     // OOM crashes:(
 // // //     // execute(
 // // //     //     &*model,
@@ -270,7 +269,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let mut emitter = X86Emitter::new(&mut ctx);
     let model = models::get("aarch64").unwrap();
 
-    execute(&*model, "borealis_register_init", &[], &mut emitter);
+    translate(&*model, "borealis_register_init", &[], &mut emitter);
     let r0 = unsafe { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
     let r1 = unsafe { register_file_ptr.add(model.reg_offset("R1")) as *mut u64 };
     let r2 = unsafe { register_file_ptr.add(model.reg_offset("R2")) as *mut u8 };
@@ -289,7 +288,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let y = emitter.read_register(r1_offset.clone(), Type::Unsigned(0x40));
     let carry_in = emitter.read_register(r2_offset.clone(), Type::Unsigned(0x8));
 
-    let res = execute(
+    let res = translate(
         &*model,
         "add_with_carry_test",
         &[x, y, carry_in],
@@ -342,7 +341,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     let mut ctx = X86TranslationContext::new();
 // // //     let model = models::get("aarch64").unwrap();
 
-// // //     execute(&*model, "borealis_register_init", &[], &mut ctx);
+// // // translate(&*model, "borealis_register_init", &[], &mut ctx);
 
 // // //     assert_eq!(
 // // //         Bits::new(0xffff_ffff, 32),
@@ -366,7 +365,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // // fn rev_d00dfeed() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     state.write_register::<u64>(REG_R3, 0xedfe0dd0);
-// // //     execute_aarch64_instrs_integer_arithmetic_rev(&mut state, TRACER,
+// // // translate_aarch64_instrs_integer_arithmetic_rev(&mut state, TRACER,
 // 32, // 3, // 32, 3);     assert_eq!(0xd00dfeed,
 // state.read_register::<u64>(REG_R3)); // // }
 

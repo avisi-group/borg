@@ -4,7 +4,7 @@ use {
             emitter::{self, BlockResult, Emitter},
             x86::{
                 emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
-                encoder::{Instruction, Operand, PhysicalRegister},
+                encoder::Instruction,
             },
         },
         devices::SharedDevice,
@@ -72,13 +72,16 @@ pub fn load_all(device: &SharedDevice) {
         });
 }
 
-pub fn execute(
+pub fn translate(
     model: &Model,
     function: &str,
     arguments: &[X86NodeRef],
     emitter: &mut X86Emitter,
 ) -> X86NodeRef {
-    FunctionExecutor::new(model, function, arguments, emitter).translate()
+    // x86_64 has full descending stack so current stack offset needs to start at 8
+    // for first stack variable offset to point to the next empty slot
+    let current_stack_offset = 8;
+    FunctionTranslator::new(model, function, arguments, emitter, current_stack_offset).translate()
 }
 
 #[derive(Debug, Clone)]
@@ -92,7 +95,7 @@ enum LocalVariable {
     },
 }
 
-struct FunctionExecutor<'m, 'e, 'c> {
+struct FunctionTranslator<'m, 'e, 'c> {
     model: &'m Model,
     function_name: InternedString,
     x86_blocks: HashMap<Ref<Block>, Ref<X86Block>>,
@@ -100,17 +103,18 @@ struct FunctionExecutor<'m, 'e, 'c> {
 
     variables: HashMap<InternedString, LocalVariable>,
 
-    stack_size: usize,
+    current_stack_offset: usize,
 
     emitter: &'e mut X86Emitter<'c>,
 }
 
-impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
+impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
     fn new(
         model: &'m Model,
         function: &str,
         arguments: &[X86NodeRef],
         emitter: &'e mut X86Emitter<'c>,
+        current_stack_offset: usize,
     ) -> Self {
         let mut celf = Self {
             model,
@@ -118,7 +122,7 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
             x86_blocks: HashMap::default(),
             rudder_blocks: HashMap::default(),
             variables: HashMap::default(),
-            stack_size: 0,
+            current_stack_offset,
             emitter,
         };
 
@@ -180,34 +184,20 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
             .get(&self.function_name)
             .unwrap_or_else(|| panic!("failed to find function {:?} in model", self.function_name));
 
+        // create an empty block all control flow will end at
         let exit_block = self.emitter.ctx().arena_mut().insert(X86Block::new());
 
+        // create an empty entry block for this function
         let entry_x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
 
-        // insert stack setup prologue to current block and stack teardown epilogue to
-        // exit block
-        //
-        // push rbp
-        // mov  rbp, rsp
-        // sub  rsp, TOTAL_SIZE
-        {
-            self.emitter
-                .append(Instruction::push(Operand::preg(64, PhysicalRegister::RBP)));
-            self.emitter.append(Instruction::mov(
-                Operand::preg(64, PhysicalRegister::RSP),
-                Operand::preg(64, PhysicalRegister::RBP),
-            ));
-            self.emitter.append(Instruction::sub(
-                Operand::imm(32, self.stack_size as u64),
-                Operand::preg(64, PhysicalRegister::RSP),
-            ));
-
-            self.emitter.append(Instruction::jmp(entry_x86));
-            self.emitter.add_target(entry_x86);
-        }
+        // jump from the *current* emitter block to this function's entry block
+        self.emitter.append(Instruction::jmp(entry_x86));
+        self.emitter.add_target(entry_x86);
 
         let mut block_queue = alloc::collections::VecDeque::new();
 
+        // start translation of the function's rudder entry block to the new (empty) X86
+        // entry block
         block_queue.push_front(JumpKind::Static(function.entry_block(), entry_x86));
 
         let mut visited_dynamic_blocks = HashSet::default();
@@ -280,22 +270,6 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
 
         // finish translation with current block set to the exit block
         self.emitter.set_current_block(exit_block);
-
-        {
-            // insert stack teardown epilogue to exit block
-            //
-            // mov     rsp, rbp
-            // pop     rbp
-            exit_block
-                .get_mut(self.emitter.ctx().arena_mut())
-                .append(Instruction::mov(
-                    Operand::preg(64, PhysicalRegister::RBP),
-                    Operand::preg(64, PhysicalRegister::RSP),
-                ));
-            exit_block
-                .get_mut(self.emitter.ctx().arena_mut())
-                .append(Instruction::pop(Operand::preg(64, PhysicalRegister::RBP)));
-        }
 
         log::trace!("queue empty, reading return value and exiting");
 
@@ -370,10 +344,10 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                                     symbol.name(),
                                     LocalVariable::Stack {
                                         typ: emit_rudder_type(&symbol.typ()),
-                                        stack_offset: self.stack_size,
+                                        stack_offset: self.current_stack_offset,
                                     },
                                 );
-                                self.stack_size += symbol.typ().width_bytes();
+                                self.current_stack_offset += symbol.typ().width_bytes();
                             }
                         }
 
@@ -538,7 +512,18 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                         .cloned()
                         .collect::<Vec<_>>();
 
-                    Some(execute(self.model, target.as_ref(), &args, self.emitter))
+                    Some(
+                        FunctionTranslator::new(
+                            self.model,
+                            target.as_ref(),
+                            &args,
+                            self.emitter,
+                            self.current_stack_offset, /* pass in the current stack offset so
+                                                        * called functions' stack variables
+                                                        * don't corrupt this function's */
+                        )
+                        .translate(),
+                    )
                 }
                 Statement::Jump { target } => {
                     // make new empty x86 block
