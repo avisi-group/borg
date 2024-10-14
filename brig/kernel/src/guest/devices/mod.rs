@@ -11,6 +11,33 @@ use {
 
 pub mod virtio;
 
+/// takes a really long time (requires release and no logging) then panics with
+///
+/// ```
+/// ERROR [kernel] panicked at kernel/src/dbt/x86/encoder.rs:1202:40:
+/// no label for ref1 (arena 0) found
+/// ```
+/// #[ktest]
+fn init_system() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let unit = emitter.constant(0, Type::Unsigned(0));
+    execute(&*model, "__InitSystem", &[unit], &mut emitter);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(register_file_ptr);
+
+    panic!();
+}
+
 #[ktest]
 fn static_dynamic_chaos_smoke() {
     fn run(mut register_file: [u64; 3]) -> [u64; 3] {
@@ -26,7 +53,6 @@ fn static_dynamic_chaos_smoke() {
             emitter.leave();
             let num_regs = emitter.next_vreg();
             let translation = ctx.compile(num_regs);
-            log::debug!("{:?}", translation);
             translation.execute(register_file_ptr);
         }
 
@@ -39,37 +65,35 @@ fn static_dynamic_chaos_smoke() {
     assert_eq!(run([1, 1, 0]), [1, 1, 5]);
 }
 
-// #[ktest]
-// fn num_of_feature() {
-//     let mut ctx = X86TranslationContext::new();
-//     let model = models::get("aarch64").unwrap();
-//     let mut register_file = alloc::vec![0u8;model.register_file_size()];
-//     let register_file_ptr = register_file.as_mut_ptr();
+#[ktest]
+fn num_of_feature() {
+    let model = models::get("aarch64").unwrap();
 
-//     execute(&*model, "borealis_register_init", &[], &mut ctx);
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
 
-//     let r0_offset = ctx
-//         .emitter()
-//         .constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-//     let feature = ctx
-//         .emitter()
-//         .read_register(r0_offset.clone(), Type::Unsigned(0x20));
+    execute(&*model, "borealis_register_init", &[], &mut emitter);
 
-//     //  execute(&*model, "num_of_Feature", &[feature], &mut ctx);
+    let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    let feature = emitter.read_register(r0_offset.clone(), Type::Unsigned(0x20));
 
-//     ctx.emitter().leave();
-//     let translation = ctx.compile();
-//     log::debug!("{:?}", translation);
-//     translation.execute(register_file_ptr);
-// }
+    execute(&*model, "num_of_Feature", &[feature], &mut emitter);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(register_file_ptr);
+}
 
 #[ktest]
 fn decodea64_smoke() {
-    let mut register_file = Box::new([0u8; 104488usize]);
-    let register_file_ptr = register_file.as_mut_ptr();
-
     let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new();
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -87,7 +111,6 @@ fn decodea64_smoke() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    log::debug!("\n{:?}", translation);
 
     unsafe {
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
@@ -224,48 +247,21 @@ fn addwithcarry_overflow() {
     assert_eq!(flags, 0b1001);
 }
 
-// // // Testing the flags of the `0x0000000040234888:  eb01001f      cmp x0,
-// x1` // // instruction
-// // #[ktest]
-// // fn addwithcarry_early_4880_loop() {
-// //     let (sum, flags) = add_with_carry_harness(0x425a6004, !0x425a6020,
-// // false);     assert_eq!(sum, 0xffffffffffffffe3);
-// //     assert_eq!(flags, 0b1000);
-// // }
+// Testing the flags of the `0x0000000040234888:  eb01001f      cmp x0,x1`
+// instruction
+#[ktest]
+fn addwithcarry_early_4880_loop() {
+    let (sum, flags) = add_with_carry_harness(0x425a6004, !0x425a6020, false);
+    assert_eq!(sum, 0xffffffffffffffe3);
+    assert_eq!(flags, 0b1000);
+}
 
-// // // #[ktest]
-// // // fn replicate_bits() {
-// // //     let mut register_file = Box::new([0u8; 104488usize]);
-// // //     let register_file_ptr = register_file.as_mut_ptr();
-// // //     let mut ctx = X86TranslationContext::new();
-// // //     let model = models::get("aarch64").unwrap();
-
-// // //     execute(&*model, "borealis_register_init", &[], &mut ctx);
-
-// // //     assert_eq!(
-// // //         Bits::new(0xffff_ffff, 32),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0xff, // 8), 4)     );
-// // //     assert_eq!(
-// // //         Bits::new(0xaa, 8),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0xaa, // 8), 1)     );
-// // //     assert_eq!(
-// // //         Bits::new(0xaaaa, 16),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0xaa, // 8), 2)     );
-// // //     assert_eq!(
-// // //         Bits::new(0xffff_ffff, 32),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0x1, // 1), 32)     );
-// // // }
-
-// // #[ktest]
-// // fn addwithcarry_linux_regression() {
-// //     let (sum, flags) = add_with_carry_harness(0xffffffc0082b3cd0,
-// // 0xffffffffffffffd8, false);     assert_eq!(sum, 0xffffffc0082b3ca8);
-// //     assert_eq!(flags, 0b1010);
-// // }
+#[ktest]
+fn addwithcarry_linux_regression() {
+    let (sum, flags) = add_with_carry_harness(0xffffffc0082b3cd0, 0xffffffffffffffd8, false);
+    assert_eq!(sum, 0xffffffc0082b3ca8);
+    assert_eq!(flags, 0b1010);
+}
 
 fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let mut register_file = Box::new([0u8; 104488usize]);
@@ -315,28 +311,55 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     unsafe { (*r0, *(r1 as *mut u8)) }
 }
 
+// #[ktest]
+// fn ubfx() {
+//     {
+//         let mut state = State::new(Box::new(NoneEnv));
+//         // decode bit masks
+//         assert_eq!(
+//             ProductTypea79c7f841a890648 {
+//                 tuple__pcnt_bv__pcnt_bv0: Bits::new(0xFFFF00000000000F, 64),
+//                 tuple__pcnt_bv__pcnt_bv1: Bits::new(0xF, 64)
+//             },
+//             DecodeBitMasks(&mut state, TRACER, true, 0x13, 0x10, false, 0x40)
+//         );
+//     }
+
+//     {
+//         let mut state = State::new(Box::new(NoneEnv));
+//         state.write_register::<u64>(REG_R3, 0x8444_c004);
+
+//         // ubfx x3, x3, #16, #4
+//         u__DecodeA64(&mut state, TRACER, 0, 0xd3504c63);
+//         assert_eq!(0x4, state.read_register::<u64>(REG_R3));
+//     }
+// }
+
 // // // #[ktest]
-// // // fn ubfx() {
-// // //     {
-// // //         let mut state = State::new(Box::new(NoneEnv));
-// // //         // decode bit masks
-// // //         assert_eq!(
-// // //             ProductTypea79c7f841a890648 {
-// // //                 tuple__pcnt_bv__pcnt_bv0: Bits::new(0xFFFF00000000000F,
-// // 64), //                 tuple__pcnt_bv__pcnt_bv1: Bits::new(0xF, 64)
-// // //             },
-// // //             DecodeBitMasks(&mut state, TRACER, true, 0x13, 0x10, false,
-// // 0x40) //         );
-// // //     }
+// // // fn replicate_bits() {
+// // //     let mut register_file = Box::new([0u8; 104488usize]);
+// // //     let register_file_ptr = register_file.as_mut_ptr();
+// // //     let mut ctx = X86TranslationContext::new();
+// // //     let model = models::get("aarch64").unwrap();
 
-// // //     {
-// // //         let mut state = State::new(Box::new(NoneEnv));
-// // //         state.write_register::<u64>(REG_R3, 0x8444_c004);
+// // //     execute(&*model, "borealis_register_init", &[], &mut ctx);
 
-// // //         // ubfx x3, x3, #16, #4
-// // //         u__DecodeA64(&mut state, TRACER, 0, 0xd3504c63);
-// // //         assert_eq!(0x4, state.read_register::<u64>(REG_R3));
-// // //     }
+// // //     assert_eq!(
+// // //         Bits::new(0xffff_ffff, 32),
+// // //         replicate_bits_borealis_internal(&mut state, TRACER,
+// // Bits::new(0xff, // 8), 4)     );
+// // //     assert_eq!(
+// // //         Bits::new(0xaa, 8),
+// // //         replicate_bits_borealis_internal(&mut state, TRACER,
+// // Bits::new(0xaa, // 8), 1)     );
+// // //     assert_eq!(
+// // //         Bits::new(0xaaaa, 16),
+// // //         replicate_bits_borealis_internal(&mut state, TRACER,
+// // Bits::new(0xaa, // 8), 2)     );
+// // //     assert_eq!(
+// // //         Bits::new(0xffff_ffff, 32),
+// // //         replicate_bits_borealis_internal(&mut state, TRACER,
+// // Bits::new(0x1, // 1), 32)     );
 // // // }
 
 // // // #[ktest]

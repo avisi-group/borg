@@ -3,7 +3,7 @@ use {
         dbt::{
             emitter::{self, BlockResult, Emitter},
             x86::{
-                emitter::{X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
+                emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
                 encoder::{Instruction, Operand, PhysicalRegister},
             },
         },
@@ -238,6 +238,8 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     let x86_block = *self.x86_blocks.get(&b).unwrap();
                     self.emitter.set_current_block(x86_block);
 
+                    log::trace!("translating dynamic block rudder={b:?}, x86={x86_block:?}",);
+
                     let res = self.translate_block(function, b, true);
                     log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
                     visited_dynamic_blocks.insert(b);
@@ -297,12 +299,16 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
 
         log::trace!("queue empty, reading return value and exiting");
 
-        return self.read_variable(
-            self.variables
-                .get(&InternedString::from_static("borealis_fn_return_value"))
-                .unwrap()
-                .clone(),
-        );
+        if function.return_type().is_unit() {
+            self.emitter.constant(0, emitter::Type::Unsigned(0))
+        } else {
+            self.read_variable(
+                self.variables
+                    .get(&InternedString::from_static("borealis_fn_return_value"))
+                    .unwrap()
+                    .clone(),
+            )
+        }
     }
 
     fn translate_block(
@@ -345,12 +351,14 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     if symbol.typ().is_unit() {
                         Some(self.emitter.constant(0, emitter::Type::Unsigned(0)))
                     } else {
+                        log::debug!("reading var {}", symbol.name());
                         let var = self.variables.get(&symbol.name()).unwrap().clone();
                         Some(self.read_variable(var))
                     }
                 }
                 Statement::WriteVariable { symbol, value } => {
                     if !symbol.typ().is_unit() {
+                        log::debug!("writing var {}", symbol.name());
                         if is_dynamic {
                             // if we're in a dynamic block and the local variable is not on the
                             // stack, put it there
@@ -536,7 +544,6 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     // make new empty x86 block
                     let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
                     self.rudder_blocks.insert(x86, *target);
-
                     return self.emitter.jump(x86);
                 }
                 Statement::Branch {
@@ -545,12 +552,30 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     false_target,
                 } => {
                     let condition = statement_values.get(condition).unwrap().clone();
-                    let true_target = self.lookup_x86_block(*true_target);
-                    let false_target = self.lookup_x86_block(*false_target);
 
-                    return self.emitter.branch(condition, true_target, false_target);
+                    // todo: obviously refactor this to re-use jump logic
+
+                    return match condition.kind() {
+                        NodeKind::Constant { value, .. } => {
+                            if *value == 0 {
+                                let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
+                                self.rudder_blocks.insert(x86, *false_target);
+                                self.emitter.jump(x86)
+                            } else {
+                                let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
+                                self.rudder_blocks.insert(x86, *true_target);
+                                self.emitter.jump(x86)
+                            }
+                        }
+                        _ => {
+                            let true_target = self.lookup_x86_block(*true_target);
+                            let false_target = self.lookup_x86_block(*false_target);
+                            self.emitter.branch(condition, true_target, false_target)
+                        }
+                    };
                 }
                 Statement::Return { value } => {
+                    log::debug!("writing var borealis_fn_return_value");
                     let var = self
                         .variables
                         .get(&InternedString::from_static("borealis_fn_return_value"))
@@ -667,6 +692,17 @@ impl<'m, 'e, 'c> FunctionExecutor<'m, 'e, 'c> {
                     };
 
                     self.emitter.panic(msg.as_ref());
+
+                    let unit = self.emitter.constant(0, emitter::Type::Unsigned(0));
+
+                    self.write_variable(
+                        self.variables
+                            .get(&InternedString::from_static("borealis_fn_return_value"))
+                            .unwrap()
+                            .clone(),
+                        unit,
+                    );
+
                     return BlockResult::Panic;
                 }
                 Statement::Undefined => todo!(),

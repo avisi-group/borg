@@ -783,6 +783,31 @@ impl Instruction {
                     )
                     .unwrap();
             }
+            // MOV M -> R
+            MOV(
+                Operand {
+                    kind:
+                        M {
+                            base: Some(PHYS(base)),
+                            index,
+                            scale,
+                            displacement,
+                            ..
+                        },
+                    width_in_bits: 1,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 1,
+                },
+            ) => {
+                assembler
+                    .mov::<AsmRegister8, AsmMemoryOperand>(
+                        dst.into(),
+                        memory_operand_to_iced(*base, *index, *scale, *displacement),
+                    )
+                    .unwrap();
+            }
             // MOV R -> M
             MOV(
                 Operand {
@@ -1181,11 +1206,11 @@ impl Instruction {
             JMP(Operand {
                 kind: T(target), ..
             }) => {
-                if let Some(label) = label_map.get(target) {
-                    assembler.jmp(label.clone()).unwrap();
-                } else {
-                    log::warn!("no label for {target:?} found, assuming static fallthrough")
-                }
+                let label = label_map
+                    .get(target)
+                    .unwrap_or_else(|| panic!("no label for {target:?} found"))
+                    .clone();
+                assembler.jmp(label.clone()).unwrap();
             }
             RET => {
                 assembler.ret().unwrap();

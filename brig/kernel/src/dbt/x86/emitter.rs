@@ -597,13 +597,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     ) -> BlockResult {
         match condition.kind() {
             NodeKind::Constant { value, .. } => {
-                if *value == 0 {
-                    self.add_target(false_target.clone());
-                    BlockResult::Static(false_target)
-                } else {
-                    self.add_target(true_target.clone());
-                    BlockResult::Static(true_target)
-                }
+                todo!("this was handled in models.rs")
             }
             _ => {
                 let condition = condition.to_operand(self);
@@ -1308,12 +1302,7 @@ impl X86Block {
     pub fn push_next(&mut self, target: Ref<X86Block>) {
         self.next.push(target);
         if self.next.len() > 2 {
-            // sort this out, this happens if we have a static jump to another
-            // static, which contains two dynamic jumps
-            //
-            // the first static-static jump is never materialised, and should
-            // maybe be overwritten by the two dynamic targets?
-            log::warn!("more than two targets?")
+            panic!("bad, blocks should not have more than 2 targets")
         }
     }
 }
