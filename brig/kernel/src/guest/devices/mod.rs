@@ -1,7 +1,8 @@
 use {
     crate::dbt::{
         emitter::{Emitter, Type},
-        models::{self, translate},
+        models::{self},
+        translate::translate,
         x86::{emitter::X86Emitter, X86TranslationContext},
     },
     alloc::boxed::Box,
@@ -16,7 +17,7 @@ pub mod virtio;
 /// ERROR [kernel] panicked at kernel/src/dbt/x86/encoder.rs:1202:40:
 /// no label for ref1 (arena 0) found
 /// ```
-/// #[ktest]
+//#[ktest]
 fn init_system() {
     let model = models::get("aarch64").unwrap();
 

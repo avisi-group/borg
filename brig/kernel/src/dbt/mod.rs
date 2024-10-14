@@ -6,8 +6,10 @@ use {
 };
 
 pub mod emitter;
+pub mod interpret;
 pub mod models;
 mod trampoline;
+pub mod translate;
 pub mod x86;
 
 pub struct Translation {
