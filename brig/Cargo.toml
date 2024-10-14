@@ -4,8 +4,6 @@ members = [
     "kernel",
     "proc_macro_lib",
     "plugins_rt",
-    # "plugins/guest/test",
-    # "plugins/guest/devices/arm/aarch64_interpreter",
     "plugins/guest/devices/primecell/pl011",
 ]
 
@@ -15,12 +13,7 @@ plugins_rt = { path = "./plugins_rt" }
 kernel = { path = "./kernel" }
 proc_macro_lib = { path = "./proc_macro_lib" }
 
-[profile.dev]
-opt-level = 1
-
 [profile.release]
 debug = true
-incremental = true
-codegen-units = 256
 debug-assertions = true
 overflow-checks = true

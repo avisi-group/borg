@@ -10,7 +10,6 @@ use {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Arena<T> {
     vec: Vec<T>,
-    #[cfg(debug_assertions)]
     id: crate::id::Id,
 }
 
@@ -18,7 +17,6 @@ impl<T> Arena<T> {
     pub fn new() -> Self {
         Self {
             vec: Vec::new(),
-            #[cfg(debug_assertions)]
             id: crate::id::Id::new(),
         }
     }
@@ -27,7 +25,6 @@ impl<T> Arena<T> {
         self.vec.push(t);
         Ref {
             index: self.vec.len() - 1,
-            #[cfg(debug_assertions)]
             arena: self.id,
             _phantom: PhantomData,
         }
@@ -41,21 +38,19 @@ impl<T> Arena<T> {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Ref<T> {
     index: usize,
-    #[cfg(debug_assertions)]
+
     arena: crate::id::Id,
     _phantom: PhantomData<T>,
 }
 
 impl<T> Ref<T> {
     pub fn get_mut<'reph, 'arena: 'reph>(&self, arena: &'arena mut Arena<T>) -> &'reph mut T {
-        #[cfg(debug_assertions)]
         assert_eq!(arena.id, self.arena);
 
         arena.vec.get_mut(self.index).unwrap()
     }
 
     pub fn get<'reph, 'arena: 'reph>(&self, arena: &'arena Arena<T>) -> &'reph T {
-        #[cfg(debug_assertions)]
         assert_eq!(arena.id, self.arena);
 
         arena.vec.get(self.index).unwrap()
@@ -90,10 +85,6 @@ impl<T> Copy for Ref<T> {}
 
 impl<T> Debug for Ref<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        if cfg!(debug_assertions) {
-            write!(f, "ref{} (arena {})", self.index(), self.arena)
-        } else {
-            write!(f, "ref{}", self.index())
-        }
+        write!(f, "ref{} (arena {})", self.index(), self.arena)
     }
 }
