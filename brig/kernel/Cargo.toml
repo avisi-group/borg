@@ -14,7 +14,7 @@ x86_64 = "0.15.1"
 x86 = "0.52.0"
 x2apic = "0.4.3"
 uart_16550 = "0.3.1"
-acpi = "5.0.0"
+acpi = "5.1.0"
 virtio-drivers = { version = "0.7.5", features = ["alloc"] }
 
 spin = "0.9.8"

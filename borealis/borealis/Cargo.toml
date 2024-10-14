@@ -16,7 +16,7 @@ color-eyre = { version = "0.6.3", default-features = false }
 pretty_assertions = "1.4.1"
 pretty_env_logger = "0.5.0"
 log = "0.4.22"
-clap = { version = "4.5.19", features = ["derive"] }
+clap = { version = "4.5.20", features = ["derive"] }
 deepsize = "0.2.0"
 serde_json = "1.0.128"
 num-bigint = { version = "0.4.6", features = ["serde"] }
