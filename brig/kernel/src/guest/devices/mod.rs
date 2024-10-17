@@ -1,7 +1,7 @@
 use {
     crate::dbt::{
         emitter::{Emitter, Type},
-        interpret::interpret,
+        interpret::{interpret, Value},
         models::{self},
         translate::translate,
         x86::{emitter::X86Emitter, X86TranslationContext},
@@ -57,23 +57,15 @@ fn translate_interpret_equivalent() {
 /// ERROR [kernel] panicked at kernel/src/dbt/x86/encoder.rs:1202:40:
 /// no label for ref1 (arena 0) found
 /// ```
-//#[ktest]
+//#[ktest] todo: fix me next
 fn init_system() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
-    let mut emitter = X86Emitter::new(&mut ctx);
-
-    let unit = emitter.constant(0, Type::Unsigned(0));
-    translate(&*model, "__InitSystem", &[unit], &mut emitter);
-
-    emitter.leave();
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
-    translation.execute(register_file_ptr);
+    interpret(&*model, "borealis_register_init", &[], register_file_ptr);
+    interpret(&*model, "__InitSystem", &[Value::Unit], register_file_ptr);
 
     panic!();
 }

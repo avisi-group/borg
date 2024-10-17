@@ -46,11 +46,10 @@ pub enum Type {
         width: usize,
     },
 
-    // ehhhh
+    // Not great but useful for debugging
     String,
 
     Bits,
-    ArbitraryLengthInteger,
     Rational,
 
     // Any type, used for undefineds
@@ -116,7 +115,7 @@ impl Type {
                 element_type,
             } => element_type.width_bits() * element_count,
 
-            Self::Bits | Self::ArbitraryLengthInteger => usize::try_from(u128::BITS).unwrap(),
+            Self::Bits => 64,
             // width of internedstring
             Self::String => 32,
             Self::Rational => todo!(),
@@ -173,10 +172,6 @@ impl Type {
         matches!(self, Self::Bits)
     }
 
-    pub fn is_apint(&self) -> bool {
-        matches!(self, Self::ArbitraryLengthInteger)
-    }
-
     pub fn is_u1(&self) -> bool {
         match self {
             Self::Primitive(PrimitiveType {
@@ -219,7 +214,6 @@ impl Display for Type {
                 element_type,
             } => write!(f, "[{element_type}; {element_count:?}]"),
             Type::Bits => write!(f, "bv"),
-            Type::ArbitraryLengthInteger => write!(f, "i"),
             Type::String => write!(f, "str"),
             Type::Rational => write!(f, "rational"),
             Type::Any => write!(f, "any"),

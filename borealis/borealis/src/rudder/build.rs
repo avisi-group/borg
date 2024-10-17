@@ -192,12 +192,13 @@ impl BuildContext {
                 // todo: this is broken:(
                 self.resolve_type(inner.clone())
             }
-            boom::Type::Integer { size } => match size {
-                boom::Size::Static(size) => {
-                    Type::new_primitive(PrimitiveTypeClass::SignedInteger, *size)
-                }
-                boom::Size::Unknown => Type::ArbitraryLengthInteger,
-            },
+            boom::Type::Integer { size } => Type::new_primitive(
+                PrimitiveTypeClass::SignedInteger,
+                match size {
+                    boom::Size::Static(size) => *size,
+                    boom::Size::Unknown => 64,
+                },
+            ),
             boom::Type::Bits { size } => match size {
                 boom::Size::Static(size) => {
                     Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, *size)
@@ -478,19 +479,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 "%i64->%i" => {
                     // lots of %i64->%i(Int(BigInt(-1))) so disabled this check
                     // assert_eq!(Type::s64(), *args[0].typ());
-                    Some(cast(
-                        self.block,
-                        self.block_arena_mut(),
-                        args[0].clone(),
-                        Type::ArbitraryLengthInteger,
-                    ))
+                    Some(args[0].clone())
                 }
 
                 "%i->%i64" => {
                     let arena = self.statement_arena();
-                    assert!(matches!(args[0].get(arena).typ(arena), Type::ArbitraryLengthInteger));
+                    assert_eq!(args[0].get(arena).typ(arena), Type::s64());
 
-                    Some(cast(self.block, self.block_arena_mut(), args[0].clone(), Type::s64()))
+                    Some(args[0].clone())
                 }
 
                 "%string->%real" => {
@@ -739,12 +735,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             value: args[0].clone(),
                         },
                     );
-                    Some(cast(
-                        self.block,
-                        self.block_arena_mut(),
-                        ceil,
-                        Type::ArbitraryLengthInteger,
-                    ))
+                    Some(ceil)
                 }
 
                 // val floor : (%real) -> %i
@@ -757,12 +748,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             value: args[0].clone(),
                         },
                     );
-                    Some(cast(
-                        self.block,
-                        self.block_arena_mut(),
-                        floor,
-                        Type::ArbitraryLengthInteger,
-                    ))
+                    Some(floor)
                 }
 
                 // val to_real : (%i) -> %real
@@ -788,7 +774,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block,
                         self.block_arena_mut(),
                         Statement::Constant {
-                            typ: (Type::ArbitraryLengthInteger),
+                            typ: Type::s64(),
                             value: ConstantValue::SignedInteger(1),
                         },
                     );
@@ -1098,8 +1084,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block,
                         self.block_arena_mut(),
                         Statement::Cast {
-                            kind: CastOperationKind::ZeroExtend,
-                            typ: (Type::ArbitraryLengthInteger),
+                            kind: CastOperationKind::Reinterpret,
+                            typ: Type::s64(),
                             value: args[0].clone(),
                         },
                     ))
@@ -1128,7 +1114,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         Statement::Cast {
                             kind: CastOperationKind::SignExtend,
-                            typ: (Type::ArbitraryLengthInteger),
+                            typ: Type::s64(),
                             value: args[0].clone(),
                         },
                     ))
@@ -1561,7 +1547,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant {
-                        typ: (Type::ArbitraryLengthInteger),
+                        typ: Type::s64(),
                         value: ConstantValue::SignedInteger(0),
                     },
                 )),
@@ -1882,10 +1868,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     i64::MAX
                 });
                 Statement::Constant {
-                    typ: (Type::new_primitive(
-                        PrimitiveTypeClass::SignedInteger,
-                        signed_smallest_width_of_value(value).into(),
-                    )),
+                    typ: (Type::new_primitive(PrimitiveTypeClass::SignedInteger, 64)),
                     value: ConstantValue::SignedInteger(value),
                 }
             }
@@ -1959,7 +1942,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             Ordering::Equal => CastOperationKind::Reinterpret,
                         }
                     }
-                    Type::Bits | Type::ArbitraryLengthInteger | Type::Rational | Type::Any => {
+                    Type::Bits | Type::Rational | Type::Any => {
                         todo!()
                     }
                     Type::Union { .. } => todo!(),

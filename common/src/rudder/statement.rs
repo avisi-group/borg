@@ -1202,27 +1202,6 @@ pub fn cast_at(
                 element_width_in_bits,
                 ..
             }),
-            Type::ArbitraryLengthInteger,
-        ) => {
-            assert!(*element_width_in_bits < 128);
-
-            build_at(
-                block,
-                arena,
-                Statement::Cast {
-                    kind: CastOperationKind::ZeroExtend,
-                    typ: destination_type,
-                    value: source,
-                },
-                location,
-            )
-        }
-
-        (
-            Type::Primitive(PrimitiveType {
-                element_width_in_bits,
-                ..
-            }),
             Type::Bits,
         ) => {
             if *element_width_in_bits > 128 {
@@ -1245,54 +1224,11 @@ pub fn cast_at(
             )
         }
 
-        (Type::ArbitraryLengthInteger, Type::Primitive(_)) => build_at(
-            block,
-            arena,
-            Statement::Cast {
-                kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            },
-            location,
-        ),
-
         (Type::Bits, Type::Primitive(_)) => build_at(
             block,
             arena,
             Statement::Cast {
                 kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            },
-            location,
-        ),
-
-        (Type::ArbitraryLengthInteger, Type::Bits) => build_at(
-            block,
-            arena,
-            Statement::Cast {
-                kind: CastOperationKind::Convert,
-                typ: destination_type,
-                value: source,
-            },
-            location,
-        ),
-
-        (Type::ArbitraryLengthInteger, Type::Rational) => build_at(
-            block,
-            arena,
-            Statement::Cast {
-                kind: CastOperationKind::Convert,
-                typ: destination_type,
-                value: source,
-            },
-            location,
-        ),
-        (Type::Rational, Type::ArbitraryLengthInteger) => build_at(
-            block,
-            arena,
-            Statement::Cast {
-                kind: CastOperationKind::Convert,
                 typ: destination_type,
                 value: source,
             },

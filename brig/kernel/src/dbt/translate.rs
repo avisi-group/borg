@@ -753,15 +753,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 /// Converts a rudder type to a `Type` value
 fn emit_rudder_constant_type(value: &ConstantValue, typ: &rudder::types::Type) -> emitter::Type {
     match typ {
-        rudder::types::Type::ArbitraryLengthInteger => {
-            let ConstantValue::SignedInteger(cv) = value else {
-                panic!();
-            };
-
-            let width = signed_smallest_width_of_value(*cv);
-
-            emitter::Type::Signed(width)
-        }
         rudder::types::Type::Bits => {
             let ConstantValue::UnsignedInteger(cv) = value else {
                 panic!();
@@ -793,7 +784,6 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
                 PrimitiveTypeClass::FloatingPoint => emitter::Type::Floating(width),
             }
         }
-        rudder::types::Type::ArbitraryLengthInteger => emitter::Type::Signed(64),
         rudder::types::Type::Bits => emitter::Type::Bits,
         rudder::types::Type::Tuple(_) => emitter::Type::Tuple,
         t => panic!("todo codegen type instance: {t:?}"),

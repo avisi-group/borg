@@ -118,13 +118,15 @@ impl<'f> Interpreter<'f> {
             let statement = statement_ref.get(block.arena());
             let value = match statement {
                 Statement::Constant { typ, value } => Some(Value::from_constant(value, typ)),
-                Statement::ReadVariable { symbol } => {
-                    Some(self.locals.get(&symbol.name()).unwrap().clone())
-                }
+                Statement::ReadVariable { symbol } => Some(
+                    self.locals
+                        .get(&symbol.name())
+                        .unwrap_or_else(|| panic!("no local found for {symbol:?}"))
+                        .clone(),
+                ),
                 Statement::ReadRegister { typ, offset } => {
                     let width = match typ {
                         Type::Primitive(typ) => typ.width(),
-                        Type::ArbitraryLengthInteger => 64,
                         t => todo!("{t}"),
                     };
 
@@ -145,9 +147,13 @@ impl<'f> Interpreter<'f> {
                             value: value & mask(u32::try_from(*element_width_in_bits).unwrap()),
                             length: u8::try_from(*element_width_in_bits).unwrap(),
                         },
-                        Type::ArbitraryLengthInteger => Value::SignedInteger {
-                            value: value as i64,
-                            length: 64,
+                        Type::Primitive(PrimitiveType {
+                            tc: PrimitiveTypeClass::SignedInteger,
+                            element_width_in_bits,
+                        }) => Value::SignedInteger {
+                            value: (value & mask(u32::try_from(*element_width_in_bits).unwrap()))
+                                as i64,
+                            length: u8::try_from(*element_width_in_bits).unwrap(),
                         },
                         t => todo!("{t}"),
                     })
@@ -303,7 +309,6 @@ impl<'f> Interpreter<'f> {
                     let value = self.resolve(value);
 
                     match (&kind, &dest_typ, &value) {
-                        (_, Type::ArbitraryLengthInteger, _) => Some(value),
                         (
                             CastOperationKind::SignExtend,
                             Type::Primitive(PrimitiveType {
