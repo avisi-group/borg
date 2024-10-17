@@ -27,7 +27,9 @@ static LOGGER: &'static dyn Log = &Logger {
         ("virtio_drivers", LevelFilter::Warn),
         ("tar_no_std", LevelFilter::Warn),
         ("elfloader", LevelFilter::Info),
-        ("kernel::dbt", LevelFilter::Info),
+        ("kernel::dbt::x86", LevelFilter::Info),
+        ("kernel::dbt::translate", LevelFilter::Info),
+        ("kernel::dbt::interpret", LevelFilter::Info),
     ],
 };
 

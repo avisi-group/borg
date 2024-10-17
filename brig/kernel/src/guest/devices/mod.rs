@@ -1,6 +1,7 @@
 use {
     crate::dbt::{
         emitter::{Emitter, Type},
+        interpret::interpret,
         models::{self},
         translate::translate,
         x86::{emitter::X86Emitter, X86TranslationContext},
@@ -10,6 +11,45 @@ use {
 };
 
 pub mod virtio;
+
+#[ktest]
+fn translate_interpret_equivalent() {
+    unsafe {
+        let model = models::get("aarch64").unwrap();
+
+        let mut register_file = alloc::vec![0u8; model.register_file_size()];
+        let register_file_ptr = register_file.as_mut_ptr();
+
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
+        let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u32;
+        let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u32;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+
+        *see = 0;
+        *r0 = 2;
+        *r1 = 5;
+        *r2 = 10;
+
+        interpret(&*model, "borealis_register_init", &[], register_file_ptr);
+
+        // todo: enable me
+        // let unit = crate::dbt::interpret::Value::Unit;
+        //  interpret(&*model, "__InitSystem", &[unit], register_file_ptr);
+
+        let pc = crate::dbt::interpret::Value::UnsignedInteger {
+            value: 0,
+            length: 64,
+        };
+        let opcode = crate::dbt::interpret::Value::UnsignedInteger {
+            value: 0x8b020020,
+            length: 64,
+        };
+        interpret(&*model, "__DecodeA64", &[pc, opcode], register_file_ptr);
+
+        assert_eq!(15, (*r0));
+        assert_eq!(0xe, (*see));
+    }
+}
 
 /// takes a really long time (requires release and no logging) then panics with
 ///

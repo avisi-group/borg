@@ -44,3 +44,37 @@ impl Debug for Translation {
         Ok(())
     }
 }
+
+// generate n ones
+fn ones(n: u64) -> u64 {
+    let (res, overflowed) = 1u64.overflowing_shl(n.try_into().unwrap());
+
+    if overflowed {
+        if n == u64::from(u64::BITS) {
+            u64::MAX
+        } else {
+            panic!("overflowed while generating mask of {n} 1s")
+        }
+    } else {
+        res - 1
+    }
+}
+
+fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
+    let cleared_target = {
+        let mask = !(ones(length) << start);
+        target & mask
+    };
+
+    let shifted_source = {
+        let mask = ones(length);
+        let masked_source = source & mask;
+        masked_source << start
+    };
+
+    cleared_target | shifted_source
+}
+
+fn bit_extract(value: u64, start: u64, length: u64) -> u64 {
+    (value >> start) & ones(length)
+}
