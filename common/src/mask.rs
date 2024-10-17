@@ -1,5 +1,14 @@
 pub fn mask<I: Into<u32>>(width: I) -> u64 {
-    1u64.checked_shl(width.into())
-        .map(|n| n - 1)
-        .unwrap_or(u64::MAX)
+    let n = width.into();
+    let (res, overflowed) = 1u64.overflowing_shl(n);
+
+    if overflowed {
+        if n > u64::BITS {
+            log::warn!("overflowed while generating mask of {n} 1s")
+        }
+
+        u64::MAX
+    } else {
+        res - 1
+    }
 }

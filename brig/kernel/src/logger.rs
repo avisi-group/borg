@@ -29,7 +29,7 @@ static LOGGER: &'static dyn Log = &Logger {
         ("elfloader", LevelFilter::Info),
         ("kernel::dbt::x86", LevelFilter::Info),
         ("kernel::dbt::translate", LevelFilter::Info),
-        // ("kernel::dbt::interpret", LevelFilter::Info),
+        ("kernel::dbt::interpret", LevelFilter::Debug),
     ],
 };
 

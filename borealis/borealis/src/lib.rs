@@ -288,6 +288,21 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "SecurityStateAtEL",
         "Unreachable",
         "HaveVirtHostExt",
+        "AArch64_TakeReset",
+        "AArch64_ResetControlRegisters",
+        "AArch64_AutoGen_ArchitectureReset",
+        "EncodePARange",
+        "Have56BitPAExt",
+        "EncodeVARange",
+        "HaveCNTSCExt",
+        "IsG1ActivityMonitorImplemented",
+        "IsG1ActivityMonitorOffsetImplemented",
+        "__Reset",
+        "AArch64_ResetGeneralRegisters",
+        "AArch64_ResetSIMDFPRegisters",
+        "V_set",
+        "ImplementedSMEVectorLength",
+        "Align_int",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -317,6 +332,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().starts_with("Mk")
         || name.as_ref().starts_with("_update_")
         || name.as_ref().starts_with("_get_")
+        || name.as_ref().starts_with("Have")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

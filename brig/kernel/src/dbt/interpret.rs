@@ -8,7 +8,6 @@ use {
         rudder::{
             block::Block,
             constant_value::ConstantValue,
-            function::Function,
             statement::{
                 BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
                 TernaryOperationKind, UnaryOperationKind,
@@ -21,7 +20,7 @@ use {
     core::{
         borrow::Borrow,
         cmp::{max, Ordering},
-        ops::{Add, Sub},
+        ops::{Add, BitAnd, BitOr, Mul, Sub},
         panic,
     },
 };
@@ -96,7 +95,9 @@ impl<'f> Interpreter<'f> {
             Value::SignedInteger {
                 value: i,
                 length: _,
-            } => i.try_into().unwrap(),
+            } => i
+                .try_into()
+                .unwrap_or_else(|_| panic!("cannot resolve {i} as u64")),
             _ => panic!(),
         }
     }
@@ -111,10 +112,6 @@ impl<'f> Interpreter<'f> {
                 .arena(),
         );
         for statement_ref in block.statements() {
-            log::debug!(
-                "{}: block {block_ref:?}: statement {statement_ref:?}",
-                self.function_name
-            );
             let statement = statement_ref.get(block.arena());
             let value = match statement {
                 Statement::Constant { typ, value } => Some(Value::from_constant(value, typ)),
@@ -136,6 +133,16 @@ impl<'f> Interpreter<'f> {
                         9..=16 => self.read_reg::<u16>(offset) as u64,
                         17..=32 => self.read_reg::<u32>(offset) as u64,
                         33..=64 => self.read_reg::<u64>(offset),
+                        65..=128 => {
+                            let lo = self.read_reg::<u64>(offset);
+                            let hi = self.read_reg::<u64>(offset + 8);
+
+                            if hi == 0 {
+                                lo
+                            } else {
+                                panic!();
+                            }
+                        }
                         w => todo!("{w}"),
                     };
 
@@ -217,7 +224,9 @@ impl<'f> Interpreter<'f> {
                         },
                         BinaryOperationKind::Sub => left - right,
                         BinaryOperationKind::Add => left + right,
-
+                        BinaryOperationKind::Multiply => left * right,
+                        BinaryOperationKind::Or => left | right,
+                        BinaryOperationKind::And => left & right,
                         _ => todo!("{kind:?}"),
                     })
                 }
@@ -294,12 +303,19 @@ impl<'f> Interpreter<'f> {
                     target,
                     args,
                     return_type,
-                } => Some(interpret(
-                    &self.model,
-                    target.as_ref(),
-                    &args.iter().map(|a| self.resolve(a)).collect::<Vec<_>>(),
-                    self.register_file,
-                )),
+                } => {
+                    log::debug!(
+                        "{}: block {block_ref:?}: call {target:?}",
+                        self.function_name
+                    );
+
+                    Some(interpret(
+                        &self.model,
+                        target.as_ref(),
+                        &args.iter().map(|a| self.resolve(a)).collect::<Vec<_>>(),
+                        self.register_file,
+                    ))
+                }
                 Statement::Cast {
                     kind,
                     typ: dest_typ,
@@ -383,6 +399,34 @@ impl<'f> Interpreter<'f> {
                             value: *value,
                             length: u8::try_from(*element_width_in_bits).unwrap(),
                         }),
+                        (
+                            CastOperationKind::Reinterpret,
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::UnsignedInteger,
+                                element_width_in_bits,
+                            }),
+                            Value::UnsignedInteger { value, length },
+                        ) => {
+                            if *element_width_in_bits == usize::from(*length) {
+                                Some(Value::UnsignedInteger {
+                                    value: *value,
+                                    length: *length,
+                                })
+                            } else {
+                                todo!()
+                            }
+                        }
+                        (
+                            CastOperationKind::ZeroExtend,
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::SignedInteger,
+                                element_width_in_bits,
+                            }),
+                            Value::UnsignedInteger { value, .. },
+                        ) => Some(Value::SignedInteger {
+                            value: i64::try_from(*value).unwrap(),
+                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                        }),
                         (k, t, v) => todo!("{k:?} {t:?} {v:?}"),
                     }
                 }
@@ -391,23 +435,60 @@ impl<'f> Interpreter<'f> {
                     typ,
                     value,
                     length,
-                } => todo!(),
+                } => {
+                    let value = self.resolve(value);
+                    let target_length = u8::try_from(self.resolve_u64(length)).unwrap();
+                    match (kind, typ, &value) {
+                        (
+                            CastOperationKind::ZeroExtend,
+                            Type::Bits,
+                            Value::UnsignedInteger { value, length },
+                        ) => {
+                            if target_length > *length {
+                                Some(Value::UnsignedInteger {
+                                    value: value & mask(target_length),
+                                    length: target_length,
+                                })
+                            } else {
+                                panic!();
+                            }
+                        }
+                        _ => todo!("{kind:?} {typ:?} {value:?} {length}"),
+                    }
+                }
                 Statement::Select {
                     condition,
                     true_value,
                     false_value,
-                } => todo!(),
+                } => {
+                    let condition = self.resolve_u64(condition);
+
+                    Some(self.resolve(if condition != 0 {
+                        true_value
+                    } else {
+                        false_value
+                    }))
+                }
                 Statement::BitExtract {
                     value,
                     start,
                     length,
                 } => {
-                    let value = self.resolve_u64(value);
+                    let value = self.resolve(value);
                     let start = self.resolve_u64(start);
                     let length = self.resolve_u64(length);
-                    Some(Value::UnsignedInteger {
-                        value: bit_extract(value, start, length),
-                        length: u8::try_from(length).unwrap(),
+
+                    Some(match value {
+                        Value::UnsignedInteger { value, .. } => Value::UnsignedInteger {
+                            value: bit_extract(value, start, length),
+                            length: u8::try_from(length).unwrap(),
+                        },
+                        // todo: test/verify this
+                        Value::SignedInteger { value, .. } => Value::SignedInteger {
+                            value: bit_extract(value as u64, start, length) as i64,
+                            length: u8::try_from(length).unwrap(),
+                        },
+                        _ => todo!("{value:?}"),
                     })
                 }
                 Statement::BitInsert {
@@ -447,7 +528,16 @@ impl<'f> Interpreter<'f> {
                         length: u8::try_from(length).unwrap(),
                     })
                 }
-                Statement::SizeOf { value } => todo!(),
+                Statement::SizeOf { value } => {
+                    let value = self.resolve(value);
+                    match value {
+                        Value::UnsignedInteger { length, .. } => Some(Value::UnsignedInteger {
+                            value: u64::from(length),
+                            length: 16,
+                        }),
+                        _ => todo!("size-of {value:?}"),
+                    }
+                }
                 Statement::MatchesUnion { value, variant } => todo!(),
                 Statement::UnwrapUnion { value, variant } => todo!(),
                 Statement::CreateTuple(vec) => {
@@ -485,7 +575,10 @@ impl<'f> Interpreter<'f> {
                         9..=16 => self.write_reg(offset, u16::try_from(value).unwrap()),
                         17..=32 => self.write_reg(offset, u32::try_from(value).unwrap()),
                         33..=64 => self.write_reg(offset, value),
-                        65..=128 => self.write_reg(offset, u128::try_from(value).unwrap()),
+                        65..=128 => {
+                            self.write_reg(offset, value);
+                            self.write_reg(offset + 8, 0u64); // todo: hack
+                        }
                         w => todo!("{w}"),
                     }
 
@@ -525,6 +618,11 @@ impl<'f> Interpreter<'f> {
                     None
                 }
             };
+
+            log::trace!(
+                "{}: block {block_ref:?}: {statement_ref:?} = {value:?}",
+                self.function_name
+            );
 
             if let Some(value) = value {
                 self.statement_values.insert(*statement_ref, value);
@@ -635,6 +733,19 @@ impl Sub for Value {
                 value: left - right,
                 length: max(left_length, right_length),
             },
+            (
+                Value::UnsignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::UnsignedInteger {
+                value: left - right,
+                length: max(left_length, right_length),
+            },
             (left, right) => todo!("{left:?} {right:?}"),
         }
     }
@@ -656,6 +767,101 @@ impl Add for Value {
                 },
             ) => Value::SignedInteger {
                 value: left + right,
+                length: max(left_length, right_length),
+            },
+            (
+                Value::UnsignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::SignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::SignedInteger {
+                value: i64::try_from(left).unwrap() + right,
+                length: max(left_length, right_length),
+            },
+            (left, right) => todo!("{left:?} {right:?}"),
+        }
+    }
+}
+
+impl Mul for Value {
+    type Output = Value;
+
+    fn mul(self, rhs: Value) -> Self::Output {
+        match (self, rhs) {
+            (
+                Value::SignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::SignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::SignedInteger {
+                value: left * right,
+                length: max(left_length, right_length),
+            },
+            (
+                Value::SignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::SignedInteger {
+                value: left * i64::try_from(right).unwrap(),
+                length: max(left_length, right_length),
+            },
+            (left, right) => todo!("{left:?} {right:?}"),
+        }
+    }
+}
+
+impl BitOr for Value {
+    type Output = Value;
+
+    fn bitor(self, rhs: Value) -> Self::Output {
+        match (self, rhs) {
+            (
+                Value::UnsignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::UnsignedInteger {
+                value: left | right,
+                length: max(left_length, right_length),
+            },
+            (left, right) => todo!("{left:?} {right:?}"),
+        }
+    }
+}
+
+impl BitAnd for Value {
+    type Output = Value;
+
+    fn bitand(self, rhs: Value) -> Self::Output {
+        match (self, rhs) {
+            (
+                Value::UnsignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::UnsignedInteger {
+                value: left & right,
                 length: max(left_length, right_length),
             },
             (left, right) => todo!("{left:?} {right:?}"),

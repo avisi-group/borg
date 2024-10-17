@@ -1,6 +1,7 @@
 use {
     crate::arch::x86::memory::ExecutableAllocator,
     alloc::{string::String, vec::Vec},
+    common::mask::mask,
     core::fmt::{self, Debug},
     iced_x86::{Formatter, Instruction},
 };
@@ -45,29 +46,28 @@ impl Debug for Translation {
     }
 }
 
-// generate n ones
-fn ones(n: u64) -> u64 {
-    let (res, overflowed) = 1u64.overflowing_shl(n.try_into().unwrap());
-
-    if overflowed {
-        if n == u64::from(u64::BITS) {
-            u64::MAX
-        } else {
-            panic!("overflowed while generating mask of {n} 1s")
-        }
-    } else {
-        res - 1
-    }
-}
-
 fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
+    // todo: hack
+    if start >= 64 {
+        log::warn!("attempting to insert {length} bits of {source} into {target} at {start}");
+        if source == 0 {
+            return 0;
+        }
+    }
+
+    let length = u32::try_from(length).unwrap();
+
     let cleared_target = {
-        let mask = !(ones(length) << start);
+        let mask = !(mask(length)
+            .checked_shl(u32::try_from(start).unwrap())
+            .unwrap_or_else(|| {
+                panic!("overflow in shl with {target:b} {source:?} {start:?} {length:?}")
+            }));
         target & mask
     };
 
     let shifted_source = {
-        let mask = ones(length);
+        let mask = mask(length);
         let masked_source = source & mask;
         masked_source << start
     };
@@ -76,5 +76,5 @@ fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
 }
 
 fn bit_extract(value: u64, start: u64, length: u64) -> u64 {
-    (value >> start) & ones(length)
+    (value >> start) & mask(u32::try_from(length).unwrap())
 }
