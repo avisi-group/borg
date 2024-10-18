@@ -303,6 +303,26 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "V_set",
         "ImplementedSMEVectorLength",
         "Align_int",
+        "fdiv_int",
+        "SupportedPowerTwoSVL",
+        "ImplementedSVEVectorLength",
+        "IsPow2",
+        "FloorPow2",
+        "CeilPow2",
+        "IsSVEEnabled",
+        "IsOriginalSVEEnabled",
+        "AArch64_ResetSpecialRegisters",
+        "ResetExternalDebugRegisters",
+        "AArch64_PAMax",
+        "is_zero_subrange",
+        "extzx",
+        "extzv",
+        "BranchTo",
+        "Hint_Branch",
+        "AArch64_BranchAddr",
+        "AddrTop",
+        "S1TranslationRegime",
+        "EffectiveTBI",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -333,6 +353,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().starts_with("_update_")
         || name.as_ref().starts_with("_get_")
         || name.as_ref().starts_with("Have")
+        || name.as_ref().starts_with("decode_")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

@@ -12,13 +12,7 @@ use {
 
 pub mod virtio;
 
-/// takes a really long time (requires release and no logging) then panics with
-///
-/// ```
-/// ERROR [kernel] panicked at kernel/src/dbt/x86/encoder.rs:1202:40:
-/// no label for ref1 (arena 0) found
-/// ```
-//#[ktest]
+#[ktest]
 fn init_system() {
     let model = models::get("aarch64").unwrap();
 
@@ -27,8 +21,6 @@ fn init_system() {
 
     interpret(&*model, "borealis_register_init", &[], register_file_ptr);
     interpret(&*model, "__InitSystem", &[Value::Unit], register_file_ptr);
-
-    panic!();
 }
 
 #[ktest]

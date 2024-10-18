@@ -558,6 +558,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     ))
                 }
 
+                "undefined_range" => Some(args[0].clone()),
+
                 "eq_bit" | "eq_bits" | "eq_int" | "eq_bool" | "eq_string" | "eq_real" => Some(build(
                     self.block,
                     self.block_arena_mut(),

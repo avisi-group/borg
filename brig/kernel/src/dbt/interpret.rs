@@ -20,7 +20,7 @@ use {
     core::{
         borrow::Borrow,
         cmp::{max, Ordering},
-        ops::{Add, BitAnd, BitOr, Mul, Sub},
+        ops::{Add, BitAnd, BitOr, Div, Mul, Sub},
         panic,
     },
 };
@@ -103,7 +103,7 @@ impl<'f> Interpreter<'f> {
     }
 
     fn interpret_block(&mut self, block_ref: Ref<Block>) -> BlockResult {
-        log::debug!("{}: block {block_ref:?}", self.function_name);
+        log::trace!("{}: block {block_ref:?}", self.function_name);
         let block = block_ref.get(
             self.model
                 .functions()
@@ -133,17 +133,14 @@ impl<'f> Interpreter<'f> {
                         9..=16 => self.read_reg::<u16>(offset) as u64,
                         17..=32 => self.read_reg::<u32>(offset) as u64,
                         33..=64 => self.read_reg::<u64>(offset),
-                        65..=128 => {
-                            let lo = self.read_reg::<u64>(offset);
-                            let hi = self.read_reg::<u64>(offset + 8);
+                        65..=128 => u64::try_from(self.read_reg::<u128>(offset)).unwrap(),
 
-                            if hi == 0 {
-                                lo
-                            } else {
-                                panic!();
-                            }
+                        w => {
+                            log::warn!(
+                                "tried to read a {w} bit register offset {offset}, returning 0"
+                            );
+                            0
                         }
-                        w => todo!("{w}"),
                     };
 
                     Some(match typ {
@@ -152,7 +149,7 @@ impl<'f> Interpreter<'f> {
                             element_width_in_bits,
                         }) => Value::UnsignedInteger {
                             value: value & mask(u32::try_from(*element_width_in_bits).unwrap()),
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         },
                         Type::Primitive(PrimitiveType {
                             tc: PrimitiveTypeClass::SignedInteger,
@@ -160,7 +157,7 @@ impl<'f> Interpreter<'f> {
                         }) => Value::SignedInteger {
                             value: (value & mask(u32::try_from(*element_width_in_bits).unwrap()))
                                 as i64,
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         },
                         t => todo!("{t}"),
                     })
@@ -227,6 +224,7 @@ impl<'f> Interpreter<'f> {
                         BinaryOperationKind::Multiply => left * right,
                         BinaryOperationKind::Or => left | right,
                         BinaryOperationKind::And => left & right,
+                        BinaryOperationKind::Divide => left / right,
                         _ => todo!("{kind:?}"),
                     })
                 }
@@ -291,20 +289,30 @@ impl<'f> Interpreter<'f> {
                             ShiftOperationKind::LogicalShiftLeft,
                             Value::UnsignedInteger { value, length },
                         ) => {
-                            (Some(Value::UnsignedInteger {
-                                value: (value << amount) & mask(*length),
+                            let (value, did_overflow) =
+                                value.overflowing_shl(u32::try_from(amount).unwrap());
+
+                            if did_overflow {
+                                log::warn!("overflowed during lsl of {value} by {amount}");
+                            }
+
+                            Some(Value::UnsignedInteger {
+                                value: value & mask(*length),
                                 length: *length,
-                            }))
+                            })
                         }
+                        (
+                            ShiftOperationKind::LogicalShiftLeft,
+                            Value::SignedInteger { value, length },
+                        ) => Some(Value::SignedInteger {
+                            value: value << amount,
+                            length: *length,
+                        }),
                         _ => todo!("{value:?} {kind:?} by {amount}"),
                     }
                 }
-                Statement::Call {
-                    target,
-                    args,
-                    return_type,
-                } => {
-                    log::debug!(
+                Statement::Call { target, args, .. } => {
+                    log::trace!(
                         "{}: block {block_ref:?}: call {target:?}",
                         self.function_name
                     );
@@ -338,7 +346,7 @@ impl<'f> Interpreter<'f> {
                                 source_typ.width_bits(),
                                 *element_width_in_bits,
                             ),
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         }),
                         (
                             CastOperationKind::Truncate,
@@ -349,7 +357,7 @@ impl<'f> Interpreter<'f> {
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::UnsignedInteger {
                             value: value & mask(u32::try_from(*element_width_in_bits).unwrap()),
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         }),
                         (
                             CastOperationKind::Reinterpret,
@@ -363,7 +371,7 @@ impl<'f> Interpreter<'f> {
                                 *value & mask(u32::try_from(*element_width_in_bits).unwrap()),
                             )
                             .unwrap(),
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         }),
                         (
                             CastOperationKind::Reinterpret,
@@ -378,7 +386,7 @@ impl<'f> Interpreter<'f> {
                                     & mask(u32::try_from(*element_width_in_bits).unwrap()),
                             )
                             .unwrap(),
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         }),
                         (
                             CastOperationKind::ZeroExtend,
@@ -397,7 +405,7 @@ impl<'f> Interpreter<'f> {
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::UnsignedInteger {
                             value: *value,
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         }),
                         (
                             CastOperationKind::Reinterpret,
@@ -425,7 +433,7 @@ impl<'f> Interpreter<'f> {
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
                             value: i64::try_from(*value).unwrap(),
-                            length: u8::try_from(*element_width_in_bits).unwrap(),
+                            length: u16::try_from(*element_width_in_bits).unwrap(),
                         }),
                         (k, t, v) => todo!("{k:?} {t:?} {v:?}"),
                     }
@@ -437,7 +445,7 @@ impl<'f> Interpreter<'f> {
                     length,
                 } => {
                     let value = self.resolve(value);
-                    let target_length = u8::try_from(self.resolve_u64(length)).unwrap();
+                    let target_length = u16::try_from(self.resolve_u64(length)).unwrap();
                     match (kind, typ, &value) {
                         (
                             CastOperationKind::ZeroExtend,
@@ -481,12 +489,12 @@ impl<'f> Interpreter<'f> {
                     Some(match value {
                         Value::UnsignedInteger { value, .. } => Value::UnsignedInteger {
                             value: bit_extract(value, start, length),
-                            length: u8::try_from(length).unwrap(),
+                            length: u16::try_from(length).unwrap(),
                         },
                         // todo: test/verify this
                         Value::SignedInteger { value, .. } => Value::SignedInteger {
                             value: bit_extract(value as u64, start, length) as i64,
-                            length: u8::try_from(length).unwrap(),
+                            length: u16::try_from(length).unwrap(),
                         },
                         _ => todo!("{value:?}"),
                     })
@@ -525,7 +533,7 @@ impl<'f> Interpreter<'f> {
 
                     Some(Value::UnsignedInteger {
                         value,
-                        length: u8::try_from(length).unwrap(),
+                        length: u16::try_from(length).unwrap(),
                     })
                 }
                 Statement::SizeOf { value } => {
@@ -571,7 +579,7 @@ impl<'f> Interpreter<'f> {
                     let offset = self.resolve_u64(offset);
 
                     match width {
-                        1..=8 => self.write_reg(offset, u8::try_from(value).unwrap()),
+                        1..=8 => self.write_reg(offset, u16::try_from(value).unwrap()),
                         9..=16 => self.write_reg(offset, u16::try_from(value).unwrap()),
                         17..=32 => self.write_reg(offset, u32::try_from(value).unwrap()),
                         33..=64 => self.write_reg(offset, value),
@@ -579,7 +587,9 @@ impl<'f> Interpreter<'f> {
                             self.write_reg(offset, value);
                             self.write_reg(offset + 8, 0u64); // todo: hack
                         }
-                        w => todo!("{w}"),
+                        w => {
+                            log::warn!("tried to write {value} to a {w} bit register offset {offset}, did nothing");
+                        }
                     }
 
                     None
@@ -633,18 +643,23 @@ impl<'f> Interpreter<'f> {
     }
 
     fn read_reg<T>(&self, offset: u64) -> T {
-        unsafe { (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T).read() }
+        unsafe {
+            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T).read_unaligned()
+        }
     }
 
     fn write_reg<T>(&self, offset: u64, value: T) {
-        unsafe { (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T).write(value) }
+        unsafe {
+            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T)
+                .write_unaligned(value)
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    UnsignedInteger { value: u64, length: u8 },
-    SignedInteger { value: i64, length: u8 },
+    UnsignedInteger { value: u64, length: u16 },
+    SignedInteger { value: i64, length: u16 },
     FloatingPoint(f64),
     String(InternedString),
     Unit,
@@ -656,11 +671,11 @@ impl Value {
         match value {
             ConstantValue::UnsignedInteger(u) => Value::UnsignedInteger {
                 value: *u,
-                length: u8::try_from(typ.width_bits()).unwrap(),
+                length: u16::try_from(typ.width_bits()).unwrap(),
             },
             ConstantValue::SignedInteger(i) => Value::SignedInteger {
                 value: *i,
-                length: u8::try_from(typ.width_bits()).unwrap(),
+                length: u16::try_from(typ.width_bits()).unwrap(),
             },
             ConstantValue::FloatingPoint(f) => Value::FloatingPoint(*f),
             ConstantValue::Rational(_ratio) => todo!(),
@@ -782,6 +797,19 @@ impl Add for Value {
                 value: i64::try_from(left).unwrap() + right,
                 length: max(left_length, right_length),
             },
+            (
+                Value::SignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::SignedInteger {
+                value: left + i64::try_from(right).unwrap(),
+                length: max(left_length, right_length),
+            },
             (left, right) => todo!("{left:?} {right:?}"),
         }
     }
@@ -862,6 +890,28 @@ impl BitAnd for Value {
                 },
             ) => Value::UnsignedInteger {
                 value: left & right,
+                length: max(left_length, right_length),
+            },
+            (left, right) => todo!("{left:?} {right:?}"),
+        }
+    }
+}
+impl Div for Value {
+    type Output = Value;
+
+    fn div(self, rhs: Value) -> Self::Output {
+        match (self, rhs) {
+            (
+                Value::SignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::SignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::SignedInteger {
+                value: left / right,
                 length: max(left_length, right_length),
             },
             (left, right) => todo!("{left:?} {right:?}"),
