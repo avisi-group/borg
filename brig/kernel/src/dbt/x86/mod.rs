@@ -132,6 +132,13 @@ impl X86TranslationContext {
         let mut to_visit = alloc::vec![];
 
         {
+            let panic_label = assembler.create_label();
+            log::trace!("panic_block ({panic_label:?}) {:?}", self.panic_block());
+            label_map.insert(self.panic_block(), panic_label);
+            to_visit.push(self.panic_block()) // visit panic block last
+        }
+
+        {
             let initial_label = assembler.create_label();
             log::trace!(
                 "initial_block ({initial_label:?}) {:?}",
@@ -161,7 +168,12 @@ impl X86TranslationContext {
             // lower block
             assembler
                 .set_label(label_map.get_mut(&next).unwrap())
-                .unwrap();
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "{e}: label {:?} for block {next:?} re-used",
+                        label_map.get_mut(&next).unwrap()
+                    )
+                });
             assembler
                 .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + next.index()))
                 .unwrap();

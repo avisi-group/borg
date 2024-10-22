@@ -2,7 +2,7 @@ use {
     crate::dbt::{
         emitter::{self, BlockResult, Emitter},
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
+            emitter::{NodeKind, X86Block, X86Emitter, X86Node, X86NodeRef, X86SymbolRef},
             encoder::Instruction,
         },
     },
@@ -14,7 +14,7 @@ use {
             self, block::Block, constant_value::ConstantValue, function::Function,
             statement::Statement, types::PrimitiveTypeClass, Model,
         },
-        width_helpers::{signed_smallest_width_of_value, unsigned_smallest_width_of_value},
+        width_helpers::unsigned_smallest_width_of_value,
         HashMap, HashSet,
     },
 };
@@ -79,6 +79,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         emitter: &'e mut X86Emitter<'c>,
         current_stack_offset: usize,
     ) -> Self {
+        log::debug!("translating {function:?}");
+
         let mut celf = Self {
             model,
             function_name: InternedString::from(function),
@@ -135,7 +137,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             celf.x86_blocks.insert(rudder_block, x86_block);
         });
 
-        log::debug!("{:#?}", celf.x86_blocks);
+        log::trace!("blocks: {:#?}", celf.x86_blocks);
 
         celf
     }
@@ -319,21 +321,21 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         self.emitter.constant(0, emitter::Type::Unsigned(0)),
                     ))
                 } else {
-                    log::debug!("reading var {}", symbol.name());
+                    log::trace!("reading var {}", symbol.name());
                     let var = self.variables.get(&symbol.name()).unwrap().clone();
                     StatementResult::Data(Some(self.read_variable(var)))
                 }
             }
             Statement::WriteVariable { symbol, value } => {
                 if !symbol.typ().is_unit() {
-                    log::debug!("writing var {}", symbol.name());
+                    log::trace!("writing var {}", symbol.name());
                     if is_dynamic {
                         // if we're in a dynamic block and the local variable is not on the
                         // stack, put it there
                         if let LocalVariable::Virtual { .. } =
                             self.variables.get(&symbol.name()).unwrap()
                         {
-                            log::debug!("upgrading {:?} from virtual to stack", symbol.name());
+                            log::trace!("upgrading {:?} from virtual to stack", symbol.name());
                             self.variables.insert(
                                 symbol.name(),
                                 LocalVariable::Stack {
@@ -556,14 +558,17 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 };
             }
             Statement::Return { value } => {
-                log::debug!("writing var borealis_fn_return_value");
+                log::trace!("writing var borealis_fn_return_value");
                 let var = self
                     .variables
                     .get(&InternedString::from_static("borealis_fn_return_value"))
                     .unwrap()
                     .clone();
 
-                let value = statement_values.get(value).unwrap().clone();
+                let value = statement_values
+                    .get(value)
+                    .cloned()
+                    .unwrap_or_else(|| self.emitter.constant(0, emitter::Type::Unsigned(0))); // todo: need more cohesive handling of statement values
 
                 self.write_variable(var, value);
                 StatementResult::ControlFlow(BlockResult::Return)

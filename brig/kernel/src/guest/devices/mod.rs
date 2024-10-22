@@ -7,6 +7,7 @@ use {
         x86::{emitter::X86Emitter, X86TranslationContext},
     },
     alloc::boxed::Box,
+    common::rudder::Model,
     proc_macro_lib::ktest,
 };
 
@@ -19,8 +20,7 @@ fn init_system() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    interpret(&*model, "borealis_register_init", &[], register_file_ptr);
-    interpret(&*model, "__InitSystem", &[Value::Unit], register_file_ptr);
+    init(&*model, register_file_ptr);
 }
 
 #[ktest]
@@ -60,7 +60,7 @@ fn num_of_feature() {
     let mut ctx = X86TranslationContext::new();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    translate(&*model, "borealis_register_init", &[], &mut emitter);
+    init(&*model, register_file_ptr);
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     let feature = emitter.read_register(r0_offset.clone(), Type::Unsigned(0x20));
@@ -73,7 +73,45 @@ fn num_of_feature() {
     translation.execute(register_file_ptr);
 }
 
-#[ktest]
+//#[ktest]
+// todo fix "Labels can't be re-used and can only be set once.: label CodeLabel { id: 2657, instruction_index: 6753 } for block ref112667 (arena 6) re-used"
+fn statistical_profiling_disabled() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let unit = emitter.constant(0, Type::Unsigned(0));
+    let is_enabled = translate(
+        &*model,
+        "StatisticalProfilingEnabled",
+        &[unit],
+        &mut emitter,
+    );
+
+    let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    emitter.write_register(r0_offset, is_enabled);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(register_file_ptr);
+
+    unsafe {
+        assert_eq!(
+            false,
+            *(register_file_ptr.add(model.reg_offset("R0")) as *mut bool)
+        )
+    }
+}
+
+//#[ktest]
+// todo: called `Result::unwrap()` on an `Err` value: TryFromIntError(())
 fn decodea64_smoke() {
     let model = models::get("aarch64").unwrap();
 
@@ -83,10 +121,7 @@ fn decodea64_smoke() {
     let mut ctx = X86TranslationContext::new();
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    translate(&*model, "borealis_register_init", &[], &mut emitter);
-
-    // let unit = emitter.constant(0, Type::Unsigned(0));
-    // execute(&*model, "__InitSystem", &[unit], &mut emitter);
+    init(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x8b020020, Type::Unsigned(64));
@@ -123,6 +158,8 @@ fn decodea64_smoke_interpret() {
         let mut register_file = alloc::vec![0u8; model.register_file_size()];
         let register_file_ptr = register_file.as_mut_ptr();
 
+        init(&*model, register_file_ptr);
+
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
         let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u32;
         let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u32;
@@ -132,12 +169,6 @@ fn decodea64_smoke_interpret() {
         *r0 = 2;
         *r1 = 5;
         *r2 = 10;
-
-        interpret(&*model, "borealis_register_init", &[], register_file_ptr);
-
-        // todo: enable me
-        // let unit = crate::dbt::interpret::Value::Unit;
-        //  interpret(&*model, "__InitSystem", &[unit], register_file_ptr);
 
         let pc = crate::dbt::interpret::Value::UnsignedInteger {
             value: 0,
@@ -154,93 +185,82 @@ fn decodea64_smoke_interpret() {
     }
 }
 
-// // // #[ktest]
-// // // fn fibonacci() {
-// // //     let mut register_file = Box::new([0u8; 104488usize]);
-// // //     let register_file_ptr = register_file.as_mut_ptr();
+////#[ktest]
+fn fibonacci() {
+    let model = models::get("aarch64").unwrap();
 
-// // //     let mut ctx = X86TranslationContext::new();
-// // //     let model = models::get("aarch64").unwrap();
-// // // translate(&*model, "borealis_register_init", &[], &mut ctx);
-// // //     // OOM crashes:(
-// // //     // execute(
-// // //     //     &*model,
-// // //     //     "__InitSystem",
-// // //     //     &[ctx.emitter().constant(0, Type::Unsigned(0))],
-// // //     //     &mut ctx,
-// // //     // );
-// // //     ctx.emitter().leave();
-// // //     let translation = ctx.compile();
-// // //     translation.execute(register_file_ptr);
+    let mut register_file = Box::new([0u8; 104488usize]);
+    let register_file_ptr = register_file.as_mut_ptr();
 
-// // //     // // hacky, run sail function that goes before the main loop :/
+    init(&*model, register_file_ptr);
 
-// // //     let program = [
-// // //         // <_start>
-// // //         0xd2800000, // mov     x0, #0x0 (#0)
-// // //         0xd2800021, // mov     x1, #0x1 (#1)
-// // //         0xd2800002, // mov     x2, #0x0 (#0)
-// // //         0xd2800003, // mov     x3, #0x0 (#0)
-// // //         0xd2800144, // mov     x4, #0xa (#10)
-// // //         // <loop>
-// // //         0xeb04007f, // cmp     x3, x4
-// // //         0x540000c0, // b.eq    400104 <done>  // b.none
-// // //         0x8b010002, // add     x2, x0, x1
-// // //         0xaa0103e0, // mov     x0, x1
-// // //         0xaa0203e1, // mov     x1, x2
-// // //         0x91000463, // add     x3, x3, #0x1
-// // //         0x17fffffa, // b       4000e8 <loop>
-// // //         // <done>
-// // //         0xaa0203e0, // mov     x0, x2
-// // //         0x52800ba8, // mov     w8, #0x5d (#93)
-// // //         0xd4000001, // svc     #0x0
-// // //     ];
-// // //     unsafe {
-// // //         let see = register_file_ptr.add(model.reg_offset("SEE")) as
-// *mut // i32; //         let branch_taken =
-// // //             { register_file_ptr.add(model.reg_offset("__BranchTaken"))
-// as // // *mut bool };         let pc = {
-// // // register_file_ptr.add(model.reg_offset("_PC")) as *mut u64 };
-// let // r0 // = { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
-// // let // r3 = { register_file_ptr.add(model.reg_offset("R3")) as *mut u64 };
+    let program = [
+        // <_start>
+        0xd2800000, // mov     x0, #0x0 (#0)
+        0xd2800021, // mov     x1, #0x1 (#1)
+        0xd2800002, // mov     x2, #0x0 (#0)
+        0xd2800003, // mov     x3, #0x0 (#0)
+        0xd2800144, // mov     x4, #0xa (#10)
+        // <loop>
+        0xeb04007f, // cmp     x3, x4
+        0x540000c0, // b.eq    400104 <done>  // b.none
+        0x8b010002, // add     x2, x0, x1
+        0xaa0103e0, // mov     x0, x1
+        0xaa0203e1, // mov     x1, x2
+        0x91000463, // add     x3, x3, #0x1
+        0x17fffffa, // b       4000e8 <loop>
+        // <done>
+        0xaa0203e0, // mov     x0, x2
+        0x52800ba8, // mov     w8, #0x5d (#93)
+        0xd4000001, // svc     #0x0
+    ];
 
-// // //         // bounded just in case
-// // //         for _ in 0..100 {
-// // //             log::warn!("pc = {}", *pc);
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let branch_taken =
+            { register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool };
+        let pc = { register_file_ptr.add(model.reg_offset("_PC")) as *mut u64 };
+        let r0 = { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
+        let r3 = { register_file_ptr.add(model.reg_offset("R3")) as *mut u64 };
 
-// // //             *see = -1;
-// // //             *branch_taken = false;
+        // bounded just in case
+        for _ in 0..100 {
+            log::warn!("pc = {}", *pc);
 
-// // //             // exit before the svc
-// // //             if *pc == 0x38 {
-// // //                 break;
-// // //             }
+            *see = -1;
+            *branch_taken = false;
 
-// // //             let mut ctx = X86TranslationContext::new();
-// // //             let model = models::get("aarch64").unwrap();
+            // exit before the svc
+            if *pc == 0x38 {
+                break;
+            }
 
-// // //             {
-// // //                 let opcode = ctx
-// // //                     .emitter()
-// // //                     .constant(program[*pc as usize / 4],
-// // Type::Unsigned(64)); //                 let pc =
-// ctx.emitter().constant(*pc, // Type::Unsigned(64)); //
-// execute(&*model, "__DecodeA64", &[pc, // opcode], &mut ctx); //             }
+            let model = models::get("aarch64").unwrap();
 
-// // //             ctx.emitter().leave();
-// // //             let translation = ctx.compile();
-// // //             translation.execute(register_file_ptr);
+            let mut ctx = X86TranslationContext::new();
+            let mut emitter = X86Emitter::new(&mut ctx);
 
-// // //             // increment PC if no branch was taken
-// // //             if !*branch_taken {
-// // //                 *pc += 4;
-// // //             }
-// // //         }
+            {
+                let opcode = emitter.constant(program[*pc as usize / 4], Type::Unsigned(64));
+                let pc = emitter.constant(*pc, Type::Unsigned(64));
+                translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+            }
 
-// // //         assert_eq!(89, *r0);
-// // //         assert_eq!(10, *r3);
-// // //     }
-// // // }
+            emitter.leave();
+            let num_regs = emitter.next_vreg();
+            let translation = ctx.compile(num_regs);
+            translation.execute(register_file_ptr);
+
+            // increment PC if no branch was taken
+            if !*branch_taken {
+                *pc += 4;
+            }
+        }
+
+        assert_eq!(89, *r0);
+        assert_eq!(10, *r3);
+    }
+}
 
 #[ktest]
 fn addwithcarry_negative() {
@@ -294,7 +314,8 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let mut emitter = X86Emitter::new(&mut ctx);
     let model = models::get("aarch64").unwrap();
 
-    translate(&*model, "borealis_register_init", &[], &mut emitter);
+    init(&*model, register_file_ptr);
+
     let r0 = unsafe { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
     let r1 = unsafe { register_file_ptr.add(model.reg_offset("R1")) as *mut u64 };
     let r2 = unsafe { register_file_ptr.add(model.reg_offset("R2")) as *mut u8 };
@@ -334,8 +355,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 
     unsafe { (*r0, *(r1 as *mut u8)) }
 }
-
-// #[ktest]
+//#[ktest]
 // fn ubfx() {
 //     {
 //         let mut state = State::new(Box::new(NoneEnv));
@@ -359,7 +379,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 //     }
 // }
 
-// // // #[ktest]
+// //////#[ktest]
 // // // fn replicate_bits() {
 // // //     let mut register_file = Box::new([0u8; 104488usize]);
 // // //     let register_file_ptr = register_file.as_mut_ptr();
@@ -386,7 +406,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // Bits::new(0x1, // 1), 32)     );
 // // // }
 
-// // // #[ktest]
+// //////#[ktest]
 // // // fn rev_d00dfeed() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     state.write_register::<u64>(REG_R3, 0xedfe0dd0);
@@ -394,7 +414,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // 32, // 3, // 32, 3);     assert_eq!(0xd00dfeed,
 // state.read_register::<u64>(REG_R3)); // // }
 
-// // // #[ktest]
+// //////#[ktest]
 // // // fn ispow2() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     let x = 2048i128;
@@ -405,7 +425,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert!(IsPow2(&mut state, TRACER, x));
 // // // }
 
-// // // #[ktest]
+// //////#[ktest]
 // // // fn udiv() {
 // // //     let x = 0xffffff8008bfffffu64;
 // // //     let y = 0x200000u64;
@@ -420,7 +440,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert_eq!(x / y, state.read_register(REG_R19));
 // // // }
 
-// // // #[ktest]
+// //////#[ktest]
 // // // fn place_slice() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     assert_eq!(
@@ -448,7 +468,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert_eq!(state.read_register::<u64>(REG_R2),
 // 0xffff_ffff_ffff_ff00); // // }
 
-// // // #[ktest]
+// //////#[ktest]
 // // // fn cmp_csel_2() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
@@ -468,7 +488,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert_eq!(state.read_register::<u64>(REG_R2),
 // 0x0fff_ffff_ffff_ffc0); // // }
 
-// // // #[ktest]
+// //////#[ktest]
 // // // fn rbitx0() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     state.write_register::<u64>(REG_R0, 0x0000000000000001);
@@ -479,3 +499,303 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     // assert bits are reversed
 // // //     assert_eq!(state.read_register::<u64>(REG_R0), 0x8000000000000000);
 // // // }
+
+fn init(model: &Model, register_file: *mut u8) {
+    interpret(&*model, "borealis_register_init", &[], register_file);
+    configure_features(&*model, register_file);
+    interpret(&*model, "__InitSystem", &[Value::Unit], register_file);
+}
+
+fn configure_features(model: &Model, register_file: *mut u8) {
+    let features = [
+        "FEAT_AA32EL0_IMPLEMENTED",
+        "FEAT_AA32EL1_IMPLEMENTED",
+        "FEAT_AA32EL2_IMPLEMENTED",
+        "FEAT_AA32EL3_IMPLEMENTED",
+        "FEAT_AA64EL0_IMPLEMENTED",
+        "FEAT_AA64EL1_IMPLEMENTED",
+        "FEAT_AA64EL2_IMPLEMENTED",
+        "FEAT_AA64EL3_IMPLEMENTED",
+        "FEAT_EL0_IMPLEMENTED",
+        "FEAT_EL1_IMPLEMENTED",
+        "FEAT_EL2_IMPLEMENTED",
+        "FEAT_EL3_IMPLEMENTED",
+        "FEAT_AES_IMPLEMENTED",
+        "FEAT_AdvSIMD_IMPLEMENTED",
+        "FEAT_CSV2_1p1_IMPLEMENTED",
+        "FEAT_CSV2_1p2_IMPLEMENTED",
+        "FEAT_CSV2_2_IMPLEMENTED",
+        "FEAT_CSV2_3_IMPLEMENTED",
+        "FEAT_DoubleLock_IMPLEMENTED",
+        "FEAT_ETMv4_IMPLEMENTED",
+        "FEAT_ETMv4p1_IMPLEMENTED",
+        "FEAT_ETMv4p2_IMPLEMENTED",
+        "FEAT_ETMv4p3_IMPLEMENTED",
+        "FEAT_ETMv4p4_IMPLEMENTED",
+        "FEAT_ETMv4p5_IMPLEMENTED",
+        "FEAT_ETMv4p6_IMPLEMENTED",
+        "FEAT_ETS2_IMPLEMENTED",
+        "FEAT_FP_IMPLEMENTED",
+        "FEAT_GICv3_IMPLEMENTED",
+        "FEAT_GICv3_LEGACY_IMPLEMENTED",
+        "FEAT_GICv3_TDIR_IMPLEMENTED",
+        "FEAT_GICv3p1_IMPLEMENTED",
+        "FEAT_GICv4_IMPLEMENTED",
+        "FEAT_GICv4p1_IMPLEMENTED",
+        "FEAT_IVIPT_IMPLEMENTED",
+        "FEAT_PCSRv8_IMPLEMENTED",
+        "FEAT_PMULL_IMPLEMENTED",
+        "FEAT_PMUv3_IMPLEMENTED",
+        "FEAT_PMUv3_EXT_IMPLEMENTED",
+        "FEAT_PMUv3_EXT32_IMPLEMENTED",
+        "FEAT_SHA1_IMPLEMENTED",
+        "FEAT_SHA256_IMPLEMENTED",
+        "FEAT_TRC_EXT_IMPLEMENTED",
+        "FEAT_TRC_SR_IMPLEMENTED",
+        "FEAT_nTLBPA_IMPLEMENTED",
+        "FEAT_CRC32_IMPLEMENTED",
+        "FEAT_Debugv8p1_IMPLEMENTED",
+        "FEAT_HAFDBS_IMPLEMENTED",
+        "FEAT_HPDS_IMPLEMENTED",
+        "FEAT_LOR_IMPLEMENTED",
+        "FEAT_LSE_IMPLEMENTED",
+        "FEAT_PAN_IMPLEMENTED",
+        "FEAT_PMUv3p1_IMPLEMENTED",
+        "FEAT_RDM_IMPLEMENTED",
+        "FEAT_VHE_IMPLEMENTED",
+        "FEAT_VMID16_IMPLEMENTED",
+        "FEAT_AA32BF16_IMPLEMENTED",
+        "FEAT_AA32HPD_IMPLEMENTED",
+        "FEAT_AA32I8MM_IMPLEMENTED",
+        "FEAT_ASMv8p2_IMPLEMENTED",
+        "FEAT_DPB_IMPLEMENTED",
+        "FEAT_Debugv8p2_IMPLEMENTED",
+        "FEAT_EDHSR_IMPLEMENTED",
+        "FEAT_F32MM_IMPLEMENTED",
+        "FEAT_F64MM_IMPLEMENTED",
+        "FEAT_FP16_IMPLEMENTED",
+        "FEAT_HPDS2_IMPLEMENTED",
+        "FEAT_I8MM_IMPLEMENTED",
+        "FEAT_IESB_IMPLEMENTED",
+        "FEAT_LPA_IMPLEMENTED",
+        "FEAT_LSMAOC_IMPLEMENTED",
+        "FEAT_LVA_IMPLEMENTED",
+        "FEAT_MPAM_IMPLEMENTED",
+        "FEAT_PAN2_IMPLEMENTED",
+        "FEAT_PCSRv8p2_IMPLEMENTED",
+        "FEAT_RAS_IMPLEMENTED",
+        "FEAT_SHA3_IMPLEMENTED",
+        "FEAT_SHA512_IMPLEMENTED",
+        "FEAT_SM3_IMPLEMENTED",
+        "FEAT_SM4_IMPLEMENTED",
+        "FEAT_SPE_IMPLEMENTED",
+        "FEAT_SVE_IMPLEMENTED",
+        "FEAT_TTCNP_IMPLEMENTED",
+        "FEAT_UAO_IMPLEMENTED",
+        "FEAT_VPIPT_IMPLEMENTED",
+        "FEAT_XNX_IMPLEMENTED",
+        "FEAT_CCIDX_IMPLEMENTED",
+        "FEAT_CONSTPACFIELD_IMPLEMENTED",
+        "FEAT_EPAC_IMPLEMENTED",
+        "FEAT_FCMA_IMPLEMENTED",
+        "FEAT_FPAC_IMPLEMENTED",
+        "FEAT_FPACCOMBINE_IMPLEMENTED",
+        "FEAT_JSCVT_IMPLEMENTED",
+        "FEAT_LRCPC_IMPLEMENTED",
+        "FEAT_NV_IMPLEMENTED",
+        "FEAT_PACIMP_IMPLEMENTED",
+        "FEAT_PACQARMA3_IMPLEMENTED",
+        "FEAT_PACQARMA5_IMPLEMENTED",
+        "FEAT_PAuth_IMPLEMENTED",
+        "FEAT_SPEv1p1_IMPLEMENTED",
+        "FEAT_AMUv1_IMPLEMENTED",
+        "FEAT_BBM_IMPLEMENTED",
+        "FEAT_CNTSC_IMPLEMENTED",
+        "FEAT_DIT_IMPLEMENTED",
+        "FEAT_Debugv8p4_IMPLEMENTED",
+        "FEAT_DotProd_IMPLEMENTED",
+        "FEAT_DoubleFault_IMPLEMENTED",
+        "FEAT_FHM_IMPLEMENTED",
+        "FEAT_FlagM_IMPLEMENTED",
+        "FEAT_IDST_IMPLEMENTED",
+        "FEAT_LRCPC2_IMPLEMENTED",
+        "FEAT_LSE2_IMPLEMENTED",
+        "FEAT_NV2_IMPLEMENTED",
+        "FEAT_PMUv3p4_IMPLEMENTED",
+        "FEAT_RASSAv1p1_IMPLEMENTED",
+        "FEAT_RASv1p1_IMPLEMENTED",
+        "FEAT_S2FWB_IMPLEMENTED",
+        "FEAT_SEL2_IMPLEMENTED",
+        "FEAT_TLBIOS_IMPLEMENTED",
+        "FEAT_TLBIRANGE_IMPLEMENTED",
+        "FEAT_TRF_IMPLEMENTED",
+        "FEAT_TTL_IMPLEMENTED",
+        "FEAT_TTST_IMPLEMENTED",
+        "FEAT_BTI_IMPLEMENTED",
+        "FEAT_CSV2_IMPLEMENTED",
+        "FEAT_CSV3_IMPLEMENTED",
+        "FEAT_DPB2_IMPLEMENTED",
+        "FEAT_E0PD_IMPLEMENTED",
+        "FEAT_EVT_IMPLEMENTED",
+        "FEAT_ExS_IMPLEMENTED",
+        "FEAT_FRINTTS_IMPLEMENTED",
+        "FEAT_FlagM2_IMPLEMENTED",
+        "FEAT_GTG_IMPLEMENTED",
+        "FEAT_MTE_IMPLEMENTED",
+        "FEAT_MTE2_IMPLEMENTED",
+        "FEAT_PMUv3p5_IMPLEMENTED",
+        "FEAT_RNG_IMPLEMENTED",
+        "FEAT_RNG_TRAP_IMPLEMENTED",
+        "FEAT_SB_IMPLEMENTED",
+        "FEAT_SPECRES_IMPLEMENTED",
+        "FEAT_SSBS_IMPLEMENTED",
+        "FEAT_SSBS2_IMPLEMENTED",
+        "FEAT_AMUv1p1_IMPLEMENTED",
+        "FEAT_BF16_IMPLEMENTED",
+        "FEAT_DGH_IMPLEMENTED",
+        "FEAT_ECV_IMPLEMENTED",
+        "FEAT_FGT_IMPLEMENTED",
+        "FEAT_HPMN0_IMPLEMENTED",
+        "FEAT_MPAMv0p1_IMPLEMENTED",
+        "FEAT_MPAMv1p1_IMPLEMENTED",
+        "FEAT_MTPMU_IMPLEMENTED",
+        "FEAT_PAuth2_IMPLEMENTED",
+        "FEAT_TWED_IMPLEMENTED",
+        "FEAT_AFP_IMPLEMENTED",
+        "FEAT_EBF16_IMPLEMENTED",
+        "FEAT_HCX_IMPLEMENTED",
+        "FEAT_LPA2_IMPLEMENTED",
+        "FEAT_LS64_IMPLEMENTED",
+        "FEAT_LS64_ACCDATA_IMPLEMENTED",
+        "FEAT_LS64_V_IMPLEMENTED",
+        "FEAT_MTE3_IMPLEMENTED",
+        "FEAT_PAN3_IMPLEMENTED",
+        "FEAT_PMUv3p7_IMPLEMENTED",
+        "FEAT_RPRES_IMPLEMENTED",
+        "FEAT_SPEv1p2_IMPLEMENTED",
+        "FEAT_WFxT_IMPLEMENTED",
+        "FEAT_XS_IMPLEMENTED",
+        "FEAT_CMOW_IMPLEMENTED",
+        "FEAT_Debugv8p8_IMPLEMENTED",
+        "FEAT_GICv3_NMI_IMPLEMENTED",
+        "FEAT_HBC_IMPLEMENTED",
+        "FEAT_MOPS_IMPLEMENTED",
+        "FEAT_NMI_IMPLEMENTED",
+        "FEAT_PMUv3_EXT64_IMPLEMENTED",
+        "FEAT_PMUv3_TH_IMPLEMENTED",
+        "FEAT_PMUv3p8_IMPLEMENTED",
+        "FEAT_SCTLR2_IMPLEMENTED",
+        "FEAT_SPEv1p3_IMPLEMENTED",
+        "FEAT_TCR2_IMPLEMENTED",
+        "FEAT_TIDCP1_IMPLEMENTED",
+        "FEAT_ADERR_IMPLEMENTED",
+        "FEAT_AIE_IMPLEMENTED",
+        "FEAT_ANERR_IMPLEMENTED",
+        "FEAT_CLRBHB_IMPLEMENTED",
+        "FEAT_CSSC_IMPLEMENTED",
+        "FEAT_Debugv8p9_IMPLEMENTED",
+        "FEAT_DoubleFault2_IMPLEMENTED",
+        "FEAT_ECBHB_IMPLEMENTED",
+        "FEAT_FGT2_IMPLEMENTED",
+        "FEAT_HAFT_IMPLEMENTED",
+        "FEAT_LRCPC3_IMPLEMENTED",
+        "FEAT_MTE4_IMPLEMENTED",
+        "FEAT_MTE_ASYM_FAULT_IMPLEMENTED",
+        "FEAT_MTE_ASYNC_IMPLEMENTED",
+        "FEAT_MTE_CANONICAL_TAGS_IMPLEMENTED",
+        "FEAT_MTE_NO_ADDRESS_TAGS_IMPLEMENTED",
+        "FEAT_MTE_PERM_IMPLEMENTED",
+        "FEAT_MTE_STORE_ONLY_IMPLEMENTED",
+        "FEAT_MTE_TAGGED_FAR_IMPLEMENTED",
+        "FEAT_PCSRv8p9_IMPLEMENTED",
+        "FEAT_PFAR_IMPLEMENTED",
+        "FEAT_PMUv3_EDGE_IMPLEMENTED",
+        "FEAT_PMUv3_ICNTR_IMPLEMENTED",
+        "FEAT_PMUv3_SS_IMPLEMENTED",
+        "FEAT_PMUv3p9_IMPLEMENTED",
+        "FEAT_PRFMSLC_IMPLEMENTED",
+        "FEAT_RASSAv2_IMPLEMENTED",
+        "FEAT_RASv2_IMPLEMENTED",
+        "FEAT_RPRFM_IMPLEMENTED",
+        "FEAT_S1PIE_IMPLEMENTED",
+        "FEAT_S1POE_IMPLEMENTED",
+        "FEAT_S2PIE_IMPLEMENTED",
+        "FEAT_S2POE_IMPLEMENTED",
+        "FEAT_SPECRES2_IMPLEMENTED",
+        "FEAT_SPE_CRR_IMPLEMENTED",
+        "FEAT_SPE_FDS_IMPLEMENTED",
+        "FEAT_SPEv1p4_IMPLEMENTED",
+        "FEAT_SPMU_IMPLEMENTED",
+        "FEAT_THE_IMPLEMENTED",
+        "FEAT_DoPD_IMPLEMENTED",
+        "FEAT_ETE_IMPLEMENTED",
+        "FEAT_SVE2_IMPLEMENTED",
+        "FEAT_SVE_AES_IMPLEMENTED",
+        "FEAT_SVE_BitPerm_IMPLEMENTED",
+        "FEAT_SVE_PMULL128_IMPLEMENTED",
+        "FEAT_SVE_SHA3_IMPLEMENTED",
+        "FEAT_SVE_SM4_IMPLEMENTED",
+        "FEAT_TME_IMPLEMENTED",
+        "FEAT_TRBE_IMPLEMENTED",
+        "FEAT_ETEv1p1_IMPLEMENTED",
+        "FEAT_BRBE_IMPLEMENTED",
+        "FEAT_ETEv1p2_IMPLEMENTED",
+        "FEAT_RME_IMPLEMENTED",
+        "FEAT_SME_IMPLEMENTED",
+        "FEAT_SME_F64F64_IMPLEMENTED",
+        "FEAT_SME_FA64_IMPLEMENTED",
+        "FEAT_SME_I16I64_IMPLEMENTED",
+        "FEAT_BRBEv1p1_IMPLEMENTED",
+        "FEAT_MEC_IMPLEMENTED",
+        "FEAT_SME2_IMPLEMENTED",
+        "FEAT_ABLE_IMPLEMENTED",
+        "FEAT_CHK_IMPLEMENTED",
+        "FEAT_D128_IMPLEMENTED",
+        "FEAT_EBEP_IMPLEMENTED",
+        "FEAT_ETEv1p3_IMPLEMENTED",
+        "FEAT_GCS_IMPLEMENTED",
+        "FEAT_ITE_IMPLEMENTED",
+        "FEAT_LSE128_IMPLEMENTED",
+        "FEAT_LVA3_IMPLEMENTED",
+        "FEAT_SEBEP_IMPLEMENTED",
+        "FEAT_SME2p1_IMPLEMENTED",
+        "FEAT_SME_F16F16_IMPLEMENTED",
+        "FEAT_SVE2p1_IMPLEMENTED",
+        "FEAT_SVE_B16B16_IMPLEMENTED",
+        "FEAT_SYSINSTR128_IMPLEMENTED",
+        "FEAT_SYSREG128_IMPLEMENTED",
+        "FEAT_TRBE_EXT_IMPLEMENTED",
+        "FEAT_TRBE_MPAM_IMPLEMENTED",
+        "v8Ap0_IMPLEMENTED",
+        "v8Ap1_IMPLEMENTED",
+        "v8Ap2_IMPLEMENTED",
+        "v8Ap3_IMPLEMENTED",
+        "v8Ap4_IMPLEMENTED",
+        "v8Ap5_IMPLEMENTED",
+        "v8Ap6_IMPLEMENTED",
+        "v8Ap7_IMPLEMENTED",
+        "v8Ap8_IMPLEMENTED",
+        "v8Ap9_IMPLEMENTED",
+        "v9Ap0_IMPLEMENTED",
+        "v9Ap1_IMPLEMENTED",
+        "v9Ap2_IMPLEMENTED",
+        "v9Ap3_IMPLEMENTED",
+        "v9Ap4_IMPLEMENTED",
+    ];
+
+    let enabled = [
+        "FEAT_AA64EL0_IMPLEMENTED",
+        "FEAT_AA64EL1_IMPLEMENTED",
+        "FEAT_AA64EL2_IMPLEMENTED",
+        "FEAT_AA64EL3_IMPLEMENTED",
+        "FEAT_D128_IMPLEMENTED",
+    ];
+
+    features
+        .iter()
+        .map(|name| (name, enabled.contains(name)))
+        .for_each(|(name, value)| {
+            let offset = model.reg_offset(name);
+            unsafe { register_file.add(offset).write(value as u8) };
+        });
+}

@@ -123,9 +123,14 @@ impl IrqManager {
             self.avail.insert(i);
         }
 
-        for i in 0x50..0x60 {
+        for (f, i) in [
+            (dbt_handler_undefined_terminator as IrqHandlerFn, 0x50),
+            (dbt_handler_default_terminator, 0x51),
+            (dbt_handler_const_assert, 0x52),
+            (dbt_handler_panic, 0x53),
+        ] {
             self.avail.remove(&i);
-            self.assign_irq(i, dbt_handler);
+            self.assign_irq(i, f);
         }
 
         self.idt.load();
@@ -199,6 +204,19 @@ fn gpf_exception(machine_context: *mut MachineContext) {
 }
 
 #[irq_handler(with_code = true)]
-fn dbt_handler(_machine_context: *mut MachineContext) {
-    panic!("DBT interrupt")
+fn dbt_handler_undefined_terminator(_machine_context: *mut MachineContext) {
+    panic!("DBT interrupt: undefined terminator")
+}
+
+#[irq_handler(with_code = true)]
+fn dbt_handler_default_terminator(_machine_context: *mut MachineContext) {
+    panic!("DBT interrupt: default terminator")
+}
+#[irq_handler(with_code = true)]
+fn dbt_handler_const_assert(_machine_context: *mut MachineContext) {
+    panic!("DBT interrupt: const assert")
+}
+#[irq_handler(with_code = true)]
+fn dbt_handler_panic(_machine_context: *mut MachineContext) {
+    panic!("DBT interrupt: panic")
 }

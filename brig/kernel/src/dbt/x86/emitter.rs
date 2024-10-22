@@ -95,7 +95,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 typ,
                 kind: NodeKind::GuestRegister { offset: *value },
             }),
-            _ => panic!("can't read non constant offset"),
+            _ => panic!("can't read non constant offset: {offset:#?}"),
         }
     }
 
@@ -487,6 +487,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     ) -> Self::NodeRef {
         let typ = value.typ().clone();
         match (value.kind(), start.kind(), length.kind()) {
+            // total constant
             (
                 NodeKind::Constant { value, .. },
                 NodeKind::Constant { value: start, .. },
@@ -498,6 +499,32 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     width: u16::try_from(*length).unwrap(),
                 },
             }),
+            // known start and length
+            (
+                _,
+                NodeKind::Constant { .. },
+                NodeKind::Constant {
+                    value: length_value,
+                    ..
+                },
+            ) => {
+                // value >> start && mask(length)
+                let shifted =
+                    self.shift(value.clone(), start, ShiftOperationKind::LogicalShiftLeft);
+
+                let cast = self.cast(
+                    shifted,
+                    Type::Unsigned(u16::try_from(*length_value).unwrap()),
+                    CastOperationKind::Truncate,
+                );
+
+                let mask = self.constant(
+                    mask(u32::try_from(*length_value).unwrap()),
+                    cast.typ().clone(),
+                );
+
+                self.binary_operation(BinaryOperationKind::And(cast, mask))
+            }
             // todo: constant start and length with non-constant value can still be specialized?
             _ => Self::NodeRef::from(X86Node {
                 typ,
@@ -641,7 +668,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     }
 
     fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
-        let width = u8::try_from(typ.width()).unwrap();
+        let width = typ.width();
 
         Self::NodeRef::from(X86Node {
             typ,
@@ -724,7 +751,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
     fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef {
         let NodeKind::Tuple(values) = tuple.kind() else {
-            unreachable!()
+            panic!("accessing non tuple: {:?}", *tuple.0)
         };
 
         values[index].clone()
@@ -740,7 +767,16 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 if let NodeKind::Constant { width, .. } = value.kind() {
                     self.constant(u64::from(*width), Type::Unsigned(16))
                 } else {
-                    todo!("size of {value:#?}")
+                    match value.kind() {
+                        NodeKind::Cast {
+                            value,
+                            kind: CastOperationKind::ZeroExtend,
+                        } => match value.typ() {
+                            Type::Unsigned(w) => self.constant(u64::from(*w), Type::Unsigned(16)),
+                            _ => todo!(),
+                        },
+                        _ => todo!("size of {value:#?}"),
+                    }
                 }
             }
             Type::Tuple => todo!(),
@@ -841,11 +877,12 @@ impl X86NodeRef {
                 Operand::imm((*width).try_into().unwrap(), *value)
             }
             NodeKind::GuestRegister { offset } => {
-                let dst = Operand::vreg(64, emitter.next_vreg());
+                let width = self.typ().width();
+                let dst = Operand::vreg(width, emitter.next_vreg());
 
                 emitter.append(Instruction::mov(
                     Operand::mem_base_displ(
-                        64,
+                        width,
                         Register::PhysicalRegister(PhysicalRegister::RBP),
                         (*offset).try_into().unwrap(),
                     ),
@@ -870,7 +907,7 @@ impl X86NodeRef {
             }
             NodeKind::BinaryOperation(kind) => match kind {
                 BinaryOperationKind::Add(left, right) => {
-                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -880,7 +917,7 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::Sub(left, right) => {
-                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -890,7 +927,7 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::Or(left, right) => {
-                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -900,7 +937,7 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::And(left, right) => {
-                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -922,7 +959,7 @@ impl X86NodeRef {
             },
             NodeKind::TernaryOperation(kind) => match kind {
                 TernaryOperationKind::AddWithCarry(a, b, carry) => {
-                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let dst = Operand::vreg(a.typ().width(), emitter.next_vreg());
 
                     let a = a.to_operand(emitter);
                     let b = b.to_operand(emitter);
@@ -937,7 +974,7 @@ impl X86NodeRef {
             NodeKind::UnaryOperation(kind) => match &kind {
                 // todo: not might be wrong here (output 0 or 1?)
                 UnaryOperationKind::Complement(value) | UnaryOperationKind::Not(value) => {
-                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let dst = Operand::vreg(value.typ().width(), emitter.next_vreg());
                     let value = value.to_operand(emitter);
                     emitter.append(Instruction::mov(value, dst.clone()));
                     emitter.append(Instruction::not(dst.clone()));
@@ -981,6 +1018,7 @@ impl X86NodeRef {
                     dst
                 };
 
+                // todo: this 64 should be the value of `length`
                 let dst = Operand::vreg(64, emitter.next_vreg());
 
                 emitter.append(Instruction::bextr(control_byte, value, dst.clone()));
@@ -1014,7 +1052,12 @@ impl X86NodeRef {
                             panic!("{:?}\n{:#?}", self.typ(), value);
                         }
                         CastOperationKind::Truncate => {
-                            assert!(src.width_in_bits > dst.width_in_bits);
+                            let src_width = canonicalize_width(src.width_in_bits);
+                            let dst_width = canonicalize_width(dst.width_in_bits);
+                            if src_width < dst_width {
+                                panic!("src ({src_width} bits) must be larger than dst ({dst_width} bits)");
+                            }
+
                             emitter.append(Instruction::mov(src, dst.clone()));
                         }
 
@@ -1069,9 +1112,9 @@ impl X86NodeRef {
                 let length = length.to_operand(emitter);
 
                 let mask = Operand::vreg(64, emitter.next_vreg());
-                emitter.append(Instruction::mov(Operand::imm(64, 1), mask.clone()));
+                emitter.append(Instruction::mov(Operand::imm(64, 64), mask.clone()));
                 emitter.append(Instruction::shl(length.clone(), mask.clone()));
-                emitter.append(Instruction::sub(Operand::imm(64, 1), mask.clone()));
+                emitter.append(Instruction::sub(Operand::imm(64, 64), mask.clone()));
                 emitter.append(Instruction::shl(start, mask.clone()));
 
                 let masked_target = Operand::vreg(64, emitter.next_vreg());
@@ -1136,10 +1179,7 @@ impl X86NodeRef {
                 true_value,
                 false_value,
             } => {
-                let dest = Operand::vreg(
-                    u8::try_from(true_value.typ().width()).unwrap(),
-                    emitter.next_vreg(),
-                );
+                let dest = Operand::vreg(true_value.typ().width(), emitter.next_vreg());
 
                 let condition = condition.to_operand(emitter);
                 let true_value = true_value.to_operand(emitter);
@@ -1191,7 +1231,7 @@ pub enum NodeKind {
     ReadStackVariable {
         // positive offset here (will be subtracted from RSP)
         offset: usize,
-        width: u8,
+        width: u16,
     },
     BitExtract {
         value: X86NodeRef,
@@ -1348,7 +1388,7 @@ fn emit_compare(
         | (Immediate(_), Memory { .. })
         | (Memory { .. }, Memory { .. }) => {
             let left = if let (Memory { .. }, Memory { .. }) = (&left.kind, &right.kind) {
-                let dst = Operand::vreg(64, emitter.next_vreg());
+                let dst = Operand::vreg(left.width_in_bits, emitter.next_vreg());
                 emitter.append(Instruction::mov(left, dst.clone()));
                 dst
             } else {
@@ -1359,7 +1399,7 @@ fn emit_compare(
 
             // setCC only sets the lowest bit
 
-            let dst = Operand::vreg(64, emitter.next_vreg());
+            let dst = Operand::vreg(1, emitter.next_vreg());
 
             emitter.append(match kind {
                 BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
@@ -1380,7 +1420,7 @@ fn emit_compare(
 
         (Memory { .. }, Immediate(_)) | (Register(_), Immediate(_)) => {
             emitter.append(Instruction::cmp(right, left));
-            let dst = Operand::vreg(64, emitter.next_vreg());
+            let dst = Operand::vreg(1, emitter.next_vreg());
 
             emitter.append(match kind {
                 BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
@@ -1406,7 +1446,7 @@ fn emit_compare(
     emitter.append(Instruction::and(
         Operand {
             kind: OperandKind::Immediate(0b1),
-            width_in_bits: 64,
+            width_in_bits: 8,
         },
         dst.clone(),
     ));
@@ -1426,7 +1466,7 @@ fn emit_compare(
     // }
 }
 
-fn canonicalize_width(width: u16) -> u8 {
+fn canonicalize_width(width: u16) -> u16 {
     match width {
         0..=8 => 8,
         9..=16 => 16,

@@ -323,6 +323,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AddrTop",
         "S1TranslationRegime",
         "EffectiveTBI",
+        "ConstrainUnpredictableBits",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

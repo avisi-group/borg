@@ -27,6 +27,7 @@ static LOGGER: &'static dyn Log = &Logger {
         ("virtio_drivers", LevelFilter::Warn),
         ("tar_no_std", LevelFilter::Warn),
         ("elfloader", LevelFilter::Info),
+        ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
         ("kernel::dbt::x86", LevelFilter::Info),
         ("kernel::dbt::translate", LevelFilter::Info),
         ("kernel::dbt::interpret", LevelFilter::Info),

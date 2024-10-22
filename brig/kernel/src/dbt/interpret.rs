@@ -136,7 +136,7 @@ impl<'f> Interpreter<'f> {
                         65..=128 => u64::try_from(self.read_reg::<u128>(offset)).unwrap(),
 
                         w => {
-                            log::warn!(
+                            log::trace!(
                                 "tried to read a {w} bit register offset {offset}, returning 0"
                             );
                             0
@@ -293,7 +293,7 @@ impl<'f> Interpreter<'f> {
                                 value.overflowing_shl(u32::try_from(amount).unwrap());
 
                             if did_overflow {
-                                log::warn!("overflowed during lsl of {value} by {amount}");
+                                log::trace!("overflowed during lsl of {value} by {amount}");
                             }
 
                             Some(Value::UnsignedInteger {
@@ -588,7 +588,7 @@ impl<'f> Interpreter<'f> {
                             self.write_reg(offset + 8, 0u64); // todo: hack
                         }
                         w => {
-                            log::warn!("tried to write {value} to a {w} bit register offset {offset}, did nothing");
+                            log::trace!("tried to write {value} to a {w} bit register offset {offset}, did nothing");
                         }
                     }
 

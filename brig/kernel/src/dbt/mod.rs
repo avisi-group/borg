@@ -49,9 +49,10 @@ impl Debug for Translation {
 fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
     // todo: hack
     if start >= 64 {
-        log::warn!("attempting to insert {length} bits of {source} into {target} at {start}");
         if source == 0 {
             return 0;
+        } else {
+            panic!("attempting to insert {length} bits of {source} into {target} at {start}");
         }
     }
 
