@@ -952,6 +952,7 @@ impl Instruction {
                     .cmp::<AsmRegister64, i32>(right.into(), (*left).try_into().unwrap())
                     .unwrap();
             }
+
             SETAE(Operand {
                 kind: R(PHYS(condition)),
                 ..
@@ -1074,10 +1075,14 @@ impl Instruction {
                     ..
                 },
             ) => {
-                //assert_eq!(left_width, right_width);
-                assembler
-                    .and::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
-                    .unwrap();
+                if *left == u64::MAX {
+                    // no-op
+                } else {
+                    //assert_eq!(left_width, right_width);
+                    assembler
+                        .and::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
+                        .unwrap();
+                }
             }
             BEXTR(
                 Operand {

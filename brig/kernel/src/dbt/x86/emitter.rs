@@ -972,12 +972,22 @@ impl X86NodeRef {
                 }
             },
             NodeKind::UnaryOperation(kind) => match &kind {
-                // todo: not might be wrong here (output 0 or 1?)
-                UnaryOperationKind::Complement(value) | UnaryOperationKind::Not(value) => {
+                UnaryOperationKind::Complement(value) => {
                     let dst = Operand::vreg(value.typ().width(), emitter.next_vreg());
                     let value = value.to_operand(emitter);
                     emitter.append(Instruction::mov(value, dst.clone()));
                     emitter.append(Instruction::not(dst.clone()));
+                    dst
+                }
+                UnaryOperationKind::Not(value) => {
+                    let width = value.typ().width();
+                    let value = value.to_operand(emitter);
+                    let dst = Operand::vreg(width, emitter.next_vreg());
+
+                    emitter.append(Instruction::cmp(Operand::imm(width, 0), value));
+                    emitter.append(Instruction::sete(dst.clone()));
+                    emitter.append(Instruction::and(Operand::imm(width, 1), dst.clone()));
+
                     dst
                 }
                 kind => todo!("{kind:?}"),

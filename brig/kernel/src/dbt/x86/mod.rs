@@ -132,13 +132,6 @@ impl X86TranslationContext {
         let mut to_visit = alloc::vec![];
 
         {
-            let panic_label = assembler.create_label();
-            log::trace!("panic_block ({panic_label:?}) {:?}", self.panic_block());
-            label_map.insert(self.panic_block(), panic_label);
-            to_visit.push(self.panic_block()) // visit panic block last
-        }
-
-        {
             let initial_label = assembler.create_label();
             log::trace!(
                 "initial_block ({initial_label:?}) {:?}",

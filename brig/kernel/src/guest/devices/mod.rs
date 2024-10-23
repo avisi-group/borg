@@ -110,8 +110,7 @@ fn statistical_profiling_disabled() {
     }
 }
 
-//#[ktest]
-// todo: called `Result::unwrap()` on an `Err` value: TryFromIntError(())
+#[ktest]
 fn decodea64_smoke() {
     let model = models::get("aarch64").unwrap();
 
@@ -131,6 +130,7 @@ fn decodea64_smoke() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
+    log::trace!("{translation:?}");
 
     unsafe {
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
