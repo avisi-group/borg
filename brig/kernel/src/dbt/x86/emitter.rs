@@ -1353,7 +1353,9 @@ impl X86Block {
     pub fn push_next(&mut self, target: Ref<X86Block>) {
         self.next.push(target);
         if self.next.len() > 2 {
-            panic!("bad, blocks should not have more than 2 targets")
+            panic!(
+                "bad, blocks should not have more than 2 real targets (asserts complicate things)"
+            )
         }
     }
 }

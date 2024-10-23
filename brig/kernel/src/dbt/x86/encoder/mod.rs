@@ -778,6 +778,14 @@ impl Instruction {
                 (8, 64) => assembler
                     .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                     .unwrap(),
+                (32, 64) => {
+                    assembler
+                        .xor::<AsmRegister64, AsmRegister64>(dst.into(), dst.into())
+                        .unwrap();
+                    assembler
+                        .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                        .unwrap()
+                }
                 (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
             },
 

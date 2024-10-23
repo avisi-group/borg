@@ -73,7 +73,7 @@ fn num_of_feature() {
     translation.execute(register_file_ptr);
 }
 
-//#[ktest]
+#[ktest]
 // todo fix "Labels can't be re-used and can only be set once.: label CodeLabel { id: 2657, instruction_index: 6753 } for block ref112667 (arena 6) re-used"
 fn statistical_profiling_disabled() {
     let model = models::get("aarch64").unwrap();
@@ -130,7 +130,6 @@ fn decodea64_smoke() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    log::trace!("{translation:?}");
 
     unsafe {
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
