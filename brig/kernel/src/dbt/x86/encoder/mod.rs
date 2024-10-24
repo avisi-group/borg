@@ -775,7 +775,7 @@ impl Instruction {
                 (16, 32) => assembler
                     .movzx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
                     .unwrap(),
-                (8, 64) => assembler
+                (1..=8, 64) => assembler
                     .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                     .unwrap(),
                 (32, 64) => {
@@ -786,6 +786,7 @@ impl Instruction {
                         .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                         .unwrap()
                 }
+
                 (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
             },
 
@@ -1092,6 +1093,20 @@ impl Instruction {
                         .unwrap();
                 }
             }
+            AND(
+                Operand {
+                    kind: R(PHYS(left)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: 64,
+                },
+            ) => {
+                assembler
+                    .and::<AsmRegister64, AsmRegister64>(right.into(), left.into())
+                    .unwrap();
+            }
             BEXTR(
                 Operand {
                     kind: R(PHYS(ctrl)),
@@ -1187,8 +1202,42 @@ impl Instruction {
             }) => {
                 assembler.setne::<AsmRegister8>(dst.into()).unwrap();
             }
+            SETBE(Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: 1,
+            }) => {
+                assembler.setbe::<AsmRegister8>(dst.into()).unwrap();
+            }
             SETNE(dst) => setne::encode(assembler, dst),
 
+            CMOVE(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
+                },
+            ) => {
+                assembler
+                    .cmove::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+            CMOVNE(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: 64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: 64,
+                },
+            ) => {
+                assembler
+                    .cmovne::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
             _ => panic!("cannot encode this instruction {}", self),
         }
     }

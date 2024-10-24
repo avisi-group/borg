@@ -13,6 +13,9 @@ use {
     core::{cell::RefCell, fmt::Debug, panic},
     proc_macro_lib::ktest,
 };
+
+const INVALID_OFFSET: i32 = 0xDEAD00F;
+
 pub struct X86Emitter<'ctx> {
     current_block: Ref<X86Block>,
     panic_block: Ref<X86Block>,
@@ -95,7 +98,16 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 typ,
                 kind: NodeKind::GuestRegister { offset: *value },
             }),
-            _ => panic!("can't read non constant offset: {offset:#?}"),
+
+            _ => {
+                log::trace!("can't read non constant offset: {offset:#?}");
+                Self::NodeRef::from(X86Node {
+                    typ,
+                    kind: NodeKind::GuestRegister {
+                        offset: u64::try_from(INVALID_OFFSET).unwrap(),
+                    },
+                })
+            }
         }
     }
 
@@ -499,6 +511,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     width: u16::try_from(*length).unwrap(),
                 },
             }),
+
             // known start and length
             (
                 _,
@@ -525,6 +538,18 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
                 self.binary_operation(BinaryOperationKind::And(cast, mask))
             }
+            // // known value, unknown start and length
+            // (NodeKind::Constant { .. }, _, _) => {
+            //     let value =
+            //     Self::NodeRef::from(X86Node {
+            //         typ,
+            //         kind: NodeKind::BitExtract {
+            //             value,
+            //             start,
+            //             length,
+            //         },
+            //     })
+            // }
             // todo: constant start and length with non-constant value can still be specialized?
             _ => Self::NodeRef::from(X86Node {
                 typ,
@@ -598,7 +623,11 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef) {
         let offset = match offset.kind() {
             NodeKind::Constant { value, .. } => (*value).try_into().unwrap(),
-            _ => panic!("register's have constant offsets"),
+
+            _ => {
+                log::trace!("write register with non constant offset: {offset:?}");
+                INVALID_OFFSET
+            }
         };
 
         // todo: validate offset + width is within register file
@@ -837,6 +866,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 }
 
 fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {
+    if value == 0 {
+        return 0;
+    }
+
     const CONTAINER_WIDTH: u32 = u64::BITS;
 
     let original_width = u32::from(original_width);
@@ -997,7 +1030,15 @@ impl X86NodeRef {
                 start,
                 length,
             } => {
-                let value = value.to_operand(emitter);
+                let value = if let NodeKind::Constant { .. } = value.kind() {
+                    let value_reg = Operand::vreg(value.typ().width(), emitter.next_vreg());
+                    let value_imm = value.to_operand(emitter);
+                    emitter.append(Instruction::mov(value_imm, value_reg.clone()));
+                    value_reg
+                } else {
+                    value.to_operand(emitter)
+                };
+
                 let start = start.to_operand(emitter);
                 let length = length.to_operand(emitter);
 
@@ -1195,9 +1236,10 @@ impl X86NodeRef {
                 let true_value = true_value.to_operand(emitter);
                 let false_value = false_value.to_operand(emitter);
 
+                // if this sequence is modified, the register allocator must be fixed
                 emitter.append(Instruction::test(condition.clone(), condition.clone()));
                 emitter.append(Instruction::cmove(false_value, dest.clone()));
-                emitter.append(Instruction::cmovne(true_value, dest.clone()));
+                emitter.append(Instruction::cmovne(true_value, dest.clone())); // this write to dest does not result in deallocation
 
                 dest
             }

@@ -74,7 +74,6 @@ fn num_of_feature() {
 }
 
 #[ktest]
-// todo fix "Labels can't be re-used and can only be set once.: label CodeLabel { id: 2657, instruction_index: 6753 } for block ref112667 (arena 6) re-used"
 fn statistical_profiling_disabled() {
     let model = models::get("aarch64").unwrap();
 
@@ -106,6 +105,117 @@ fn statistical_profiling_disabled() {
         assert_eq!(
             false,
             *(register_file_ptr.add(model.reg_offset("R0")) as *mut bool)
+        )
+    }
+}
+
+#[ktest]
+fn havebrbext_disabled() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let unit = emitter.constant(0, Type::Unsigned(0));
+    let is_enabled = translate(&*model, "HaveBRBExt", &[unit], &mut emitter);
+
+    let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    emitter.write_register(r0_offset, is_enabled);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(register_file_ptr);
+
+    unsafe {
+        assert_eq!(
+            false,
+            *(register_file_ptr.add(model.reg_offset("R0")) as *mut bool)
+        )
+    }
+}
+
+#[ktest]
+fn using_aarch32_disabled() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let unit = emitter.constant(0, Type::Unsigned(0));
+    let is_enabled = translate(&*model, "UsingAArch32", &[unit], &mut emitter);
+
+    let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    emitter.write_register(r0_offset, is_enabled);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    translation.execute(register_file_ptr);
+
+    unsafe {
+        assert_eq!(
+            false,
+            *(register_file_ptr.add(model.reg_offset("R0")) as *mut bool)
+        )
+    }
+}
+
+#[ktest]
+fn branchto() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let target = emitter.constant(0xDEADFEED, Type::Unsigned(64));
+    let branch_type = emitter.constant(1, Type::Unsigned(32));
+    let branch_conditional = emitter.constant(1, Type::Unsigned(1));
+    translate(
+        &*model,
+        "BranchTo",
+        &[target, branch_type, branch_conditional],
+        &mut emitter,
+    );
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        assert_eq!(
+            0x0,
+            *(register_file_ptr.add(model.reg_offset("_PC")) as *mut u64)
+        );
+
+        *(register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool) = false;
+    }
+
+    translation.execute(register_file_ptr);
+
+    unsafe {
+        assert_eq!(
+            0xDEADFEED,
+            *(register_file_ptr.add(model.reg_offset("_PC")) as *mut u64)
+        );
+        assert_eq!(
+            true,
+            *(register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool)
         )
     }
 }
@@ -184,7 +294,43 @@ fn decodea64_smoke_interpret() {
     }
 }
 
-////#[ktest]
+#[ktest]
+fn branch_if_eq() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x540000c0, Type::Unsigned(64));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let pc = register_file_ptr.add(model.reg_offset("_PC")) as *mut u32;
+        let branch_taken = register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool;
+
+        *see = -1;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(0x45, (*see));
+        assert_eq!(0x0, (*pc));
+        assert_eq!(true, (*branch_taken));
+    }
+}
+
+//#[ktest]
 fn fibonacci() {
     let model = models::get("aarch64").unwrap();
 

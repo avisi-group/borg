@@ -2,7 +2,7 @@
 
 use {
     crate::dbt::x86::{
-        encoder::{Instruction, PhysicalRegister, Register, UseDef},
+        encoder::{Instruction, Opcode, PhysicalRegister, Register, UseDef},
         register_allocator::RegisterAllocator,
     },
     alloc::vec::Vec,
@@ -75,6 +75,48 @@ impl SolidStateRegisterAllocator {
 
 impl RegisterAllocator for SolidStateRegisterAllocator {
     fn process(&mut self, instruction: &mut Instruction) {
+        // kinda hacky, tightly coupled to the encoding of select
+        // ignore the second cmov, and (implicitly) treat the first as always writing to
+        // the dest register
+        if matches!(instruction.0, Opcode::CMOVNE(_, _)) {
+            instruction.get_use_defs().for_each(|usedef| match usedef {
+                // treat read-writes the same as reads
+                UseDef::UseDef(reg) | UseDef::Use(reg) => {
+                    match reg {
+                        Register::PhysicalRegister(preg) => {
+                            self.physical_used.bit_set(preg.index());
+                        }
+                        Register::VirtualRegister(vreg) => {
+                            // use of vreg
+                            // if this is the first read we see, it's live range starts here
+
+                            // so allocate a register for it if its the first read, or lookup the
+                            // existing allocation if not
+
+                            // but we don't need to check if it's the first, just lookup or allocate
+                            let phys = self.lookup_or_allocate(VirtualRegisterIndex(*vreg));
+                            *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
+                        }
+                    }
+                }
+                UseDef::Def(reg) => match reg {
+                    Register::PhysicalRegister(_) => {
+                        // don't reset physical used bit, if the following CMOVE
+                        // will write to it again
+                    }
+                    Register::VirtualRegister(vreg) => {
+                        // lookup but don't de-allocate
+                        let phys = self
+                            .register_allocations
+                            .lookup(VirtualRegisterIndex(*vreg))
+                            .unwrap();
+                        *reg = Register::PhysicalRegister(PhysicalRegister::from_index(phys.0));
+                    }
+                },
+            });
+            return;
+        }
+
         instruction.get_use_defs().for_each(|usedef| match usedef {
             // treat read-writes the same as reads
             UseDef::UseDef(reg) | UseDef::Use(reg) => {

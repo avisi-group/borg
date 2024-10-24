@@ -1536,6 +1536,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 )),
 
+                // todo: remove me!
+                "HaveBRBExt" | "HaveStatisticalProfiling" =>Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u1()),
+                        value: ConstantValue::UnsignedInteger(0),
+                    },
+                )),
+
                 "__GetVerbosity" => Some(build(
                     self.block,
                     self.block_arena_mut(),
