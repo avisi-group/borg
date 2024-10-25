@@ -324,6 +324,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "S1TranslationRegime",
         "EffectiveTBI",
         "ConstrainUnpredictableBits",
+        "execute_aarch64_instrs_integer_logical_shiftedreg",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
