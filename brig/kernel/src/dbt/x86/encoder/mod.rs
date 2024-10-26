@@ -12,6 +12,7 @@ use {
 mod mov;
 mod setne;
 mod shl;
+mod shr;
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum Opcode {
@@ -756,10 +757,10 @@ impl Instruction {
                     width_in_bits: dst_width,
                 },
             ) => match (*src_width, *dst_width) {
-                (32, 64) => assembler
-                    .movsx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
+                (16..=32, 33..=64) => assembler
+                    .movsxd::<AsmRegister64, AsmRegister32>(dst.into(), src.into())
                     .unwrap(),
-                (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
+                (src, dst) => todo!("{src} -> {dst} sign extend mov not implemented"),
             },
             // MOVZX R -> R
             MOVZX(
@@ -786,6 +787,9 @@ impl Instruction {
                         .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                         .unwrap()
                 }
+                (16..=32, 16..=32) => assembler
+                    .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                    .unwrap(),
 
                 (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
             },
@@ -843,12 +847,13 @@ impl Instruction {
                 },
             ) => {
                 // assert_eq!(src_width_in_bits, dst_width_in_bits);
+
                 assembler
-                    .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
+                    .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src as i64).unwrap())
                     .unwrap();
             }
 
-            // ADD IMM -> R
+            // SUB IMM -> R
             SUB(
                 Operand {
                     kind: I(src),
@@ -863,21 +868,35 @@ impl Instruction {
                     .sub::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
             }
+            // TEST R, R
+            TEST(
+                Operand {
+                    kind: R(PHYS(left)),
+                    width_in_bits: 33..=64,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: 33..=64,
+                },
+            ) => {
+                assembler
+                    .test::<AsmRegister64, AsmRegister64>(left.into(), right.into())
+                    .unwrap();
+            }
 
             // TEST R, R
             TEST(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: 1..=8,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: 1..=8,
                 },
             ) => {
-                assert_eq!(src_width_in_bits, dst_width_in_bits);
                 assembler
-                    .test::<AsmRegister64, AsmRegister64>(left.into(), right.into())
+                    .test::<AsmRegister8, AsmRegister8>(left.into(), right.into())
                     .unwrap();
             }
             JNE(Operand {
@@ -1001,6 +1020,7 @@ impl Instruction {
                 ..
             }) => assembler.neg::<AsmRegister64>(value.into()).unwrap(),
             SHL(amount, value) => shl::encode(assembler, amount, value),
+            SHR(amount, value) => shr::encode(assembler, amount, value),
             // OR I R
             OR(
                 Operand {
@@ -1014,6 +1034,21 @@ impl Instruction {
             ) => {
                 assembler
                     .or::<AsmRegister8, i32>(right.into(), i32::try_from(*left).unwrap())
+                    .unwrap();
+            }
+            // OR I R
+            OR(
+                Operand {
+                    kind: I(left),
+                    width_in_bits: 1..=8,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: 17..=32,
+                },
+            ) => {
+                assembler
+                    .or::<AsmRegister32, i32>(right.into(), i32::try_from(*left).unwrap())
                     .unwrap();
             }
             // OR R R

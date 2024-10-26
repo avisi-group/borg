@@ -1,10 +1,11 @@
-use core::fmt::{self, Display, Formatter};
-
 use crate::{
     intern::InternedString,
     rudder::{function::Function, types::Type},
     HashMap,
 };
+use alloc::format;
+use core::fmt::{self, Display, Formatter};
+use itertools::Itertools;
 
 pub mod block;
 pub mod constant_value;
@@ -76,7 +77,12 @@ impl Display for Model {
 
         writeln!(f)?;
         for (name, func) in self.functions() {
-            writeln!(f, "function {}:", name,)?;
+            let parameters = func
+                .parameters()
+                .into_iter()
+                .map(|sym| format!("{}: {}", sym.name(), sym.typ()))
+                .join(", ");
+            writeln!(f, "function {}({}):", name, parameters)?;
 
             write!(f, "{}", func)?;
             writeln!(f)?;
@@ -89,7 +95,7 @@ impl Display for Model {
 impl Display for Function {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.block_iter().try_for_each(|block| {
-            writeln!(f, "  block{}:", block.index())?;
+            writeln!(f, "  block {:#x}:", block.index())?;
             write!(f, "{}", block.get(self.arena()))
         })
     }

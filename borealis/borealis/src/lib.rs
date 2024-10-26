@@ -342,6 +342,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AMEVCNTR0_EL0_read",
         "AMEVTYPER0_read",
         "DBGWCR_read",
+        "execute_aarch64_instrs_integer_arithmetic_div",
     ];
 
     if FN_DENYLIST.contains(&name.as_ref()) {
@@ -356,6 +357,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().starts_with("_get_")
         || name.as_ref().starts_with("Have")
         || name.as_ref().starts_with("decode_")
+        || name.as_ref().starts_with("execute_aarch64_instrs")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

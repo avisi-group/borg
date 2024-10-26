@@ -1157,16 +1157,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val SignExtend0 : (%bv, %i) -> %bv
                 // val sail_sign_extend : (%bv, %i) -> %bv
-                "SignExtend0" | "sail_sign_extend" => Some(build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BitsCast {
-                        kind: CastOperationKind::SignExtend,
-                        typ: (Type::Bits),
-                        value: args[0].clone(),
-                        length: args[1].clone(),
-                    },
-                )),
+                "SignExtend0" | "sail_sign_extend" => {
+                    match (args[0].get(self.statement_arena()).typ(self.statement_arena()).clone(), args[1].get(self.statement_arena()).clone()) {
+                        (Type::Primitive(PrimitiveType { tc: PrimitiveTypeClass::UnsignedInteger, .. }), Statement::Constant { value: ConstantValue::SignedInteger(length),.. }) =>
+
+                           Some(build(self.block, self.block_arena_mut(), Statement::Cast { kind: CastOperationKind::SignExtend, typ: Type::Primitive(PrimitiveType { tc: PrimitiveTypeClass::UnsignedInteger, element_width_in_bits:usize::try_from(length).unwrap() }), value: args[0] }))
+                        ,
+                        (Type::Bits,_) =>  Some(build(
+                            self.block,
+                            self.block_arena_mut(),
+                            Statement::BitsCast {
+                                kind: CastOperationKind::SignExtend,
+                                typ: (Type::Bits),
+                                value: args[0].clone(),
+                                length: args[1].clone(),
+                            },
+                        )),
+                        (_,_) => todo!("sail extend {:?} {:?}",args[0], args[1]),
+                    }
+                   },
 
                 // val truncate : (%bv, %i) -> %bv
                 "truncate" => Some(build(
@@ -1537,7 +1546,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 )),
 
                 // todo: remove me!
-                "HaveBRBExt" | "HaveStatisticalProfiling" =>Some(build(
+                "HaveBRBExt" | "HaveStatisticalProfiling" | "HaveGCS" => Some(build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant {
@@ -2190,6 +2199,102 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         kind: ShiftOperationKind::LogicalShiftLeft,
                         value: left_cast,
                         amount: right_width_constant,
+                    },
+                );
+
+                build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Or,
+                        lhs: left_shift,
+                        rhs: right,
+                    },
+                )
+            }
+            (
+                Type::Primitive(PrimitiveType {
+                    tc: PrimitiveTypeClass::UnsignedInteger,
+                    element_width_in_bits: left_width,
+                }),
+                Type::Bits,
+            ) => {
+                let right_width = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::SizeOf { value: right },
+                );
+
+                let left_width = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::u16(),
+                        value: ConstantValue::UnsignedInteger(u64::try_from(left_width).unwrap()),
+                    },
+                );
+
+                let length = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Add,
+                        lhs: left_width,
+                        rhs: right_width,
+                    },
+                );
+
+                let left_cast = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::CreateBits {
+                        value: left,
+                        length,
+                    },
+                );
+
+                let left_shift = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: left_cast,
+                        amount: right_width,
+                    },
+                );
+                build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Or,
+                        lhs: left_shift,
+                        rhs: right,
+                    },
+                )
+            }
+            (
+                Type::Bits,
+                Type::Primitive(PrimitiveType {
+                    tc: PrimitiveTypeClass::UnsignedInteger,
+                    element_width_in_bits: right_width,
+                }),
+            ) => {
+                let right_width = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::u16(),
+                        value: ConstantValue::UnsignedInteger(u64::try_from(right_width).unwrap()),
+                    },
+                );
+
+                let left_shift = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: left,
+                        amount: right_width,
                     },
                 );
 

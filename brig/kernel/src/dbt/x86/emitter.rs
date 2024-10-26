@@ -466,7 +466,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         kind: ShiftOperationKind,
     ) -> Self::NodeRef {
         let typ = value.typ().clone();
-        match (value.kind(), amount.kind()) {
+        match (value.kind(), amount.kind(), kind.clone()) {
             (
                 NodeKind::Constant {
                     value: value_value,
@@ -476,11 +476,15 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     value: amount_value,
                     ..
                 },
+                ShiftOperationKind::LogicalShiftLeft,
             ) => {
                 // mask to width of value
                 self.constant((value_value << amount_value) & mask(*value_width), typ)
             }
-            (_, _) => Self::NodeRef::from(X86Node {
+            (NodeKind::Constant { .. }, NodeKind::Constant { .. }, k) => {
+                todo!("{k:?}")
+            }
+            (_, _, _) => Self::NodeRef::from(X86Node {
                 typ,
                 kind: NodeKind::Shift {
                     value,
@@ -515,15 +519,20 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             // known start and length
             (
                 _,
-                NodeKind::Constant { .. },
+                NodeKind::Constant {
+                    value: start_value, ..
+                },
                 NodeKind::Constant {
                     value: length_value,
                     ..
                 },
             ) => {
                 // value >> start && mask(length)
-                let shifted =
-                    self.shift(value.clone(), start, ShiftOperationKind::LogicalShiftLeft);
+                let shifted = self.shift(
+                    value.clone(),
+                    start.clone(),
+                    ShiftOperationKind::LogicalShiftRight,
+                );
 
                 let cast = self.cast(
                     shifted,
@@ -906,9 +915,7 @@ impl X86NodeRef {
 
     fn to_operand(&self, emitter: &mut X86Emitter) -> Operand {
         match self.kind() {
-            NodeKind::Constant { value, width } => {
-                Operand::imm((*width).try_into().unwrap(), *value)
-            }
+            NodeKind::Constant { value, width } => Operand::imm(*width, *value),
             NodeKind::GuestRegister { offset } => {
                 let width = self.typ().width();
                 let dst = Operand::vreg(width, emitter.next_vreg());
@@ -1131,24 +1138,24 @@ impl X86NodeRef {
                 kind,
             } => {
                 let amount = amount.to_operand(emitter);
-                let op0 = value.to_operand(emitter);
+                let value = value.to_operand(emitter);
 
                 match kind {
                     ShiftOperationKind::LogicalShiftLeft => {
-                        emitter.append(Instruction::shl(amount, op0.clone()));
+                        emitter.append(Instruction::shl(amount, value.clone()));
                     }
 
                     ShiftOperationKind::LogicalShiftRight => {
-                        emitter.append(Instruction::shr(amount, op0.clone()));
+                        emitter.append(Instruction::shr(amount, value.clone()));
                     }
 
                     ShiftOperationKind::ArithmeticShiftRight => {
-                        emitter.append(Instruction::sar(amount, op0.clone()));
+                        emitter.append(Instruction::sar(amount, value.clone()));
                     }
                     _ => todo!("{kind:?}"),
                 }
 
-                op0
+                value
             }
             NodeKind::BitInsert {
                 target,

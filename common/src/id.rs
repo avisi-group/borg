@@ -6,7 +6,7 @@ use core::{
 };
 
 /// Unique identifier
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Id(u32);
 
 impl Default for Id {
@@ -36,8 +36,14 @@ impl LowerHex for Id {
     }
 }
 
+impl Debug for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Id({:x})", self)
+    }
+}
+
 impl Display for Id {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{:x}", self)
     }
 }

@@ -82,6 +82,22 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
+                width_in_bits: 17..=32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: 17..=32,
+            },
+        ) => {
+            //assert_eq!(src_width_in_bits, dst_width_in_bits);
+            assembler
+                .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .unwrap();
+        }
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
                 width_in_bits: 1..=8,
             },
             Operand {

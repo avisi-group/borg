@@ -4,9 +4,14 @@ use {
         interpret::{interpret, Value},
         models::{self},
         translate::translate,
-        x86::{emitter::X86Emitter, X86TranslationContext},
+        x86::{
+            emitter::{
+                BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind, X86Emitter,
+            },
+            X86TranslationContext,
+        },
     },
-    common::rudder::Model,
+    common::{mask::mask, rudder::Model},
     proc_macro_lib::ktest,
 };
 
@@ -232,7 +237,7 @@ fn decodea64_addsub() {
     init(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
-    let opcode = emitter.constant(0x8b020020, Type::Unsigned(64));
+    let opcode = emitter.constant(0x8b020020, Type::Unsigned(32));
     translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
     emitter.leave();
@@ -284,7 +289,7 @@ fn decodea64_addsub_interpret() {
         };
         let opcode = crate::dbt::interpret::Value::UnsignedInteger {
             value: 0x8b020020,
-            length: 64,
+            length: 32,
         };
         interpret(&*model, "__DecodeA64", &[pc, opcode], register_file_ptr);
 
@@ -306,7 +311,7 @@ fn decodea64_mov() {
     init(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
-    let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(32));
     translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
     emitter.leave();
@@ -332,6 +337,43 @@ fn decodea64_mov() {
 }
 
 #[ktest]
+fn decodea64_branch() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let pc = emitter.constant(44, Type::Unsigned(64));
+    let opcode = emitter.constant(0x17fffffa, Type::Unsigned(32));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    //  log::trace!("{translation:?}");
+
+    unsafe {
+        let pc = register_file_ptr.add(model.reg_offset("_PC")) as *mut u64;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+
+        *pc = 44;
+        *see = -1;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(20, (*pc));
+        assert_eq!(67, (*see));
+    }
+}
+
+#[ktest]
 fn branch_if_eq() {
     let model = models::get("aarch64").unwrap();
 
@@ -344,7 +386,7 @@ fn branch_if_eq() {
     init(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
-    let opcode = emitter.constant(0x540000c0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x540000c0, Type::Unsigned(32));
     translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
     emitter.leave();
@@ -367,7 +409,40 @@ fn branch_if_eq() {
     }
 }
 
-//#[ktest]
+#[ktest]
+fn branch_uncond_imm_offset_math() {
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // s0: read-var imm26:u26
+    let s0 = emitter.constant(0x17fffffa & mask(26u32), Type::Unsigned(26));
+
+    // s1: const #0u : u2
+    let s1 = emitter.constant(0, Type::Unsigned(2));
+
+    // s2: cast zx s0 -> u28
+    let s2 = emitter.cast(s0, Type::Unsigned(28), CastOperationKind::ZeroExtend);
+
+    // s3: const #2u : u16
+    let s3 = emitter.constant(2, Type::Unsigned(16));
+
+    // s4: lsl s2 s3
+    let s4 = emitter.shift(s2, s3, ShiftOperationKind::LogicalShiftLeft);
+
+    // s5: or s4 s1
+    let s5 = emitter.binary_operation(BinaryOperationKind::Or(s4, s1));
+
+    // s9: cast sx s5 -> u64
+    let s9 = emitter.cast(s5, Type::Unsigned(64), CastOperationKind::SignExtend);
+
+    let NodeKind::Constant { value, width } = s9.kind() else {
+        panic!()
+    };
+    assert_eq!(*value, 0xffffffffffffffe8);
+    assert_eq!(*width, 64);
+}
+
+////#[ktest]
 fn fibonacci() {
     let model = models::get("aarch64").unwrap();
 
@@ -423,7 +498,7 @@ fn fibonacci() {
             let mut emitter = X86Emitter::new(&mut ctx);
 
             {
-                let opcode = emitter.constant(program[*pc as usize / 4], Type::Unsigned(64));
+                let opcode = emitter.constant(program[*pc as usize / 4], Type::Unsigned(32));
                 let pc = emitter.constant(*pc, Type::Unsigned(64));
                 translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
             }
@@ -539,7 +614,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     unsafe { (*r0, *(r1 as *mut u8)) }
 }
 
-//#[ktest]
+////#[ktest]
 // fn rbitx0() {
 //     let mut state = State::new(Box::new(NoneEnv));
 //     state.write_register::<u64>(REG_R0, 0x0000000000000001);
@@ -551,7 +626,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 //     assert_eq!(state.read_register::<u64>(REG_R0), 0x8000000000000000);
 // }
 
-//#[ktest]
+////#[ktest]
 // fn ubfx() {
 //     {
 //         let mut state = State::new(Box::new(NoneEnv));
@@ -575,7 +650,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 //     }
 // }
 
-// //////#[ktest]
+// ////////#[ktest]
 // // // fn replicate_bits() {
 // // //     let mut register_file = Box::new([0u8;
 // model.register_file_size()]); // //     let register_file_ptr =
@@ -603,7 +678,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // Bits::new(0x1, // 1), 32)     );
 // // // }
 
-// //////#[ktest]
+// ////////#[ktest]
 // // // fn rev_d00dfeed() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     state.write_register::<u64>(REG_R3, 0xedfe0dd0);
@@ -611,7 +686,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // 32, // 3, // 32, 3);     assert_eq!(0xd00dfeed,
 // state.read_register::<u64>(REG_R3)); // // }
 
-// //////#[ktest]
+// ////////#[ktest]
 // // // fn ispow2() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     let x = 2048i128;
@@ -622,7 +697,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert!(IsPow2(&mut state, TRACER, x));
 // // // }
 
-// //////#[ktest]
+// ////////#[ktest]
 // // // fn udiv() {
 // // //     let x = 0xffffff8008bfffffu64;
 // // //     let y = 0x200000u64;
@@ -637,7 +712,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert_eq!(x / y, state.read_register(REG_R19));
 // // // }
 
-// //////#[ktest]
+// ////////#[ktest]
 // // // fn place_slice() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     assert_eq!(
@@ -665,7 +740,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert_eq!(state.read_register::<u64>(REG_R2),
 // 0xffff_ffff_ffff_ff00); // // }
 
-// //////#[ktest]
+// ////////#[ktest]
 // // // fn cmp_csel_2() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);

@@ -64,6 +64,7 @@ impl<T> Ref<T> {
 impl<T> Hash for Ref<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.index.hash(state);
+        self.arena.hash(state);
     }
 }
 
@@ -85,6 +86,6 @@ impl<T> Copy for Ref<T> {}
 
 impl<T> Debug for Ref<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "ref{} (arena {})", self.index(), self.arena)
+        write!(f, "ref {:#x} (arena {})", self.index(), self.arena)
     }
 }
