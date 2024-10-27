@@ -3,7 +3,7 @@ use {
         bit_extract, bit_insert,
         emitter::{BlockResult, Type},
         x86::{
-            encoder::{Instruction, Operand, OperandKind, PhysicalRegister, Register},
+            encoder::{Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register},
             register_allocator::RegisterAllocator,
             Emitter, X86TranslationContext,
         },
@@ -754,10 +754,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     }
 
     // returns a tuple of (operation_result, flags)
-    fn get_flags(&mut self) -> Self::NodeRef {
+    fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef {
         Self::NodeRef::from(X86Node {
             typ: Type::Unsigned(4),
-            kind: NodeKind::GetFlags,
+            kind: NodeKind::GetFlags { operation },
         })
     }
 
@@ -1005,7 +1005,6 @@ impl X86NodeRef {
                     let b = b.to_operand(emitter);
                     let carry = carry.to_operand(emitter);
                     emitter.append(Instruction::mov(b.clone(), dst.clone()));
-
                     emitter.append(Instruction::adc(a, dst.clone(), carry));
 
                     dst
@@ -1205,8 +1204,19 @@ impl X86NodeRef {
 
                 masked_target
             }
-            NodeKind::GetFlags => {
-                //  todo: assert that the operation comes right before this emitted instruction
+            NodeKind::GetFlags { operation } => {
+                // if the last instruction wasn't an ADC, emit one? todo:
+                // if !matches!(
+                //     emitter
+                //         .current_block
+                //         .get(emitter.ctx.arena())
+                //         .instructions()
+                //         .last()
+                //         .map(|i| &i.0),
+                //     Some(Opcode::ADC(_, _, _))
+                // ) {
+                //     let _op = operation.to_operand(emitter);
+                // }
 
                 let n = Operand::vreg(8, emitter.next_vreg());
                 let z = Operand::vreg(8, emitter.next_vreg());
@@ -1303,7 +1313,9 @@ pub enum NodeKind {
         start: X86NodeRef,
         length: X86NodeRef,
     },
-    GetFlags,
+    GetFlags {
+        operation: X86NodeRef,
+    },
     Tuple(Vec<X86NodeRef>),
     Select {
         condition: X86NodeRef,

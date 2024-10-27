@@ -443,6 +443,66 @@ fn branch_uncond_imm_offset_math() {
 }
 
 ////#[ktest]
+/// cmp not setting NZCV correctly
+fn cmp_csel() {
+    assert_eq!(
+        0xffff_ffff_ffff_ff00,
+        cmp_csel_inner(0xffff_ffff_ffff_ff00, 0xffff_ffff_ffff_ffc0)
+    );
+    assert_eq!(
+        0x0fff_ffff_ffff_ffc0,
+        cmp_csel_inner(0xffff_ffff_ffff_ff00, 0x0fff_ffff_ffff_ffc0)
+    );
+
+    fn cmp_csel_inner(pre_r0: u64, pre_r2: u64) -> u64 {
+        let model = models::get("aarch64").unwrap();
+
+        let mut register_file = alloc::vec![0u8; model.register_file_size()];
+        let register_file_ptr = register_file.as_mut_ptr();
+
+        let mut ctx = X86TranslationContext::new();
+        let mut emitter = X86Emitter::new(&mut ctx);
+
+        init(&*model, register_file_ptr);
+
+        let see_offset = emitter.constant(model.reg_offset("SEE") as u64, Type::Unsigned(64));
+        let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
+        emitter.write_register(see_offset, see_value);
+
+        //cmp     x2, x0
+        let pc = emitter.constant(0, Type::Unsigned(64));
+        let opcode = emitter.constant(0xeb00005f, Type::Unsigned(32));
+        translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+        // let see_offset = emitter.constant(model.reg_offset("SEE") as u64,
+        // Type::Unsigned(64)); let see_value = emitter.constant(-1i32 as u64,
+        // Type::Signed(32)); emitter.write_register(see_offset, see_value);
+
+        // // //  csel    x2, x2, x0, ls  // ls = plast
+        // let pc = emitter.constant(0, Type::Unsigned(64));
+        // let opcode = emitter.constant(0x9a809042, Type::Unsigned(32));
+        // translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+        emitter.leave();
+
+        let num_regs = emitter.next_vreg();
+        let translation = ctx.compile(num_regs);
+
+        unsafe {
+            let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+            let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u64;
+
+            *r0 = pre_r0;
+            *r2 = pre_r2;
+
+            translation.execute(register_file_ptr);
+
+            *r2
+        }
+    }
+}
+
+////#[ktest]
 fn fibonacci() {
     let model = models::get("aarch64").unwrap();
 
@@ -614,7 +674,123 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     unsafe { (*r0, *(r1 as *mut u8)) }
 }
 
-////#[ktest]
+//#[ktest]
+fn decodea64_cmp_negative() {
+    let flags = decodea64_cmp_harness(0, -5i64 as u64);
+    assert_eq!(flags, 0b1000);
+}
+
+//#[ktest]
+fn decodea64_cmp_zero() {
+    let flags = decodea64_cmp_harness(0, 0);
+    assert_eq!(flags, 0b0100);
+}
+
+//#[ktest]
+fn decodea64_cmp_carry() {
+    let flags = decodea64_cmp_harness(u64::MAX, 1);
+    assert_eq!(flags, 0b0110);
+}
+
+//#[ktest]
+fn decodea64_cmp_overflow() {
+    let flags = decodea64_cmp_harness(u64::MAX / 2, u64::MAX / 2);
+    assert_eq!(flags, 0b1001);
+}
+
+//#[ktest]
+fn decodea64_cmp_early_4880_loop() {
+    let flags = decodea64_cmp_harness(0x425a6004, !0x425a6020);
+    assert_eq!(flags, 0b1000);
+}
+
+//#[ktest]
+fn decodea64_cmp_linux_regression() {
+    let flags = decodea64_cmp_harness(0xffffffc0082b3cd0, 0xffffffffffffffd8);
+    assert_eq!(flags, 0b1010);
+}
+
+fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    unsafe {
+        *(register_file_ptr.add(model.reg_offset("R0")) as *mut u64) = x;
+        *(register_file_ptr.add(model.reg_offset("R1")) as *mut u64) = y;
+        *(register_file_ptr.add(model.reg_offset("SEE")) as *mut i32) = -1;
+    }
+
+    // cmp    x0, x1
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xeb01001f, Type::Unsigned(32));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    log::trace!("{translation:?}");
+    translation.execute(register_file_ptr);
+
+    unsafe {
+        *(register_file_ptr.add(model.reg_offset("PSTATE_N")) as *mut u8) << 3
+            | *(register_file_ptr.add(model.reg_offset("PSTATE_Z")) as *mut u8) << 2
+            | *(register_file_ptr.add(model.reg_offset("PSTATE_C")) as *mut u8) << 1
+            | *(register_file_ptr.add(model.reg_offset("PSTATE_V")) as *mut u8)
+    }
+}
+
+#[ktest]
+fn shiftreg() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let _1 = emitter.constant(1, Type::Signed(64));
+    let shift_type = emitter.constant(1, Type::Signed(32));
+    let amount = emitter.constant(0, Type::Signed(64));
+    let width = emitter.constant(64, Type::Signed(64));
+    let value = translate(
+        &*model,
+        "ShiftReg",
+        &[_1, shift_type, amount, width],
+        &mut emitter,
+    );
+
+    let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+    emitter.write_register(r0_offset, value);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+        let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u64;
+
+        *r0 = 0;
+        *r1 = 0xdeadfeeddeadfeed;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*r0, 0xdeadfeeddeadfeed);
+        assert_eq!(*r1, 0xdeadfeeddeadfeed);
+    }
+}
+
+//////#[ktest]
 // fn rbitx0() {
 //     let mut state = State::new(Box::new(NoneEnv));
 //     state.write_register::<u64>(REG_R0, 0x0000000000000001);
@@ -626,7 +802,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 //     assert_eq!(state.read_register::<u64>(REG_R0), 0x8000000000000000);
 // }
 
-////#[ktest]
+//////#[ktest]
 // fn ubfx() {
 //     {
 //         let mut state = State::new(Box::new(NoneEnv));
@@ -650,7 +826,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 //     }
 // }
 
-// ////////#[ktest]
+// //////////#[ktest]
 // // // fn replicate_bits() {
 // // //     let mut register_file = Box::new([0u8;
 // model.register_file_size()]); // //     let register_file_ptr =
@@ -678,7 +854,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // Bits::new(0x1, // 1), 32)     );
 // // // }
 
-// ////////#[ktest]
+// //////////#[ktest]
 // // // fn rev_d00dfeed() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     state.write_register::<u64>(REG_R3, 0xedfe0dd0);
@@ -686,7 +862,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // 32, // 3, // 32, 3);     assert_eq!(0xd00dfeed,
 // state.read_register::<u64>(REG_R3)); // // }
 
-// ////////#[ktest]
+// //////////#[ktest]
 // // // fn ispow2() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     let x = 2048i128;
@@ -697,7 +873,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert!(IsPow2(&mut state, TRACER, x));
 // // // }
 
-// ////////#[ktest]
+// //////////#[ktest]
 // // // fn udiv() {
 // // //     let x = 0xffffff8008bfffffu64;
 // // //     let y = 0x200000u64;
@@ -712,7 +888,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //     assert_eq!(x / y, state.read_register(REG_R19));
 // // // }
 
-// ////////#[ktest]
+// //////////#[ktest]
 // // // fn place_slice() {
 // // //     let mut state = State::new(Box::new(NoneEnv));
 // // //     assert_eq!(
@@ -720,45 +896,6 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 // // //         place_slice_signed(&mut state, TRACER, 64,
 // Bits::new(0xffffffd8, // 64), // 0, 32, 0,)     );
 // // // }
-
-// // // fn cmp_csel() {
-// // //     let mut state = State::new(Box::new(NoneEnv));
-// // //     state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
-// // //     state.write_register::<u64>(REG_R2, 0xffff_ffff_ffff_ffc0);
-
-// // //     //   //  let pstate = ProductTypee2f620c8eb69267c::default();
-
-// // //     //     state.write_register::<u64>(REG_PSTATE, pstate);
-
-// // //     //cmp     x2, x0
-// // //     u__DecodeA64(&mut state, TRACER, 0x0, 0xeb00005f);
-
-// // //     //  csel    x2, x2, x0, ls  // ls = plast
-// // //     u__DecodeA64(&mut state, TRACER, 0x0, 0x9a809042);
-
-// // //     // assert x2
-// // //     assert_eq!(state.read_register::<u64>(REG_R2),
-// 0xffff_ffff_ffff_ff00); // // }
-
-// ////////#[ktest]
-// // // fn cmp_csel_2() {
-// // //     let mut state = State::new(Box::new(NoneEnv));
-// // //     state.write_register::<u64>(REG_R0, 0xffff_ffff_ffff_ff00);
-// // //     state.write_register::<u64>(REG_R2, 0x0fff_ffff_ffff_ffc0);
-
-// // //     //   //  let pstate = ProductTypee2f620c8eb69267c::default();
-
-// // //     //     state.write_register::<u64>(REG_PSTATE, pstate);
-
-// // //     //cmp     x2, x0
-// // //     u__DecodeA64(&mut state, TRACER, 0x0, 0xeb00005f);
-
-// // //     //  csel    x2, x2, x0, ls  // ls = plast
-// // //     u__DecodeA64(&mut state, TRACER, 0x0, 0x9a809042);
-
-// // //     // assert x2
-// // //     assert_eq!(state.read_register::<u64>(REG_R2),
-// 0x0fff_ffff_ffff_ffc0); // // }
 
 fn init(model: &Model, register_file: *mut u8) {
     interpret(&*model, "borealis_register_init", &[], register_file);

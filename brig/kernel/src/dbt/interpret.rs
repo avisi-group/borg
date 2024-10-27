@@ -164,10 +164,9 @@ impl<'f> Interpreter<'f> {
                 }
                 Statement::ReadMemory { offset, size } => todo!(),
                 Statement::ReadPc => todo!(),
-                Statement::GetFlags => {
+                Statement::GetFlags { operation: _ } => {
                     // todo: technically should get the last statement or
                     // something
-
                     Some(Value::UnsignedInteger {
                         value: u64::from(self.flags),
                         length: 4,

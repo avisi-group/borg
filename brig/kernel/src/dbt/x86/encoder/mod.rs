@@ -857,7 +857,7 @@ impl Instruction {
             SUB(
                 Operand {
                     kind: I(src),
-                    width_in_bits: 32,
+                    width_in_bits: _,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
@@ -868,6 +868,7 @@ impl Instruction {
                     .sub::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
             }
+
             // TEST R, R
             TEST(
                 Operand {
@@ -981,6 +982,12 @@ impl Instruction {
                     .unwrap();
             }
 
+            SETA(Operand {
+                kind: R(PHYS(condition)),
+                ..
+            }) => {
+                assembler.seta::<AsmRegister8>(condition.into()).unwrap();
+            }
             SETAE(Operand {
                 kind: R(PHYS(condition)),
                 ..

@@ -82,7 +82,13 @@ impl Display for Model {
                 .into_iter()
                 .map(|sym| format!("{}: {}", sym.name(), sym.typ()))
                 .join(", ");
-            writeln!(f, "function {}({}):", name, parameters)?;
+            writeln!(
+                f,
+                "function {}({}) -> {} :",
+                name,
+                parameters,
+                func.return_type()
+            )?;
 
             write!(f, "{}", func)?;
             writeln!(f)?;

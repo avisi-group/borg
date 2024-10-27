@@ -60,7 +60,7 @@ pub trait Emitter {
 
     fn assert(&mut self, condition: Self::NodeRef);
 
-    fn get_flags(&mut self) -> Self::NodeRef;
+    fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef;
 
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);

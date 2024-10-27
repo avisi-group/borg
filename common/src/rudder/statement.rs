@@ -121,7 +121,9 @@ pub enum Statement {
         value: Ref<Statement>,
     },
 
-    GetFlags,
+    GetFlags {
+        operation: Ref<Statement>,
+    },
 
     UnaryOperation {
         kind: UnaryOperationKind,
@@ -398,7 +400,7 @@ impl Statement {
                 ts[*index].clone()
             }
 
-            Self::GetFlags => Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4),
+            Self::GetFlags { .. } => Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4),
             Self::CreateTuple(values) => {
                 Type::Tuple(values.iter().map(|v| v.get(arena).typ(arena)).collect())
             }
@@ -831,7 +833,15 @@ impl Statement {
                         .collect(),
                 )
             }
-            Self::GetFlags => (),
+            Self::GetFlags { operation } => {
+                let operation = if operation == use_of {
+                    with.clone()
+                } else {
+                    operation.clone()
+                };
+
+                *self = Self::GetFlags { operation };
+            }
         }
     }
 
@@ -1035,8 +1045,8 @@ impl Statement {
             Self::TupleAccess { index, source } => {
                 format!("tuple-access {}.{index}", source)
             }
-            Self::GetFlags => {
-                format!("get-flags")
+            Self::GetFlags { operation } => {
+                format!("get-flags {operation}")
             }
             Self::CreateTuple(values) => {
                 format!(
@@ -1466,7 +1476,9 @@ pub fn import_statement(
             source: mapping.get(&source).unwrap().clone(),
             index,
         },
-        Statement::GetFlags => Statement::GetFlags,
+        Statement::GetFlags { operation } => Statement::GetFlags {
+            operation: mapping.get(&operation).unwrap().clone(),
+        },
         Statement::CreateTuple(values) => Statement::CreateTuple(
             values
                 .iter()

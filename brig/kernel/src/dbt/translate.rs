@@ -406,7 +406,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
             Statement::ReadPc => todo!(),
             Statement::WritePc { .. } => todo!(),
-            Statement::GetFlags => StatementResult::Data(Some(self.emitter.get_flags())),
+            Statement::GetFlags { operation } => {
+                let operation = statement_values.get(operation).unwrap().clone();
+                StatementResult::Data(Some(self.emitter.get_flags(operation)))
+            }
             Statement::UnaryOperation { kind, value } => {
                 use {
                     crate::dbt::x86::emitter::UnaryOperationKind as EmitterOp,

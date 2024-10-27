@@ -1400,7 +1400,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let flags = build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::GetFlags ,
+                        Statement::GetFlags {operation: sum.clone()},
                     );
 
                     Some(build(

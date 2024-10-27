@@ -268,8 +268,9 @@ impl<'a> StatementUseAnalysis<'a> {
                 Statement::MatchesUnion { value, .. } => self.add_use(value, stmt),
                 Statement::UnwrapUnion { value, .. } => self.add_use(value, stmt),
 
-                Statement::GetFlags
-                | Statement::ReadVariable { .. }
+                Statement::GetFlags { operation } => self.add_use(operation, stmt),
+
+                Statement::ReadVariable { .. }
                 | Statement::ReadPc
                 | Statement::Jump { .. }
                 | Statement::PhiNode { .. }
