@@ -1165,22 +1165,25 @@ impl X86NodeRef {
                 let amount = amount.to_operand(emitter);
                 let value = value.to_operand(emitter);
 
+                let dst = Operand::vreg(value.width_in_bits, emitter.next_vreg());
+                emitter.append(Instruction::mov(value, dst.clone()));
+
                 match kind {
                     ShiftOperationKind::LogicalShiftLeft => {
-                        emitter.append(Instruction::shl(amount, value.clone()));
+                        emitter.append(Instruction::shl(amount, dst.clone()));
                     }
 
                     ShiftOperationKind::LogicalShiftRight => {
-                        emitter.append(Instruction::shr(amount, value.clone()));
+                        emitter.append(Instruction::shr(amount, dst.clone()));
                     }
 
                     ShiftOperationKind::ArithmeticShiftRight => {
-                        emitter.append(Instruction::sar(amount, value.clone()));
+                        emitter.append(Instruction::sar(amount, dst.clone()));
                     }
                     _ => todo!("{kind:?}"),
                 }
 
-                value
+                dst
             }
             NodeKind::BitInsert {
                 target,
