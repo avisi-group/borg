@@ -852,11 +852,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         rhs: args[1].clone(),
                     },
                 )),
-                "not_vec" | "not_bool" => Some(build(
+                 "not_bool" => Some(build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::UnaryOperation {
                         kind: UnaryOperationKind::Not,
+                        value: args[0].clone(),
+                    },
+                )),
+                "not_vec" => Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::UnaryOperation {
+                        kind: UnaryOperationKind::Complement,
                         value: args[0].clone(),
                     },
                 )),

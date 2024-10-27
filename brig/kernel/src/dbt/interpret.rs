@@ -82,7 +82,14 @@ impl<'f> Interpreter<'f> {
     fn resolve<R: Borrow<Ref<Statement>>>(&self, statement_ref: R) -> Value {
         self.statement_values
             .get(statement_ref.borrow())
-            .unwrap()
+            .unwrap_or_else(|| {
+                panic!(
+                    "failed to resolve {:?} in {:?}\nstatement_values: {:?}",
+                    statement_ref.borrow(),
+                    self.function_name,
+                    self.statement_values,
+                )
+            })
             .clone()
     }
 
@@ -104,6 +111,7 @@ impl<'f> Interpreter<'f> {
 
     fn interpret_block(&mut self, block_ref: Ref<Block>) -> BlockResult {
         log::trace!("{}: block {block_ref:?}", self.function_name);
+        self.statement_values.clear();
         let block = block_ref.get(
             self.model
                 .functions()
@@ -184,6 +192,16 @@ impl<'f> Interpreter<'f> {
                             Some(Value::UnsignedInteger {
                                 value: (value == 0) as u64,
                                 length: 1,
+                            })
+                        }
+                        UnaryOperationKind::Complement => {
+                            let Value::UnsignedInteger { value, length } = value else {
+                                todo!()
+                            };
+
+                            Some(Value::UnsignedInteger {
+                                value: !value,
+                                length,
                             })
                         }
                         _ => todo!("{kind:?} {value:?}"),
