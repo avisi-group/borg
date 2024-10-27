@@ -9,8 +9,13 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::{arena::Ref, mask::mask},
-    core::{cell::RefCell, fmt::Debug, panic},
+    common::{arena::Ref, mask::mask, HashMap},
+    core::{
+        cell::RefCell,
+        fmt::Debug,
+        hash::{Hash, Hasher},
+        panic,
+    },
     proc_macro_lib::ktest,
 };
 
@@ -18,6 +23,7 @@ const INVALID_OFFSET: i32 = 0xDEAD00F;
 
 pub struct X86Emitter<'ctx> {
     current_block: Ref<X86Block>,
+    current_block_operands: HashMap<X86NodeRef, Operand>,
     panic_block: Ref<X86Block>,
     next_vreg: usize,
     ctx: &'ctx mut X86TranslationContext,
@@ -27,6 +33,7 @@ impl<'ctx> X86Emitter<'ctx> {
     pub fn new(ctx: &'ctx mut X86TranslationContext) -> Self {
         Self {
             current_block: ctx.initial_block(),
+            current_block_operands: HashMap::default(),
             panic_block: ctx.panic_block(),
             next_vreg: 0,
             ctx,
@@ -64,6 +71,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
     fn set_current_block(&mut self, block: Self::BlockRef) {
         self.current_block = block;
+        self.current_block_operands = HashMap::default();
     }
 
     fn constant(&mut self, value: u64, typ: Type) -> Self::NodeRef {
@@ -904,6 +912,20 @@ fn signextend_64() {
 #[derive(Debug, Clone)]
 pub struct X86NodeRef(Rc<X86Node>);
 
+impl Hash for X86NodeRef {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Rc::as_ptr(&self.0).hash(state);
+    }
+}
+
+impl Eq for X86NodeRef {}
+
+impl PartialEq for X86NodeRef {
+    fn eq(&self, other: &X86NodeRef) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
 impl X86NodeRef {
     pub fn kind(&self) -> &NodeKind {
         &self.0.kind
@@ -914,7 +936,11 @@ impl X86NodeRef {
     }
 
     fn to_operand(&self, emitter: &mut X86Emitter) -> Operand {
-        match self.kind() {
+        if let Some(operand) = emitter.current_block_operands.get(self) {
+            return operand.clone();
+        }
+
+        let op = match self.kind() {
             NodeKind::Constant { value, width } => Operand::imm(*width, *value),
             NodeKind::GuestRegister { offset } => {
                 let width = self.typ().width();
@@ -1205,39 +1231,76 @@ impl X86NodeRef {
                 masked_target
             }
             NodeKind::GetFlags { operation } => {
-                // if the last instruction wasn't an ADC, emit one? todo:
-                // if !matches!(
-                //     emitter
-                //         .current_block
-                //         .get(emitter.ctx.arena())
-                //         .instructions()
-                //         .last()
-                //         .map(|i| &i.0),
-                //     Some(Opcode::ADC(_, _, _))
-                // ) {
-                //     let _op = operation.to_operand(emitter);
-                // }
-
                 let n = Operand::vreg(8, emitter.next_vreg());
                 let z = Operand::vreg(8, emitter.next_vreg());
                 let c = Operand::vreg(8, emitter.next_vreg());
                 let v = Operand::vreg(8, emitter.next_vreg());
                 let dest = Operand::vreg(8, emitter.next_vreg());
 
-                emitter.append(Instruction::sets(n.clone()));
-                emitter.append(Instruction::sete(z.clone()));
-                emitter.append(Instruction::setc(c.clone()));
-                emitter.append(Instruction::seto(v.clone()));
+                let instrs = [
+                    Instruction::sets(n.clone()),
+                    Instruction::sete(z.clone()),
+                    Instruction::setc(c.clone()),
+                    Instruction::seto(v.clone()),
+                    Instruction::xor(dest.clone(), dest.clone()),
+                    Instruction::or(n.clone(), dest.clone()),
+                    Instruction::shl(Operand::imm(1, 1), dest.clone()),
+                    Instruction::or(z.clone(), dest.clone()),
+                    Instruction::shl(Operand::imm(1, 1), dest.clone()),
+                    Instruction::or(c.clone(), dest.clone()),
+                    Instruction::shl(Operand::imm(1, 1), dest.clone()),
+                    Instruction::or(v.clone(), dest.clone()),
+                ];
 
-                emitter.append(Instruction::xor(dest.clone(), dest.clone()));
+                match emitter.current_block_operands.get(operation).cloned() {
+                    Some(operation_operand) => {
+                        let block_instructions = &mut emitter
+                            .current_block
+                            .clone()
+                            .get_mut(emitter.ctx().arena_mut())
+                            .instructions;
 
-                emitter.append(Instruction::or(n.clone(), dest.clone()));
-                emitter.append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-                emitter.append(Instruction::or(z.clone(), dest.clone()));
-                emitter.append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-                emitter.append(Instruction::or(c.clone(), dest.clone()));
-                emitter.append(Instruction::shl(Operand::imm(1, 1), dest.clone()));
-                emitter.append(Instruction::or(v.clone(), dest.clone()));
+                        let (index, adc) = block_instructions
+                            .iter()
+                            .enumerate()
+                            .rev()
+                            .find(|(_, i)| matches!(i.0, Opcode::ADC(_, _, _)))
+                            .unwrap();
+
+                        if let Opcode::ADC(_, dst, _) = &adc.0 {
+                            assert_eq!(*dst, operation_operand)
+                        } else {
+                            panic!()
+                        };
+
+                        for instr in instrs.into_iter().rev() {
+                            block_instructions.insert(index + 1, instr);
+                        }
+                    }
+                    None => {
+                        let _target = operation.to_operand(emitter);
+
+                        emitter
+                            .current_block
+                            .clone()
+                            .get_mut(emitter.ctx().arena_mut())
+                            .instructions
+                            .extend_from_slice(&instrs);
+                    }
+                }
+                // if the last instruction wasn't an ADC, emit one? todo:
+                if !matches!(
+                    emitter
+                        .current_block
+                        .get(emitter.ctx.arena())
+                        .instructions()
+                        .last()
+                        .map(|i| &i.0),
+                    Some(Opcode::ADC(_, _, _))
+                ) {
+                    let _op = operation.to_operand(emitter);
+                }
+
                 // nzcv
                 dest
             }
@@ -1260,7 +1323,12 @@ impl X86NodeRef {
 
                 dest
             }
-        }
+        };
+
+        emitter
+            .current_block_operands
+            .insert(self.clone(), op.clone());
+        op
     }
 }
 
