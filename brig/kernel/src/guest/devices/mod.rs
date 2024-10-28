@@ -442,7 +442,7 @@ fn branch_uncond_imm_offset_math() {
     assert_eq!(*width, 64);
 }
 
-////#[ktest]
+//#[ktest]
 /// cmp not setting NZCV correctly
 fn cmp_csel() {
     assert_eq!(
@@ -674,42 +674,75 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     unsafe { (*r0, *(r1 as *mut u8)) }
 }
 
-//#[ktest]
-fn decodea64_cmp_negative() {
-    let flags = decodea64_cmp_harness(0, -5i64 as u64);
+#[ktest]
+fn decodea64_cmp_first_greater() {
+    let flags = decodea64_cmp_harness(10, 5);
+    assert_eq!(flags, 0b0010);
+}
+#[ktest]
+fn decodea64_cmp_second_greater() {
+    let flags = decodea64_cmp_harness(5, 10);
     assert_eq!(flags, 0b1000);
 }
 
-//#[ktest]
+#[ktest]
 fn decodea64_cmp_zero() {
     let flags = decodea64_cmp_harness(0, 0);
-    assert_eq!(flags, 0b0100);
-}
-
-//#[ktest]
-fn decodea64_cmp_carry() {
-    let flags = decodea64_cmp_harness(u64::MAX, 1);
     assert_eq!(flags, 0b0110);
 }
 
-//#[ktest]
-fn decodea64_cmp_overflow() {
-    let flags = decodea64_cmp_harness(u64::MAX / 2, u64::MAX / 2);
+#[ktest]
+fn decodea64_cmp_equal() {
+    let flags = decodea64_cmp_harness(u64::MAX, u64::MAX);
+    assert_eq!(flags, 0b0110);
+}
+
+#[ktest]
+fn decodea64_cmp_signed_overflow() {
+    let flags = decodea64_cmp_harness(0x7fffffffffffffff, 0xffffffffffffffff);
     assert_eq!(flags, 0b1001);
 }
 
-//#[ktest]
-fn decodea64_cmp_early_4880_loop() {
-    let flags = decodea64_cmp_harness(0x425a6004, !0x425a6020);
+#[ktest]
+fn decodea64_cmp_positive_overflow() {
+    let flags = decodea64_cmp_harness(0x7FFF_FFFF_FFFF_FFFF, 1);
+    assert_eq!(flags, 0b0010);
+}
+
+#[ktest]
+fn decodea64_cmp_negative_overflow() {
+    let flags = decodea64_cmp_harness(0, 0x8000000000000000);
+    assert_eq!(flags, 0b1001);
+}
+
+#[ktest]
+fn decodea64_cmp_signed_underflow() {
+    let flags = decodea64_cmp_harness(0x8000000000000000, u64::MAX);
     assert_eq!(flags, 0b1000);
 }
 
-//#[ktest]
-fn decodea64_cmp_linux_regression() {
-    let flags = decodea64_cmp_harness(0xffffffc0082b3cd0, 0xffffffffffffffd8);
+#[ktest]
+fn decodea64_cmp_something() {
+    let flags = decodea64_cmp_harness(u64::MAX, 0);
     assert_eq!(flags, 0b1010);
 }
 
+/// verified with
+/// ```rust
+/// fn get_flags(x: u64, y: u64) -> u8 {
+///     let mut nzcv: u64;
+///     unsafe {
+///         asm!(
+///             "cmp x0, x1",
+///             "mrs x2, nzcv",
+///             in("x0") x,
+///             in("x1") y,
+///             out("x2") nzcv,
+///         );
+///     }
+///     u8::try_from(nzcv >> 28).unwrap()
+/// }
+/// ```
 fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     let model = models::get("aarch64").unwrap();
 
@@ -735,7 +768,6 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    log::trace!("{translation:?}");
     translation.execute(register_file_ptr);
 
     unsafe {
