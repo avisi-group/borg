@@ -443,15 +443,16 @@ fn branch_uncond_imm_offset_math() {
 }
 
 //#[ktest]
-/// cmp not setting NZCV correctly
+// second assert fails :(
 fn cmp_csel() {
-    assert_eq!(
-        0xffff_ffff_ffff_ff00,
-        cmp_csel_inner(0xffff_ffff_ffff_ff00, 0xffff_ffff_ffff_ffc0)
-    );
     assert_eq!(
         0x0fff_ffff_ffff_ffc0,
         cmp_csel_inner(0xffff_ffff_ffff_ff00, 0x0fff_ffff_ffff_ffc0)
+    );
+
+    assert_eq!(
+        0xffff_ffff_ffff_ff00,
+        cmp_csel_inner(0xffff_ffff_ffff_ff00, 0xffff_ffff_ffff_ffc0)
     );
 
     fn cmp_csel_inner(pre_r0: u64, pre_r2: u64) -> u64 {
@@ -469,19 +470,19 @@ fn cmp_csel() {
         let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
         emitter.write_register(see_offset, see_value);
 
-        //cmp     x2, x0
+        // cmp     x2, x0
         let pc = emitter.constant(0, Type::Unsigned(64));
         let opcode = emitter.constant(0xeb00005f, Type::Unsigned(32));
         translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
-        // let see_offset = emitter.constant(model.reg_offset("SEE") as u64,
-        // Type::Unsigned(64)); let see_value = emitter.constant(-1i32 as u64,
-        // Type::Signed(32)); emitter.write_register(see_offset, see_value);
+        let see_offset = emitter.constant(model.reg_offset("SEE") as u64, Type::Unsigned(64));
+        let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
+        emitter.write_register(see_offset, see_value);
 
-        // // //  csel    x2, x2, x0, ls  // ls = plast
-        // let pc = emitter.constant(0, Type::Unsigned(64));
-        // let opcode = emitter.constant(0x9a809042, Type::Unsigned(32));
-        // translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+        // csel    x2, x2, x0, ls  // ls = plast
+        let pc = emitter.constant(0, Type::Unsigned(64));
+        let opcode = emitter.constant(0x9a809042, Type::Unsigned(32));
+        translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
         emitter.leave();
 
@@ -502,7 +503,7 @@ fn cmp_csel() {
     }
 }
 
-////#[ktest]
+#[ktest]
 fn fibonacci() {
     let model = models::get("aarch64").unwrap();
 
@@ -542,8 +543,6 @@ fn fibonacci() {
 
         // bounded just in case
         for _ in 0..100 {
-            log::warn!("pc = {}", *pc);
-
             *see = -1;
             *branch_taken = false;
 
