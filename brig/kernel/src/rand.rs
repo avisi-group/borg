@@ -8,7 +8,17 @@ use {
 static RNG: Once<Mutex<Rng>> = Once::INIT;
 
 pub fn init() {
-    RNG.call_once(|| Mutex::new(Rng::with_seed(RdRand::new().unwrap().get_u64().unwrap())));
+    RNG.call_once(|| {
+        Mutex::new(Rng::with_seed(
+            RdRand::new()
+                .map(|rd| rd.get_u64())
+                .flatten()
+                .unwrap_or_else(|| {
+                    log::warn!("no RDRAND, seeding with 0 instead");
+                    0
+                }),
+        ))
+    });
 }
 
 pub fn new_uuid_v4() -> Uuid {
