@@ -3,6 +3,7 @@ use {
         memory_operand_to_iced, Operand,
         OperandKind::{Immediate as I, Memory as M, Register as R},
         Register::PhysicalRegister as PHYS,
+        Width,
     },
     iced_x86::code_asm::{
         byte_ptr, dword_ptr, word_ptr, AsmMemoryOperand, AsmRegister32, AsmRegister64,
@@ -16,11 +17,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
         ) => {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
@@ -33,11 +34,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 64,
+                width_in_bits: Width::_64,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 8,
+                width_in_bits: Width::_8,
             },
         ) => {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
@@ -49,28 +50,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 32,
+                width_in_bits: Width::_32,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 8,
-            },
-        ) => {
-            //assert_eq!(src_width_in_bits, dst_width_in_bits);
-
-            assembler
-                .mov::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
-                .unwrap();
-        }
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: 1..=8,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
         ) => {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
@@ -83,11 +67,28 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 17..=32,
+                width_in_bits: Width::_8,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 17..=32,
+                width_in_bits: Width::_8,
+            },
+        ) => {
+            //assert_eq!(src_width_in_bits, dst_width_in_bits);
+
+            assembler
+                .mov::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
+                .unwrap();
+        }
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
             },
         ) => {
             //assert_eq!(src_width_in_bits, dst_width_in_bits);
@@ -99,11 +100,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
         ) => {
             // todo: check high bits of src are zero?
@@ -122,11 +123,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 64,
+                width_in_bits: Width::_64,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 64,
+                width_in_bits: Width::_64,
             },
         ) => {
             assembler
@@ -147,11 +148,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
         ) => {
             assembler
@@ -172,11 +173,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 17..=32,
+                width_in_bits: Width::_32,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 17..=32,
+                width_in_bits: Width::_32,
             },
         ) => {
             assembler
@@ -190,7 +191,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
             Operand {
                 kind:
@@ -201,7 +202,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
         ) => {
             assembler
@@ -215,7 +216,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 17..=32,
+                width_in_bits: Width::_32,
             },
             Operand {
                 kind:
@@ -226,7 +227,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 17..=32,
+                width_in_bits: Width::_32,
             },
         ) => {
             assembler
@@ -240,7 +241,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
             Operand {
                 kind:
@@ -251,7 +252,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
         ) => {
             assembler
@@ -265,7 +266,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: I(src),
-                width_in_bits: 32,
+                width_in_bits: Width::_32,
             },
             Operand {
                 kind:
@@ -276,7 +277,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 32,
+                width_in_bits: Width::_32,
             },
         ) => {
             // assert_eq!(src_width_in_bits, dst_width_in_bits);
@@ -292,7 +293,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: I(src),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
             Operand {
                 kind:
@@ -303,7 +304,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
         ) => {
             // assert_eq!(src_width_in_bits, dst_width_in_bits);
@@ -319,7 +320,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: I(src),
-                width_in_bits: 9..=16,
+                width_in_bits: Width::_16,
             },
             Operand {
                 kind:
@@ -330,7 +331,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 9..=16,
+                width_in_bits: Width::_16,
             },
         ) => {
             // assert_eq!(src_width_in_bits, dst_width_in_bits);
@@ -346,7 +347,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: I(src),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
             Operand {
                 kind:
@@ -357,7 +358,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
         ) => {
             // lo
@@ -380,95 +381,15 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 )
                 .unwrap();
         }
-        // MOV I -> M
-        (
-            Operand {
-                kind: I(src),
-                width_in_bits: 65..=128,
-            },
-            Operand {
-                kind:
-                    M {
-                        base: Some(PHYS(base)),
-                        index,
-                        scale,
-                        displacement,
-                        ..
-                    },
-                width_in_bits: 65..=128,
-            },
-        ) => {
-            // lolo
-            assembler
-                .mov::<AsmMemoryOperand, u32>(
-                    dword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
-                    u32::try_from(*src & u64::from(u32::MAX)).unwrap(),
-                )
-                .unwrap();
-            // lohi
-            assembler
-                .mov::<AsmMemoryOperand, u32>(
-                    dword_ptr(memory_operand_to_iced(
-                        *base,
-                        *index,
-                        *scale,
-                        *displacement + 4,
-                    )),
-                    u32::try_from((*src >> 32) & u64::from(u32::MAX)).unwrap(),
-                )
-                .unwrap();
-            // hilo
-            assembler
-                .mov::<AsmMemoryOperand, u32>(
-                    dword_ptr(memory_operand_to_iced(
-                        *base,
-                        *index,
-                        *scale,
-                        *displacement + 8,
-                    )),
-                    0,
-                )
-                .unwrap();
-            // hihi
-            assembler
-                .mov::<AsmMemoryOperand, u32>(
-                    dword_ptr(memory_operand_to_iced(
-                        *base,
-                        *index,
-                        *scale,
-                        *displacement + 12,
-                    )),
-                    0,
-                )
-                .unwrap();
-        }
-        // MOV I -> M
-        (
-            Operand {
-                kind: I(_src),
-                width_in_bits: 0,
-            },
-            Operand {
-                kind:
-                    M {
-                        base: Some(PHYS(_base)),
-                        ..
-                    },
-                width_in_bits: 0,
-            },
-        ) => {
-            todo!("why");
-        }
-
         // MOV I -> R
         (
             Operand {
                 kind: I(src),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
         ) => {
             assembler
@@ -479,11 +400,11 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: I(src),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
             Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
         ) => {
             assembler

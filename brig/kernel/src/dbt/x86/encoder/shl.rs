@@ -3,6 +3,7 @@ use {
         Operand,
         OperandKind::{Immediate as I, Register as R},
         Register::PhysicalRegister as PHYS,
+        Width,
     },
     iced_x86::code_asm::{AsmRegister32, AsmRegister64, AsmRegister8, CodeAssembler},
 };
@@ -15,7 +16,7 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
             Operand {
                 kind: R(PHYS(value)),
-                width_in_bits: 1..=8,
+                width_in_bits: Width::_8,
             },
         ) => {
             assembler
@@ -28,7 +29,7 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
             Operand {
                 kind: R(PHYS(value)),
-                width_in_bits: 17..=32,
+                width_in_bits: Width::_32,
             },
         ) => {
             assembler
@@ -41,7 +42,7 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
             },
             Operand {
                 kind: R(PHYS(value)),
-                width_in_bits: 33..=64,
+                width_in_bits: Width::_64,
             },
         ) => {
             assembler

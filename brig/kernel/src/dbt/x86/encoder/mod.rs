@@ -1,11 +1,14 @@
 use {
     crate::dbt::x86::emitter::X86Block,
     common::{arena::Ref, HashMap},
-    core::fmt::{Debug, Display, Formatter},
+    core::{
+        cmp::Ordering,
+        fmt::{self, Debug, Display, Formatter},
+    },
     displaydoc::Display,
     iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8, CodeAssembler,
-        CodeLabel,
+        qword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8,
+        CodeAssembler, CodeLabel,
     },
 };
 
@@ -13,6 +16,48 @@ mod mov;
 mod setne;
 mod shl;
 mod shr;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Width {
+    _8,
+    _16,
+    _32,
+    _64,
+}
+
+impl Width {
+    pub fn from_uncanonicalized(bits: u16) -> Self {
+        match bits {
+            0 => panic!("cannot encode 0-bit width"),
+            1..=8 => Self::_8,
+            9..=16 => Self::_16,
+            17..=32 => Self::_32,
+            33..=64 => Self::_64,
+            _ => panic!("cannot encode >64-bit width"),
+        }
+    }
+
+    fn as_u16(&self) -> u16 {
+        match self {
+            Width::_8 => 8,
+            Width::_16 => 16,
+            Width::_32 => 32,
+            Width::_64 => 64,
+        }
+    }
+}
+
+impl Display for Width {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_u16())
+    }
+}
+
+impl PartialOrd for Width {
+    fn partial_cmp(&self, other: &Width) -> Option<Ordering> {
+        self.as_u16().partial_cmp(&other.as_u16())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum Opcode {
@@ -441,37 +486,45 @@ impl Debug for OperandKind {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Operand {
-    pub kind: OperandKind,
-    pub width_in_bits: u16,
+    kind: OperandKind,
+    width_in_bits: Width,
 }
 
 impl Operand {
-    pub fn imm(width_in_bits: u16, value: u64) -> Operand {
+    pub fn kind(&self) -> &OperandKind {
+        &self.kind
+    }
+
+    pub fn width(&self) -> Width {
+        self.width_in_bits
+    }
+
+    pub fn imm(width_in_bits: Width, value: u64) -> Operand {
         Operand {
             kind: OperandKind::Immediate(value),
-            width_in_bits,
+            width_in_bits: (width_in_bits),
         }
     }
 
-    pub fn preg(width_in_bits: u16, reg: PhysicalRegister) -> Operand {
+    pub fn preg(width_in_bits: Width, reg: PhysicalRegister) -> Operand {
         Operand {
             kind: OperandKind::Register(Register::PhysicalRegister(reg)),
-            width_in_bits,
+            width_in_bits: (width_in_bits),
         }
     }
 
-    pub fn vreg(width_in_bits: u16, reg: usize) -> Operand {
+    pub fn vreg(width_in_bits: Width, reg: usize) -> Operand {
         Operand {
             kind: OperandKind::Register(Register::VirtualRegister(reg)),
-            width_in_bits,
+            width_in_bits: (width_in_bits),
         }
     }
 
-    pub fn mem_base(width_in_bits: u16, base: Register) -> Operand {
+    pub fn mem_base(width_in_bits: Width, base: Register) -> Operand {
         Self::mem_base_displ(width_in_bits, base, 0)
     }
 
-    pub fn mem_base_displ(width_in_bits: u16, base: Register, displacement: i32) -> Operand {
+    pub fn mem_base_displ(width_in_bits: Width, base: Register, displacement: i32) -> Operand {
         Operand {
             kind: OperandKind::Memory {
                 base: Some(base),
@@ -480,7 +533,7 @@ impl Operand {
                 displacement,
                 segment_override: None,
             },
-            width_in_bits,
+            width_in_bits: (width_in_bits),
         }
     }
 
@@ -508,7 +561,7 @@ impl Operand {
                 displacement,
                 segment_override: None,
             },
-            width_in_bits,
+            width_in_bits: Width::from_uncanonicalized(width_in_bits),
         }
     }
 
@@ -525,14 +578,14 @@ impl Operand {
                 displacement,
                 segment_override: Some(segment),
             },
-            width_in_bits,
+            width_in_bits: Width::from_uncanonicalized(width_in_bits),
         }
     }
 
     pub fn target(target: Ref<X86Block>) -> Self {
         Self {
             kind: OperandKind::Target(target),
-            width_in_bits: 0,
+            width_in_bits: Width::_64, // todo: not really true, fix this
         }
     }
 }
@@ -757,7 +810,7 @@ impl Instruction {
                     width_in_bits: dst_width,
                 },
             ) => match (*src_width, *dst_width) {
-                (16..=32, 33..=64) => assembler
+                (Width::_32, Width::_64) => assembler
                     .movsxd::<AsmRegister64, AsmRegister32>(dst.into(), src.into())
                     .unwrap(),
                 (src, dst) => todo!("{src} -> {dst} sign extend mov not implemented"),
@@ -773,13 +826,13 @@ impl Instruction {
                     width_in_bits: dst_width,
                 },
             ) => match (*src_width, *dst_width) {
-                (16, 32) => assembler
+                (Width::_16, Width::_32) => assembler
                     .movzx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
                     .unwrap(),
-                (1..=8, 64) => assembler
+                (Width::_8, Width::_64) => assembler
                     .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                     .unwrap(),
-                (32, 64) => {
+                (Width::_32, Width::_64) => {
                     assembler
                         .xor::<AsmRegister64, AsmRegister64>(dst.into(), dst.into())
                         .unwrap();
@@ -787,7 +840,7 @@ impl Instruction {
                         .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                         .unwrap()
                 }
-                (16..=32, 16..=32) => assembler
+                (Width::_32, Width::_32) => assembler
                     .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                     .unwrap(),
 
@@ -804,17 +857,17 @@ impl Instruction {
                             displacement,
                             ..
                         },
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 assembler
                     .lea::<AsmRegister64, AsmMemoryOperand>(
                         dst.into(),
-                        memory_operand_to_iced(*base, *index, *scale, *displacement),
+                        qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
                     )
                     .unwrap();
             }
@@ -839,15 +892,13 @@ impl Instruction {
             ADD(
                 Operand {
                     kind: I(src),
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: _,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: Width::_64,
                 },
             ) => {
-                // assert_eq!(src_width_in_bits, dst_width_in_bits);
-
                 assembler
                     .add::<AsmRegister64, i32>(dst.into(), i32::try_from(*src as i64).unwrap())
                     .unwrap();
@@ -861,7 +912,7 @@ impl Instruction {
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 assembler
@@ -873,11 +924,11 @@ impl Instruction {
             TEST(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: 33..=64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 33..=64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 assembler
@@ -889,11 +940,11 @@ impl Instruction {
             TEST(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
             ) => {
                 assembler
@@ -924,14 +975,13 @@ impl Instruction {
             CMP(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
             ) => {
-                //assert_eq!(left_width, right_width);
                 assembler
                     .cmp::<AsmRegister8, AsmRegister8>(right.into(), left.into())
                     .unwrap();
@@ -939,14 +989,13 @@ impl Instruction {
             CMP(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: 17..=32,
+                    width_in_bits: Width::_32,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 17..=32,
+                    width_in_bits: Width::_32,
                 },
             ) => {
-                //assert_eq!(left_width, right_width);
                 assembler
                     .cmp::<AsmRegister32, AsmRegister32>(right.into(), left.into())
                     .unwrap();
@@ -954,14 +1003,13 @@ impl Instruction {
             CMP(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: 33..=64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 33..=64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
-                //assert_eq!(left_width, right_width);
                 assembler
                     .cmp::<AsmRegister64, AsmRegister64>(right.into(), left.into())
                     .unwrap();
@@ -969,16 +1017,29 @@ impl Instruction {
             CMP(
                 Operand {
                     kind: I(left),
-                    width_in_bits: left_width,
+                    width_in_bits: _,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: right_width,
+                    width_in_bits: Width::_64,
                 },
             ) => {
-                //assert_eq!(left_width, right_width);
                 assembler
                     .cmp::<AsmRegister64, i32>(right.into(), (*left).try_into().unwrap())
+                    .unwrap();
+            }
+            CMP(
+                Operand {
+                    kind: I(left),
+                    width_in_bits: _,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: Width::_8,
+                },
+            ) => {
+                assembler
+                    .cmp::<AsmRegister8, i32>(right.into(), (*left).try_into().unwrap())
                     .unwrap();
             }
 
@@ -1032,11 +1093,11 @@ impl Instruction {
             OR(
                 Operand {
                     kind: I(left),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
             ) => {
                 assembler
@@ -1047,11 +1108,11 @@ impl Instruction {
             OR(
                 Operand {
                     kind: I(left),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 17..=32,
+                    width_in_bits: Width::_32,
                 },
             ) => {
                 assembler
@@ -1062,11 +1123,11 @@ impl Instruction {
             OR(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 1..=8,
+                    width_in_bits: Width::_8,
                 },
             ) => {
                 assembler
@@ -1076,11 +1137,11 @@ impl Instruction {
             OR(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: 33..=64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 33..=64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 //assert_eq!(src_width, dst_width);
@@ -1091,11 +1152,11 @@ impl Instruction {
             XOR(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 //assert_eq!(src_width, dst_width);
@@ -1106,11 +1167,11 @@ impl Instruction {
             XOR(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: 8,
+                    width_in_bits: Width::_8,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 8,
+                    width_in_bits: Width::_8,
                 },
             ) => {
                 //assert_eq!(src_width, dst_width);
@@ -1129,7 +1190,6 @@ impl Instruction {
                 if *left == u64::MAX {
                     // no-op
                 } else {
-                    //assert_eq!(left_width, right_width);
                     assembler
                         .and::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
                         .unwrap();
@@ -1138,11 +1198,11 @@ impl Instruction {
             AND(
                 Operand {
                     kind: R(PHYS(left)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(right)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 assembler
@@ -1177,11 +1237,11 @@ impl Instruction {
             ADC(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(carry)),
@@ -1201,15 +1261,15 @@ impl Instruction {
             ADC(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: I(carry_in),
-                    width_in_bits: 1,
+                    width_in_bits: Width::_8,
                 },
             ) => match carry_in {
                 0 => {
@@ -1227,26 +1287,26 @@ impl Instruction {
             },
             PUSH(Operand {
                 kind: R(PHYS(src)),
-                width_in_bits: 64,
+                width_in_bits: Width::_64,
             }) => {
                 assembler.push::<AsmRegister64>(src.into()).unwrap();
             }
             POP(Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 64,
+                width_in_bits: Width::_64,
             }) => {
                 assembler.pop::<AsmRegister64>(dst.into()).unwrap();
             }
 
             SETB(Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 1,
+                width_in_bits: Width::_8,
             }) => {
                 assembler.setne::<AsmRegister8>(dst.into()).unwrap();
             }
             SETBE(Operand {
                 kind: R(PHYS(dst)),
-                width_in_bits: 1,
+                width_in_bits: Width::_8,
             }) => {
                 assembler.setbe::<AsmRegister8>(dst.into()).unwrap();
             }
@@ -1255,11 +1315,11 @@ impl Instruction {
             CMOVE(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 assembler
@@ -1269,11 +1329,11 @@ impl Instruction {
             CMOVNE(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: 64,
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 assembler

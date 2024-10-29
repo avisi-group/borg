@@ -1,6 +1,6 @@
 use {
     crate::dbt::x86::{
-        encoder::{Instruction, Opcode, Operand, PhysicalRegister, Register},
+        encoder::{Instruction, Opcode, Operand, PhysicalRegister, Register, Width},
         register_allocator::solid_state::SolidStateRegisterAllocator,
     },
     proc_macro_lib::ktest,
@@ -16,9 +16,9 @@ pub trait RegisterAllocator {
 #[ktest]
 fn simple_allocation_regression() {
     let mut instrs = [Instruction(Opcode::MOV(
-        Operand::vreg(64, 1),
+        Operand::vreg(Width::_64, 1),
         Operand::mem_base_displ(
-            64,
+            Width::_64,
             Register::PhysicalRegister(PhysicalRegister::RBP),
             0x4321,
         ),

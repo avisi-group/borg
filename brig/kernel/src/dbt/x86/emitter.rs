@@ -3,7 +3,7 @@ use {
         bit_extract, bit_insert,
         emitter::{BlockResult, Type},
         x86::{
-            encoder::{Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register},
+            encoder::{Instruction, Opcode, Operand, PhysicalRegister, Register, Width},
             register_allocator::RegisterAllocator,
             Emitter, X86TranslationContext,
         },
@@ -652,7 +652,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
         let value = value.to_operand(self);
 
-        let width = value.width_in_bits;
+        let width = value.width();
 
         self.append(Instruction::mov(
             value,
@@ -725,10 +725,8 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef) {
         let value = value.to_operand(self);
 
-        let width = value.width_in_bits;
-
         let mem = Operand::mem_base_displ(
-            width,
+            value.width(),
             Register::PhysicalRegister(PhysicalRegister::RSP),
             -(i32::try_from(offset).unwrap()),
         );
@@ -942,9 +940,11 @@ impl X86NodeRef {
         }
 
         let op = match self.kind() {
-            NodeKind::Constant { value, width } => Operand::imm(*width, *value),
+            NodeKind::Constant { value, width } => {
+                Operand::imm(Width::from_uncanonicalized(*width), *value)
+            }
             NodeKind::GuestRegister { offset } => {
-                let width = self.typ().width();
+                let width = Width::from_uncanonicalized(self.typ().width());
                 let dst = Operand::vreg(width, emitter.next_vreg());
 
                 emitter.append(Instruction::mov(
@@ -959,11 +959,12 @@ impl X86NodeRef {
                 dst
             }
             NodeKind::ReadStackVariable { offset, width } => {
-                let dst = Operand::vreg(*width, emitter.next_vreg());
+                let width = Width::from_uncanonicalized(*width);
+                let dst = Operand::vreg(width, emitter.next_vreg());
 
                 emitter.append(Instruction::mov(
                     Operand::mem_base_displ(
-                        *width,
+                        width,
                         Register::PhysicalRegister(PhysicalRegister::RSP),
                         -(i32::try_from(*offset).unwrap()),
                     ),
@@ -974,7 +975,8 @@ impl X86NodeRef {
             }
             NodeKind::BinaryOperation(kind) => match kind {
                 BinaryOperationKind::Add(left, right) => {
-                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -984,7 +986,8 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::Sub(left, right) => {
-                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -994,7 +997,8 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::Or(left, right) => {
-                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -1004,7 +1008,8 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::And(left, right) => {
-                    let dst = Operand::vreg(left.typ().width(), emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
                     let right = right.to_operand(emitter);
@@ -1026,7 +1031,8 @@ impl X86NodeRef {
             },
             NodeKind::TernaryOperation(kind) => match kind {
                 TernaryOperationKind::AddWithCarry(a, b, carry) => {
-                    let dst = Operand::vreg(a.typ().width(), emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(a.typ().width());
+                    let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let a = a.to_operand(emitter);
                     let b = b.to_operand(emitter);
@@ -1039,14 +1045,15 @@ impl X86NodeRef {
             },
             NodeKind::UnaryOperation(kind) => match &kind {
                 UnaryOperationKind::Complement(value) => {
-                    let dst = Operand::vreg(value.typ().width(), emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(value.typ().width());
+                    let dst = Operand::vreg(width, emitter.next_vreg());
                     let value = value.to_operand(emitter);
                     emitter.append(Instruction::mov(value, dst.clone()));
                     emitter.append(Instruction::not(dst.clone()));
                     dst
                 }
                 UnaryOperationKind::Not(value) => {
-                    let width = value.typ().width();
+                    let width = Width::from_uncanonicalized(value.typ().width());
                     let value = value.to_operand(emitter);
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
@@ -1064,7 +1071,8 @@ impl X86NodeRef {
                 length,
             } => {
                 let value = if let NodeKind::Constant { .. } = value.kind() {
-                    let value_reg = Operand::vreg(value.typ().width(), emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(value.typ().width());
+                    let value_reg = Operand::vreg(width, emitter.next_vreg());
                     let value_imm = value.to_operand(emitter);
                     emitter.append(Instruction::mov(value_imm, value_reg.clone()));
                     value_reg
@@ -1077,24 +1085,24 @@ impl X86NodeRef {
 
                 //  start[0..8] ++ length[0..8];
                 let control_byte = {
-                    let mask = Operand::imm(64, 0xff);
+                    let mask = Operand::imm(Width::_64, 0xff);
 
                     let start = {
-                        let dst = Operand::vreg(64, emitter.next_vreg());
+                        let dst = Operand::vreg(Width::_64, emitter.next_vreg());
                         emitter.append(Instruction::mov(start, dst.clone()));
                         emitter.append(Instruction::and(mask.clone(), dst.clone()));
                         dst
                     };
 
                     let length = {
-                        let dst = Operand::vreg(64, emitter.next_vreg());
+                        let dst = Operand::vreg(Width::_64, emitter.next_vreg());
                         emitter.append(Instruction::mov(length, dst.clone()));
                         emitter.append(Instruction::and(mask.clone(), dst.clone()));
-                        emitter.append(Instruction::shl(Operand::imm(8, 8), dst.clone()));
+                        emitter.append(Instruction::shl(Operand::imm(Width::_8, 8), dst.clone()));
                         dst
                     };
 
-                    let dst = Operand::vreg(64, emitter.next_vreg());
+                    let dst = Operand::vreg(Width::_64, emitter.next_vreg());
 
                     emitter.append(Instruction::mov(start, dst.clone()));
                     emitter.append(Instruction::or(length, dst.clone()));
@@ -1103,14 +1111,14 @@ impl X86NodeRef {
                 };
 
                 // todo: this 64 should be the value of `length`
-                let dst = Operand::vreg(64, emitter.next_vreg());
+                let dst = Operand::vreg(Width::_64, emitter.next_vreg());
 
                 emitter.append(Instruction::bextr(control_byte, value, dst.clone()));
 
                 dst
             }
             NodeKind::Cast { value, kind } => {
-                let target_width = canonicalize_width(self.typ().width());
+                let target_width = Width::from_uncanonicalized(self.typ().width());
                 let dst = Operand::vreg(target_width, emitter.next_vreg());
                 let src = value.to_operand(emitter);
 
@@ -1119,14 +1127,14 @@ impl X86NodeRef {
                 } else {
                     match kind {
                         CastOperationKind::ZeroExtend => {
-                            if src.width_in_bits == dst.width_in_bits {
+                            if src.width() == dst.width() {
                                 emitter.append(Instruction::mov(src, dst.clone()));
                             } else {
                                 emitter.append(Instruction::movzx(src, dst.clone()));
                             }
                         }
                         CastOperationKind::SignExtend => {
-                            if src.width_in_bits == dst.width_in_bits {
+                            if src.width() == dst.width() {
                                 emitter.append(Instruction::mov(src, dst.clone()));
                             } else {
                                 emitter.append(Instruction::movsx(src, dst.clone()));
@@ -1136,8 +1144,8 @@ impl X86NodeRef {
                             panic!("{:?}\n{:#?}", self.typ(), value);
                         }
                         CastOperationKind::Truncate => {
-                            let src_width = canonicalize_width(src.width_in_bits);
-                            let dst_width = canonicalize_width(dst.width_in_bits);
+                            let src_width = src.width();
+                            let dst_width = dst.width();
                             if src_width < dst_width {
                                 panic!("src ({src_width} bits) must be larger than dst ({dst_width} bits)");
                             }
@@ -1166,7 +1174,7 @@ impl X86NodeRef {
                 let amount = amount.to_operand(emitter);
                 let value = value.to_operand(emitter);
 
-                let dst = Operand::vreg(value.width_in_bits, emitter.next_vreg());
+                let dst = Operand::vreg(value.width(), emitter.next_vreg());
                 emitter.append(Instruction::mov(value, dst.clone()));
 
                 match kind {
@@ -1198,23 +1206,23 @@ impl X86NodeRef {
                 let start = start.to_operand(emitter);
                 let length = length.to_operand(emitter);
 
-                let mask = Operand::vreg(64, emitter.next_vreg());
-                emitter.append(Instruction::mov(Operand::imm(64, 64), mask.clone()));
+                let mask = Operand::vreg(Width::_64, emitter.next_vreg());
+                emitter.append(Instruction::mov(Operand::imm(Width::_64, 64), mask.clone()));
                 emitter.append(Instruction::shl(length.clone(), mask.clone()));
-                emitter.append(Instruction::sub(Operand::imm(64, 64), mask.clone()));
+                emitter.append(Instruction::sub(Operand::imm(Width::_64, 64), mask.clone()));
                 emitter.append(Instruction::shl(start, mask.clone()));
 
-                let masked_target = Operand::vreg(64, emitter.next_vreg());
+                let masked_target = Operand::vreg(Width::_64, emitter.next_vreg());
                 emitter.append(Instruction::mov(target, masked_target.clone()));
                 emitter.append(Instruction::and(mask.clone(), masked_target.clone()));
 
-                let shifted_source = Operand::vreg(64, emitter.next_vreg());
+                let shifted_source = Operand::vreg(Width::_64, emitter.next_vreg());
                 emitter.append(Instruction::mov(source, shifted_source.clone()));
                 emitter.append(Instruction::shl(length.clone(), shifted_source.clone()));
 
                 {
                     // not strictly necessary but may avoid issues if there is junk data
-                    let invert_mask = Operand::vreg(64, emitter.next_vreg());
+                    let invert_mask = Operand::vreg(Width::_64, emitter.next_vreg());
                     emitter.append(Instruction::mov(mask.clone(), invert_mask.clone()));
                     emitter.append(Instruction::not(invert_mask.clone()));
                     emitter.append(Instruction::and(
@@ -1235,11 +1243,11 @@ impl X86NodeRef {
                 masked_target
             }
             NodeKind::GetFlags { operation } => {
-                let n = Operand::vreg(8, emitter.next_vreg());
-                let z = Operand::vreg(8, emitter.next_vreg());
-                let c = Operand::vreg(8, emitter.next_vreg());
-                let v = Operand::vreg(8, emitter.next_vreg());
-                let dest = Operand::vreg(8, emitter.next_vreg());
+                let n = Operand::vreg(Width::_8, emitter.next_vreg());
+                let z = Operand::vreg(Width::_8, emitter.next_vreg());
+                let c = Operand::vreg(Width::_8, emitter.next_vreg());
+                let v = Operand::vreg(Width::_8, emitter.next_vreg());
+                let dest = Operand::vreg(Width::_8, emitter.next_vreg());
 
                 let instrs = [
                     Instruction::sets(n.clone()),
@@ -1248,11 +1256,11 @@ impl X86NodeRef {
                     Instruction::seto(v.clone()),
                     Instruction::xor(dest.clone(), dest.clone()),
                     Instruction::or(n.clone(), dest.clone()),
-                    Instruction::shl(Operand::imm(1, 1), dest.clone()),
+                    Instruction::shl(Operand::imm(Width::_8, 1), dest.clone()),
                     Instruction::or(z.clone(), dest.clone()),
-                    Instruction::shl(Operand::imm(1, 1), dest.clone()),
+                    Instruction::shl(Operand::imm(Width::_8, 1), dest.clone()),
                     Instruction::or(c.clone(), dest.clone()),
-                    Instruction::shl(Operand::imm(1, 1), dest.clone()),
+                    Instruction::shl(Operand::imm(Width::_8, 1), dest.clone()),
                     Instruction::or(v.clone(), dest.clone()),
                 ];
 
@@ -1314,7 +1322,8 @@ impl X86NodeRef {
                 true_value,
                 false_value,
             } => {
-                let dest = Operand::vreg(true_value.typ().width(), emitter.next_vreg());
+                let width = Width::from_uncanonicalized(true_value.typ().width());
+                let dest = Operand::vreg(width, emitter.next_vreg());
 
                 let condition = condition.to_operand(emitter);
                 let true_value = true_value.to_operand(emitter);
@@ -1525,15 +1534,15 @@ fn emit_compare(
 
     // anything else (imm on the right) must be reworked
 
-    let dst = match (&left.kind, &right.kind) {
+    let dst = match (left.kind(), right.kind()) {
         (Register(_), Register(_))
         | (Register(_), Memory { .. })
         | (Memory { .. }, Register(_))
         | (Immediate(_), Register(_))
         | (Immediate(_), Memory { .. })
         | (Memory { .. }, Memory { .. }) => {
-            let left = if let (Memory { .. }, Memory { .. }) = (&left.kind, &right.kind) {
-                let dst = Operand::vreg(left.width_in_bits, emitter.next_vreg());
+            let left = if let (Memory { .. }, Memory { .. }) = (left.kind(), right.kind()) {
+                let dst = Operand::vreg(left.width(), emitter.next_vreg());
                 emitter.append(Instruction::mov(left, dst.clone()));
                 dst
             } else {
@@ -1544,7 +1553,7 @@ fn emit_compare(
 
             // setCC only sets the lowest bit
 
-            let dst = Operand::vreg(1, emitter.next_vreg());
+            let dst = Operand::vreg(Width::_8, emitter.next_vreg());
 
             emitter.append(match kind {
                 BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
@@ -1565,7 +1574,7 @@ fn emit_compare(
 
         (Memory { .. }, Immediate(_)) | (Register(_), Immediate(_)) => {
             emitter.append(Instruction::cmp(right, left));
-            let dst = Operand::vreg(1, emitter.next_vreg());
+            let dst = Operand::vreg(Width::_8, emitter.next_vreg());
 
             emitter.append(match kind {
                 BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
@@ -1588,13 +1597,7 @@ fn emit_compare(
 
     // setCC instructions only set the least significant byte to 0x00 or 0x01, we
     // need to clear or set the other 63 bits
-    emitter.append(Instruction::and(
-        Operand {
-            kind: OperandKind::Immediate(0b1),
-            width_in_bits: 8,
-        },
-        dst.clone(),
-    ));
+    emitter.append(Instruction::and(Operand::imm(Width::_8, 1), dst.clone()));
     emitter.append(Instruction::neg(dst.clone()));
 
     dst
@@ -1609,16 +1612,6 @@ fn emit_compare(
     //     let right = right.to_operand(emitter);
 
     // }
-}
-
-fn canonicalize_width(width: u16) -> u16 {
-    match width {
-        0..=8 => 8,
-        9..=16 => 16,
-        17..=32 => 32,
-        33..=64 => 64,
-        w => panic!("width {w:?} is greater than 64"),
-    }
 }
 
 // #[cfg(test)]

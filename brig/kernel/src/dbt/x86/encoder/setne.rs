@@ -1,6 +1,6 @@
 use {
     crate::dbt::x86::encoder::{
-        Operand, OperandKind::Register as R, Register::PhysicalRegister as PHYS,
+        Operand, OperandKind::Register as R, Register::PhysicalRegister as PHYS, Width,
     },
     iced_x86::code_asm::{AsmRegister64, AsmRegister8, CodeAssembler},
 };
@@ -9,7 +9,7 @@ pub fn encode(assembler: &mut CodeAssembler, dst: &Operand) {
     match dst {
         Operand {
             kind: R(PHYS(target)),
-            width_in_bits: 64,
+            width_in_bits: Width::_64,
         } => {
             assembler
                 .xor::<AsmRegister64, AsmRegister64>(target.into(), target.into())
@@ -18,7 +18,7 @@ pub fn encode(assembler: &mut CodeAssembler, dst: &Operand) {
         }
         Operand {
             kind: R(PHYS(target)),
-            width_in_bits: 1..=8,
+            width_in_bits: Width::_8,
         } => {
             assembler.setne::<AsmRegister8>(target.into()).unwrap();
         }
