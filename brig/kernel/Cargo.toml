@@ -23,7 +23,7 @@ byte-unit = { version = "5.1.4", default-features = false, features = ["byte"] }
 log = { version = "0.4.22", default-features = false }
 elf = { version = "0.7.4", default-features = false }
 rustc-demangle = { version = "0.1.24", default-features = false }
-serde = { version = "1.0.213", default-features = false, features = [
+serde = { version = "1.0.214", default-features = false, features = [
     "derive",
     "alloc",
 ] }
