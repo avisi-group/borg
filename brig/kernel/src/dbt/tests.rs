@@ -440,17 +440,16 @@ fn branch_uncond_imm_offset_math() {
     assert_eq!(*width, 64);
 }
 
-//#[ktest]
-// second assert fails :(
+#[ktest]
 fn cmp_csel() {
-    assert_eq!(
-        0x0fff_ffff_ffff_ffc0,
-        cmp_csel_inner(0xffff_ffff_ffff_ff00, 0x0fff_ffff_ffff_ffc0)
-    );
-
     assert_eq!(
         0xffff_ffff_ffff_ff00,
         cmp_csel_inner(0xffff_ffff_ffff_ff00, 0xffff_ffff_ffff_ffc0)
+    );
+
+    assert_eq!(
+        0x0fff_ffff_ffff_ffc0,
+        cmp_csel_inner(0xffff_ffff_ffff_ff00, 0x0fff_ffff_ffff_ffc0)
     );
 
     fn cmp_csel_inner(pre_r0: u64, pre_r2: u64) -> u64 {
