@@ -9,6 +9,7 @@ use {
 pub mod emitter;
 pub mod interpret;
 pub mod models;
+mod tests;
 mod trampoline;
 pub mod translate;
 pub mod x86;

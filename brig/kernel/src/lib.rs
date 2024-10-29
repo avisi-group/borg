@@ -14,6 +14,7 @@ use {
         },
         dbt::models,
         devices::manager::SharedDeviceManager,
+        fs::{tar::TarFilesystem, File, Filesystem},
         logger::WRITER,
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
@@ -79,7 +80,15 @@ fn continue_start() {
     // plugins::load_all(&device);
     models::load_all(&device);
 
-    tests::run_all();
+    // todo: fix this hack:(
+    let test_name = {
+        let mut dev = device.lock();
+        let mut fs = TarFilesystem::mount(dev.as_block());
+        fs.open("test.txt")
+            .ok()
+            .map(|f| alloc::string::String::from_utf8(f.read_to_vec().unwrap()).unwrap())
+    };
+    tests::run(test_name.as_deref());
 
     guest::start();
 }

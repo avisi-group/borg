@@ -202,9 +202,14 @@ fn generate_asm(inner_fn_ident: &str, with_code: bool) -> String {
 #[proc_macro_attribute]
 pub fn ktest(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     let item: ItemFn = parse_macro_input!(item);
+    let fn_name = item.sig.ident.clone();
+    let fn_name_str = fn_name.to_string();
+    let static_name = Ident::new(&format!("TEST_{fn_name_str}"), Span::call_site());
 
     quote! {
         #[linkme::distributed_slice(crate::tests::TESTS)]
+        static #static_name: (&'static str, fn()) = (#fn_name_str, #fn_name);
+
         #item
     }
     .into()

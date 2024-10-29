@@ -5,10 +5,11 @@ use {
     itertools::Itertools,
     std::{
         fs::{self, File},
-        io::BufReader,
+        io::{BufReader, Write},
         path::{Path, PathBuf},
         process::{self, Stdio},
     },
+    tar::Header,
     walkdir::WalkDir,
 };
 
@@ -30,6 +31,10 @@ struct Cli {
     /// Do not build brig, use existing UEFI image and guest data
     #[arg(long)]
     no_build: bool,
+
+    /// Run only the supplied test
+    #[arg(long)]
+    test: Option<String>,
 
     /// Enable QEMU GDB server
     #[arg(long)]
@@ -60,7 +65,7 @@ fn main() -> color_eyre::Result<()> {
     }
 
     // create TAR file containing guest kernel, plugins, and configuration
-    let guest_tar = build_guest_tar("./guest_data", &artifacts);
+    let guest_tar = build_guest_tar("./guest_data", &artifacts, cli.test);
 
     // create an UEFI disk image of kernel
     let uefi_path = {
@@ -155,7 +160,11 @@ fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Art
 /// * `platform.dts` is converted to `platform.dtb`
 /// * `cdylib` artifacts are placed in the `plugins` directory of the tarfile
 ///   (in addition to any in the guest data file)
-fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, artifacts: &[Artifact]) -> PathBuf {
+fn build_guest_tar<P: AsRef<Path>>(
+    guest_data_path: P,
+    artifacts: &[Artifact],
+    test: Option<String>,
+) -> PathBuf {
     // todo: rewrite this to process guest_data files in iterator into tar file,
     // some left alone (plugins dir, config.json), others are converted like
     // platform.dts,
@@ -223,11 +232,29 @@ fn build_guest_tar<P: AsRef<Path>>(guest_data_path: P, artifacts: &[Artifact]) -
         )
         .chain(plugins)
         .for_each(|(src, dest)| {
-            tar.append_file(dest, &mut File::open(src).unwrap())
-                .unwrap();
+            let data = fs::read(src).unwrap();
+
+            let mut header = Header::new_gnu();
+            header.set_path(dest).unwrap();
+            header.set_size(data.len() as u64);
+            header.set_cksum();
+
+            tar.append(&header, data.as_slice()).unwrap();
         });
 
-    tar.finish().unwrap();
+    if let Some(test) = test {
+        let data = test.as_bytes();
+
+        let mut header = Header::new_gnu();
+        header.set_path("test.txt").unwrap();
+        header.set_size(u64::try_from(data.len()).unwrap());
+        header.set_cksum();
+
+        tar.append(&header, data).unwrap();
+    }
+
+    tar.into_inner().unwrap().flush().unwrap();
+
     tar_path
 }
 

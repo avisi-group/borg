@@ -25,7 +25,9 @@ static LOGGER: &'static dyn Log = &Logger {
     default_level: LevelFilter::Trace,
     module_levels: [
         ("virtio_drivers", LevelFilter::Warn),
-        ("tar_no_std", LevelFilter::Warn),
+        ("tar_no_std", LevelFilter::Off), /* todo: find better way of silencing error
+                                           * about empty file named "" at end of
+                                           * archive */
         ("elfloader", LevelFilter::Info),
         ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
         ("kernel::dbt::x86", LevelFilter::Info),
