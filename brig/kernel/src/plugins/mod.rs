@@ -1,12 +1,10 @@
 use {
     crate::{
-        alloc::borrow::ToOwned,
         devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
-        guest::register_device_factory,
         plugins::{host::Host, shared_object::SharedObject},
     },
-    alloc::{boxed::Box, collections::BTreeMap},
+    alloc::collections::BTreeMap,
     elfloader::ElfBinary,
     plugins_api::PluginHeader,
     spin::Mutex,

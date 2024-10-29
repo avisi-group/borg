@@ -2,7 +2,7 @@ use {
     crate::dbt::{
         emitter::{self, BlockResult, Emitter},
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86Node, X86NodeRef, X86SymbolRef},
+            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
             encoder::Instruction,
         },
     },

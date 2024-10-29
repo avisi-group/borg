@@ -528,7 +528,8 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             (
                 _,
                 NodeKind::Constant {
-                    value: start_value, ..
+                    value: _start_value,
+                    ..
                 },
                 NodeKind::Constant {
                     value: length_value,
@@ -670,7 +671,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         false_target: Self::BlockRef,
     ) -> BlockResult {
         match condition.kind() {
-            NodeKind::Constant { value, .. } => {
+            NodeKind::Constant { .. } => {
                 todo!("this was handled in models.rs")
             }
             _ => {

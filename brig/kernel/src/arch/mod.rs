@@ -1,7 +1,8 @@
 use {
     ::x86::msr::{rdmsr, wrmsr, IA32_TSC_AUX},
-    alloc::{boxed::Box, collections::BTreeMap},
+    alloc::boxed::Box,
     bootloader_api::BootInfo,
+    common::HashMap,
     core::{
         any::{Any, TypeId},
         sync::atomic::{AtomicU64, Ordering},
@@ -23,7 +24,7 @@ pub fn platform_init(boot_info: &BootInfo) {
 
 #[derive(Default)]
 pub struct CoreStorage {
-    state: BTreeMap<TypeId, Box<dyn Any>>,
+    state: HashMap<TypeId, Box<dyn Any>>,
 }
 
 static mut NEXT_CORE_ID: AtomicU64 = AtomicU64::new(0);

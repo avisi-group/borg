@@ -170,7 +170,7 @@ impl<'f> Interpreter<'f> {
                         t => todo!("{t}"),
                     })
                 }
-                Statement::ReadMemory { offset, size } => todo!(),
+                Statement::ReadMemory { .. } => todo!(),
                 Statement::ReadPc => todo!(),
                 Statement::GetFlags { operation: _ } => {
                     // todo: technically should get the last statement or
@@ -356,7 +356,7 @@ impl<'f> Interpreter<'f> {
                                 tc: PrimitiveTypeClass::SignedInteger,
                                 element_width_in_bits,
                             }),
-                            Value::SignedInteger { value, length },
+                            Value::SignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
                             value: sign_extend(
                                 *value,
@@ -538,12 +538,8 @@ impl<'f> Interpreter<'f> {
                         length: target_length,
                     })
                 }
-                Statement::ReadElement { vector, index } => todo!(),
-                Statement::AssignElement {
-                    vector,
-                    value,
-                    index,
-                } => todo!(),
+                Statement::ReadElement { .. } => todo!(),
+                Statement::AssignElement { .. } => todo!(),
                 Statement::CreateBits { value, length } => {
                     let value = self.resolve_u64(value);
                     let length = self.resolve_u64(length);
@@ -563,8 +559,8 @@ impl<'f> Interpreter<'f> {
                         _ => todo!("size-of {value:?}"),
                     }
                 }
-                Statement::MatchesUnion { value, variant } => todo!(),
-                Statement::UnwrapUnion { value, variant } => todo!(),
+                Statement::MatchesUnion { .. } => todo!(),
+                Statement::UnwrapUnion { .. } => todo!(),
                 Statement::CreateTuple(vec) => {
                     Some(Value::Tuple(vec.iter().map(|s| self.resolve(s)).collect()))
                 }
@@ -611,9 +607,9 @@ impl<'f> Interpreter<'f> {
 
                     None
                 }
-                Statement::WriteMemory { offset, value } => todo!(),
-                Statement::WritePc { value } => todo!(),
-                Statement::PhiNode { members } => todo!(),
+                Statement::WriteMemory { .. } => todo!(),
+                Statement::WritePc { .. } => todo!(),
+                Statement::PhiNode { .. } => todo!(),
 
                 Statement::Jump { target } => return BlockResult::NextBlock(*target),
                 Statement::Branch {
