@@ -139,7 +139,6 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 
     info!("Building rudder");
-
     let mut rudder = rudder::build::from_boom(&ast.get());
 
     if let Some(path) = &dump_ir {

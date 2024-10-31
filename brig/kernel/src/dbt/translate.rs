@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        emitter::{self, BlockResult, Emitter},
+        emitter::{self, BlockResult, Emitter, Type},
         x86::{
             emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
             encoder::Instruction,
@@ -405,7 +405,16 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 todo!()
             }
             Statement::ReadPc => todo!(),
-            Statement::WritePc { .. } => todo!(),
+            Statement::WritePc { value } => {
+                self.emitter.ctx().set_write_pc();
+
+                let pc_offset = self.emitter.ctx().pc_offset() as u64;
+
+                let offset = self.emitter.constant(pc_offset, Type::Unsigned(64));
+                let value = statement_values.get(value).unwrap().clone();
+                self.emitter.write_register(offset, value);
+                StatementResult::Data(None)
+            }
             Statement::GetFlags { operation } => {
                 let operation = statement_values.get(operation).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.get_flags(operation)))

@@ -608,7 +608,10 @@ impl<'f> Interpreter<'f> {
                     None
                 }
                 Statement::WriteMemory { .. } => todo!(),
-                Statement::WritePc { .. } => todo!(),
+                Statement::WritePc { value } => {
+                    self.write_reg(self.model.reg_offset("_PC") as u64, self.resolve_u64(value));
+                    None
+                }
                 Statement::PhiNode { .. } => todo!(),
 
                 Statement::Jump { target } => return BlockResult::NextBlock(*target),

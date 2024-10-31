@@ -27,6 +27,8 @@ pub struct X86TranslationContext {
     blocks: Arena<X86Block>,
     initial_block: Ref<X86Block>,
     panic_block: Ref<X86Block>,
+    writes_to_pc: bool,
+    pc_offset: usize,
 }
 
 impl Debug for X86TranslationContext {
@@ -60,7 +62,7 @@ impl Debug for X86TranslationContext {
 }
 
 impl X86TranslationContext {
-    pub fn new() -> Self {
+    pub fn new(pc_offset: usize) -> Self {
         let mut arena = Arena::new();
 
         let initial_block = arena.insert(X86Block::new());
@@ -70,6 +72,8 @@ impl X86TranslationContext {
             blocks: arena,
             initial_block,
             panic_block,
+            writes_to_pc: false,
+            pc_offset,
         };
 
         // add panic to the panic block
@@ -207,5 +211,17 @@ impl X86TranslationContext {
 
     pub fn create_symbol(&mut self) -> X86SymbolRef {
         X86SymbolRef(Rc::new(RefCell::new(None)))
+    }
+
+    pub fn set_write_pc(&mut self) {
+        self.writes_to_pc = true;
+    }
+
+    pub fn get_write_pc(&self) -> bool {
+        self.writes_to_pc
+    }
+
+    pub fn pc_offset(&self) -> usize {
+        self.pc_offset
     }
 }

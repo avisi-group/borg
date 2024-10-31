@@ -1670,42 +1670,51 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 );
             }
             None => {
-                //register lookup
-                let Some(RegisterDescriptor {
-                    typ: register_type,
-                    offset: register_offset,
-                    ..
-                }) = self.ctx().registers.get(root).cloned()
-                else {
-                    panic!("wtf is {root} in {}", self.fn_ctx().rudder_fn.name());
-                };
+                if root.as_ref() == "_PC" {
+                    let cast = cast(self.block, self.block_arena_mut(), source, Type::u64());
+                    build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::WritePc { value: cast },
+                    );
+                } else {
+                    //register lookup
+                    let Some(RegisterDescriptor {
+                        typ: register_type,
+                        offset: register_offset,
+                        ..
+                    }) = self.ctx().registers.get(root).cloned()
+                    else {
+                        panic!("wtf is {root} in {}", self.fn_ctx().rudder_fn.name());
+                    };
 
-                let (field_offsets, outer_type) =
-                    fields_to_offsets(&self.ctx().structs, register_type, fields);
+                    let (field_offsets, outer_type) =
+                        fields_to_offsets(&self.ctx().structs, register_type, fields);
 
-                // offset + offset of each field
-                let offset = register_offset + field_offsets.iter().sum::<usize>();
+                    // offset + offset of each field
+                    let offset = register_offset + field_offsets.iter().sum::<usize>();
 
-                // cast to outermost type
-                let cast = cast(self.block, self.block_arena_mut(), source, outer_type);
+                    // cast to outermost type
+                    let cast = cast(self.block, self.block_arena_mut(), source, outer_type);
 
-                let offset = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u32()),
-                        value: ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
-                    },
-                );
+                    let offset = build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::Constant {
+                            typ: (Type::u32()),
+                            value: ConstantValue::UnsignedInteger(u64::try_from(offset).unwrap()),
+                        },
+                    );
 
-                build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::WriteRegister {
-                        offset,
-                        value: cast,
-                    },
-                );
+                    build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::WriteRegister {
+                            offset,
+                            value: cast,
+                        },
+                    );
+                }
             }
         }
     }

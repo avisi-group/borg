@@ -10,8 +10,9 @@ use {
             },
             X86TranslationContext,
         },
+        Translation,
     },
-    common::{mask::mask, rudder::Model},
+    common::{mask::mask, rudder::Model, HashMap},
     proc_macro_lib::ktest,
 };
 
@@ -32,7 +33,7 @@ fn static_dynamic_chaos_smoke() {
         let model = models::get("aarch64").unwrap();
 
         {
-            let mut ctx = X86TranslationContext::new();
+            let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
             let mut emitter = X86Emitter::new(&mut ctx);
 
             translate(&*model, "func_corrupted_var", &[], &mut emitter);
@@ -59,7 +60,7 @@ fn num_of_feature() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -82,7 +83,7 @@ fn statistical_profiling_disabled() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -118,7 +119,7 @@ fn havebrbext_disabled() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -149,7 +150,7 @@ fn using_aarch32_disabled() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -180,7 +181,7 @@ fn branchto() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -229,7 +230,7 @@ fn decodea64_addsub() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -303,7 +304,7 @@ fn decodea64_mov() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -341,7 +342,7 @@ fn decodea64_branch() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -378,7 +379,7 @@ fn branch_if_eq() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -409,7 +410,7 @@ fn branch_if_eq() {
 
 #[ktest]
 fn branch_uncond_imm_offset_math() {
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(0);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // s0: read-var imm26:u26
@@ -458,7 +459,7 @@ fn cmp_csel() {
         let mut register_file = alloc::vec![0u8; model.register_file_size()];
         let register_file_ptr = register_file.as_mut_ptr();
 
-        let mut ctx = X86TranslationContext::new();
+        let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
         let mut emitter = X86Emitter::new(&mut ctx);
 
         init(&*model, register_file_ptr);
@@ -501,7 +502,7 @@ fn cmp_csel() {
 }
 
 #[ktest]
-fn fibonacci() {
+fn fibonacci_instr() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
@@ -550,7 +551,7 @@ fn fibonacci() {
 
             let model = models::get("aarch64").unwrap();
 
-            let mut ctx = X86TranslationContext::new();
+            let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
             let mut emitter = X86Emitter::new(&mut ctx);
 
             {
@@ -572,6 +573,133 @@ fn fibonacci() {
 
         assert_eq!(89, *r0);
         assert_eq!(10, *r3);
+    }
+}
+
+#[ktest]
+fn fibonacci_block() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    init(&*model, register_file_ptr);
+
+    let program = [
+        // <_start>
+        0xd2800000, // mov     x0, #0x0 (#0)
+        0xd2800021, // mov     x1, #0x1 (#1)
+        0xd2800002, // mov     x2, #0x0 (#0)
+        0xd2800003, // mov     x3, #0x0 (#0)
+        0xd2800c84, // mov     x4, #0x64 (#100)
+        // <loop>
+        0xeb04007f, // cmp     x3, x4
+        0x540000c0, // b.eq    400104 <done>  // b.none
+        0x8b010002, // add     x2, x0, x1
+        0xaa0103e0, // mov     x0, x1
+        0xaa0203e1, // mov     x1, x2
+        0x91000463, // add     x3, x3, #0x1
+        0x17fffffa, // b       4000e8 <loop>
+        // <done>
+        0xaa0203e0, // mov     x0, x2
+        0x52800ba8, // mov     w8, #0x5d (#93)
+        0xd4000001, // svc     #0x0
+    ];
+
+    let mut blocks = HashMap::<u64, Translation>::default();
+
+    loop {
+        unsafe {
+            let pc_offset = model.reg_offset("_PC");
+            let mut current_pc = *(register_file_ptr.add(pc_offset) as *mut u64);
+            let start_pc = current_pc;
+            if let Some(translation) = blocks.get(&start_pc) {
+                translation.execute(register_file.as_mut_ptr());
+                continue;
+            }
+
+            if current_pc == 56 {
+                break;
+            }
+
+            let mut ctx = X86TranslationContext::new(pc_offset);
+            let mut emitter = X86Emitter::new(&mut ctx);
+
+            loop {
+                let see_offset =
+                    emitter.constant(model.reg_offset("SEE") as u64, Type::Unsigned(64));
+                let neg1 = emitter.constant(-1i32 as u64, Type::Signed(32));
+                emitter.write_register(see_offset, neg1);
+
+                let branch_taken_offset =
+                    emitter.constant(model.reg_offset("__BranchTaken") as u64, Type::Unsigned(64));
+                let _false = emitter.constant(0 as u64, Type::Unsigned(1));
+                emitter.write_register(branch_taken_offset, _false);
+
+                {
+                    let opcode =
+                        emitter.constant(program[current_pc as usize / 4], Type::Unsigned(32));
+                    let pc = emitter.constant(current_pc, Type::Unsigned(64));
+                    let _return_value =
+                        translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+                }
+
+                if emitter.ctx().get_write_pc() || (current_pc == ((program.len() * 4) - 8) as u64)
+                {
+                    break;
+                } else {
+                    let pc_offset = emitter.constant(pc_offset as u64, Type::Unsigned(64));
+                    let pc = emitter.read_register(pc_offset.clone(), Type::Unsigned(64));
+                    let _4 = emitter.constant(4, Type::Unsigned(64));
+                    let pc_inc = emitter.binary_operation(BinaryOperationKind::Add(pc, _4));
+                    emitter.write_register(pc_offset, pc_inc);
+
+                    current_pc += 4;
+                }
+            }
+
+            // inc PC if branch not taken
+            {
+                let branch_taken_offset =
+                    emitter.constant(model.reg_offset("__BranchTaken") as u64, Type::Unsigned(64));
+                let branch_taken = emitter.read_register(branch_taken_offset, Type::Unsigned(1));
+
+                let _0 = emitter.constant(0, Type::Unsigned(64));
+                let _4 = emitter.constant(4, Type::Unsigned(64));
+                let addend = emitter.select(branch_taken, _0, _4);
+
+                let pc_offset = emitter.constant(pc_offset as u64, Type::Unsigned(64));
+                let pc = emitter.read_register(pc_offset.clone(), Type::Unsigned(64));
+                let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
+                emitter.write_register(pc_offset, new_pc);
+            }
+
+            emitter.leave();
+            let num_regs = emitter.next_vreg();
+            let translation = ctx.compile(num_regs);
+
+            // log::trace!("{translation:?}")
+
+            translation.execute(register_file.as_mut_ptr());
+            blocks.insert(start_pc, translation);
+
+            log::trace!(
+                "{} {}",
+                *(register_file_ptr.add(model.reg_offset("_PC")) as *mut u64),
+                *(register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut u8)
+            );
+        }
+    }
+
+    unsafe {
+        assert_eq!(
+            1298777728820984005,
+            *(register_file_ptr.add(model.reg_offset("R0")) as *mut u64)
+        );
+        assert_eq!(
+            100,
+            *(register_file_ptr.add(model.reg_offset("R3")) as *mut u64)
+        );
     }
 }
 
@@ -625,7 +753,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -744,7 +872,7 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
 
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -780,7 +908,7 @@ fn shiftreg() {
 
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -824,7 +952,7 @@ fn ispow2() {
 
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
-    let mut ctx = X86TranslationContext::new();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     init(&*model, register_file_ptr);
@@ -914,7 +1042,7 @@ fn ispow2() {
 // // //     let mut register_file = Box::new([0u8;
 // model.register_file_size()]); // //     let register_file_ptr =
 // register_file.as_mut_ptr(); // //     let mut ctx =
-// X86TranslationContext::new(); // //     let model =
+// X86TranslationContext::new(model.reg_offset("_PC")); // //     let model =
 // models::get("aarch64").unwrap();
 
 // // // translate(&*model, "borealis_register_init", &[], &mut ctx);

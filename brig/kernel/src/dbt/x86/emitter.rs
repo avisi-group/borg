@@ -1345,7 +1345,16 @@ impl X86NodeRef {
                 let dest = Operand::vreg(width, emitter.next_vreg());
 
                 let condition = condition.to_operand(emitter);
-                let true_value = true_value.to_operand(emitter);
+                let true_value = {
+                    let op = true_value.to_operand(emitter);
+                    if let OperandKind::Immediate(_) = op.kind() {
+                        let true_dst = Operand::vreg(width, emitter.next_vreg());
+                        emitter.append(Instruction::mov(op, true_dst.clone()));
+                        true_dst
+                    } else {
+                        op
+                    }
+                };
                 let false_value = false_value.to_operand(emitter);
 
                 // if this sequence is modified, the register allocator must be fixed
