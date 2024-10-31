@@ -91,6 +91,8 @@ pub enum Opcode {
     XOR(Operand, Operand),
     /// and {0}, {1},
     AND(Operand, Operand),
+    /// imul {0}, {1},
+    IMUL(Operand, Operand),
     /// not {0}
     NOT(Operand),
     /// neg {0}
@@ -680,6 +682,10 @@ impl Instruction {
 
     pub fn and(src: Operand, dst: Operand) -> Self {
         Self(Opcode::AND(src, dst))
+    }
+
+    pub fn imul(src: Operand, dst: Operand) -> Self {
+        Self(Opcode::IMUL(src, dst))
     }
 
     pub fn shl(amount: Operand, op0: Operand) -> Self {
@@ -1340,6 +1346,22 @@ impl Instruction {
                     .cmovne::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
             }
+            IMUL(
+                Operand {
+                    kind: I(left),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .imul_3::<AsmRegister64, AsmRegister64, i32>(
+                    dst.into(),
+                    dst.into(),
+                    i32::try_from(*left).unwrap(),
+                )
+                .unwrap(),
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1366,7 +1388,8 @@ impl Instruction {
             | Opcode::XOR(src, dst)
             | Opcode::ADD(src, dst)
             | Opcode::SUB(src, dst)
-            | Opcode::AND(src, dst) => [
+            | Opcode::AND(src, dst)
+            | Opcode::IMUL(src, dst) => [
                 Some((OperandDirection::In, src)),
                 Some((OperandDirection::InOut, dst)),
                 None,

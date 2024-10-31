@@ -818,6 +818,61 @@ fn shiftreg() {
     }
 }
 
+//#[ktest]
+fn ispow2() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new();
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let r3_offset = emitter.constant(model.reg_offset("R3") as u64, Type::Unsigned(0x40));
+    let x = emitter.read_register(r3_offset, Type::Unsigned(0x40));
+
+    {
+        let value = translate(&*model, "FloorPow2", &[x.clone()], &mut emitter);
+        let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
+        emitter.write_register(r0_offset, value);
+    }
+
+    // {
+    //     let value = translate(&*model, "CeilPow2", &[x.clone()], &mut emitter);
+    //     let r1_offset = emitter.constant(model.reg_offset("R1") as u64,
+    // Type::Unsigned(0x40));     emitter.write_register(r1_offset, value);
+    // }
+
+    // {
+    //     let value = translate(&*model, "IsPow2", &[x], &mut emitter);
+    //     let r2_offset = emitter.constant(model.reg_offset("R2") as u64,
+    // Type::Unsigned(0x40));     emitter.write_register(r2_offset, value);
+    // }
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+    log::debug!("{translation:?}");
+
+    unsafe {
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+        let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u64;
+        let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u64;
+        let r3 = register_file_ptr.add(model.reg_offset("R3")) as *mut u64;
+
+        *r0 = 0;
+        *r1 = 0;
+        *r2 = 0;
+        *r3 = 2048;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*r0, *r1);
+        assert_eq!(1, *r2)
+    }
+}
+
 //////#[ktest]
 // fn rbitx0() {
 //     let mut state = State::new(Box::new(NoneEnv));
@@ -889,17 +944,6 @@ fn shiftreg() {
 // // // translate_aarch64_instrs_integer_arithmetic_rev(&mut state, TRACER,
 // 32, // 3, // 32, 3);     assert_eq!(0xd00dfeed,
 // state.read_register::<u64>(REG_R3)); // // }
-
-// //////////#[ktest]
-// // // fn ispow2() {
-// // //     let mut state = State::new(Box::new(NoneEnv));
-// // //     let x = 2048i128;
-// // //     assert_eq!(
-// // //         FloorPow2(&mut state, TRACER, x),
-// // //         CeilPow2(&mut state, TRACER, x)
-// // //     );
-// // //     assert!(IsPow2(&mut state, TRACER, x));
-// // // }
 
 // //////////#[ktest]
 // // // fn udiv() {

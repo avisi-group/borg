@@ -204,7 +204,10 @@ pub fn ktest(_attribute: TokenStream, item: TokenStream) -> TokenStream {
     let item: ItemFn = parse_macro_input!(item);
     let fn_name = item.sig.ident.clone();
     let fn_name_str = fn_name.to_string();
-    let static_name = Ident::new(&format!("TEST_{fn_name_str}"), Span::call_site());
+    let static_name = Ident::new(
+        &format!("TEST_{}", fn_name_str.to_ascii_uppercase()),
+        Span::call_site(),
+    );
 
     quote! {
         #[linkme::distributed_slice(crate::tests::TESTS)]

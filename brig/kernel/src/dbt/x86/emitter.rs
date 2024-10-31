@@ -3,7 +3,9 @@ use {
         bit_extract, bit_insert,
         emitter::{BlockResult, Type},
         x86::{
-            encoder::{Instruction, Opcode, Operand, PhysicalRegister, Register, Width},
+            encoder::{
+                Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register, Width,
+            },
             register_allocator::RegisterAllocator,
             Emitter, X86TranslationContext,
         },
@@ -1018,6 +1020,17 @@ impl X86NodeRef {
 
                     dst
                 }
+                BinaryOperationKind::Multiply(left, right) => {
+                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let dst = Operand::vreg(width, emitter.next_vreg());
+
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
+                    emitter.append(Instruction::mov(left, dst.clone()));
+                    emitter.append(Instruction::imul(right, dst.clone()));
+
+                    dst
+                }
                 BinaryOperationKind::CompareEqual(left, right)
                 | BinaryOperationKind::CompareNotEqual(left, right)
                 | BinaryOperationKind::CompareGreaterThan(left, right)
@@ -1171,11 +1184,17 @@ impl X86NodeRef {
                 amount,
                 kind,
             } => {
-                let amount = amount.to_operand(emitter);
+                let mut amount = amount.to_operand(emitter);
                 let value = value.to_operand(emitter);
 
                 let dst = Operand::vreg(value.width(), emitter.next_vreg());
                 emitter.append(Instruction::mov(value, dst.clone()));
+
+                if let OperandKind::Register(_) = amount.kind() {
+                    let amount_dst = Operand::preg(Width::_8, PhysicalRegister::RCX);
+                    emitter.append(Instruction::mov(amount, amount_dst.clone()));
+                    amount = amount_dst;
+                }
 
                 match kind {
                     ShiftOperationKind::LogicalShiftLeft => {
@@ -1331,7 +1350,7 @@ impl X86NodeRef {
 
                 // if this sequence is modified, the register allocator must be fixed
                 emitter.append(Instruction::test(condition.clone(), condition.clone()));
-                emitter.append(Instruction::cmove(false_value, dest.clone()));
+                emitter.append(Instruction::mov(false_value, dest.clone()));
                 emitter.append(Instruction::cmovne(true_value, dest.clone())); // this write to dest does not result in deallocation
 
                 dest
