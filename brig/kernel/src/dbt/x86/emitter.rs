@@ -1385,7 +1385,7 @@ pub struct X86Node {
     pub kind: NodeKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum NodeKind {
     Constant {
         value: u64,
@@ -1433,7 +1433,7 @@ pub enum NodeKind {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum BinaryOperationKind {
     Add(X86NodeRef, X86NodeRef),
     Sub(X86NodeRef, X86NodeRef),
@@ -1452,7 +1452,7 @@ pub enum BinaryOperationKind {
     CompareGreaterThanOrEqual(X86NodeRef, X86NodeRef),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum UnaryOperationKind {
     Not(X86NodeRef),
     Negate(X86NodeRef),
@@ -1464,12 +1464,12 @@ pub enum UnaryOperationKind {
     SquareRoot(X86NodeRef),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TernaryOperationKind {
     AddWithCarry(X86NodeRef, X86NodeRef, X86NodeRef),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CastOperationKind {
     ZeroExtend,
     SignExtend,
@@ -1479,7 +1479,7 @@ pub enum CastOperationKind {
     Broadcast,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ShiftOperationKind {
     LogicalShiftLeft,
     LogicalShiftRight,

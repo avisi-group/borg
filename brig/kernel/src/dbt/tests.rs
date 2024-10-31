@@ -1001,7 +1001,7 @@ fn ispow2() {
     }
 }
 
-//////#[ktest]
+//#[ktest]
 // fn rbitx0() {
 //     let mut state = State::new(Box::new(NoneEnv));
 //     state.write_register::<u64>(REG_R0, 0x0000000000000001);
@@ -1037,33 +1037,69 @@ fn ispow2() {
 //     }
 // }
 
-// //////////#[ktest]
-// // // fn replicate_bits() {
-// // //     let mut register_file = Box::new([0u8;
-// model.register_file_size()]); // //     let register_file_ptr =
-// register_file.as_mut_ptr(); // //     let mut ctx =
-// X86TranslationContext::new(model.reg_offset("_PC")); // //     let model =
-// models::get("aarch64").unwrap();
+#[ktest]
+fn replicate_bits() {
+    let model = models::get("aarch64").unwrap();
 
-// // // translate(&*model, "borealis_register_init", &[], &mut ctx);
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-// // //     assert_eq!(
-// // //         Bits::new(0xffff_ffff, 32),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0xff, // 8), 4)     );
-// // //     assert_eq!(
-// // //         Bits::new(0xaa, 8),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0xaa, // 8), 1)     );
-// // //     assert_eq!(
-// // //         Bits::new(0xaaaa, 16),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0xaa, // 8), 2)     );
-// // //     assert_eq!(
-// // //         Bits::new(0xffff_ffff, 32),
-// // //         replicate_bits_borealis_internal(&mut state, TRACER,
-// // Bits::new(0x1, // 1), 32)     );
-// // // }
+    init(&*model, register_file_ptr);
+
+    {
+        let value = emitter.constant(0xaa, Type::Unsigned(8));
+        let count = emitter.constant(2, Type::Signed(64));
+        assert_eq!(
+            &NodeKind::Constant {
+                value: 0xaaaa,
+                width: 16,
+            },
+            translate(
+                &model,
+                "replicate_bits_borealis_internal",
+                &[value, count],
+                &mut emitter,
+            )
+            .kind()
+        );
+    }
+    {
+        let value = emitter.constant(0x1, Type::Unsigned(1));
+        let count = emitter.constant(32, Type::Signed(64));
+        assert_eq!(
+            &NodeKind::Constant {
+                value: 0xffff_ffff,
+                width: 32,
+            },
+            translate(
+                &model,
+                "replicate_bits_borealis_internal",
+                &[value, count],
+                &mut emitter,
+            )
+            .kind()
+        );
+    }
+    {
+        let value = emitter.constant(0xaaff, Type::Unsigned(16));
+        let count = emitter.constant(4, Type::Signed(64));
+        assert_eq!(
+            &NodeKind::Constant {
+                value: 0xaaff_aaff_aaff_aaff,
+                width: 64,
+            },
+            translate(
+                &model,
+                "replicate_bits_borealis_internal",
+                &[value, count],
+                &mut emitter,
+            )
+            .kind()
+        );
+    }
+}
 
 // //////////#[ktest]
 // // // fn rev_d00dfeed() {

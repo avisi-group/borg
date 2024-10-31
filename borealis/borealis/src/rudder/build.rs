@@ -55,14 +55,14 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
     internal_fns::insert_stub(&mut build_ctx.functions, &*REPLICATE_BITS_BOREALIS_INTERNAL);
 
     log::warn!("starting build functions");
-    let model = build_ctx.build_functions();
+    let mut model = build_ctx.build_functions();
     log::warn!("done build functions");
 
-    // // insert again to overwrite empty boom generated rudder
-    // model.get_functions_mut().insert(
-    //     REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-    //     REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
-    // );
+    // insert again to overwrite empty boom generated rudder
+    model.functions_mut().insert(
+        REPLICATE_BITS_BOREALIS_INTERNAL.name(),
+        REPLICATE_BITS_BOREALIS_INTERNAL.clone(),
+    );
 
     model
 }
