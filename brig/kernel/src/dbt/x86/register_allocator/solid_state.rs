@@ -76,8 +76,7 @@ impl SolidStateRegisterAllocator {
 impl RegisterAllocator for SolidStateRegisterAllocator {
     fn process(&mut self, instruction: &mut Instruction) {
         // kinda hacky, tightly coupled to the encoding of select
-        // ignore the second cmov, and (implicitly) treat the first as always writing to
-        // the dest register
+        // do not kill (deallocate) destination of cmovne
         if matches!(instruction.0, Opcode::CMOVNE(_, _)) {
             instruction.get_use_defs().for_each(|usedef| match usedef {
                 // treat read-writes the same as reads

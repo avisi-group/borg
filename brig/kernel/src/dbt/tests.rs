@@ -248,7 +248,7 @@ fn decodea64_addsub() {
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
         let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u32;
         let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u32;
-        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
 
         *see = -1;
         *r0 = 2;
@@ -321,7 +321,7 @@ fn decodea64_mov() {
     unsafe {
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
         let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u32;
-        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
 
         *see = -1;
         *r0 = 2;
@@ -360,7 +360,7 @@ fn decodea64_branch() {
 
     unsafe {
         let pc = register_file_ptr.add(model.reg_offset("_PC")) as *mut u64;
-        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
 
         *pc = 44;
         *see = -1;
@@ -394,7 +394,7 @@ fn branch_if_eq() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
         let pc = register_file_ptr.add(model.reg_offset("_PC")) as *mut u32;
         let branch_taken = register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool;
 
@@ -532,7 +532,7 @@ fn fibonacci_instr() {
     ];
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i32;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
         let branch_taken =
             { register_file_ptr.add(model.reg_offset("__BranchTaken")) as *mut bool };
         let pc = { register_file_ptr.add(model.reg_offset("_PC")) as *mut u64 };
@@ -880,7 +880,7 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     unsafe {
         *(register_file_ptr.add(model.reg_offset("R0")) as *mut u64) = x;
         *(register_file_ptr.add(model.reg_offset("R1")) as *mut u64) = y;
-        *(register_file_ptr.add(model.reg_offset("SEE")) as *mut i32) = -1;
+        *(register_file_ptr.add(model.reg_offset("SEE")) as *mut i64) = -1;
     }
 
     // cmp    x0, x1
@@ -1001,17 +1001,81 @@ fn ispow2() {
     }
 }
 
+#[ktest]
+fn rbitx0_interpret() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init(&*model, register_file_ptr);
+
+    unsafe {
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+
+        *r0 = 0x0123_4567_89ab_cdef;
+        *see = -1;
+
+        // rbit x0
+        let pc = Value::UnsignedInteger {
+            value: 0,
+            length: 64,
+        };
+        let opcode = Value::UnsignedInteger {
+            value: 0xdac00000,
+            length: 32,
+        };
+        interpret(&*model, "__DecodeA64", &[pc, opcode], register_file_ptr);
+
+        // assert bits are reversed
+        assert_eq!(*r0, 0xf7b3_d591_e6a2_c480);
+    }
+}
+
 //#[ktest]
-// fn rbitx0() {
-//     let mut state = State::new(Box::new(NoneEnv));
-//     state.write_register::<u64>(REG_R0, 0x0000000000000001);
+fn rbitx0() {
+    let model = models::get("aarch64").unwrap();
 
-//     // rbit x0
-//     u__DecodeA64(&mut state, TRACER, 0x0, 0xdac00000);
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-//     // assert bits are reversed
-//     assert_eq!(state.read_register::<u64>(REG_R0), 0x8000000000000000);
-// }
+    init(&*model, register_file_ptr);
+
+    // rbit x0
+    // let pc = emitter.constant(0, Type::Unsigned(64));
+    // let opcode = emitter.constant(0xdac00000, Type::Unsigned(32));
+    // translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    let _0 = emitter.constant(0, Type::Signed(64));
+    let _64 = emitter.constant(64, Type::Signed(64));
+    let _0 = emitter.constant(0, Type::Signed(64));
+    translate(
+        &*model,
+        "execute_aarch64_instrs_integer_arithmetic_rbit",
+        &[_0.clone(), _64, _0],
+        &mut emitter,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+
+        *r0 = 0x0123_4567_89ab_cdef;
+        *see = -1;
+
+        log::trace!("{translation:?}");
+        translation.execute(register_file_ptr);
+
+        // assert bits are reversed
+        assert_eq!(*r0, 0xf7b3_d591_e6a2_c480);
+    }
+}
 
 //////#[ktest]
 // fn ubfx() {
