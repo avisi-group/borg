@@ -1225,23 +1225,29 @@ impl X86NodeRef {
                 let start = start.to_operand(emitter);
                 let length = length.to_operand(emitter);
 
-                let mask = Operand::vreg(Width::_64, emitter.next_vreg());
-                emitter.append(Instruction::mov(Operand::imm(Width::_64, 64), mask.clone()));
-                emitter.append(Instruction::shl(length.clone(), mask.clone()));
-                emitter.append(Instruction::sub(Operand::imm(Width::_64, 64), mask.clone()));
-                emitter.append(Instruction::shl(start, mask.clone()));
+                let width = target.width();
 
-                let masked_target = Operand::vreg(Width::_64, emitter.next_vreg());
+                // mask off target bits
+                let mask = Operand::vreg(width, emitter.next_vreg());
+                emitter.append(Instruction::mov(Operand::imm(width, 1), mask.clone()));
+                emitter.append(Instruction::shl(length.clone(), mask.clone()));
+                emitter.append(Instruction::sub(Operand::imm(width, 1), mask.clone()));
+                emitter.append(Instruction::shl(start.clone(), mask.clone()));
+                emitter.append(Instruction::not(mask.clone()));
+
+                let masked_target = Operand::vreg(width, emitter.next_vreg());
                 emitter.append(Instruction::mov(target, masked_target.clone()));
                 emitter.append(Instruction::and(mask.clone(), masked_target.clone()));
 
-                let shifted_source = Operand::vreg(Width::_64, emitter.next_vreg());
+                // shift source by start
+                let shifted_source = Operand::vreg(width, emitter.next_vreg());
                 emitter.append(Instruction::mov(source, shifted_source.clone()));
-                emitter.append(Instruction::shl(length.clone(), shifted_source.clone()));
+                emitter.append(Instruction::shl(start, shifted_source.clone()));
 
+                // apply ~mask to source
                 {
                     // not strictly necessary but may avoid issues if there is junk data
-                    let invert_mask = Operand::vreg(Width::_64, emitter.next_vreg());
+                    let invert_mask = Operand::vreg(width, emitter.next_vreg());
                     emitter.append(Instruction::mov(mask.clone(), invert_mask.clone()));
                     emitter.append(Instruction::not(invert_mask.clone()));
                     emitter.append(Instruction::and(
@@ -1250,9 +1256,6 @@ impl X86NodeRef {
                     ));
                 }
 
-                // mask off target bits
-                // shift source by start
-                // apply ~mask to source
                 // OR source and target
                 emitter.append(Instruction::or(
                     shifted_source.clone(),

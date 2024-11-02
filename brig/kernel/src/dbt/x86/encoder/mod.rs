@@ -1362,6 +1362,7 @@ impl Instruction {
                     i32::try_from(*left).unwrap(),
                 )
                 .unwrap(),
+            NOP => assembler.nop().unwrap(),
             _ => panic!("cannot encode this instruction {}", self),
         }
     }

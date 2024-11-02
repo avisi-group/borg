@@ -1,5 +1,6 @@
 use {
     crate::dbt::{
+        bit_insert,
         emitter::{Emitter, Type},
         interpret::{interpret, Value},
         models::{self},
@@ -1032,7 +1033,7 @@ fn rbitx0_interpret() {
     }
 }
 
-//#[ktest]
+#[ktest]
 fn rbitx0() {
     let model = models::get("aarch64").unwrap();
 
@@ -1069,11 +1070,67 @@ fn rbitx0() {
         *r0 = 0x0123_4567_89ab_cdef;
         *see = -1;
 
-        log::trace!("{translation:?}");
         translation.execute(register_file_ptr);
 
         // assert bits are reversed
         assert_eq!(*r0, 0xf7b3_d591_e6a2_c480);
+    }
+}
+
+#[ktest]
+fn bitinsert() {
+    for (target, source, start, length) in [
+        (0x0, 0xff, 0, 8),
+        (0xffff_0000_ffff, 0xffff, 16, 16),
+        (0xdeadfeed, 0xaaa, 13, 7),
+    ] {
+        assert_eq!(
+            bit_insert(target, source, start, length),
+            harness(target, source, start, length)
+        );
+    }
+
+    fn harness(target: u64, source: u64, start: u64, length: u64) -> u64 {
+        let model = models::get("aarch64").unwrap();
+
+        let mut register_file = alloc::vec![0u8; model.register_file_size()];
+        let register_file_ptr = register_file.as_mut_ptr();
+        let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+        let mut emitter = X86Emitter::new(&mut ctx);
+
+        {
+            let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(64));
+            let r1_offset = emitter.constant(model.reg_offset("R1") as u64, Type::Unsigned(64));
+            let r2_offset = emitter.constant(model.reg_offset("R2") as u64, Type::Unsigned(64));
+
+            let target = emitter.read_register(r0_offset, Type::Unsigned(64));
+            let source = emitter.read_register(r1_offset, Type::Unsigned(64));
+            let start = emitter.constant(start, Type::Signed(64));
+            let length = emitter.constant(length, Type::Signed(64));
+
+            let inserted = emitter.bit_insert(target, source, start, length);
+
+            emitter.write_register(r2_offset, inserted);
+
+            emitter.leave();
+        }
+
+        let num_regs = emitter.next_vreg();
+        let translation = ctx.compile(num_regs);
+        // log::trace!("{translation:?}");
+
+        unsafe {
+            let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+            let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u64;
+            let r2 = register_file_ptr.add(model.reg_offset("R2")) as *mut u64;
+
+            *r0 = target;
+            *r1 = source;
+
+            translation.execute(register_file_ptr);
+
+            *r2
+        }
     }
 }
 
