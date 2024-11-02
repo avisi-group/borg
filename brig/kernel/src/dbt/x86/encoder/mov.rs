@@ -411,6 +411,50 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .mov::<AsmRegister64, u64>(dst.into(), *src)
                 .unwrap();
         }
+        // MOV I -> R
+        (
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .mov::<AsmRegister32, u32>(dst.into(), u32::try_from(*src).unwrap())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                .unwrap();
+        }
+        (
+            // todo: move me to movzx
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .movzx::<AsmRegister32, AsmRegister8>(dst.into(), src.into())
+                .unwrap();
+        }
         _ => todo!("mov {src} {dst}"),
     }
 }

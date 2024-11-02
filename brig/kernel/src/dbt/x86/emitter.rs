@@ -205,7 +205,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 ) => Self::NodeRef::from(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
-                        value: lhs_value - rhs_value,
+                        value: lhs_value.wrapping_sub(*rhs_value),
                         width: *width,
                     },
                 }),
@@ -227,6 +227,27 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value * rhs_value,
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            Divide(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value,
+                        width,
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: lhs_value / rhs_value,
                         width: *width,
                     },
                 }),

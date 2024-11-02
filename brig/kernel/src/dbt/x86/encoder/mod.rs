@@ -925,6 +925,21 @@ impl Instruction {
                     .sub::<AsmRegister64, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
             }
+            // SUB IMM -> R
+            SUB(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: _,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => {
+                assembler
+                    .sub::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
+                    .unwrap();
+            }
 
             // TEST R, R
             TEST(
@@ -1142,6 +1157,20 @@ impl Instruction {
             }
             OR(
                 Operand {
+                    kind: R(PHYS(left)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: Width::_32,
+                },
+            ) => {
+                assembler
+                    .or::<AsmRegister32, AsmRegister32>(right.into(), left.into())
+                    .unwrap();
+            }
+            OR(
+                Operand {
                     kind: R(PHYS(src)),
                     width_in_bits: Width::_64,
                 },
@@ -1196,8 +1225,9 @@ impl Instruction {
                 if *left == u64::MAX {
                     // no-op
                 } else {
+                    assert!(*left <= u32::MAX as u64);
                     assembler
-                        .and::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
+                        .and::<AsmRegister64, i32>(right.into(), *left as i32)
                         .unwrap();
                 }
             }
@@ -1213,6 +1243,20 @@ impl Instruction {
             ) => {
                 assembler
                     .and::<AsmRegister64, AsmRegister64>(right.into(), left.into())
+                    .unwrap();
+            }
+            AND(
+                Operand {
+                    kind: R(PHYS(left)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: Width::_32,
+                },
+            ) => {
+                assembler
+                    .and::<AsmRegister32, AsmRegister32>(right.into(), left.into())
                     .unwrap();
             }
             BEXTR(

@@ -1045,18 +1045,9 @@ fn rbitx0() {
     init(&*model, register_file_ptr);
 
     // rbit x0
-    // let pc = emitter.constant(0, Type::Unsigned(64));
-    // let opcode = emitter.constant(0xdac00000, Type::Unsigned(32));
-    // translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
-    let _0 = emitter.constant(0, Type::Signed(64));
-    let _64 = emitter.constant(64, Type::Signed(64));
-    let _0 = emitter.constant(0, Type::Signed(64));
-    translate(
-        &*model,
-        "execute_aarch64_instrs_integer_arithmetic_rbit",
-        &[_0.clone(), _64, _0],
-        &mut emitter,
-    );
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xdac00000, Type::Unsigned(32));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
     emitter.leave();
 
@@ -1222,13 +1213,42 @@ fn replicate_bits() {
     }
 }
 
-// //////////#[ktest]
-// // // fn rev_d00dfeed() {
-// // //     let mut state = State::new(Box::new(NoneEnv));
-// // //     state.write_register::<u64>(REG_R3, 0xedfe0dd0);
-// // // translate_aarch64_instrs_integer_arithmetic_rev(&mut state, TRACER,
-// 32, // 3, // 32, 3);     assert_eq!(0xd00dfeed,
-// state.read_register::<u64>(REG_R3)); // // }
+#[ktest]
+fn rev_d00dfeed() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let _32 = emitter.constant(32, Type::Signed(64));
+    let _3 = emitter.constant(3, Type::Signed(64));
+    translate(
+        &*model,
+        "execute_aarch64_instrs_integer_arithmetic_rev",
+        &[_32.clone(), _3.clone(), _32, _3],
+        &mut emitter,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r3 = register_file_ptr.add(model.reg_offset("R3")) as *mut u64;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+
+        *r3 = 0xedfe0dd0;
+        *see = -1;
+
+        translation.execute(register_file_ptr);
+        assert_eq!(0xd00dfeed, *r3);
+    }
+}
 
 // //////////#[ktest]
 // // // fn udiv() {
