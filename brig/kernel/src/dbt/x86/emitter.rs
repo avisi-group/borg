@@ -4,7 +4,7 @@ use {
         emitter::{BlockResult, Type},
         x86::{
             encoder::{
-                Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register, Width,
+                width::Width, Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register,
             },
             register_allocator::RegisterAllocator,
             Emitter, X86TranslationContext,
@@ -248,6 +248,27 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value / rhs_value,
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            Modulo(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value,
+                        width,
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: lhs_value % rhs_value,
                         width: *width,
                     },
                 }),
@@ -509,8 +530,34 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 },
                 ShiftOperationKind::LogicalShiftLeft,
             ) => {
+                let shifted = match (value_value, amount_value) {
+                    (0, _) => 0,
+                    (v, 0) => *v,
+                    (v, a) => v
+                        .checked_shl(u32::try_from(*a).unwrap())
+                        .unwrap_or_else(|| panic!("failed to shift left {value:?} by {amount:?}")),
+                };
+
+                // shift and mask to width of value
+                self.constant(shifted & mask(*value_width), typ)
+            }
+            (
+                NodeKind::Constant {
+                    value: value_value, ..
+                },
+                NodeKind::Constant {
+                    value: amount_value,
+                    ..
+                },
+                ShiftOperationKind::LogicalShiftRight,
+            ) => {
                 // mask to width of value
-                self.constant((value_value << amount_value) & mask(*value_width), typ)
+                self.constant(
+                    value_value
+                        .checked_shr(u32::try_from(*amount_value).unwrap())
+                        .unwrap_or(0),
+                    typ,
+                )
             }
             (NodeKind::Constant { .. }, NodeKind::Constant { .. }, k) => {
                 todo!("{k:?}")
@@ -963,11 +1010,13 @@ impl X86NodeRef {
         }
 
         let op = match self.kind() {
-            NodeKind::Constant { value, width } => {
-                Operand::imm(Width::from_uncanonicalized(*width), *value)
-            }
+            NodeKind::Constant { value, width } => Operand::imm(
+                Width::from_uncanonicalized(*width)
+                    .unwrap_or_else(|e| panic!("failed to canonicalize width of {self:?}: {e}")),
+                *value,
+            ),
             NodeKind::GuestRegister { offset } => {
-                let width = Width::from_uncanonicalized(self.typ().width());
+                let width = Width::from_uncanonicalized(self.typ().width()).unwrap();
                 let dst = Operand::vreg(width, emitter.next_vreg());
 
                 emitter.append(Instruction::mov(
@@ -982,7 +1031,7 @@ impl X86NodeRef {
                 dst
             }
             NodeKind::ReadStackVariable { offset, width } => {
-                let width = Width::from_uncanonicalized(*width);
+                let width = Width::from_uncanonicalized(*width).unwrap();
                 let dst = Operand::vreg(width, emitter.next_vreg());
 
                 emitter.append(Instruction::mov(
@@ -998,7 +1047,7 @@ impl X86NodeRef {
             }
             NodeKind::BinaryOperation(kind) => match kind {
                 BinaryOperationKind::Add(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
@@ -1009,7 +1058,7 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::Sub(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
@@ -1020,7 +1069,7 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::Or(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
@@ -1031,7 +1080,7 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::And(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
@@ -1042,7 +1091,7 @@ impl X86NodeRef {
                     dst
                 }
                 BinaryOperationKind::Multiply(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width());
+                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
@@ -1065,7 +1114,7 @@ impl X86NodeRef {
             },
             NodeKind::TernaryOperation(kind) => match kind {
                 TernaryOperationKind::AddWithCarry(a, b, carry) => {
-                    let width = Width::from_uncanonicalized(a.typ().width());
+                    let width = Width::from_uncanonicalized(a.typ().width()).unwrap();
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let a = a.to_operand(emitter);
@@ -1079,7 +1128,7 @@ impl X86NodeRef {
             },
             NodeKind::UnaryOperation(kind) => match &kind {
                 UnaryOperationKind::Complement(value) => {
-                    let width = Width::from_uncanonicalized(value.typ().width());
+                    let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
                     let dst = Operand::vreg(width, emitter.next_vreg());
                     let value = value.to_operand(emitter);
                     emitter.append(Instruction::mov(value, dst.clone()));
@@ -1087,7 +1136,7 @@ impl X86NodeRef {
                     dst
                 }
                 UnaryOperationKind::Not(value) => {
-                    let width = Width::from_uncanonicalized(value.typ().width());
+                    let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
                     let value = value.to_operand(emitter);
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
@@ -1105,7 +1154,7 @@ impl X86NodeRef {
                 length,
             } => {
                 let value = if let NodeKind::Constant { .. } = value.kind() {
-                    let width = Width::from_uncanonicalized(value.typ().width());
+                    let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
                     let value_reg = Operand::vreg(width, emitter.next_vreg());
                     let value_imm = value.to_operand(emitter);
                     emitter.append(Instruction::mov(value_imm, value_reg.clone()));
@@ -1152,7 +1201,7 @@ impl X86NodeRef {
                 dst
             }
             NodeKind::Cast { value, kind } => {
-                let target_width = Width::from_uncanonicalized(self.typ().width());
+                let target_width = Width::from_uncanonicalized(self.typ().width()).unwrap();
                 let dst = Operand::vreg(target_width, emitter.next_vreg());
                 let src = value.to_operand(emitter);
 
@@ -1365,7 +1414,7 @@ impl X86NodeRef {
                 true_value,
                 false_value,
             } => {
-                let width = Width::from_uncanonicalized(true_value.typ().width());
+                let width = Width::from_uncanonicalized(true_value.typ().width()).unwrap();
                 let dest = Operand::vreg(width, emitter.next_vreg());
 
                 let condition = condition.to_operand(emitter);

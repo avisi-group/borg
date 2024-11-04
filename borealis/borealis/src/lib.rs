@@ -325,6 +325,11 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "ConstrainUnpredictableBits",
         "execute_aarch64_instrs_integer_logical_shiftedreg",
         "ROR",
+        "DecodeBitMasks",
+        "HighestSetBit",
+        "zext_ones",
+        "_shl_int_general",
+        "extsv",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

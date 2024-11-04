@@ -319,6 +319,22 @@ impl<'f> Interpreter<'f> {
                             })
                         }
                         (
+                            ShiftOperationKind::LogicalShiftRight,
+                            Value::UnsignedInteger { value, length },
+                        ) => {
+                            let (value, did_overflow) =
+                                value.overflowing_shr(u32::try_from(amount).unwrap());
+
+                            if did_overflow {
+                                log::trace!("overflowed during lsl of {value} by {amount}");
+                            }
+
+                            Some(Value::UnsignedInteger {
+                                value: value & mask(*length),
+                                length: *length,
+                            })
+                        }
+                        (
                             ShiftOperationKind::LogicalShiftLeft,
                             Value::SignedInteger { value, length },
                         ) => Some(Value::SignedInteger {
@@ -452,6 +468,23 @@ impl<'f> Interpreter<'f> {
                             value: i64::try_from(*value).unwrap(),
                             length: u16::try_from(*element_width_in_bits).unwrap(),
                         }),
+                        (
+                            CastOperationKind::Truncate,
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::UnsignedInteger,
+                                element_width_in_bits,
+                            }),
+                            Value::SignedInteger { value, .. },
+                        ) => {
+                            let length = u16::try_from(*element_width_in_bits).unwrap();
+                            Some(Value::UnsignedInteger {
+                                value: u64::try_from(*value).unwrap() & mask(length),
+                                length,
+                            })
+                        }
+                        (CastOperationKind::Convert, Type::Bits, Value::UnsignedInteger { .. }) => {
+                            Some(value)
+                        }
                         (k, t, v) => todo!("{k:?} {t:?} {v:?}"),
                     }
                 }
@@ -466,6 +499,20 @@ impl<'f> Interpreter<'f> {
                     match (kind, typ, &value) {
                         (
                             CastOperationKind::ZeroExtend,
+                            Type::Bits,
+                            Value::UnsignedInteger { value, length },
+                        ) => {
+                            if target_length > *length {
+                                Some(Value::UnsignedInteger {
+                                    value: value & mask(target_length),
+                                    length: target_length,
+                                })
+                            } else {
+                                panic!();
+                            }
+                        }
+                        (
+                            CastOperationKind::SignExtend,
                             Type::Bits,
                             Value::UnsignedInteger { value, length },
                         ) => {
@@ -777,6 +824,19 @@ impl Sub for Value {
                 value: left - right,
                 length: max(left_length, right_length),
             },
+            (
+                Value::SignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::SignedInteger {
+                value: left - i64::try_from(right).unwrap(),
+                length: max(left_length, right_length),
+            },
             (left, right) => todo!("{left:?} {right:?}"),
         }
     }
@@ -860,6 +920,19 @@ impl Mul for Value {
                 },
             ) => Value::SignedInteger {
                 value: left * i64::try_from(right).unwrap(),
+                length: max(left_length, right_length),
+            },
+            (
+                Value::UnsignedInteger {
+                    value: left,
+                    length: left_length,
+                },
+                Value::UnsignedInteger {
+                    value: right,
+                    length: right_length,
+                },
+            ) => Value::UnsignedInteger {
+                value: left * right,
                 length: max(left_length, right_length),
             },
             (left, right) => todo!("{left:?} {right:?}"),

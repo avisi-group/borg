@@ -1,6 +1,6 @@
 use {
     crate::dbt::x86::{
-        encoder::{Instruction, Opcode, Operand, PhysicalRegister, Register, Width},
+        encoder::{width::Width, Instruction, Opcode, Operand, PhysicalRegister, Register},
         register_allocator::solid_state::SolidStateRegisterAllocator,
     },
     proc_macro_lib::ktest,

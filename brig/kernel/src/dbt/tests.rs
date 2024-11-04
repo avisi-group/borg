@@ -1125,29 +1125,222 @@ fn bitinsert() {
     }
 }
 
-//////#[ktest]
-// fn ubfx() {
-//     {
-//         let mut state = State::new(Box::new(NoneEnv));
-//         // decode bit masks
-//         assert_eq!(
-//             ProductTypea79c7f841a890648 {
-//                 tuple__pcnt_bv__pcnt_bv0: Bits::new(0xFFFF00000000000F, 64),
-//                 tuple__pcnt_bv__pcnt_bv1: Bits::new(0xF, 64)
-//             },
-//             DecodeBitMasks(&mut state, TRACER, true, 0x13, 0x10, false, 0x40)
-//         );
-//     }
+//#[ktest]
+fn ubfx() {
+    let model = models::get("aarch64").unwrap();
 
-//     {
-//         let mut state = State::new(Box::new(NoneEnv));
-//         state.write_register::<u64>(REG_R3, 0x8444_c004);
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-//         // ubfx x3, x3, #16, #4
-//         u__DecodeA64(&mut state, TRACER, 0, 0xd3504c63);
-//         assert_eq!(0x4, state.read_register::<u64>(REG_R3));
-//     }
-// }
+    init(&*model, register_file_ptr);
+
+    // ubfx x3, x3, #16, #4
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd3504c63, Type::Unsigned(32));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r3 = register_file_ptr.add(model.reg_offset("R3")) as *mut u64;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+
+        *r3 = 0x8444_c004;
+        *see = -1;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*r3, 0x4);
+    }
+}
+
+#[ktest]
+fn highest_set_bit() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.constant(0b100, Type::Unsigned(64));
+    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 2,
+            width: 64
+        }
+    );
+
+    let x = emitter.constant(u64::MAX, Type::Unsigned(64));
+    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 63,
+            width: 64
+        }
+    );
+}
+
+#[ktest]
+fn ror() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.constant(0xff00, Type::Unsigned(64));
+    let shift = emitter.constant(8, Type::Signed(64));
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xff,
+            width: 64
+        }
+    );
+
+    let x = emitter.constant(0xff, Type::Unsigned(64));
+    let shift = emitter.constant(8, Type::Signed(64));
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xff00_0000_0000_0000,
+            width: 64
+        }
+    );
+
+    let x = emitter.constant(0xff, Type::Unsigned(32));
+    let shift = emitter.constant(8, Type::Signed(64));
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xff00_0000,
+            width: 32
+        }
+    );
+}
+
+#[ktest]
+fn zext_ones() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let n = emitter.constant(1, Type::Signed(64));
+    let m = emitter.constant(1, Type::Signed(64));
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
+
+    let n = emitter.constant(64, Type::Signed(64));
+    let m = emitter.constant(0, Type::Signed(64));
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0,
+            width: 64
+        }
+    );
+    // todo: enable me
+    // let n = emitter.constant(64, Type::Signed(64));
+    // let m = emitter.constant(64, Type::Signed(64));
+    // let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    // assert_eq!(
+    //     res.kind(),
+    //     &NodeKind::Constant {
+    //         value: 1,
+    //         width: 64
+    //     }
+    // );
+}
+
+//#[ktest]
+fn decodebitmasks() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    // assert_eq!(
+    //     interpret(
+    //         &*model,
+    //         "DecodeBitMasks",
+    //         &[
+    //             Value::UnsignedInteger {
+    //                 value: 1,
+    //                 length: 1,
+    //             },
+    //             Value::UnsignedInteger {
+    //                 value: 0x13,
+    //                 length: 6,
+    //             },
+    //             Value::UnsignedInteger {
+    //                 value: 0x10,
+    //                 length: 6,
+    //             },
+    //             Value::UnsignedInteger {
+    //                 value: 0,
+    //                 length: 1,
+    //             },
+    //             Value::SignedInteger {
+    //                 value: 0x40,
+    //                 length: 64,
+    //             },
+    //         ],
+    //         register_file_ptr,
+    //     ),
+    //     Value::Tuple(alloc::vec![
+    //         Value::UnsignedInteger {
+    //             value: 0xFFFF00000000000F,
+    //             length: 64
+    //         },
+    //         Value::UnsignedInteger {
+    //             value: 0xF,
+    //             length: 64
+    //         }
+    //     ])
+    // );
+
+    let immn = emitter.constant(1, Type::Unsigned(1));
+    let imms = emitter.constant(0x13, Type::Unsigned(6));
+    let immr = emitter.constant(0x10, Type::Unsigned(6));
+    let immediate = emitter.constant(0, Type::Unsigned(1));
+    let m = emitter.constant(0x40, Type::Signed(64));
+    let res = translate(
+        &*model,
+        "DecodeBitMasks",
+        &[immn, imms, immr, immediate, m],
+        &mut emitter,
+    );
+
+    assert_eq!(
+        emitter.access_tuple(res.clone(), 0).kind(),
+        &NodeKind::Constant {
+            value: 0xFFFF00000000000F,
+            width: 64
+        }
+    );
+    assert_eq!(
+        emitter.access_tuple(res, 1).kind(),
+        &NodeKind::Constant {
+            value: 0xF,
+            width: 64
+        }
+    );
+}
 
 #[ktest]
 fn replicate_bits() {
@@ -1250,20 +1443,20 @@ fn rev_d00dfeed() {
     }
 }
 
-// //////////#[ktest]
-// // // fn udiv() {
-// // //     let x = 0xffffff8008bfffffu64;
-// // //     let y = 0x200000u64;
-// // //     let mut state = State::new(Box::new(NoneEnv));
-// // //     state.write_register(REG_R19, x);
-// // //     state.write_register(REG_R1, y);
+//////////#[ktest]
+// // fn udiv() {
+// //     let x = 0xffffff8008bfffffu64;
+// //     let y = 0x200000u64;
+// //     let mut state = State::new(Box::new(NoneEnv));
+// //     state.write_register(REG_R19, x);
+// //     state.write_register(REG_R1, y);
+// 0x9ac10a73
+// //     // div
+// //     u__DecodeA64_DataProcReg::u__DecodeA64_DataProcReg(&mut state,
+//TRACER, // // 0x0, 0x9ac10a73);
 
-// // //     // div
-// // //     u__DecodeA64_DataProcReg::u__DecodeA64_DataProcReg(&mut state,
-// TRACER, // // 0x0, 0x9ac10a73);
-
-// // //     assert_eq!(x / y, state.read_register(REG_R19));
-// // // }
+// //     assert_eq!(x / y, state.read_register(REG_R19));
+// // }
 
 // //////////#[ktest]
 // // // fn place_slice() {

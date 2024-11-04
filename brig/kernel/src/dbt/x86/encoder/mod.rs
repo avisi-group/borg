@@ -1,10 +1,7 @@
 use {
-    crate::dbt::x86::emitter::X86Block,
+    crate::dbt::x86::{emitter::X86Block, encoder::width::Width},
     common::{arena::Ref, HashMap},
-    core::{
-        cmp::Ordering,
-        fmt::{self, Debug, Display, Formatter},
-    },
+    core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
         qword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8,
@@ -16,48 +13,7 @@ mod mov;
 mod setne;
 mod shl;
 mod shr;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Width {
-    _8,
-    _16,
-    _32,
-    _64,
-}
-
-impl Width {
-    pub fn from_uncanonicalized(bits: u16) -> Self {
-        match bits {
-            0 => panic!("cannot encode 0-bit width"),
-            1..=8 => Self::_8,
-            9..=16 => Self::_16,
-            17..=32 => Self::_32,
-            33..=64 => Self::_64,
-            _ => panic!("cannot encode >64-bit width"),
-        }
-    }
-
-    fn as_u16(&self) -> u16 {
-        match self {
-            Width::_8 => 8,
-            Width::_16 => 16,
-            Width::_32 => 32,
-            Width::_64 => 64,
-        }
-    }
-}
-
-impl Display for Width {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.as_u16())
-    }
-}
-
-impl PartialOrd for Width {
-    fn partial_cmp(&self, other: &Width) -> Option<Ordering> {
-        self.as_u16().partial_cmp(&other.as_u16())
-    }
-}
+pub mod width;
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum Opcode {
@@ -563,7 +519,7 @@ impl Operand {
                 displacement,
                 segment_override: None,
             },
-            width_in_bits: Width::from_uncanonicalized(width_in_bits),
+            width_in_bits: Width::from_uncanonicalized(width_in_bits).unwrap(),
         }
     }
 
@@ -580,7 +536,7 @@ impl Operand {
                 displacement,
                 segment_override: Some(segment),
             },
-            width_in_bits: Width::from_uncanonicalized(width_in_bits),
+            width_in_bits: Width::from_uncanonicalized(width_in_bits).unwrap(),
         }
     }
 
