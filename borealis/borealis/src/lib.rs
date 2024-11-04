@@ -330,6 +330,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "zext_ones",
         "_shl_int_general",
         "extsv",
+        "place_slice_signed",
+        "sext_slice",
+        "place_slice",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

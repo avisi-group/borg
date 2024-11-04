@@ -1443,6 +1443,34 @@ fn rev_d00dfeed() {
     }
 }
 
+#[ktest]
+fn place_slice() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let m = emitter.constant(64, Type::Signed(64));
+    let xs = emitter.constant(0xffffffd8, Type::Unsigned(64));
+    let i = emitter.constant(0, Type::Signed(64));
+    let l = emitter.constant(32, Type::Signed(64));
+    let shift = emitter.constant(0, Type::Signed(64));
+
+    let res = translate(
+        &*model,
+        "place_slice_signed",
+        &[m, xs, i, l, shift],
+        &mut emitter,
+    );
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xffffffffffffffd8,
+            width: 64
+        }
+    );
+}
+
 //////////#[ktest]
 // // fn udiv() {
 // //     let x = 0xffffff8008bfffffu64;
@@ -1457,15 +1485,6 @@ fn rev_d00dfeed() {
 
 // //     assert_eq!(x / y, state.read_register(REG_R19));
 // // }
-
-// //////////#[ktest]
-// // // fn place_slice() {
-// // //     let mut state = State::new(Box::new(NoneEnv));
-// // //     assert_eq!(
-// // //         Bits::new(0xffffffffffffffd8, 64),
-// // //         place_slice_signed(&mut state, TRACER, 64,
-// Bits::new(0xffffffd8, // 64), // 0, 32, 0,)     );
-// // // }
 
 fn init(model: &Model, register_file: *mut u8) {
     interpret(&*model, "borealis_register_init", &[], register_file);

@@ -559,6 +559,25 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     typ,
                 )
             }
+            (
+                NodeKind::Constant {
+                    value: value_value,
+                    width: 64, // has to be 64 for the i64 shift to be valid
+                },
+                NodeKind::Constant {
+                    value: amount_value,
+                    ..
+                },
+                ShiftOperationKind::ArithmeticShiftRight,
+            ) => {
+                let signed_value = *value_value as i64;
+                let shifted = signed_value
+                    .checked_shr(u32::try_from(*amount_value).unwrap())
+                    .unwrap() as u64;
+
+                // mask to width of value
+                self.constant(shifted, typ)
+            }
             (NodeKind::Constant { .. }, NodeKind::Constant { .. }, k) => {
                 todo!("{k:?}")
             }
