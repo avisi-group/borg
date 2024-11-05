@@ -303,7 +303,10 @@ fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
     cmd.arg("-drive")
         .arg(format!("format=raw,file={}", uefi_path.to_str().unwrap()));
     cmd.arg("-nographic");
+
+    #[cfg(target_arch = "x86_64")]
     cmd.arg("-enable-kvm");
+
     cmd.arg("-no-reboot");
 
     if gdb {
@@ -327,8 +330,9 @@ fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
     // cmd.arg("file=../../brig-programs/rootfs.ext2,if=none,format=raw,id=drive1");
     cmd.arg("-M");
     cmd.arg("q35");
-    cmd.arg("-cpu");
-    cmd.arg("host");
+
+    #[cfg(target_arch = "x86_64")]
+    cmd.args(["-cpu", "host"]);
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
