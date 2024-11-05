@@ -13,7 +13,11 @@ use {
         },
         Translation,
     },
-    common::{mask::mask, rudder::Model, HashMap},
+    common::{
+        mask::mask,
+        rudder::{statement::UnaryOperationKind, Model},
+        HashMap,
+    },
     proc_macro_lib::ktest,
 };
 
@@ -1471,20 +1475,134 @@ fn place_slice() {
     );
 }
 
-//////////#[ktest]
-// // fn udiv() {
-// //     let x = 0xffffff8008bfffffu64;
-// //     let y = 0x200000u64;
-// //     let mut state = State::new(Box::new(NoneEnv));
-// //     state.write_register(REG_R19, x);
-// //     state.write_register(REG_R1, y);
-// 0x9ac10a73
-// //     // div
-// //     u__DecodeA64_DataProcReg::u__DecodeA64_DataProcReg(&mut state,
-//TRACER, // // 0x0, 0x9ac10a73);
+#[ktest]
+fn udiv() {
+    let model = models::get("aarch64").unwrap();
 
-// //     assert_eq!(x / y, state.read_register(REG_R19));
-// // }
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u64;
+        let r19 = register_file_ptr.add(model.reg_offset("R19")) as *mut u64;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+
+        let x = 0xffffff8008bfffffu64;
+        let y = 0x200000u64;
+
+        *see = -1;
+        *r1 = y;
+        *r19 = x;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(x / y, (*r19));
+    }
+}
+
+#[ktest]
+fn floor() {
+    assert_eq!(0, harness(3, 4));
+    assert_eq!(1, harness(5, 4));
+    assert_eq!(2, harness(8, 4));
+
+    fn harness(n: i64, d: i64) -> i64 {
+        let model = models::get("aarch64").unwrap();
+
+        let mut register_file = alloc::vec![0u8; model.register_file_size()];
+        let register_file_ptr = register_file.as_mut_ptr();
+
+        let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+        let mut emitter = X86Emitter::new(&mut ctx);
+
+        {
+            let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(64));
+            let n = emitter.read_register(r0_offset.clone(), Type::Unsigned(64));
+            let r1_offset = emitter.constant(model.reg_offset("R1") as u64, Type::Unsigned(64));
+            let d = emitter.read_register(r1_offset.clone(), Type::Unsigned(64));
+
+            let real = emitter.create_tuple(alloc::vec![n, d]);
+            let floor =
+                emitter.unary_operation(crate::dbt::x86::emitter::UnaryOperationKind::Floor(real));
+            emitter.write_register(r0_offset.clone(), floor);
+        }
+        emitter.leave();
+
+        let num_regs = emitter.next_vreg();
+        let translation = ctx.compile(num_regs);
+
+        unsafe {
+            let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut i64;
+            let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut i64;
+
+            *r0 = n;
+            *r1 = d;
+
+            translation.execute(register_file_ptr);
+
+            *r0
+        }
+    }
+}
+
+#[ktest]
+fn ceil() {
+    assert_eq!(1, harness(3, 4));
+    assert_eq!(2, harness(5, 4));
+    assert_eq!(2, harness(8, 4));
+
+    fn harness(n: i64, d: i64) -> i64 {
+        let model = models::get("aarch64").unwrap();
+
+        let mut register_file = alloc::vec![0u8; model.register_file_size()];
+        let register_file_ptr = register_file.as_mut_ptr();
+
+        let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+        let mut emitter = X86Emitter::new(&mut ctx);
+
+        {
+            let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(64));
+            let n = emitter.read_register(r0_offset.clone(), Type::Unsigned(64));
+            let r1_offset = emitter.constant(model.reg_offset("R1") as u64, Type::Unsigned(64));
+            let d = emitter.read_register(r1_offset.clone(), Type::Unsigned(64));
+
+            let real = emitter.create_tuple(alloc::vec![n, d]);
+            let floor =
+                emitter.unary_operation(crate::dbt::x86::emitter::UnaryOperationKind::Ceil(real));
+            emitter.write_register(r0_offset.clone(), floor);
+        }
+        emitter.leave();
+
+        let num_regs = emitter.next_vreg();
+        let translation = ctx.compile(num_regs);
+
+        unsafe {
+            let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut i64;
+            let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut i64;
+
+            *r0 = n;
+            *r1 = d;
+
+            translation.execute(register_file_ptr);
+
+            *r0
+        }
+    }
+}
 
 fn init(model: &Model, register_file: *mut u8) {
     interpret(&*model, "borealis_register_init", &[], register_file);

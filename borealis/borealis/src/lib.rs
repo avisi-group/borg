@@ -7,7 +7,8 @@ use {
                 builtin_fns::HandleBuiltinFunctions, cycle_finder::CycleFinder,
                 destruct_composites::DestructComposites, destruct_unions::DestructUnions,
                 fix_exceptions::FixExceptions, fold_unconditionals::FoldUnconditionals,
-                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
+                lower_reals::LowerReals, remove_const_branch::RemoveConstBranch,
+                remove_constant_type::RemoveConstantType,
             },
             Ast,
         },
@@ -111,6 +112,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
 
     info!("Running passes on BOOM");
     [
+        LowerReals::new_boxed(),
         HandleBuiltinFunctions::new_boxed(),
         RemoveConstantType::new_boxed(),
         DestructComposites::new_boxed(),
@@ -333,6 +335,8 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "place_slice_signed",
         "sext_slice",
         "place_slice",
+        "asl_Int",
+        "RoundTowardsZero",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -350,7 +354,6 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AMEVCNTR0_EL0_read",
         "AMEVTYPER0_read",
         "DBGWCR_read",
-        "execute_aarch64_instrs_integer_arithmetic_div",
     ];
 
     if FN_DENYLIST.contains(&name.as_ref()) {

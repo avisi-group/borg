@@ -50,7 +50,6 @@ pub enum Type {
     String,
 
     Bits,
-    Rational,
 
     // Any type, used for undefineds
     Any,
@@ -118,7 +117,7 @@ impl Type {
             Self::Bits => 64,
             // width of internedstring
             Self::String => 32,
-            Self::Rational => todo!(),
+
             Self::Any => todo!(),
 
             Self::Tuple(ts) => ts.iter().map(|typ| typ.width_bits()).sum(),
@@ -215,7 +214,6 @@ impl Display for Type {
             } => write!(f, "[{element_type}; {element_count:?}]"),
             Type::Bits => write!(f, "bv"),
             Type::String => write!(f, "str"),
-            Type::Rational => write!(f, "rational"),
             Type::Any => write!(f, "any"),
             Type::Tuple(ts) => {
                 write!(f, "(").unwrap();

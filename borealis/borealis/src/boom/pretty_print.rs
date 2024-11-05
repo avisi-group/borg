@@ -331,12 +331,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Type::Union { width } => {
                 write!(self.writer, "union({width})")
             }
-            Type::List { element_type } => {
-                write!(self.writer, "list<").unwrap();
-                self.visit_type(element_type.clone());
-                write!(self.writer, ">").unwrap();
-                Ok(())
-            }
             Type::Vector { element_type } => {
                 write!(self.writer, "vec<").unwrap();
                 self.visit_type(element_type.clone());

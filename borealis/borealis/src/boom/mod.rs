@@ -278,10 +278,6 @@ pub enum Type {
 
     Tuple(Vec<Shared<Self>>),
 
-    List {
-        element_type: Shared<Self>,
-    },
-
     Vector {
         element_type: Shared<Self>,
     },
@@ -333,8 +329,7 @@ impl Walkable for Shared<Type> {
                 .iter()
                 .for_each(|field| visitor.visit_named_type(field)),
 
-            List { element_type }
-            | Vector { element_type }
+            Vector { element_type }
             | FixedVector { element_type, .. }
             | Reference(element_type) => visitor.visit_type(element_type.clone()),
 

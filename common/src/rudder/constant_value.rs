@@ -6,8 +6,6 @@ use {
         fmt::{self, Display, Formatter},
         ops::{Add, Div, Mul, Not, Sub},
     },
-    num_rational::Ratio,
-    num_traits::CheckedMul,
 };
 
 // idk why this is necessary
@@ -19,7 +17,6 @@ pub enum ConstantValue {
     UnsignedInteger(u64),
     SignedInteger(i64),
     FloatingPoint(f64),
-    Rational(Ratio<i128>),
     String(InternedString),
     Unit,
     Tuple(Vec<ConstantValue>),
@@ -31,7 +28,7 @@ impl ConstantValue {
             ConstantValue::UnsignedInteger(v) => *v == 0,
             ConstantValue::SignedInteger(v) => *v == 0,
             ConstantValue::FloatingPoint(v) => *v == 0.,
-            ConstantValue::Rational(r) => *r == (Ratio::<i128>::ZERO),
+
             ConstantValue::Unit | ConstantValue::String(_) => false,
             ConstantValue::Tuple(_) => panic!(),
         }
@@ -78,19 +75,7 @@ impl ConstantValue {
 
                 ConstantValue::FloatingPoint(result)
             }
-            ConstantValue::Rational(r) => {
-                let mut acc = *r;
-                for _ in 0..i {
-                    match acc.checked_mul(r) {
-                        Some(res) => acc = res,
-                        None => {
-                            acc = Ratio::<i128>::from_integer(i128::MAX);
-                            break;
-                        }
-                    }
-                }
-                ConstantValue::Rational(acc)
-            }
+
             _ => todo!(),
         }
     }
@@ -189,7 +174,6 @@ impl Not for ConstantValue {
             ConstantValue::UnsignedInteger(v) => ConstantValue::UnsignedInteger(!v),
             ConstantValue::SignedInteger(v) => ConstantValue::SignedInteger(!v),
             ConstantValue::FloatingPoint(_)
-            | ConstantValue::Rational(_)
             | ConstantValue::String(_)
             | ConstantValue::Unit
             | ConstantValue::Tuple(_) => panic!("not a thing"),
@@ -219,7 +203,6 @@ impl Display for ConstantValue {
             ConstantValue::FloatingPoint(v) => write!(f, "{v}f"),
             ConstantValue::Unit => write!(f, "()"),
             ConstantValue::String(str) => write!(f, "{str:?}"),
-            ConstantValue::Rational(r) => write!(f, "{r:?}"),
             ConstantValue::Tuple(vs) => {
                 write!(f, "(").unwrap();
                 vs.iter().for_each(|v| write!(f, "{v},  ").unwrap());

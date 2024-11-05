@@ -171,7 +171,6 @@ fn validate_constant_type(
             }),
         )
         | (ConstantValue::String(_), Type::String)
-        | (ConstantValue::Rational(_), Type::Rational)
         | (ConstantValue::Tuple(_), Type::Tuple(_)) => None,
 
         _ => Some(ValidationMessage::stmt_warn(

@@ -1,6 +1,6 @@
 //! JIB to BOOM conversion
 
-use crate::boom::convert::sail_ast::Identifier;
+use crate::boom::{control_flow::ControlFlowBlock, convert::sail_ast::Identifier};
 use {
     crate::boom::{
         self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionDefinition,
@@ -47,32 +47,60 @@ impl BoomEmitter {
 
     /// Emit BOOM AST
     pub fn finish(mut self) -> boom::Ast {
-        self.register_init_statements
-            .push(Shared::new(boom::Statement::VariableDeclaration {
-                name: "ret".into(),
-                typ: Shared::new(Type::Unit),
-            }));
-        self.register_init_statements
-            .push(Shared::new(boom::Statement::Copy {
-                expression: boom::Expression::Identifier("ret".into()),
-                value: Shared::new(boom::Value::Literal(Shared::new(boom::Literal::Unit))),
-            }));
-        self.register_init_statements
-            .push(Shared::new(boom::Statement::End("ret".into())));
+        // create register initialization function
+        {
+            self.register_init_statements
+                .push(Shared::new(boom::Statement::VariableDeclaration {
+                    name: "ret".into(),
+                    typ: Shared::new(Type::Unit),
+                }));
+            self.register_init_statements
+                .push(Shared::new(boom::Statement::Copy {
+                    expression: boom::Expression::Identifier("ret".into()),
+                    value: Shared::new(boom::Value::Literal(Shared::new(boom::Literal::Unit))),
+                }));
+            self.register_init_statements
+                .push(Shared::new(boom::Statement::End("ret".into())));
 
-        self.ast.functions.insert(
-            "borealis_register_init".into(),
-            FunctionDefinition {
-                signature: FunctionSignature {
-                    name: "borealis_register_init".into(),
-                    parameters: Shared::new(vec![]),
-                    return_type: Shared::new(Type::Unit),
+            self.ast.functions.insert(
+                "borealis_register_init".into(),
+                FunctionDefinition {
+                    signature: FunctionSignature {
+                        name: "borealis_register_init".into(),
+                        parameters: Shared::new(vec![]),
+                        return_type: Shared::new(Type::Unit),
+                    },
+                    entry_block: ControlFlowGraphBuilder::from_statements(
+                        &self.register_init_statements,
+                    ),
                 },
-                entry_block: ControlFlowGraphBuilder::from_statements(
-                    &self.register_init_statements,
-                ),
+            );
+        }
+
+        self.ast.functions.extend(self.function_types.iter().map(
+            |(name, (parameters, return_type))| {
+                (
+                    *name,
+                    FunctionDefinition {
+                        signature: FunctionSignature {
+                            name: *name,
+                            parameters: Shared::new(
+                                parameters
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, typ)| Parameter {
+                                        name: format!("p{i}").into(),
+                                        typ: typ.clone(),
+                                    })
+                                    .collect(),
+                            ),
+                            return_type: return_type.clone(),
+                        },
+                        entry_block: ControlFlowBlock::new(),
+                    },
+                )
             },
-        );
+        ));
 
         self.ast
     }
@@ -231,7 +259,7 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Shared<boom::Type> {
         jib_ast::Type::Vector(typ) => boom::Type::Vector {
             element_type: (convert_type(&**typ)),
         },
-        jib_ast::Type::List(typ) => boom::Type::List {
+        jib_ast::Type::List(typ) => boom::Type::Vector {
             element_type: (convert_type(&**typ)),
         },
         jib_ast::Type::Ref(typ) => boom::Type::Reference(convert_type(&**typ)),

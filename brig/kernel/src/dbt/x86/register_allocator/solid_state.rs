@@ -75,7 +75,7 @@ impl SolidStateRegisterAllocator {
 
 impl RegisterAllocator for SolidStateRegisterAllocator {
     fn process(&mut self, instruction: &mut Instruction) {
-        // kinda hacky, tightly coupled to the encoding of select
+        // kinda hacky, tightly coupled to the encoding of select:
         // do not kill (deallocate) destination of cmovne
         if matches!(instruction.0, Opcode::CMOVNE(_, _)) {
             instruction.get_use_defs().for_each(|usedef| match usedef {

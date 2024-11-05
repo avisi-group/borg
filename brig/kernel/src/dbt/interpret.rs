@@ -741,7 +741,6 @@ impl Value {
                 length: u16::try_from(typ.width_bits()).unwrap(),
             },
             ConstantValue::FloatingPoint(f) => Value::FloatingPoint(*f),
-            ConstantValue::Rational(_ratio) => todo!(),
             ConstantValue::String(interned_string) => Value::String(*interned_string),
             ConstantValue::Unit => Value::Unit,
             ConstantValue::Tuple(vec) => {

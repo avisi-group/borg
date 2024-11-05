@@ -315,6 +315,10 @@ impl Statement {
             } => Type::u1(),
             Self::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
             Self::TernaryOperation { a, .. } => a.get(arena).typ(arena),
+            Self::UnaryOperation {
+                kind: UnaryOperationKind::Ceil | UnaryOperationKind::Floor,
+                ..
+            } => Type::s64(),
             Self::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             Self::ShiftOperation { value, .. } => value.get(arena).typ(arena),
 

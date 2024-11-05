@@ -49,6 +49,8 @@ pub enum Opcode {
     AND(Operand, Operand),
     /// imul {0}, {1},
     IMUL(Operand, Operand),
+    /// idiv {0}, {1}, {2}
+    IDIV(Operand, Operand, Operand),
     /// not {0}
     NOT(Operand),
     /// neg {0}
@@ -79,12 +81,16 @@ pub enum Opcode {
 
     /// setne {0}
     SETNE(Operand),
+    /// setnz {0}
+    SETNZ(Operand),
     /// setb {0}
     SETB(Operand),
     /// setbe {0}
     SETBE(Operand),
     /// seta {0}
     SETA(Operand),
+    /// setg {0}
+    SETG(Operand),
     /// setae {0}
     SETAE(Operand),
     /// jne {0}
@@ -644,6 +650,10 @@ impl Instruction {
         Self(Opcode::IMUL(src, dst))
     }
 
+    pub fn idiv(dividend_hi: Operand, dividend_lo: Operand, divisor: Operand) -> Self {
+        Self(Opcode::IDIV(dividend_hi, dividend_lo, divisor))
+    }
+
     pub fn shl(amount: Operand, op0: Operand) -> Self {
         Self(Opcode::SHL(amount, op0))
     }
@@ -704,11 +714,16 @@ impl Instruction {
     pub fn setne(r: Operand) -> Self {
         Self(Opcode::SETNE(r))
     }
+    pub fn setnz(r: Operand) -> Self {
+        Self(Opcode::SETNZ(r))
+    }
 
     pub fn setb(r: Operand) -> Self {
         Self(Opcode::SETB(r))
     }
-
+    pub fn setg(r: Operand) -> Self {
+        Self(Opcode::SETG(r))
+    }
     pub fn setbe(r: Operand) -> Self {
         Self(Opcode::SETBE(r))
     }
@@ -838,14 +853,13 @@ impl Instruction {
             ADD(
                 Operand {
                     kind: R(PHYS(src)),
-                    width_in_bits: src_width_in_bits,
+                    width_in_bits: Width::_64,
                 },
                 Operand {
                     kind: R(PHYS(dst)),
-                    width_in_bits: dst_width_in_bits,
+                    width_in_bits: Width::_64,
                 },
             ) => {
-                assert_eq!(src_width_in_bits, dst_width_in_bits);
                 assembler
                     .add::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
@@ -894,6 +908,21 @@ impl Instruction {
             ) => {
                 assembler
                     .sub::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
+                    .unwrap();
+            }
+            // SUB R -> R
+            SUB(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assembler
+                    .sub::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
             }
 
@@ -1021,40 +1050,39 @@ impl Instruction {
             }
 
             SETA(Operand {
-                kind: R(PHYS(condition)),
-                ..
+                kind: R(PHYS(dst)), ..
             }) => {
-                assembler.seta::<AsmRegister8>(condition.into()).unwrap();
+                assembler.seta::<AsmRegister8>(dst.into()).unwrap();
+            }
+            SETG(Operand {
+                kind: R(PHYS(dst)), ..
+            }) => {
+                assembler.setg::<AsmRegister8>(dst.into()).unwrap();
             }
             SETAE(Operand {
-                kind: R(PHYS(condition)),
-                ..
+                kind: R(PHYS(dst)), ..
             }) => {
-                assembler.setae::<AsmRegister8>(condition.into()).unwrap();
+                assembler.setae::<AsmRegister8>(dst.into()).unwrap();
             }
             SETE(Operand {
-                kind: R(PHYS(condition)),
-                ..
+                kind: R(PHYS(dst)), ..
             }) => {
-                assembler.sete::<AsmRegister8>(condition.into()).unwrap();
+                assembler.sete::<AsmRegister8>(dst.into()).unwrap();
             }
             SETO(Operand {
-                kind: R(PHYS(condition)),
-                ..
+                kind: R(PHYS(dst)), ..
             }) => {
-                assembler.seto::<AsmRegister8>(condition.into()).unwrap();
+                assembler.seto::<AsmRegister8>(dst.into()).unwrap();
             }
             SETC(Operand {
-                kind: R(PHYS(condition)),
-                ..
+                kind: R(PHYS(dst)), ..
             }) => {
-                assembler.setc::<AsmRegister8>(condition.into()).unwrap();
+                assembler.setc::<AsmRegister8>(dst.into()).unwrap();
             }
             SETS(Operand {
-                kind: R(PHYS(condition)),
-                ..
+                kind: R(PHYS(dst)), ..
             }) => {
-                assembler.sets::<AsmRegister8>(condition.into()).unwrap();
+                assembler.sets::<AsmRegister8>(dst.into()).unwrap();
             }
             NOT(Operand {
                 kind: R(PHYS(value)),
@@ -1215,6 +1243,20 @@ impl Instruction {
                     .and::<AsmRegister32, AsmRegister32>(right.into(), left.into())
                     .unwrap();
             }
+            AND(
+                Operand {
+                    kind: R(PHYS(left)),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: Width::_8,
+                },
+            ) => {
+                assembler
+                    .and::<AsmRegister8, AsmRegister8>(right.into(), left.into())
+                    .unwrap();
+            }
             BEXTR(
                 Operand {
                     kind: R(PHYS(ctrl)),
@@ -1310,6 +1352,10 @@ impl Instruction {
             }) => {
                 assembler.setne::<AsmRegister8>(dst.into()).unwrap();
             }
+            SETNZ(Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_8,
+            }) => assembler.setnz::<AsmRegister8>(dst.into()).unwrap(),
             SETBE(Operand {
                 kind: R(PHYS(dst)),
                 width_in_bits: Width::_8,
@@ -1362,7 +1408,38 @@ impl Instruction {
                     i32::try_from(*left).unwrap(),
                 )
                 .unwrap(),
+            IMUL(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
+                },
+            ) => assembler
+                .imul_2::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .unwrap(),
+            IDIV(
+                Operand {
+                    kind: R(PHYS(hi)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(lo)),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(div)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assert_eq!(*hi, PhysicalRegister::RDX);
+                assert_eq!(*lo, PhysicalRegister::RAX);
+                assembler.idiv::<AsmRegister64>(div.into()).unwrap();
+            }
             NOP => assembler.nop().unwrap(),
+
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1396,6 +1473,12 @@ impl Instruction {
                 None,
             ]
             .into_iter(),
+            Opcode::IDIV(dividend_hi, dividend_lo, divisor) => [
+                Some((OperandDirection::InOut, dividend_hi)),
+                Some((OperandDirection::InOut, dividend_lo)),
+                Some((OperandDirection::In, divisor)),
+            ]
+            .into_iter(),
             Opcode::JMP(tgt) => [Some((OperandDirection::None, tgt)), None, None].into_iter(),
             Opcode::RET | Opcode::NOP => [None, None, None].into_iter(),
             Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => [
@@ -1407,9 +1490,11 @@ impl Instruction {
             Opcode::JNE(tgt) => [Some((OperandDirection::None, tgt)), None, None].into_iter(),
             Opcode::SETE(r)
             | Opcode::SETNE(r)
+            | Opcode::SETNZ(r)
             | Opcode::SETB(r)
             | Opcode::SETBE(r)
             | Opcode::SETA(r)
+            | Opcode::SETG(r)
             | Opcode::SETAE(r)
             | Opcode::SETS(r)
             | Opcode::SETO(r)

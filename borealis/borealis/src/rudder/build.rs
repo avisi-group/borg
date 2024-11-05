@@ -22,8 +22,6 @@ use {
         HashMap,
     },
     log::trace,
-    num_rational::Ratio,
-    num_traits::cast::FromPrimitive,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
     sailrs::shared::Shared,
@@ -170,10 +168,9 @@ impl BuildContext {
             // value
             boom::Type::Bool | boom::Type::Bit => Type::u1(),
             boom::Type::Float => Type::f64(),
-            boom::Type::Real => Type::Rational,
+            boom::Type::Real => panic!("should be removed by pass"),
             boom::Type::Union { width } => Type::Union { width: *width },
             boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
-            boom::Type::List { .. } => todo!(),
             boom::Type::Vector { element_type } => {
                 let element_type = (self.resolve_type(element_type.clone())).clone();
                 // todo: Brian Campbell said the Sail C backend had functionality to staticize
@@ -489,26 +486,26 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(args[0].clone())
                 }
 
-                "%string->%real" => {
-                    let Statement::Constant { value, .. } = args[0].get(self.statement_arena()) else {
-                        panic!();
-                    };
+                // "%string->%real" => {
+                //     let Statement::Constant { value, .. } = args[0].get(self.statement_arena()) else {
+                //         panic!();
+                //     };
 
-                    let ConstantValue::String(str) = value else {
-                        panic!();
-                    };
+                //     let ConstantValue::String(str) = value else {
+                //         panic!();
+                //     };
 
-                    let r = Ratio::<i128>::from_f64(str.as_ref().parse().unwrap()).unwrap();
+                //     let r = Ratio::<i128>::from_f64(str.as_ref().parse().unwrap()).unwrap();
 
-                    Some(build(
-                        self.block,
-                        self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::Rational),
-                            value: ConstantValue::Rational(r),
-                        },
-                    ))
-                }
+                //     Some(build(
+                //         self.block,
+                //         self.block_arena_mut(),
+                //         Statement::Constant {
+                //             typ: (Type::Rational),
+                //             value: ConstantValue::Rational(r),
+                //         },
+                //     ))
+                // }
 
                 "make_the_value" | "size_itself_int" => Some(args[0].clone()),
                 // %bv, %i, %i -> %bv
@@ -753,13 +750,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Some(floor)
                 }
 
-                // val to_real : (%i) -> %real
-                "to_real" => Some(cast(
-                    self.block,
-                    self.block_arena_mut(),
-                    args[0].clone(),
-                    Type::Rational,
-                )),
+
 
                 // val pow2 : (%i) -> %i
                 // val _builtin_pow2 : (%i) -> %i
@@ -1980,7 +1971,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             Ordering::Equal => CastOperationKind::Reinterpret,
                         }
                     }
-                    Type::Bits | Type::Rational | Type::Any => {
+                    Type::Bits | Type::Any => {
                         todo!()
                     }
                     Type::Union { .. } => todo!(),

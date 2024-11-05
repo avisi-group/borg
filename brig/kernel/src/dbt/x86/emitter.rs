@@ -162,6 +162,11 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     }),
                 }
             }
+            Ceil(_) | Floor(_) => Self::NodeRef::from(X86Node {
+                typ: Type::Signed(64),
+                kind: NodeKind::UnaryOperation(op),
+            }),
+
             _ => {
                 todo!("{op:?}")
             }
@@ -251,6 +256,22 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         width: *width,
                     },
                 }),
+                (NodeKind::Tuple(left), NodeKind::Tuple(right)) => {
+                    match (left.as_slice(), right.as_slice()) {
+                        ([left_num, left_den], [right_num, right_den]) => {
+                            let num = self.binary_operation(BinaryOperationKind::Multiply(
+                                left_num.clone(),
+                                right_den.clone(),
+                            ));
+                            let den = self.binary_operation(BinaryOperationKind::Multiply(
+                                left_den.clone(),
+                                right_num.clone(),
+                            ));
+                            self.create_tuple(alloc::vec![num, den])
+                        }
+                        _ => panic!(),
+                    }
+                }
                 _ => Self::NodeRef::from(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
@@ -1120,6 +1141,17 @@ impl X86NodeRef {
 
                     dst
                 }
+                // BinaryOperationKind::Divide(left, right) => {
+                //     let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
+                //     let dst = Operand::vreg(width, emitter.next_vreg());
+
+                //     let left = left.to_operand(emitter);
+                //     let right = right.to_operand(emitter);
+                //     emitter.append(Instruction::mov(left, dst.clone()));
+                //     emitter.append(Instruction::idiv(right, dst.clone()));
+
+                //     dst
+                // }
                 BinaryOperationKind::CompareEqual(left, right)
                 | BinaryOperationKind::CompareNotEqual(left, right)
                 | BinaryOperationKind::CompareGreaterThan(left, right)
@@ -1129,7 +1161,7 @@ impl X86NodeRef {
                     emit_compare(kind, emitter, left.clone(), right.clone())
                 }
 
-                op => todo!("{op:?}"),
+                op => todo!("{op:#?}"),
             },
             NodeKind::TernaryOperation(kind) => match kind {
                 TernaryOperationKind::AddWithCarry(a, b, carry) => {
@@ -1164,6 +1196,90 @@ impl X86NodeRef {
                     emitter.append(Instruction::and(Operand::imm(width, 1), dst.clone()));
 
                     dst
+                }
+                UnaryOperationKind::Ceil(value) => {
+                    let NodeKind::Tuple(real) = value.kind() else {
+                        panic!();
+                    };
+
+                    let [num, den] = real.as_slice() else {
+                        panic!();
+                    };
+
+                    let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
+                    let num = num.to_operand(emitter);
+                    let den = den.to_operand(emitter);
+                    let divisor = Operand::vreg(width, emitter.next_vreg());
+
+                    let rax = Operand::preg(width, PhysicalRegister::RAX);
+                    let rdx = Operand::preg(width, PhysicalRegister::RDX);
+
+                    emitter.append(Instruction::xor(rdx.clone(), rdx.clone()));
+                    emitter.append(Instruction::mov(num.clone(), rax.clone()));
+                    emitter.append(Instruction::mov(den, divisor.clone()));
+                    emitter.append(Instruction::idiv(rdx.clone(), rax.clone(), divisor));
+
+                    let quotient = Operand::vreg(width, emitter.next_vreg());
+                    let remainder = Operand::vreg(width, emitter.next_vreg());
+                    emitter.append(Instruction::mov(rax.clone(), quotient.clone()));
+                    emitter.append(Instruction::mov(rdx.clone(), remainder.clone()));
+
+                    let nz = Operand::vreg(Width::_8, emitter.next_vreg());
+                    let g = Operand::vreg(Width::_8, emitter.next_vreg());
+
+                    emitter.append(Instruction::test(remainder.clone(), remainder.clone()));
+                    emitter.append(Instruction::setnz(nz.clone()));
+                    emitter.append(Instruction::test(num.clone(), num.clone()));
+                    emitter.append(Instruction::setg(g.clone()));
+                    emitter.append(Instruction::and(g.clone(), nz.clone()));
+                    let mask = Operand::vreg(width, emitter.next_vreg());
+                    emitter.append(Instruction::movzx(nz, mask.clone()));
+
+                    emitter.append(Instruction::add(mask.clone(), quotient.clone()));
+
+                    quotient
+                }
+                UnaryOperationKind::Floor(value) => {
+                    let NodeKind::Tuple(real) = value.kind() else {
+                        panic!();
+                    };
+
+                    let [num, den] = real.as_slice() else {
+                        panic!();
+                    };
+
+                    let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
+                    let num = num.to_operand(emitter);
+                    let den = den.to_operand(emitter);
+                    let divisor = Operand::vreg(width, emitter.next_vreg());
+
+                    let rax = Operand::preg(width, PhysicalRegister::RAX);
+                    let rdx = Operand::preg(width, PhysicalRegister::RDX);
+
+                    emitter.append(Instruction::xor(rdx.clone(), rdx.clone()));
+                    emitter.append(Instruction::mov(num.clone(), rax.clone()));
+                    emitter.append(Instruction::mov(den, divisor.clone()));
+                    emitter.append(Instruction::idiv(rdx.clone(), rax.clone(), divisor));
+
+                    let quotient = Operand::vreg(width, emitter.next_vreg());
+                    let remainder = Operand::vreg(width, emitter.next_vreg());
+                    emitter.append(Instruction::mov(rax.clone(), quotient.clone()));
+                    emitter.append(Instruction::mov(rdx.clone(), remainder.clone()));
+
+                    let nz = Operand::vreg(Width::_8, emitter.next_vreg());
+                    let s = Operand::vreg(Width::_8, emitter.next_vreg());
+
+                    emitter.append(Instruction::test(remainder.clone(), remainder.clone()));
+                    emitter.append(Instruction::setnz(nz.clone()));
+                    emitter.append(Instruction::test(num.clone(), num.clone()));
+                    emitter.append(Instruction::sets(s.clone()));
+                    emitter.append(Instruction::and(s.clone(), nz.clone()));
+                    let mask = Operand::vreg(width, emitter.next_vreg());
+                    emitter.append(Instruction::movzx(nz, mask.clone()));
+
+                    emitter.append(Instruction::sub(mask, quotient.clone()));
+
+                    quotient
                 }
                 kind => todo!("{kind:?}"),
             },
@@ -1427,7 +1543,7 @@ impl X86NodeRef {
                 // nzcv
                 dest
             }
-            NodeKind::Tuple(_vec) => unreachable!(),
+            NodeKind::Tuple(vec) => panic!("cannot convert to operand: {vec:#?}"),
             NodeKind::Select {
                 condition,
                 true_value,
@@ -1642,6 +1758,27 @@ fn emit_compare(
     right: X86NodeRef,
 ) -> Operand {
     use crate::dbt::x86::encoder::OperandKind::*;
+
+    let (left, right) = match (left.kind(), right.kind()) {
+        (NodeKind::Constant { .. }, NodeKind::Constant { .. }) => todo!(),
+        (NodeKind::Tuple(left_real), NodeKind::Tuple(right_real)) => {
+            match (left_real.clone().as_slice(), right_real.as_slice()) {
+                ([left_num, left_den], [right_num, right_den]) => (
+                    emitter.binary_operation(BinaryOperationKind::Multiply(
+                        left_num.clone(),
+                        right_den.clone(),
+                    )),
+                    emitter.binary_operation(BinaryOperationKind::Multiply(
+                        left_den.clone(),
+                        right_num.clone(),
+                    )),
+                ),
+                _ => panic!(),
+            }
+        }
+        _ => (left, right),
+    };
+
     let left = left.to_operand(emitter);
     let right = right.to_operand(emitter);
 

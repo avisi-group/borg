@@ -301,7 +301,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     ConstantValue::String(s) => self
                         .emitter
                         .constant(s.key().into(), emitter::Type::Unsigned(32)),
-                    ConstantValue::Rational(_) => todo!(),
 
                     ConstantValue::Tuple(_) => {
                         // let Type::Tuple(types) = &typ else { panic!() };
