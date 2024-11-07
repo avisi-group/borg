@@ -196,26 +196,6 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             },
         );
 
-        let cast_len = build(
-            shift_block_ref,
-            function.arena_mut(),
-            Statement::Cast {
-                kind: CastOperationKind::ZeroExtend,
-                typ: (Type::u8()),
-                value: len.clone(),
-            },
-        );
-
-        let bundle_len = build(
-            shift_block_ref,
-            function.arena_mut(),
-            Statement::Cast {
-                kind: CastOperationKind::Convert,
-                typ: (Type::Bits),
-                value: cast_len.clone(),
-            },
-        );
-
         // shift result
         let shift_result = build(
             shift_block_ref,
@@ -223,7 +203,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             Statement::ShiftOperation {
                 kind: ShiftOperationKind::LogicalShiftLeft,
                 value: read_result.clone(),
-                amount: bundle_len.clone(),
+                amount: len.clone(),
             },
         );
 

@@ -1213,6 +1213,13 @@ pub fn cast_at(
 
         (
             Type::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::UnsignedInteger,
+                ..
+            }),
+            Type::Bits,
+        ) => source,
+        (
+            Type::Primitive(PrimitiveType {
                 element_width_in_bits,
                 ..
             }),

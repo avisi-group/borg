@@ -22,6 +22,7 @@ use {
         HashMap,
     },
     log::trace,
+    num_bigint::BigInt,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     regex::Regex,
     sailrs::shared::Shared,
@@ -2035,30 +2036,80 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let mut lhs = self.build_value(left.clone());
                 let mut rhs = self.build_value(right.clone());
 
-                let arena = self.statement_arena();
+                let (lhs_type, rhs_type) = {
+                    let arena = self.statement_arena();
+                    (lhs.get(arena).typ(arena), rhs.get(arena).typ(arena))
+                };
 
-                if lhs.get(arena).typ(arena) != rhs.get(arena).typ(arena) {
-                    // need to insert casts
-                    let destination_type = if lhs.get(arena).typ(arena).width_bits()
-                        > rhs.get(arena).typ(arena).width_bits()
-                    {
-                        lhs.get(arena).typ(arena)
-                    } else {
-                        rhs.get(arena).typ(arena)
+                if lhs_type != rhs_type {
+                    (lhs, rhs) = match (&lhs_type, &rhs_type) {
+                        (
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::SignedInteger,
+                                element_width_in_bits: 8..=32,
+                            }),
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::SignedInteger,
+                                element_width_in_bits: 64,
+                            }),
+                        ) => (
+                            cast(
+                                self.block,
+                                self.block_arena_mut(),
+                                lhs.clone(),
+                                rhs_type.clone(),
+                            ),
+                            rhs,
+                        ),
+                        (
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::SignedInteger,
+                                element_width_in_bits: 64,
+                            }),
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::SignedInteger,
+                                element_width_in_bits: 32,
+                            }),
+                        ) => (
+                            lhs,
+                            cast(
+                                self.block,
+                                self.block_arena_mut(),
+                                rhs.clone(),
+                                lhs_type.clone(),
+                            ),
+                        ),
+                        (
+                            Type::Bits,
+                            Type::Primitive(PrimitiveType {
+                                tc: PrimitiveTypeClass::SignedInteger,
+                                element_width_in_bits: 64,
+                            }),
+                        ) => {
+                            if let boom::Value::Literal(lit) = &*right.get() {
+                                if let boom::Literal::Int(i) = &*lit.get() {
+                                    if *i == BigInt::ZERO {
+                                        let zero = build(
+                                            self.block,
+                                            self.block_arena_mut(),
+                                            Statement::Constant {
+                                                typ: (Type::u8()),
+                                                value: ConstantValue::UnsignedInteger(0),
+                                            },
+                                        );
+                                        (lhs, zero)
+                                    } else {
+                                        todo!()
+                                    }
+                                } else {
+                                    todo!()
+                                }
+                            } else {
+                                todo!()
+                            }
+                        }
+                        _ => todo!("types {lhs_type} and {rhs_type} in operation {op:?} differ"),
                     };
-
-                    lhs = cast(
-                        self.block,
-                        self.block_arena_mut(),
-                        lhs.clone(),
-                        destination_type.clone(),
-                    );
-                    rhs = cast(
-                        self.block,
-                        self.block_arena_mut(),
-                        rhs.clone(),
-                        destination_type,
-                    );
                 }
 
                 build(
@@ -2107,7 +2158,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     left.clone(),
-                    Type::u128(),
+                    Type::u128(), // todo fix this
                 );
                 let l_length = build(
                     self.block,
