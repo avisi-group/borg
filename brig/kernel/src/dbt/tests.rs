@@ -1233,16 +1233,52 @@ fn ror() {
 }
 
 #[ktest]
-fn zext_ones() {
+fn extsv() {
     let model = models::get("aarch64").unwrap();
 
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let n = emitter.constant(1, Type::Signed(64));
-    let m = emitter.constant(1, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
-    assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
+    let m = emitter.constant(32, Type::Signed(64));
+    let v = emitter.constant(0xFFFF_FFFF_FFFF_FFFF, Type::Unsigned(64));
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xFFFF_FFFF,
+            width: 32
+        }
+    );
+
+    let m = emitter.constant(64, Type::Signed(64));
+    let v = emitter.constant(-1i32 as u64, Type::Unsigned(32));
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: -1i64 as u64,
+            width: 64
+        }
+    );
+
+    let m = emitter.constant(64, Type::Signed(64));
+    let v = emitter.constant(1, Type::Unsigned(1));
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: u64::MAX,
+            width: 64
+        }
+    );
+}
+
+#[ktest]
+fn zext_ones() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(0, Type::Signed(64));
@@ -1254,17 +1290,28 @@ fn zext_ones() {
             width: 64
         }
     );
-    // todo: enable me
-    // let n = emitter.constant(64, Type::Signed(64));
-    // let m = emitter.constant(64, Type::Signed(64));
-    // let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
-    // assert_eq!(
-    //     res.kind(),
-    //     &NodeKind::Constant {
-    //         value: 1,
-    //         width: 64
-    //     }
-    // );
+
+    let n = emitter.constant(64, Type::Signed(64));
+    let m = emitter.constant(32, Type::Signed(64));
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xFFFF_FFFF,
+            width: 64
+        }
+    );
+
+    let n = emitter.constant(64, Type::Signed(64));
+    let m = emitter.constant(64, Type::Signed(64));
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: u64::MAX,
+            width: 64
+        }
+    );
 }
 
 //#[ktest]
