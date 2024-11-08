@@ -1210,11 +1210,17 @@ pub fn cast_at(
                 (_, _) => panic!("casting from fixed to fixed"),
             }
         }
-
         (
             Type::Primitive(PrimitiveType {
-                element_width_in_bits,
+                tc: PrimitiveTypeClass::UnsignedInteger,
                 ..
+            }),
+            Type::Bits,
+        ) => source,
+        (
+            Type::Primitive(PrimitiveType {
+                tc: PrimitiveTypeClass::SignedInteger,
+                element_width_in_bits,
             }),
             Type::Bits,
         ) => {
@@ -1236,6 +1242,12 @@ pub fn cast_at(
                 },
                 location,
             )
+            // panic!(
+            //     "{} ({}) to {}",
+            //     source.get(s_arena).to_string(s_arena),
+            //     &source.get(s_arena).typ(s_arena),
+            //     &destination_type
+            // )
         }
 
         (Type::Bits, Type::Primitive(_)) => build_at(

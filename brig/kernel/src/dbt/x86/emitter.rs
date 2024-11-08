@@ -514,13 +514,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     CastOperationKind::Broadcast => *constant_value,
                 };
 
-                Self::NodeRef::from(X86Node {
-                    typ: target_type.clone(),
-                    kind: NodeKind::Constant {
-                        value: casted_value,
-                        width: target_type.width(),
-                    },
-                })
+                self.constant(casted_value, target_type.clone())
             }
             _ => Self::NodeRef::from(X86Node {
                 typ: target_type,
@@ -626,13 +620,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 NodeKind::Constant { value, .. },
                 NodeKind::Constant { value: start, .. },
                 NodeKind::Constant { value: length, .. },
-            ) => Self::NodeRef::from(X86Node {
-                typ,
-                kind: NodeKind::Constant {
-                    value: bit_extract(*value, *start, *length),
-                    width: u16::try_from(*length).unwrap(),
-                },
-            }),
+            ) => self.constant(
+                bit_extract(*value, *start, *length),
+                Type::Unsigned(u16::try_from(*length).unwrap()),
+            ),
 
             // known start and length
             (
@@ -704,13 +695,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 NodeKind::Constant { value: source, .. },
                 NodeKind::Constant { value: start, .. },
                 NodeKind::Constant { value: length, .. },
-            ) => Self::NodeRef::from(X86Node {
-                typ,
-                kind: NodeKind::Constant {
-                    value: bit_insert(*target, *source, *start, *length),
-                    width: u16::try_from(*length).unwrap(),
-                },
-            }),
+            ) => self.constant(
+                bit_insert(*target, *source, *start, *length),
+                Type::Unsigned(u16::try_from(*length).unwrap()),
+            ),
             _ => Self::NodeRef::from(X86Node {
                 typ,
                 kind: NodeKind::BitInsert {

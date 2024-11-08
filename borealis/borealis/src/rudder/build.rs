@@ -286,8 +286,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         self.function_build_context
     }
 
+    fn block_arena(&self) -> &Arena<Block> {
+        self.fn_ctx().rudder_fn.arena()
+    }
+
     fn block_arena_mut(&mut self) -> &mut Arena<Block> {
         self.fn_ctx_mut().rudder_fn.arena_mut()
+    }
+
+    fn statement_arena(&self) -> &Arena<Statement> {
+        self.block.get(self.block_arena()).arena()
     }
 
     fn build_block(mut self, boom_block: boom::control_flow::ControlFlowBlock) -> Ref<Block> {
@@ -592,7 +600,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val add_bits_int : (%bv, %i) -> %bv
                 "add_bits_int" => {
-                    let rhs = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::Bits);
+                    let rhs = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::u64());
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
@@ -606,7 +614,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val sub_bits_int : (%bv, %i) -> %bv
                 "sub_bits_int" => {
-                    let rhs = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::Bits);
+                    let rhs = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::u64());
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
@@ -1195,22 +1203,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block,
                         self.block_arena_mut(),
                         Statement::Constant {
-                            typ: (Type::u8()),
+                            typ: Type::u64(),
                             value: ConstantValue::UnsignedInteger(0),
                         },
                     );
 
-                    let value = cast(self.block, self.block_arena_mut(), const_0, Type::Bits);
-
                     Some(build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::BitsCast {
-                            kind: CastOperationKind::ZeroExtend,
-                            typ: (Type::Bits),
-                            value,
-                            length,
-                        },
+                        Statement::CreateBits { value: const_0, length },
                     ))
                 }
 
@@ -1225,9 +1226,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 // val bitvector_update : (%bv, %i, %bit) -> %bv
                 "bitvector_update" => {
-                    let target = cast(self.block, self.block_arena_mut(), args[0].clone(), Type::Bits);
-                    let i = args[1].clone();
-                    let bit = cast(self.block, self.block_arena_mut(), args[2].clone(), Type::Bits);
+                    let target =  args[0];
+                    let i = args[1];
+
+                    assert_eq!(args[2].get(self.statement_arena()).typ(self.statement_arena()), Type::u1());
+
+                    let bit = args[2];
 
                     let const_1 = build(
                         self.block,
@@ -2107,7 +2111,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     left.clone(),
-                    Type::u128(),
+                    Type::u64(),
                 );
                 let l_length = build(
                     self.block,
@@ -2119,7 +2123,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     right.clone(),
-                    Type::u128(),
+                    Type::u64(),
                 );
                 let r_length = build(
                     self.block,
@@ -2318,10 +2322,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
             (a, b) => panic!("todo concat for {a:?} {b:?}"),
         }
-    }
-
-    fn statement_arena(&self) -> &Arena<Statement> {
-        self.block.get(self.fn_ctx().rudder_fn.arena()).arena()
     }
 }
 
