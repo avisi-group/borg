@@ -487,6 +487,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 value: constant_value,
                 ..
             } => {
+                if let Type::Bits = target_type {
+                    panic!("don't cast to a bits:(")
+                }
+
                 let original_width = value.typ().width();
                 let target_width = target_type.width();
 
@@ -514,7 +518,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     CastOperationKind::Broadcast => *constant_value,
                 };
 
-                self.constant(casted_value, target_type.clone())
+                self.constant(casted_value, target_type)
             }
             _ => Self::NodeRef::from(X86Node {
                 typ: target_type,
@@ -933,45 +937,80 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         _typ: Type,
         kind: CastOperationKind,
     ) -> Self::NodeRef {
-        match (value.kind(), length.kind()) {
+        match (value.kind(), length.kind(), kind) {
             (
                 NodeKind::Constant {
                     value: value_value,
-                    width: _value_width,
+                    width: value_width,
                 },
                 NodeKind::Constant {
                     value: length_value,
-                    width: _length_width,
+                    ..
                 },
+                CastOperationKind::Truncate,
             ) => {
-                let length = u16::try_from(*length_value).unwrap();
+                let target_length = u16::try_from(*length_value).unwrap();
+
+                assert!(target_length <= *value_width);
 
                 let typ = match value.typ() {
-                    Type::Unsigned(_) | Type::Bits => Type::Unsigned(length),
-                    Type::Signed(_) => Type::Signed(length),
+                    Type::Unsigned(_) | Type::Bits => Type::Unsigned(target_length),
+                    Type::Signed(_) => Type::Signed(target_length),
+                    _ => todo!(),
+                };
+
+                self.constant(*value_value & mask(target_length), typ)
+            }
+            (
+                NodeKind::Constant {
+                    value: value_value,
+                    width: value_width,
+                },
+                NodeKind::Constant {
+                    value: length_value,
+                    ..
+                },
+                CastOperationKind::SignExtend,
+            ) => {
+                let target_length = u16::try_from(*length_value).unwrap();
+
+                assert!(target_length >= *value_width);
+
+                let typ = match value.typ() {
+                    Type::Unsigned(_) | Type::Bits => Type::Unsigned(target_length),
+                    Type::Signed(_) => Type::Signed(target_length),
+                    _ => todo!(),
+                };
+
+                let sign_extended =
+                    ((*value_value as i64) << (64 - value_width)) >> (64 - value_width);
+
+                self.constant(sign_extended as u64 & mask(target_length), typ)
+            }
+            (
+                NodeKind::Constant {
+                    value: value_value,
+                    width: value_width,
+                },
+                NodeKind::Constant {
+                    value: length_value,
+                    ..
+                },
+                CastOperationKind::ZeroExtend,
+            ) => {
+                let target_length = u16::try_from(*length_value).unwrap();
+
+                assert!(target_length >= *value_width);
+
+                let typ = match value.typ() {
+                    Type::Unsigned(_) | Type::Bits => Type::Unsigned(target_length),
+                    Type::Signed(_) => Type::Signed(target_length),
                     _ => todo!(),
                 };
 
                 self.constant(*value_value, typ)
             }
-            (
-                _,
-                NodeKind::Constant {
-                    value: length_value,
-                    width: _length_width,
-                },
-            ) => {
-                let length = u16::try_from(*length_value).unwrap();
-
-                let typ = match value.typ() {
-                    Type::Unsigned(_) => Type::Unsigned(length),
-                    Type::Signed(_) => Type::Signed(length),
-                    _ => todo!(),
-                };
-
-                self.cast(value, typ, kind)
-            }
-            (_, _) => {
+            _ => {
                 // todo: attach length information
                 value
             }

@@ -1232,21 +1232,26 @@ pub fn cast_at(
                 );
             }
 
-            build_at(
-                block,
-                arena,
-                Statement::Cast {
-                    kind: CastOperationKind::ZeroExtend,
-                    typ: destination_type,
-                    value: source,
-                },
-                location,
-            )
-            // panic!(
-            //     "{} ({}) to {}",
-            //     source.get(s_arena).to_string(s_arena),
-            //     &source.get(s_arena).typ(s_arena),
-            //     &destination_type
+            panic!(
+                "{} ({}) to {}",
+                source.get(s_arena).to_string(s_arena),
+                &source.get(s_arena).typ(s_arena),
+                &destination_type
+            );
+
+            // // if the panic ever occurs for a good reason, use this:
+            // build_at(
+            //     block,
+            //     arena,
+            //     Statement::Cast {
+            //         kind: CastOperationKind::Convert,
+            //         typ: Type::Primitive(PrimitiveType {
+            //             tc: PrimitiveTypeClass::UnsignedInteger,
+            //             element_width_in_bits: *element_width_in_bits,
+            //         }),
+            //         value: source,
+            //     },
+            //     location,
             // )
         }
 

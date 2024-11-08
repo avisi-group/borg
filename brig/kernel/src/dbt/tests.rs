@@ -971,17 +971,17 @@ fn ispow2() {
         emitter.write_register(r0_offset, value);
     }
 
-    // {
-    //     let value = translate(&*model, "CeilPow2", &[x.clone()], &mut emitter);
-    //     let r1_offset = emitter.constant(model.reg_offset("R1") as u64,
-    // Type::Unsigned(0x40));     emitter.write_register(r1_offset, value);
-    // }
+    {
+        let value = translate(&*model, "CeilPow2", &[x.clone()], &mut emitter);
+        let r1_offset = emitter.constant(model.reg_offset("R1") as u64, Type::Unsigned(0x40));
+        emitter.write_register(r1_offset, value);
+    }
 
-    // {
-    //     let value = translate(&*model, "IsPow2", &[x], &mut emitter);
-    //     let r2_offset = emitter.constant(model.reg_offset("R2") as u64,
-    // Type::Unsigned(0x40));     emitter.write_register(r2_offset, value);
-    // }
+    {
+        let value = translate(&*model, "IsPow2", &[x], &mut emitter);
+        let r2_offset = emitter.constant(model.reg_offset("R2") as u64, Type::Unsigned(0x40));
+        emitter.write_register(r2_offset, value);
+    }
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -1233,6 +1233,50 @@ fn ror() {
 }
 
 #[ktest]
+fn extsv() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let m = emitter.constant(32, Type::Signed(64));
+    let v = emitter.constant(0xFFFF_FFFF_FFFF_FFFF, Type::Unsigned(64));
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xFFFF_FFFF,
+            width: 32
+        }
+    );
+    let m = emitter.constant(64, Type::Signed(64));
+    let v = emitter.constant(-1i32 as u64, Type::Unsigned(32));
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: -1i64 as u64,
+            width: 64
+        }
+    );
+    let m = emitter.constant(64, Type::Signed(64));
+    let v = emitter.constant(1, Type::Unsigned(1));
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: u64::MAX,
+            width: 64
+        }
+    );
+
+    let m = emitter.constant(1, Type::Signed(64));
+    let v = emitter.constant(1, Type::Unsigned(1));
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
+}
+
+#[ktest]
 fn zext_ones() {
     let model = models::get("aarch64").unwrap();
 
@@ -1254,20 +1298,31 @@ fn zext_ones() {
             width: 64
         }
     );
-    // todo: enable me
-    // let n = emitter.constant(64, Type::Signed(64));
-    // let m = emitter.constant(64, Type::Signed(64));
-    // let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
-    // assert_eq!(
-    //     res.kind(),
-    //     &NodeKind::Constant {
-    //         value: 1,
-    //         width: 64
-    //     }
-    // );
+
+    let n = emitter.constant(64, Type::Signed(64));
+    let m = emitter.constant(32, Type::Signed(64));
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: 0xFFFF_FFFF,
+            width: 64
+        }
+    );
+
+    let n = emitter.constant(64, Type::Signed(64));
+    let m = emitter.constant(64, Type::Signed(64));
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    assert_eq!(
+        res.kind(),
+        &NodeKind::Constant {
+            value: u64::MAX,
+            width: 64
+        }
+    );
 }
 
-//#[ktest]
+#[ktest]
 fn decodebitmasks() {
     let model = models::get("aarch64").unwrap();
 
@@ -1278,6 +1333,7 @@ fn decodebitmasks() {
 
     init(&*model, register_file_ptr);
 
+    // times out:(
     // assert_eq!(
     //     interpret(
     //         &*model,
