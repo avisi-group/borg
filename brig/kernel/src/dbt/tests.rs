@@ -13,11 +13,7 @@ use {
         },
         Translation,
     },
-    common::{
-        mask::mask,
-        rudder::{statement::UnaryOperationKind, Model},
-        HashMap,
-    },
+    common::{mask::mask, rudder::Model, HashMap},
     proc_macro_lib::ktest,
 };
 
@@ -949,6 +945,96 @@ fn shiftreg() {
         assert_eq!(*r0, 0xdeadfeeddeadfeed);
         assert_eq!(*r1, 0xdeadfeeddeadfeed);
     }
+}
+
+#[ktest]
+fn floorpow2_constant() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.constant(2048, Type::Signed(64));
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 2048,
+            width: 64
+        }
+    );
+    let x = emitter.constant(2397, Type::Signed(64));
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 2048,
+            width: 64
+        }
+    );
+    let x = emitter.constant(4095, Type::Signed(64));
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 2048,
+            width: 64
+        }
+    );
+    let x = emitter.constant(1231, Type::Signed(64));
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 1024,
+            width: 64
+        }
+    );
+}
+
+#[ktest]
+fn ceilpow2_constant() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let x = emitter.constant(2048, Type::Signed(64));
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 2048,
+            width: 64
+        }
+    );
+    let x = emitter.constant(2397, Type::Signed(64));
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 4096,
+            width: 64
+        }
+    );
+    let x = emitter.constant(4095, Type::Signed(64));
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 4096,
+            width: 64
+        }
+    );
+    let x = emitter.constant(1231, Type::Signed(64));
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    assert_eq!(
+        value.kind(),
+        &NodeKind::Constant {
+            value: 2048,
+            width: 64
+        }
+    );
 }
 
 //#[ktest]
