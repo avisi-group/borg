@@ -1129,7 +1129,7 @@ fn bitinsert() {
     }
 }
 
-//#[ktest]
+#[ktest]
 fn ubfx() {
     let model = models::get("aarch64").unwrap();
 

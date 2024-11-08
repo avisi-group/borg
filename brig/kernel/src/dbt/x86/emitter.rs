@@ -1151,7 +1151,16 @@ impl X86NodeRef {
                     let dst = Operand::vreg(width, emitter.next_vreg());
 
                     let left = left.to_operand(emitter);
-                    let right = right.to_operand(emitter);
+                    let mut right = right.to_operand(emitter);
+
+                    if let OperandKind::Immediate(i) = right.kind() {
+                        if *i > u32::MAX as u64 {
+                            let new = Operand::vreg(width, emitter.next_vreg());
+                            emitter.append(Instruction::mov(right, new.clone()));
+                            right = new;
+                        }
+                    }
+
                     emitter.append(Instruction::mov(left, dst.clone()));
                     emitter.append(Instruction::and(right, dst.clone()));
 
