@@ -1,10 +1,11 @@
 //! JIB to BOOM conversion
 
-use crate::boom::{control_flow::ControlFlowBlock, convert::sail_ast::Identifier};
 use {
     crate::boom::{
-        self, control_flow::builder::ControlFlowGraphBuilder, Bit, FunctionDefinition,
-        FunctionSignature, NamedType, Parameter, Size, Type,
+        self,
+        control_flow::{builder::ControlFlowGraphBuilder, ControlFlowBlock},
+        convert::sail_ast::Identifier,
+        Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Type,
     },
     common::{intern::InternedString, width_helpers::signed_smallest_width_of_value, HashMap},
     itertools::Itertools,

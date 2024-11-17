@@ -192,9 +192,7 @@ impl ControlFlowGraphBuilder {
             .resolved_blocks
             .insert(unresolved.clone().into(), resolved.clone())
         {
-            panic!(
-                "unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}"
-            )
+            panic!("unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}")
         }
 
         resolved.set_label(unresolved.get().label);

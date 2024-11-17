@@ -21,18 +21,7 @@ fn main() -> Result<()> {
     let build_path = PathBuf::from(env::var("OUT_DIR")?).join(PROJECT_NAME);
 
     // dune
-    ensure!(
-        Command::new("dune")
-            .arg("build")
-            .arg("--profile")
-            .arg("release")
-            .env("DUNE_BUILD_DIR", &build_path)
-            .current_dir(&source_path)
-            .status()
-            .wrap_err("Failed to execute dune build")?
-            .success(),
-        format!("Failed to build OCaml wrapper library at source path {source_path:?} and build path {build_path:?}")
-    );
+    ensure!(Command::new("dune").arg("build").arg("--profile").arg("release").env("DUNE_BUILD_DIR", &build_path).current_dir(&source_path).status().wrap_err("Failed to execute dune build")?.success(), format!("Failed to build OCaml wrapper library at source path {source_path:?} and build path {build_path:?}"));
 
     let mut build = cc::Build::new();
 

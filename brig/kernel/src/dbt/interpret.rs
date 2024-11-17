@@ -613,7 +613,10 @@ impl<'f> Interpreter<'f> {
                 }
                 Statement::TupleAccess { index, source } => {
                     let Value::Tuple(values) = self.resolve(source) else {
-                        panic!()
+                        panic!(
+                            "attempted tuple-access {index} of {:?}",
+                            self.resolve(source)
+                        )
                     };
 
                     Some(values[*index].clone())

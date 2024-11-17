@@ -55,7 +55,7 @@ impl Pass for DestructComposites {
                 // returning the identifies and types of the removed parameters
                 let mut removed_items = split_parameters(def.signature.parameters.clone());
                 removed_items.extend(removed_registers.clone());
-                destruct_local_structs(functions, removed_items, def)
+                destruct_local_structs(functions, removed_items, def);
             });
         }
 
@@ -129,26 +129,8 @@ fn destruct_local_structs(
                 match &*statement.get() {
                     // if a struct local var is declared, replace it with declarations for all its
                     // fields
-                    Statement::VariableDeclaration {
-                        name: variable_name,
-                        typ,
-                    } => {
-                        let Type::Struct { fields, .. } = &*typ.get() else {
-                            return vec![clone];
-                        };
-
-                        removed_items.insert(*variable_name, typ.clone());
-
-                        fields
-                            .iter()
-                            .map(|NamedType { name: field_name, typ }| {
-                                Statement::VariableDeclaration {
-                                    name: destructed_ident(*variable_name, *field_name),
-                                    typ: typ.clone(),
-                                }
-                                .into()
-                            })
-                            .collect()
+                    Statement::VariableDeclaration {name,typ } => {
+                      split_declarations(*name, typ.clone(),&mut removed_items)
                     }
                     // if a struct is copied into a local variable, replace with several copies into
                     // each field
@@ -160,21 +142,14 @@ fn destruct_local_structs(
                                 panic!();
                             };
 
-                            return vec![Shared::new(Statement::Copy {
-                                expression: Expression::Identifier(destructed_ident(struc, *field)),
-                                value: value.clone(),
-                            })];
+                            return vec![Shared::new(Statement::Copy { expression: Expression::Identifier(destructed_ident(struc, *field)), value: value.clone() })];
                         }
 
                         // if we are copying *from* a field
                         {
                             let value_mut = &mut *value.get_mut();
 
-                            if let Value::Field {
-                                value: struc_val,
-                                field_name,
-                            } = value_mut
-                            {
+                            if let Value::Field { value: struc_val, field_name } = value_mut {
                                 let Value::Identifier(struc) = *(struc_val.clone().get()) else {
                                     panic!();
                                 };
@@ -188,80 +163,51 @@ fn destruct_local_structs(
                             return vec![clone];
                         };
 
-                        let Some(typ) = removed_items.get(dest) else {
+                        let Some(dest_typ) = removed_items.get(dest) else {
                             return vec![clone];
                         };
 
-                        if let Type::Struct { fields,.. } = &*typ.get() {
+                        if let Type::Struct { fields: dest_fields, .. } = &*dest_typ.get() {
                             // names of the fields to be copied into
-                            let local_fields = fields
-                                .iter()
-                                .map(|NamedType { name, .. }| Expression::Identifier(destructed_ident(*dest, *name)))
-                                .collect::<Vec<_>>();
+                            let local_fields = fields_to_expressions(*dest, &dest_fields);// dest_fields.iter().map(|NamedType { name, .. }| Expression::Identifier(destructed_ident(*dest, *name))).collect::<Vec<_>>();
 
                             let values = match &*value.get() {
                                 // if the value is an identifier, look up fields in structs map, and get
                                 // list of values from that
-                                Value::Identifier(ident) => {
-                                    let typ = removed_items.get(ident).unwrap_or_else(|| {
-                                        panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
-                                    });
+                                Value::Identifier(_) => {
+                                    split_arguments(&[value.clone()], &removed_items)
+                                    // let typ = removed_items.get(ident).unwrap_or_else(|| panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name));
 
-                                    let Type::Struct {  fields,.. } = &*typ.get() else {
-                                        panic!("not a struct?");
-                                    };
+                                    // let Type::Struct { fields, .. } = &*typ.get() else {
+                                    //     panic!("not a struct?");
+                                    // };
 
-
-                                    fields
-                                        .iter()
-                                        .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name)))
-                                        .map(Shared::new)
-                                        .collect::<Vec<_>>()
+                                    // fields.iter().map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name))).map(Shared::new).collect::<Vec<_>>()
                                 }
                                 // if the value is a struct, use those fields
-                                Value::Struct { fields, .. } => fields
-                                    .iter()
-                                    .map(|NamedValue { value, .. }| value)
-                                    .cloned()
-                                    .collect::<Vec<_>>(),
+                                // todo: recursive structs here too
+                                Value::Struct { fields, .. } => fields.iter().map(|NamedValue { value, .. }| value).cloned().collect::<Vec<_>>(),
 
                                 Value::VectorAccess { value, index } => {
-                                    let Value::Identifier(ident) = &*value.get() else {
-                                        todo!()
-                                    };
-                                    let typ = removed_items.get(ident).unwrap_or_else(|| {
-                                        panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name)
-                                    });
+                                    let Value::Identifier(ident) = &*value.get() else { todo!() };
+                                    let typ = removed_items.get(ident).unwrap_or_else(|| panic!("attempting to assign non struct value identifier {ident:?} in {}", fn_def.signature.name));
 
-                                    let Type::FixedVector{  element_type,..   } = &*typ.get() else {
+                                    let Type::FixedVector { element_type, .. } = &*typ.get() else {
                                         panic!("not a fixed vector?");
                                     };
 
-                                    let Type::Struct {  fields,.. } = &*element_type.get() else {
+                                    let Type::Struct { fields, .. } = &*element_type.get() else {
                                         panic!("not a struct?");
                                     };
 
-                                    fields
-                                        .iter()
-                                        .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name)))
-                                        .map(Shared::new)
-                                        .map(|value| Value::VectorAccess { value, index: index.clone() })
-                                        .map(Shared::new)
-                                        .collect::<Vec<_>>()
+                                    fields.iter().map(|NamedType { name, .. }| Value::Identifier(destructed_ident(*ident, *name))).map(Shared::new).map(|value| Value::VectorAccess { value, index: index.clone() }).map(Shared::new).collect::<Vec<_>>()
                                 }
                                 _ => panic!("value is a struct in {clone:?} in {}", fn_def.signature.name),
                             };
 
-                            local_fields
-                                .into_iter()
-                                .zip(values)
-                                .map(|(expression, value)| Statement::Copy { expression, value })
-                                .map(Shared::new)
-                                .collect()
+                            local_fields.into_iter().zip(values).map(|(expression, value)| Statement::Copy { expression, value }).map(Shared::new).collect()
                         } else {
-                            let Value::VectorMutate { vector, element, index } = &*value.get() else {
-                                todo!()
-                            };
+                            let Value::VectorMutate { vector, element, index } = &*value.get() else { todo!() };
 
                             let Value::Identifier(element) = &*element.get() else {
                                 todo!();
@@ -273,41 +219,33 @@ fn destruct_local_structs(
 
                             assert_eq!(*source, *dest);
 
-                            let Type::FixedVector { element_type,.. } = &*typ.get() else {
+                            let Type::FixedVector { element_type, .. } = &*dest_typ.get() else {
                                 todo!();
                             };
 
-
-                            let Type::Struct { fields: dest_fields,.. } = &*element_type.get() else {
+                            let Type::Struct { fields: dest_fields, .. } = &*element_type.get() else {
                                 todo!();
                             };
 
                             // names of the fields to be copied into
-                           dest_fields
-                                  .iter()
-                                  .map(|NamedType { name, .. }| *name)
-                                  .map(|field_name| {
+                            dest_fields
+                                .iter()
+                                .map(|NamedType { name, .. }| *name)
+                                .map(|field_name| {
                                     let field_vec = destructed_ident(*dest, field_name);
                                     let element = destructed_ident(*element, field_name);
 
-                                   Shared::new(Statement::Copy {
+                                    Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(field_vec),
-                                        value: Shared::new(Value::VectorMutate {
-                                            vector: Shared::new(Value::Identifier(field_vec)),
-                                            element: Shared::new(Value::Identifier(element)),
-                                            index: index.clone()})
-                         }) }).collect()
-
-
+                                        value: Shared::new(Value::VectorMutate { vector: Shared::new(Value::Identifier(field_vec)), element: Shared::new(Value::Identifier(element)), index: index.clone() }),
+                                    })
+                                })
+                                .collect()
                         }
                     }
 
                     // if we return a struct from a function call, assign it to the individual field variables
-                    Statement::FunctionCall {
-                        expression: Some(expression),
-                        name,
-                        arguments,
-                    } => {
+                    Statement::FunctionCall { expression: Some(expression), name, arguments } => {
                         let expression = {
                             let Some(def) = functions.get(name) else {
                                 // should properly handle built-ins here (but none return structs so this should
@@ -317,7 +255,7 @@ fn destruct_local_structs(
                                 return vec![clone];
                             };
 
-                            if let Type::Tuple(return_types) = &*def.signature.return_type.get() {
+                            if let Type::Tuple(_return_types) = &*def.signature.return_type.get() {
                                 let Expression::Identifier(dest) = expression else {
                                     // only visiting each statement once so this should be true (for now, unions
                                     // break this)
@@ -329,53 +267,19 @@ fn destruct_local_structs(
                                     return vec![clone];
                                 };
 
-                                let Type::Struct {  fields,.. } = &*typ.get() else {
+                                let Type::Struct { fields, .. } = &*typ.get() else {
                                     panic!("not a struct?");
                                 };
 
-                                assert_eq!(fields.len(), return_types.len()); //todo: validate the types too
-
-                                Some(Expression::Tuple(
-                                    fields
-                                        .iter()
-                                        .map(|NamedType { name, .. }| {
-                                            Expression::Identifier(destructed_ident(*dest, *name))
-                                        })
-                                        .collect(),
-                                ))
+                                Some(fields_to_tuple(*dest, &fields))
                             } else {
                                 Some(expression.clone())
                             }
                         };
 
-                        let arguments = arguments
-                            .iter()
-                            .flat_map(|v| {
-                                if let Value::Identifier(ident) = &*v.get() {
-                                    if let Some(typ) = removed_items.get(ident) {
-                                        let Type::Struct {  fields,.. } = &*typ.get() else {
-                                            panic!("not a struct?");
-                                        };
-                                        fields
-                                            .iter()
-                                            .map(|NamedType { name, .. }| {
-                                                Shared::new(Value::Identifier(destructed_ident(*ident, *name)))
-                                            })
-                                            .collect()
-                                    } else {
-                                        vec![v.clone()]
-                                    }
-                                } else {
-                                    vec![v.clone()]
-                                }
-                            })
-                            .collect();
+                        let arguments = split_arguments(arguments, &removed_items);
 
-                        vec![Shared::new(Statement::FunctionCall {
-                            expression,
-                            name: *name,
-                            arguments,
-                        })]
+                        vec![Shared::new(Statement::FunctionCall { expression, name: *name, arguments })]
                     }
                     _ => vec![clone],
                 }
@@ -385,33 +289,36 @@ fn destruct_local_structs(
         block.set_statements(destructed);
 
         if let Terminator::Return(Value::Identifier(return_value_ident)) = block.terminator() {
-            if let Some(typ) = removed_items.get(&return_value_ident) {
-                let Type::Struct {  fields,.. } = &*typ.get() else {
-                    panic!("not a struct?");
-                };
-                block.set_terminator(Terminator::Return(Value::Tuple(
-                    fields
-                        .iter()
-                        .map(|NamedType { name, .. }| Value::Identifier(destructed_ident(return_value_ident, *name)))
-                        .map(Shared::new)
-                        .collect(),
-                )));
+            // done to distinguish structs of one element (converted to unary tuple) from a single return value
+            if removed_items.contains_key(&return_value_ident) {
+                   block.set_terminator(Terminator::Return(Value::Tuple(split_arguments(&[Shared::new(Value::Identifier(return_value_ident))], &removed_items))));
             }
         }
     });
 }
 
 fn split_return(fn_def: &mut FunctionDefinition) {
-    let Type::Struct { fields, .. } = (&*fn_def.signature.return_type.get()).clone() else {
-        return;
-    };
+    fn_def.signature.return_type =
+        nested_structs_to_flat_tuple(fn_def.signature.return_type.clone());
+}
 
-    fn_def.signature.return_type = Shared::new(Type::Tuple(
-        fields
-            .into_iter()
-            .map(|NamedType { typ, .. }| typ)
-            .collect(),
-    ));
+fn nested_structs_to_flat_tuple(typ: Shared<Type>) -> Shared<Type> {
+    fn inner(typ: Shared<Type>) -> Vec<Shared<Type>> {
+        if let Type::Struct { fields, .. } = &*typ.get() {
+            fields
+                .iter()
+                .map(|nt| nt.typ.clone())
+                .flat_map(inner)
+                .collect()
+        } else {
+            vec![typ.clone()]
+        }
+    }
+
+    match &*typ.get() {
+        Type::Struct { .. } => Shared::new(Type::Tuple(inner(typ.clone()))),
+        _ => typ.clone(),
+    }
 }
 
 fn destructed_ident(
@@ -477,6 +384,43 @@ fn remove_field_values(def: &FunctionDefinition) {
     FieldVisitor.visit_function_definition(def);
 }
 
+fn split_arguments(
+    arguments: &[Shared<Value>],
+    removed_items: &HashMap<InternedString, Shared<Type>>,
+) -> Vec<Shared<Value>> {
+    fn inner(ident: InternedString, typ: Shared<Type>) -> Vec<Shared<Value>> {
+        let Type::Struct { fields, .. } = &*typ.get() else {
+            unreachable!("not a struct?");
+        };
+        fields
+            .iter()
+            .flat_map(|NamedType { name, typ }| {
+                let name = destructed_ident(ident, *name);
+                if let Type::Struct { .. } = &*typ.get() {
+                    inner(name, typ.clone())
+                } else {
+                    vec![Shared::new(Value::Identifier(name))]
+                }
+            })
+            .collect()
+    }
+
+    arguments
+        .iter()
+        .flat_map(|v| {
+            if let Value::Identifier(ident) = &*v.get() {
+                if let Some(typ) = removed_items.get(ident) {
+                    inner(*ident, typ.clone())
+                } else {
+                    vec![v.clone()]
+                }
+            } else {
+                vec![v.clone()]
+            }
+        })
+        .collect()
+}
+
 fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedString, Shared<Type>> {
     let mut removed = HashMap::default();
 
@@ -484,21 +428,10 @@ fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedStrin
     *parameters = parameters
         .iter()
         .flat_map(|parameter| {
-            if let Type::Struct { fields, .. } = &*parameter.typ.get() {
+            if let Type::Struct { .. } = &*parameter.typ.get() {
                 removed.insert(parameter.name, parameter.typ.clone());
 
-                fields
-                    .iter()
-                    .map(
-                        |NamedType {
-                             name: field_name,
-                             typ,
-                         }| Parameter {
-                            name: destructed_ident(parameter.name, *field_name),
-                            typ: typ.clone(),
-                        },
-                    )
-                    .collect()
+                split_parameter_type(parameter.name, parameter.typ.clone())
             } else {
                 vec![parameter.clone()]
             }
@@ -506,4 +439,93 @@ fn split_parameters(parameters: Shared<Vec<Parameter>>) -> HashMap<InternedStrin
         .collect();
 
     removed
+}
+
+fn split_parameter_type(parameter_name: InternedString, typ: Shared<Type>) -> Vec<Parameter> {
+    if let Type::Struct { fields, .. } = &*typ.get() {
+        fields
+            .iter()
+            .flat_map(|NamedType { name, typ }| {
+                let name = destructed_ident(parameter_name, *name);
+                split_parameter_type(name, typ.clone())
+            })
+            .collect()
+    } else {
+        vec![Parameter {
+            name: parameter_name,
+            typ: typ.clone(),
+        }]
+    }
+}
+
+fn fields_to_expressions(
+    local_variable_name: InternedString,
+    fields: &[NamedType],
+) -> Vec<Expression> {
+    fields
+        .iter()
+        .flat_map(|NamedType { name, typ }| {
+            let name = destructed_ident(local_variable_name, *name);
+            if let Type::Struct { fields, .. } = &*typ.get() {
+                fields_to_expressions(name, fields)
+            } else {
+                vec![Expression::Identifier(name)]
+            }
+        })
+        .collect()
+}
+
+fn fields_to_tuple(local_variable_name: InternedString, fields: &[NamedType]) -> Expression {
+    Expression::Tuple(fields_to_expressions(local_variable_name, fields))
+}
+
+fn split_declarations(
+    root_name: InternedString,
+    typ: Shared<Type>,
+    removed_items: &mut HashMap<InternedString, Shared<Type>>,
+) -> Vec<Shared<Statement>> {
+    fn inner(
+        named_type: NamedType,
+        removed_items: &mut HashMap<InternedString, Shared<Type>>,
+    ) -> Vec<NamedType> {
+        if let Type::Struct { fields, .. } = &*named_type.typ.get() {
+            removed_items.insert(named_type.name, named_type.typ.clone());
+            fields
+                .iter()
+                .cloned()
+                .flat_map(|NamedType { name, typ }| {
+                    inner(
+                        NamedType {
+                            name: destructed_ident(named_type.name, name),
+                            typ,
+                        },
+                        removed_items,
+                    )
+                })
+                .collect()
+        } else {
+            vec![named_type.clone()]
+        }
+    }
+
+    if let Type::Struct { .. } = &*typ.get() {
+        removed_items.insert(root_name, typ.clone());
+
+        inner(
+            NamedType {
+                name: root_name,
+                typ: typ.clone(),
+            },
+            removed_items,
+        )
+        .into_iter()
+        .map(|NamedType { name, typ }| Statement::VariableDeclaration { name, typ })
+        .map(Shared::new)
+        .collect()
+    } else {
+        vec![Shared::new(Statement::VariableDeclaration {
+            name: root_name,
+            typ: typ.clone(),
+        })]
+    }
 }

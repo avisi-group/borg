@@ -577,6 +577,35 @@ fn fibonacci_instr() {
     }
 }
 
+///  4000d4:	d2955fe0 	mov	x0, #0xaaff                	// #43775
+///  4000d8:	d2800001 	mov	x1, #0x0                   	// #0
+///  4000dc:	91500421 	add	x1, x1, #0x401, lsl #12
+///  4000e0:	f9000020 	str	x0, [x1]
+///  4000e4:	f9400020 	ldr	x0, [x1]
+//#[ktest]
+fn mem() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    panic!("{translation:?}")
+}
+
 #[ktest]
 fn fibonacci_block() {
     let model = models::get("aarch64").unwrap();

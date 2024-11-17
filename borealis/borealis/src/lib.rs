@@ -337,6 +337,11 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "place_slice",
         "asl_Int",
         "RoundTowardsZero",
+        "__DecodeA64_LoadStore",
+        "Mem_read__1",
+        "Mem_read__2",
+        "CreateAccDescGPR",
+        //   "NewAccDesc",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -369,6 +374,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().starts_with("Have")
         || name.as_ref().starts_with("decode_")
         || name.as_ref().starts_with("execute_aarch64_instrs")
+        || name.as_ref().starts_with("__DecodeA64")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {
