@@ -338,27 +338,32 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "asl_Int",
         "RoundTowardsZero",
         "__DecodeA64_LoadStore",
+        "Mem_read",
         "Mem_read__1",
         "Mem_read__2",
         "CreateAccDescGPR",
-        //   "NewAccDesc",
+        "NewAccDesc",
+        "undefined_AccessDescriptor",
+        "undefined_MPAMinfo",
+        "GenMPAMcurEL",
+        "GenMPAMatEL",
+        "DefaultMPAMinfo",
+        "Mem_set",
+        "IsAligned__1",
+        "HaveLSE2Ext",
+        "HaveLRCPC3Ext",
+        "ConstrainUnpredictable",
+        "BigEndian",
+        "AArch64_MemSingle_read",
+        // "AArch64_MemSingle_read__1",
+        // "PhysMemRead"
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
         "AArch64_MemTag_read",
         "MemSingleNF_read",
-        "ICV_AP1R_read",
-        "ICC_AP1R_S_read",
-        "ICC_AP1R_NS_read",
         "sail_mem_write",
         "sail_mem_read",
-        "DBGBCR_read",
-        "DBGBXVR_read",
-        "ICH_LRC_read",
-        "ICC_AP1R_EL1_read",
-        "AMEVCNTR0_EL0_read",
-        "AMEVTYPER0_read",
-        "DBGWCR_read",
     ];
 
     if FN_DENYLIST.contains(&name.as_ref()) {
