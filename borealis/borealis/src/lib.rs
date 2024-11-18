@@ -355,8 +355,8 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "ConstrainUnpredictable",
         "BigEndian",
         "AArch64_MemSingle_read",
-        // "AArch64_MemSingle_read__1",
-        // "PhysMemRead"
+        "AArch64_MemSingle_read__1",
+        //"PhysMemRead",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

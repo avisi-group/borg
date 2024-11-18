@@ -4,6 +4,7 @@ use {
         FunctionDefinition, NamedType, NamedValue, Parameter, Statement, Type, Value,
     },
     common::{intern::InternedString, HashMap},
+    itertools::Itertools,
     sailrs::shared::Shared,
 };
 
@@ -246,6 +247,22 @@ fn destruct_local_structs(
 
                     // if we return a struct from a function call, assign it to the individual field variables
                     Statement::FunctionCall { expression: Some(expression), name, arguments } => {
+
+                       let expression = if let Expression::Field { expression, field } = expression {
+                            let mut idents = vec![*field];
+                            let mut current_expression:Box<Expression> = expression.clone();
+                            loop {
+                                match *current_expression {
+                                    Expression::Field { expression, field } => {idents.push(field); current_expression = expression},
+                                    Expression::Identifier(ident) => {idents.push(ident); break;}
+                                    _ => panic!(),
+                                }
+                            }
+                            Expression::Identifier(InternedString::from(idents.iter().rev().join("_")))
+                        } else {
+                            (*expression).clone()
+                        };
+
                         let expression = {
                             let Some(def) = functions.get(name) else {
                                 // should properly handle built-ins here (but none return structs so this should
@@ -255,6 +272,7 @@ fn destruct_local_structs(
                                 return vec![clone];
                             };
 
+
                             if let Type::Tuple(_return_types) = &*def.signature.return_type.get() {
                                 let Expression::Identifier(dest) = expression else {
                                     // only visiting each statement once so this should be true (for now, unions
@@ -262,7 +280,7 @@ fn destruct_local_structs(
                                     panic!();
                                 };
 
-                                let Some(typ) = removed_items.get(dest) else {
+                                let Some(typ) = removed_items.get(&dest) else {
                                     // tuple return type already removed
                                     return vec![clone];
                                 };
@@ -271,7 +289,7 @@ fn destruct_local_structs(
                                     panic!("not a struct?");
                                 };
 
-                                Some(fields_to_tuple(*dest, &fields))
+                                Some(fields_to_tuple(dest, &fields))
                             } else {
                                 Some(expression.clone())
                             }

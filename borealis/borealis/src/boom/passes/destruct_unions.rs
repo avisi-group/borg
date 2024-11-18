@@ -1,8 +1,9 @@
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Size, Statement, Type, Value,
+        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, FunctionDefinition,
+        Parameter, Size, Statement, Type, Value,
     },
-    common::{intern::InternedString, HashMap, HashSet},
+    common::{intern::InternedString, HashMap},
     sailrs::shared::Shared,
 };
 
@@ -24,7 +25,7 @@ impl Pass for DestructUnions {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        handle_registers(ast.clone());
+        let removed = handle_registers(ast.clone());
 
         let union_tag_type = Shared::new(Type::Integer {
             size: Size::Static(32),
@@ -38,51 +39,99 @@ impl Pass for DestructUnions {
             .map(|(&i, &v)| (i, v))
             .collect::<HashMap<_, _>>();
 
-        ast.get()
-            .functions
-            .iter()
-            .map(|(_, d)| d.entry_block.clone())
-            .for_each(|entry_block| {
-                destruct_locals(&union_tags, union_tag_type.clone(), entry_block)
-            });
+        ast.get().functions.iter().for_each(|(_, def)| {
+            handle_function(def, removed.clone(), &union_tags, union_tag_type.clone())
+        });
 
         false
     }
 }
 
-fn handle_registers(ast: Shared<Ast>) {
+fn handle_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>> {
     let union_regs = ast
         .get_mut()
         .registers
         .iter()
         .filter(|(_, typ)| matches!(&*typ.get(), Type::Union { .. }))
         .map(|(name, typ)| (*name, typ.clone()))
-        .collect::<Vec<_>>();
+        .collect::<HashMap<_, _>>();
 
-    for (register_name, typ) in union_regs {
-        ast.get_mut().registers.remove(&register_name);
+    for (register_name, typ) in &union_regs {
+        ast.get_mut().registers.remove(register_name);
 
         ast.get_mut().registers.insert(
-            tag_ident(register_name),
+            tag_ident(*register_name),
             Shared::new(Type::Integer {
                 size: Size::Static(32),
             }),
         );
         ast.get_mut()
             .registers
-            .insert(value_ident(register_name), typ);
+            .insert(value_ident(*register_name), typ.clone());
     }
+
+    union_regs
+}
+
+fn handle_function(
+    def: &FunctionDefinition,
+    mut removed: HashMap<InternedString, Shared<Type>>,
+    union_tags: &HashMap<InternedString, usize>,
+    union_tag_type: Shared<Type>,
+) {
+    // todo
+    // if let Type::Union { width } = &*def.signature.return_type.get() {
+    //     if let Some(_) = union_tags.get(&def.signature.name) {
+    //         // union constructor, will be handled later
+    //     } else {
+    //         *def.signature.return_type.get_mut() = Type::Tuple(vec![
+    //             union_tag_type.clone(),
+    //             Shared::new(Type::Union { width: *width }),
+    //         ])
+    //     }
+    // };
+
+    let parameters = def
+        .signature
+        .parameters
+        .get()
+        .iter()
+        .flat_map(|param| {
+            if let Type::Union { .. } = &*param.typ.get() {
+                removed.insert(param.name, param.typ.clone());
+                vec![
+                    Parameter {
+                        name: tag_ident(param.name),
+                        typ: union_tag_type.clone(),
+                    },
+                    Parameter {
+                        name: value_ident(param.name),
+                        typ: param.typ.clone(),
+                    },
+                ]
+            } else {
+                vec![param.clone()]
+            }
+        })
+        .collect();
+    *def.signature.parameters.get_mut() = parameters;
+
+    destruct_locals(
+        removed,
+        &union_tags,
+        union_tag_type.clone(),
+        def.entry_block.clone(),
+    );
 }
 
 /// split locally declared unions into a tag and a local variable the size of
 /// the largest value?
 fn destruct_locals(
+    mut removed: HashMap<InternedString, Shared<Type>>,
     union_tags: &HashMap<InternedString, usize>,
     union_tag_type: Shared<Type>,
     entry_block: ControlFlowBlock,
 ) {
-    let mut union_local_idents = HashSet::default();
-
     entry_block.iter().for_each(|block| {
         let destructed = block
             .statements()
@@ -98,7 +147,7 @@ fn destruct_locals(
                         // if we have a type declaration for a union, emit value and tag variables
                         // instead
                         if let Type::Union { .. } = &*typ.get() {
-                            union_local_idents.insert(*variable_name);
+                            removed.insert(*variable_name, typ.clone());
                             vec![
                                 Shared::new(Statement::VariableDeclaration {
                                     name: value_ident(*variable_name),
@@ -121,7 +170,7 @@ fn destruct_locals(
                             return vec![clone];
                         };
 
-                        if union_local_idents.contains(dst) || union_local_idents.contains(src) {
+                        if removed.contains_key(dst) || removed.contains_key(src) {
                             vec![
                                 Shared::new(Statement::Copy {
                                     expression: Expression::Identifier(tag_ident(*dst)),
@@ -166,7 +215,64 @@ fn destruct_locals(
                                 panic!();
                             }
                         } else {
-                            vec![clone]
+                            // fix union destination or argument
+                            let expression = match expression {
+                                Some(Expression::Tuple(exprs)) => Some(Expression::Tuple(
+                                    exprs
+                                        .iter()
+                                        .flat_map(|e| {
+                                            if let Expression::Identifier(ident) = e {
+                                                if removed.contains_key(ident) {
+                                                    vec![
+                                                        Expression::Identifier(tag_ident(*ident)),
+                                                        Expression::Identifier(value_ident(*ident)),
+                                                    ]
+                                                } else {
+                                                    vec![Expression::Identifier(*ident)]
+                                                }
+                                            } else {
+                                                vec![e.clone()]
+                                            }
+                                        })
+                                        .collect(),
+                                )),
+                                Some(Expression::Identifier(ident)) => {
+                                    if removed.contains_key(ident) {
+                                        Some(Expression::Tuple(vec![
+                                            Expression::Identifier(tag_ident(*ident)),
+                                            Expression::Identifier(value_ident(*ident)),
+                                        ]))
+                                    } else {
+                                        Some(Expression::Identifier(*ident))
+                                    }
+                                }
+                                Some(expr) => Some(expr.clone()),
+                                None => None,
+                            };
+
+                            let arguments = arguments
+                                .iter()
+                                .flat_map(|arg| {
+                                    if let Value::Identifier(ident) = &*arg.get() {
+                                        if removed.contains_key(ident) {
+                                            vec![
+                                                Shared::new(Value::Identifier(tag_ident(*ident))),
+                                                Shared::new(Value::Identifier(value_ident(*ident))),
+                                            ]
+                                        } else {
+                                            vec![arg.clone()]
+                                        }
+                                    } else {
+                                        vec![arg.clone()]
+                                    }
+                                })
+                                .collect();
+
+                            vec![Shared::new(Statement::FunctionCall {
+                                expression,
+                                name: *name,
+                                arguments,
+                            })]
                         }
                     }
                     _ => vec![clone],

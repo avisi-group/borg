@@ -948,7 +948,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     /// Generates rudder for a writing a statement to a boom::Expression
     fn build_expression_write(&mut self, target: &boom::Expression, source: Ref<Statement>) {
         let boom::Expression::Identifier(ident) = target else {
-            panic!("got non ident expression: {target:?}");
+            panic!(
+                "got non ident expression: {target:?} in {:?}",
+                self.fn_ctx().rudder_fn.name()
+            );
         };
 
         match self.fn_ctx_mut().rudder_fn.get_local_variable(*ident) {
