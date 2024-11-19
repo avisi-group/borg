@@ -1,5 +1,4 @@
 use {
-    crate::intern::InternedString,
     alloc::{
         borrow::ToOwned,
         boxed::Box,
@@ -35,7 +34,6 @@ impl PrimitiveType {
 #[derive(Debug, Hash, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Type {
     Primitive(PrimitiveType),
-    Struct(Vec<(InternedString, Type)>),
 
     Vector {
         element_count: usize,
@@ -44,18 +42,10 @@ pub enum Type {
 
     Tuple(Vec<Type>),
 
-    // anything can be cast to/from a union value?
-    Union {
-        width: usize,
-    },
-
-    // Not great but useful for debugging
-    String,
-
     Bits,
 
-    // Any type, used for undefineds
-    Any,
+    // Used for debugging
+    String,
 }
 
 macro_rules! type_def_helper {
@@ -74,20 +64,10 @@ impl Type {
         })
     }
 
-    pub fn new_product(fields: Vec<(InternedString, Type)>) -> Self {
-        Self::Struct(fields)
-    }
-
     /// Gets the offset in bytes of a field of a composite or an element of a
     /// vector
     pub fn byte_offset(&self, element_field: usize) -> Option<usize> {
         match self {
-            Type::Struct(fields) => Some(
-                fields
-                    .iter()
-                    .take(element_field)
-                    .fold(0, |acc, (_, typ)| acc + typ.width_bytes()),
-            ),
             Type::Vector { element_type, .. } => Some(element_field * element_type.width_bytes()),
             _ => None,
         }
@@ -95,8 +75,6 @@ impl Type {
 
     pub fn width_bits(&self) -> usize {
         match self {
-            Self::Struct(xs) => xs.iter().map(|(_, typ)| typ.width_bits()).sum(),
-            Self::Union { width } => *width,
             Self::Primitive(p) => p.element_width_in_bits,
             Self::Vector {
                 element_count,
@@ -106,8 +84,6 @@ impl Type {
             Self::Bits => 64,
             // width of internedstring
             Self::String => 32,
-
-            Self::Any => todo!(),
 
             Self::Tuple(ts) => ts.iter().map(|typ| typ.width_bits()).sum(),
         }
@@ -175,15 +151,13 @@ impl Display for Type {
                 PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width_bits()),
                 PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
             },
-            Type::Struct(_) => write!(f, "struct"),
-            Type::Union { width } => write!(f, "union({width})"),
+
             Type::Vector {
                 element_count,
                 element_type,
             } => write!(f, "[{element_type}; {element_count:?}]"),
             Type::Bits => write!(f, "bv"),
             Type::String => write!(f, "str"),
-            Type::Any => write!(f, "any"),
             Type::Tuple(ts) => {
                 write!(f, "(").unwrap();
                 for t in ts {

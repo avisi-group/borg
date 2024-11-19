@@ -683,7 +683,7 @@ impl<'f> Interpreter<'f> {
                     let v = self.resolve(v);
                     panic!("panic! {v:?}")
                 }
-                Statement::Undefined => panic!("undefined"),
+
                 Statement::Assert { condition } => {
                     let condition = self.resolve_u64(condition);
                     if condition == 0 {

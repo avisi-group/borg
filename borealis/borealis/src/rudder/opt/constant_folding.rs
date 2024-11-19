@@ -269,8 +269,6 @@ fn cast_integer(value: ConstantValue, typ: Type) -> ConstantValue {
                 panic!("incompatible type class {tc:?} and constant value {cv:?}")
             }
         },
-        // do nothing, todo: check width
-        Type::Union { .. } => value,
         _ => panic!("failed to cast {value:x?} to type {typ:?}"),
     }
 }

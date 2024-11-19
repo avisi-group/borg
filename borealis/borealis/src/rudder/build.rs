@@ -150,7 +150,7 @@ impl BuildContext {
             boom::Type::Float => Type::f64(),
             boom::Type::Real | boom::Type::Union { .. } | boom::Type::Struct { .. } => {
                 log::warn!("should be removed by pass: {:?}", &*typ.get());
-                Type::Any
+                Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 9999)
             }
 
             boom::Type::Vector { element_type } => {
@@ -1948,7 +1948,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             },
             boom::Literal::Unit => unreachable!("units removed in boom pass"),
             boom::Literal::Reference(_) => todo!(),
-            boom::Literal::Undefined => Statement::Undefined,
+            boom::Literal::Undefined => todo!(),
         };
 
         build(self.block, self.block_arena_mut(), kind)
@@ -1988,7 +1988,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     .unwrap();
 
                 let kind = match source_type {
-                    Type::Struct(_) | Type::Vector { .. } | Type::String => {
+                    Type::Vector { .. } | Type::String => {
                         panic!("cast on non-primitive type")
                     }
                     Type::Primitive(_) => {
@@ -1998,10 +1998,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             Ordering::Equal => CastOperationKind::Reinterpret,
                         }
                     }
-                    Type::Bits | Type::Any => {
+                    Type::Bits => {
                         todo!()
                     }
-                    Type::Union { .. } => todo!(),
+
                     Type::Tuple(_) => todo!(),
                 };
 

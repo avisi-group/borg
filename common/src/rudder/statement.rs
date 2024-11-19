@@ -220,9 +220,6 @@ pub enum Statement {
     /// debugging purposes
     Panic(Ref<Statement>),
 
-    /// `Default::default()`, or uninitialized, or ???
-    Undefined,
-
     Assert {
         condition: Ref<Statement>,
     },
@@ -402,7 +399,6 @@ impl Statement {
                 todo!()
             }
 
-            Self::Undefined => Some(Type::Any),
             Self::TupleAccess { index, source } => {
                 let Some(Type::Tuple(ts)) = &source.get(arena).typ(arena) else {
                     panic!();
@@ -829,7 +825,6 @@ impl Statement {
             Self::ReadPc => todo!(),
             Self::Jump { .. } => todo!(),
             Self::PhiNode { .. } => todo!(),
-            Self::Undefined => todo!(),
             Self::TupleAccess { index, source } => {
                 let source = if source == use_of {
                     with.clone()
@@ -984,13 +979,13 @@ impl Statement {
                 format!("bits-cast {} {} -> {} length {}", op, value, typ, length)
             }
             Self::Jump { target } => format!("jump block {:#x}", target.index()), /* todo: type
-                                                                                    * for target
-                                                                                    * that formats
-                                                                                    * to block {:
-                                                                                    * #x}, or maybe
-                                                                                    * fancy display
-                                                                                    * T {:#x} for
-                                                                                    * Ref<T> */
+            * for target
+             * that formats
+             * to block {:
+             * #x}, or maybe
+             * fancy display
+             * T {:#x} for
+             * Ref<T> */
             Self::Branch {
                 condition,
                 true_target,
@@ -1030,7 +1025,6 @@ impl Statement {
             Self::Panic(statement) => {
                 format!("panic {}", statement)
             }
-            Self::Undefined => format!("undefined",),
 
             Self::ReadPc => format!("read-pc"),
             Self::WritePc { value } => format!("write-pc {}", value),
@@ -1293,41 +1287,6 @@ pub fn cast_at(
             location,
         ),
 
-        // allow casting any to anything
-        (Type::Any, _) => build_at(
-            block,
-            arena,
-            Statement::Cast {
-                kind: CastOperationKind::Convert,
-                typ: destination_type,
-                value: source,
-            },
-            location,
-        ),
-
-        // unions can go from and to anything
-        // todo: verify width here
-        (Type::Union { .. }, _) => build_at(
-            block,
-            arena,
-            Statement::Cast {
-                kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            },
-            location,
-        ),
-        (_, Type::Union { .. }) => build_at(
-            block,
-            arena,
-            Statement::Cast {
-                kind: CastOperationKind::Reinterpret,
-                typ: destination_type,
-                value: source,
-            },
-            location,
-        ),
-
         (src, dst) => {
             log::error!("current block: {:?}", block.get(arena));
             panic!(
@@ -1519,7 +1478,6 @@ pub fn import_statement(
             variant,
         },
 
-        Statement::Undefined => Statement::Undefined,
         Statement::TupleAccess { index, source } => Statement::TupleAccess {
             source: mapping.get(&source).unwrap().clone(),
             index,

@@ -690,7 +690,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 StatementResult::ControlFlow(BlockResult::Panic)
             }
-            Statement::Undefined => todo!(),
+
             Statement::Assert { condition } => {
                 let condition = statement_values.get(condition).unwrap().clone();
                 self.emitter.assert(condition);
@@ -760,10 +760,6 @@ fn emit_rudder_constant_type(value: &ConstantValue, typ: &rudder::types::Type) -
 
             let width = unsigned_smallest_width_of_value(*cv);
 
-            emitter::Type::Unsigned(width)
-        }
-        rudder::types::Type::Union { width } => {
-            let width = u16::try_from(*width).unwrap();
             emitter::Type::Unsigned(width)
         }
         rudder::types::Type::String => emitter::Type::Unsigned(32),
