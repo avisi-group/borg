@@ -54,7 +54,10 @@ impl Pass for LowerReals {
                  signature,
                  entry_block,
              }| {
-                try_replace_type(&signature.return_type);
+                if let Some(ret) = &signature.return_type {
+                    try_replace_type(&ret);
+                }
+
                 signature
                     .parameters
                     .get()
@@ -101,5 +104,4 @@ fn try_replace_type(typ: &Shared<Type>) {
 
         _ => (),
     }
-    if matches!(*typ, Type::Real) {}
 }

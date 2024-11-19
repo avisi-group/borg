@@ -37,7 +37,7 @@ fn static_dynamic_chaos_smoke() {
             let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
             let mut emitter = X86Emitter::new(&mut ctx);
 
-            translate(&*model, "func_corrupted_var", &[], &mut emitter);
+            translate(&*model, "func_corrupted_var", &[], &mut emitter).unwrap();
 
             emitter.leave();
             let num_regs = emitter.next_vreg();
@@ -69,7 +69,7 @@ fn num_of_feature() {
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     let feature = emitter.read_register(r0_offset.clone(), Type::Unsigned(0x20));
 
-    translate(&*model, "num_of_Feature", &[feature], &mut emitter);
+    translate(&*model, "num_of_Feature", &[feature], &mut emitter).unwrap();
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -89,13 +89,7 @@ fn statistical_profiling_disabled() {
 
     init(&*model, register_file_ptr);
 
-    let unit = emitter.constant(0, Type::Unsigned(0));
-    let is_enabled = translate(
-        &*model,
-        "StatisticalProfilingEnabled",
-        &[unit],
-        &mut emitter,
-    );
+    let is_enabled = translate(&*model, "StatisticalProfilingEnabled", &[], &mut emitter).unwrap();
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     emitter.write_register(r0_offset, is_enabled);
@@ -125,8 +119,7 @@ fn havebrbext_disabled() {
 
     init(&*model, register_file_ptr);
 
-    let unit = emitter.constant(0, Type::Unsigned(0));
-    let is_enabled = translate(&*model, "HaveBRBExt", &[unit], &mut emitter);
+    let is_enabled = translate(&*model, "HaveBRBExt", &[], &mut emitter).unwrap();
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     emitter.write_register(r0_offset, is_enabled);
@@ -156,8 +149,7 @@ fn using_aarch32_disabled() {
 
     init(&*model, register_file_ptr);
 
-    let unit = emitter.constant(0, Type::Unsigned(0));
-    let is_enabled = translate(&*model, "UsingAArch32", &[unit], &mut emitter);
+    let is_enabled = translate(&*model, "UsingAArch32", &[], &mut emitter).unwrap();
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     emitter.write_register(r0_offset, is_enabled);
@@ -811,7 +803,8 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
         "add_with_carry_test",
         &[x, y, carry_in],
         &mut emitter,
-    );
+    )
+    .unwrap();
 
     let sum = emitter.access_tuple(res.clone(), 0);
     emitter.write_register(r0_offset, sum);
@@ -952,7 +945,8 @@ fn shiftreg() {
         "ShiftReg",
         &[_1, shift_type, amount, width],
         &mut emitter,
-    );
+    )
+    .unwrap();
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     emitter.write_register(r0_offset, value);
@@ -984,7 +978,7 @@ fn floorpow2_constant() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -993,7 +987,7 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1002,7 +996,7 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1011,7 +1005,7 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter);
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1029,7 +1023,7 @@ fn ceilpow2_constant() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1038,7 +1032,7 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1047,7 +1041,7 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1056,7 +1050,7 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter);
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1081,19 +1075,19 @@ fn ispow2() {
     let x = emitter.read_register(r3_offset, Type::Unsigned(0x40));
 
     {
-        let value = translate(&*model, "FloorPow2", &[x.clone()], &mut emitter);
+        let value = translate(&*model, "FloorPow2", &[x.clone()], &mut emitter).unwrap();
         let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
         emitter.write_register(r0_offset, value);
     }
 
     {
-        let value = translate(&*model, "CeilPow2", &[x.clone()], &mut emitter);
+        let value = translate(&*model, "CeilPow2", &[x.clone()], &mut emitter).unwrap();
         let r1_offset = emitter.constant(model.reg_offset("R1") as u64, Type::Unsigned(0x40));
         emitter.write_register(r1_offset, value);
     }
 
     {
-        let value = translate(&*model, "IsPow2", &[x], &mut emitter);
+        let value = translate(&*model, "IsPow2", &[x], &mut emitter).unwrap();
         let r2_offset = emitter.constant(model.reg_offset("R2") as u64, Type::Unsigned(0x40));
         emitter.write_register(r2_offset, value);
     }
@@ -1286,7 +1280,7 @@ fn highest_set_bit() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(0b100, Type::Unsigned(64));
-    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter);
+    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1296,7 +1290,7 @@ fn highest_set_bit() {
     );
 
     let x = emitter.constant(u64::MAX, Type::Unsigned(64));
-    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter);
+    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1315,7 +1309,7 @@ fn ror() {
 
     let x = emitter.constant(0xff00, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter);
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1326,7 +1320,7 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter);
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1337,7 +1331,7 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(32));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter);
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1356,7 +1350,7 @@ fn extsv() {
 
     let m = emitter.constant(32, Type::Signed(64));
     let v = emitter.constant(0xFFFF_FFFF_FFFF_FFFF, Type::Unsigned(64));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1366,7 +1360,7 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(-1i32 as u64, Type::Unsigned(32));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1376,7 +1370,7 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1387,7 +1381,7 @@ fn extsv() {
 
     let m = emitter.constant(1, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter);
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 }
 
@@ -1400,12 +1394,12 @@ fn zext_ones() {
 
     let n = emitter.constant(1, Type::Signed(64));
     let m = emitter.constant(1, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(0, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1416,7 +1410,7 @@ fn zext_ones() {
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(32, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1427,7 +1421,7 @@ fn zext_ones() {
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(64, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter);
+    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1499,7 +1493,8 @@ fn decodebitmasks() {
         "DecodeBitMasks",
         &[immn, imms, immr, immediate, m],
         &mut emitter,
-    );
+    )
+    .unwrap();
 
     assert_eq!(
         emitter.access_tuple(res.clone(), 0).kind(),
@@ -1542,6 +1537,7 @@ fn replicate_bits() {
                 &[value, count],
                 &mut emitter,
             )
+            .unwrap()
             .kind()
         );
     }
@@ -1559,6 +1555,7 @@ fn replicate_bits() {
                 &[value, count],
                 &mut emitter,
             )
+            .unwrap()
             .kind()
         );
     }
@@ -1576,6 +1573,7 @@ fn replicate_bits() {
                 &[value, count],
                 &mut emitter,
             )
+            .unwrap()
             .kind()
         );
     }
@@ -1636,7 +1634,8 @@ fn place_slice() {
         "place_slice_signed",
         &[m, xs, i, l, shift],
         &mut emitter,
-    );
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1778,7 +1777,7 @@ fn ceil() {
 fn init(model: &Model, register_file: *mut u8) {
     interpret(&*model, "borealis_register_init", &[], register_file);
     configure_features(&*model, register_file);
-    interpret(&*model, "__InitSystem", &[Value::Unit], register_file);
+    interpret(&*model, "__InitSystem", &[], register_file);
 }
 
 fn configure_features(model: &Model, register_file: *mut u8) {

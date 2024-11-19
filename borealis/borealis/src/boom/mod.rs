@@ -116,7 +116,7 @@ impl Ast {
                                 }),
                             },
                         ]),
-                        return_type,
+                        return_type: Some(return_type),
                     },
                     entry_block,
                 },
@@ -228,7 +228,7 @@ impl Walkable for Parameter {
 pub struct FunctionSignature {
     pub name: InternedString,
     pub parameters: Shared<Vec<Parameter>>,
-    pub return_type: Shared<Type>,
+    pub return_type: Option<Shared<Type>>,
 }
 
 impl Walkable for FunctionSignature {
@@ -237,10 +237,10 @@ impl Walkable for FunctionSignature {
             .get()
             .iter()
             .for_each(|Parameter { typ, .. }| visitor.visit_type(typ.clone()));
-        // self.return_types
-        //     .iter()
-        //     .for_each(|typ| visitor.visit_type(typ.clone()));
-        visitor.visit_type(self.return_type.clone());
+
+        if let Some(return_type) = &self.return_type {
+            visitor.visit_type(return_type.clone());
+        }
     }
 }
 

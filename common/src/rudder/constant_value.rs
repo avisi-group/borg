@@ -18,7 +18,6 @@ pub enum ConstantValue {
     SignedInteger(i64),
     FloatingPoint(f64),
     String(InternedString),
-    Unit,
     Tuple(Vec<ConstantValue>),
 }
 
@@ -29,7 +28,7 @@ impl ConstantValue {
             ConstantValue::SignedInteger(v) => *v == 0,
             ConstantValue::FloatingPoint(v) => *v == 0.,
 
-            ConstantValue::Unit | ConstantValue::String(_) => false,
+            ConstantValue::String(_) => false,
             ConstantValue::Tuple(_) => panic!(),
         }
     }
@@ -175,7 +174,6 @@ impl Not for ConstantValue {
             ConstantValue::SignedInteger(v) => ConstantValue::SignedInteger(!v),
             ConstantValue::FloatingPoint(_)
             | ConstantValue::String(_)
-            | ConstantValue::Unit
             | ConstantValue::Tuple(_) => panic!("not a thing"),
         }
     }
@@ -189,7 +187,7 @@ impl PartialOrd for ConstantValue {
             }
             (ConstantValue::SignedInteger(l), ConstantValue::SignedInteger(r)) => l.partial_cmp(r),
             (ConstantValue::FloatingPoint(l), ConstantValue::FloatingPoint(r)) => l.partial_cmp(r),
-            (ConstantValue::Unit, ConstantValue::Unit) => Some(Ordering::Equal),
+
             _ => None,
         }
     }
@@ -201,7 +199,6 @@ impl Display for ConstantValue {
             ConstantValue::UnsignedInteger(v) => write!(f, "{v}u"),
             ConstantValue::SignedInteger(v) => write!(f, "{v}s"),
             ConstantValue::FloatingPoint(v) => write!(f, "{v}f"),
-            ConstantValue::Unit => write!(f, "()"),
             ConstantValue::String(str) => write!(f, "{str:?}"),
             ConstantValue::Tuple(vs) => {
                 write!(f, "(").unwrap();

@@ -1,13 +1,16 @@
 use {
     crate::intern::InternedString,
-    alloc::{boxed::Box, vec::Vec},
+    alloc::{
+        borrow::ToOwned,
+        boxed::Box,
+        string::{String, ToString},
+        vec::Vec,
+    },
     core::fmt::{self, Display, Formatter},
 };
 
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PrimitiveTypeClass {
-    Void,
-    Unit,
     UnsignedInteger,
     SignedInteger,
     FloatingPoint,
@@ -75,20 +78,6 @@ impl Type {
         Self::Struct(fields)
     }
 
-    pub fn void() -> Self {
-        Self::Primitive(PrimitiveType {
-            tc: PrimitiveTypeClass::Void,
-            element_width_in_bits: 0,
-        })
-    }
-
-    pub fn unit() -> Self {
-        Self::Primitive(PrimitiveType {
-            tc: PrimitiveTypeClass::Unit,
-            element_width_in_bits: 0,
-        })
-    }
-
     /// Gets the offset in bytes of a field of a composite or an element of a
     /// vector
     pub fn byte_offset(&self, element_field: usize) -> Option<usize> {
@@ -149,24 +138,6 @@ impl Type {
         }
     }
 
-    pub fn is_void(&self) -> bool {
-        match self {
-            Self::Primitive(PrimitiveType { tc, .. }) => {
-                matches!(tc, PrimitiveTypeClass::Void)
-            }
-            _ => false,
-        }
-    }
-
-    pub fn is_unit(&self) -> bool {
-        match self {
-            Self::Primitive(PrimitiveType { tc, .. }) => {
-                matches!(tc, PrimitiveTypeClass::Unit)
-            }
-            _ => false,
-        }
-    }
-
     pub fn is_bits(&self) -> bool {
         matches!(self, Self::Bits)
     }
@@ -200,8 +171,6 @@ impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self {
             Type::Primitive(p) => match &p.tc {
-                PrimitiveTypeClass::Void => write!(f, "void"),
-                PrimitiveTypeClass::Unit => write!(f, "()"),
                 PrimitiveTypeClass::UnsignedInteger => write!(f, "u{}", self.width_bits()),
                 PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width_bits()),
                 PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
@@ -224,4 +193,11 @@ impl Display for Type {
             }
         }
     }
+}
+
+pub fn maybe_type_to_string(o: Option<Type>) -> String {
+    o.as_ref()
+        .as_ref()
+        .map(ToString::to_string)
+        .unwrap_or("void".to_owned())
 }

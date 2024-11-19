@@ -52,7 +52,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             } => match unary_op_kind {
                 UnaryOperationKind::Not => {
                     let constant = Statement::Constant {
-                        typ: stmt.get(arena).typ(arena),
+                        typ: stmt.get(arena).typ(arena).unwrap(),
                         value: !constant_value,
                     };
 
@@ -101,7 +101,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                     };
 
                     let constant = Statement::Constant {
-                        typ: stmt.get(arena).typ(arena),
+                        typ: stmt.get(arena).typ(arena).unwrap(),
                         value: cv,
                     };
                     stmt.get_mut(arena).replace_kind(constant);

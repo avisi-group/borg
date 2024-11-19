@@ -118,7 +118,8 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
                     if !lhs
                         .get(s_arena)
                         .typ(s_arena)
-                        .is_compatible_with(&rhs.get(s_arena).typ(s_arena))
+                        .unwrap()
+                        .is_compatible_with(&rhs.get(s_arena).typ(s_arena).unwrap())
                     {
                         messages.push(ValidationMessage::stmt_err(
                             f.name(),
@@ -160,13 +161,6 @@ fn validate_constant_type(
             ConstantValue::FloatingPoint(_),
             Type::Primitive(PrimitiveType {
                 tc: PrimitiveTypeClass::FloatingPoint,
-                ..
-            }),
-        )
-        | (
-            ConstantValue::Unit,
-            Type::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::Unit,
                 ..
             }),
         )

@@ -362,7 +362,7 @@ impl<'f> Interpreter<'f> {
                     typ: dest_typ,
                     value,
                 } => {
-                    let source_typ = value.get(block.arena()).typ(block.arena());
+                    let source_typ = value.get(block.arena()).typ(block.arena()).unwrap();
                     let value = self.resolve(value);
 
                     match (&kind, &dest_typ, &value) {
@@ -632,10 +632,6 @@ impl<'f> Interpreter<'f> {
                         Value::SignedInteger { value, length } => {
                             (value as u64 & mask(length), length)
                         }
-                        Value::Unit => (0, 1), /* todo: investigate */
-                        // why we are
-                        // writing units to
-                        // unions
                         t => todo!("{t:?}"),
                     };
 
@@ -734,7 +730,7 @@ pub enum Value {
     SignedInteger { value: i64, length: u16 },
     FloatingPoint(f64),
     String(InternedString),
-    Unit,
+
     Tuple(Vec<Value>),
 }
 
@@ -751,7 +747,7 @@ impl Value {
             },
             ConstantValue::FloatingPoint(f) => Value::FloatingPoint(*f),
             ConstantValue::String(interned_string) => Value::String(*interned_string),
-            ConstantValue::Unit => Value::Unit,
+
             ConstantValue::Tuple(vec) => {
                 let Type::Tuple(types) = typ else {
                     unreachable!()

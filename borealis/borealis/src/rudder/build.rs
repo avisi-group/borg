@@ -123,7 +123,11 @@ impl BuildContext {
             (
                 Function::new(
                     name,
-                    self.resolve_type(definition.signature.return_type.clone()),
+                    definition
+                        .signature
+                        .return_type
+                        .as_ref()
+                        .map(|typ| self.resolve_type(typ.clone())),
                     definition
                         .signature
                         .parameters
@@ -162,7 +166,7 @@ impl BuildContext {
 
     fn resolve_type(&self, typ: Shared<boom::Type>) -> Type {
         match &*typ.get() {
-            boom::Type::Unit => Type::unit(),
+            boom::Type::Unit => panic!("found unit"),
             boom::Type::String => Type::String,
             // value
             boom::Type::Bool | boom::Type::Bit => Type::u1(),
@@ -466,7 +470,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
             "%i->%i64" => {
                 let arena = self.statement_arena();
-                assert_eq!(args[0].get(arena).typ(arena), Type::s64());
+                assert_eq!(args[0].get(arena).typ(arena), Some(Type::s64()));
 
                 Some(args[0].clone())
             }
@@ -508,7 +512,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let arena = self.statement_arena();
                     args[1].get(arena).typ(arena)
                 };
-                let one = cast(self.block, self.block_arena_mut(), one, typ);
+                let one = cast(self.block, self.block_arena_mut(), one, typ.unwrap());
                 let diff = build(
                     self.block,
                     self.block_arena_mut(),
@@ -974,7 +978,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
             "bitvector_length" => {
                 let arena = self.statement_arena();
-                assert!(matches!(args[0].get(arena).typ(arena), Type::Bits));
+                assert!(matches!(args[0].get(arena).typ(arena), Some(Type::Bits)));
 
                 Some(build(
                     self.block,
@@ -1177,6 +1181,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 args[0]
                     .get(self.statement_arena())
                     .typ(self.statement_arena())
+                    .unwrap()
                     .clone(),
                 args[1].get(self.statement_arena()).clone(),
             ) {
@@ -1265,7 +1270,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     args[2]
                         .get(self.statement_arena())
                         .typ(self.statement_arena()),
-                    Type::u1()
+                    Some(Type::u1())
                 );
 
                 let bit = args[2];
@@ -1639,6 +1644,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Statement::Panic(args[0].clone()),
             )),
 
+            // todo: don't replace with constant, delete
             "AArch64_DC"
             | "execute_aarch64_instrs_system_barriers_dmb"
             | "execute_aarch64_instrs_system_barriers_dsb"
@@ -1658,8 +1664,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.block,
                 self.block_arena_mut(),
                 Statement::Constant {
-                    typ: (Type::unit()),
-                    value: ConstantValue::Unit,
+                    typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 1)),
+                    value: ConstantValue::UnsignedInteger(0),
                 },
             )),
             _ => None,
@@ -1833,8 +1839,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant {
-                        typ: Type::unit(),
-                        value: ConstantValue::Unit,
+                        typ: Type::String,
+                        value: ConstantValue::String(
+                            format!("boom attempted to build a struct {name:?} here").into(),
+                        ),
                     },
                 );
                 return build(self.block, self.block_arena_mut(), Statement::Panic(c));
@@ -1955,10 +1963,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 typ: (Type::String),
                 value: ConstantValue::String(*str),
             },
-            boom::Literal::Unit => Statement::Constant {
-                typ: (Type::unit()),
-                value: ConstantValue::Unit,
-            },
+            boom::Literal::Unit => unreachable!("units removed in boom pass"),
             boom::Literal::Reference(_) => todo!(),
             boom::Literal::Undefined => Statement::Undefined,
         };
@@ -1996,7 +2001,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let source_type = value
                     .get(self.statement_arena())
-                    .typ(self.statement_arena());
+                    .typ(self.statement_arena())
+                    .unwrap();
 
                 let kind = match source_type {
                     Type::Struct(_) | Type::Vector { .. } | Type::String => {
@@ -2075,14 +2081,15 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
                 let arena = self.statement_arena();
 
-                if lhs.get(arena).typ(arena) != rhs.get(arena).typ(arena) {
+                let left_type = lhs.get(arena).typ(arena).unwrap();
+                let right_type = rhs.get(arena).typ(arena).unwrap();
+
+                if left_type != right_type {
                     // need to insert casts
-                    let destination_type = if lhs.get(arena).typ(arena).width_bits()
-                        > rhs.get(arena).typ(arena).width_bits()
-                    {
-                        lhs.get(arena).typ(arena)
+                    let destination_type = if left_type.width_bits() > right_type.width_bits() {
+                        left_type
                     } else {
-                        rhs.get(arena).typ(arena)
+                        right_type
                     };
 
                     lhs = cast(
@@ -2139,7 +2146,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
         // todo: (zero extend original value || create new bits with runtime length)
         // then bitinsert
-        match (left.get(arena).typ(arena), right.get(arena).typ(arena)) {
+        match (
+            left.get(arena).typ(arena).unwrap(),
+            right.get(arena).typ(arena).unwrap(),
+        ) {
             (Type::Bits, Type::Bits) => {
                 let l_value = cast(
                     self.block,

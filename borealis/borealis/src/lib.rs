@@ -181,6 +181,18 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         .functions_mut()
         .extend(variable_corrupted_example().into_iter());
 
+    let to_remove = rudder
+        .functions()
+        .keys()
+        .copied()
+        .filter(|name| !fn_is_allowlisted(*name))
+        .collect::<Vec<_>>();
+    for name in to_remove {
+        let function = rudder.functions_mut().get_mut(&name).unwrap();
+        let block = function.new_block();
+        function.set_entry_block(block);
+    }
+
     if matches!(
         &mode,
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
@@ -357,6 +369,19 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         // "AArch64_MemSingle_read",
         // "AArch64_MemSingle_read__1",
         //"PhysMemRead",
+        "ELIsInHost",
+        "sext_subrange",
+        "sail_ones",
+        "zext_subrange",
+        "zext_slice",
+        "IsInHost",
+        "to_real",
+        "replicate_bits_borealis_internal",
+        "SPESampleAddOpOther",
+        "example_f1",
+        "example_f2",
+        "func_corrupted_var",
+        "SPESampleAddOpOther__1",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -407,15 +432,11 @@ fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast:
 
 fn example_functions() -> HashMap<InternedString, Function> {
     let mut fns = HashMap::default();
-    let mut f1 = Function::new("example_f1".into(), Type::unit(), vec![]);
+    let mut f1 = Function::new("example_f1".into(), None, vec![]);
 
     {
         let entry_block = f1.entry_block().get_mut(f1.arena_mut());
         let s_arena = entry_block.arena_mut();
-        let _unit = s_arena.insert(Statement::Constant {
-            typ: Type::unit(),
-            value: ConstantValue::UnsignedInteger(0),
-        });
         let _0 = s_arena.insert(Statement::Constant {
             typ: Type::u64(),
             value: ConstantValue::UnsignedInteger(0),
@@ -445,7 +466,7 @@ fn example_functions() -> HashMap<InternedString, Function> {
         let call1 = s_arena.insert(Statement::Call {
             target: "example_f2".into(),
             args: vec![r0, r1],
-            return_type: Type::u64(),
+            return_type: Some(Type::u64()),
         });
         let r2 = s_arena.insert(Statement::ReadRegister {
             typ: Type::u64(),
@@ -454,23 +475,22 @@ fn example_functions() -> HashMap<InternedString, Function> {
         let call2 = s_arena.insert(Statement::Call {
             target: "example_f2".into(),
             args: vec![call1, r2],
-            return_type: Type::u64(),
+            return_type: Some(Type::u64()),
         });
         let w3 = s_arena.insert(Statement::WriteRegister {
             offset: _24,
             value: call2,
         });
-        let ret = s_arena.insert(Statement::Return { value: Some(_unit) });
-        entry_block.set_statements(
-            [_unit, _0, _8, _16, _24, r0, r1, call1, r2, call2, w3, ret].into_iter(),
-        );
+        let ret = s_arena.insert(Statement::Return { value: None });
+        entry_block
+            .set_statements([_0, _8, _16, _24, r0, r1, call1, r2, call2, w3, ret].into_iter());
     }
 
     let left = Symbol::new("left".into(), Type::u64());
     let right = Symbol::new("right".into(), Type::u64());
     let mut f2 = Function::new(
         "example_f2".into(),
-        Type::u64(),
+        Some(Type::u64()),
         vec![left.clone(), right.clone()],
     );
     {
@@ -495,7 +515,7 @@ fn example_functions() -> HashMap<InternedString, Function> {
 
 fn variable_corrupted_example() -> HashMap<InternedString, Function> {
     let mut fns = HashMap::default();
-    let mut func = Function::new("func_corrupted_var".into(), Type::u64(), vec![]);
+    let mut func = Function::new("func_corrupted_var".into(), Some(Type::u64()), vec![]);
     let ret_val = Symbol::new("x".into(), Type::u64());
     func.add_local_variable(ret_val.clone());
 

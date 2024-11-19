@@ -29,7 +29,7 @@ pub fn insert_stub(
                 signature: boom::FunctionSignature {
                     name: f.name(),
                     parameters: Shared::new(vec![]),
-                    return_type: Shared::new(boom::Type::Unit),
+                    return_type: None,
                 },
                 entry_block: ControlFlowBlock::new(),
             },
@@ -53,7 +53,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
 
     let mut function = Function::new(
         "replicate_bits_borealis_internal".into(),
-        Type::Bits,
+        Some(Type::Bits),
         vec![bits_symbol.clone(), count_symbol.clone()],
     );
     function.add_local_variable(result_symbol.clone());

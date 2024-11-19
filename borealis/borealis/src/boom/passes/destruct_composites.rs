@@ -273,7 +273,7 @@ fn destruct_local_structs(
                             };
 
 
-                            if let Type::Tuple(_return_types) = &*def.signature.return_type.get() {
+                            if let Some(Type::Tuple(_return_types)) = def.signature.return_type.as_ref().map(|t| t.get().clone()) {
                                 let Expression::Identifier(dest) = expression else {
                                     // only visiting each statement once so this should be true (for now, unions
                                     // break this)
@@ -316,8 +316,9 @@ fn destruct_local_structs(
 }
 
 fn split_return(fn_def: &mut FunctionDefinition) {
-    fn_def.signature.return_type =
-        nested_structs_to_flat_tuple(fn_def.signature.return_type.clone());
+    if let Some(return_type) = &mut fn_def.signature.return_type {
+        *return_type = nested_structs_to_flat_tuple(return_type.clone());
+    }
 }
 
 fn nested_structs_to_flat_tuple(typ: Shared<Type>) -> Shared<Type> {

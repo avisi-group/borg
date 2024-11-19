@@ -1,6 +1,7 @@
 use {
     crate::boom::{
-        control_flow::Terminator, passes::Pass, Ast, Expression, Literal, Statement, Type, Value,
+        control_flow::Terminator, passes::Pass, Ast, Expression, Literal, Parameter, Statement,
+        Type, Value,
     },
     common::{intern::InternedString, HashSet},
     sailrs::shared::Shared,
@@ -41,8 +42,23 @@ impl Pass for RemoveUnits {
             })
             .collect();
 
-        ast.functions.iter().for_each(|(_, def)| {
+        ast.functions.iter_mut().for_each(|(_, def)| {
             let mut removed = removed_registers.clone();
+
+            if let Some(ret) = def.signature.return_type.clone() {
+                def.signature.return_type = remove_unit_type(ret.clone());
+            }
+
+            let new_params = def
+                .signature
+                .parameters
+                .get()
+                .iter()
+                .filter_map(|p| {
+                    remove_unit_type(p.typ.clone()).map(|typ| Parameter { name: p.name, typ })
+                })
+                .collect();
+            *def.signature.parameters.get_mut() = new_params;
 
             def.entry_block.iter().for_each(|b| {
                 b.set_statements(
@@ -147,5 +163,17 @@ fn filter_value(value: Shared<Value>, removed: &HashSet<InternedString>) -> Opti
                 .collect(),
         ))),
         _ => Some(value.clone()),
+    }
+}
+
+fn remove_unit_type(typ: Shared<Type>) -> Option<Shared<Type>> {
+    match &*typ.get() {
+        Type::Unit => None,
+        Type::Tuple(vec) => Some(Shared::new(Type::Tuple(
+            vec.iter()
+                .flat_map(|t| remove_unit_type(t.clone()))
+                .collect(),
+        ))),
+        _ => Some(typ.clone()),
     }
 }

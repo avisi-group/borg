@@ -1,9 +1,12 @@
 use crate::{
     intern::InternedString,
-    rudder::{function::Function, types::Type},
+    rudder::{
+        function::Function,
+        types::{maybe_type_to_string, Type},
+    },
     HashMap,
 };
-use alloc::format;
+use alloc::{borrow::ToOwned, format, string::ToString};
 use core::fmt::{self, Display, Formatter};
 use itertools::Itertools;
 
@@ -87,7 +90,7 @@ impl Display for Model {
                 "function {}({}) -> {} :",
                 name,
                 parameters,
-                func.return_type()
+                maybe_type_to_string(func.return_type())
             )?;
 
             write!(f, "{}", func)?;

@@ -262,7 +262,11 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
         }
 
         write!(self.writer, ") -> ").unwrap();
-        self.visit_type(return_type.clone());
+        if let Some(ret) = return_type {
+            self.visit_type(ret.clone());
+        } else {
+            write!(self.writer, "void").unwrap();
+        }
 
         writeln!(self.writer, " {{").unwrap();
     }

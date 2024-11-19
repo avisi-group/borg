@@ -40,7 +40,7 @@ pub fn translate(
     function: &str,
     arguments: &[X86NodeRef],
     emitter: &mut X86Emitter,
-) -> X86NodeRef {
+) -> Option<X86NodeRef> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = 8;
@@ -63,11 +63,8 @@ struct FunctionTranslator<'m, 'e, 'c> {
     function_name: InternedString,
     x86_blocks: HashMap<Ref<Block>, Ref<X86Block>>,
     rudder_blocks: HashMap<Ref<X86Block>, Ref<Block>>,
-
     variables: HashMap<InternedString, LocalVariable>,
-
     current_stack_offset: usize,
-
     emitter: &'e mut X86Emitter<'c>,
 }
 
@@ -142,7 +139,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         celf
     }
 
-    fn translate(&mut self) -> X86NodeRef {
+    fn translate(&mut self) -> Option<X86NodeRef> {
         let function = self
             .model
             .functions()
@@ -238,15 +235,17 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
         log::trace!("queue empty, reading return value and exiting");
 
-        if function.return_type().is_unit() {
-            self.emitter.constant(0, emitter::Type::Unsigned(0))
-        } else {
-            self.read_variable(
-                self.variables
-                    .get(&InternedString::from_static("borealis_fn_return_value"))
-                    .unwrap()
-                    .clone(),
+        if function.return_type().is_some() {
+            Some(
+                self.read_variable(
+                    self.variables
+                        .get(&InternedString::from_static("borealis_fn_return_value"))
+                        .unwrap()
+                        .clone(),
+                ),
             )
+        } else {
+            None
         }
     }
 
@@ -277,7 +276,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
         }
 
-        unreachable!("last statement in block should have returned a control flow statement result")
+        unreachable!(
+            "last statement in block should have returned a control flow statement result in {:?}",
+            function.name()
+        )
     }
 
     // todo: fix these parameters this is silly
@@ -297,7 +299,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     ConstantValue::UnsignedInteger(v) => self.emitter.constant(*v, typ),
                     ConstantValue::SignedInteger(v) => self.emitter.constant(*v as u64, typ),
                     ConstantValue::FloatingPoint(v) => self.emitter.constant(*v as u64, typ),
-                    ConstantValue::Unit => self.emitter.constant(0, typ),
+
                     ConstantValue::String(s) => self
                         .emitter
                         .constant(s.key().into(), emitter::Type::Unsigned(32)),
@@ -315,51 +317,43 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 }))
             }
             Statement::ReadVariable { symbol } => {
-                if symbol.typ().is_unit() {
-                    StatementResult::Data(Some(
-                        self.emitter.constant(0, emitter::Type::Unsigned(0)),
-                    ))
-                } else {
-                    log::trace!("reading var {}", symbol.name());
-                    let var = self.variables.get(&symbol.name()).unwrap().clone();
-                    StatementResult::Data(Some(self.read_variable(var)))
-                }
+                log::trace!("reading var {}", symbol.name());
+                let var = self.variables.get(&symbol.name()).unwrap().clone();
+                StatementResult::Data(Some(self.read_variable(var)))
             }
             Statement::WriteVariable { symbol, value } => {
-                if !symbol.typ().is_unit() {
-                    log::trace!("writing var {}", symbol.name());
-                    if is_dynamic {
-                        // if we're in a dynamic block and the local variable is not on the
-                        // stack, put it there
-                        if let LocalVariable::Virtual { .. } =
-                            self.variables.get(&symbol.name()).unwrap()
-                        {
-                            log::trace!("upgrading {:?} from virtual to stack", symbol.name());
-                            self.variables.insert(
-                                symbol.name(),
-                                LocalVariable::Stack {
-                                    typ: emit_rudder_type(&symbol.typ()),
-                                    stack_offset: self.current_stack_offset,
-                                },
-                            );
-                            self.current_stack_offset += symbol.typ().width_bytes();
-                        }
+                log::trace!("writing var {}", symbol.name());
+                if is_dynamic {
+                    // if we're in a dynamic block and the local variable is not on the
+                    // stack, put it there
+                    if let LocalVariable::Virtual { .. } =
+                        self.variables.get(&symbol.name()).unwrap()
+                    {
+                        log::trace!("upgrading {:?} from virtual to stack", symbol.name());
+                        self.variables.insert(
+                            symbol.name(),
+                            LocalVariable::Stack {
+                                typ: emit_rudder_type(&symbol.typ()),
+                                stack_offset: self.current_stack_offset,
+                            },
+                        );
+                        self.current_stack_offset += symbol.typ().width_bytes();
                     }
-
-                    let var = self.variables.get(&symbol.name()).unwrap().clone();
-
-                    let value = statement_values
-                        .get(value)
-                        .unwrap_or_else(|| {
-                            panic!(
-                                "no value for {value} when writing to {symbol:?} in {} {block:?}",
-                                function.name()
-                            )
-                        })
-                        .clone();
-
-                    self.write_variable(var, value);
                 }
+
+                let var = self.variables.get(&symbol.name()).unwrap().clone();
+
+                let value = statement_values
+                    .get(value)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "no value for {value} when writing to {symbol:?} in {} {block:?}",
+                            function.name()
+                        )
+                    })
+                    .clone();
+
+                self.write_variable(var, value);
 
                 StatementResult::Data(None)
             }
@@ -517,7 +511,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     .cloned()
                     .collect::<Vec<_>>();
 
-                StatementResult::Data(Some(
+                StatementResult::Data(
                     FunctionTranslator::new(
                         self.model,
                         target.as_ref(),
@@ -528,7 +522,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                                                     * don't corrupt this function's */
                     )
                     .translate(),
-                ))
+                )
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
@@ -578,11 +572,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         .unwrap()
                         .clone();
 
-                    let value = statement_values
-                        .get(value)
-                        .cloned()
-                        .unwrap_or_else(|| self.emitter.constant(0, emitter::Type::Unsigned(0))); // todo: need more cohesive handling of statement values
-
+                    let value = statement_values.get(value).cloned().unwrap();
                     self.write_variable(var, value);
                 }
 
@@ -698,16 +688,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 self.emitter.panic(msg.as_ref());
 
-                let unit = self.emitter.constant(0, emitter::Type::Unsigned(0));
-
-                self.write_variable(
-                    self.variables
-                        .get(&InternedString::from_static("borealis_fn_return_value"))
-                        .unwrap()
-                        .clone(),
-                    unit,
-                );
-
                 StatementResult::ControlFlow(BlockResult::Panic)
             }
             Statement::Undefined => todo!(),
@@ -798,8 +778,6 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
             let width = u16::try_from(primitive.width()).unwrap();
             match primitive.tc {
                 PrimitiveTypeClass::UnsignedInteger => emitter::Type::Unsigned(width),
-                PrimitiveTypeClass::Void => todo!(),
-                PrimitiveTypeClass::Unit => emitter::Type::Unsigned(0),
                 PrimitiveTypeClass::SignedInteger => emitter::Type::Signed(width),
                 PrimitiveTypeClass::FloatingPoint => emitter::Type::Floating(width),
             }

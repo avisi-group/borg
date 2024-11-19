@@ -41,7 +41,7 @@ impl Display for Symbol {
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Function {
     // return type and parameters are read only, so do not need to exist behind a `Shared`
-    return_type: Type,
+    return_type: Option<Type>,
     parameters: Vec<Symbol>,
     name: InternedString,
     local_variables: HashMap<InternedString, Symbol>,
@@ -56,7 +56,7 @@ impl Debug for Function {
 }
 
 impl Function {
-    pub fn new(name: InternedString, return_type: Type, parameters: Vec<Symbol>) -> Self {
+    pub fn new(name: InternedString, return_type: Option<Type>, parameters: Vec<Symbol>) -> Self {
         let mut block_arena = Arena::new();
         let entry_block = block_arena.insert(Block::new());
         Self {
@@ -71,10 +71,6 @@ impl Function {
 
     pub fn name(&self) -> InternedString {
         self.name
-    }
-
-    pub fn signature(&self) -> (Type, Vec<Symbol>) {
-        (self.return_type(), self.parameters())
     }
 
     pub fn add_local_variable(&mut self, symbol: Symbol) {
@@ -100,7 +96,7 @@ impl Function {
             .cloned()
     }
 
-    pub fn return_type(&self) -> Type {
+    pub fn return_type(&self) -> Option<Type> {
         self.return_type.clone()
     }
 

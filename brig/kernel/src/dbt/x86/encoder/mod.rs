@@ -925,6 +925,21 @@ impl Instruction {
                     .sub::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
             }
+            // SUB IMM -> R
+            SUB(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_8,
+                },
+            ) => {
+                assembler
+                    .sub::<AsmRegister8, i32>(dst.into(), i32::try_from(*src).unwrap())
+                    .unwrap();
+            }
 
             // TEST R, R
             TEST(
@@ -1094,6 +1109,20 @@ impl Instruction {
             }) => assembler.neg::<AsmRegister64>(value.into()).unwrap(),
             SHL(amount, value) => shl::encode(assembler, amount, value),
             SHR(amount, value) => shr::encode(assembler, amount, value),
+            SAR(
+                Operand {
+                    kind: R(PHYS(amount)),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(value)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assembler
+                    .sar::<AsmRegister64, AsmRegister8>(value.into(), amount.into())
+                    .unwrap();
+            }
             // OR I R
             OR(
                 Operand {

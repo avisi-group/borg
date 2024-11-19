@@ -1,7 +1,7 @@
 use {
     crate::boom::{
         control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, FunctionDefinition, Literal,
-        NamedType, NamedValue, Parameter, Size, Statement, Type, Value,
+        NamedType, Parameter, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, HashMap},
     sailrs::shared::Shared,
@@ -166,7 +166,7 @@ fn destruct_locals(
                         // function name is a union tag constructor
 
                         // todo: tidy this up
-                        if let Some((fields, tag, named_type)) = unions
+                        if let Some((fields, tag, _)) = unions
                             .values()
                             .flat_map(|nts| {
                                 nts.into_iter()

@@ -78,6 +78,12 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
     fn constant(&mut self, value: u64, typ: Type) -> Self::NodeRef {
         let width = typ.width();
+        if width == 0 {
+            panic!(
+                "no zero width constants allowed! {typ:?} @ {:?}",
+                self.current_block
+            )
+        }
         Self::NodeRef::from(X86Node {
             typ,
             kind: NodeKind::Constant { value, width },

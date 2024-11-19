@@ -63,6 +63,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                                 assign_value
                                     .get(block.get(arena).arena())
                                     .typ(block.get(arena).arena())
+                                    .unwrap()
                                     .width_bytes()
                                     .try_into()
                                     .unwrap(),
@@ -118,7 +119,8 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
             {
                 let element_type = stmt
                     .get(block.get(arena).arena())
-                    .typ(block.get(arena).arena());
+                    .typ(block.get(arena).arena())
+                    .unwrap();
 
                 let index = cast_at(block, arena, index, Type::s64(), Location::Before(stmt));
 

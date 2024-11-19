@@ -69,7 +69,7 @@ impl BoomEmitter {
                     signature: FunctionSignature {
                         name: "borealis_register_init".into(),
                         parameters: Shared::new(vec![]),
-                        return_type: Shared::new(Type::Unit),
+                        return_type: None,
                     },
                     entry_block: ControlFlowGraphBuilder::from_statements(
                         &self.register_init_statements,
@@ -95,7 +95,7 @@ impl BoomEmitter {
                                     })
                                     .collect(),
                             ),
-                            return_type: return_type.clone(),
+                            return_type: Some(return_type.clone()),
                         },
                         entry_block: ControlFlowBlock::new(),
                     },
@@ -189,7 +189,7 @@ impl BoomEmitter {
                         signature: FunctionSignature {
                             name,
                             parameters,
-                            return_type,
+                            return_type: Some(return_type),
                         },
                         entry_block: control_flow,
                     },

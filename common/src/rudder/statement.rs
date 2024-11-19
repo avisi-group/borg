@@ -6,11 +6,12 @@ use {
             block::Block,
             constant_value::ConstantValue,
             function::Symbol,
-            types::{PrimitiveType, PrimitiveTypeClass, Type},
+            types::{maybe_type_to_string, PrimitiveType, PrimitiveTypeClass, Type},
         },
         HashMap,
     },
     alloc::{
+        borrow::ToOwned,
         format,
         string::{String, ToString},
         vec::Vec,
@@ -152,10 +153,10 @@ pub enum Statement {
     Call {
         target: InternedString, // todo: ref<function>
         args: Vec<Ref<Statement>>,
-        return_type: Type, /* todo: this is really bad. necessary to avoid needing to pass a
-                            * rudder model into every .typ() call, and hopefully a function
-                            * return type is unlikely to change after boom, but this should
-                            * really be a function lookup */
+        return_type: Option<Type>, /* todo: this is really bad. necessary to avoid needing to pass a
+                                    * rudder model into every .typ() call, and hopefully a function
+                                    * return type is unlikely to change after boom, but this should
+                                    * really be a function lookup */
     },
     Cast {
         kind: CastOperationKind,
@@ -284,15 +285,15 @@ impl Statement {
         )
     }
 
-    pub fn typ(&self, arena: &Arena<Statement>) -> Type {
+    pub fn typ(&self, arena: &Arena<Statement>) -> Option<Type> {
         match self {
-            Self::Constant { typ, .. } => typ.clone(),
-            Self::ReadVariable { symbol } => symbol.typ(),
-            Self::WriteVariable { .. } => Type::void(),
-            Self::ReadRegister { typ, .. } => typ.clone(),
-            Self::WriteRegister { .. } => Type::unit(),
-            Self::ReadMemory { .. } => Type::Bits,
-            Self::WriteMemory { .. } => Type::unit(),
+            Self::Constant { typ, .. } => Some(typ.clone()),
+            Self::ReadVariable { symbol } => Some(symbol.typ()),
+            Self::WriteVariable { .. } => None,
+            Self::ReadRegister { typ, .. } => Some(typ.clone()),
+            Self::WriteRegister { .. } => None,
+            Self::ReadMemory { .. } => Some(Type::Bits),
+            Self::WriteMemory { .. } => None,
             Self::BinaryOperation {
                 kind: BinaryOperationKind::CompareEqual,
                 ..
@@ -316,35 +317,36 @@ impl Statement {
             | Self::BinaryOperation {
                 kind: BinaryOperationKind::CompareLessThan,
                 ..
-            } => Type::u1(),
+            } => Some(Type::u1()),
             Self::BinaryOperation { lhs, .. } => lhs.get(arena).typ(arena),
             Self::TernaryOperation { a, .. } => a.get(arena).typ(arena),
             Self::UnaryOperation {
                 kind: UnaryOperationKind::Ceil | UnaryOperationKind::Floor,
                 ..
-            } => Type::s64(),
+            } => Some(Type::s64()),
             Self::UnaryOperation { value, .. } => value.get(arena).typ(arena),
             Self::ShiftOperation { value, .. } => value.get(arena).typ(arena),
 
             Self::Call { return_type, .. } => return_type.clone(),
 
-            Self::Cast { typ, .. } | Self::BitsCast { typ, .. } => typ.clone(),
-            Self::Jump { .. } => Type::void(),
-            Self::Branch { .. } => Type::void(),
+            Self::Cast { typ, .. } | Self::BitsCast { typ, .. } => Some(typ.clone()),
+            Self::Jump { .. } => None,
+            Self::Branch { .. } => None,
             Self::PhiNode { members } => members
                 .first()
                 .map(|(_, stmt)| stmt.get(arena).typ(arena))
-                .unwrap_or_else(|| (Type::void())),
-            Self::Return { .. } => Type::void(),
-            Self::Select { true_value, .. } => true_value.get(arena).typ(arena),
-            Self::Panic(_) => Type::void(),
+                .flatten(),
 
-            Self::ReadPc => Type::u64(),
-            Self::WritePc { .. } => Type::void(),
+            Self::Return { .. } => None,
+            Self::Select { true_value, .. } => true_value.get(arena).typ(arena),
+            Self::Panic(_) => None,
+
+            Self::ReadPc => Some(Type::u64()),
+            Self::WritePc { .. } => None,
             // todo: this is a simplification, be more precise about lengths?
             Self::BitExtract { value, length, .. } => {
                 if let Self::Constant { value: length, .. } = length.get(arena) {
-                    match length {
+                    Some(match length {
                         ConstantValue::UnsignedInteger(l) => Type::new_primitive(
                             PrimitiveTypeClass::UnsignedInteger,
                             usize::try_from(*l).unwrap(),
@@ -354,7 +356,7 @@ impl Statement {
                             usize::try_from(*l).unwrap(),
                         ),
                         _ => panic!("non unsigned integer length: {length:#?}"),
-                    }
+                    })
                 } else {
                     value.get(arena).typ(arena) // potentially should be Bits,
                                                 // but this type will always be
@@ -370,21 +372,21 @@ impl Statement {
                 ..
             } => original_value.get(arena).typ(arena),
             Self::ReadElement { vector, .. } => {
-                let Type::Vector { element_type, .. } = &vector.get(arena).typ(arena) else {
+                let Some(Type::Vector { element_type, .. }) = &vector.get(arena).typ(arena) else {
                     panic!("cannot read field of non-composite type")
                 };
 
-                (**element_type).clone()
+                Some((**element_type).clone())
             }
             Self::AssignElement { vector, .. } => {
                 // get type of the vector and return it
                 vector.get(arena).typ(arena)
             }
 
-            Self::SizeOf { .. } => Type::u16(),
-            Self::Assert { .. } => Type::unit(),
-            Self::CreateBits { .. } => Type::Bits,
-            Self::MatchesUnion { .. } => Type::u1(),
+            Self::SizeOf { .. } => Some(Type::u16()),
+            Self::Assert { .. } => None,
+            Self::CreateBits { .. } => Some(Type::Bits),
+            Self::MatchesUnion { .. } => Some(Type::u1()),
             Self::UnwrapUnion { .. } => {
                 // let Type::Enum(variants) = &*value.get(arena).typ(arena) else {
                 //     panic!("cannot unwrap non sum type");
@@ -399,19 +401,28 @@ impl Statement {
                 todo!()
             }
 
-            Self::Undefined => Type::Any,
+            Self::Undefined => Some(Type::Any),
             Self::TupleAccess { index, source } => {
-                let Type::Tuple(ts) = &source.get(arena).typ(arena) else {
+                let Some(Type::Tuple(ts)) = &source.get(arena).typ(arena) else {
                     panic!();
                 };
 
-                ts[*index].clone()
+                Some(ts[*index].clone())
             }
 
-            Self::GetFlags { .. } => Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4),
-            Self::CreateTuple(values) => {
-                Type::Tuple(values.iter().map(|v| v.get(arena).typ(arena)).collect())
+            Self::GetFlags { .. } => {
+                Some(Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4))
             }
+            Self::CreateTuple(values) => Some(Type::Tuple(
+                values
+                    .iter()
+                    .map(|v| {
+                        v.get(arena)
+                            .typ(arena)
+                            .expect("why are you making a tuple that contains a void")
+                    })
+                    .collect(),
+            )),
         }
     }
 
@@ -866,7 +877,7 @@ impl Statement {
                     symbol.name(),
                     symbol.typ(),
                     value,
-                    value.get(arena).typ(arena)
+                    maybe_type_to_string(value.get(arena).typ(arena))
                 )
             }
             Self::ReadRegister { typ, offset } => {
@@ -1116,11 +1127,13 @@ pub fn cast_at(
 ) -> Ref<Statement> {
     let s_arena = block.get(arena).arena();
 
-    if source.get(s_arena).typ(s_arena) == destination_type {
+    let source_type = source.get(s_arena).typ(s_arena).unwrap();
+
+    if source_type == destination_type {
         return source;
     }
 
-    match (&source.get(s_arena).typ(s_arena), &destination_type) {
+    match (&source_type, &destination_type) {
         // both primitives, do a cast
         (Type::Primitive(source_primitive), Type::Primitive(dest_primitive)) => {
             // compare widths
@@ -1140,8 +1153,6 @@ pub fn cast_at(
                 // destination is larger than source
                 Ordering::Less => {
                     let kind = match source_primitive.type_class() {
-                        PrimitiveTypeClass::Void => panic!("cannot cast void"),
-                        PrimitiveTypeClass::Unit => panic!("cannot cast unit"),
                         PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
                         PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
                         PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
@@ -1235,7 +1246,7 @@ pub fn cast_at(
             if *element_width_in_bits > 128 {
                 log::warn!(
                     "source type in cast {} -> {} exceeds 128 bits",
-                    source.get(s_arena).typ(s_arena),
+                    source_type,
                     destination_type
                 );
             }
@@ -1243,7 +1254,7 @@ pub fn cast_at(
             panic!(
                 "{} ({}) to {}",
                 source.get(s_arena).to_string(s_arena),
-                &source.get(s_arena).typ(s_arena),
+                &source_type,
                 &destination_type
             );
 
