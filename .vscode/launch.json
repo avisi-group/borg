@@ -39,7 +39,7 @@
                     "kind": "bin"
                 },
             },
-            "args": ["--dump-ir","${workspaceFolder}/ir","${workspaceFolder}/arm94_sail18.rkyv", "${workspaceFolder}/aarch64"],
+            "args": ["--dump-ir","${workspaceFolder}/ir","${workspaceFolder}/arm94_sail18.rkyv", "${workspaceFolder}/brig-cli/guest_data/aarch64.postcard"],
             "cwd": "${workspaceFolder}/borealis",
             "env": {
                 "RAYON_NUM_THREADS": "1"

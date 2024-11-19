@@ -25,17 +25,16 @@ pub mod visitor;
 /// BOOM AST
 #[derive(Debug, Clone, Default)]
 pub struct Ast {
-    /// Sequence of definitions
-    pub definitions: Vec<Definition>,
     /// Register types by identifier
     pub registers: HashMap<InternedString, Shared<Type>>,
     /// Function definitions by identifier
     pub functions: HashMap<InternedString, FunctionDefinition>,
     pub constants: HashMap<InternedString, i32>,
-    /// name -> (width, variant -> tag)
-    pub unions: HashMap<InternedString, (usize, HashMap<InternedString, usize>)>,
     /// name -> fields (implicit indices)
     pub enums: HashMap<InternedString, Vec<InternedString>>,
+    pub structs: HashMap<InternedString, Vec<NamedType>>,
+    pub unions: HashMap<InternedString, Vec<NamedType>>,
+    pub pragmas: HashMap<InternedString, InternedString>,
 }
 
 impl Ast {
@@ -45,6 +44,24 @@ impl Ast {
         emitter.process(iter);
 
         let mut ast = emitter.finish();
+
+        {
+            ast.registers
+                .insert("have_exception".into(), Shared::new(Type::Bool));
+            ast.registers.insert(
+                "current_exception".into(),
+                Shared::new(Type::Union {
+                    name: InternedString::from_static("exception"),
+                    fields: ast
+                        .unions
+                        .get(&InternedString::from_static("exception"))
+                        .unwrap()
+                        .clone(),
+                }),
+            );
+            ast.registers
+                .insert("throw".into(), Shared::new(Type::String));
+        }
 
         {
             let return_type = Shared::new(Type::Tuple(vec![
@@ -119,6 +136,11 @@ pub enum Definition {
         fields: Vec<NamedType>,
     },
 
+    Union {
+        name: InternedString,
+        fields: Vec<NamedType>,
+    },
+
     Pragma {
         key: InternedString,
         value: InternedString,
@@ -135,6 +157,10 @@ impl Walkable for Definition {
                     .iter()
                     .for_each(|named_type| visitor.visit_named_type(named_type));
             }
+
+            Self::Union { fields, .. } => fields
+                .iter()
+                .for_each(|named_type| visitor.visit_named_type(named_type)),
         }
     }
 }
@@ -268,7 +294,8 @@ pub enum Type {
     Constant(i64),
 
     Union {
-        width: usize,
+        name: InternedString,
+        fields: Vec<NamedType>,
     },
 
     Struct {

@@ -2,7 +2,7 @@ use {
     crate::boom::{
         control_flow::{ControlFlowBlock, Terminator},
         passes::Pass,
-        Ast, Definition, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
+        Ast, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
     },
     common::intern::InternedString,
     sailrs::shared::Shared,
@@ -44,12 +44,10 @@ impl Pass for LowerReals {
 
         // replace all real types with (i64, i64)
         ast.get_mut().registers.values().for_each(try_replace_type);
-        ast.get_mut().definitions.iter().for_each(|def| {
-            if let Definition::Struct { fields, .. } = def {
-                fields
-                    .iter()
-                    .for_each(|NamedType { typ, .. }| try_replace_type(typ));
-            }
+        ast.get_mut().structs.iter().for_each(|(_, fields)| {
+            fields
+                .iter()
+                .for_each(|NamedType { typ, .. }| try_replace_type(typ));
         });
         ast.get_mut().functions.values().for_each(
             |FunctionDefinition {

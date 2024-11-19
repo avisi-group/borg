@@ -6,9 +6,9 @@ use {
             passes::{
                 builtin_fns::HandleBuiltinFunctions, cycle_finder::CycleFinder,
                 destruct_composites::DestructComposites, destruct_unions::DestructUnions,
-                fix_exceptions::FixExceptions, fold_unconditionals::FoldUnconditionals,
-                lower_reals::LowerReals, remove_const_branch::RemoveConstBranch,
-                remove_constant_type::RemoveConstantType,
+                fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
+                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
+                remove_units::RemoveUnits,
             },
             Ast,
         },
@@ -117,7 +117,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         RemoveConstantType::new_boxed(),
         DestructComposites::new_boxed(),
         DestructUnions::new_boxed(),
-        FixExceptions::new_boxed(),
+        RemoveUnits::new_boxed(),
     ]
     .into_iter()
     .for_each(|mut pass| {
@@ -354,8 +354,8 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "HaveLRCPC3Ext",
         "ConstrainUnpredictable",
         "BigEndian",
-        "AArch64_MemSingle_read",
-        "AArch64_MemSingle_read__1",
+        // "AArch64_MemSingle_read",
+        // "AArch64_MemSingle_read__1",
         //"PhysMemRead",
     ];
 

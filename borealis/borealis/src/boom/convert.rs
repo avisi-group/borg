@@ -125,22 +125,14 @@ impl BoomEmitter {
                     } /* type is u32 but don't need to */
                     // define it
                     jib_ast::TypeDefinition::Struct(name, fields) => {
-                        self.ast.definitions.push(boom::Definition::Struct {
-                            name: name.as_interned(),
-                            fields: convert_fields(fields.iter()),
-                        });
+                        self.ast
+                            .structs
+                            .insert(name.as_interned(), convert_fields(fields.iter()));
                     }
                     jib_ast::TypeDefinition::Variant(name, fields) => {
-                        let width =
-                            effective_width(&jib_ast::Type::Variant(name.clone(), fields.clone()));
-
-                        let tags = fields
-                            .iter()
-                            .enumerate()
-                            .map(|(i, (name, _))| (name.as_interned(), i))
-                            .collect();
-
-                        self.ast.unions.insert(name.as_interned(), (width, tags));
+                        self.ast
+                            .unions
+                            .insert(name.as_interned(), convert_fields(fields.iter()));
                     }
                 }
             }
@@ -206,10 +198,7 @@ impl BoomEmitter {
             jib_ast::DefinitionAux::Startup(_, _) => todo!(),
             jib_ast::DefinitionAux::Finish(_, _) => todo!(),
             jib_ast::DefinitionAux::Pragma(key, value) => {
-                self.ast.definitions.push(boom::Definition::Pragma {
-                    key: *key,
-                    value: *value,
-                })
+                self.ast.pragmas.insert(*key, *value);
             }
         };
     }
@@ -249,10 +238,10 @@ fn convert_type<T: Borrow<jib_ast::Type>>(typ: T) -> Shared<boom::Type> {
         },
 
         // unions are special
-        jib_ast::Type::Variant(_, _) => {
-            let width = effective_width(&typ.borrow());
-            boom::Type::Union { width }
-        }
+        jib_ast::Type::Variant(name, fields) => boom::Type::Union {
+            name: name.as_interned(),
+            fields: convert_fields(fields.as_ref()),
+        },
         jib_ast::Type::Fvector(length, typ) => boom::Type::FixedVector {
             length: *length,
             element_type: convert_type(&**typ),

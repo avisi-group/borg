@@ -32,11 +32,11 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
     let mut build_ctx = BuildContext::default();
 
     // DEFINITION ORDER DEPENDANT!!!
-    ast.definitions.iter().for_each(|def| match def {
-        boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
-        // todo contains KV pairs, "mangled" and "tuplestruct" as keys and type names as values
-        boom::Definition::Pragma { .. } => (),
-    });
+    // ast.definitions.iter().for_each(|def| match def {
+    //     boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
+    //     // todo contains KV pairs, "mangled" and "tuplestruct" as keys and type names as values
+    //     boom::Definition::Pragma { .. } => (),
+    // });
 
     ast.registers.iter().for_each(|(name, typ)| {
         let typ = build_ctx.resolve_type(typ.clone());
@@ -168,9 +168,11 @@ impl BuildContext {
             // value
             boom::Type::Bool | boom::Type::Bit => Type::u1(),
             boom::Type::Float => Type::f64(),
-            boom::Type::Real => panic!("should be removed by pass"),
-            boom::Type::Union { width } => Type::Union { width: *width },
-            boom::Type::Struct { name, .. } => self.structs.get(name).unwrap().0.clone(),
+            boom::Type::Real | boom::Type::Union { .. } | boom::Type::Struct { .. } => {
+                log::warn!("should be removed by pass: {:?}", &*typ.get());
+                Type::Any
+            }
+
             boom::Type::Vector { element_type } => {
                 let element_type = (self.resolve_type(element_type.clone())).clone();
                 // todo: Brian Campbell said the Sail C backend had functionality to staticize
@@ -1088,7 +1090,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 );
             }
             boom::Value::Struct { name, fields } => {
-                panic!("got struct {name} {fields:?} but structs should have been removed in boom")
+                let c = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::unit(),
+                        value: ConstantValue::Unit,
+                    },
+                );
+                return build(self.block, self.block_arena_mut(), Statement::Panic(c));
+                //      panic!("got struct {name} {fields:?} but structs should have been removed in boom")
             }
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),

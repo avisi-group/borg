@@ -21,37 +21,23 @@ const PADDING: &str = "  ";
 /// Pretty-print BOOM AST
 pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
     let Ast {
-        definitions,
         registers,
         functions,
         constants,
-        unions,
         enums,
+        structs,
+        unions,
+        pragmas,
     } = &*ast.get();
 
     let mut visitor = PrettyPrinter::new(w);
 
-    definitions
-        .iter()
-        .for_each(|def| visitor.visit_definition(def));
-
-    registers.iter().for_each(|(name, typ)| {
-        write!(visitor.writer, "register {name}: ").unwrap();
-        visitor.visit_type(typ.clone());
-        writeln!(visitor.writer).unwrap();
+    pragmas.iter().for_each(|(key, value)| {
+        visitor.prindent(format!("#{key} {value}"));
     });
 
     constants.iter().for_each(|(name, value)| {
         writeln!(visitor.writer, "constant {name}: {value}").unwrap();
-    });
-    writeln!(visitor.writer).unwrap();
-
-    unions.iter().for_each(|(name, (width, variants))| {
-        writeln!(visitor.writer, "union {name}: {width} {{").unwrap();
-        for (variant, tag) in variants {
-            writeln!(visitor.writer, "\t{variant} = {tag},").unwrap();
-        }
-        writeln!(visitor.writer, "}}").unwrap();
     });
     writeln!(visitor.writer).unwrap();
 
@@ -61,6 +47,42 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
             writeln!(visitor.writer, "\t{variant} = {i},").unwrap();
         }
         writeln!(visitor.writer, "}}").unwrap();
+    });
+
+    structs.iter().for_each(|(name, fields)| {
+        visitor.prindentln(format!("struct {name} {{"));
+
+        {
+            let _h = visitor.indent();
+            fields.iter().for_each(|NamedType { name, typ }| {
+                visitor.prindent(format!("{name}: "));
+                visitor.visit_type(typ.clone());
+                writeln!(visitor.writer, ",").unwrap();
+            });
+        }
+
+        visitor.prindentln("}");
+    });
+
+    unions.iter().for_each(|(name, fields)| {
+        visitor.prindentln(format!("union {name} {{"));
+
+        {
+            let _h = visitor.indent();
+            fields.iter().for_each(|NamedType { name, typ }| {
+                visitor.prindent(format!("{name}: "));
+                visitor.visit_type(typ.clone());
+                writeln!(visitor.writer, ",").unwrap();
+            });
+        }
+
+        visitor.prindentln("}");
+    });
+
+    registers.iter().for_each(|(name, typ)| {
+        write!(visitor.writer, "register {name}: ").unwrap();
+        visitor.visit_type(typ.clone());
+        writeln!(visitor.writer).unwrap();
     });
 
     functions
@@ -191,6 +213,20 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             }
             Definition::Pragma { key, value } => {
                 self.prindent(format!("#{key} {value}"));
+            }
+            Definition::Union { name, fields } => {
+                self.prindentln(format!("union {name} {{"));
+
+                {
+                    let _h = self.indent();
+                    fields.iter().for_each(|NamedType { name, typ }| {
+                        self.prindent(format!("{name}: "));
+                        self.visit_type(typ.clone());
+                        writeln!(self.writer, ",").unwrap();
+                    });
+                }
+
+                self.prindentln("}");
             }
         }
     }
@@ -328,8 +364,8 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Type::Struct { name, .. } => {
                 write!(self.writer, "{name}")
             }
-            Type::Union { width } => {
-                write!(self.writer, "union({width})")
+            Type::Union { name, .. } => {
+                write!(self.writer, "{name}")
             }
             Type::Vector { element_type } => {
                 write!(self.writer, "vec<").unwrap();

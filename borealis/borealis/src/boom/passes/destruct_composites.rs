@@ -388,7 +388,7 @@ fn remove_field_values(def: &FunctionDefinition) {
                     return;
                 };
                 let Value::Identifier(ident) = &*value.get() else {
-                    panic!("field access to non identifier")
+                    panic!("field access to non identifier: {:?}", &*value.get())
                 };
 
                 (*ident, *field_name)

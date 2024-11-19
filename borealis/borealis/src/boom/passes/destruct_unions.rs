@@ -1,7 +1,7 @@
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, FunctionDefinition,
-        Parameter, Size, Statement, Type, Value,
+        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, FunctionDefinition, Literal,
+        NamedType, NamedValue, Parameter, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, HashMap},
     sailrs::shared::Shared,
@@ -25,49 +25,39 @@ impl Pass for DestructUnions {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
+        let unions = ast.get().unions.clone();
+
         let removed = handle_registers(ast.clone());
 
-        let union_tag_type = Shared::new(Type::Integer {
-            size: Size::Static(32),
-        });
-
-        let union_tags = ast
-            .get()
-            .unions
+        ast.get()
+            .functions
             .iter()
-            .flat_map(|(_, (_, tags))| tags)
-            .map(|(&i, &v)| (i, v))
-            .collect::<HashMap<_, _>>();
-
-        ast.get().functions.iter().for_each(|(_, def)| {
-            handle_function(def, removed.clone(), &union_tags, union_tag_type.clone())
-        });
+            .for_each(|(_, def)| handle_function(def, removed.clone(), &unions));
 
         false
     }
 }
 
-fn handle_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>> {
+fn handle_registers(ast: Shared<Ast>) -> HashMap<InternedString, Vec<NamedType>> {
     let union_regs = ast
         .get_mut()
         .registers
         .iter()
-        .filter(|(_, typ)| matches!(&*typ.get(), Type::Union { .. }))
-        .map(|(name, typ)| (*name, typ.clone()))
+        .filter_map(|(name, typ)| {
+            if let Type::Union { fields, .. } = &*typ.get() {
+                Some((*name, fields.clone()))
+            } else {
+                None
+            }
+        })
         .collect::<HashMap<_, _>>();
 
-    for (register_name, typ) in &union_regs {
+    for (register_name, fields) in &union_regs {
         ast.get_mut().registers.remove(register_name);
 
-        ast.get_mut().registers.insert(
-            tag_ident(*register_name),
-            Shared::new(Type::Integer {
-                size: Size::Static(32),
-            }),
-        );
         ast.get_mut()
             .registers
-            .insert(value_ident(*register_name), typ.clone());
+            .extend(destruct(*register_name, fields));
     }
 
     union_regs
@@ -75,9 +65,8 @@ fn handle_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>> {
 
 fn handle_function(
     def: &FunctionDefinition,
-    mut removed: HashMap<InternedString, Shared<Type>>,
-    union_tags: &HashMap<InternedString, usize>,
-    union_tag_type: Shared<Type>,
+    mut removed: HashMap<InternedString, Vec<NamedType>>,
+    unions: &HashMap<InternedString, Vec<NamedType>>,
 ) {
     // todo
     // if let Type::Union { width } = &*def.signature.return_type.get() {
@@ -97,18 +86,13 @@ fn handle_function(
         .get()
         .iter()
         .flat_map(|param| {
-            if let Type::Union { .. } = &*param.typ.get() {
-                removed.insert(param.name, param.typ.clone());
-                vec![
-                    Parameter {
-                        name: tag_ident(param.name),
-                        typ: union_tag_type.clone(),
-                    },
-                    Parameter {
-                        name: value_ident(param.name),
-                        typ: param.typ.clone(),
-                    },
-                ]
+            if let Type::Union { fields, .. } = &*param.typ.get() {
+                removed.insert(param.name, fields.clone());
+
+                destruct(param.name, fields)
+                    .into_iter()
+                    .map(|(name, typ)| Parameter { name, typ })
+                    .collect()
             } else {
                 vec![param.clone()]
             }
@@ -116,20 +100,14 @@ fn handle_function(
         .collect();
     *def.signature.parameters.get_mut() = parameters;
 
-    destruct_locals(
-        removed,
-        &union_tags,
-        union_tag_type.clone(),
-        def.entry_block.clone(),
-    );
+    destruct_locals(removed, unions, def.entry_block.clone());
 }
 
 /// split locally declared unions into a tag and a local variable the size of
 /// the largest value?
 fn destruct_locals(
-    mut removed: HashMap<InternedString, Shared<Type>>,
-    union_tags: &HashMap<InternedString, usize>,
-    union_tag_type: Shared<Type>,
+    mut removed: HashMap<InternedString, Vec<NamedType>>,
+    unions: &HashMap<InternedString, Vec<NamedType>>,
     entry_block: ControlFlowBlock,
 ) {
     entry_block.iter().for_each(|block| {
@@ -146,18 +124,13 @@ fn destruct_locals(
                     } => {
                         // if we have a type declaration for a union, emit value and tag variables
                         // instead
-                        if let Type::Union { .. } = &*typ.get() {
-                            removed.insert(*variable_name, typ.clone());
-                            vec![
-                                Shared::new(Statement::VariableDeclaration {
-                                    name: value_ident(*variable_name),
-                                    typ: typ.clone(),
-                                }),
-                                Shared::new(Statement::VariableDeclaration {
-                                    name: tag_ident(*variable_name),
-                                    typ: union_tag_type.clone(),
-                                }),
-                            ]
+                        if let Type::Union { fields, .. } = &*typ.get() {
+                            removed.insert(*variable_name, fields.clone());
+                            destruct(*variable_name, fields)
+                                .into_iter()
+                                .map(|(name, typ)| Statement::VariableDeclaration { name, typ })
+                                .map(Shared::new)
+                                .collect()
                         } else {
                             return vec![clone];
                         }
@@ -170,22 +143,18 @@ fn destruct_locals(
                             return vec![clone];
                         };
 
-                        if removed.contains_key(dst) || removed.contains_key(src) {
-                            vec![
-                                Shared::new(Statement::Copy {
-                                    expression: Expression::Identifier(tag_ident(*dst)),
-                                    value: Shared::new(Value::Identifier(tag_ident(*src))),
-                                }),
-                                Shared::new(Statement::Copy {
-                                    expression: Expression::Identifier(value_ident(*dst)),
-                                    value: Shared::new(Value::Identifier(value_ident(*src))),
-                                }),
-                            ]
-
-                            // assign value
-                            // assign tag
-                        } else {
-                            vec![clone]
+                        match (removed.get(src), removed.get(dst)) {
+                            (Some(src_fields), Some(dst_fields)) => destruct(*src, src_fields)
+                                .into_iter()
+                                .zip(destruct(*dst, dst_fields).into_iter())
+                                .map(|((src, _), (dst, _))| Statement::Copy {
+                                    expression: Expression::Identifier(dst),
+                                    value: Shared::new(Value::Identifier(src)),
+                                })
+                                .map(Shared::new)
+                                .collect(),
+                            (None, None) => vec![clone],
+                            _ => panic!(),
                         }
                     }
 
@@ -195,22 +164,41 @@ fn destruct_locals(
                         arguments,
                     } => {
                         // function name is a union tag constructor
-                        if let Some(tag) = union_tags.get(name) {
+
+                        // todo: tidy this up
+                        if let Some((fields, tag, named_type)) = unions
+                            .values()
+                            .flat_map(|nts| {
+                                nts.into_iter()
+                                    .enumerate()
+                                    .map(|(i, nt)| (nts.clone(), i, nt))
+                            })
+                            .find(|(_, _, nt)| nt.name == *name)
+                        {
                             if let Some(Expression::Identifier(ident)) = expression {
                                 assert_eq!(1, arguments.len());
 
-                                vec![
-                                    Shared::new(Statement::Copy {
+                                fields
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, nt)| Statement::Copy {
+                                        expression: Expression::Identifier(value_ident(
+                                            *ident, nt.name, i,
+                                        )),
+                                        value: if i == tag {
+                                            arguments[0].clone()
+                                        } else {
+                                            default_value(nt.typ.clone())
+                                        },
+                                    })
+                                    .chain([Statement::Copy {
                                         expression: Expression::Identifier(tag_ident(*ident)),
                                         value: Shared::new(Value::Literal(Shared::new(
-                                            crate::boom::Literal::Int((*tag).into()),
+                                            Literal::Int(tag.into()),
                                         ))),
-                                    }),
-                                    Shared::new(Statement::Copy {
-                                        expression: Expression::Identifier(value_ident(*ident)),
-                                        value: arguments[0].clone(),
-                                    }),
-                                ]
+                                    }])
+                                    .map(Shared::new)
+                                    .collect()
                             } else {
                                 panic!();
                             }
@@ -222,11 +210,13 @@ fn destruct_locals(
                                         .iter()
                                         .flat_map(|e| {
                                             if let Expression::Identifier(ident) = e {
-                                                if removed.contains_key(ident) {
-                                                    vec![
-                                                        Expression::Identifier(tag_ident(*ident)),
-                                                        Expression::Identifier(value_ident(*ident)),
-                                                    ]
+                                                if let Some(fields) = removed.get(ident) {
+                                                    destruct(*ident, fields)
+                                                        .into_iter()
+                                                        .map(|(name, _)| {
+                                                            Expression::Identifier(name)
+                                                        })
+                                                        .collect()
                                                 } else {
                                                     vec![Expression::Identifier(*ident)]
                                                 }
@@ -237,11 +227,13 @@ fn destruct_locals(
                                         .collect(),
                                 )),
                                 Some(Expression::Identifier(ident)) => {
-                                    if removed.contains_key(ident) {
-                                        Some(Expression::Tuple(vec![
-                                            Expression::Identifier(tag_ident(*ident)),
-                                            Expression::Identifier(value_ident(*ident)),
-                                        ]))
+                                    if let Some(fields) = removed.get(ident) {
+                                        Some(Expression::Tuple(
+                                            destruct(*ident, fields)
+                                                .into_iter()
+                                                .map(|(name, _)| Expression::Identifier(name))
+                                                .collect(),
+                                        ))
                                     } else {
                                         Some(Expression::Identifier(*ident))
                                     }
@@ -254,11 +246,12 @@ fn destruct_locals(
                                 .iter()
                                 .flat_map(|arg| {
                                     if let Value::Identifier(ident) = &*arg.get() {
-                                        if removed.contains_key(ident) {
-                                            vec![
-                                                Shared::new(Value::Identifier(tag_ident(*ident))),
-                                                Shared::new(Value::Identifier(value_ident(*ident))),
-                                            ]
+                                        if let Some(fields) = removed.get(ident) {
+                                            destruct(*ident, fields)
+                                                .into_iter()
+                                                .map(|(name, _)| Value::Identifier(name))
+                                                .map(Shared::new)
+                                                .collect()
                                         } else {
                                             vec![arg.clone()]
                                         }
@@ -284,10 +277,61 @@ fn destruct_locals(
     });
 }
 
-fn value_ident(local_union_ident: InternedString) -> InternedString {
-    format!("{local_union_ident}_value").into()
+fn destruct(
+    root_name: InternedString,
+    fields: &[NamedType],
+) -> Vec<(InternedString, Shared<Type>)> {
+    [(
+        tag_ident(root_name),
+        Shared::new(Type::Integer {
+            size: Size::Static(32),
+        }),
+    )]
+    .into_iter()
+    .chain(
+        fields
+            .iter()
+            .enumerate()
+            .map(|(tag, NamedType { name, typ })| {
+                (value_ident(root_name, *name, tag), typ.clone())
+            }),
+    )
+    .collect()
 }
 
-fn tag_ident(local_union_ident: InternedString) -> InternedString {
-    format!("{local_union_ident}_tag").into()
+fn tag_ident(ident: InternedString) -> InternedString {
+    format!("{ident}_tag").into()
+}
+
+fn value_ident(root: InternedString, variant: InternedString, tag: usize) -> InternedString {
+    format!("{root}_{variant}_{tag}").into()
+}
+
+fn default_value(typ: Shared<Type>) -> Shared<Value> {
+    match &*typ.get() {
+        Type::Unit => Shared::new(Value::Literal(Shared::new(Literal::Unit))),
+        Type::String => Shared::new(Value::Literal(Shared::new(Literal::String(
+            InternedString::from_static("default value"),
+        )))),
+        Type::Bool => Shared::new(Value::Literal(Shared::new(Literal::Bool(false)))),
+        // Type::Struct { name, fields } => Shared::new(Value::Struct {
+        //     name: *name,
+        //     fields: fields
+        //         .iter()
+        //         .cloned()
+        //         .map(|NamedType { name, typ }| NamedValue {
+        //             name,
+        //             value: default_value(typ),
+        //         })
+        //         .collect(),
+        // }),
+        Type::Integer { .. } => Shared::new(Value::Literal(Shared::new(Literal::Int(0.into())))),
+        Type::Bits { .. } => {
+            Shared::new(Value::Literal(Shared::new(Literal::Bits(vec![0.into()]))))
+        }
+        Type::Union { .. } | Type::Struct { .. } => {
+            Shared::new(Value::Literal(Shared::new(Literal::Undefined)))
+        }
+        t => todo!("{t:?}"),
+    }
 }

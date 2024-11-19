@@ -21,12 +21,12 @@ pub mod builtin_fns;
 pub mod cycle_finder;
 pub mod destruct_composites;
 pub mod destruct_unions;
-pub mod fix_exceptions;
 pub mod fold_unconditionals;
 pub mod lower_reals;
 pub mod monomorphize_vectors;
 pub mod remove_const_branch;
 pub mod remove_constant_type;
+pub mod remove_units;
 
 /// Pass that performs an operation on an AST
 pub trait Pass {
