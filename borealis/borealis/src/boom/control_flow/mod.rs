@@ -200,7 +200,7 @@ impl Eq for ControlFlowBlockWeak {}
 #[derive(Debug, Clone)]
 pub enum Terminator {
     /// Function return with value
-    Return(Value),
+    Return(Option<Value>),
     Panic(Value),
     /// If condition evaluates to true, then jump to target, otherwise jump to
     /// fallthrough

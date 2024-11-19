@@ -73,7 +73,9 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         build(
             end_block_ref,
             function.arena_mut(),
-            Statement::Return { value: read_result },
+            Statement::Return {
+                value: Some(read_result),
+            },
         );
 
         end_block_ref

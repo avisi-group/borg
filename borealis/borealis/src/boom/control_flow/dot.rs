@@ -63,11 +63,13 @@ impl Graph {
 
             let terminator = match node.terminator() {
                 Terminator::Return(value) => {
-                    let value = {
-                        let mut buf = Vec::new();
-                        boom::pretty_print::print_value(&mut buf, Shared::new(value));
-                        String::from_utf8(buf).unwrap()
-                    };
+                    let value = value
+                        .map(|value| {
+                            let mut buf = Vec::new();
+                            boom::pretty_print::print_value(&mut buf, Shared::new(value));
+                            String::from_utf8(buf).unwrap()
+                        })
+                        .unwrap_or_default();
 
                     format!("return ({value})")
                 }

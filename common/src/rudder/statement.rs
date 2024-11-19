@@ -10,7 +10,11 @@ use {
         },
         HashMap,
     },
-    alloc::{format, string::String, vec::Vec},
+    alloc::{
+        format,
+        string::{String, ToString},
+        vec::Vec,
+    },
     core::{
         cmp::Ordering,
         fmt::{self, Debug, Display},
@@ -176,7 +180,7 @@ pub enum Statement {
         members: Vec<(Ref<Block>, Ref<Statement>)>,
     },
     Return {
-        value: Ref<Statement>,
+        value: Option<Ref<Statement>>,
     },
     Select {
         condition: Ref<Statement>,
@@ -418,12 +422,13 @@ impl Statement {
     pub fn replace_use(&mut self, use_of: Ref<Statement>, with: Ref<Statement>) {
         match self.clone() {
             Self::Return { value } => {
-                let value = if value == use_of {
-                    with.clone()
-                } else {
-                    value.clone()
-                };
-
+                let value = value.map(|value| {
+                    if value == use_of {
+                        with.clone()
+                    } else {
+                        value.clone()
+                    }
+                });
                 *self = Self::Return { value };
             }
             Self::Branch {
@@ -991,7 +996,10 @@ impl Statement {
             }
 
             Self::Return { value } => {
-                format!("return {}", value)
+                format!(
+                    "return {}",
+                    value.as_ref().map(ToString::to_string).unwrap_or_default()
+                )
             }
             Self::Select {
                 condition,
@@ -1426,7 +1434,7 @@ pub fn import_statement(
         },
         Statement::PhiNode { .. } => todo!(),
         Statement::Return { value } => Statement::Return {
-            value: mapping.get(&value).unwrap().clone(),
+            value: value.map(|value| mapping.get(&value).unwrap().clone()),
         },
         Statement::Select {
             condition,

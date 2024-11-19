@@ -569,19 +569,23 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 };
             }
             Statement::Return { value } => {
-                log::trace!("writing var borealis_fn_return_value");
-                let var = self
-                    .variables
-                    .get(&InternedString::from_static("borealis_fn_return_value"))
-                    .unwrap()
-                    .clone();
+                if let Some(value) = value {
+                    log::trace!("writing var borealis_fn_return_value");
 
-                let value = statement_values
-                    .get(value)
-                    .cloned()
-                    .unwrap_or_else(|| self.emitter.constant(0, emitter::Type::Unsigned(0))); // todo: need more cohesive handling of statement values
+                    let var = self
+                        .variables
+                        .get(&InternedString::from_static("borealis_fn_return_value"))
+                        .unwrap()
+                        .clone();
 
-                self.write_variable(var, value);
+                    let value = statement_values
+                        .get(value)
+                        .cloned()
+                        .unwrap_or_else(|| self.emitter.constant(0, emitter::Type::Unsigned(0))); // todo: need more cohesive handling of statement values
+
+                    self.write_variable(var, value);
+                }
+
                 StatementResult::ControlFlow(BlockResult::Return)
             }
 

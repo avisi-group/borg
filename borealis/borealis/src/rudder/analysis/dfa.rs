@@ -206,7 +206,9 @@ impl<'a> StatementUseAnalysis<'a> {
                     self.add_use(condition, stmt);
                 }
                 Statement::Return { value } => {
-                    self.add_use(value, stmt);
+                    if let Some(value) = value {
+                        self.add_use(value, stmt);
+                    }
                 }
                 Statement::Select {
                     condition,

@@ -203,7 +203,7 @@ impl ControlFlowGraphBuilder {
         // resolve each kind of terminator
         let terminator = match &unresolved.get().terminator {
             MaybeUnresolvedTerminator::Return(ident) => {
-                Terminator::Return(Value::Identifier(*ident))
+                Terminator::Return(Some(Value::Identifier(*ident)))
             }
             MaybeUnresolvedTerminator::Undefined => Terminator::Panic(Value::Literal(Shared::new(
                 Literal::String("undefined terminator".into()),

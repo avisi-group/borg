@@ -23,7 +23,6 @@ use {
     },
     log::trace,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
-    regex::Regex,
     sailrs::shared::Shared,
     std::cmp::Ordering,
 };
@@ -318,7 +317,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         // check terminator, insert final rudder statement
         let kind = match boom_block.terminator() {
             boom::control_flow::Terminator::Return(value) => Statement::Return {
-                value: self.build_value(Shared::new(value)),
+                value: value.map(|value| self.build_value(Shared::new(value))),
             },
 
             boom::control_flow::Terminator::Conditional {
@@ -458,472 +457,1212 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         name: InternedString,
         args: &[Ref<Statement>],
     ) -> Option<Ref<Statement>> {
-        if Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$")
-            .unwrap()
-            .is_match(name.as_ref())
-        {
-            panic!("removed");
-        } else if Regex::new(r"^plain_vector_update<([0-9a-zA-Z_%<>]+)>$")
-            .unwrap()
-            .is_match(name.as_ref())
-        {
-            Some(build(
+        match name.as_ref() {
+            "%i64->%i" => {
+                // lots of %i64->%i(Int(BigInt(-1))) so disabled this check
+                // assert_eq!(Type::s64(), *args[0].typ());
+                Some(args[0].clone())
+            }
+
+            "%i->%i64" => {
+                let arena = self.statement_arena();
+                assert_eq!(args[0].get(arena).typ(arena), Type::s64());
+
+                Some(args[0].clone())
+            }
+
+            // "%string->%real" => {
+            //     let Statement::Constant { value, .. } = args[0].get(self.statement_arena()) else {
+            //         panic!();
+            //     };
+
+            //     let ConstantValue::String(str) = value else {
+            //         panic!();
+            //     };
+
+            //     let r = Ratio::<i128>::from_f64(str.as_ref().parse().unwrap()).unwrap();
+
+            //     Some(build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::Constant {
+            //             typ: (Type::Rational),
+            //             value: ConstantValue::Rational(r),
+            //         },
+            //     ))
+            // }
+            "make_the_value" | "size_itself_int" => Some(args[0].clone()),
+            // %bv, %i, %i -> %bv
+            "subrange_bits" => {
+                // end - start + 1
+                let one = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::s64()),
+                        value: ConstantValue::SignedInteger(1),
+                    },
+                );
+
+                let typ = {
+                    let arena = self.statement_arena();
+                    args[1].get(arena).typ(arena)
+                };
+                let one = cast(self.block, self.block_arena_mut(), one, typ);
+                let diff = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Sub,
+                        lhs: args[1].clone(),
+                        rhs: args[2].clone(),
+                    },
+                );
+                let len = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Add,
+                        lhs: diff.clone(),
+                        rhs: one.clone(),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitExtract {
+                        value: args[0].clone(),
+                        start: args[2].clone(),
+                        length: len,
+                    },
+                ))
+            }
+
+            "undefined_range" => Some(args[0].clone()),
+
+            "eq_bit" | "eq_bits" | "eq_int" | "eq_bool" | "eq_string" | "eq_real" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::AssignElement {
-                    vector: args[0].clone(),
-                    value: args[2].clone(),
-                    index: args[1].clone(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::CompareEqual,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
                 },
-            ))
-        } else if Regex::new(r"^plain_vector_access<([0-9a-zA-Z_%<>]+)>$")
-            .unwrap()
-            .is_match(name.as_ref())
-        {
-            panic!("removed");
-        } else {
-            match name.as_ref() {
-                "%i64->%i" => {
-                    // lots of %i64->%i(Int(BigInt(-1))) so disabled this check
-                    // assert_eq!(Type::s64(), *args[0].typ());
-                    Some(args[0].clone())
-                }
+            )),
 
-                "%i->%i64" => {
-                    let arena = self.statement_arena();
-                    assert_eq!(args[0].get(arena).typ(arena), Type::s64());
+            "neq_bits"
+            | "neq_any<ESecurityState%>"
+            | "neq_any<EFault%>"
+            | "neq_bool"
+            | "neq_int" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::CompareNotEqual,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
 
-                    Some(args[0].clone())
-                }
+            // val add_atom : (%i, %i) -> %i
+            // val add_bits : (%bv, %bv) -> %bv
+            // val add_real : (%real, %real) -> %real
+            "add_atom" | "add_bits" | "add_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::Add,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
 
-                // "%string->%real" => {
-                //     let Statement::Constant { value, .. } = args[0].get(self.statement_arena()) else {
-                //         panic!();
-                //     };
+            // val add_bits_int : (%bv, %i) -> %bv
+            "add_bits_int" => {
+                let rhs = cast(
+                    self.block,
+                    self.block_arena_mut(),
+                    args[1].clone(),
+                    Type::u64(),
+                );
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Add,
+                        lhs: args[0].clone(),
+                        rhs,
+                    },
+                ))
+            }
 
-                //     let ConstantValue::String(str) = value else {
-                //         panic!();
-                //     };
+            // val sub_bits_int : (%bv, %i) -> %bv
+            "sub_bits_int" => {
+                let rhs = cast(
+                    self.block,
+                    self.block_arena_mut(),
+                    args[1].clone(),
+                    Type::u64(),
+                );
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Sub,
+                        lhs: args[0].clone(),
+                        rhs,
+                    },
+                ))
+            }
 
-                //     let r = Ratio::<i128>::from_f64(str.as_ref().parse().unwrap()).unwrap();
+            "sub_bits" | "sub_atom" | "sub_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::Sub,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
 
-                //     Some(build(
-                //         self.block,
-                //         self.block_arena_mut(),
-                //         Statement::Constant {
-                //             typ: (Type::Rational),
-                //             value: ConstantValue::Rational(r),
-                //         },
-                //     ))
+            "mult_atom" | "mult_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::Multiply,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+
+            "tdiv_int" | "ediv_int" | "ediv_nat" | "div_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::Divide,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+
+            "emod_nat" | "_builtin_mod_nat" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::Modulo,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+
+            "negate_atom" | "neg_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::UnaryOperation {
+                    kind: UnaryOperationKind::Negate,
+                    value: args[0].clone(),
+                },
+            )),
+            "abs_int_atom" | "abs_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::UnaryOperation {
+                    kind: UnaryOperationKind::Absolute,
+                    value: args[0].clone(),
+                },
+            )),
+            "min_int" => {
+                let true_value = args[0].clone();
+                let false_value = args[1].clone();
+
+                let condition = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::CompareLessThan,
+                        lhs: true_value.clone(),
+                        rhs: false_value.clone(),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Select {
+                        condition,
+                        true_value,
+                        false_value,
+                    },
+                ))
+            }
+
+            "max_int" => {
+                let true_value = args[0].clone();
+                let false_value = args[1].clone();
+
+                let condition = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::CompareGreaterThan,
+                        lhs: true_value.clone(),
+                        rhs: false_value.clone(),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Select {
+                        condition,
+                        true_value,
+                        false_value,
+                    },
+                ))
+            }
+
+            // val ceil : (%real) -> %i
+            "ceil" => {
+                let ceil = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::UnaryOperation {
+                        kind: UnaryOperationKind::Ceil,
+                        value: args[0].clone(),
+                    },
+                );
+                Some(ceil)
+            }
+
+            // val floor : (%real) -> %i
+            "floor" => {
+                let floor = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::UnaryOperation {
+                        kind: UnaryOperationKind::Floor,
+                        value: args[0].clone(),
+                    },
+                );
+                Some(floor)
+            }
+
+            // val pow2 : (%i) -> %i
+            // val _builtin_pow2 : (%i) -> %i
+            "pow2" | "_builtin_pow2" => {
+                // WRONG!! pow2(n) is 2^n not n^2
+                // Some(build(   self.block, self.block_arena_mut(),Statement::UnaryOperation {
+                //     kind: UnaryOperationKind::Power2,
+                //     value: args[0].clone(),
+                // }))
+
+                // hopefully correct
+                // 1 << args[0]
+                let const_1 = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::s64(),
+                        value: ConstantValue::SignedInteger(1),
+                    },
+                );
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: const_1,
+                        amount: args[0].clone(),
+                    },
+                ))
+            }
+
+            // val pow_real : (%real, %i) -> %real
+            "pow_real" => {
+                // cast args[1] to i32, todo: move this to codegen cause it's a rust thing
+                let i = cast(
+                    self.block,
+                    self.block_arena_mut(),
+                    args[1].clone(),
+                    Type::s32(),
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::PowI,
+                        lhs: args[0].clone(),
+                        rhs: i,
+                    },
+                ))
+            }
+
+            "sqrt" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::UnaryOperation {
+                    kind: UnaryOperationKind::SquareRoot,
+                    value: args[0].clone(),
+                },
+            )),
+
+            "lt_int" | "lt_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::CompareLessThan,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+            "lteq_int" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::CompareLessThanOrEqual,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+            "gt_int" | "gt_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::CompareGreaterThan,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+            "gteq_int" | "gteq_real" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::CompareGreaterThanOrEqual,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+            "not_bool" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::UnaryOperation {
+                    kind: UnaryOperationKind::Not,
+                    value: args[0].clone(),
+                },
+            )),
+            "not_vec" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::UnaryOperation {
+                    kind: UnaryOperationKind::Complement,
+                    value: args[0].clone(),
+                },
+            )),
+            "and_vec" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::And,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+            "xor_vec" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::Xor,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+            "or_vec" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BinaryOperation {
+                    kind: BinaryOperationKind::Or,
+                    lhs: args[0].clone(),
+                    rhs: args[1].clone(),
+                },
+            )),
+
+            "sail_shiftright" | "_shr_int" | "_shr32" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::ShiftOperation {
+                    kind: ShiftOperationKind::LogicalShiftRight,
+                    value: args[0].clone(),
+                    amount: args[1].clone(),
+                },
+            )),
+            "sail_arith_shiftright" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::ShiftOperation {
+                    kind: ShiftOperationKind::ArithmeticShiftRight,
+                    value: args[0].clone(),
+                    amount: args[1].clone(),
+                },
+            )),
+            "sail_shiftleft" | "_shl_int" | "_shl8" | "_shl32" | "_shl1" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::ShiftOperation {
+                    kind: ShiftOperationKind::LogicalShiftLeft,
+                    value: args[0].clone(),
+                    amount: args[1].clone(),
+                },
+            )),
+
+            "slice" => {
+                // uint64 n, uint64 start, uint64 len
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitExtract {
+                        value: args[0].clone(),
+                        start: args[1].clone(),
+                        length: args[2].clone(),
+                    },
+                ))
+            }
+
+            "bitvector_access" => {
+                let length = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u64()),
+                        value: ConstantValue::UnsignedInteger(1),
+                    },
+                );
+                let bitex = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitExtract {
+                        value: args[0].clone(),
+                        start: args[1].clone(),
+                        length,
+                    },
+                );
+
+                Some(cast(self.block, self.block_arena_mut(), bitex, Type::u1()))
+            }
+
+            // val undefined_bitvector : (%i) -> %bv
+            "undefined_bitvector" => {
+                let zero = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::u64(),
+                        value: ConstantValue::UnsignedInteger(0),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::CreateBits {
+                        value: zero,
+                        length: args[0].clone(),
+                    },
+                ))
+            }
+
+            "bitvector_length" => {
+                let arena = self.statement_arena();
+                assert!(matches!(args[0].get(arena).typ(arena), Type::Bits));
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::SizeOf {
+                        value: args[0].clone(),
+                    },
+                ))
+            }
+
+            "update_fbits" => {
+                //     if ((bit & 1) == 1) {
+                //         return op | (bit << n);
+                //    } else {
+                //         return op & ~(bit << n);
+                //    }
+                let op = cast(
+                    self.block,
+                    self.block_arena_mut(),
+                    args[0].clone(),
+                    Type::u64(),
+                );
+                let n = args[1].clone();
+                let bit = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Cast {
+                        kind: CastOperationKind::ZeroExtend,
+                        typ: (Type::u64()),
+                        value: args[2].clone(),
+                    },
+                );
+
+                // 1
+                let one = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u64()),
+                        value: ConstantValue::UnsignedInteger(1),
+                    },
+                );
+
+                // (bit & 1)
+                let and = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::And,
+                        lhs: bit.clone(),
+                        rhs: one.clone(),
+                    },
+                );
+
+                //  (bit & 1) == 1
+                let condition = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::CompareEqual,
+                        lhs: and,
+                        rhs: one,
+                    },
+                );
+
+                // bit << n
+                let shift = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ShiftOperation {
+                        kind: ShiftOperationKind::LogicalShiftLeft,
+                        value: bit.clone(),
+                        amount: n,
+                    },
+                );
+
+                // op | (bit << n)
+                let true_value = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Or,
+                        lhs: op.clone(),
+                        rhs: shift.clone(),
+                    },
+                );
+
+                // ~(bit << n)
+                let inverse = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::UnaryOperation {
+                        kind: UnaryOperationKind::Complement,
+                        value: shift,
+                    },
+                );
+
+                // op & ~(bit << n)
+                let false_value = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::And,
+                        lhs: op,
+                        rhs: inverse,
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Select {
+                        condition,
+                        true_value,
+                        false_value,
+                    },
+                ))
+            }
+
+            // %bv -> %i
+            "UInt0" | "unsigned" | "_builtin_unsigned" => {
+                // just copy bits
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Cast {
+                        kind: CastOperationKind::Reinterpret,
+                        typ: Type::s64(),
+                        value: args[0].clone(),
+                    },
+                ))
+            }
+            // %bv -> %i
+            "SInt0" => {
+                //                     void sail_signed(sail_int *rop, const lbits op)
+                // {
+                //   if (op.len == 0) {
+                //     mpz_set_ui(*rop, 0);
+                //   } else {
+                //     mp_bitcnt_t sign_bit = op.len - 1;
+                //     mpz_set(*rop, *op.bits);
+                //     if (mpz_tstbit(*op.bits, sign_bit) != 0) {
+                //       /* If sign bit is unset then we are done,
+                //          otherwise clear sign_bit and subtract 2**sign_bit */
+                //       mpz_set_ui(sail_lib_tmp1, 1);
+                //       mpz_mul_2exp(sail_lib_tmp1, sail_lib_tmp1, sign_bit); /* 2**sign_bit */
+                //       mpz_combit(*rop, sign_bit); /* clear sign_bit */
+                //       mpz_sub(*rop, *rop, sail_lib_tmp1);
+                //     }
+                //   }
                 // }
-                "make_the_value" | "size_itself_int" => Some(args[0].clone()),
-                // %bv, %i, %i -> %bv
-                "subrange_bits" => {
-                    // end - start + 1
-                    let one = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::s64()), value: ConstantValue::SignedInteger(1) });
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Cast {
+                        kind: CastOperationKind::SignExtend,
+                        typ: Type::s64(),
+                        value: args[0].clone(),
+                    },
+                ))
+            }
 
-                    let typ = {
-                        let arena = self.statement_arena();
-                        args[1].get(arena).typ(arena)
+            // val ZeroExtend0 : (%bv, %i) -> %bv
+            // val sail_zero_extend : (%bv, %i) -> %bv
+            "ZeroExtend0" | "sail_zero_extend" => {
+                let length = args[1].get(self.statement_arena());
+                if let Statement::Constant { value, .. } = length {
+                    let width = match value {
+                        ConstantValue::UnsignedInteger(u) => usize::try_from(*u).unwrap(),
+                        ConstantValue::SignedInteger(i) => usize::try_from(*i).unwrap(),
+                        _ => panic!(),
                     };
-                    let one = cast(self.block, self.block_arena_mut(), one, typ);
-                    let diff = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Sub, lhs: args[1].clone(), rhs: args[2].clone() });
-                    let len = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Add, lhs: diff.clone(), rhs: one.clone() });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::BitExtract { value: args[0].clone(), start: args[2].clone(), length: len }))
-                }
-
-                "undefined_range" => Some(args[0].clone()),
-
-                "eq_bit" | "eq_bits" | "eq_int" | "eq_bool" | "eq_string" | "eq_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareEqual, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                "neq_bits" | "neq_any<ESecurityState%>" | "neq_any<EFault%>" | "neq_bool" | "neq_int" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareNotEqual, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                // val add_atom : (%i, %i) -> %i
-                // val add_bits : (%bv, %bv) -> %bv
-                // val add_real : (%real, %real) -> %real
-                "add_atom" | "add_bits" | "add_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Add, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                // val add_bits_int : (%bv, %i) -> %bv
-                "add_bits_int" => {
-                    let rhs = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::u64());
-                    Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Add, lhs: args[0].clone(), rhs }))
-                }
-
-                // val sub_bits_int : (%bv, %i) -> %bv
-                "sub_bits_int" => {
-                    let rhs = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::u64());
-                    Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Sub, lhs: args[0].clone(), rhs }))
-                }
-
-                "sub_bits" | "sub_atom" | "sub_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Sub, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                "mult_atom" | "mult_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Multiply, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                "tdiv_int" | "ediv_int" | "ediv_nat" | "div_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Divide, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                "emod_nat" | "_builtin_mod_nat" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Modulo, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                "negate_atom" | "neg_real" => Some(build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::Negate, value: args[0].clone() })),
-                "abs_int_atom" | "abs_real" => Some(build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::Absolute, value: args[0].clone() })),
-                "min_int" => {
-                    let true_value = args[0].clone();
-                    let false_value = args[1].clone();
-
-                    let condition = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareLessThan, lhs: true_value.clone(), rhs: false_value.clone() });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::Select { condition, true_value, false_value }))
-                }
-
-                "max_int" => {
-                    let true_value = args[0].clone();
-                    let false_value = args[1].clone();
-
-                    let condition = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareGreaterThan, lhs: true_value.clone(), rhs: false_value.clone() });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::Select { condition, true_value, false_value }))
-                }
-
-                // val ceil : (%real) -> %i
-                "ceil" => {
-                    let ceil = build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::Ceil, value: args[0].clone() });
-                    Some(ceil)
-                }
-
-                // val floor : (%real) -> %i
-                "floor" => {
-                    let floor = build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::Floor, value: args[0].clone() });
-                    Some(floor)
-                }
-
-                // val pow2 : (%i) -> %i
-                // val _builtin_pow2 : (%i) -> %i
-                "pow2" | "_builtin_pow2" => {
-                    // WRONG!! pow2(n) is 2^n not n^2
-                    // Some(build(   self.block, self.block_arena_mut(),Statement::UnaryOperation {
-                    //     kind: UnaryOperationKind::Power2,
-                    //     value: args[0].clone(),
-                    // }))
-
-                    // hopefully correct
-                    // 1 << args[0]
-                    let const_1 = build(self.block, self.block_arena_mut(), Statement::Constant { typ: Type::s64(), value: ConstantValue::SignedInteger(1) });
-                    Some(build(self.block, self.block_arena_mut(), Statement::ShiftOperation { kind: ShiftOperationKind::LogicalShiftLeft, value: const_1, amount: args[0].clone() }))
-                }
-
-                // val pow_real : (%real, %i) -> %real
-                "pow_real" => {
-                    // cast args[1] to i32, todo: move this to codegen cause it's a rust thing
-                    let i = cast(self.block, self.block_arena_mut(), args[1].clone(), Type::s32());
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::PowI, lhs: args[0].clone(), rhs: i }))
-                }
-
-                "sqrt" => Some(build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::SquareRoot, value: args[0].clone() })),
-
-                "lt_int" | "lt_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareLessThan, lhs: args[0].clone(), rhs: args[1].clone() })),
-                "lteq_int" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareLessThanOrEqual, lhs: args[0].clone(), rhs: args[1].clone() })),
-                "gt_int" | "gt_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareGreaterThan, lhs: args[0].clone(), rhs: args[1].clone() })),
-                "gteq_int" | "gteq_real" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareGreaterThanOrEqual, lhs: args[0].clone(), rhs: args[1].clone() })),
-                "not_bool" => Some(build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::Not, value: args[0].clone() })),
-                "not_vec" => Some(build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::Complement, value: args[0].clone() })),
-                "and_vec" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::And, lhs: args[0].clone(), rhs: args[1].clone() })),
-                "xor_vec" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Xor, lhs: args[0].clone(), rhs: args[1].clone() })),
-                "or_vec" => Some(build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Or, lhs: args[0].clone(), rhs: args[1].clone() })),
-
-                "sail_shiftright" | "_shr_int" | "_shr32" => Some(build(self.block, self.block_arena_mut(), Statement::ShiftOperation { kind: ShiftOperationKind::LogicalShiftRight, value: args[0].clone(), amount: args[1].clone() })),
-                "sail_arith_shiftright" => Some(build(self.block, self.block_arena_mut(), Statement::ShiftOperation { kind: ShiftOperationKind::ArithmeticShiftRight, value: args[0].clone(), amount: args[1].clone() })),
-                "sail_shiftleft" | "_shl_int" | "_shl8" | "_shl32" | "_shl1" => Some(build(self.block, self.block_arena_mut(), Statement::ShiftOperation { kind: ShiftOperationKind::LogicalShiftLeft, value: args[0].clone(), amount: args[1].clone() })),
-
-                "slice" => {
-                    // uint64 n, uint64 start, uint64 len
-                    Some(build(self.block, self.block_arena_mut(), Statement::BitExtract { value: args[0].clone(), start: args[1].clone(), length: args[2].clone() }))
-                }
-
-                "bitvector_access" => {
-                    let length = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u64()), value: ConstantValue::UnsignedInteger(1) });
-                    let bitex = build(self.block, self.block_arena_mut(), Statement::BitExtract { value: args[0].clone(), start: args[1].clone(), length });
-
-                    Some(cast(self.block, self.block_arena_mut(), bitex, Type::u1()))
-                }
-
-                // val undefined_bitvector : (%i) -> %bv
-                "undefined_bitvector" => {
-                    let zero = build(self.block, self.block_arena_mut(), Statement::Constant { typ: Type::u64(), value: ConstantValue::UnsignedInteger(0) });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::CreateBits { value: zero, length: args[0].clone() }))
-                }
-
-                "bitvector_length" => {
-                    let arena = self.statement_arena();
-                    assert!(matches!(args[0].get(arena).typ(arena), Type::Bits));
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::SizeOf { value: args[0].clone() }))
-                }
-
-                "update_fbits" => {
-                    //     if ((bit & 1) == 1) {
-                    //         return op | (bit << n);
-                    //    } else {
-                    //         return op & ~(bit << n);
-                    //    }
-                    let op = cast(self.block, self.block_arena_mut(), args[0].clone(), Type::u64());
-                    let n = args[1].clone();
-                    let bit = build(self.block, self.block_arena_mut(), Statement::Cast { kind: CastOperationKind::ZeroExtend, typ: (Type::u64()), value: args[2].clone() });
-
-                    // 1
-                    let one = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u64()), value: ConstantValue::UnsignedInteger(1) });
-
-                    // (bit & 1)
-                    let and = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::And, lhs: bit.clone(), rhs: one.clone() });
-
-                    //  (bit & 1) == 1
-                    let condition = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::CompareEqual, lhs: and, rhs: one });
-
-                    // bit << n
-                    let shift = build(self.block, self.block_arena_mut(), Statement::ShiftOperation { kind: ShiftOperationKind::LogicalShiftLeft, value: bit.clone(), amount: n });
-
-                    // op | (bit << n)
-                    let true_value = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Or, lhs: op.clone(), rhs: shift.clone() });
-
-                    // ~(bit << n)
-                    let inverse = build(self.block, self.block_arena_mut(), Statement::UnaryOperation { kind: UnaryOperationKind::Complement, value: shift });
-
-                    // op & ~(bit << n)
-                    let false_value = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::And, lhs: op, rhs: inverse });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::Select { condition, true_value, false_value }))
-                }
-
-                // %bv -> %i
-                "UInt0" | "unsigned" | "_builtin_unsigned" => {
-                    // just copy bits
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::Cast { kind: CastOperationKind::Reinterpret, typ: Type::s64(), value: args[0].clone() }))
-                }
-                // %bv -> %i
-                "SInt0" => {
-                    //                     void sail_signed(sail_int *rop, const lbits op)
-                    // {
-                    //   if (op.len == 0) {
-                    //     mpz_set_ui(*rop, 0);
-                    //   } else {
-                    //     mp_bitcnt_t sign_bit = op.len - 1;
-                    //     mpz_set(*rop, *op.bits);
-                    //     if (mpz_tstbit(*op.bits, sign_bit) != 0) {
-                    //       /* If sign bit is unset then we are done,
-                    //          otherwise clear sign_bit and subtract 2**sign_bit */
-                    //       mpz_set_ui(sail_lib_tmp1, 1);
-                    //       mpz_mul_2exp(sail_lib_tmp1, sail_lib_tmp1, sign_bit); /* 2**sign_bit */
-                    //       mpz_combit(*rop, sign_bit); /* clear sign_bit */
-                    //       mpz_sub(*rop, *rop, sail_lib_tmp1);
-                    //     }
-                    //   }
-                    // }
-                    Some(build(self.block, self.block_arena_mut(), Statement::Cast { kind: CastOperationKind::SignExtend, typ: Type::s64(), value: args[0].clone() }))
-                }
-
-                // val ZeroExtend0 : (%bv, %i) -> %bv
-                // val sail_zero_extend : (%bv, %i) -> %bv
-                "ZeroExtend0" | "sail_zero_extend" => {
-                    let length = args[1].get(self.statement_arena());
-                    if let Statement::Constant { value, .. } = length {
-                        let width = match value {
-                            ConstantValue::UnsignedInteger(u) => usize::try_from(*u).unwrap(),
-                            ConstantValue::SignedInteger(i) => usize::try_from(*i).unwrap(),
-                            _ => panic!(),
-                        };
-                        Some(build(self.block, self.block_arena_mut(), Statement::Cast { kind: CastOperationKind::ZeroExtend, typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, width)), value: args[0].clone() }))
-                    } else {
-                        Some(build(self.block, self.block_arena_mut(), Statement::BitsCast { kind: CastOperationKind::ZeroExtend, typ: (Type::Bits), value: args[0], length: args[1] }))
-                    }
-                }
-
-                // val SignExtend0 : (%bv, %i) -> %bv
-                // val sail_sign_extend : (%bv, %i) -> %bv
-                "SignExtend0" | "sail_sign_extend" => match (args[0].get(self.statement_arena()).typ(self.statement_arena()).clone(), args[1].get(self.statement_arena()).clone()) {
-                    (Type::Primitive(PrimitiveType { tc: PrimitiveTypeClass::UnsignedInteger, .. }), Statement::Constant { value: ConstantValue::SignedInteger(length), .. }) => Some(build(
+                    Some(build(
                         self.block,
                         self.block_arena_mut(),
                         Statement::Cast {
-                            kind: CastOperationKind::SignExtend,
-                            typ: Type::Primitive(PrimitiveType { tc: PrimitiveTypeClass::UnsignedInteger, element_width_in_bits: usize::try_from(length).unwrap() }),
-                            value: args[0],
+                            kind: CastOperationKind::ZeroExtend,
+                            typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, width)),
+                            value: args[0].clone(),
                         },
-                    )),
-                    (Type::Bits, _) => Some(build(self.block, self.block_arena_mut(), Statement::BitsCast { kind: CastOperationKind::SignExtend, typ: (Type::Bits), value: args[0].clone(), length: args[1].clone() })),
-                    (_, _) => todo!("sail extend {:?} {:?}", args[0], args[1]),
-                },
-
-                // val truncate : (%bv, %i) -> %bv
-                "truncate" => Some(build(self.block, self.block_arena_mut(), Statement::BitsCast { kind: CastOperationKind::Truncate, typ: (Type::Bits), value: args[0].clone(), length: args[1].clone() })),
-
-                "sail_zeros" => {
-                    let length = args[0].clone();
-
-                    let const_0 = build(self.block, self.block_arena_mut(), Statement::Constant { typ: Type::u64(), value: ConstantValue::UnsignedInteger(0) });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::CreateBits { value: const_0, length }))
+                    ))
+                } else {
+                    Some(build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::BitsCast {
+                            kind: CastOperationKind::ZeroExtend,
+                            typ: (Type::Bits),
+                            value: args[0],
+                            length: args[1],
+                        },
+                    ))
                 }
-
-                "sail_assert" => Some(build(self.block, self.block_arena_mut(), Statement::Assert { condition: args[0].clone() })),
-
-                // val bitvector_update : (%bv, %i, %bit) -> %bv
-                "bitvector_update" => {
-                    let target = args[0];
-                    let i = args[1];
-
-                    assert_eq!(args[2].get(self.statement_arena()).typ(self.statement_arena()), Type::u1());
-
-                    let bit = args[2];
-
-                    let const_1 = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u64()), value: ConstantValue::UnsignedInteger(1) });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::BitInsert { target, source: bit, start: i, length: const_1 }))
-                }
-
-                // val append_64 : (%bv, %bv64) -> %bv
-                "append_64" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
-
-                "bitvector_concat" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
-
-                // val set_slice_int : (%i, %i, %i, %bv) -> %i
-                "set_slice_int" => {
-                    // const sail_int len, const sail_int n, const sail_int start, const lbits slice
-                    let len = args[0].clone();
-                    let n = args[1].clone();
-                    let start = args[2].clone();
-
-                    // cast the slice from a %bv to a i128 for the i128 version of bit-insert
-                    let slice = args[3].clone();
-
-                    // destination[start..] = source[0..source.len()]
-                    // todo: check correctness and write some unit tests for this
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::BitInsert { target: n, source: slice, start, length: len }))
-                }
-
-                //val get_slice_int : (%i, %i, %i) -> %bv
-                "get_slice_int" => {
-                    let extract = build(self.block, self.block_arena_mut(), Statement::BitExtract { value: args[1].clone(), start: args[2].clone(), length: args[0].clone() });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::CreateBits { value: extract, length: args[0].clone() }))
-                }
-
-                // val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv
-                "set_slice_bits" => {
-                    // len, slen, x, pos, y
-                    let _len = args[0].clone();
-                    let slen = args[1].clone();
-                    let destination = args[2].clone();
-                    let start = args[3].clone();
-                    let source = args[4].clone();
-
-                    // destination[start..] = source[0..source.len()]
-                    Some(build(self.block, self.block_arena_mut(), Statement::BitInsert { target: destination, source, start, length: slen }))
-                }
-
-                "update_subrange_bits" => {
-                    let destination = args[0].clone();
-                    let end = args[1].clone();
-                    let start = args[2].clone();
-                    let source = args[3].clone();
-
-                    let sum = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Sub, lhs: end, rhs: start.clone() });
-
-                    let const_1 = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u64()), value: ConstantValue::UnsignedInteger(1) });
-
-                    let source_length = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Add, lhs: sum, rhs: const_1 });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::BitInsert { target: destination, source, start, length: source_length }))
-                }
-
-                "replicate_bits" => Some(build(self.block, self.block_arena_mut(), Statement::Call { target: REPLICATE_BITS_BOREALIS_INTERNAL.name(), args: vec![args[0].clone(), args[1].clone()], return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type() })),
-
-                /* ### NON-BUILTIN FUNCTIONS BELOW THIS POINT ### */
-                "AddWithCarry" => {
-                    let x = args[0].clone();
-                    let y = args[1].clone();
-                    let carry_in = args[2].clone();
-
-                    let sum = build(self.block, self.block_arena_mut(), Statement::TernaryOperation { kind: TernaryOperationKind::AddWithCarry, a: x, b: y, c: carry_in });
-
-                    // nzcv bv4
-                    let flags = build(self.block, self.block_arena_mut(), Statement::GetFlags { operation: sum.clone() });
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::CreateTuple(vec![sum, flags])))
-                }
-
-                /* To maintain correctness, borealis must only specialize on actual Sail compiler builtins, specializing other functions means restricting compatibiliy on a specific model, however memory access is the one exception to this, and must be intercepted */
-                "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
-                    let _request = args[0].clone();
-                    let _addrsize = args[1].clone();
-                    let phys_addr = args[2].clone();
-                    let n = args[3].clone();
-
-                    let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
-
-                    let const_8 = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u64()), value: ConstantValue::UnsignedInteger(8) });
-                    let size_bits = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Multiply, lhs: size_bytes, rhs: const_8 });
-
-                    let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
-
-                    Some(build(self.block, self.block_arena_mut(), Statement::ReadMemory { offset, size: size_bits }))
-                }
-
-                "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" | "write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
-                    let _request = args[0].clone();
-                    let _addrsize = args[1].clone();
-                    let phys_addr = args[2].clone();
-                    let n = args[3].clone();
-                    let data = args[4].clone();
-
-                    let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
-
-                    let const_8 = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u64()), value: ConstantValue::UnsignedInteger(8) });
-                    let size_bits = build(self.block, self.block_arena_mut(), Statement::BinaryOperation { kind: BinaryOperationKind::Multiply, lhs: size_bytes, rhs: const_8 });
-
-                    let value = build(self.block, self.block_arena_mut(), Statement::BitsCast { kind: CastOperationKind::Truncate, typ: Type::Bits, value: data, length: size_bits });
-                    let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
-
-                    build(self.block, self.block_arena_mut(), Statement::WriteMemory { offset, value });
-
-                    // return value also appears to be always ignored
-                    Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u1()), value: ConstantValue::UnsignedInteger(0) }))
-                }
-
-                // ignore
-                "append_str" | "__monomorphize" | "concat_str" => Some(args[0].clone()),
-
-                // result of sail_mem_read always appears to ignore the value returned by `read_tag#` (underscore in Ok((value, _))):
-                // match sail_mem_read(read_request(accdesc, translation_info, size, desc.vaddress, desc.paddress.address)) {
-                //     Ok((value, _)) => (CreatePhysMemRetStatus(Fault_None), value),
-                //     Err(statuscode) => (CreatePhysMemRetStatus(statuscode), sail_zeros(8 * size))
-                //   }
-                "read_tag#" => Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u1()), value: ConstantValue::UnsignedInteger(1) })),
-                "write_tag#" => {
-                    let msg = build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::String), value: ConstantValue::String("write_tag panic".into()) });
-                    Some(build(self.block, self.block_arena_mut(), Statement::Panic(msg)))
-                }
-
-                "DecStr" | "bits_str" | "HexStr" => Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::String), value: ConstantValue::String("fix me in build_specialized_function".into()) })),
-
-                // todo: remove me!
-                "HaveBRBExt" | "HaveStatisticalProfiling" | "HaveGCS" => Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u1()), value: ConstantValue::UnsignedInteger(0) })),
-
-                "__GetVerbosity" => Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::u64()), value: ConstantValue::UnsignedInteger(0) })),
-
-                "get_cycle_count" => Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: Type::s64(), value: ConstantValue::SignedInteger(0) })),
-
-                // requires u256 internally :(
-                "SHA256hash" => Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)), value: ConstantValue::UnsignedInteger(0) })),
-
-                // val putchar : (%i) -> %unit
-                "putchar" => Some(build(self.block, self.block_arena_mut(), Statement::Panic(args[0].clone()))),
-
-                "AArch64_DC" | "execute_aarch64_instrs_system_barriers_dmb" | "execute_aarch64_instrs_system_barriers_dsb" | "execute_aarch64_instrs_system_barriers_isb" | "sail_return_exception" | "sail_branch_announce" | "sail_tlbi" | "prerr_bits" | "prerr_int" | "sail_cache_op" | "sail_barrier" | "__WakeupRequest" | "print" | "print_endline" | "check_cycle_count" | "sail_take_exception" => Some(build(self.block, self.block_arena_mut(), Statement::Constant { typ: (Type::unit()), value: ConstantValue::Unit })),
-                _ => None,
             }
+
+            // val SignExtend0 : (%bv, %i) -> %bv
+            // val sail_sign_extend : (%bv, %i) -> %bv
+            "SignExtend0" | "sail_sign_extend" => match (
+                args[0]
+                    .get(self.statement_arena())
+                    .typ(self.statement_arena())
+                    .clone(),
+                args[1].get(self.statement_arena()).clone(),
+            ) {
+                (
+                    Type::Primitive(PrimitiveType {
+                        tc: PrimitiveTypeClass::UnsignedInteger,
+                        ..
+                    }),
+                    Statement::Constant {
+                        value: ConstantValue::SignedInteger(length),
+                        ..
+                    },
+                ) => Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Cast {
+                        kind: CastOperationKind::SignExtend,
+                        typ: Type::Primitive(PrimitiveType {
+                            tc: PrimitiveTypeClass::UnsignedInteger,
+                            element_width_in_bits: usize::try_from(length).unwrap(),
+                        }),
+                        value: args[0],
+                    },
+                )),
+                (Type::Bits, _) => Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitsCast {
+                        kind: CastOperationKind::SignExtend,
+                        typ: (Type::Bits),
+                        value: args[0].clone(),
+                        length: args[1].clone(),
+                    },
+                )),
+                (_, _) => todo!("sail extend {:?} {:?}", args[0], args[1]),
+            },
+
+            // val truncate : (%bv, %i) -> %bv
+            "truncate" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::BitsCast {
+                    kind: CastOperationKind::Truncate,
+                    typ: (Type::Bits),
+                    value: args[0].clone(),
+                    length: args[1].clone(),
+                },
+            )),
+
+            "sail_zeros" => {
+                let length = args[0].clone();
+
+                let const_0 = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::u64(),
+                        value: ConstantValue::UnsignedInteger(0),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::CreateBits {
+                        value: const_0,
+                        length,
+                    },
+                ))
+            }
+
+            "sail_assert" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Assert {
+                    condition: args[0].clone(),
+                },
+            )),
+
+            // val bitvector_update : (%bv, %i, %bit) -> %bv
+            "bitvector_update" => {
+                let target = args[0];
+                let i = args[1];
+
+                assert_eq!(
+                    args[2]
+                        .get(self.statement_arena())
+                        .typ(self.statement_arena()),
+                    Type::u1()
+                );
+
+                let bit = args[2];
+
+                let const_1 = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u64()),
+                        value: ConstantValue::UnsignedInteger(1),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitInsert {
+                        target,
+                        source: bit,
+                        start: i,
+                        length: const_1,
+                    },
+                ))
+            }
+
+            // val append_64 : (%bv, %bv64) -> %bv
+            "append_64" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
+
+            "bitvector_concat" => Some(self.generate_concat(args[0].clone(), args[1].clone())),
+
+            // val set_slice_int : (%i, %i, %i, %bv) -> %i
+            "set_slice_int" => {
+                // const sail_int len, const sail_int n, const sail_int start, const lbits slice
+                let len = args[0].clone();
+                let n = args[1].clone();
+                let start = args[2].clone();
+
+                // cast the slice from a %bv to a i128 for the i128 version of bit-insert
+                let slice = args[3].clone();
+
+                // destination[start..] = source[0..source.len()]
+                // todo: check correctness and write some unit tests for this
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitInsert {
+                        target: n,
+                        source: slice,
+                        start,
+                        length: len,
+                    },
+                ))
+            }
+
+            //val get_slice_int : (%i, %i, %i) -> %bv
+            "get_slice_int" => {
+                let extract = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitExtract {
+                        value: args[1].clone(),
+                        start: args[2].clone(),
+                        length: args[0].clone(),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::CreateBits {
+                        value: extract,
+                        length: args[0].clone(),
+                    },
+                ))
+            }
+
+            // val set_slice_bits : (%i, %i, %bv, %i, %bv) -> %bv
+            "set_slice_bits" => {
+                // len, slen, x, pos, y
+                let _len = args[0].clone();
+                let slen = args[1].clone();
+                let destination = args[2].clone();
+                let start = args[3].clone();
+                let source = args[4].clone();
+
+                // destination[start..] = source[0..source.len()]
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitInsert {
+                        target: destination,
+                        source,
+                        start,
+                        length: slen,
+                    },
+                ))
+            }
+
+            "update_subrange_bits" => {
+                let destination = args[0].clone();
+                let end = args[1].clone();
+                let start = args[2].clone();
+                let source = args[3].clone();
+
+                let sum = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Sub,
+                        lhs: end,
+                        rhs: start.clone(),
+                    },
+                );
+
+                let const_1 = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u64()),
+                        value: ConstantValue::UnsignedInteger(1),
+                    },
+                );
+
+                let source_length = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Add,
+                        lhs: sum,
+                        rhs: const_1,
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitInsert {
+                        target: destination,
+                        source,
+                        start,
+                        length: source_length,
+                    },
+                ))
+            }
+
+            "replicate_bits" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Call {
+                    target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
+                    args: vec![args[0].clone(), args[1].clone()],
+                    return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
+                },
+            )),
+
+            /* ### NON-BUILTIN FUNCTIONS BELOW THIS POINT ### */
+            "AddWithCarry" => {
+                let x = args[0].clone();
+                let y = args[1].clone();
+                let carry_in = args[2].clone();
+
+                let sum = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::TernaryOperation {
+                        kind: TernaryOperationKind::AddWithCarry,
+                        a: x,
+                        b: y,
+                        c: carry_in,
+                    },
+                );
+
+                // nzcv bv4
+                let flags = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::GetFlags {
+                        operation: sum.clone(),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::CreateTuple(vec![sum, flags]),
+                ))
+            }
+
+            /* To maintain correctness, borealis must only specialize on actual Sail compiler builtins, specializing other functions means restricting compatibiliy on a specific model, however memory access is the one exception to this, and must be intercepted */
+            "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+            | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+            | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
+                let _request = args[0].clone();
+                let _addrsize = args[1].clone();
+                let phys_addr = args[2].clone();
+                let n = args[3].clone();
+
+                let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
+
+                let const_8 = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u64()),
+                        value: ConstantValue::UnsignedInteger(8),
+                    },
+                );
+                let size_bits = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Multiply,
+                        lhs: size_bytes,
+                        rhs: const_8,
+                    },
+                );
+
+                let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ReadMemory {
+                        offset,
+                        size: size_bits,
+                    },
+                ))
+            }
+
+            "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+            | "write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
+                let _request = args[0].clone();
+                let _addrsize = args[1].clone();
+                let phys_addr = args[2].clone();
+                let n = args[3].clone();
+                let data = args[4].clone();
+
+                let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
+
+                let const_8 = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u64()),
+                        value: ConstantValue::UnsignedInteger(8),
+                    },
+                );
+                let size_bits = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::Multiply,
+                        lhs: size_bytes,
+                        rhs: const_8,
+                    },
+                );
+
+                let value = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BitsCast {
+                        kind: CastOperationKind::Truncate,
+                        typ: Type::Bits,
+                        value: data,
+                        length: size_bits,
+                    },
+                );
+                let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
+
+                build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::WriteMemory { offset, value },
+                );
+
+                // return value also appears to be always ignored
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::u1()),
+                        value: ConstantValue::UnsignedInteger(0),
+                    },
+                ))
+            }
+
+            // ignore
+            "append_str" | "__monomorphize" | "concat_str" => Some(args[0].clone()),
+
+            // result of sail_mem_read always appears to ignore the value returned by `read_tag#` (underscore in Ok((value, _))):
+            // match sail_mem_read(read_request(accdesc, translation_info, size, desc.vaddress, desc.paddress.address)) {
+            //     Ok((value, _)) => (CreatePhysMemRetStatus(Fault_None), value),
+            //     Err(statuscode) => (CreatePhysMemRetStatus(statuscode), sail_zeros(8 * size))
+            //   }
+            "read_tag#" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: (Type::u1()),
+                    value: ConstantValue::UnsignedInteger(1),
+                },
+            )),
+            "write_tag#" => {
+                let msg = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::String),
+                        value: ConstantValue::String("write_tag panic".into()),
+                    },
+                );
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Panic(msg),
+                ))
+            }
+
+            "DecStr" | "bits_str" | "HexStr" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: (Type::String),
+                    value: ConstantValue::String("fix me in build_specialized_function".into()),
+                },
+            )),
+
+            // todo: remove me!
+            "HaveBRBExt" | "HaveStatisticalProfiling" | "HaveGCS" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: (Type::u1()),
+                    value: ConstantValue::UnsignedInteger(0),
+                },
+            )),
+
+            "__GetVerbosity" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: (Type::u64()),
+                    value: ConstantValue::UnsignedInteger(0),
+                },
+            )),
+
+            "get_cycle_count" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: Type::s64(),
+                    value: ConstantValue::SignedInteger(0),
+                },
+            )),
+
+            // requires u256 internally :(
+            "SHA256hash" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
+                    value: ConstantValue::UnsignedInteger(0),
+                },
+            )),
+
+            // val putchar : (%i) -> %unit
+            "putchar" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Panic(args[0].clone()),
+            )),
+
+            "AArch64_DC"
+            | "execute_aarch64_instrs_system_barriers_dmb"
+            | "execute_aarch64_instrs_system_barriers_dsb"
+            | "execute_aarch64_instrs_system_barriers_isb"
+            | "sail_return_exception"
+            | "sail_branch_announce"
+            | "sail_tlbi"
+            | "prerr_bits"
+            | "prerr_int"
+            | "sail_cache_op"
+            | "sail_barrier"
+            | "__WakeupRequest"
+            | "print"
+            | "print_endline"
+            | "check_cycle_count"
+            | "sail_take_exception" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: (Type::unit()),
+                    value: ConstantValue::Unit,
+                },
+            )),
+            _ => None,
         }
     }
 

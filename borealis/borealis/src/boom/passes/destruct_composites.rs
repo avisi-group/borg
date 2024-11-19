@@ -306,10 +306,10 @@ fn destruct_local_structs(
 
         block.set_statements(destructed);
 
-        if let Terminator::Return(Value::Identifier(return_value_ident)) = block.terminator() {
+        if let Terminator::Return(Some(Value::Identifier(return_value_ident))) = block.terminator() {
             // done to distinguish structs of one element (converted to unary tuple) from a single return value
             if removed_items.contains_key(&return_value_ident) {
-                   block.set_terminator(Terminator::Return(Value::Tuple(split_arguments(&[Shared::new(Value::Identifier(return_value_ident))], &removed_items))));
+                   block.set_terminator(Terminator::Return(Some(Value::Tuple(split_arguments(&[Shared::new(Value::Identifier(return_value_ident))], &removed_items)))));
             }
         }
     });

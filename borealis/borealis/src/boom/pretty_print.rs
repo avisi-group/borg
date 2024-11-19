@@ -153,7 +153,9 @@ impl<'writer, W: Write> PrettyPrinter<'writer, W> {
                 match b.terminator() {
                     Terminator::Return(value) => {
                         write!(self.writer, "        return ").unwrap();
-                        self.visit_value(Shared::new(value));
+                        if let Some(value) = value {
+                            self.visit_value(Shared::new(value));
+                        }
                         writeln!(self.writer, ";").unwrap();
                     }
                     Terminator::Conditional {

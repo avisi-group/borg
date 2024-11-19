@@ -88,9 +88,9 @@ impl Ast {
                     ],
                 }),
             ]);
-            entry_block.set_terminator(control_flow::Terminator::Return(Value::Identifier(
+            entry_block.set_terminator(control_flow::Terminator::Return(Some(Value::Identifier(
                 "return".into(),
-            )));
+            ))));
             ast.functions.insert(
                 "add_with_carry_test".into(),
                 FunctionDefinition {

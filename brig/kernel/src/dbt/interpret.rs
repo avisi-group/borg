@@ -30,7 +30,7 @@ pub fn interpret(
     function_name: &str,
     arguments: &[Value],
     register_file: *mut u8,
-) -> Value {
+) -> Option<Value> {
     log::debug!("interpreting {function_name}");
     let function_name = InternedString::from(function_name);
     let function = model.functions().get(&function_name).unwrap();
@@ -350,12 +350,12 @@ impl<'f> Interpreter<'f> {
                         self.function_name
                     );
 
-                    Some(interpret(
+                    interpret(
                         &self.model,
                         target.as_ref(),
                         &args.iter().map(|a| self.resolve(a)).collect::<Vec<_>>(),
                         self.register_file,
-                    ))
+                    )
                 }
                 Statement::Cast {
                     kind,
@@ -680,7 +680,7 @@ impl<'f> Interpreter<'f> {
                 }
 
                 Statement::Return { value } => {
-                    return BlockResult::ReturnValue(self.resolve(value));
+                    return BlockResult::ReturnValue(value.map(|value| self.resolve(value)));
                 }
 
                 Statement::Panic(v) => {
@@ -1018,7 +1018,7 @@ impl Div for Value {
 
 enum BlockResult {
     NextBlock(Ref<Block>),
-    ReturnValue(Value),
+    ReturnValue(Option<Value>),
 }
 
 fn sign_extend(value: i64, source_width: usize, dest_width: usize) -> i64 {

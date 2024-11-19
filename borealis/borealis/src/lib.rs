@@ -460,7 +460,7 @@ fn example_functions() -> HashMap<InternedString, Function> {
             offset: _24,
             value: call2,
         });
-        let ret = s_arena.insert(Statement::Return { value: _unit });
+        let ret = s_arena.insert(Statement::Return { value: Some(_unit) });
         entry_block.set_statements(
             [_unit, _0, _8, _16, _24, r0, r1, call1, r2, call2, w3, ret].into_iter(),
         );
@@ -484,7 +484,7 @@ fn example_functions() -> HashMap<InternedString, Function> {
             lhs: left,
             rhs: right,
         });
-        let ret = s_arena.insert(Statement::Return { value: add });
+        let ret = s_arena.insert(Statement::Return { value: Some(add) });
         entry_block.set_statements([left, right, add, ret].into_iter());
     }
     fns.insert(f1.name(), f1);
@@ -611,7 +611,7 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
                 offset: _16,
                 value: read,
             });
-            let ret = s_arena.insert(Statement::Return { value: read });
+            let ret = s_arena.insert(Statement::Return { value: Some(read) });
             g.set_statements([read, _16, w, ret].into_iter());
         }
     }

@@ -33,12 +33,12 @@ impl Pass for LowerReals {
             .unwrap()
             .entry_block = {
             let block = ControlFlowBlock::new();
-            block.set_terminator(Terminator::Return(Value::Tuple(vec![
+            block.set_terminator(Terminator::Return(Some(Value::Tuple(vec![
                 Shared::new(Value::Identifier("p0".into())),
                 Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(
                     1.into(),
                 )))),
-            ])));
+            ]))));
             block
         };
 

@@ -1,7 +1,6 @@
 use {
     crate::boom::{
-        control_flow::Terminator, passes::Pass, Ast, Expression, Literal, Size, Statement, Type,
-        Value,
+        control_flow::Terminator, passes::Pass, Ast, Expression, Literal, Statement, Type, Value,
     },
     common::{intern::InternedString, HashSet},
     sailrs::shared::Shared,
@@ -93,12 +92,9 @@ impl Pass for RemoveUnits {
                         .collect(),
                 );
 
-                if let Terminator::Return(Value::Identifier(ident)) = b.terminator() {
+                if let Terminator::Return(Some(Value::Identifier(ident))) = b.terminator() {
                     if removed.contains(&ident) {
-                        // todo: should be option<value>
-                        b.set_terminator(Terminator::Return(Value::Literal(Shared::new(
-                            Literal::Unit,
-                        ))));
+                        b.set_terminator(Terminator::Return(None));
                     }
                 }
             });
