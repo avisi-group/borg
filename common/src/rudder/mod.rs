@@ -1,14 +1,16 @@
-use crate::{
-    intern::InternedString,
-    rudder::{
-        function::Function,
-        types::{maybe_type_to_string, Type},
+use {
+    crate::{
+        intern::InternedString,
+        rudder::{
+            function::Function,
+            types::{maybe_type_to_string, Type},
+        },
+        HashMap,
     },
-    HashMap,
+    alloc::format,
+    core::fmt::{self, Display, Formatter},
+    itertools::Itertools,
 };
-use alloc::{borrow::ToOwned, format, string::ToString};
-use core::fmt::{self, Display, Formatter};
-use itertools::Itertools;
 
 pub mod block;
 pub mod constant_value;

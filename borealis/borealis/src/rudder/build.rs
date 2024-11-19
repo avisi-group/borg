@@ -32,9 +32,9 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 
     // DEFINITION ORDER DEPENDANT!!!
     // ast.definitions.iter().for_each(|def| match def {
-    //     boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name, fields),
-    //     // todo contains KV pairs, "mangled" and "tuplestruct" as keys and type names as values
-    //     boom::Definition::Pragma { .. } => (),
+    //     boom::Definition::Struct { name, fields } => build_ctx.add_struct(*name,
+    // fields),     // todo contains KV pairs, "mangled" and "tuplestruct" as
+    // keys and type names as values     boom::Definition::Pragma { .. } => (),
     // });
 
     ast.registers.iter().for_each(|(name, typ)| {
@@ -66,10 +66,6 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 
 #[derive(Default)]
 struct BuildContext {
-    /// Name of struct maps to the rudder type and a map of field names to field
-    /// indices
-    structs: HashMap<InternedString, (Type, HashMap<InternedString, usize>)>,
-
     /// Name of enum maps to the rudder type and a map of enum variants to the
     /// integer discriminant of that variant
     enums: HashMap<InternedString, (Type, HashMap<InternedString, u32>)>,
@@ -96,25 +92,6 @@ impl BuildContext {
 
         // 8 byte aligned
         self.next_register_offset += typ.width_bytes().next_multiple_of(8)
-    }
-
-    fn add_struct(&mut self, name: InternedString, fields: &[boom::NamedType]) {
-        let typ = Type::Struct(
-            fields
-                .iter()
-                .map(|boom::NamedType { name, typ }| (*name, self.resolve_type(typ.clone())))
-                .collect(),
-        );
-
-        let fields = fields
-            .iter()
-            .enumerate()
-            .map(|(idx, boom::NamedType { name, .. })| (*name, idx))
-            .collect();
-
-        if self.structs.insert(name, (typ, fields)).is_some() {
-            panic!("struct with name {name} already added");
-        }
     }
 
     fn add_function(&mut self, name: InternedString, definition: &boom::FunctionDefinition) {
@@ -476,8 +453,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
 
             // "%string->%real" => {
-            //     let Statement::Constant { value, .. } = args[0].get(self.statement_arena()) else {
-            //         panic!();
+            //     let Statement::Constant { value, .. } = args[0].get(self.statement_arena()) else
+            // {         panic!();
             //     };
 
             //     let ConstantValue::String(str) = value else {
@@ -1460,7 +1437,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ))
             }
 
-            /* To maintain correctness, borealis must only specialize on actual Sail compiler builtins, specializing other functions means restricting compatibiliy on a specific model, however memory access is the one exception to this, and must be intercepted */
+            /* To maintain correctness, borealis must only specialize on actual Sail compiler
+             * builtins, specializing other functions means restricting compatibiliy on a
+             * specific model, however memory access is the one exception to this, and must be
+             * intercepted */
             "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
             | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
             | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
@@ -1561,8 +1541,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             // ignore
             "append_str" | "__monomorphize" | "concat_str" => Some(args[0].clone()),
 
-            // result of sail_mem_read always appears to ignore the value returned by `read_tag#` (underscore in Ok((value, _))):
-            // match sail_mem_read(read_request(accdesc, translation_info, size, desc.vaddress, desc.paddress.address)) {
+            // result of sail_mem_read always appears to ignore the value returned by `read_tag#`
+            // (underscore in Ok((value, _))): match sail_mem_read(read_request(accdesc,
+            // translation_info, size, desc.vaddress, desc.paddress.address)) {
             //     Ok((value, _)) => (CreatePhysMemRetStatus(Fault_None), value),
             //     Err(statuscode) => (CreatePhysMemRetStatus(statuscode), sail_zeros(8 * size))
             //   }
@@ -1834,7 +1815,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::CreateTuple(values),
                 );
             }
-            boom::Value::Struct { name, fields } => {
+            boom::Value::Struct { name, .. } => {
                 let c = build(
                     self.block,
                     self.block_arena_mut(),
@@ -1846,7 +1827,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 );
                 return build(self.block, self.block_arena_mut(), Statement::Panic(c));
-                //      panic!("got struct {name} {fields:?} but structs should have been removed in boom")
+                // todo: do whatever to enable this panic
+                //      panic!("got struct {name} {fields:?} but structs should
+                // have been removed in boom")
             }
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),

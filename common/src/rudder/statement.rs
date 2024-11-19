@@ -11,7 +11,6 @@ use {
         HashMap,
     },
     alloc::{
-        borrow::ToOwned,
         format,
         string::{String, ToString},
         vec::Vec,
@@ -153,10 +152,12 @@ pub enum Statement {
     Call {
         target: InternedString, // todo: ref<function>
         args: Vec<Ref<Statement>>,
-        return_type: Option<Type>, /* todo: this is really bad. necessary to avoid needing to pass a
-                                    * rudder model into every .typ() call, and hopefully a function
-                                    * return type is unlikely to change after boom, but this should
-                                    * really be a function lookup */
+        return_type: Option<Type>, /* todo: this is really bad. necessary to avoid needing to
+                                    * pass a rudder model
+                                    * into every .typ() call, and hopefully a function
+                                    * return type is unlikely to change after boom, but this
+                                    * should really be a
+                                    * function lookup */
     },
     Cast {
         kind: CastOperationKind,
@@ -982,7 +983,14 @@ impl Statement {
 
                 format!("bits-cast {} {} -> {} length {}", op, value, typ, length)
             }
-            Self::Jump { target } => format!("jump block {:#x}", target.index()), // todo: type for target that formats to block {:#x}, or maybe fancy display T {:#x} for Ref<T>
+            Self::Jump { target } => format!("jump block {:#x}", target.index()), /* todo: type
+                                                                                    * for target
+                                                                                    * that formats
+                                                                                    * to block {:
+                                                                                    * #x}, or maybe
+                                                                                    * fancy display
+                                                                                    * T {:#x} for
+                                                                                    * Ref<T> */
             Self::Branch {
                 condition,
                 true_target,

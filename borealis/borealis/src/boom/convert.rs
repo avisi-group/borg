@@ -7,7 +7,7 @@ use {
         convert::sail_ast::Identifier,
         Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Type,
     },
-    common::{intern::InternedString, width_helpers::signed_smallest_width_of_value, HashMap},
+    common::{intern::InternedString, HashMap},
     itertools::Itertools,
     sailrs::{
         jib_ast::{self, CReturn},
@@ -503,45 +503,4 @@ fn convert_fields<
             typ: convert_type(typ.borrow()),
         })
         .collect()
-}
-
-/// Returns the effective width of a type in bits
-///
-/// "effective" because we're using this for unions
-fn effective_width(typ: &jib_ast::Type) -> usize {
-    match typ {
-        jib_ast::Type::Lint => 128,
-        jib_ast::Type::Fbits(i) | jib_ast::Type::Fint(i) => (*i).try_into().unwrap(),
-        jib_ast::Type::Constant(c) => {
-            signed_smallest_width_of_value((&c.0).try_into().unwrap()).into()
-        }
-        jib_ast::Type::Lbits => 128, // todo maybe + 8 for the length?
-        jib_ast::Type::Sbits(_) => todo!(),
-
-        jib_ast::Type::Unit => 0,
-        jib_ast::Type::Bool | jib_ast::Type::Bit => 1,
-
-        jib_ast::Type::String => 32,
-
-        jib_ast::Type::Enum(_, _) => 32,
-        jib_ast::Type::Struct(_, fields) => {
-            fields.iter().map(|(_, typ)| effective_width(typ)).sum()
-        }
-        jib_ast::Type::Variant(_, fields) => fields
-            .iter()
-            .map(|(_, typ)| effective_width(typ))
-            .max()
-            .unwrap(),
-        jib_ast::Type::Fvector(count, typ) => {
-            effective_width(typ) * usize::try_from(*count).unwrap()
-        }
-
-        // Type::Struct { fields, .. } =>
-        // Type::Union { fields, .. } => fields
-        //     .iter()
-        //     .map(|NamedType { typ, .. }| effective_width(typ.clone()))
-        //     .max()
-        //     .unwrap(),
-        _ => panic!("unknown size of type {typ:?}"),
-    }
 }
