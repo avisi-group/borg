@@ -5,7 +5,7 @@ use common::{
         constant_value::ConstantValue,
         function::Function,
         statement::{BinaryOperationKind, CastOperationKind, Statement, UnaryOperationKind},
-        types::{PrimitiveTypeClass, Type},
+        types::{PrimitiveType, Type},
     },
 };
 
@@ -249,24 +249,24 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
 
 fn cast_integer(value: ConstantValue, typ: Type) -> ConstantValue {
     match &typ {
-        Type::Primitive(primitive) => match (primitive.tc, value) {
-            (PrimitiveTypeClass::SignedInteger, ConstantValue::UnsignedInteger(i)) => {
+        Type::Primitive(primitive) => match (primitive, value) {
+            (PrimitiveType::SignedInteger(_), ConstantValue::UnsignedInteger(i)) => {
                 ConstantValue::SignedInteger(i64::try_from(i).unwrap())
             }
-            (PrimitiveTypeClass::SignedInteger, ConstantValue::SignedInteger(i)) => {
+            (PrimitiveType::SignedInteger(_), ConstantValue::SignedInteger(i)) => {
                 ConstantValue::SignedInteger(i)
             }
-            (PrimitiveTypeClass::UnsignedInteger, ConstantValue::SignedInteger(i)) => {
+            (PrimitiveType::UnsignedInteger(_), ConstantValue::SignedInteger(i)) => {
                 ConstantValue::UnsignedInteger(u64::try_from(i).unwrap())
             }
-            (PrimitiveTypeClass::UnsignedInteger, ConstantValue::UnsignedInteger(i)) => {
+            (PrimitiveType::UnsignedInteger(_), ConstantValue::UnsignedInteger(i)) => {
                 ConstantValue::UnsignedInteger(i)
             }
-            (PrimitiveTypeClass::FloatingPoint, ConstantValue::SignedInteger(s)) => {
+            (PrimitiveType::FloatingPoint(_), ConstantValue::SignedInteger(s)) => {
                 ConstantValue::FloatingPoint(f64::from(i16::try_from(s).unwrap()))
             }
-            (tc, cv) => {
-                panic!("incompatible type class {tc:?} and constant value {cv:?}")
+            (typ, cv) => {
+                panic!("incompatible type {typ:?} and constant value {cv:?}")
             }
         },
         _ => panic!("failed to cast {value:x?} to type {typ:?}"),

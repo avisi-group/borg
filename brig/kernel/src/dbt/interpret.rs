@@ -12,7 +12,7 @@ use {
                 BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
                 TernaryOperationKind, UnaryOperationKind,
             },
-            types::{PrimitiveType, PrimitiveTypeClass, Type},
+            types::{PrimitiveType, Type},
             Model,
         },
         HashMap,
@@ -152,21 +152,18 @@ impl<'f> Interpreter<'f> {
                     };
 
                     Some(match typ {
-                        Type::Primitive(PrimitiveType {
-                            tc: PrimitiveTypeClass::UnsignedInteger,
-                            element_width_in_bits,
-                        }) => Value::UnsignedInteger {
-                            value: value & mask(u32::try_from(*element_width_in_bits).unwrap()),
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
-                        },
-                        Type::Primitive(PrimitiveType {
-                            tc: PrimitiveTypeClass::SignedInteger,
-                            element_width_in_bits,
-                        }) => Value::SignedInteger {
-                            value: (value & mask(u32::try_from(*element_width_in_bits).unwrap()))
-                                as i64,
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
-                        },
+                        Type::Primitive(PrimitiveType::UnsignedInteger(width)) => {
+                            Value::UnsignedInteger {
+                                value: value & mask(*width),
+                                length: *width,
+                            }
+                        }
+                        Type::Primitive(PrimitiveType::SignedInteger(width)) => {
+                            Value::SignedInteger {
+                                value: (value & mask(*width)) as i64,
+                                length: *width,
+                            }
+                        }
                         t => todo!("{t}"),
                     })
                 }
@@ -368,10 +365,7 @@ impl<'f> Interpreter<'f> {
                     match (&kind, &dest_typ, &value) {
                         (
                             CastOperationKind::SignExtend,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::SignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::SignedInteger(element_width_in_bits)),
                             Value::SignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
                             value: sign_extend(
@@ -379,47 +373,32 @@ impl<'f> Interpreter<'f> {
                                 source_typ.width_bits(),
                                 *element_width_in_bits,
                             ),
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
+                            length: *element_width_in_bits,
                         }),
                         (
                             CastOperationKind::Truncate,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::UnsignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::UnsignedInteger(element_width_in_bits)),
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::UnsignedInteger {
-                            value: value & mask(u32::try_from(*element_width_in_bits).unwrap()),
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
+                            value: value & mask(*element_width_in_bits),
+                            length: *element_width_in_bits,
                         }),
                         (
                             CastOperationKind::Reinterpret,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::SignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::SignedInteger(element_width_in_bits)),
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
-                            value: i64::try_from(
-                                *value & mask(u32::try_from(*element_width_in_bits).unwrap()),
-                            )
-                            .unwrap(),
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
+                            value: i64::try_from(*value & mask(*element_width_in_bits)).unwrap(),
+                            length: *element_width_in_bits,
                         }),
                         (
                             CastOperationKind::Reinterpret,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::SignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::SignedInteger(element_width_in_bits)),
                             Value::SignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
-                            value: i64::try_from(
-                                *value as u64
-                                    & mask(u32::try_from(*element_width_in_bits).unwrap()),
-                            )
-                            .unwrap(),
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
+                            value: i64::try_from(*value as u64 & mask(*element_width_in_bits))
+                                .unwrap(),
+                            length: *element_width_in_bits,
                         }),
                         (
                             CastOperationKind::ZeroExtend,
@@ -431,24 +410,18 @@ impl<'f> Interpreter<'f> {
                         }),
                         (
                             CastOperationKind::ZeroExtend,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::UnsignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::UnsignedInteger(element_width_in_bits)),
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::UnsignedInteger {
                             value: *value,
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
+                            length: *element_width_in_bits,
                         }),
                         (
                             CastOperationKind::Reinterpret,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::UnsignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::UnsignedInteger(element_width_in_bits)),
                             Value::UnsignedInteger { value, length },
                         ) => {
-                            if *element_width_in_bits == usize::from(*length) {
+                            if element_width_in_bits == length {
                                 Some(Value::UnsignedInteger {
                                     value: *value,
                                     length: *length,
@@ -459,24 +432,18 @@ impl<'f> Interpreter<'f> {
                         }
                         (
                             CastOperationKind::ZeroExtend,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::SignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::SignedInteger(element_width_in_bits)),
                             Value::UnsignedInteger { value, .. },
                         ) => Some(Value::SignedInteger {
                             value: i64::try_from(*value).unwrap(),
-                            length: u16::try_from(*element_width_in_bits).unwrap(),
+                            length: *element_width_in_bits,
                         }),
                         (
                             CastOperationKind::Truncate,
-                            Type::Primitive(PrimitiveType {
-                                tc: PrimitiveTypeClass::UnsignedInteger,
-                                element_width_in_bits,
-                            }),
+                            Type::Primitive(PrimitiveType::UnsignedInteger(element_width_in_bits)),
                             Value::SignedInteger { value, .. },
                         ) => {
-                            let length = u16::try_from(*element_width_in_bits).unwrap();
+                            let length = *element_width_in_bits;
                             Some(Value::UnsignedInteger {
                                 value: u64::try_from(*value).unwrap() & mask(length),
                                 length,
@@ -1017,9 +984,10 @@ enum BlockResult {
     ReturnValue(Option<Value>),
 }
 
-fn sign_extend(value: i64, source_width: usize, dest_width: usize) -> i64 {
-    let shift_amount = usize::try_from(i64::BITS).unwrap() - source_width;
+fn sign_extend(value: i64, source_width: u16, dest_width: u16) -> i64 {
+    let shift_amount = i64::BITS - u32::from(source_width);
 
-    (((value << shift_amount) >> shift_amount) as u64 & mask(u32::try_from(dest_width).unwrap()))
-        as i64
+    let signed_extended = (value << shift_amount) >> shift_amount;
+
+    ((signed_extended as u64) & mask(dest_width)) as i64
 }

@@ -58,7 +58,7 @@ impl Model {
     pub fn register_file_size(&self) -> usize {
         self.registers
             .values()
-            .map(|d| d.offset + d.typ.width_bytes())
+            .map(|d| d.offset + usize::from(d.typ.width_bytes()))
             .max()
             .unwrap()
     }

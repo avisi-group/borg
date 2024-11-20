@@ -9,25 +9,17 @@ use {
 };
 
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub enum PrimitiveTypeClass {
-    UnsignedInteger,
-    SignedInteger,
-    FloatingPoint,
-}
-
-#[derive(Debug, Hash, Clone, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct PrimitiveType {
-    pub tc: PrimitiveTypeClass,
-    pub element_width_in_bits: usize,
+pub enum PrimitiveType {
+    UnsignedInteger(u16),
+    SignedInteger(u16),
+    FloatingPoint(u16),
 }
 
 impl PrimitiveType {
-    pub fn type_class(&self) -> PrimitiveTypeClass {
-        self.tc
-    }
-
-    pub fn width(&self) -> usize {
-        self.element_width_in_bits
+    pub fn width(&self) -> u16 {
+        match self {
+            Self::FloatingPoint(w) | Self::SignedInteger(w) | Self::UnsignedInteger(w) => *w,
+        }
     }
 }
 
@@ -37,10 +29,10 @@ pub enum Type {
 
     Vector {
         element_count: usize,
-        element_type: Box<Type>,
+        element_type: Box<Self>,
     },
 
-    Tuple(Vec<Type>),
+    Tuple(Vec<Self>),
 
     Bits,
 
@@ -51,37 +43,47 @@ pub enum Type {
 macro_rules! type_def_helper {
     ($name: ident, $cls: ident, $width: expr) => {
         pub fn $name() -> Self {
-            Self::new_primitive(PrimitiveTypeClass::$cls, $width)
+            Self::new_primitive(PrimitiveType::$cls($width))
         }
     };
 }
 
 impl Type {
-    pub fn new_primitive(tc: PrimitiveTypeClass, element_width: usize) -> Self {
-        Self::Primitive(PrimitiveType {
-            tc,
-            element_width_in_bits: element_width,
-        })
+    pub fn new_primitive(primitive: PrimitiveType) -> Self {
+        Self::Primitive(primitive)
     }
 
     /// Gets the offset in bytes of a field of a composite or an element of a
     /// vector
     pub fn byte_offset(&self, element_field: usize) -> Option<usize> {
         match self {
-            Type::Vector { element_type, .. } => Some(element_field * element_type.width_bytes()),
+            Type::Vector { element_type, .. } => {
+                Some(element_field * usize::try_from(element_type.width_bytes()).unwrap())
+            }
             _ => None,
         }
     }
 
-    pub fn width_bits(&self) -> usize {
+    pub fn width_bits(&self) -> u16 {
         match self {
-            Self::Primitive(p) => p.element_width_in_bits,
+            Self::Primitive(p) => p.width(),
             Self::Vector {
                 element_count,
                 element_type,
-            } => element_type.width_bits() * element_count,
+            } => u16::try_from(element_type.width_bits() as usize * *element_count).unwrap_or_else(
+                |_| {
+                    // todo: filter out oversized numbers earlier
+                    // log::trace!(
+                    //     "vector [{element_type};{element_count}] ({}) too big",
+                    //     element_type.width_bits() as usize * *element_count
+                    // );
+
+                    0
+                },
+            ),
 
             Self::Bits => 64,
+
             // width of internedstring
             Self::String => 32,
 
@@ -89,7 +91,7 @@ impl Type {
         }
     }
 
-    pub fn width_bytes(&self) -> usize {
+    pub fn width_bytes(&self) -> u16 {
         self.width_bits().div_ceil(8)
     }
 
@@ -119,13 +121,7 @@ impl Type {
     }
 
     pub fn is_u1(&self) -> bool {
-        match self {
-            Self::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::UnsignedInteger,
-                element_width_in_bits,
-            }) => *element_width_in_bits == 1,
-            _ => false,
-        }
+        matches!(self, Self::Primitive(PrimitiveType::UnsignedInteger(1)))
     }
 
     pub fn is_unknown_length_vector(&self) -> bool {
@@ -146,10 +142,10 @@ impl Type {
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match &self {
-            Type::Primitive(p) => match &p.tc {
-                PrimitiveTypeClass::UnsignedInteger => write!(f, "u{}", self.width_bits()),
-                PrimitiveTypeClass::SignedInteger => write!(f, "i{}", self.width_bits()),
-                PrimitiveTypeClass::FloatingPoint => write!(f, "f{}", self.width_bits()),
+            Type::Primitive(p) => match &p {
+                PrimitiveType::UnsignedInteger(_) => write!(f, "u{}", self.width_bits()),
+                PrimitiveType::SignedInteger(_) => write!(f, "i{}", self.width_bits()),
+                PrimitiveType::FloatingPoint(_) => write!(f, "f{}", self.width_bits()),
             },
 
             Type::Vector {

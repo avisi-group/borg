@@ -15,7 +15,7 @@ use {
                 build, cast, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
                 TernaryOperationKind, UnaryOperationKind,
             },
-            types::{PrimitiveType, PrimitiveTypeClass, Type},
+            types::{PrimitiveType, Type},
             Model, RegisterDescriptor,
         },
         width_helpers::signed_smallest_width_of_value,
@@ -91,7 +91,7 @@ impl BuildContext {
         log::debug!("adding register {name} @ {:x}", self.next_register_offset);
 
         // 8 byte aligned
-        self.next_register_offset += typ.width_bytes().next_multiple_of(8)
+        self.next_register_offset += usize::from(typ.width_bytes()).next_multiple_of(8)
     }
 
     fn add_function(&mut self, name: InternedString, definition: &boom::FunctionDefinition) {
@@ -149,8 +149,9 @@ impl BuildContext {
             boom::Type::Bool | boom::Type::Bit => Type::u1(),
             boom::Type::Float => Type::f64(),
             boom::Type::Real | boom::Type::Union { .. } | boom::Type::Struct { .. } => {
+                // todo: panic
                 log::warn!("should be removed by pass: {:?}", &*typ.get());
-                Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 9999)
+                Type::new_primitive(PrimitiveType::UnsignedInteger(9999))
             }
 
             boom::Type::Vector { element_type } => {
@@ -171,26 +172,24 @@ impl BuildContext {
                 // todo: this is broken:(
                 self.resolve_type(inner.clone())
             }
-            boom::Type::Integer { size } => Type::new_primitive(
-                PrimitiveTypeClass::SignedInteger,
-                match size {
-                    boom::Size::Static(size) => *size,
+            boom::Type::Integer { size } => {
+                Type::new_primitive(PrimitiveType::SignedInteger(match size {
+                    boom::Size::Static(size) => u16::try_from(*size).unwrap(),
                     boom::Size::Unknown => 64,
-                },
-            ),
+                }))
+            }
             boom::Type::Bits { size } => match size {
-                boom::Size::Static(size) => {
-                    Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, *size)
-                }
+                boom::Size::Static(size) => Type::new_primitive(PrimitiveType::UnsignedInteger(
+                    u16::try_from(*size).unwrap(),
+                )),
                 boom::Size::Unknown => Type::Bits,
             },
             boom::Type::Constant(c) => {
                 // todo: this should be a panic, but because structs/unions can have constant
                 // type fields we do the following
-                Type::new_primitive(
-                    PrimitiveTypeClass::SignedInteger,
-                    signed_smallest_width_of_value(*c).into(),
-                )
+                Type::new_primitive(PrimitiveType::SignedInteger(
+                    signed_smallest_width_of_value(*c),
+                ))
             }
             boom::Type::Tuple(ts) => {
                 Type::Tuple(ts.iter().cloned().map(|t| self.resolve_type(t)).collect())
@@ -1122,11 +1121,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             // val ZeroExtend0 : (%bv, %i) -> %bv
             // val sail_zero_extend : (%bv, %i) -> %bv
             "ZeroExtend0" | "sail_zero_extend" => {
-                let length = args[1].get(self.statement_arena());
-                if let Statement::Constant { value, .. } = length {
-                    let width = match value {
-                        ConstantValue::UnsignedInteger(u) => usize::try_from(*u).unwrap(),
-                        ConstantValue::SignedInteger(i) => usize::try_from(*i).unwrap(),
+                let width = args[1].get(self.statement_arena());
+                if let Statement::Constant { value: width, .. } = width {
+                    let width = match width {
+                        ConstantValue::UnsignedInteger(u) => u16::try_from(*u).unwrap(),
+                        ConstantValue::SignedInteger(i) => u16::try_from(*i).unwrap(),
                         _ => panic!(),
                     };
                     Some(build(
@@ -1134,7 +1133,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         self.block_arena_mut(),
                         Statement::Cast {
                             kind: CastOperationKind::ZeroExtend,
-                            typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, width)),
+                            typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(width))),
                             value: args[0].clone(),
                         },
                     ))
@@ -1163,12 +1162,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 args[1].get(self.statement_arena()).clone(),
             ) {
                 (
-                    Type::Primitive(PrimitiveType {
-                        tc: PrimitiveTypeClass::UnsignedInteger,
-                        ..
-                    }),
+                    Type::Primitive(PrimitiveType::UnsignedInteger(_)),
                     Statement::Constant {
-                        value: ConstantValue::SignedInteger(length),
+                        value: ConstantValue::SignedInteger(width),
                         ..
                     },
                 ) => Some(build(
@@ -1176,10 +1172,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::Cast {
                         kind: CastOperationKind::SignExtend,
-                        typ: Type::Primitive(PrimitiveType {
-                            tc: PrimitiveTypeClass::UnsignedInteger,
-                            element_width_in_bits: usize::try_from(length).unwrap(),
-                        }),
+                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(
+                            u16::try_from(width).unwrap(),
+                        )),
                         value: args[0],
                     },
                 )),
@@ -1613,7 +1608,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.block,
                 self.block_arena_mut(),
                 Statement::Constant {
-                    typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 256)),
+                    typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(256))),
                     value: ConstantValue::UnsignedInteger(0),
                 },
             )),
@@ -1625,7 +1620,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Statement::Panic(args[0].clone()),
             )),
 
-            // todo: don't replace with constant, delete
             "AArch64_DC"
             | "execute_aarch64_instrs_system_barriers_dmb"
             | "execute_aarch64_instrs_system_barriers_dsb"
@@ -1641,14 +1635,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "print"
             | "print_endline"
             | "check_cycle_count"
-            | "sail_take_exception" => Some(build(
-                self.block,
-                self.block_arena_mut(),
-                Statement::Constant {
-                    typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 1)),
-                    value: ConstantValue::UnsignedInteger(0),
-                },
-            )),
+            | "sail_take_exception" =>
+            // todo: don't replace with constant, delete
+            {
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(1))),
+                        value: ConstantValue::UnsignedInteger(0),
+                    },
+                ))
+            }
             _ => None,
         }
     }
@@ -1926,12 +1924,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     i64::MAX
                 });
                 Statement::Constant {
-                    typ: (Type::new_primitive(PrimitiveTypeClass::SignedInteger, 64)),
+                    typ: (Type::new_primitive(PrimitiveType::SignedInteger(64))),
                     value: ConstantValue::SignedInteger(value),
                 }
             }
             boom::Literal::Bits(bits) => Statement::Constant {
-                typ: (Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, bits.len())),
+                typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(
+                    u16::try_from(bits.len()).unwrap(),
+                ))),
                 value: ConstantValue::UnsignedInteger(bits_to_int(bits).try_into().unwrap()),
             },
             boom::Literal::Bit(bit) => Statement::Constant {
@@ -2196,14 +2196,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 )
             }
             (
-                Type::Primitive(PrimitiveType {
-                    tc: PrimitiveTypeClass::UnsignedInteger,
-                    element_width_in_bits: left_width,
-                }),
-                Type::Primitive(PrimitiveType {
-                    tc: PrimitiveTypeClass::UnsignedInteger,
-                    element_width_in_bits: right_width,
-                }),
+                Type::Primitive(PrimitiveType::UnsignedInteger(left_width)),
+                Type::Primitive(PrimitiveType::UnsignedInteger(right_width)),
             ) => {
                 // cast left to width left + right
                 // shift left by width of right
@@ -2214,10 +2208,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::Cast {
                         kind: CastOperationKind::ZeroExtend,
-                        typ: (Type::Primitive(PrimitiveType {
-                            tc: PrimitiveTypeClass::UnsignedInteger,
-                            element_width_in_bits: left_width + right_width,
-                        })),
+                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(
+                            left_width + right_width,
+                        )),
                         value: left,
                     },
                 );
@@ -2251,13 +2244,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 )
             }
-            (
-                Type::Primitive(PrimitiveType {
-                    tc: PrimitiveTypeClass::UnsignedInteger,
-                    element_width_in_bits: left_width,
-                }),
-                Type::Bits,
-            ) => {
+            (Type::Primitive(PrimitiveType::UnsignedInteger(left_width)), Type::Bits) => {
                 let right_width = build(
                     self.block,
                     self.block_arena_mut(),
@@ -2311,13 +2298,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 )
             }
-            (
-                Type::Bits,
-                Type::Primitive(PrimitiveType {
-                    tc: PrimitiveTypeClass::UnsignedInteger,
-                    element_width_in_bits: right_width,
-                }),
-            ) => {
+            (Type::Bits, Type::Primitive(PrimitiveType::UnsignedInteger(right_width))) => {
                 let right_width = build(
                     self.block,
                     self.block_arena_mut(),

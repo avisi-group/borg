@@ -12,7 +12,7 @@ use {
         intern::InternedString,
         rudder::{
             self, block::Block, constant_value::ConstantValue, function::Function,
-            statement::Statement, types::PrimitiveTypeClass, Model,
+            statement::Statement, types::PrimitiveType, Model,
         },
         width_helpers::unsigned_smallest_width_of_value,
         HashMap, HashSet,
@@ -337,7 +337,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                                 stack_offset: self.current_stack_offset,
                             },
                         );
-                        self.current_stack_offset += symbol.typ().width_bytes();
+                        self.current_stack_offset += usize::from(symbol.typ().width_bytes());
                     }
                 }
 
@@ -770,14 +770,11 @@ fn emit_rudder_constant_type(value: &ConstantValue, typ: &rudder::types::Type) -
 /// Converts a rudder type to a `Type` value
 fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
     match typ {
-        rudder::types::Type::Primitive(primitive) => {
-            let width = u16::try_from(primitive.width()).unwrap();
-            match primitive.tc {
-                PrimitiveTypeClass::UnsignedInteger => emitter::Type::Unsigned(width),
-                PrimitiveTypeClass::SignedInteger => emitter::Type::Signed(width),
-                PrimitiveTypeClass::FloatingPoint => emitter::Type::Floating(width),
-            }
-        }
+        rudder::types::Type::Primitive(primitive) => match *primitive {
+            PrimitiveType::UnsignedInteger(width) => emitter::Type::Unsigned(width),
+            PrimitiveType::SignedInteger(width) => emitter::Type::Signed(width),
+            PrimitiveType::FloatingPoint(width) => emitter::Type::Floating(width),
+        },
         rudder::types::Type::Bits => emitter::Type::Bits,
         rudder::types::Type::Tuple(_) => emitter::Type::Tuple,
         t => panic!("todo codegen type instance: {t:?}"),

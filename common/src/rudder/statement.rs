@@ -6,7 +6,7 @@ use {
             block::Block,
             constant_value::ConstantValue,
             function::Symbol,
-            types::{maybe_type_to_string, PrimitiveType, PrimitiveTypeClass, Type},
+            types::{maybe_type_to_string, PrimitiveType, Type},
         },
         HashMap,
     },
@@ -346,12 +346,10 @@ impl Statement {
                 if let Self::Constant { value: length, .. } = length.get(arena) {
                     Some(match length {
                         ConstantValue::UnsignedInteger(l) => Type::new_primitive(
-                            PrimitiveTypeClass::UnsignedInteger,
-                            usize::try_from(*l).unwrap(),
+                            PrimitiveType::UnsignedInteger(u16::try_from(*l).unwrap()),
                         ),
                         ConstantValue::SignedInteger(l) => Type::new_primitive(
-                            PrimitiveTypeClass::UnsignedInteger,
-                            usize::try_from(*l).unwrap(),
+                            PrimitiveType::UnsignedInteger(u16::try_from(*l).unwrap()),
                         ),
                         _ => panic!("non unsigned integer length: {length:#?}"),
                     })
@@ -407,9 +405,7 @@ impl Statement {
                 Some(ts[*index].clone())
             }
 
-            Self::GetFlags { .. } => {
-                Some(Type::new_primitive(PrimitiveTypeClass::UnsignedInteger, 4))
-            }
+            Self::GetFlags { .. } => Some(Type::new_primitive(PrimitiveType::UnsignedInteger(4))),
             Self::CreateTuple(values) => Some(Type::Tuple(
                 values
                     .iter()
@@ -1154,10 +1150,10 @@ pub fn cast_at(
 
                 // destination is larger than source
                 Ordering::Less => {
-                    let kind = match source_primitive.type_class() {
-                        PrimitiveTypeClass::UnsignedInteger => CastOperationKind::ZeroExtend,
-                        PrimitiveTypeClass::SignedInteger => CastOperationKind::SignExtend,
-                        PrimitiveTypeClass::FloatingPoint => CastOperationKind::SignExtend,
+                    let kind = match source_primitive {
+                        PrimitiveType::UnsignedInteger(_) => CastOperationKind::ZeroExtend,
+                        PrimitiveType::SignedInteger(_) => CastOperationKind::SignExtend,
+                        PrimitiveType::FloatingPoint(_) => CastOperationKind::SignExtend,
                     };
 
                     build_at(
@@ -1231,23 +1227,11 @@ pub fn cast_at(
                 (_, _) => panic!("casting from fixed to fixed"),
             }
         }
-        (
-            Type::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::UnsignedInteger,
-                ..
-            }),
-            Type::Bits,
-        ) => source,
-        (
-            Type::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::SignedInteger,
-                element_width_in_bits,
-            }),
-            Type::Bits,
-        ) => {
-            if *element_width_in_bits > 128 {
+        (Type::Primitive(PrimitiveType::UnsignedInteger(_)), Type::Bits) => source,
+        (Type::Primitive(PrimitiveType::SignedInteger(element_width_in_bits)), Type::Bits) => {
+            if *element_width_in_bits > 64 {
                 log::warn!(
-                    "source type in cast {} -> {} exceeds 128 bits",
+                    "source type in cast {} -> {} exceeds 64 bits",
                     source_type,
                     destination_type
                 );

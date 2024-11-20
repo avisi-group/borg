@@ -7,7 +7,7 @@ use {
             constant_value::ConstantValue,
             function::Function,
             statement::Statement,
-            types::{PrimitiveType, PrimitiveTypeClass, Type},
+            types::{PrimitiveType, Type},
             Model,
         },
     },
@@ -143,27 +143,9 @@ fn validate_constant_type(
     ),
 ) -> Option<ValidationMessage> {
     match (&value, &typ) {
-        (
-            ConstantValue::UnsignedInteger(_),
-            Type::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::UnsignedInteger,
-                ..
-            }),
-        )
-        | (
-            ConstantValue::SignedInteger(_),
-            Type::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::SignedInteger,
-                ..
-            }),
-        )
-        | (
-            ConstantValue::FloatingPoint(_),
-            Type::Primitive(PrimitiveType {
-                tc: PrimitiveTypeClass::FloatingPoint,
-                ..
-            }),
-        )
+        (ConstantValue::UnsignedInteger(_), Type::Primitive(PrimitiveType::UnsignedInteger(_)))
+        | (ConstantValue::SignedInteger(_), Type::Primitive(PrimitiveType::SignedInteger(_)))
+        | (ConstantValue::FloatingPoint(_), Type::Primitive(PrimitiveType::FloatingPoint(_)))
         | (ConstantValue::String(_), Type::String)
         | (ConstantValue::Tuple(_), Type::Tuple(_)) => None,
 
