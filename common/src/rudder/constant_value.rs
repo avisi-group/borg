@@ -8,10 +8,6 @@ use {
     },
 };
 
-// idk why this is necessary
-#[allow(unused_imports)]
-use num_traits::float::FloatCore as _;
-
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum ConstantValue {
     UnsignedInteger(u64),
@@ -65,6 +61,10 @@ impl ConstantValue {
 
         match self {
             ConstantValue::FloatingPoint(f) => {
+                // used as powi not available in `no_std`
+                #[allow(unused)]
+                use num_traits::float::FloatCore as _;
+
                 let result = f.powi(i32::try_from(i).unwrap());
 
                 // some sail source does actually want infinite/NaNs
