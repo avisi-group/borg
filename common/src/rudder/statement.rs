@@ -168,7 +168,7 @@ pub enum Statement {
         kind: CastOperationKind,
         typ: Type,
         value: Ref<Statement>,
-        length: Ref<Statement>,
+        width: Ref<Statement>,
     },
     Jump {
         target: Ref<Block>,
@@ -192,18 +192,18 @@ pub enum Statement {
     BitExtract {
         value: Ref<Statement>,
         start: Ref<Statement>,
-        length: Ref<Statement>,
+        width: Ref<Statement>,
     },
     BitInsert {
-        /// Target data that `length` bits of `source` will be inserted into at
+        /// Target data that `width` bits of `source` will be inserted into at
         /// position `start`
         target: Ref<Statement>,
         /// Source bits that will be inserted into target
         source: Ref<Statement>,
         /// Offset into `target` that `source` will be inserted
         start: Ref<Statement>,
-        /// Length of `source` that will be inserted
-        length: Ref<Statement>,
+        /// Width of `source` that will be inserted
+        width: Ref<Statement>,
     },
     ReadElement {
         vector: Ref<Statement>,
@@ -226,11 +226,11 @@ pub enum Statement {
 
     CreateBits {
         value: Ref<Statement>,
-        length: Ref<Statement>,
+        width: Ref<Statement>,
     },
 
     // creating bits and getting the value done through casting
-    // gets the length when applied to bits
+    // gets the width when applied to bits
     SizeOf {
         value: Ref<Statement>,
     },
@@ -342,7 +342,11 @@ impl Statement {
             Self::ReadPc => Some(Type::u64()),
             Self::WritePc { .. } => None,
             // todo: this is a simplification, be more precise about lengths?
-            Self::BitExtract { value, length, .. } => {
+            Self::BitExtract {
+                value,
+                width: length,
+                ..
+            } => {
                 if let Self::Constant { value: length, .. } = length.get(arena) {
                     Some(match length {
                         ConstantValue::UnsignedInteger(l) => Type::new_primitive(
@@ -508,7 +512,7 @@ impl Statement {
                 kind,
                 typ,
                 value,
-                length,
+                width: length,
             } => {
                 let value = if value == use_of {
                     with.clone()
@@ -526,7 +530,7 @@ impl Statement {
                     kind,
                     typ,
                     value,
-                    length,
+                    width: length,
                 };
             }
             Self::Call {
@@ -554,7 +558,7 @@ impl Statement {
             Self::BitExtract {
                 value,
                 start,
-                length,
+                width: length,
             } => {
                 let value = if value == use_of {
                     with.clone()
@@ -577,7 +581,7 @@ impl Statement {
                 *self = Self::BitExtract {
                     value,
                     start,
-                    length,
+                    width: length,
                 };
             }
 
@@ -679,7 +683,7 @@ impl Statement {
                 target: original_value,
                 source: insert_value,
                 start,
-                length,
+                width: length,
             } => {
                 let stmts = [original_value, insert_value, start, length]
                     .into_iter()
@@ -690,7 +694,7 @@ impl Statement {
                     target: stmts[0].clone(),
                     source: stmts[1].clone(),
                     start: stmts[2].clone(),
-                    length: stmts[3].clone(),
+                    width: stmts[3].clone(),
                 }
             }
 
@@ -781,7 +785,10 @@ impl Statement {
                 *self = Self::Panic(value)
             }
 
-            Self::CreateBits { value, length } => {
+            Self::CreateBits {
+                value,
+                width: length,
+            } => {
                 let value = if value == use_of {
                     with.clone()
                 } else {
@@ -794,7 +801,10 @@ impl Statement {
                     length.clone()
                 };
 
-                *self = Self::CreateBits { value, length };
+                *self = Self::CreateBits {
+                    value,
+                    width: length,
+                };
             }
             Self::MatchesUnion { value, variant } => {
                 let value = if value == use_of {
@@ -961,7 +971,7 @@ impl Statement {
                 kind,
                 typ,
                 value,
-                length,
+                width: length,
             } => {
                 let op = match kind {
                     CastOperationKind::ZeroExtend => "zx",
@@ -1027,13 +1037,13 @@ impl Statement {
             Self::BitExtract {
                 value,
                 start,
-                length,
+                width: length,
             } => format!("bit-extract {} {} {}", value, start, length),
             Self::BitInsert {
                 target: original_value,
                 source: insert_value,
                 start,
-                length,
+                width: length,
             } => format!(
                 "bit-insert {} {} {} {}",
                 original_value, insert_value, start, length
@@ -1054,7 +1064,10 @@ impl Statement {
                 format!("assert {}", condition)
             }
 
-            Self::CreateBits { value, length } => {
+            Self::CreateBits {
+                value,
+                width: length,
+            } => {
                 format!("create-bits {} {}", value, length)
             }
             Self::MatchesUnion { value, variant } => {
@@ -1228,8 +1241,8 @@ pub fn cast_at(
             }
         }
         (Type::Primitive(PrimitiveType::UnsignedInteger(_)), Type::Bits) => source,
-        (Type::Primitive(PrimitiveType::SignedInteger(element_width_in_bits)), Type::Bits) => {
-            if *element_width_in_bits > 64 {
+        (Type::Primitive(PrimitiveType::SignedInteger(width)), Type::Bits) => {
+            if *width > 64 {
                 log::warn!(
                     "source type in cast {} -> {} exceeds 64 bits",
                     source_type,
@@ -1377,12 +1390,12 @@ pub fn import_statement(
             kind,
             typ,
             value,
-            length,
+            width: length,
         } => Statement::BitsCast {
             kind,
             typ: typ.clone(),
             value: mapping.get(&value).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
+            width: mapping.get(&length).unwrap().clone(),
         },
         Statement::Jump { target } => Statement::Jump { target },
         Statement::Branch {
@@ -1410,22 +1423,22 @@ pub fn import_statement(
         Statement::BitExtract {
             value,
             start,
-            length,
+            width: length,
         } => Statement::BitExtract {
             value: mapping.get(&value).unwrap().clone(),
             start: mapping.get(&start).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
+            width: mapping.get(&length).unwrap().clone(),
         },
         Statement::BitInsert {
             target,
             source,
             start,
-            length,
+            width: length,
         } => Statement::BitInsert {
             target: mapping.get(&target).unwrap().clone(),
             source: mapping.get(&source).unwrap().clone(),
             start: mapping.get(&start).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
+            width: mapping.get(&length).unwrap().clone(),
         },
         Statement::ReadElement { vector, index } => Statement::ReadElement {
             vector: mapping.get(&vector).unwrap().clone(),
@@ -1446,9 +1459,12 @@ pub fn import_statement(
             condition: mapping.get(&condition).unwrap().clone(),
         },
 
-        Statement::CreateBits { value, length } => Statement::CreateBits {
+        Statement::CreateBits {
+            value,
+            width: length,
+        } => Statement::CreateBits {
             value: mapping.get(&value).unwrap().clone(),
-            length: mapping.get(&length).unwrap().clone(),
+            width: mapping.get(&length).unwrap().clone(),
         },
         Statement::SizeOf { value } => Statement::SizeOf {
             value: mapping.get(&value).unwrap().clone(),

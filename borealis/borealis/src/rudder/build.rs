@@ -514,7 +514,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::BitExtract {
                         value: args[0].clone(),
                         start: args[2].clone(),
-                        length: len,
+                        width: len,
                     },
                 ))
             }
@@ -904,7 +904,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::BitExtract {
                         value: args[0].clone(),
                         start: args[1].clone(),
-                        length: args[2].clone(),
+                        width: args[2].clone(),
                     },
                 ))
             }
@@ -924,7 +924,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::BitExtract {
                         value: args[0].clone(),
                         start: args[1].clone(),
-                        length,
+                        width: length,
                     },
                 );
 
@@ -947,7 +947,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::CreateBits {
                         value: zero,
-                        length: args[0].clone(),
+                        width: args[0].clone(),
                     },
                 ))
             }
@@ -1145,7 +1145,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                             kind: CastOperationKind::ZeroExtend,
                             typ: (Type::Bits),
                             value: args[0],
-                            length: args[1],
+                            width: args[1],
                         },
                     ))
                 }
@@ -1185,7 +1185,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         kind: CastOperationKind::SignExtend,
                         typ: (Type::Bits),
                         value: args[0].clone(),
-                        length: args[1].clone(),
+                        width: args[1].clone(),
                     },
                 )),
                 (_, _) => todo!("sail extend {:?} {:?}", args[0], args[1]),
@@ -1199,7 +1199,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     kind: CastOperationKind::Truncate,
                     typ: (Type::Bits),
                     value: args[0].clone(),
-                    length: args[1].clone(),
+                    width: args[1].clone(),
                 },
             )),
 
@@ -1220,7 +1220,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::CreateBits {
                         value: const_0,
-                        length,
+                        width: length,
                     },
                 ))
             }
@@ -1263,7 +1263,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         target,
                         source: bit,
                         start: i,
-                        length: const_1,
+                        width: const_1,
                     },
                 ))
             }
@@ -1293,7 +1293,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         target: n,
                         source: slice,
                         start,
-                        length: len,
+                        width: len,
                     },
                 ))
             }
@@ -1306,7 +1306,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::BitExtract {
                         value: args[1].clone(),
                         start: args[2].clone(),
-                        length: args[0].clone(),
+                        width: args[0].clone(),
                     },
                 );
 
@@ -1315,7 +1315,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::CreateBits {
                         value: extract,
-                        length: args[0].clone(),
+                        width: args[0].clone(),
                     },
                 ))
             }
@@ -1337,7 +1337,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         target: destination,
                         source,
                         start,
-                        length: slen,
+                        width: slen,
                     },
                 ))
             }
@@ -1384,7 +1384,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         target: destination,
                         source,
                         start,
-                        length: source_length,
+                        width: source_length,
                     },
                 ))
             }
@@ -1511,7 +1511,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         kind: CastOperationKind::Truncate,
                         typ: Type::Bits,
                         value: data,
-                        length: size_bits,
+                        width: size_bits,
                     },
                 );
                 let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
@@ -2192,7 +2192,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::CreateBits { value, length },
+                    Statement::CreateBits {
+                        value,
+                        width: length,
+                    },
                 )
             }
             (
@@ -2275,7 +2278,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::CreateBits {
                         value: left,
-                        length,
+                        width: length,
                     },
                 );
 

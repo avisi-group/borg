@@ -603,7 +603,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 kind,
                 typ,
                 value,
-                length,
+                width,
             } => {
                 use {
                     crate::dbt::x86::emitter::CastOperationKind as EmitterOp,
@@ -611,7 +611,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 };
 
                 let value = statement_values.get(value).unwrap().clone();
-                let length = statement_values.get(length).unwrap().clone();
+                let width = statement_values.get(width).unwrap().clone();
                 let typ = emit_rudder_type(typ);
 
                 let kind = match kind {
@@ -623,7 +623,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     RudderOp::Broadcast => EmitterOp::Broadcast,
                 };
 
-                StatementResult::Data(Some(self.emitter.bits_cast(value, length, typ, kind)))
+                StatementResult::Data(Some(self.emitter.bits_cast(value, width, typ, kind)))
             }
 
             Statement::PhiNode { .. } => todo!(),
@@ -645,24 +645,24 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             Statement::BitExtract {
                 value,
                 start,
-                length,
+                width,
             } => {
                 let value = statement_values.get(value).unwrap().clone();
                 let start = statement_values.get(start).unwrap().clone();
-                let length = statement_values.get(length).unwrap().clone();
-                StatementResult::Data(Some(self.emitter.bit_extract(value, start, length)))
+                let width = statement_values.get(width).unwrap().clone();
+                StatementResult::Data(Some(self.emitter.bit_extract(value, start, width)))
             }
             Statement::BitInsert {
                 target,
                 source,
                 start,
-                length,
+                width,
             } => {
                 let target = statement_values.get(target).unwrap().clone();
                 let source = statement_values.get(source).unwrap().clone();
                 let start = statement_values.get(start).unwrap().clone();
-                let length = statement_values.get(length).unwrap().clone();
-                StatementResult::Data(Some(self.emitter.bit_insert(target, source, start, length)))
+                let width = statement_values.get(width).unwrap().clone();
+                StatementResult::Data(Some(self.emitter.bit_insert(target, source, start, width)))
             }
             Statement::ReadElement { .. } => {
                 todo!()
@@ -696,10 +696,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 self.emitter.assert(condition);
                 StatementResult::Data(None)
             }
-            Statement::CreateBits { value, length } => {
+            Statement::CreateBits { value, width } => {
                 let value = statement_values.get(value).unwrap().clone();
-                let length = statement_values.get(length).unwrap().clone();
-                StatementResult::Data(Some(self.emitter.create_bits(value, length)))
+                let width = statement_values.get(width).unwrap().clone();
+                StatementResult::Data(Some(self.emitter.create_bits(value, width)))
             }
             Statement::SizeOf { value } => {
                 let value = statement_values.get(value).unwrap().clone();

@@ -277,11 +277,11 @@ fn decodea64_addsub_interpret() {
 
         let pc = crate::dbt::interpret::Value::UnsignedInteger {
             value: 0,
-            length: 64,
+            width: 64,
         };
         let opcode = crate::dbt::interpret::Value::UnsignedInteger {
             value: 0x8b020020,
-            length: 32,
+            width: 32,
         };
         interpret(&*model, "__DecodeA64", &[pc, opcode], register_file_ptr);
 
@@ -1133,11 +1133,11 @@ fn rbitx0_interpret() {
         // rbit x0
         let pc = Value::UnsignedInteger {
             value: 0,
-            length: 64,
+            width: 64,
         };
         let opcode = Value::UnsignedInteger {
             value: 0xdac00000,
-            length: 32,
+            width: 32,
         };
         interpret(&*model, "__DecodeA64", &[pc, opcode], register_file_ptr);
 

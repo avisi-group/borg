@@ -322,7 +322,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             function.arena_mut(),
             Statement::CreateBits {
                 value: zero.clone(),
-                length: length.clone(),
+                width: length.clone(),
             },
         );
 

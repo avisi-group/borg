@@ -198,7 +198,11 @@ impl<'a> StatementUseAnalysis<'a> {
                 Statement::Cast { value, .. } => {
                     self.add_use(value, stmt);
                 }
-                Statement::BitsCast { value, length, .. } => {
+                Statement::BitsCast {
+                    value,
+                    width: length,
+                    ..
+                } => {
                     self.add_use(value, stmt);
                     self.add_use(length, stmt);
                 }
@@ -222,7 +226,7 @@ impl<'a> StatementUseAnalysis<'a> {
                 Statement::BitExtract {
                     value,
                     start,
-                    length,
+                    width: length,
                 } => {
                     self.add_use(value, stmt);
                     self.add_use(start, stmt);
@@ -232,7 +236,7 @@ impl<'a> StatementUseAnalysis<'a> {
                     target,
                     source,
                     start,
-                    length,
+                    width: length,
                 } => {
                     self.add_use(target, stmt);
                     self.add_use(source, stmt);
@@ -258,7 +262,10 @@ impl<'a> StatementUseAnalysis<'a> {
                 Statement::Panic(value) => {
                     self.add_use(value, stmt);
                 }
-                Statement::CreateBits { value, length } => {
+                Statement::CreateBits {
+                    value,
+                    width: length,
+                } => {
                     self.add_use(value, stmt);
                     self.add_use(length, stmt);
                 }
