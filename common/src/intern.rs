@@ -19,14 +19,23 @@ type Interner = lasso::ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>>;
 
 static mut INTERNER: OnceCell<Interner> = OnceCell::new();
 
-pub(crate) fn interner() -> &'static mut Interner {
-    unsafe { INTERNER.get_mut() }.unwrap()
+fn interner() -> &'static mut Interner {
+    unsafe {
+        #[allow(static_mut_refs)]
+        INTERNER.get_mut()
+    }
+    .unwrap()
 }
 
 /// Initializes the interner with an initial state
 pub fn init(state: HashMap<String, u32>) {
     let interner = postcard::from_bytes(&postcard::to_allocvec(&state).unwrap()).unwrap();
-    assert!(unsafe { INTERNER.set(interner) }.is_ok())
+
+    assert!(unsafe {
+        #[allow(static_mut_refs)]
+        INTERNER.set(interner)
+    }
+    .is_ok())
 }
 
 /// Gets the strings and associated keys of the current interner
