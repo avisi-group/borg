@@ -10,7 +10,7 @@ sailrs = { path = "../sailrs" }
 common = { path = "../../common", default-features = false, features = ["std"] }
 
 displaydoc = "0.2.5"
-thiserror = "1.0.69"
+thiserror = "2.0.3"
 errctx = "1.0.0"
 color-eyre = { version = "0.6.3", default-features = false }
 pretty_assertions = "1.4.1"
@@ -25,19 +25,10 @@ regex = "1.11.1"
 dot = "0.1.4"
 itertools = "0.13.0"
 kinded = "0.3.0"
-quote = "1.0.37"
-syn = { version = "2.0.87",  features = ["full", "parsing"] }
-prettyplease = "0.2.25"
-proc-macro2 = "1.0.89"
 memmap2 = "0.9.5"
 rkyv = {version = "0.7.45", default-features = false, features = ["std", "alloc", "size_64"] }
 parking_lot = { version = "0.12.3", features = ["serde"] }
-cargo-util-schemas = "0.5.0"
-semver = { version = "1.0.23", features = ["serde"] }
-walkdir = "2.5.0"
 rayon = "1.10.0"
-num-rational = { version = "0.4.2", default-features = false, features = ["serde"]}
-num-traits = { version = "0.2.19", default-features = false, features = ["i128"] }
 serde = { version = "1.0.215", features = ["derive"] }
 hashbrown = { version = "0.14.5", features = ["rkyv", "serde", "rayon"] }
 postcard = { version = "1.0.10", features = ["alloc"] }
