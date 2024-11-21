@@ -18,7 +18,7 @@ use {
         },
     },
     common::{
-        intern::{self, InternedString},
+        intern::InternedString,
         rudder::{
             block::Block,
             constant_value::ConstantValue,
@@ -30,7 +30,7 @@ use {
     },
     deepsize::DeepSizeOf,
     errctx::PathCtx,
-    log::{debug, info, trace},
+    log::{debug, info},
     rkyv::Deserialize,
     sailrs::{
         bytes, create_file_buffered,
@@ -59,14 +59,9 @@ pub fn load_model(path: &Path) -> ListVec<Definition> {
 
     info!("deserializing");
 
-    let (jib, strs): (ListVec<Definition>, _) =
-        unsafe { rkyv::archived_root::<(ListVec<Definition>, HashMap<String, u32>)>(&mmap) }
-            .deserialize(&mut rkyv::Infallible)
-            .unwrap();
-
-    trace!("initializing interner");
-
-    intern::init(strs);
+    let jib: ListVec<Definition> = unsafe { rkyv::archived_root::<ListVec<Definition>>(&mmap) }
+        .deserialize(&mut rkyv::Infallible)
+        .unwrap();
 
     info!("JIB size: {:.2}", bytes(jib.deep_size_of()));
 

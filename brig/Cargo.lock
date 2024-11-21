@@ -162,6 +162,7 @@ dependencies = [
  "postcard",
  "rkyv",
  "serde",
+ "spin",
  "twox-hash",
 ]
 

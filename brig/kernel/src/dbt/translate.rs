@@ -300,9 +300,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     ConstantValue::SignedInteger(v) => self.emitter.constant(*v as u64, typ),
                     ConstantValue::FloatingPoint(v) => self.emitter.constant(*v as u64, typ),
 
-                    ConstantValue::String(s) => self
+                    ConstantValue::String(_) => self
                         .emitter
-                        .constant(s.key().into(), emitter::Type::Unsigned(32)),
+                        .constant(0xDEAD5555, emitter::Type::Unsigned(32)),
 
                     ConstantValue::Tuple(_) => {
                         // let Type::Tuple(types) = &typ else { panic!() };

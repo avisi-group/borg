@@ -12,8 +12,10 @@ pub mod mask;
 pub mod rudder;
 pub mod width_helpers;
 
+pub type Hasher = XxHash64;
+
 /// HashMap with non-default hasher
-pub type HashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<XxHash64>>;
+pub type HashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<Hasher>>;
 
 /// HashSet with non-default hasher
-pub type HashSet<T> = hashbrown::HashSet<T, BuildHasherDefault<XxHash64>>;
+pub type HashSet<T> = hashbrown::HashSet<T, BuildHasherDefault<Hasher>>;

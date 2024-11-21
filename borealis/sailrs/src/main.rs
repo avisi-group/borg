@@ -1,7 +1,6 @@
 use {
     clap::Parser,
     color_eyre::Result,
-    common::{intern, intern::get_interner_state, HashMap},
     deepsize::DeepSizeOf,
     log::info,
     rkyv::ser::{serializers::AllocSerializer, Serializer},
@@ -32,20 +31,19 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or("info"))?;
 
-    intern::init(HashMap::default());
-
     let jib = load_from_config(args.input)?;
 
-    info!("JIB size: {:.2} bytes", bytes(jib.deep_size_of()));
-
-    let state = (jib, get_interner_state());
-
-    info!("serializing");
+    info!(
+        "JIB size: {:.2} bytes, serializing",
+        bytes(jib.deep_size_of())
+    );
 
     let mut serializer = AllocSerializer::<16384>::default();
-    serializer.serialize_value(&state).unwrap();
-    let bytes = serializer.into_serializer().into_inner();
-    create_file_buffered(&args.output)?.write_all(&bytes)?;
+    serializer.serialize_value(&jib).unwrap();
+    let serialized = serializer.into_serializer().into_inner();
+    create_file_buffered(&args.output)?.write_all(&serialized)?;
+
+    info!("Serialized JIB to {:.2} bytes", bytes(serialized.len()));
 
     info!("done");
 

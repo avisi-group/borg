@@ -1,49 +1,60 @@
 use {
-    crate::HashMap,
-    alloc::{
-        borrow::ToOwned,
-        string::{String, ToString},
-    },
-    core::{cell::OnceCell, hash::BuildHasherDefault},
+    alloc::string::String,
     deepsize::DeepSizeOf,
-    lasso::{Key, Spur},
-    rkyv::{Archive, Archived, Fallible},
-    twox_hash::XxHash64,
+    lasso::Spur,
+    rkyv::{
+        string::{ArchivedString, StringResolver},
+        Fallible,
+    },
 };
 
 #[cfg(feature = "no-std")]
-type Interner = lasso::Rodeo<Spur, BuildHasherDefault<XxHash64>>;
+mod interner {
+    use {
+        crate::Hasher,
+        core::hash::BuildHasherDefault,
+        lasso::Spur,
+        spin::{lazy::Lazy, mutex::Mutex},
+    };
+
+    static INTERNER: Lazy<Mutex<lasso::Rodeo<Spur, BuildHasherDefault<Hasher>>>> =
+        Lazy::new(|| Mutex::new(lasso::Rodeo::with_hasher(Default::default())));
+
+    pub fn get_or_intern(str: &str) -> Spur {
+        INTERNER.lock().get_or_intern(str)
+    }
+    pub fn get_or_intern_static(str: &'static str) -> Spur {
+        INTERNER.lock().get_or_intern_static(str)
+    }
+
+    pub fn resolve(key: Spur) -> &'static str {
+        let interner = INTERNER.lock();
+        let str = interner.resolve(&key);
+
+        // SAFETY: INTERNER is static, keys are never dropped so this `&'interner str` is really a `&'static str`
+        unsafe { core::mem::transmute(str) }
+    }
+}
 
 #[cfg(feature = "std")]
-type Interner = lasso::ThreadedRodeo<Spur, BuildHasherDefault<XxHash64>>;
+mod interner {
+    extern crate std;
 
-static mut INTERNER: OnceCell<Interner> = OnceCell::new();
+    use {crate::Hasher, core::hash::BuildHasherDefault, lasso::Spur, std::sync::LazyLock};
 
-fn interner() -> &'static mut Interner {
-    unsafe {
-        #[allow(static_mut_refs)]
-        INTERNER.get_mut()
+    static INTERNER: LazyLock<lasso::ThreadedRodeo<Spur, BuildHasherDefault<Hasher>>> =
+        LazyLock::new(|| lasso::ThreadedRodeo::with_hasher(Default::default()));
+
+    pub fn get_or_intern(str: &str) -> Spur {
+        INTERNER.get_or_intern(str)
     }
-    .unwrap()
-}
-
-/// Initializes the interner with an initial state
-pub fn init(state: HashMap<String, u32>) {
-    let interner = postcard::from_bytes(&postcard::to_allocvec(&state).unwrap()).unwrap();
-
-    assert!(unsafe {
-        #[allow(static_mut_refs)]
-        INTERNER.set(interner)
+    pub fn get_or_intern_static(str: &'static str) -> Spur {
+        INTERNER.get_or_intern_static(str)
     }
-    .is_ok())
-}
 
-/// Gets the strings and associated keys of the current interner
-pub fn get_interner_state() -> HashMap<String, u32> {
-    interner()
-        .strings()
-        .map(|s| (s.to_owned(), InternedString::new(s).key()))
-        .collect()
+    pub fn resolve(key: Spur) -> &'static str {
+        INTERNER.resolve(&key)
+    }
 }
 
 /// Key for an interned string
@@ -53,23 +64,18 @@ pub struct InternedString(Spur);
 impl InternedString {
     /// Create a new interned string
     pub fn new<A: AsRef<str>>(str: A) -> Self {
-        Self(interner().get_or_intern(str.as_ref()))
+        Self(interner::get_or_intern(str.as_ref()))
     }
 
     /// Create a new interned string from a static str
     pub fn from_static(key: &'static str) -> Self {
-        Self(interner().get_or_intern_static(key))
-    }
-
-    /// Gets the inner key of the interned string
-    pub fn key(&self) -> u32 {
-        self.0.into_inner().into()
+        Self(interner::get_or_intern_static(key))
     }
 }
 
 impl AsRef<str> for InternedString {
     fn as_ref(&self) -> &str {
-        interner().resolve(&self.0)
+        interner::resolve(self.0)
     }
 }
 
@@ -93,13 +99,13 @@ impl From<&'_ str> for InternedString {
 
 impl core::fmt::Debug for InternedString {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        core::fmt::Debug::fmt(interner().resolve(&self.0), f)
+        core::fmt::Debug::fmt(interner::resolve(self.0), f)
     }
 }
 
 impl core::fmt::Display for InternedString {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        core::fmt::Display::fmt(interner().resolve(&self.0), f)
+        core::fmt::Display::fmt(interner::resolve(self.0), f)
     }
 }
 
@@ -108,7 +114,7 @@ impl<'de> serde::Deserialize<'de> for InternedString {
     where
         D: serde::Deserializer<'de>,
     {
-        String::deserialize(deserializer).map(Self::new)
+        <&str as serde::Deserialize>::deserialize(deserializer).map(Self::from)
     }
 }
 
@@ -117,7 +123,7 @@ impl serde::Serialize for InternedString {
     where
         S: serde::Serializer,
     {
-        self.to_string().serialize(serializer)
+        self.as_ref().serialize(serializer)
     }
 }
 
@@ -131,6 +137,7 @@ unsafe impl ocaml::FromValue for InternedString {
 #[cfg(feature = "std")]
 unsafe impl ocaml::ToValue for InternedString {
     fn to_value(&self, rt: &ocaml::Runtime) -> ocaml::Value {
+        use alloc::string::ToString;
         self.to_string().to_value(rt)
     }
 }
@@ -146,32 +153,28 @@ impl DeepSizeOf for InternedString {
 }
 
 impl rkyv::Archive for InternedString {
-    type Archived = u32;
+    type Archived = ArchivedString;
+    type Resolver = StringResolver;
 
-    type Resolver = ();
-
-    unsafe fn resolve(&self, _pos: usize, _resolver: Self::Resolver, out: *mut Self::Archived) {
-        out.write(self.key());
+    unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
+        ArchivedString::resolve_from_str(self.as_ref(), pos, resolver, out);
     }
 }
 
-impl<S: Fallible + rkyv::ser::Serializer> rkyv::Serialize<S> for InternedString {
-    fn serialize(
-        &self,
-        _serializer: &mut S,
-    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
-        Ok(())
-    }
-}
-
-impl<D: Fallible> rkyv::Deserialize<InternedString, D>
-    for Archived<<InternedString as Archive>::Archived>
+impl<S: Fallible> rkyv::Serialize<S> for InternedString
+where
+    str: rkyv::SerializeUnsized<S>,
 {
-    fn deserialize(&self, _: &mut D) -> Result<InternedString, <D as Fallible>::Error> {
-        Ok(InternedString::from(
-            // try from usize adds 1, -1 to bring it back down
-            // todo: why???
-            Spur::try_from_usize(usize::try_from(*self).unwrap() - 1).unwrap(),
-        ))
+    fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
+        ArchivedString::serialize_from_str(self.as_ref(), serializer)
+    }
+}
+
+impl<D: Fallible> rkyv::Deserialize<InternedString, D> for ArchivedString
+where
+    str: rkyv::DeserializeUnsized<str, D>,
+{
+    fn deserialize(&self, _: &mut D) -> Result<InternedString, D::Error> {
+        Ok(InternedString::from(self.as_str()))
     }
 }

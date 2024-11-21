@@ -22,8 +22,6 @@ pub fn get(name: &str) -> Option<Arc<Model>> {
 }
 
 pub fn load_all(device: &SharedDevice) {
-    common::intern::init(Default::default());
-
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
 

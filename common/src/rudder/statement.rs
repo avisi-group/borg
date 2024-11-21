@@ -984,14 +984,14 @@ impl Statement {
 
                 format!("bits-cast {} {} -> {} length {}", op, value, typ, length)
             }
-            Self::Jump { target } => format!("jump block {:#x}", target.index()), /* todo: type
-            * for target
-             * that formats
-             * to block {:
-             * #x}, or maybe
-             * fancy display
-             * T {:#x} for
-             * Ref<T> */
+            Self::Jump { target } => format!("jump block {:#x}", target.index()), /* todo: type */
+            // for target
+            // that formats
+            // to block {:
+            // #x}, or maybe
+            // fancy display
+            // T {:#x} for
+            // Ref<T>
             Self::Branch {
                 condition,
                 true_target,
