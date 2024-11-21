@@ -2063,6 +2063,7 @@ fn configure_features(model: &Model, register_file: *mut u8) {
         "FEAT_AA64EL2_IMPLEMENTED",
         "FEAT_AA64EL3_IMPLEMENTED",
         "FEAT_D128_IMPLEMENTED",
+        "FEAT_LVA3_IMPLEMENTED",
     ];
 
     features

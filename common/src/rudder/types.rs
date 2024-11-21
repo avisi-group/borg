@@ -64,14 +64,18 @@ impl Type {
         }
     }
 
+    fn width_bits_alinged(&self) -> u16 {
+        self.width_bytes() * 8
+    }
+
     pub fn width_bits(&self) -> u16 {
         match self {
             Self::Primitive(p) => p.width(),
             Self::Vector {
                 element_count,
                 element_type,
-            } => u16::try_from(element_type.width_bits() as usize * *element_count).unwrap_or_else(
-                |_| {
+            } => u16::try_from((element_type.width_bits_alinged()) as usize * *element_count)
+                .unwrap_or_else(|_| {
                     // todo: filter out oversized numbers earlier
                     // log::trace!(
                     //     "vector [{element_type};{element_count}] ({}) too big",
@@ -79,15 +83,14 @@ impl Type {
                     // );
 
                     0
-                },
-            ),
+                }),
 
             Self::Bits => 64,
 
             // width of internedstring
             Self::String => 32,
 
-            Self::Tuple(ts) => ts.iter().map(|typ| typ.width_bits()).sum(),
+            Self::Tuple(ts) => ts.iter().map(|typ| typ.width_bits_alinged()).sum(),
         }
     }
 

@@ -8,6 +8,7 @@ use {
         NamedValue, Operation, Parameter, Size, Statement, Type, Value,
     },
     common::intern::InternedString,
+    itertools::Itertools,
     sailrs::shared::Shared,
     std::{
         io::Write,
@@ -32,61 +33,80 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
 
     let mut visitor = PrettyPrinter::new(w);
 
-    pragmas.iter().for_each(|(key, value)| {
-        visitor.prindent(format!("#{key} {value}"));
-    });
+    pragmas
+        .iter()
+        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        .for_each(|(key, value)| {
+            visitor.prindent(format!("#{key} {value}"));
+        });
 
-    constants.iter().for_each(|(name, value)| {
-        writeln!(visitor.writer, "constant {name}: {value}").unwrap();
-    });
+    constants
+        .iter()
+        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        .for_each(|(name, value)| {
+            writeln!(visitor.writer, "constant {name}: {value}").unwrap();
+        });
     writeln!(visitor.writer).unwrap();
 
-    enums.iter().for_each(|(name, variants)| {
-        writeln!(visitor.writer, "enum {name} {{").unwrap();
-        for (i, variant) in variants.iter().enumerate() {
-            writeln!(visitor.writer, "\t{variant} = {i},").unwrap();
-        }
-        writeln!(visitor.writer, "}}").unwrap();
-    });
+    enums
+        .iter()
+        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        .for_each(|(name, variants)| {
+            writeln!(visitor.writer, "enum {name} {{").unwrap();
+            for (i, variant) in variants.iter().enumerate() {
+                writeln!(visitor.writer, "\t{variant} = {i},").unwrap();
+            }
+            writeln!(visitor.writer, "}}").unwrap();
+        });
 
-    structs.iter().for_each(|(name, fields)| {
-        visitor.prindentln(format!("struct {name} {{"));
+    structs
+        .iter()
+        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        .for_each(|(name, fields)| {
+            visitor.prindentln(format!("struct {name} {{"));
 
-        {
-            let _h = visitor.indent();
-            fields.iter().for_each(|NamedType { name, typ }| {
-                visitor.prindent(format!("{name}: "));
-                visitor.visit_type(typ.clone());
-                writeln!(visitor.writer, ",").unwrap();
-            });
-        }
+            {
+                let _h = visitor.indent();
+                fields.iter().for_each(|NamedType { name, typ }| {
+                    visitor.prindent(format!("{name}: "));
+                    visitor.visit_type(typ.clone());
+                    writeln!(visitor.writer, ",").unwrap();
+                });
+            }
 
-        visitor.prindentln("}");
-    });
+            visitor.prindentln("}");
+        });
 
-    unions.iter().for_each(|(name, fields)| {
-        visitor.prindentln(format!("union {name} {{"));
+    unions
+        .iter()
+        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        .for_each(|(name, fields)| {
+            visitor.prindentln(format!("union {name} {{"));
 
-        {
-            let _h = visitor.indent();
-            fields.iter().for_each(|NamedType { name, typ }| {
-                visitor.prindent(format!("{name}: "));
-                visitor.visit_type(typ.clone());
-                writeln!(visitor.writer, ",").unwrap();
-            });
-        }
+            {
+                let _h = visitor.indent();
+                fields.iter().for_each(|NamedType { name, typ }| {
+                    visitor.prindent(format!("{name}: "));
+                    visitor.visit_type(typ.clone());
+                    writeln!(visitor.writer, ",").unwrap();
+                });
+            }
 
-        visitor.prindentln("}");
-    });
+            visitor.prindentln("}");
+        });
 
-    registers.iter().for_each(|(name, typ)| {
-        write!(visitor.writer, "register {name}: ").unwrap();
-        visitor.visit_type(typ.clone());
-        writeln!(visitor.writer).unwrap();
-    });
+    registers
+        .iter()
+        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        .for_each(|(name, typ)| {
+            write!(visitor.writer, "register {name}: ").unwrap();
+            visitor.visit_type(typ.clone());
+            writeln!(visitor.writer).unwrap();
+        });
 
     functions
         .iter()
+        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
         .for_each(|(_, fundef)| visitor.visit_function_definition(fundef));
 }
 

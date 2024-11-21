@@ -76,12 +76,20 @@ impl Display for Model {
         writeln!(f, "rudder context:")?;
         writeln!(f)?;
 
-        for (name, reg) in self.registers() {
+        for (name, reg) in self
+            .registers()
+            .into_iter()
+            .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        {
             writeln!(f, "register {name}: {reg:?}")?;
         }
 
         writeln!(f)?;
-        for (name, func) in self.functions() {
+        for (name, func) in self
+            .functions()
+            .into_iter()
+            .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
+        {
             let parameters = func
                 .parameters()
                 .into_iter()
