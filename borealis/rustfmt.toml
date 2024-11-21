@@ -1,3 +1,2 @@
 wrap_comments = true
 imports_granularity = "One"
-max_width = 100

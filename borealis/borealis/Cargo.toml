@@ -31,4 +31,4 @@ parking_lot = { version = "0.12.3", features = ["serde"] }
 rayon = "1.10.0"
 serde = { version = "1.0.215", features = ["derive"] }
 hashbrown = { version = "0.14.5", features = ["rkyv", "serde", "rayon"] }
-postcard = { version = "1.0.10", features = ["alloc"] }
+postcard = { version = "1.0.10", features = ["alloc"], default-features = false }

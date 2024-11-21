@@ -52,4 +52,4 @@ bitset-core = { version = "0.1.1", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 linkme = "0.3.31"
 num-rational = { version = "0.4.2", default-features = false }
-postcard = "1.0.10"
+postcard = { version = "1.0.10", features = ["alloc"], default-features = false }

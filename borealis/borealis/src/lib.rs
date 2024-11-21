@@ -192,6 +192,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
     ) {
         info!("Serializing Rudder");
+
         let buf = postcard::to_allocvec(&rudder).unwrap();
 
         info!("Writing {:.2} to {:?}", bytes(buf.len()), &path);

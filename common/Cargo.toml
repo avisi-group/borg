@@ -7,14 +7,14 @@ authors = ["AVISI Research Group"]
 [dependencies]
 rkyv = {version = "0.7.45", default-features = false, features = ["alloc", "size_64"] }
 hashbrown = { version = "0.14.5", features = ["rkyv", "serde"] }
-twox-hash = { version = "1.6.3", default-features = false }
+twox-hash = { version = "2.0.1", default-features = false, features = ["alloc", "xxhash64"] }
 serde = { version = "1.0.215", default-features = false, features = ["alloc", "derive"] }
 log = "0.4.22"
 num-rational = { version = "0.4.2", default-features = false, features = ["serde"] }
 num-traits = { version = "0.2.19", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 deepsize = { version = "0.2.0", default-features = false, features = ["derive"] }
-postcard = { version = "1.0.10", features = ["alloc"] }
+postcard = { version = "1.0.10", features = ["alloc"], default-features = false }
 
 lasso = { version = "0.7.3", default-features = false, features = ["deepsize", "serialize"] }
 ocaml = { version = "1.0.1", optional = true }

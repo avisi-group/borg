@@ -1,6 +1,3 @@
-use std::io::BufWriter;
-
-use itertools::Itertools;
 use {
     crate::{
         boom::{self, bits_to_int},
@@ -33,13 +30,10 @@ use {
 pub fn from_boom(ast: &boom::Ast) -> Model {
     let mut build_ctx = BuildContext::default();
 
-    ast.registers
-        .iter()
-        .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
-        .for_each(|(name, typ)| {
-            let typ = build_ctx.resolve_type(typ.clone());
-            build_ctx.add_register(*name, typ);
-        });
+    ast.registers.iter().for_each(|(name, typ)| {
+        let typ = build_ctx.resolve_type(typ.clone());
+        build_ctx.add_register(*name, typ);
+    });
 
     // need all functions with signatures before building
     ast.functions

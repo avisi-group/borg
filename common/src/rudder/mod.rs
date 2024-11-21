@@ -18,7 +18,7 @@ pub mod function;
 pub mod statement;
 pub mod types;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct Model {
     fns: HashMap<InternedString, Function>,
     // offset-type pairs, offsets may not be unique? todo: ask tom
