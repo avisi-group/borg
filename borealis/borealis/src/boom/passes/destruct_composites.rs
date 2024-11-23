@@ -275,9 +275,10 @@ fn destruct_local_structs(
 
                             if let Some(Type::Tuple(_return_types)) = def.signature.return_type.as_ref().map(|t| t.get().clone()) {
                                 let Expression::Identifier(dest) = expression else {
-                                    // only visiting each statement once so this should be true (for now, unions
-                                    // break this)
-                                    panic!();
+
+                                    assert!(matches!(expression, Expression::Tuple(_)));
+                                    // tuple return type already removed
+                                    return vec![clone];
                                 };
 
                                 let Some(typ) = removed_items.get(&dest) else {

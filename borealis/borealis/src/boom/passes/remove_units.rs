@@ -137,7 +137,7 @@ fn filter_expression(
                 .filter_map(|e| filter_expression(e, removed))
                 .collect(),
         )),
-        _ => unreachable!(),
+        e => unreachable!("{e:?}"),
     }
 }
 

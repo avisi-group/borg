@@ -5,10 +5,9 @@ use {
         boom::{
             passes::{
                 builtin_fns::HandleBuiltinFunctions, cycle_finder::CycleFinder,
-                destruct_composites::DestructComposites, destruct_unions::DestructUnions,
-                fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
-                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-                remove_units::RemoveUnits,
+                destruct_unions::DestructUnions, fold_unconditionals::FoldUnconditionals,
+                lower_reals::LowerReals, remove_const_branch::RemoveConstBranch,
+                remove_constant_type::RemoveConstantType, remove_units::RemoveUnits,
             },
             Ast,
         },
@@ -109,8 +108,8 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         LowerReals::new_boxed(),
         HandleBuiltinFunctions::new_boxed(),
         RemoveConstantType::new_boxed(),
-        DestructComposites::new_boxed(),
         DestructUnions::new_boxed(),
+        //  DestructComposites::new_boxed(),
         RemoveUnits::new_boxed(),
     ]
     .into_iter()

@@ -64,14 +64,14 @@ impl Ast {
         }
 
         {
-            let return_type = Shared::new(Type::Tuple(vec![
-                Shared::new(Type::Bits {
-                    size: Size::Static(64),
-                }),
-                Shared::new(Type::Bits {
-                    size: Size::Static(4),
-                }),
-            ]));
+            let return_type = Shared::new(Type::Struct {
+                name: "tuple#%bv_%bv4".into(),
+                fields: ast
+                    .structs
+                    .get(&InternedString::from("tuple#%bv_%bv4"))
+                    .unwrap()
+                    .clone(),
+            });
             let entry_block = ControlFlowBlock::new();
             entry_block.set_statements(vec![
                 Shared::new(Statement::VariableDeclaration {

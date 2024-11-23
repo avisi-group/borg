@@ -175,7 +175,6 @@ dependencies = [
  "displaydoc",
  "dot",
  "errctx",
- "hashbrown 0.14.5",
  "itertools",
  "kinded",
  "log",

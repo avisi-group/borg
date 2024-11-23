@@ -23,4 +23,4 @@ spin = { version = "0.9.8", features = ["lazy"], optional = true }
 [features]
 default = ["no-std"]
 no-std = ["lasso/no-std", "dep:spin"]
-std = ["dep:ocaml", "lasso/multi-threaded"]
+std = ["dep:ocaml", "lasso/multi-threaded", "hashbrown/rayon"]
