@@ -20,7 +20,6 @@ pub mod any;
 pub mod builtin_fns;
 pub mod cycle_finder;
 pub mod destruct_composites;
-pub mod destruct_unions;
 pub mod fold_unconditionals;
 pub mod lower_reals;
 pub mod monomorphize_vectors;

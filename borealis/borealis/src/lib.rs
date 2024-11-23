@@ -5,7 +5,7 @@ use {
         boom::{
             passes::{
                 builtin_fns::HandleBuiltinFunctions, cycle_finder::CycleFinder,
-                destruct_unions::DestructUnions, fold_unconditionals::FoldUnconditionals,
+                destruct_composites::DestructComposites, fold_unconditionals::FoldUnconditionals,
                 lower_reals::LowerReals, remove_const_branch::RemoveConstBranch,
                 remove_constant_type::RemoveConstantType, remove_units::RemoveUnits,
             },
@@ -108,7 +108,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         LowerReals::new_boxed(),
         HandleBuiltinFunctions::new_boxed(),
         RemoveConstantType::new_boxed(),
-        DestructUnions::new_boxed(),
+        DestructComposites::new_boxed(),
         //  DestructComposites::new_boxed(),
         RemoveUnits::new_boxed(),
     ]
