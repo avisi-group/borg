@@ -15,17 +15,19 @@ pub enum ConstantValue {
     FloatingPoint(f64),
     String(InternedString),
     Tuple(Vec<ConstantValue>),
+    Vector(Vec<ConstantValue>),
 }
 
 impl ConstantValue {
-    pub fn zero(&self) -> bool {
+    pub fn is_zero(&self) -> bool {
         match self {
             ConstantValue::UnsignedInteger(v) => *v == 0,
             ConstantValue::SignedInteger(v) => *v == 0,
             ConstantValue::FloatingPoint(v) => *v == 0.,
 
-            ConstantValue::String(_) => false,
-            ConstantValue::Tuple(_) => panic!(),
+            ConstantValue::String(_) | ConstantValue::Tuple(_) | ConstantValue::Vector(_) => {
+                panic!()
+            }
         }
     }
 
@@ -174,7 +176,8 @@ impl Not for ConstantValue {
             ConstantValue::SignedInteger(v) => ConstantValue::SignedInteger(!v),
             ConstantValue::FloatingPoint(_)
             | ConstantValue::String(_)
-            | ConstantValue::Tuple(_) => panic!("not a thing"),
+            | ConstantValue::Tuple(_)
+            | ConstantValue::Vector(_) => panic!("not a thing"),
         }
     }
 }
@@ -204,6 +207,11 @@ impl Display for ConstantValue {
                 write!(f, "(").unwrap();
                 vs.iter().for_each(|v| write!(f, "{v},  ").unwrap());
                 write!(f, ")")
+            }
+            ConstantValue::Vector(vs) => {
+                write!(f, "[").unwrap();
+                vs.iter().for_each(|v| write!(f, "{v},  ").unwrap());
+                write!(f, "]")
             }
         }
     }

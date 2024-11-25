@@ -683,7 +683,7 @@ pub enum Value {
     SignedInteger { value: i64, width: u16 },
     FloatingPoint(f64),
     String(InternedString),
-
+    Vector(Vec<Value>),
     Tuple(Vec<Value>),
 }
 
@@ -709,6 +709,16 @@ impl Value {
                     vec.iter()
                         .zip(types)
                         .map(|(v, t)| Value::from_constant(v, t))
+                        .collect(),
+                )
+            }
+            ConstantValue::Vector(vec) => {
+                let Type::Vector { element_type, .. } = typ else {
+                    panic!()
+                };
+                Value::Vector(
+                    vec.iter()
+                        .map(|cv| Value::from_constant(cv, element_type))
                         .collect(),
                 )
             }

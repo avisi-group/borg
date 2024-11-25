@@ -647,6 +647,7 @@ pub enum Literal {
     Bit(Bit),
     Bool(bool),
     String(InternedString),
+    Vector(Vec<Shared<Literal>>),
     Unit,
     Reference(InternedString),
     Undefined,

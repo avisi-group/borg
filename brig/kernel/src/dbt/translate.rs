@@ -314,6 +314,16 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         // ((#(#values),*))
                         todo!("tuple")
                     }
+                    ConstantValue::Vector(_) => {
+                        // let Type::Tuple(types) = &typ else { panic!() };
+                        // let values = values
+                        //     .iter()
+                        //     .cloned()
+                        //     .zip(types.iter().cloned())
+                        //     .map(|(value, typ)| codegen_constant_value(value, typ));
+                        // ((#(#values),*))
+                        todo!("tuple")
+                    }
                 }))
             }
             Statement::ReadVariable { symbol } => {

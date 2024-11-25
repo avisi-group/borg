@@ -23,7 +23,7 @@ pub fn run(f: &mut Function) -> bool {
             if let Statement::Constant { value, .. } = condition.get(block.arena()).clone() {
                 trace!("found constant branch statement {}", value);
 
-                if value.zero() {
+                if value.is_zero() {
                     terminator_ref
                         .get_mut(block.arena_mut())
                         .replace_kind(Statement::Jump {

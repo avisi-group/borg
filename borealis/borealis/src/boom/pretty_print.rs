@@ -565,6 +565,13 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Literal::Unit => write!(self.writer, "()"),
             Literal::Reference(s) => write!(self.writer, "&{s}"),
             Literal::Undefined => write!(self.writer, "undefined"),
+            Literal::Vector(vec) => {
+                write!(self.writer, "[").unwrap();
+                for element in vec {
+                    self.visit_literal(element.clone());
+                }
+                write!(self.writer, "]")
+            }
         }
         .unwrap()
     }

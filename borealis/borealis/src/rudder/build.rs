@@ -1911,38 +1911,50 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
     }
 
     fn build_literal(&mut self, literal: &boom::Literal) -> Ref<Statement> {
+        let value = build_constant_value(literal);
+
         let kind = match literal {
-            boom::Literal::Int(i) => {
-                let value = i.try_into().unwrap_or_else(|_| {
-                    log::error!("failed to convert {i} to i64");
-                    i64::MAX
-                });
-                Statement::Constant {
-                    typ: (Type::new_primitive(PrimitiveType::SignedInteger(64))),
-                    value: ConstantValue::SignedInteger(value),
-                }
-            }
+            boom::Literal::Int(_) => Statement::Constant {
+                typ: (Type::new_primitive(PrimitiveType::SignedInteger(64))),
+                value,
+            },
             boom::Literal::Bits(bits) => Statement::Constant {
                 typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(
                     u16::try_from(bits.len()).unwrap(),
                 ))),
-                value: ConstantValue::UnsignedInteger(bits_to_int(bits).try_into().unwrap()),
+                value,
             },
-            boom::Literal::Bit(bit) => Statement::Constant {
+            boom::Literal::Bit(_) => Statement::Constant {
                 typ: (Type::u1()),
-                value: ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
+                value,
             },
-            boom::Literal::Bool(b) => Statement::Constant {
+            boom::Literal::Bool(_) => Statement::Constant {
                 typ: (Type::u1()),
-                value: ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
+                value,
             },
-            boom::Literal::String(str) => Statement::Constant {
+            boom::Literal::String(_) => Statement::Constant {
                 typ: (Type::String),
-                value: ConstantValue::String(*str),
+                value,
             },
             boom::Literal::Unit => unreachable!("units removed in boom pass"),
             boom::Literal::Reference(_) => todo!(),
             boom::Literal::Undefined => todo!(),
+            boom::Literal::Vector(vec) => Statement::Constant {
+                typ: Type::Vector {
+                    element_count: vec.len(),
+                    element_type: Box::new(match &*vec[0].get() {
+                        boom::Literal::Bits(vec) => Type::Primitive(
+                            PrimitiveType::UnsignedInteger(u16::try_from(vec.len()).unwrap()),
+                        ),
+                        l => todo!("{l:?}"),
+                    }),
+                },
+                value: ConstantValue::Vector(
+                    vec.iter()
+                        .map(|l| build_constant_value(&*l.get()))
+                        .collect(),
+                ),
+            },
         };
 
         build(self.block, self.block_arena_mut(), kind)
@@ -2327,5 +2339,34 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
             (a, b) => panic!("todo concat for {a:?} {b:?}"),
         }
+    }
+}
+
+fn build_constant_value(literal: &boom::Literal) -> ConstantValue {
+    match literal {
+        boom::Literal::Int(i) => {
+            let value = i.try_into().unwrap_or_else(|_| {
+                log::error!("failed to convert {i} to i64");
+                i64::MAX
+            });
+            ConstantValue::SignedInteger(value)
+        }
+        boom::Literal::Bits(bits) => {
+            ConstantValue::UnsignedInteger(bits_to_int(bits).try_into().unwrap())
+        }
+        boom::Literal::Bit(bit) => ConstantValue::UnsignedInteger(bit.value().try_into().unwrap()),
+
+        boom::Literal::Bool(b) => ConstantValue::UnsignedInteger(if *b { 1 } else { 0 }),
+
+        boom::Literal::String(str) => ConstantValue::String(*str),
+
+        boom::Literal::Unit => unreachable!("units removed in boom pass"),
+        boom::Literal::Reference(_) => todo!(),
+        boom::Literal::Undefined => todo!(),
+        boom::Literal::Vector(vec) => ConstantValue::Vector(
+            vec.iter()
+                .map(|l| build_constant_value(&*l.get()))
+                .collect(),
+        ),
     }
 }

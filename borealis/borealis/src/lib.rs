@@ -109,7 +109,6 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         HandleBuiltinFunctions::new_boxed(),
         RemoveConstantType::new_boxed(),
         DestructComposites::new_boxed(),
-        //  DestructComposites::new_boxed(),
         RemoveUnits::new_boxed(),
     ]
     .into_iter()
