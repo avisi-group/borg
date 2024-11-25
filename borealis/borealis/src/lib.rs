@@ -360,9 +360,6 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "HaveLRCPC3Ext",
         "ConstrainUnpredictable",
         "BigEndian",
-        // "AArch64_MemSingle_read",
-        // "AArch64_MemSingle_read__1",
-        //"PhysMemRead",
         "ELIsInHost",
         "sext_subrange",
         "sail_ones",
@@ -376,6 +373,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "example_f2",
         "func_corrupted_var",
         "SPESampleAddOpOther__1",
+        "AArch64_MemSingle_read",
+        "AArch64_MemSingle_read__1",
+        "PARTIDspaceFromSS",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -383,6 +383,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "MemSingleNF_read",
         "sail_mem_write",
         "sail_mem_read",
+        "PhysMemRead",
     ];
 
     if FN_DENYLIST.contains(&name.as_ref()) {

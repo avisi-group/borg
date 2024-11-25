@@ -527,6 +527,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "neq_bits"
             | "neq_any<ESecurityState%>"
             | "neq_any<EFault%>"
+            | "neq_any<EMemOp%>"
             | "neq_bool"
             | "neq_int" => Some(build(
                 self.block,

@@ -1,4 +1,4 @@
-use crate::boom::control_flow::Terminator;
+use crate::boom::{control_flow::Terminator, NamedValue};
 use itertools::Itertools;
 use std::fmt;
 use std::fmt::Display;
@@ -73,7 +73,7 @@ impl DataLocation {
                         fields.push(field_name);
                         current_value = value.get().clone();
                     }
-                    _ => panic!(),
+                    v => panic!("{v:?}"),
                 }
             }
         }
@@ -490,13 +490,17 @@ fn create_union_construction_copies(
         fields
             .iter()
             .enumerate()
-            .map(|(i, nt)| Statement::Copy {
-                expression: Expression::Identifier(union_value_ident(*ident, nt.name)),
-                value: if i == tag {
-                    arguments[0].clone()
-                } else {
-                    default_value(nt.typ.clone())
-                },
+            .flat_map(|(i, nt)| {
+                destruct_variable(union_value_ident(*ident, nt.name), nt.typ.clone())
+                    .into_iter()
+                    .map(move |(ident, typ)| Statement::Copy {
+                        expression: Expression::Identifier(ident),
+                        value: if i == tag {
+                            arguments[0].clone()
+                        } else {
+                            default_value(typ.clone())
+                        },
+                    })
             })
             .chain([Statement::Copy {
                 expression: Expression::Identifier(union_tag_ident(*ident)),
@@ -601,17 +605,6 @@ fn default_value(typ: Shared<Type>) -> Shared<Value> {
             InternedString::from_static("default value"),
         )))),
         Type::Bool => Shared::new(Value::Literal(Shared::new(Literal::Bool(false)))),
-        // Type::Struct { name, fields } => Shared::new(Value::Struct {
-        //     name: *name,
-        //     fields: fields
-        //         .iter()
-        //         .cloned()
-        //         .map(|NamedType { name, typ }| NamedValue {
-        //             name,
-        //             value: default_value(typ),
-        //         })
-        //         .collect(),
-        // }),
         Type::Integer { .. } => Shared::new(Value::Literal(Shared::new(Literal::Int(0.into())))),
         Type::Bits { size } => Shared::new(Value::Literal(Shared::new(Literal::Bits(vec![
             0.into(
@@ -621,6 +614,9 @@ fn default_value(typ: Shared<Type>) -> Shared<Value> {
                 Size::Unknown => 1,
             }
         ])))),
+        Type::Struct { name, .. } | Type::Union { name, .. } => {
+            panic!("no default value for composite type {name:?}, it should be destructed")
+        }
         t => todo!("{t:?}"),
     }
 }
