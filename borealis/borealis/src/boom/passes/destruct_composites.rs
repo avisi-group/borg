@@ -392,8 +392,8 @@ fn destruct_locals(
                         arguments,
                     } => {
                         // function name is a union tag constructor
-                        if let Some((fields, tag)) = is_union_constructor(*name, composites) {
-                            create_union_construction_copies(expression, arguments, fields, tag)
+                        if let Some((union_typ, tag)) = is_union_constructor(*name, composites) {
+                            create_union_construction_copies(expression, arguments, union_typ, tag)
                         } else {
                             // if we have an expression...
                             let expression = expression.clone().map(|expr| {
@@ -485,35 +485,99 @@ fn destruct_locals(
 fn create_union_construction_copies(
     expression: &Option<Expression>,
     arguments: &Vec<Shared<Value>>,
-    fields: Vec<NamedType>,
+    union_typ: Shared<Type>,
     tag: usize,
 ) -> Vec<Shared<Statement>> {
-    if let Some(Expression::Identifier(ident)) = expression {
-        assert_eq!(1, arguments.len());
+    let Some(Expression::Identifier(dst)) = expression else {
+        panic!()
+    };
 
-        fields
-            .iter()
-            .enumerate()
-            .flat_map(|(i, nt)| {
-                destruct_variable(union_value_ident(*ident, nt.name), nt.typ.clone())
-                    .into_iter()
-                    .map(move |(ident, typ)| Statement::Copy {
-                        expression: Expression::Identifier(ident),
-                        value: if i == tag {
-                            arguments[0].clone()
-                        } else {
-                            default_value(typ.clone())
-                        },
-                    })
-            })
-            .chain([Statement::Copy {
-                expression: Expression::Identifier(union_tag_ident(*ident)),
-                value: Shared::new(Value::Literal(Shared::new(Literal::Int(tag.into())))),
-            }])
-            .map(Shared::new)
-            .collect()
-    } else {
+    assert_eq!(1, arguments.len());
+
+    let Type::Union { fields, .. } = &*union_typ.get() else {
         panic!();
+    };
+
+    let iter = [Shared::new(Statement::Copy {
+        expression: Expression::Identifier(union_tag_ident(*dst)),
+        value: Shared::new(Value::Literal(Shared::new(Literal::Int(tag.into())))),
+    })]
+    .into_iter();
+
+    match &*arguments[0].get() {
+        // assign args[0] to the correct value variable, splitting if necessary
+        Value::Identifier(source) => {
+            // need to write either the argument or a default_value to each field of the union
+            iter.chain(
+                fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, nt)| {
+                        let src = if i == tag { Some(*source) } else { None };
+                        let dst = union_value_ident(*dst, nt.name);
+                        let typ = nt.typ.clone();
+
+                        (src, dst, typ)
+                    })
+                    .flat_map(|(src, dst, typ)| {
+                        if let Some(src) = src {
+                            destruct_variable(src, typ.clone())
+                                .into_iter()
+                                .zip(destruct_variable(dst, typ).into_iter())
+                                .map(|((src, _), (dst, _))| {
+                                    (Shared::new(Value::Identifier(src)), dst)
+                                })
+                                .collect::<Vec<_>>()
+                        } else {
+                            destruct_variable(dst, typ)
+                                .into_iter()
+                                .map(|(dst, typ)| (default_value(typ), dst))
+                                .collect()
+                        }
+                    })
+                    .map(|(value, dst)| Statement::Copy {
+                        expression: Expression::Identifier(dst),
+                        value,
+                    })
+                    .map(Shared::new),
+            )
+            .collect()
+        }
+        Value::Literal(_) => iter
+            .chain(
+                fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, nt)| {
+                        let src = if i == tag {
+                            Some(arguments[0].clone())
+                        } else {
+                            None
+                        };
+                        let dst = union_value_ident(*dst, nt.name);
+                        let typ = nt.typ.clone();
+
+                        (src, dst, typ)
+                    })
+                    .flat_map(|(src, dst, typ)| {
+                        if let Some(src) = src {
+                            // todo: handle struct literals?
+                            vec![(src, dst)]
+                        } else {
+                            destruct_variable(dst, typ)
+                                .into_iter()
+                                .map(|(dst, typ)| (default_value(typ), dst))
+                                .collect()
+                        }
+                    })
+                    .map(|(value, dst)| Statement::Copy {
+                        expression: Expression::Identifier(dst),
+                        value,
+                    })
+                    .map(Shared::new),
+            )
+            .collect(),
+        v => todo!("{v:?}"),
     }
 }
 
@@ -631,24 +695,29 @@ fn default_value(typ: Shared<Type>) -> Shared<Value> {
 fn is_union_constructor(
     ident: InternedString,
     composites: &HashMap<InternedString, Shared<Type>>,
-) -> Option<(Vec<NamedType>, usize)> {
+) -> Option<(Shared<Type>, usize)> {
     composites
         .values()
         .filter_map(|c| {
-            if let Type::Union { fields, .. } = &*c.get() {
-                Some(fields.clone())
+            if let Type::Union { .. } = &*c.get() {
+                Some(c.clone())
             } else {
                 None
             }
         })
-        .flat_map(|nts| {
-            nts.clone()
+        .flat_map(|typ| {
+            let cloned = typ.clone();
+            let Type::Union { fields, .. } = &*cloned.get() else {
+                unreachable!()
+            };
+            fields
+                .clone()
                 .into_iter()
                 .enumerate()
-                .map(move |(i, nt)| (nts.clone(), i, nt))
+                .map(move |(i, nt)| (typ.clone(), i, nt))
         })
         .find(|(_, _, nt)| nt.name == ident)
-        .map(|(nts, tag, _)| (nts, tag))
+        .map(|(typ, tag, _)| (typ, tag))
 }
 
 fn is_type_composite(typ: Shared<Type>) -> bool {

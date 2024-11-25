@@ -1794,7 +1794,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     panic!("these should be members now?");
                 }
 
-                panic!("unknown ident: {:?}\n{:?}", ident, boom_value);
+                panic!(
+                    "unknown ident: {:?} in value {:?} in block {:?} in {:?}",
+                    ident,
+                    boom_value,
+                    self.block,
+                    self.fn_ctx().rudder_fn.name()
+                );
             }
 
             boom::Value::Literal(literal) => self.build_literal(&literal.get()),

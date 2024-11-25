@@ -406,6 +406,7 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "GPCNoFault",
         "AArch64_Abort",
         "IsDebugException",
+        "AArch64_DataAbort",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
