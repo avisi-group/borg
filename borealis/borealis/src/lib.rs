@@ -376,6 +376,37 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AArch64_MemSingle_read",
         "AArch64_MemSingle_read__1",
         "PARTIDspaceFromSS",
+        "MPAMisEnabled",
+        "AltPARTIDspace",
+        "AltPIdSecure",
+        "UsePrimarySpaceEL2",
+        "UsePrimarySpaceEL10",
+        "AltPIdRealm",
+        "genMPAM",
+        "genPARTID",
+        "getMPAM_PARTID",
+        "MPAMisVirtual",
+        "MAP_vPARTID",
+        "fmod_int",
+        "mapvpmw",
+        "genPMG",
+        "AArch64_SetLSInstructionSyndrome",
+        "Mem_set__2",
+        "Align_bits",
+        "Slice_int",
+        "AArch64_UnalignedAccessFaults",
+        "AlignmentEnforced",
+        "TranslationRegime",
+        "CurrentSecurityState",
+        "SCTLR_read__1",
+        "S1TranslationRegime__1",
+        "AlignmentFault",
+        "undefined_FaultRecord",
+        "undefined_FullAddress",
+        "undefined_GPCFRecord",
+        "GPCNoFault",
+        "AArch64_Abort",
+        "IsDebugException",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -384,9 +415,23 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "sail_mem_write",
         "sail_mem_read",
         "PhysMemRead",
+        "gic_read_ram", /* CtorUnwrap { value: Shared { inner: RwLock { data:
+                         * Identifier("ga#311293") } }, identifier:
+                         * "Ok<(b,Uoption<o><>),EFault%>", types: [] } Location:
+                         * borealis/src/boom/passes/destruct_composites.rs:76 */
+        "TakeTransactionCheckpoint", /*   assert_eq!(destination.to_ident(), *vector);
+                                      * borealis/src/boom/passes/destruct_composites.rs:249 */
+        "BPIALLIS_SysRegWrite32_17f454fbcdf975ae", /* Message:  parent 5B054CCAEF579530 not found in parents Location: borealis/src/boom/control_flow/mod.rs:123 */
+        "BPIALL_SysRegWrite32_4a4889731f53da78",
+        "execute_aarch32_instrs_DCPS3_Op_A_txt",
+        "execute_aarch32_instrs_DCPS2_Op_A_txt",
+        "neq_any<O<EInterruptID%>>",
     ];
 
-    if FN_DENYLIST.contains(&name.as_ref()) {
+    if FN_DENYLIST.contains(&name.as_ref())
+        || name.as_ref().contains("SysRegWrite32")
+        || name.as_ref().contains("execute_aarch32_instrs")
+    {
         return false;
     }
 
@@ -400,6 +445,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().starts_with("decode_")
         || name.as_ref().starts_with("execute_aarch64_instrs")
         || name.as_ref().starts_with("__DecodeA64")
+        || name.as_ref().contains("MPAM")
+        || name.as_ref().starts_with("undefined")
+        || name.as_ref().starts_with("neq_any")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

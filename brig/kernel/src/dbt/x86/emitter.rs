@@ -1183,17 +1183,21 @@ impl X86NodeRef {
 
                     dst
                 }
-                // BinaryOperationKind::Divide(left, right) => {
-                //     let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
-                //     let dst = Operand::vreg(width, emitter.next_vreg());
+                BinaryOperationKind::Divide(left, right) => {
+                    assert_eq!(right.typ().width(), 64);
+                    assert_eq!(left.typ().width(), 64);
 
-                //     let left = left.to_operand(emitter);
-                //     let right = right.to_operand(emitter);
-                //     emitter.append(Instruction::mov(left, dst.clone()));
-                //     emitter.append(Instruction::idiv(right, dst.clone()));
+                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
+                    let dst = Operand::vreg(width, emitter.next_vreg());
 
-                //     dst
-                // }
+                    let left = left.to_operand(emitter);
+                    let right = right.to_operand(emitter);
+                    let _0 = Operand::imm(Width::_64, 0);
+                    emitter.append(Instruction::mov(left, dst.clone()));
+                    emitter.append(Instruction::idiv(_0, right, dst.clone()));
+
+                    dst
+                }
                 BinaryOperationKind::CompareEqual(left, right)
                 | BinaryOperationKind::CompareNotEqual(left, right)
                 | BinaryOperationKind::CompareGreaterThan(left, right)

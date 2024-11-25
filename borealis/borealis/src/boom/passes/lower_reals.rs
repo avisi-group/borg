@@ -5,6 +5,7 @@ use {
         Ast, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
     },
     common::intern::InternedString,
+    rayon::iter::ParallelIterator,
     sailrs::shared::Shared,
 };
 
@@ -49,7 +50,7 @@ impl Pass for LowerReals {
                 .iter()
                 .for_each(|NamedType { typ, .. }| try_replace_type(typ));
         });
-        ast.get_mut().functions.values().for_each(
+        ast.get_mut().functions.par_values().for_each(
             |FunctionDefinition {
                  signature,
                  entry_block,

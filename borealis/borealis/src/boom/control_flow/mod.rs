@@ -119,7 +119,12 @@ impl ControlFlowBlock {
         let parent_to_remove = parent_to_remove.downgrade();
         let parents = &mut self.inner.get_mut().parents;
 
-        assert!(parents.contains(&parent_to_remove));
+        if !parents.contains(&parent_to_remove) {
+            panic!(
+                "parent {} not found in parents",
+                parent_to_remove.upgrade().unwrap(),
+            )
+        }
 
         parents.retain(|p| *p != parent_to_remove);
     }

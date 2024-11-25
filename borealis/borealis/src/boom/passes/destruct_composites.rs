@@ -1,14 +1,14 @@
-use crate::boom::{control_flow::Terminator, NamedValue};
-use itertools::Itertools;
-use std::fmt;
-use std::fmt::Display;
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock, passes::Pass, Ast, Expression, Literal, NamedType,
-        Parameter, Size, Statement, Type, Value,
+        control_flow::{ControlFlowBlock, Terminator},
+        passes::Pass,
+        Ast, Expression, Literal, NamedType, Parameter, Size, Statement, Type, Value,
     },
     common::{intern::InternedString, HashMap},
+    itertools::Itertools,
+    rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     sailrs::shared::Shared,
+    std::{fmt, fmt::Display},
 };
 
 #[derive(Debug, Default)]
@@ -18,6 +18,59 @@ impl DestructComposites {
     /// Create a new Pass object
     pub fn new_boxed() -> Box<dyn Pass> {
         Box::<Self>::default()
+    }
+}
+
+impl Pass for DestructComposites {
+    fn name(&self) -> &'static str {
+        "DestructComposites"
+    }
+
+    fn reset(&mut self) {}
+
+    fn run(&mut self, ast: Shared<Ast>) -> bool {
+        let composites = {
+            let mut map = HashMap::default();
+            map.extend(ast.get().unions.iter().map(|(name, fields)| {
+                (
+                    *name,
+                    Shared::new(Type::Union {
+                        name: *name,
+                        fields: fields.clone(),
+                    }),
+                )
+            }));
+            map.extend(ast.get().structs.iter().map(|(name, fields)| {
+                (
+                    *name,
+                    Shared::new(Type::Struct {
+                        name: *name,
+                        fields: fields.clone(),
+                    }),
+                )
+            }));
+            map
+        };
+
+        let destructed_registers = destruct_registers(ast.clone());
+
+        // function signatures need fixing first, then storing for lookup when handling
+        // function calls
+        let destructed_return_type_by_function = destruct_function_return_types(ast.clone());
+        let destructed_parameters_by_function = destruct_function_parameters(ast.clone());
+
+        ast.get().functions.par_iter().for_each(|(name, def)| {
+            destruct_locals(
+                *name,
+                &composites,
+                &destructed_registers,
+                &destructed_return_type_by_function,
+                &destructed_parameters_by_function,
+                def.entry_block.clone(),
+            );
+        });
+
+        false
     }
 }
 
@@ -122,58 +175,6 @@ impl From<&Expression> for DataLocation {
     }
 }
 
-impl Pass for DestructComposites {
-    fn name(&self) -> &'static str {
-        "DestructComposites"
-    }
-
-    fn reset(&mut self) {}
-
-    fn run(&mut self, ast: Shared<Ast>) -> bool {
-        let composites = {
-            let mut map = HashMap::default();
-            map.extend(ast.get().unions.iter().map(|(name, fields)| {
-                (
-                    *name,
-                    Shared::new(Type::Union {
-                        name: *name,
-                        fields: fields.clone(),
-                    }),
-                )
-            }));
-            map.extend(ast.get().structs.iter().map(|(name, fields)| {
-                (
-                    *name,
-                    Shared::new(Type::Struct {
-                        name: *name,
-                        fields: fields.clone(),
-                    }),
-                )
-            }));
-            map
-        };
-
-        let destructed_registers = destruct_registers(ast.clone());
-
-        // function signatures need fixing first, then storing for lookup when handling function calls
-        let destructed_return_type_by_function = destruct_function_return_types(ast.clone());
-        let destructed_parameters_by_function = destruct_function_parameters(ast.clone());
-
-        ast.get().functions.iter().for_each(|(name, def)| {
-            destruct_locals(
-                *name,
-                &composites,
-                &destructed_registers,
-                &destructed_return_type_by_function,
-                &destructed_parameters_by_function,
-                def.entry_block.clone(),
-            );
-        });
-
-        false
-    }
-}
-
 /// split locally declared unions into a tag and a local variable the size of
 /// the largest value?
 fn destruct_locals(
@@ -220,7 +221,8 @@ fn destruct_locals(
                     Statement::Copy { expression, value } => {
                         let destination = DataLocation::from(expression);
 
-                        // if source is not a location, it won't be a struct identifier or field access so return early
+                        // if source is not a location, it won't be a struct identifier or field
+                        // access so return early
                         let (source, vector_access) = match DataLocation::try_from(value.clone()) {
                             Some(source) => (source, None),
                             None => match &*value.get() {
@@ -249,7 +251,8 @@ fn destruct_locals(
                                     assert_eq!(destination.to_ident(), *vector);
 
                                     // was element destructed?
-                                    // assumes element and vector have same type (this is reasonable)
+                                    // assumes element and vector have same type (this is
+                                    // reasonable)
                                     if let Some(typ) = destructed_local_variables
                                         .get(element)
                                         .or_else(|| destructed_registers.get(element))
@@ -464,7 +467,8 @@ fn destruct_locals(
 
         if let Terminator::Return(Some(Value::Identifier(return_value_ident))) = block.terminator()
         {
-            // done to distinguish structs of one element (converted to unary tuple) from a single return value
+            // done to distinguish structs of one element (converted to unary tuple) from a
+            // single return value
             if let Some(typ) = destructed_local_variables.get(&return_value_ident) {
                 block.set_terminator(Terminator::Return(Some(Value::Tuple(
                     destruct_variable(return_value_ident, typ.clone())
@@ -513,7 +517,8 @@ fn create_union_construction_copies(
     }
 }
 
-/// Destructure a composite variable (name and type combination) into primitive types with unique identifiers
+/// Destructure a composite variable (name and type combination) into primitive
+/// types with unique identifiers
 fn destruct_variable(
     root_name: InternedString,
     typ: Shared<Type>,
@@ -621,7 +626,8 @@ fn default_value(typ: Shared<Type>) -> Shared<Value> {
     }
 }
 
-/// If the supplied identifier is a constructor for a union variant, return the fields of that union and the tag of that variant
+/// If the supplied identifier is a constructor for a union variant, return the
+/// fields of that union and the tag of that variant
 fn is_union_constructor(
     ident: InternedString,
     composites: &HashMap<InternedString, Shared<Type>>,
@@ -817,8 +823,8 @@ fn traverse_typ_from_location(
 //             Expression::Identifier(root) => {
 //                 Expression::Identifier(struct_field_ident(*root, *field))
 //             }
-//             Expression::Field { expression, field } => todo!("gotta go deeper"),
-//             _ => panic!(),
+//             Expression::Field { expression, field } => todo!("gotta go
+// deeper"),             _ => panic!(),
 //         },
 //         _ => panic!(),
 //     }
