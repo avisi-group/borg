@@ -653,17 +653,17 @@ fn destruct_variable(
 }
 
 /// Identifier for a union's tag
-fn union_tag_ident(ident: InternedString) -> InternedString {
+pub fn union_tag_ident(ident: InternedString) -> InternedString {
     format!("{ident}_tag").into()
 }
 
 /// Identifier for a union's values
-fn union_value_ident(root: InternedString, variant: InternedString) -> InternedString {
+pub fn union_value_ident(root: InternedString, variant: InternedString) -> InternedString {
     format!("{root}_{variant}").into()
 }
 
 /// Identifier for a struct's values
-fn struct_field_ident(root: InternedString, field: InternedString) -> InternedString {
+pub fn struct_field_ident(root: InternedString, field: InternedString) -> InternedString {
     format!("{root}_{field}").into()
 }
 

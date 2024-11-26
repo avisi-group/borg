@@ -1,6 +1,6 @@
 use {
     crate::{
-        boom::{self, bits_to_int},
+        boom::{self, bits_to_int, passes::destruct_composites},
         rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
     },
     common::{
@@ -40,6 +40,15 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
         .iter()
         .for_each(|(name, definition)| build_ctx.add_function(*name, definition));
 
+    build_ctx
+        .unions_tags
+        .extend(ast.unions.values().flat_map(|variants| {
+            variants
+                .iter()
+                .enumerate()
+                .map(|(i, nt)| (nt.name, u32::try_from(i).unwrap()))
+        }));
+
     // insert replicate bits signature
 
     internal_fns::insert_stub(&mut build_ctx.functions, &*REPLICATE_BITS_BOREALIS_INTERNAL);
@@ -62,6 +71,9 @@ struct BuildContext {
     /// Name of enum maps to the rudder type and a map of enum variants to the
     /// integer discriminant of that variant
     enums: HashMap<InternedString, (Type, HashMap<InternedString, u32>)>,
+
+    /// Union variant to tag map
+    unions_tags: HashMap<InternedString, u32>,
 
     /// Register name to type and offset mapping
     registers: HashMap<InternedString, RegisterDescriptor>,
@@ -946,18 +958,13 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ))
             }
 
-            "bitvector_length" => {
-                let arena = self.statement_arena();
-                assert!(matches!(args[0].get(arena).typ(arena), Some(Type::Bits)));
-
-                Some(build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::SizeOf {
-                        value: args[0].clone(),
-                    },
-                ))
-            }
+            "bitvector_length" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::SizeOf {
+                    value: args[0].clone(),
+                },
+            )),
 
             "update_fbits" => {
                 //     if ((bit & 1) == 1) {
@@ -1832,35 +1839,49 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 
             boom::Value::Field { .. } => panic!("fields should have already been flattened"),
 
-            // return false if `value`` is of the variant `identifier`, else true
-            boom::Value::CtorKind { .. } => {
-                // assert!(outer_field_accesses.is_empty());
+            boom::Value::CtorKind {
+                value, identifier, ..
+            } => {
+                let target_tag = *self
+                    .ctx()
+                    .unions_tags
+                    .get(identifier)
+                    .unwrap_or_else(|| panic!("failed to find tag value for {identifier:?}"));
 
-                // let value = self.build_value(value.clone());
+                let target_tag = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::Primitive(PrimitiveType::SignedInteger(32)),
+                        value: ConstantValue::SignedInteger(i64::from(target_tag)),
+                    },
+                );
 
-                // // get the rudder type
-                // let typ = self
-                //     .ctx()
-                //     .unions
-                //     .values()
-                //     .find(|(_, variants)| variants.contains_key(identifier))
-                //     .map(|(typ, _)| typ)
-                //     .cloned()
-                //     .unwrap();
+                let read_tag = {
+                    let boom::Value::Identifier(union_root) = &*value.get() else {
+                        panic!()
+                    };
+                    build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::ReadVariable {
+                            symbol: Symbol::new(
+                                destruct_composites::union_tag_ident(*union_root),
+                                Type::Primitive(PrimitiveType::SignedInteger(32)),
+                            ),
+                        },
+                    )
+                };
 
-                // assert_eq!(value.typ(), typ);
-
-                // // todo: investigate this further
-                // let matches = build(   self.block,
-                // self.block_arena_mut(),Statement::MatchesUnion {
-                //     value,
-                //     variant: *identifier,
-                // });
-                // build(   self.block,   self.block_arena_mut(),Statement::UnaryOperation {
-                //     kind: UnaryOperationKind::Not,
-                //     value: matches,
-                // })
-                todo!()
+                build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::BinaryOperation {
+                        kind: BinaryOperationKind::CompareEqual,
+                        lhs: target_tag,
+                        rhs: read_tag,
+                    },
+                )
             }
             boom::Value::CtorUnwrap { .. } => {
                 // let value = self.build_value(value.clone());

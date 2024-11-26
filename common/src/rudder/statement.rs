@@ -1092,6 +1092,7 @@ impl Statement {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub enum Location {
     End,
     Before(Ref<Statement>),
@@ -1283,6 +1284,60 @@ pub fn cast_at(
             },
             location,
         ),
+
+        (Type::String, Type::Tuple(t)) => {
+            if *t
+                == [
+                    Type::Primitive(PrimitiveType::SignedInteger(64)),
+                    Type::Primitive(PrimitiveType::SignedInteger(64)),
+                ]
+            {
+                let Statement::Constant { value, .. } = source.get(s_arena) else {
+                    panic!()
+                };
+
+                let ConstantValue::String(s) = value else {
+                    panic!()
+                };
+
+                let (num, den) = match s.as_ref() {
+                    "0.0" => (0, 1),
+                    "0.5" => (1, 2),
+                    "1.0" => (1, 1),
+                    "2.0" => (2, 1),
+                    _ => todo!("{s:?}"),
+                };
+
+                let num = build_at(
+                    block,
+                    arena,
+                    Statement::Constant {
+                        typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
+                        value: ConstantValue::SignedInteger(num),
+                    },
+                    location,
+                );
+
+                let den = build_at(
+                    block,
+                    arena,
+                    Statement::Constant {
+                        typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
+                        value: ConstantValue::SignedInteger(den),
+                    },
+                    location,
+                );
+
+                build_at(
+                    block,
+                    arena,
+                    Statement::CreateTuple(alloc::vec![num, den]),
+                    location,
+                )
+            } else {
+                panic!();
+            }
+        }
 
         (src, dst) => {
             log::error!("current block: {:?}", block.get(arena));

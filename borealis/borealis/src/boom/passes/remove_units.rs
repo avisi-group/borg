@@ -55,7 +55,12 @@ impl Pass for RemoveUnits {
                 .get()
                 .iter()
                 .filter_map(|p| {
-                    remove_unit_type(p.typ.clone()).map(|typ| Parameter { name: p.name, typ })
+                    let o =
+                        remove_unit_type(p.typ.clone()).map(|typ| Parameter { name: p.name, typ });
+                    if o.is_none() {
+                        removed.insert(p.name);
+                    }
+                    o
                 })
                 .collect();
             *def.signature.parameters.get_mut() = new_params;

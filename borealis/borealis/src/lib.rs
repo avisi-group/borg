@@ -407,6 +407,33 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AArch64_Abort",
         "IsDebugException",
         "AArch64_DataAbort",
+        "IsExternalAbort__1",
+        "IsExternalAbort",
+        "ThisInstrAddr",
+        "AArch64_AbortSyndrome",
+        "ExceptionSyndrome",
+        "__UNKNOWN_PASpace",
+        "AArch64_FaultSyndrome",
+        "IsSecondStage",
+        "EncodeLDFSC",
+        "IPAValid",
+        "IsExternalSyncAbort__1",
+        "IsExternalSyncAbort",
+        "take_exception",
+        "sail_take_exception",
+        "AArch64_TakeException",
+        "Halted",
+        "AArch64_TakeExceptionInDebugState",
+        "AArch64_MaybeZeroRegisterUppers",
+        "FailTransaction",
+        "FailTransaction__1",
+        "RestoreTransactionCheckpoint",
+        "RestoreTransactionCheckpointParameterised",
+        "SP_set",
+        "IsFPEnabled",
+        "AArch32_IsFPEnabled",
+        "IsSMEEnabled",
+        "Z_set",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[
@@ -448,6 +475,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().contains("MPAM")
         || name.as_ref().starts_with("undefined")
         || name.as_ref().starts_with("neq_any")
+        || name.as_ref().starts_with("AArch64")
+        || name.as_ref().starts_with("Is")
+        || name.as_ref().ends_with("__1")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

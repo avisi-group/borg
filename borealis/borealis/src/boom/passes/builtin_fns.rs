@@ -151,6 +151,13 @@ impl Pass for HandleBuiltinFunctions {
                                             Literal::Vector(vec![element; n]),
                                         ))),
                                     })
+                                } else if name.as_ref() == "Z_set" {
+                                    Shared::new(Statement::Copy {
+                                        expression: expression.clone(),
+                                        value: Shared::new(Value::Literal(Shared::new(
+                                            Literal::Unit,
+                                        ))),
+                                    })
                                 } else {
                                     s.clone()
                                 }

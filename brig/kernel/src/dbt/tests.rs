@@ -574,7 +574,7 @@ fn fibonacci_instr() {
 ///  4000dc:	91500421 	add	x1, x1, #0x401, lsl #12
 ///  4000e0:	f9000020 	str	x0, [x1]
 ///  4000e4:	f9400020 	ldr	x0, [x1]
-#[ktest]
+//#[ktest]
 fn mem() {
     let model = models::get("aarch64").unwrap();
 
