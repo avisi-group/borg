@@ -30,12 +30,11 @@ use {
     deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{debug, info},
-    rkyv::Deserialize,
     sailrs::{
         bytes, create_file_buffered,
         jib_ast::{self, Definition, DefinitionAux, Instruction},
         sail_ast::Location,
-        types::ListVec,
+        types::{ArchivedListVec, ListVec},
     },
     std::{
         fs::{create_dir_all, File},
@@ -58,9 +57,8 @@ pub fn load_model(path: &Path) -> ListVec<Definition> {
 
     info!("deserializing");
 
-    let jib: ListVec<Definition> = unsafe { rkyv::archived_root::<ListVec<Definition>>(&mmap) }
-        .deserialize(&mut rkyv::Infallible)
-        .unwrap();
+    let archived: &ArchivedListVec<Definition> = unsafe { rkyv::access_unchecked(&mmap) };
+    let jib: ListVec<Definition> = rkyv::deserialize::<_, rkyv::rancor::Error>(archived).unwrap();
 
     info!("JIB size: {:.2}", bytes(jib.deep_size_of()));
 

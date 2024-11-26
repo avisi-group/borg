@@ -6,9 +6,9 @@ use {
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
     rkyv::{
-        ser::ScratchSpace,
+        rancor::Fallible,
         vec::{ArchivedVec, VecResolver},
-        Fallible,
+        Place,
     },
     std::str::FromStr,
 };
@@ -88,26 +88,25 @@ impl DeepSizeOf for BigInt {
 
 impl rkyv::Archive for BigInt {
     type Archived = ArchivedVec<u8>;
-
     type Resolver = VecResolver;
 
-    unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
-        ArchivedVec::resolve_from_slice(self.0.to_signed_bytes_be().as_slice(), pos, resolver, out);
+    fn resolve(&self, resolver: Self::Resolver, out: Place<Self::Archived>) {
+        ArchivedVec::resolve_from_slice(self.0.to_signed_bytes_be().as_slice(), resolver, out);
     }
 }
 
-impl<S: Fallible + ScratchSpace + rkyv::ser::Serializer> rkyv::Serialize<S> for BigInt {
-    fn serialize(
-        &self,
-        serializer: &mut S,
-    ) -> Result<Self::Resolver, <S as rkyv::Fallible>::Error> {
+impl<S: Fallible + rkyv::ser::Writer + rkyv::ser::Allocator> rkyv::Serialize<S> for BigInt {
+    fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, <S as Fallible>::Error> {
         ArchivedVec::serialize_from_slice(self.0.to_signed_bytes_be().as_slice(), serializer)
     }
 }
 
-impl<D: Fallible> rkyv::Deserialize<BigInt, D> for ArchivedVec<u8> {
-    fn deserialize(&self, deserializer: &mut D) -> Result<BigInt, <D as Fallible>::Error> {
-        ArchivedVec::deserialize(self, deserializer)
+impl<D: Fallible> rkyv::Deserialize<BigInt, D> for ArchivedVec<u8>
+where
+    <D as Fallible>::Error: rkyv::rancor::Source,
+{
+    fn deserialize(&self, deserializer: &mut D) -> Result<BigInt, D::Error> {
+        <Self as rkyv::Deserialize<Vec<u8>, D>>::deserialize(self, deserializer)
             .map(|digits: Vec<u8>| BigInt(num_bigint::BigInt::from_signed_bytes_be(&digits)))
     }
 }

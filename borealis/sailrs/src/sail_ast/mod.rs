@@ -12,6 +12,7 @@ use {
     common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
+    rkyv::ser::Writer,
     std::fmt::Display,
     strum::IntoStaticStr,
 };
@@ -115,19 +116,25 @@ pub mod visitor;
     DeepSizeOf,
     IntoStaticStr,
 )]
-#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
+#[rkyv(deserialize_bounds(<__D as rkyv::rancor::Fallible>::Error: rkyv::rancor::Source))]
+#[rkyv(serialize_bounds(__S: Writer))]
+#[rkyv(bytecheck(
+    bounds(
+        __C: rkyv::validation::ArchiveContext,
+    )
+))]
 pub enum Location {
     /// Unknown location
     Unknown,
     /// Unique location
-    Unique(Int, #[omit_bounds] Box<Self>),
+    Unique(Int, #[rkyv(omit_bounds)] Box<Self>),
     /// Generated location
-    Generated(#[omit_bounds] Box<Self>),
+    Generated(#[rkyv(omit_bounds)] Box<Self>),
     /// Hint
     Hint(
         InternedString,
-        #[omit_bounds] Box<Self>,
-        #[omit_bounds] Box<Self>,
+        #[rkyv(omit_bounds)] Box<Self>,
+        #[rkyv(omit_bounds)] Box<Self>,
     ),
     /// Range between two positions
     Range(Position, Position),

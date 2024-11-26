@@ -17,6 +17,7 @@ use {
     common::intern::InternedString,
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue},
+    rkyv::ser::Writer,
 };
 
 pub mod pretty_print;
@@ -54,8 +55,13 @@ pub enum Channel {
     rkyv::Deserialize,
     DeepSizeOf,
 )]
-#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
-
+#[rkyv(deserialize_bounds(<__D as rkyv::rancor::Fallible>::Error: rkyv::rancor::Source))]
+#[rkyv(serialize_bounds(__S: Writer+ rkyv::ser::Allocator))]
+#[rkyv(bytecheck(
+    bounds(
+        __C: rkyv::validation::ArchiveContext,
+    )
+))]
 pub enum Type {
     Lint,
     Fint(Int),
@@ -70,14 +76,14 @@ pub enum Type {
     Real,
     Float(Int),
     RoundingMode,
-    Tup(#[omit_bounds] ListVec<Self>),
+    Tup(#[rkyv(omit_bounds)] ListVec<Self>),
     Enum(Identifier, ListVec<Identifier>),
-    Struct(Identifier, #[omit_bounds] ListVec<(Identifier, Self)>),
-    Variant(Identifier, #[omit_bounds] ListVec<(Identifier, Self)>),
-    Fvector(Int, #[omit_bounds] Box<Self>),
-    Vector(#[omit_bounds] Box<Self>),
-    List(#[omit_bounds] Box<Self>),
-    Ref(#[omit_bounds] Box<Self>),
+    Struct(Identifier, #[rkyv(omit_bounds)] ListVec<(Identifier, Self)>),
+    Variant(Identifier, #[rkyv(omit_bounds)] ListVec<(Identifier, Self)>),
+    Fvector(Int, #[rkyv(omit_bounds)] Box<Self>),
+    Vector(#[rkyv(omit_bounds)] Box<Self>),
+    List(#[rkyv(omit_bounds)] Box<Self>),
+    Ref(#[rkyv(omit_bounds)] Box<Self>),
     Poly(KindIdentifier),
 }
 
@@ -211,13 +217,19 @@ impl Walkable for Op {
     rkyv::Deserialize,
     DeepSizeOf,
 )]
-#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
+#[rkyv(deserialize_bounds(<__D as rkyv::rancor::Fallible>::Error: rkyv::rancor::Source))]
+#[rkyv(serialize_bounds(__S: Writer))]
+#[rkyv(bytecheck(
+    bounds(
+        __C: rkyv::validation::ArchiveContext,
+    )
+))]
 pub enum Expression {
     Id(Name, Type),
     Rmw(Name, Name, Type),
-    Field(#[omit_bounds] Box<Self>, Identifier),
-    Addr(#[omit_bounds] Box<Self>),
-    Tuple(#[omit_bounds] Box<Self>, Int),
+    Field(#[rkyv(omit_bounds)] Box<Self>, Identifier),
+    Addr(#[rkyv(omit_bounds)] Box<Self>),
+    Tuple(#[rkyv(omit_bounds)] Box<Self>, Int),
     Void,
 }
 
@@ -258,19 +270,33 @@ impl Walkable for Expression {
     rkyv::Deserialize,
     DeepSizeOf,
 )]
-#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
+#[rkyv(deserialize_bounds(<__D as rkyv::rancor::Fallible>::Error: rkyv::rancor::Source))]
+#[rkyv(serialize_bounds(__S: Writer+ rkyv::ser::Allocator))]
+#[rkyv(bytecheck(
+    bounds(
+        __C: rkyv::validation::ArchiveContext,
+    )
+))]
 pub enum Value {
     Id(Name, Type),
     // enum member
     Member(Identifier, Type),
     Lit(Vl, Type),
-    Tuple(#[omit_bounds] ListVec<Self>, Type),
-    Struct(#[omit_bounds] ListVec<(Identifier, Self)>, Type),
-    CtorKind(#[omit_bounds] Box<Self>, (Identifier, ListVec<Type>), Type),
-    CtorUnwrap(#[omit_bounds] Box<Self>, (Identifier, ListVec<Type>), Type),
-    TupleMember(#[omit_bounds] Box<Self>, Int, Int),
-    Call(Op, #[omit_bounds] ListVec<Self>),
-    Field(#[omit_bounds] Box<Self>, Identifier),
+    Tuple(#[rkyv(omit_bounds)] ListVec<Self>, Type),
+    Struct(#[rkyv(omit_bounds)] ListVec<(Identifier, Self)>, Type),
+    CtorKind(
+        #[rkyv(omit_bounds)] Box<Self>,
+        (Identifier, ListVec<Type>),
+        Type,
+    ),
+    CtorUnwrap(
+        #[rkyv(omit_bounds)] Box<Self>,
+        (Identifier, ListVec<Type>),
+        Type,
+    ),
+    TupleMember(#[rkyv(omit_bounds)] Box<Self>, Int, Int),
+    Call(Op, #[rkyv(omit_bounds)] ListVec<Self>),
+    Field(#[rkyv(omit_bounds)] Box<Self>, Identifier),
 }
 
 impl Walkable for Value {
@@ -369,7 +395,13 @@ pub enum TypeDefinition {
     rkyv::Deserialize,
     DeepSizeOf,
 )]
-#[archive(bound(serialize = "__S: rkyv::ser::ScratchSpace, __S: rkyv::ser::Serializer"))]
+#[rkyv(deserialize_bounds(<__D as rkyv::rancor::Fallible>::Error: rkyv::rancor::Source))]
+#[rkyv(serialize_bounds(__S: Writer+ rkyv::ser::Allocator))]
+#[rkyv(bytecheck(
+    bounds(
+        __C: rkyv::validation::ArchiveContext,
+    )
+))]
 pub enum InstructionAux {
     Decl(Type, Name),
     Init(Type, Name, Value),
@@ -384,12 +416,12 @@ pub enum InstructionAux {
     End(Name),
     If(
         Value,
-        #[omit_bounds] ListVec<Instruction>,
-        #[omit_bounds] ListVec<Instruction>,
+        #[rkyv(omit_bounds)] ListVec<Instruction>,
+        #[rkyv(omit_bounds)] ListVec<Instruction>,
         Type,
     ),
-    Block(#[omit_bounds] ListVec<Instruction>),
-    TryBlock(#[omit_bounds] ListVec<Instruction>),
+    Block(#[rkyv(omit_bounds)] ListVec<Instruction>),
+    TryBlock(#[rkyv(omit_bounds)] ListVec<Instruction>),
     Throw(Value),
     Comment(InternedString),
     Raw(InternedString),

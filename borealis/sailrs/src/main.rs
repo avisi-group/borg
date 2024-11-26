@@ -3,7 +3,7 @@ use {
     color_eyre::Result,
     deepsize::DeepSizeOf,
     log::info,
-    rkyv::ser::{serializers::AllocSerializer, Serializer},
+    rkyv::{api::high::to_bytes_with_alloc, ser::allocator::Arena},
     sailrs::{bytes, create_file_buffered, init_logger, load_from_config},
     std::{io::Write, path::PathBuf},
 };
@@ -38,10 +38,10 @@ fn main() -> Result<()> {
         bytes(jib.deep_size_of())
     );
 
-    let mut serializer = AllocSerializer::<16384>::default();
-    serializer.serialize_value(&jib).unwrap();
-    let serialized = serializer.into_serializer().into_inner();
-    create_file_buffered(&args.output)?.write_all(&serialized)?;
+    let mut writer = create_file_buffered(&args.output)?;
+    let mut arena = Arena::new();
+    let serialized = to_bytes_with_alloc::<_, rkyv::rancor::Error>(&jib, arena.acquire())?;
+    writer.write_all(&serialized)?;
 
     info!("Serialized JIB to {:.2} bytes", bytes(serialized.len()));
 

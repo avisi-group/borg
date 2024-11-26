@@ -10,24 +10,25 @@ repository = "https://github.com/avisi-group/borealis"
 [dependencies]
 common = { path = "../../common", default-features = false, features = ["std"] }
 
+rkyv.workspace = true
+thiserror.workspace = true
+displaydoc.workspace = true
+errctx.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+deepsize.workspace = true
+serde.workspace = true
+once_cell.workspace = true
+log.workspace = true
+num-bigint.workspace = true
+parking_lot.workspace = true
+color-eyre.workspace = true
+regex.workspace = true
+pretty_env_logger.workspace = true
+
 ocaml = { version = "1.0.1", features = ["no-panic-hook"] }
-once_cell = "1.20.2"
-parking_lot = "0.12.3"
-displaydoc = "0.2.5"
-thiserror = "2.0.3"
-errctx = "1.0.0"
-log = "0.4.22"
-serde = { version = "1.0.215", features = ["derive"] }
-deepsize = "0.2.0"
-num-bigint = { version = "0.4.6", features = ["serde"] }
-serde_json = "1.0.133"
 strum = { version = "0.26.3", features = ["derive"] }
-regex = "1.11.1"
-color-eyre = { version = "0.6.3", default-features = false }
-clap = { version = "4.5.21", features = ["derive"] }
-rkyv = { version = "0.7.45", default-features = false, features = ["std", "alloc", "size_64"] }
-rayon = "1.10.0"
-pretty_env_logger = "0.5.0"
 byte-unit = "5.1.6"
 
 [build-dependencies]

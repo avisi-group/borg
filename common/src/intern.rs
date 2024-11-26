@@ -3,8 +3,9 @@ use {
     deepsize::DeepSizeOf,
     lasso::Spur,
     rkyv::{
+        rancor::{Fallible, Source},
         string::{ArchivedString, StringResolver},
-        Fallible,
+        Archive, DeserializeUnsized, Place, SerializeUnsized,
     },
 };
 
@@ -152,29 +153,30 @@ impl DeepSizeOf for InternedString {
     }
 }
 
-impl rkyv::Archive for InternedString {
+impl Archive for InternedString {
     type Archived = ArchivedString;
     type Resolver = StringResolver;
 
-    unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
-        ArchivedString::resolve_from_str(self.as_ref(), pos, resolver, out);
+    fn resolve(&self, resolver: Self::Resolver, out: Place<Self::Archived>) {
+        ArchivedString::resolve_from_str(self.as_ref(), resolver, out);
     }
 }
 
 impl<S: Fallible> rkyv::Serialize<S> for InternedString
 where
-    str: rkyv::SerializeUnsized<S>,
+    S::Error: Source,
+    str: SerializeUnsized<S>,
 {
-    fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
+    fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, <S as Fallible>::Error> {
         ArchivedString::serialize_from_str(self.as_ref(), serializer)
     }
 }
 
 impl<D: Fallible> rkyv::Deserialize<InternedString, D> for ArchivedString
 where
-    str: rkyv::DeserializeUnsized<str, D>,
+    str: DeserializeUnsized<str, D>,
 {
-    fn deserialize(&self, _: &mut D) -> Result<InternedString, D::Error> {
+    fn deserialize(&self, _: &mut D) -> Result<InternedString, <D as Fallible>::Error> {
         Ok(InternedString::from(self.as_str()))
     }
 }
