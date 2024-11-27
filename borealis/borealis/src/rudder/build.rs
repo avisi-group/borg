@@ -40,14 +40,25 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
         .iter()
         .for_each(|(name, definition)| build_ctx.add_function(*name, definition));
 
-    build_ctx
-        .unions_tags
-        .extend(ast.unions.values().flat_map(|variants| {
-            variants
-                .iter()
-                .enumerate()
-                .map(|(i, nt)| (nt.name, u32::try_from(i).unwrap()))
-        }));
+    build_ctx.unions = ast
+        .unions
+        .values()
+        .flat_map(|variants| {
+            variants.iter().enumerate().map(|(i, nt)| {
+                (
+                    nt.name,
+                    (
+                        if let boom::Type::Unit = &*nt.typ.get() {
+                            None
+                        } else {
+                            Some(build_ctx.resolve_type(nt.typ.clone()))
+                        },
+                        u32::try_from(i).unwrap(),
+                    ),
+                )
+            })
+        })
+        .collect::<HashMap<_, _>>();
 
     // insert replicate bits signature
 
@@ -72,8 +83,8 @@ struct BuildContext {
     /// integer discriminant of that variant
     enums: HashMap<InternedString, (Type, HashMap<InternedString, u32>)>,
 
-    /// Union variant to tag map
-    unions_tags: HashMap<InternedString, u32>,
+    /// Union variant to type and tag map
+    unions: HashMap<InternedString, (Option<Type>, u32)>,
 
     /// Register name to type and offset mapping
     registers: HashMap<InternedString, RegisterDescriptor>,
@@ -1433,21 +1444,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ))
             }
 
-            /* To maintain correctness, borealis must only specialize on actual Sail compiler
-             * builtins, specializing other functions means restricting compatibiliy on a
-             * specific model, however memory access is the one exception to this, and must be
-             * intercepted */
-            "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
-            | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
-            | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
-                let _request = args[0].clone();
-                let _addrsize = args[1].clone();
-                let phys_addr = args[2].clone();
-                let n = args[3].clone();
+            // /* To maintain correctness, borealis must only specialize on actual Sail compiler
+            //  * builtins, specializing other functions means restricting compatibiliy on a
+            //  * specific model, however memory access is the one exception to this, and must be
+            //  * intercepted */
 
-                let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
+            // val Mem_read : (%bv64, %i, struct AccessDescriptor) -> %bv
+            "Mem_read" => {
+                let address = args[0].clone();
+                let size = args[1].clone();
+                let _accdesc = args[2].clone();
 
-                let const_8 = build(
+                let _8 = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant {
@@ -1460,79 +1468,116 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::BinaryOperation {
                         kind: BinaryOperationKind::Multiply,
-                        lhs: size_bytes,
-                        rhs: const_8,
+                        lhs: size,
+                        rhs: _8,
                     },
                 );
-
-                let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
-
                 Some(build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::ReadMemory {
-                        offset,
+                        offset: address,
                         size: size_bits,
                     },
                 ))
             }
 
-            "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
-            | "write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
-                let _request = args[0].clone();
-                let _addrsize = args[1].clone();
-                let phys_addr = args[2].clone();
-                let n = args[3].clone();
-                let data = args[4].clone();
+            // "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+            // | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+            // | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
+            //     let _request = args[0].clone();
+            //     let _addrsize = args[1].clone();
+            //     let phys_addr = args[2].clone();
+            //     let n = args[3].clone();
 
-                let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
+            //     let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
 
-                let const_8 = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u64()),
-                        value: ConstantValue::UnsignedInteger(8),
-                    },
-                );
-                let size_bits = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Multiply,
-                        lhs: size_bytes,
-                        rhs: const_8,
-                    },
-                );
+            //     let const_8 = build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::Constant {
+            //             typ: (Type::u64()),
+            //             value: ConstantValue::UnsignedInteger(8),
+            //         },
+            //     );
+            //     let size_bits = build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::BinaryOperation {
+            //             kind: BinaryOperationKind::Multiply,
+            //             lhs: size_bytes,
+            //             rhs: const_8,
+            //         },
+            //     );
 
-                let value = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BitsCast {
-                        kind: CastOperationKind::Truncate,
-                        typ: Type::Bits,
-                        value: data,
-                        width: size_bits,
-                    },
-                );
-                let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
+            //     let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
 
-                build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::WriteMemory { offset, value },
-                );
+            //     Some(build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::ReadMemory {
+            //             offset,
+            //             size: size_bits,
+            //         },
+            //     ))
+            // }
 
-                // return value also appears to be always ignored
-                Some(build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u1()),
-                        value: ConstantValue::UnsignedInteger(0),
-                    },
-                ))
-            }
+            // "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
+            // | "write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
+            //     let _request = args[0].clone();
+            //     let _addrsize = args[1].clone();
+            //     let phys_addr = args[2].clone();
+            //     let n = args[3].clone();
+            //     let data = args[4].clone();
+
+            //     let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
+
+            //     let const_8 = build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::Constant {
+            //             typ: (Type::u64()),
+            //             value: ConstantValue::UnsignedInteger(8),
+            //         },
+            //     );
+            //     let size_bits = build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::BinaryOperation {
+            //             kind: BinaryOperationKind::Multiply,
+            //             lhs: size_bytes,
+            //             rhs: const_8,
+            //         },
+            //     );
+
+            //     let value = build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::BitsCast {
+            //             kind: CastOperationKind::Truncate,
+            //             typ: Type::Bits,
+            //             value: data,
+            //             width: size_bits,
+            //         },
+            //     );
+            //     let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
+
+            //     build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::WriteMemory { offset, value },
+            //     );
+
+            //     // return value also appears to be always ignored
+            //     Some(build(
+            //         self.block,
+            //         self.block_arena_mut(),
+            //         Statement::Constant {
+            //             typ: (Type::u1()),
+            //             value: ConstantValue::UnsignedInteger(0),
+            //         },
+            //     ))
+            // }
 
             // ignore
             "append_str" | "__monomorphize" | "concat_str" => Some(args[0].clone()),
@@ -1842,11 +1887,12 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Value::CtorKind {
                 value, identifier, ..
             } => {
-                let target_tag = *self
+                let target_tag = self
                     .ctx()
-                    .unions_tags
+                    .unions
                     .get(identifier)
-                    .unwrap_or_else(|| panic!("failed to find tag value for {identifier:?}"));
+                    .unwrap_or_else(|| panic!("failed to find tag value for {identifier:?}"))
+                    .1;
 
                 let target_tag = build(
                     self.block,
@@ -1883,29 +1929,30 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 )
             }
-            boom::Value::CtorUnwrap { .. } => {
-                // let value = self.build_value(value.clone());
-
-                // // get the rudder type
-                // let typ = self
-                //     .ctx()
-                //     .unions
-                //     .values()
-                //     .find(|(_, variants)| variants.contains_key(identifier))
-                //     .map(|(typ, _)| typ)
-                //     .cloned()
-                //     .unwrap();
-
-                // assert_eq!(value.typ(), typ);
-
-                // let unwrap_sum = build(   self.block,
-                // self.block_arena_mut(),Statement::UnwrapUnion {
-                //     value,
-                //     variant: *identifier,
-                // });
-
-                // unwrap_sum
-                todo!()
+            boom::Value::CtorUnwrap {
+                value, identifier, ..
+            } => {
+                let boom::Value::Identifier(union_root) = &*value.get() else {
+                    panic!()
+                };
+                let typ = self
+                    .ctx()
+                    .unions
+                    .get(identifier)
+                    .unwrap_or_else(|| panic!("failed to find tag value for {identifier:?}"))
+                    .0
+                    .clone()
+                    .unwrap();
+                build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ReadVariable {
+                        symbol: Symbol::new(
+                            destruct_composites::union_value_ident(*union_root, *identifier),
+                            typ,
+                        ),
+                    },
+                )
             }
             boom::Value::VectorAccess { value, index } => {
                 let vector = self.build_value(value.clone());

@@ -196,6 +196,14 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     }
 }
 
+/// Calls to these functions will be replaced with units
+pub const DELETED_CALLS: &[&str] = &[
+    "RestoreTransactionCheckpointParameterised",
+    "Z_set",
+    "MaybeZeroSVEUppers",
+    "ResetSVEState",
+];
+
 fn fn_is_allowlisted(name: InternedString) -> bool {
     const FN_ALLOWLIST: &[&'static str] = &[
         "borealis_register_init",
@@ -432,18 +440,48 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "AArch32_IsFPEnabled",
         "IsSMEEnabled",
         "Z_set",
-    ];
-
-    const FN_DENYLIST: &[&'static str] = &[
         "AArch64_MemTag_read",
         "MemSingleNF_read",
         "sail_mem_write",
         "sail_mem_read",
-        "PhysMemRead",
+        "EndOfInstruction",
+        "ESR_set",
+        "FAR_set",
+        "PFAR_set",
+        "UpdateEDSCRFields",
+        "ExternalRootInvasiveDebugEnabled",
+        "InsertIESBBeforeException",
+        "TakeUnmaskedPhysicalSErrorInterrupts",
+        "AArch32_PendingUnmaskedPhysicalInterrupts",
+        "IRQPending",
+        "__GIC_InterruptPending",
+        "EffectiveEA",
+        "ThrowSError",
+        "GetPSRFromPSTATE",
+        "CheckExceptionCatch",
+        "HaltingAllowed",
+        "DoubleLockStatus",
+        "ExternalRealmInvasiveDebugEnabled",
+        "Halt",
+        "reverse_endianness",
+        "AllInAlignedQuantity",
+        "EffectiveMTX",
+        "EffectiveTCMA",
+        "SPEStartCounter",
+        "__IMPDEF_bits",
+        "ImpDefBits",
+        "PhysicalCountInt",
+        "__UNKNOWN_Constraint",
+        "SetInGuardedPage",
+        "HasUnprivileged",
+    ];
+
+    const FN_DENYLIST: &[&'static str] = &[
+        "PhysMemRead", // borealis/src/boom/passes/destruct_composites.rs:129 : CtorUnwrap { value: Shared { inner: RwLock { data: Identifier("ga#311880") } }, identifier: "Ok<(b,Uoption<o><>),EFault%>", types: [] }
         "gic_read_ram", /* CtorUnwrap { value: Shared { inner: RwLock { data:
-                         * Identifier("ga#311293") } }, identifier:
-                         * "Ok<(b,Uoption<o><>),EFault%>", types: [] } Location:
-                         * borealis/src/boom/passes/destruct_composites.rs:76 */
+                        * Identifier("ga#311293") } }, identifier:
+                        * "Ok<(b,Uoption<o><>),EFault%>", types: [] } Location:
+                        * borealis/src/boom/passes/destruct_composites.rs:76 */
         "TakeTransactionCheckpoint", /*   assert_eq!(destination.to_ident(), *vector);
                                       * borealis/src/boom/passes/destruct_composites.rs:249 */
         "BPIALLIS_SysRegWrite32_17f454fbcdf975ae", /* Message:  parent 5B054CCAEF579530 not found in parents Location: borealis/src/boom/control_flow/mod.rs:123 */
@@ -475,7 +513,13 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         || name.as_ref().starts_with("neq_any")
         || name.as_ref().starts_with("AArch64")
         || name.as_ref().starts_with("Is")
+        || name.as_ref().starts_with("is")
+        || name.as_ref().starts_with("Effective")
+        || name.as_ref().starts_with("__UNKNOWN")
+        || name.as_ref().starts_with("Create")
         || name.as_ref().ends_with("__1")
+        || name.as_ref().ends_with("_set")
+        || name.as_ref().ends_with("Enabled")
 }
 
 fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {

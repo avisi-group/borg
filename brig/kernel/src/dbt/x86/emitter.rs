@@ -1089,7 +1089,9 @@ impl X86NodeRef {
                 *value,
             ),
             NodeKind::GuestRegister { offset } => {
-                let width = Width::from_uncanonicalized(self.typ().width()).unwrap();
+                let width = Width::from_uncanonicalized(self.typ().width()).unwrap_or_else(|e| {
+                    panic!("invalid width register at offset {offset:?}: {e:?}")
+                });
                 let dst = Operand::vreg(width, emitter.next_vreg());
 
                 emitter.append(Instruction::mov(

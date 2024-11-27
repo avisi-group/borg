@@ -19,6 +19,7 @@ impl Width {
             17..=32 => Ok(Self::_32),
             33..=64 => Ok(Self::_64),
             0 => Err(WidthError::Zero),
+            _ => Ok(Self::_64), // todo: fix PhysicalCount and other oversized registers
             n => Err(WidthError::Oversize(n)),
         }
     }

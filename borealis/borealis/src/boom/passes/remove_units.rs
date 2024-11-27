@@ -113,10 +113,10 @@ impl Pass for RemoveUnits {
                         .collect(),
                 );
 
-                if let Terminator::Return(Some(Value::Identifier(ident))) = b.terminator() {
-                    if removed.contains(&ident) {
-                        b.set_terminator(Terminator::Return(None));
-                    }
+                if let Terminator::Return(Some(value)) = b.terminator() {
+                    b.set_terminator(Terminator::Return(
+                        filter_value(Shared::new(value), &removed).map(|s| s.get().clone()),
+                    ));
                 }
             });
         });

@@ -2,8 +2,11 @@
 // here to make the destruct_composites pass
 
 use {
-    crate::boom::{
-        passes::Pass, Ast, Bit, Expression, Literal, Operation, Size, Statement, Type, Value,
+    crate::{
+        boom::{
+            passes::Pass, Ast, Bit, Expression, Literal, Operation, Size, Statement, Type, Value,
+        },
+        DELETED_CALLS,
     },
     common::{intern::InternedString, HashMap, HashSet},
     core::panic,
@@ -151,7 +154,7 @@ impl Pass for HandleBuiltinFunctions {
                                             Literal::Vector(vec![element; n]),
                                         ))),
                                     })
-                                } else if name.as_ref() == "Z_set" {
+                                } else if DELETED_CALLS.contains(&name.as_ref()) {
                                     Shared::new(Statement::Copy {
                                         expression: expression.clone(),
                                         value: Shared::new(Value::Literal(Shared::new(
