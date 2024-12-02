@@ -772,6 +772,28 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         ));
     }
 
+    fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef {
+        Self::NodeRef::from(X86Node {
+            typ,
+            kind: NodeKind::ReadMemory { address },
+        })
+    }
+
+    fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef) {
+        let address = address.to_operand(self);
+        let OperandKind::Register(address_reg) = address.kind() else {
+            panic!()
+        };
+
+        let value = value.to_operand(self);
+        let width = value.width();
+
+        self.append(Instruction::mov(
+            value,
+            Operand::mem_base_displ(width, *address_reg, 0),
+        ));
+    }
+
     fn branch(
         &mut self,
         condition: Self::NodeRef,
@@ -1077,6 +1099,20 @@ impl X86NodeRef {
         &self.0.typ
     }
 
+    /// Same as `to_operand` but if the value is a constant, move it to a
+    /// register
+    fn to_operand_reg_promote(&self, emitter: &mut X86Emitter) -> Operand {
+        if let NodeKind::Constant { .. } = self.kind() {
+            let width = Width::from_uncanonicalized(self.typ().width()).unwrap();
+            let value_reg = Operand::vreg(width, emitter.next_vreg());
+            let value_imm = self.to_operand(emitter);
+            emitter.append(Instruction::mov(value_imm, value_reg.clone()));
+            value_reg
+        } else {
+            self.to_operand(emitter)
+        }
+    }
+
     fn to_operand(&self, emitter: &mut X86Emitter) -> Operand {
         if let Some(operand) = emitter.current_block_operands.get(self) {
             return operand.clone();
@@ -1185,20 +1221,25 @@ impl X86NodeRef {
 
                     dst
                 }
-                BinaryOperationKind::Divide(left, right) => {
-                    assert_eq!(right.typ().width(), 64);
-                    assert_eq!(left.typ().width(), 64);
+                BinaryOperationKind::Divide(dividend, divisor) => {
+                    assert_eq!(dividend.typ().width(), 64);
+                    assert_eq!(divisor.typ().width(), 64);
 
-                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, emitter.next_vreg());
+                    let width = Width::from_uncanonicalized(divisor.typ().width()).unwrap();
 
-                    let left = left.to_operand(emitter);
-                    let right = right.to_operand(emitter);
+                    let dividend = dividend.to_operand(emitter);
+                    let divisor = divisor.to_operand_reg_promote(emitter);
+
                     let _0 = Operand::imm(Width::_64, 0);
-                    emitter.append(Instruction::mov(left, dst.clone()));
-                    emitter.append(Instruction::idiv(_0, right, dst.clone()));
 
-                    dst
+                    let hi = Operand::preg(width, PhysicalRegister::RDX);
+                    let lo = Operand::preg(width, PhysicalRegister::RAX);
+
+                    emitter.append(Instruction::mov(_0, hi.clone()));
+                    emitter.append(Instruction::mov(dividend, lo.clone()));
+                    emitter.append(Instruction::idiv(hi, lo.clone(), divisor));
+
+                    lo
                 }
                 BinaryOperationKind::CompareEqual(left, right)
                 | BinaryOperationKind::CompareNotEqual(left, right)
@@ -1601,16 +1642,7 @@ impl X86NodeRef {
                 let dest = Operand::vreg(width, emitter.next_vreg());
 
                 let condition = condition.to_operand(emitter);
-                let true_value = {
-                    let op = true_value.to_operand(emitter);
-                    if let OperandKind::Immediate(_) = op.kind() {
-                        let true_dst = Operand::vreg(width, emitter.next_vreg());
-                        emitter.append(Instruction::mov(op, true_dst.clone()));
-                        true_dst
-                    } else {
-                        op
-                    }
-                };
+                let true_value = true_value.to_operand_reg_promote(emitter);
                 let false_value = false_value.to_operand(emitter);
 
                 // if this sequence is modified, the register allocator must be fixed
@@ -1620,6 +1652,7 @@ impl X86NodeRef {
 
                 dest
             }
+            NodeKind::ReadMemory { address } => todo!(),
         };
 
         emitter
@@ -1649,6 +1682,9 @@ pub enum NodeKind {
     },
     GuestRegister {
         offset: u64,
+    },
+    ReadMemory {
+        address: X86NodeRef,
     },
     UnaryOperation(UnaryOperationKind),
     BinaryOperation(BinaryOperationKind),

@@ -474,6 +474,9 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
         "__UNKNOWN_Constraint",
         "SetInGuardedPage",
         "HasUnprivileged",
+        "NoFault",
+        "S1TLBLookup",
+        "SPESampleGeneralPurposeLoadStore",
     ];
 
     const FN_DENYLIST: &[&'static str] = &[

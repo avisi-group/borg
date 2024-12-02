@@ -65,6 +65,9 @@ pub trait Emitter {
     fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);
 
+    fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef;
+    fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef);
+
     fn read_virt_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef;
     fn write_virt_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef);
     fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef;

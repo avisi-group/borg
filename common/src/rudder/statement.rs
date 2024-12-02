@@ -112,11 +112,12 @@ pub enum Statement {
     },
 
     ReadMemory {
-        offset: Ref<Statement>,
+        address: Ref<Statement>,
+        // bytes
         size: Ref<Statement>,
     },
     WriteMemory {
-        offset: Ref<Statement>,
+        address: Ref<Statement>,
         value: Ref<Statement>,
     },
 
@@ -632,7 +633,10 @@ impl Statement {
 
                 *self = Self::WriteRegister { offset, value };
             }
-            Self::WriteMemory { offset, value } => {
+            Self::WriteMemory {
+                address: offset,
+                value,
+            } => {
                 let offset = if offset == use_of {
                     with.clone()
                 } else {
@@ -645,9 +649,15 @@ impl Statement {
                     value.clone()
                 };
 
-                *self = Self::WriteMemory { offset, value }
+                *self = Self::WriteMemory {
+                    address: offset,
+                    value,
+                }
             }
-            Self::ReadMemory { offset, size } => {
+            Self::ReadMemory {
+                address: offset,
+                size,
+            } => {
                 let offset = if offset == use_of {
                     with.clone()
                 } else {
@@ -660,7 +670,10 @@ impl Statement {
                     size.clone()
                 };
 
-                *self = Self::ReadMemory { offset, size }
+                *self = Self::ReadMemory {
+                    address: offset,
+                    size,
+                }
             }
 
             Self::ReadElement { vector, index } => {
@@ -888,10 +901,16 @@ impl Statement {
             Self::WriteRegister { offset, value } => {
                 format!("write-reg {} <= {}", offset, value)
             }
-            Self::ReadMemory { offset, size } => {
+            Self::ReadMemory {
+                address: offset,
+                size,
+            } => {
                 format!("read-mem {}:{}", offset, size)
             }
-            Self::WriteMemory { offset, value } => {
+            Self::WriteMemory {
+                address: offset,
+                value,
+            } => {
                 format!("write-mem {} <= {}", offset, value)
             }
             Self::BinaryOperation { kind, lhs, rhs } => {
@@ -1385,12 +1404,18 @@ pub fn import_statement(
             offset: mapping.get(&offset).unwrap().clone(),
             value: mapping.get(&value).unwrap().clone(),
         },
-        Statement::ReadMemory { offset, size } => Statement::ReadMemory {
-            offset: mapping.get(&offset).unwrap().clone(),
+        Statement::ReadMemory {
+            address: offset,
+            size,
+        } => Statement::ReadMemory {
+            address: mapping.get(&offset).unwrap().clone(),
             size: mapping.get(&size).unwrap().clone(),
         },
-        Statement::WriteMemory { offset, value } => Statement::WriteMemory {
-            offset: mapping.get(&offset).unwrap().clone(),
+        Statement::WriteMemory {
+            address: offset,
+            value,
+        } => Statement::WriteMemory {
+            address: mapping.get(&offset).unwrap().clone(),
             value: mapping.get(&value).unwrap().clone(),
         },
         Statement::ReadPc => Statement::ReadPc,

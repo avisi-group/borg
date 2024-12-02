@@ -6,8 +6,8 @@ use {
         Width,
     },
     iced_x86::code_asm::{
-        byte_ptr, dword_ptr, word_ptr, AsmMemoryOperand, AsmRegister32, AsmRegister64,
-        AsmRegister8, CodeAssembler,
+        byte_ptr, dword_ptr, word_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32,
+        AsmRegister64, AsmRegister8, CodeAssembler,
     },
 };
 
@@ -84,6 +84,23 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         (
             Operand {
                 kind: R(PHYS(src)),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            // todo: check high bits of src are clear?
+            // this should be a movzx
+            assembler
+                .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .unwrap();
+        }
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
                 width_in_bits: Width::_32,
             },
             Operand {
@@ -110,6 +127,38 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             // todo: check high bits of src are zero?
             assembler
                 .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .unwrap();
+        }
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            // todo: check high bits of src are zero?
+            assembler
+                .mov::<AsmRegister16, AsmRegister16>(dst.into(), src.into())
+                .unwrap();
+        }
+        // MOV R -> R
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            // todo: check high bits of src are zero?
+            assembler
+                .mov::<AsmRegister16, AsmRegister16>(dst.into(), src.into())
                 .unwrap();
         }
         // MOV M -> R
@@ -173,6 +222,31 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                         displacement,
                         ..
                     },
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .mov::<AsmRegister8, AsmMemoryOperand>(
+                    dst.into(),
+                    memory_operand_to_iced(*base, *index, *scale, *displacement),
+                )
+                .unwrap();
+        }
+        // MOV M -> R
+        (
+            Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
                 width_in_bits: Width::_32,
             },
             Operand {
@@ -207,6 +281,31 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
         ) => {
             assembler
                 .mov::<AsmMemoryOperand, AsmRegister8>(
+                    memory_operand_to_iced(*base, *index, *scale, *displacement),
+                    src.into(),
+                )
+                .unwrap();
+        }
+        // MOV R -> M
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .mov::<AsmMemoryOperand, AsmRegister16>(
                     memory_operand_to_iced(*base, *index, *scale, *displacement),
                     src.into(),
                 )

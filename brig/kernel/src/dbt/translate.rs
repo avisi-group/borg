@@ -378,34 +378,29 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 self.emitter.write_register(offset, value);
                 StatementResult::Data(None)
             }
-            Statement::ReadMemory { .. } => {
-                // {
-                //     let mut buf = alloc::vec![0; #size as usize / 8];
-                //     state.read_memory(#offset, &mut buf);
+            Statement::ReadMemory { address, size } => {
+                let address = statement_values.get(address).unwrap().clone();
+                let size = statement_values.get(size).unwrap().clone();
 
-                //     let mut bytes = [0u8; 16];
-                //     bytes[..buf.len()].copy_from_slice(&buf);
+                let NodeKind::Constant { value, .. } = size.kind() else {
+                    todo!()
+                };
 
-                //     Bits::new(u128::from_ne_bytes(bytes), #size as u16)
-                // }
-                todo!()
+                let typ = match value {
+                    1 => Type::Unsigned(8),
+                    2 => Type::Unsigned(16),
+                    4 => Type::Unsigned(32),
+                    8 => Type::Unsigned(64),
+                    _ => todo!("{value}"),
+                };
+
+                StatementResult::Data(Some(self.emitter.read_memory(address, typ)))
             }
-            Statement::WriteMemory { .. } => {
-                // match &value.get(s_arena).typ(s_arena) {
-                //     Type::Primitive(PrimitiveType { .. }) => {
-                //         quote! {
-                //             state.write_memory(#offset, &#value.to_ne_bytes())
-                //         }
-                //     }
-                //     Type::Bits => {
-                //         quote! {
-                //             state.write_memory(#offset,
-                // &#value.value().to_ne_bytes()[..#value.length() as usize / 8])
-                //         }
-                //     }
-                //     _ => todo!(),
-                // }
-                todo!()
+            Statement::WriteMemory { address, value } => {
+                let address = statement_values.get(address).unwrap().clone();
+                let value = statement_values.get(value).unwrap().clone();
+                self.emitter.write_memory(address, value);
+                StatementResult::Data(None)
             }
             Statement::ReadPc => todo!(),
             Statement::WritePc { value } => {

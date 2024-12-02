@@ -168,11 +168,17 @@ impl<'a> StatementUseAnalysis<'a> {
                 Statement::ReadRegister { offset, .. } => {
                     self.add_use(offset, stmt);
                 }
-                Statement::ReadMemory { offset, size } => {
+                Statement::ReadMemory {
+                    address: offset,
+                    size,
+                } => {
                     self.add_use(offset, stmt);
                     self.add_use(size, stmt);
                 }
-                Statement::WriteMemory { offset, value } => {
+                Statement::WriteMemory {
+                    address: offset,
+                    value,
+                } => {
                     self.add_use(offset, stmt);
                     self.add_use(value, stmt);
                 }

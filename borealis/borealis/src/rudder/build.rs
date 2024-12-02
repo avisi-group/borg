@@ -1455,129 +1455,28 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let size = args[1].clone();
                 let _accdesc = args[2].clone();
 
-                let _8 = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u64()),
-                        value: ConstantValue::UnsignedInteger(8),
-                    },
-                );
-                let size_bits = build(
-                    self.block,
-                    self.block_arena_mut(),
-                    Statement::BinaryOperation {
-                        kind: BinaryOperationKind::Multiply,
-                        lhs: size,
-                        rhs: _8,
-                    },
-                );
                 Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::ReadMemory {
-                        offset: address,
-                        size: size_bits,
-                    },
+                    Statement::ReadMemory { address, size },
                 ))
             }
 
-            // "read_mem_exclusive#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
-            // | "read_mem_ifetch#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
-            // | "read_mem#<RMem_read_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
-            //     let _request = args[0].clone();
-            //     let _addrsize = args[1].clone();
-            //     let phys_addr = args[2].clone();
-            //     let n = args[3].clone();
+            //val Mem_set : (%bv64, %i, struct AccessDescriptor, %bv) -> %unit
+            "Mem_set" => {
+                let address = args[0].clone();
+                let _size = args[1].clone();
+                let _accdesc = args[2].clone();
+                let value = args[3].clone();
 
-            //     let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
+                // assert-eq size == value.width
 
-            //     let const_8 = build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::Constant {
-            //             typ: (Type::u64()),
-            //             value: ConstantValue::UnsignedInteger(8),
-            //         },
-            //     );
-            //     let size_bits = build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::BinaryOperation {
-            //             kind: BinaryOperationKind::Multiply,
-            //             lhs: size_bytes,
-            //             rhs: const_8,
-            //         },
-            //     );
-
-            //     let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
-
-            //     Some(build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::ReadMemory {
-            //             offset,
-            //             size: size_bits,
-            //         },
-            //     ))
-            // }
-
-            // "write_mem_exclusive#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>"
-            // | "write_mem#<RMem_write_request<Uarm_acc_type<>,b,O<RTranslationInfo>>>" => {
-            //     let _request = args[0].clone();
-            //     let _addrsize = args[1].clone();
-            //     let phys_addr = args[2].clone();
-            //     let n = args[3].clone();
-            //     let data = args[4].clone();
-
-            //     let size_bytes = cast(self.block, self.block_arena_mut(), n, Type::u64());
-
-            //     let const_8 = build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::Constant {
-            //             typ: (Type::u64()),
-            //             value: ConstantValue::UnsignedInteger(8),
-            //         },
-            //     );
-            //     let size_bits = build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::BinaryOperation {
-            //             kind: BinaryOperationKind::Multiply,
-            //             lhs: size_bytes,
-            //             rhs: const_8,
-            //         },
-            //     );
-
-            //     let value = build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::BitsCast {
-            //             kind: CastOperationKind::Truncate,
-            //             typ: Type::Bits,
-            //             value: data,
-            //             width: size_bits,
-            //         },
-            //     );
-            //     let offset = cast(self.block, self.block_arena_mut(), phys_addr, Type::u64());
-
-            //     build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::WriteMemory { offset, value },
-            //     );
-
-            //     // return value also appears to be always ignored
-            //     Some(build(
-            //         self.block,
-            //         self.block_arena_mut(),
-            //         Statement::Constant {
-            //             typ: (Type::u1()),
-            //             value: ConstantValue::UnsignedInteger(0),
-            //         },
-            //     ))
-            // }
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::WriteMemory { address, value },
+                ))
+            }
 
             // ignore
             "append_str" | "__monomorphize" | "concat_str" => Some(args[0].clone()),

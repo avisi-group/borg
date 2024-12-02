@@ -586,6 +586,7 @@ fn mem() {
 
     init(&*model, register_file_ptr);
 
+    //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
     translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
@@ -595,7 +596,9 @@ fn mem() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    panic!("{translation:?}")
+    log::trace!("translation:\n{translation:?}");
+
+    translation.execute(register_file_ptr);
 }
 
 #[ktest]
