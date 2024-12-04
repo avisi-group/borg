@@ -9,8 +9,8 @@ common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib.workspace = true
 plugins_api.workspace = true
 
-bootloader_api = "0.11.8"
-x86_64 = "0.15.1"
+bootloader_api = "0.11.9"
+x86_64 = "0.15.2"
 x86 = "0.52.0"
 x2apic = "0.4.3"
 uart_16550 = "0.3.2"
@@ -52,4 +52,4 @@ bitset-core = { version = "0.1.1", default-features = false }
 itertools = { version = "0.13.0", default-features = false, features = ["use_alloc"] }
 linkme = "0.3.31"
 num-rational = { version = "0.4.2", default-features = false }
-postcard = { version = "1.0.10", features = ["alloc"], default-features = false }
+postcard = { version = "1.1.1", features = ["alloc"], default-features = false }

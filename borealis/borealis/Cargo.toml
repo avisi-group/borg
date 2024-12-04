@@ -31,4 +31,4 @@ dot = "0.1.4"
 itertools = "0.13.0"
 kinded = "0.3.0"
 memmap2 = "0.9.5"
-postcard = { version = "1.0.10", features = ["alloc"], default-features = false }
+postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
