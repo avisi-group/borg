@@ -588,7 +588,7 @@ fn mem() {
 
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
-    let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
+    let opcode = emitter.constant(0xf9400020, Type::Unsigned(32));
     translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
 
     emitter.leave();
@@ -596,9 +596,79 @@ fn mem() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::trace!("translation:\n{translation:?}");
+    // log::trace!("translation:\n{translation:?}");
 
-    translation.execute(register_file_ptr);
+    unsafe {
+        let mem = alloc::boxed::Box::new(0xdead_c0de_0000_0000u64);
+
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+        let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u64;
+
+        *see = -1;
+        *r0 = 0xdeadcafe;
+        *r1 = &*mem as *const u64 as u64;
+
+        log::trace!(
+            "see: {:016x}, r0: {:016x}, r1: {:016x}, mem: {:016x}",
+            *see,
+            *r0,
+            *r1,
+            *mem
+        );
+
+        translation.execute(register_file_ptr);
+
+        log::trace!(
+            "see: {:016x}, r0: {:016x}, r1: {:016x}, mem: {:016x}",
+            *see,
+            *r0,
+            *r1,
+            *mem
+        );
+
+        panic!();
+    }
+}
+
+#[ktest]
+fn mem_load() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init(&*model, register_file_ptr);
+
+    //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xf9400020, Type::Unsigned(32));
+    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        const VALUE: u64 = 0xdead_c0de_0000_0000;
+        let mem = alloc::boxed::Box::new(VALUE);
+
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+        let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
+        let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u64;
+
+        *see = -1;
+        *r0 = 0xdeadcafe; // will be overwritten
+        *r1 = &*mem as *const u64 as u64;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*r0, VALUE);
+    }
 }
 
 #[ktest]

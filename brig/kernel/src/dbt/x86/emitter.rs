@@ -1652,7 +1652,23 @@ impl X86NodeRef {
 
                 dest
             }
-            NodeKind::ReadMemory { address } => todo!(),
+            NodeKind::ReadMemory { address } => {
+                let width = Width::from_uncanonicalized(self.typ().width()).unwrap();
+
+                let address = address.to_operand(emitter);
+                let OperandKind::Register(address_reg) = address.kind() else {
+                    panic!()
+                };
+
+                let dest = Operand::vreg(width, emitter.next_vreg());
+
+                emitter.append(Instruction::mov(
+                    Operand::mem_base_displ(width, *address_reg, 0),
+                    dest.clone(),
+                ));
+
+                dest
+            }
         };
 
         emitter
