@@ -1467,7 +1467,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let address = args[0].clone();
                 let _size = args[1].clone();
                 let _accdesc = args[2].clone();
-                let value = args[3].clone();
+                let value = args.last().cloned().unwrap();
 
                 // assert-eq size == value.width
 
