@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common = { path = "../common" }
+
 ovmf-prebuilt = "0.1.0-alpha.1" # used for UEFI booting in QEMU
 bootloader = { version = "0.11.9", default-features = false, features = ["uefi"] }
 cargo_metadata = "0.18.1"
@@ -13,3 +15,4 @@ color-eyre = "0.6.3"
 tar = "0.4.43"
 walkdir = "2.5.0"
 elf = "0.7.4"
+postcard = { version = "1.1.1", features = ["alloc"] }

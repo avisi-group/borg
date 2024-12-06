@@ -32,7 +32,8 @@ mod interner {
         let interner = INTERNER.lock();
         let str = interner.resolve(&key);
 
-        // SAFETY: INTERNER is static, keys are never dropped so this `&'interner str` is really a `&'static str`
+        // SAFETY: INTERNER is static, keys are never dropped so this `&'interner str`
+        // is really a `&'static str`
         unsafe { core::mem::transmute(str) }
     }
 }

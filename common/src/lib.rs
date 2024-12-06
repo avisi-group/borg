@@ -2,8 +2,13 @@
 
 extern crate alloc;
 
-use core::hash::BuildHasherDefault;
 pub use hashbrown::hash_map::Entry;
+use {
+    alloc::string::String,
+    alloc::vec::Vec,
+    core::hash::BuildHasherDefault,
+    serde::{Deserialize, Serialize},
+};
 
 pub mod arena;
 pub mod id;
@@ -19,3 +24,15 @@ pub type HashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<Hasher>>;
 
 /// HashSet with non-default hasher
 pub type HashSet<T> = hashbrown::HashSet<T, BuildHasherDefault<Hasher>>;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TestConfig {
+    // Do not run tests
+    None,
+    // Only run the specified tests
+    Include(Vec<String>),
+    // Run all tests except those specified
+    Exclude(Vec<String>),
+    // Run all tests
+    All,
+}

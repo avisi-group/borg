@@ -1,6 +1,7 @@
 use {
     cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message},
     clap::{Parser, Subcommand},
+    common::TestConfig,
     elf::{endian::AnyEndian, section::SectionHeader, ElfBytes},
     itertools::Itertools,
     std::{
@@ -32,9 +33,16 @@ struct Cli {
     #[arg(long)]
     no_build: bool,
 
-    /// Run only the supplied test
-    #[arg(long)]
-    test: Option<String>,
+    /// Run only the supplied tests
+    #[arg(long, value_delimiter = ',')]
+    include_tests: Option<Vec<String>>,
+
+    /// Run all except the supplied tests
+    #[arg(long, value_delimiter = ',')]
+    exclude_tests: Option<Vec<String>>,
+
+    #[arg(long, value_delimiter = ',')]
+    all_tests: bool,
 
     /// Enable QEMU GDB server
     #[arg(long)]
@@ -64,8 +72,16 @@ fn main() -> color_eyre::Result<()> {
         gdb_cli(&artifacts);
     }
 
+    let test_config = match (cli.include_tests, cli.exclude_tests, cli.all_tests) {
+        (None, None, false) => TestConfig::None,
+        (Some(include), None, false) => TestConfig::Include(include),
+        (None, Some(exclude), false) => TestConfig::Exclude(exclude),
+        (None, None, true) => TestConfig::All,
+        _ => panic!("include, exclude and all test CLI flags are mutually exclusive"),
+    };
+
     // create TAR file containing guest kernel, plugins, and configuration
-    let guest_tar = build_guest_tar("./guest_data", &artifacts, cli.test);
+    let guest_tar = build_guest_tar("./guest_data", &artifacts, test_config);
 
     // create an UEFI disk image of kernel
     let uefi_path = {
@@ -163,7 +179,7 @@ fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Art
 fn build_guest_tar<P: AsRef<Path>>(
     guest_data_path: P,
     artifacts: &[Artifact],
-    test: Option<String>,
+    test_config: TestConfig,
 ) -> PathBuf {
     // todo: rewrite this to process guest_data files in iterator into tar file,
     // some left alone (plugins dir, config.json), others are converted like
@@ -242,15 +258,15 @@ fn build_guest_tar<P: AsRef<Path>>(
             tar.append(&header, data.as_slice()).unwrap();
         });
 
-    if let Some(test) = test {
-        let data = test.as_bytes();
+    {
+        let data = postcard::to_allocvec(&test_config).unwrap();
 
         let mut header = Header::new_gnu();
-        header.set_path("test.txt").unwrap();
+        header.set_path("test_config.postcard").unwrap();
         header.set_size(u64::try_from(data.len()).unwrap());
         header.set_cksum();
 
-        tar.append(&header, data).unwrap();
+        tar.append(&header, data.as_slice()).unwrap();
     }
 
     tar.into_inner().unwrap().flush().unwrap();

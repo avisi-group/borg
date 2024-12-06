@@ -55,9 +55,6 @@ impl GuestExecutionContext {
 
 /// Start guest emulation
 pub fn start() {
-    log::info!("DONE");
-    qemu_exit();
-
     //check each connected block device for guest config
     let device_manager = SharedDeviceManager::get();
     let device = device_manager
@@ -92,8 +89,7 @@ pub fn start() {
         let factories = unsafe { GUEST_DEVICE_FACTORIES.lock() };
 
         let Some(factory) = factories.get(device_config.kind.as_str()) else {
-            log::warn!("unsupported guest device type {}", device_config.kind);
-            continue;
+            panic!("unsupported guest device type {}", device_config.kind);
         };
 
         let guest_environment = Box::new(BrigGuestEnvironment {

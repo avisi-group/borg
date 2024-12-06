@@ -19,6 +19,7 @@ use {
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
+    common::TestConfig,
     core::panic::PanicInfo,
     x86::io::outw,
 };
@@ -80,15 +81,17 @@ fn continue_start() {
     // plugins::load_all(&device);
     models::load_all(&device);
 
-    // todo: fix this hack:(
-    let test_name = {
+    let test_config = {
         let mut dev = device.lock();
         let mut fs = TarFilesystem::mount(dev.as_block());
-        fs.open("test.txt")
-            .ok()
-            .map(|f| alloc::string::String::from_utf8(f.read_to_vec().unwrap()).unwrap())
+        let file = fs
+            .open("test_config.postcard")
+            .expect("missing test configuration file")
+            .read_to_vec()
+            .unwrap();
+        postcard::from_bytes(&file).unwrap()
     };
-    tests::run(test_name.as_deref());
+    tests::run(test_config);
 
     guest::start();
 }
