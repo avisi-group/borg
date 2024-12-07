@@ -3495,16 +3495,6 @@ PhysMemTagWrite
 PhysMemTagRead
 PhysMemRead
 PhysMemWrite
-__DecodeA32_Unconditional
-__DecodeA32_DataProMisc
-__DecodeA32_LoadStoreImmLit
-__DecodeA32_LoadStoreReg
-__DecodeA32_Media
-__DecodeA32_BranchBlock
-__DecodeA32_SysASIMDFP
-__DecodeT32
-__DecodeT16
-__DecodeA32
 __SetConfig
 __EndCycle
 __ListConfig
