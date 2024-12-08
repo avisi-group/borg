@@ -1200,7 +1200,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         width: args[1].clone(),
                     },
                 )),
-                (_, _) => todo!("sail extend {:?} {:?}", args[0], args[1]),
+                (typ, target_width) => todo!(
+                    "sail extend {typ:?} {target_width:?} {:?} {:?}",
+                    args[0],
+                    args[1]
+                ),
             },
 
             // val truncate : (%bv, %i) -> %bv
