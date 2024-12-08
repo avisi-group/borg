@@ -51,7 +51,10 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
 
     // continue until all no nodes are left to visit
     while let Some(current) = to_visit.pop() {
-        trace!("processing {current}");
+        trace!(
+            "processing {current} ({} statements)",
+            current.statements().len(),
+        );
 
         // continue if we have already processed the current node
         if processed.contains(&current.id()) {
@@ -98,20 +101,29 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                             fallthrough,
                             condition,
                         } => {
-                            if target.id() == current.id() {
-                                Terminator::Conditional {
+                            match (
+                                target.id() == current.id(),
+                                fallthrough.id() == current.id(),
+                            ) {
+                                (true, true) => {
+                                    // both sides of conditional now point to the same target (the current block), so replace with unconditional to current's child
+                                    Terminator::Unconditional {
+                                        target: child.clone(),
+                                    }
+                                }
+                                (true, false) => Terminator::Conditional {
                                     condition,
                                     target: child.clone(),
                                     fallthrough,
-                                }
-                            } else if fallthrough.id() == current.id() {
-                                Terminator::Conditional {
+                                },
+                                (false, true) => Terminator::Conditional {
                                     condition,
                                     target,
                                     fallthrough: child.clone(),
+                                },
+                                (false, false) => {
+                                    panic!("neither child ({target}, {fallthrough}) of parent ({parent}) of current node ({current}) was current node");
                                 }
-                            } else {
-                                panic!("neither child ({target}, {fallthrough}) of parent ({parent}) of current node ({current}) was current node");
                             }
                         }
                         Terminator::Unconditional { target } => {
