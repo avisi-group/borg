@@ -78,7 +78,7 @@ fn continue_start() {
         .get_device_by_alias("disk00:03.0")
         .expect("disk not found");
 
-    // plugins::load_all(&device);
+    plugins::load_all(&device);
     models::load_all(&device);
 
     let test_config = {

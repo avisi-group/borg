@@ -2,6 +2,7 @@ use {
     crate::dbt::{
         bit_insert,
         emitter::{Emitter, Type},
+        init_register_file,
         interpret::{interpret, Value},
         models::{self},
         translate::translate,
@@ -13,7 +14,7 @@ use {
         },
         Translation,
     },
-    common::{mask::mask, rudder::Model, HashMap},
+    common::{mask::mask, HashMap},
     proc_macro_lib::ktest,
 };
 
@@ -24,7 +25,7 @@ fn init_system() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 }
 
 #[ktest]
@@ -64,7 +65,7 @@ fn num_of_feature() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     let feature = emitter.read_register(r0_offset.clone(), Type::Unsigned(0x20));
@@ -87,7 +88,7 @@ fn statistical_profiling_disabled() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let is_enabled = translate(&*model, "StatisticalProfilingEnabled", &[], &mut emitter).unwrap();
 
@@ -117,7 +118,7 @@ fn havebrbext_disabled() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let is_enabled = translate(&*model, "HaveBRBExt", &[], &mut emitter).unwrap();
 
@@ -147,7 +148,7 @@ fn using_aarch32_disabled() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let is_enabled = translate(&*model, "UsingAArch32", &[], &mut emitter).unwrap();
 
@@ -177,7 +178,7 @@ fn branchto() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let target = emitter.constant(0xDEADFEED, Type::Unsigned(64));
     let branch_type = emitter.constant(1, Type::Unsigned(32));
@@ -226,7 +227,7 @@ fn decodea64_addsub() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x8b020020, Type::Unsigned(32));
@@ -263,7 +264,7 @@ fn decodea64_addsub_interpret() {
         let mut register_file = alloc::vec![0u8; model.register_file_size()];
         let register_file_ptr = register_file.as_mut_ptr();
 
-        init(&*model, register_file_ptr);
+        init_register_file(&*model, register_file_ptr);
 
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u32;
         let r1 = register_file_ptr.add(model.reg_offset("R1")) as *mut u32;
@@ -300,7 +301,7 @@ fn decodea64_mov() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(32));
@@ -338,7 +339,7 @@ fn decodea64_branch() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let pc = emitter.constant(44, Type::Unsigned(64));
     let opcode = emitter.constant(0x17fffffa, Type::Unsigned(32));
@@ -375,7 +376,7 @@ fn branch_if_eq() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x540000c0, Type::Unsigned(32));
@@ -510,7 +511,7 @@ fn cmp_csel() {
         let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
         let mut emitter = X86Emitter::new(&mut ctx);
 
-        init(&*model, register_file_ptr);
+        init_register_file(&*model, register_file_ptr);
 
         let see_offset = emitter.constant(model.reg_offset("SEE") as u64, Type::Unsigned(64));
         let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
@@ -556,7 +557,7 @@ fn fibonacci_instr() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let program = [
         // <_start>
@@ -639,7 +640,7 @@ fn mem() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -696,7 +697,7 @@ fn mem_store() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
@@ -735,7 +736,7 @@ fn mem_load() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -772,7 +773,7 @@ fn fibonacci_block() {
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let program = [
         // <_start>
@@ -945,7 +946,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let r0 = unsafe { register_file_ptr.add(model.reg_offset("R0")) as *mut u64 };
     let r1 = unsafe { register_file_ptr.add(model.reg_offset("R1")) as *mut u64 };
@@ -1065,7 +1066,7 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     unsafe {
         *(register_file_ptr.add(model.reg_offset("R0")) as *mut u64) = x;
@@ -1101,7 +1102,7 @@ fn shiftreg() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let _1 = emitter.constant(1, Type::Signed(64));
     let shift_type = emitter.constant(1, Type::Signed(32));
@@ -1236,7 +1237,7 @@ fn ispow2() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let r3_offset = emitter.constant(model.reg_offset("R3") as u64, Type::Unsigned(0x40));
     let x = emitter.read_register(r3_offset, Type::Unsigned(0x40));
@@ -1288,7 +1289,7 @@ fn rbitx0_interpret() {
 
     let mut register_file = alloc::vec![0u8; model.register_file_size()];
     let register_file_ptr = register_file.as_mut_ptr();
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     unsafe {
         let r0 = register_file_ptr.add(model.reg_offset("R0")) as *mut u64;
@@ -1322,7 +1323,7 @@ fn rbitx0() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     // rbit x0
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -1414,7 +1415,7 @@ fn ubfx() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     // ubfx x3, x3, #16, #4
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -1607,7 +1608,7 @@ fn decodebitmasks() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     // times out:(
     // assert_eq!(
@@ -1688,7 +1689,7 @@ fn replicate_bits() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     {
         let value = emitter.constant(0xaa, Type::Unsigned(8));
@@ -1755,7 +1756,7 @@ fn rev_d00dfeed() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let _32 = emitter.constant(32, Type::Signed(64));
     let _3 = emitter.constant(3, Type::Signed(64));
@@ -1822,7 +1823,7 @@ fn udiv() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    init(&*model, register_file_ptr);
+    init_register_file(&*model, register_file_ptr);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
@@ -1939,305 +1940,4 @@ fn ceil() {
             *r0
         }
     }
-}
-
-fn init(model: &Model, register_file: *mut u8) {
-    interpret(&*model, "borealis_register_init", &[], register_file);
-    configure_features(&*model, register_file);
-    interpret(&*model, "__InitSystem", &[], register_file);
-}
-
-fn configure_features(model: &Model, register_file: *mut u8) {
-    let features = [
-        "FEAT_AA32EL0_IMPLEMENTED",
-        "FEAT_AA32EL1_IMPLEMENTED",
-        "FEAT_AA32EL2_IMPLEMENTED",
-        "FEAT_AA32EL3_IMPLEMENTED",
-        "FEAT_AA64EL0_IMPLEMENTED",
-        "FEAT_AA64EL1_IMPLEMENTED",
-        "FEAT_AA64EL2_IMPLEMENTED",
-        "FEAT_AA64EL3_IMPLEMENTED",
-        "FEAT_EL0_IMPLEMENTED",
-        "FEAT_EL1_IMPLEMENTED",
-        "FEAT_EL2_IMPLEMENTED",
-        "FEAT_EL3_IMPLEMENTED",
-        "FEAT_AES_IMPLEMENTED",
-        "FEAT_AdvSIMD_IMPLEMENTED",
-        "FEAT_CSV2_1p1_IMPLEMENTED",
-        "FEAT_CSV2_1p2_IMPLEMENTED",
-        "FEAT_CSV2_2_IMPLEMENTED",
-        "FEAT_CSV2_3_IMPLEMENTED",
-        "FEAT_DoubleLock_IMPLEMENTED",
-        "FEAT_ETMv4_IMPLEMENTED",
-        "FEAT_ETMv4p1_IMPLEMENTED",
-        "FEAT_ETMv4p2_IMPLEMENTED",
-        "FEAT_ETMv4p3_IMPLEMENTED",
-        "FEAT_ETMv4p4_IMPLEMENTED",
-        "FEAT_ETMv4p5_IMPLEMENTED",
-        "FEAT_ETMv4p6_IMPLEMENTED",
-        "FEAT_ETS2_IMPLEMENTED",
-        "FEAT_FP_IMPLEMENTED",
-        "FEAT_GICv3_IMPLEMENTED",
-        "FEAT_GICv3_LEGACY_IMPLEMENTED",
-        "FEAT_GICv3_TDIR_IMPLEMENTED",
-        "FEAT_GICv3p1_IMPLEMENTED",
-        "FEAT_GICv4_IMPLEMENTED",
-        "FEAT_GICv4p1_IMPLEMENTED",
-        "FEAT_IVIPT_IMPLEMENTED",
-        "FEAT_PCSRv8_IMPLEMENTED",
-        "FEAT_PMULL_IMPLEMENTED",
-        "FEAT_PMUv3_IMPLEMENTED",
-        "FEAT_PMUv3_EXT_IMPLEMENTED",
-        "FEAT_PMUv3_EXT32_IMPLEMENTED",
-        "FEAT_SHA1_IMPLEMENTED",
-        "FEAT_SHA256_IMPLEMENTED",
-        "FEAT_TRC_EXT_IMPLEMENTED",
-        "FEAT_TRC_SR_IMPLEMENTED",
-        "FEAT_nTLBPA_IMPLEMENTED",
-        "FEAT_CRC32_IMPLEMENTED",
-        "FEAT_Debugv8p1_IMPLEMENTED",
-        "FEAT_HAFDBS_IMPLEMENTED",
-        "FEAT_HPDS_IMPLEMENTED",
-        "FEAT_LOR_IMPLEMENTED",
-        "FEAT_LSE_IMPLEMENTED",
-        "FEAT_PAN_IMPLEMENTED",
-        "FEAT_PMUv3p1_IMPLEMENTED",
-        "FEAT_RDM_IMPLEMENTED",
-        "FEAT_VHE_IMPLEMENTED",
-        "FEAT_VMID16_IMPLEMENTED",
-        "FEAT_AA32BF16_IMPLEMENTED",
-        "FEAT_AA32HPD_IMPLEMENTED",
-        "FEAT_AA32I8MM_IMPLEMENTED",
-        "FEAT_ASMv8p2_IMPLEMENTED",
-        "FEAT_DPB_IMPLEMENTED",
-        "FEAT_Debugv8p2_IMPLEMENTED",
-        "FEAT_EDHSR_IMPLEMENTED",
-        "FEAT_F32MM_IMPLEMENTED",
-        "FEAT_F64MM_IMPLEMENTED",
-        "FEAT_FP16_IMPLEMENTED",
-        "FEAT_HPDS2_IMPLEMENTED",
-        "FEAT_I8MM_IMPLEMENTED",
-        "FEAT_IESB_IMPLEMENTED",
-        "FEAT_LPA_IMPLEMENTED",
-        "FEAT_LSMAOC_IMPLEMENTED",
-        "FEAT_LVA_IMPLEMENTED",
-        "FEAT_MPAM_IMPLEMENTED",
-        "FEAT_PAN2_IMPLEMENTED",
-        "FEAT_PCSRv8p2_IMPLEMENTED",
-        "FEAT_RAS_IMPLEMENTED",
-        "FEAT_SHA3_IMPLEMENTED",
-        "FEAT_SHA512_IMPLEMENTED",
-        "FEAT_SM3_IMPLEMENTED",
-        "FEAT_SM4_IMPLEMENTED",
-        "FEAT_SPE_IMPLEMENTED",
-        "FEAT_SVE_IMPLEMENTED",
-        "FEAT_TTCNP_IMPLEMENTED",
-        "FEAT_UAO_IMPLEMENTED",
-        "FEAT_VPIPT_IMPLEMENTED",
-        "FEAT_XNX_IMPLEMENTED",
-        "FEAT_CCIDX_IMPLEMENTED",
-        "FEAT_CONSTPACFIELD_IMPLEMENTED",
-        "FEAT_EPAC_IMPLEMENTED",
-        "FEAT_FCMA_IMPLEMENTED",
-        "FEAT_FPAC_IMPLEMENTED",
-        "FEAT_FPACCOMBINE_IMPLEMENTED",
-        "FEAT_JSCVT_IMPLEMENTED",
-        "FEAT_LRCPC_IMPLEMENTED",
-        "FEAT_NV_IMPLEMENTED",
-        "FEAT_PACIMP_IMPLEMENTED",
-        "FEAT_PACQARMA3_IMPLEMENTED",
-        "FEAT_PACQARMA5_IMPLEMENTED",
-        "FEAT_PAuth_IMPLEMENTED",
-        "FEAT_SPEv1p1_IMPLEMENTED",
-        "FEAT_AMUv1_IMPLEMENTED",
-        "FEAT_BBM_IMPLEMENTED",
-        "FEAT_CNTSC_IMPLEMENTED",
-        "FEAT_DIT_IMPLEMENTED",
-        "FEAT_Debugv8p4_IMPLEMENTED",
-        "FEAT_DotProd_IMPLEMENTED",
-        "FEAT_DoubleFault_IMPLEMENTED",
-        "FEAT_FHM_IMPLEMENTED",
-        "FEAT_FlagM_IMPLEMENTED",
-        "FEAT_IDST_IMPLEMENTED",
-        "FEAT_LRCPC2_IMPLEMENTED",
-        "FEAT_LSE2_IMPLEMENTED",
-        "FEAT_NV2_IMPLEMENTED",
-        "FEAT_PMUv3p4_IMPLEMENTED",
-        "FEAT_RASSAv1p1_IMPLEMENTED",
-        "FEAT_RASv1p1_IMPLEMENTED",
-        "FEAT_S2FWB_IMPLEMENTED",
-        "FEAT_SEL2_IMPLEMENTED",
-        "FEAT_TLBIOS_IMPLEMENTED",
-        "FEAT_TLBIRANGE_IMPLEMENTED",
-        "FEAT_TRF_IMPLEMENTED",
-        "FEAT_TTL_IMPLEMENTED",
-        "FEAT_TTST_IMPLEMENTED",
-        "FEAT_BTI_IMPLEMENTED",
-        "FEAT_CSV2_IMPLEMENTED",
-        "FEAT_CSV3_IMPLEMENTED",
-        "FEAT_DPB2_IMPLEMENTED",
-        "FEAT_E0PD_IMPLEMENTED",
-        "FEAT_EVT_IMPLEMENTED",
-        "FEAT_ExS_IMPLEMENTED",
-        "FEAT_FRINTTS_IMPLEMENTED",
-        "FEAT_FlagM2_IMPLEMENTED",
-        "FEAT_GTG_IMPLEMENTED",
-        "FEAT_MTE_IMPLEMENTED",
-        "FEAT_MTE2_IMPLEMENTED",
-        "FEAT_PMUv3p5_IMPLEMENTED",
-        "FEAT_RNG_IMPLEMENTED",
-        "FEAT_RNG_TRAP_IMPLEMENTED",
-        "FEAT_SB_IMPLEMENTED",
-        "FEAT_SPECRES_IMPLEMENTED",
-        "FEAT_SSBS_IMPLEMENTED",
-        "FEAT_SSBS2_IMPLEMENTED",
-        "FEAT_AMUv1p1_IMPLEMENTED",
-        "FEAT_BF16_IMPLEMENTED",
-        "FEAT_DGH_IMPLEMENTED",
-        "FEAT_ECV_IMPLEMENTED",
-        "FEAT_FGT_IMPLEMENTED",
-        "FEAT_HPMN0_IMPLEMENTED",
-        "FEAT_MPAMv0p1_IMPLEMENTED",
-        "FEAT_MPAMv1p1_IMPLEMENTED",
-        "FEAT_MTPMU_IMPLEMENTED",
-        "FEAT_PAuth2_IMPLEMENTED",
-        "FEAT_TWED_IMPLEMENTED",
-        "FEAT_AFP_IMPLEMENTED",
-        "FEAT_EBF16_IMPLEMENTED",
-        "FEAT_HCX_IMPLEMENTED",
-        "FEAT_LPA2_IMPLEMENTED",
-        "FEAT_LS64_IMPLEMENTED",
-        "FEAT_LS64_ACCDATA_IMPLEMENTED",
-        "FEAT_LS64_V_IMPLEMENTED",
-        "FEAT_MTE3_IMPLEMENTED",
-        "FEAT_PAN3_IMPLEMENTED",
-        "FEAT_PMUv3p7_IMPLEMENTED",
-        "FEAT_RPRES_IMPLEMENTED",
-        "FEAT_SPEv1p2_IMPLEMENTED",
-        "FEAT_WFxT_IMPLEMENTED",
-        "FEAT_XS_IMPLEMENTED",
-        "FEAT_CMOW_IMPLEMENTED",
-        "FEAT_Debugv8p8_IMPLEMENTED",
-        "FEAT_GICv3_NMI_IMPLEMENTED",
-        "FEAT_HBC_IMPLEMENTED",
-        "FEAT_MOPS_IMPLEMENTED",
-        "FEAT_NMI_IMPLEMENTED",
-        "FEAT_PMUv3_EXT64_IMPLEMENTED",
-        "FEAT_PMUv3_TH_IMPLEMENTED",
-        "FEAT_PMUv3p8_IMPLEMENTED",
-        "FEAT_SCTLR2_IMPLEMENTED",
-        "FEAT_SPEv1p3_IMPLEMENTED",
-        "FEAT_TCR2_IMPLEMENTED",
-        "FEAT_TIDCP1_IMPLEMENTED",
-        "FEAT_ADERR_IMPLEMENTED",
-        "FEAT_AIE_IMPLEMENTED",
-        "FEAT_ANERR_IMPLEMENTED",
-        "FEAT_CLRBHB_IMPLEMENTED",
-        "FEAT_CSSC_IMPLEMENTED",
-        "FEAT_Debugv8p9_IMPLEMENTED",
-        "FEAT_DoubleFault2_IMPLEMENTED",
-        "FEAT_ECBHB_IMPLEMENTED",
-        "FEAT_FGT2_IMPLEMENTED",
-        "FEAT_HAFT_IMPLEMENTED",
-        "FEAT_LRCPC3_IMPLEMENTED",
-        "FEAT_MTE4_IMPLEMENTED",
-        "FEAT_MTE_ASYM_FAULT_IMPLEMENTED",
-        "FEAT_MTE_ASYNC_IMPLEMENTED",
-        "FEAT_MTE_CANONICAL_TAGS_IMPLEMENTED",
-        "FEAT_MTE_NO_ADDRESS_TAGS_IMPLEMENTED",
-        "FEAT_MTE_PERM_IMPLEMENTED",
-        "FEAT_MTE_STORE_ONLY_IMPLEMENTED",
-        "FEAT_MTE_TAGGED_FAR_IMPLEMENTED",
-        "FEAT_PCSRv8p9_IMPLEMENTED",
-        "FEAT_PFAR_IMPLEMENTED",
-        "FEAT_PMUv3_EDGE_IMPLEMENTED",
-        "FEAT_PMUv3_ICNTR_IMPLEMENTED",
-        "FEAT_PMUv3_SS_IMPLEMENTED",
-        "FEAT_PMUv3p9_IMPLEMENTED",
-        "FEAT_PRFMSLC_IMPLEMENTED",
-        "FEAT_RASSAv2_IMPLEMENTED",
-        "FEAT_RASv2_IMPLEMENTED",
-        "FEAT_RPRFM_IMPLEMENTED",
-        "FEAT_S1PIE_IMPLEMENTED",
-        "FEAT_S1POE_IMPLEMENTED",
-        "FEAT_S2PIE_IMPLEMENTED",
-        "FEAT_S2POE_IMPLEMENTED",
-        "FEAT_SPECRES2_IMPLEMENTED",
-        "FEAT_SPE_CRR_IMPLEMENTED",
-        "FEAT_SPE_FDS_IMPLEMENTED",
-        "FEAT_SPEv1p4_IMPLEMENTED",
-        "FEAT_SPMU_IMPLEMENTED",
-        "FEAT_THE_IMPLEMENTED",
-        "FEAT_DoPD_IMPLEMENTED",
-        "FEAT_ETE_IMPLEMENTED",
-        "FEAT_SVE2_IMPLEMENTED",
-        "FEAT_SVE_AES_IMPLEMENTED",
-        "FEAT_SVE_BitPerm_IMPLEMENTED",
-        "FEAT_SVE_PMULL128_IMPLEMENTED",
-        "FEAT_SVE_SHA3_IMPLEMENTED",
-        "FEAT_SVE_SM4_IMPLEMENTED",
-        "FEAT_TME_IMPLEMENTED",
-        "FEAT_TRBE_IMPLEMENTED",
-        "FEAT_ETEv1p1_IMPLEMENTED",
-        "FEAT_BRBE_IMPLEMENTED",
-        "FEAT_ETEv1p2_IMPLEMENTED",
-        "FEAT_RME_IMPLEMENTED",
-        "FEAT_SME_IMPLEMENTED",
-        "FEAT_SME_F64F64_IMPLEMENTED",
-        "FEAT_SME_FA64_IMPLEMENTED",
-        "FEAT_SME_I16I64_IMPLEMENTED",
-        "FEAT_BRBEv1p1_IMPLEMENTED",
-        "FEAT_MEC_IMPLEMENTED",
-        "FEAT_SME2_IMPLEMENTED",
-        "FEAT_ABLE_IMPLEMENTED",
-        "FEAT_CHK_IMPLEMENTED",
-        "FEAT_D128_IMPLEMENTED",
-        "FEAT_EBEP_IMPLEMENTED",
-        "FEAT_ETEv1p3_IMPLEMENTED",
-        "FEAT_GCS_IMPLEMENTED",
-        "FEAT_ITE_IMPLEMENTED",
-        "FEAT_LSE128_IMPLEMENTED",
-        "FEAT_LVA3_IMPLEMENTED",
-        "FEAT_SEBEP_IMPLEMENTED",
-        "FEAT_SME2p1_IMPLEMENTED",
-        "FEAT_SME_F16F16_IMPLEMENTED",
-        "FEAT_SVE2p1_IMPLEMENTED",
-        "FEAT_SVE_B16B16_IMPLEMENTED",
-        "FEAT_SYSINSTR128_IMPLEMENTED",
-        "FEAT_SYSREG128_IMPLEMENTED",
-        "FEAT_TRBE_EXT_IMPLEMENTED",
-        "FEAT_TRBE_MPAM_IMPLEMENTED",
-        "v8Ap0_IMPLEMENTED",
-        "v8Ap1_IMPLEMENTED",
-        "v8Ap2_IMPLEMENTED",
-        "v8Ap3_IMPLEMENTED",
-        "v8Ap4_IMPLEMENTED",
-        "v8Ap5_IMPLEMENTED",
-        "v8Ap6_IMPLEMENTED",
-        "v8Ap7_IMPLEMENTED",
-        "v8Ap8_IMPLEMENTED",
-        "v8Ap9_IMPLEMENTED",
-        "v9Ap0_IMPLEMENTED",
-        "v9Ap1_IMPLEMENTED",
-        "v9Ap2_IMPLEMENTED",
-        "v9Ap3_IMPLEMENTED",
-        "v9Ap4_IMPLEMENTED",
-    ];
-
-    let enabled = [
-        "FEAT_AA64EL0_IMPLEMENTED",
-        "FEAT_AA64EL1_IMPLEMENTED",
-        "FEAT_AA64EL2_IMPLEMENTED",
-        "FEAT_AA64EL3_IMPLEMENTED",
-        "FEAT_D128_IMPLEMENTED",
-        "FEAT_LVA3_IMPLEMENTED",
-    ];
-
-    features
-        .iter()
-        .map(|name| (name, enabled.contains(name)))
-        .for_each(|(name, value)| {
-            let offset = model.reg_offset(name);
-            unsafe { register_file.add(offset).write(value as u8) };
-        });
 }
