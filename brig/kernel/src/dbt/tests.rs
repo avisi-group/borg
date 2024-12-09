@@ -434,6 +434,61 @@ fn branch_uncond_imm_offset_math() {
     assert_eq!(*width, 64);
 }
 
+/// Validated with:
+///
+/// ```rust
+/// use std::arch::asm;
+/// fn main() {
+///     for (x, y) in [
+///         (10, 5),
+///         (5, 10),
+///         (0, 0),
+///         (u64::MAX, u64::MAX),
+///         (0x7FFF_FFFF_FFFF_FFFF, -1i64 as u64),
+///         (0x7FFF_FFFF_FFFF_FFFF, 1),
+///         (0x0000000000000000, 0x8000000000000000),
+///         (0x8000000000000000, -1i64 as u64),
+///         (-1i64 as u64, 0),
+///     ] {
+///         println!("{x:x} {y:x}: {:04b}", get_flags(x, y))
+///     }
+///     println!();
+///     println!();
+///     for (r0, r2) in [
+///         (0xffff_ffff_ffff_ff00, 0x0fff_ffff_ffff_ffc0),
+///         (0xffff_ffff_ffff_ff00, 0xffff_ffff_ffff_ffc0),
+///     ] {
+///         println!("{r0:x} {r2:x}: {:x?}", cmp_csel(r0, r2))
+///     }
+/// }
+/// fn get_flags(x: u64, y: u64) -> u8 {
+///     let mut nzcv: u64;
+///     unsafe {
+///         asm!(
+///             "cmp x0, x1",
+///             "mrs x2, nzcv",
+///             in("x0") x,
+///             in("x1") y,
+///             out("x2") nzcv,
+///         );
+///     }
+///     u8::try_from(nzcv >> 28).unwrap()
+/// }
+/// fn cmp_csel(r0: u64, mut r2: u64) -> (u64, u8) {
+///     let mut nzcv: u64;
+///     unsafe {
+///         asm!(
+///             "cmp x2, x0",
+///             "mrs x1, nzcv",
+///             "csel    x2, x2, x0, ls",
+///             in("x0") r0,
+///             inout("x2") r2,
+///             out("x1") nzcv,
+///         );
+///     }
+///     (r2, u8::try_from(nzcv >> 28).unwrap())
+/// }
+/// ```
 #[ktest]
 fn cmp_csel() {
     assert_eq!(
