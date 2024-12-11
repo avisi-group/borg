@@ -1941,3 +1941,10 @@ fn ceil() {
         }
     }
 }
+
+#[ktest]
+fn msr() {
+    //  d51be000        msr     cntfrq_el0, x0
+    // todo: instruction takes multiple minutes and GB to translate, fix it
+    // todo!()
+}
