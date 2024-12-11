@@ -4,10 +4,11 @@ use {
     crate::{
         boom::{
             passes::{
-                builtin_fns::HandleBuiltinFunctions, cycle_finder::CycleFinder,
-                destruct_composites::DestructComposites, fold_unconditionals::FoldUnconditionals,
-                lower_reals::LowerReals, remove_const_branch::RemoveConstBranch,
-                remove_constant_type::RemoveConstantType, remove_units::RemoveUnits,
+                builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
+                cycle_finder::CycleFinder, destruct_composites::DestructComposites,
+                fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
+                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
+                remove_units::RemoveUnits,
             },
             Ast,
         },
@@ -119,6 +120,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         &mut [
             FoldUnconditionals::new_boxed(),
             RemoveConstBranch::new_boxed(),
+            ConstantPropogation::new_boxed(),
             // MonomorphizeVectors::new_boxed(),
             CycleFinder::new_boxed(),
         ],

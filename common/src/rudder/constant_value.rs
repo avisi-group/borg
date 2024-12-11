@@ -4,7 +4,7 @@ use {
     core::{
         cmp::Ordering,
         fmt::{self, Display, Formatter},
-        ops::{Add, Div, Mul, Not, Sub},
+        ops::{Add, BitXor, Div, Mul, Not, Sub},
     },
 };
 
@@ -178,6 +178,19 @@ impl Not for ConstantValue {
             | ConstantValue::String(_)
             | ConstantValue::Tuple(_)
             | ConstantValue::Vector(_) => panic!("not a thing"),
+        }
+    }
+}
+
+impl BitXor for ConstantValue {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (ConstantValue::UnsignedInteger(l), ConstantValue::UnsignedInteger(r)) => {
+                ConstantValue::UnsignedInteger(l ^ r)
+            }
+            (l, r) => panic!("invalid types for xor: {l:?} {r:?}"),
         }
     }
 }

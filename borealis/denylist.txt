@@ -45,7 +45,6 @@ PLOfEL
 MaybeZeroSVEUppers
 ResetSVEState
 BRBEException
-BranchTargetCheck
 ConditionSyndrome
 ClearEventRegister
 WFETrapDelay
@@ -191,7 +190,6 @@ AuthIA
 AuthIB
 AuthDA
 AuthDB
-CheckTransactionalSystemAccess
 BTypeCompatible_BTI
 BTypeCompatible_PACIXSP
 SetBTypeCompatible
@@ -2157,7 +2155,6 @@ CTI_SetEventLevel
 ChooseRandomNonExcludedTag
 ClearExclusiveByAddress
 ComputePACIMPDEF
-ConstrainUnpredictableInteger
 DC_CIGDPAPA
 DC_CIPAPA
 GPTTLBCache
@@ -2180,12 +2177,6 @@ MemSetParametersIllformedM
 PendSErrorInterrupt
 ReportedPARAttrs
 ReportedPARShareability
-S1TLBCache
-S2TLBCache
-S2TLBLookup
-SETPostSizeChoice
-SETPreSizeChoice
-SETSizeChoice
 SetIss2
 SetLoadStoreType
 SetTLBIncludesGPT

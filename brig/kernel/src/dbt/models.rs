@@ -1,6 +1,15 @@
 use {
     crate::{
-        dbt::init_register_file,
+        dbt::{
+            emitter::{Emitter, Type},
+            init_register_file,
+            translate::translate,
+            x86::{
+                emitter::{BinaryOperationKind, X86Emitter},
+                X86TranslationContext,
+            },
+            Translation,
+        },
         devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
         guest::register_device_factory,
@@ -13,7 +22,7 @@ use {
         sync::Arc,
         vec::Vec,
     },
-    common::rudder::Model,
+    common::{rudder::Model, HashMap},
     core::fmt::{self, Debug},
     plugins_api::{
         guest::{Device, DeviceFactory},
@@ -94,7 +103,7 @@ impl DeviceFactory for ModelDeviceFactory {
 struct ModelDevice {
     name: String,
     model: Arc<Model>,
-    register_file: Vec<u8>,
+    register_file: Mutex<Vec<u8>>,
 }
 
 impl ModelDevice {
@@ -110,7 +119,7 @@ impl ModelDevice {
         Self {
             name,
             model,
-            register_file,
+            register_file: Mutex::new(register_file),
         }
     }
 }
@@ -123,7 +132,100 @@ impl Debug for ModelDevice {
 
 impl Device for ModelDevice {
     fn start(&self) {
-        todo!()
+        let register_file_ptr = self.register_file.lock().as_mut_ptr();
+
+        let mut blocks = HashMap::<u64, Translation>::default();
+
+        loop {
+            unsafe {
+                let pc_offset = self.model.reg_offset("_PC");
+                let mut current_pc = *(register_file_ptr.add(pc_offset) as *mut u64);
+                let start_pc = current_pc;
+                if let Some(translation) = blocks.get(&start_pc) {
+                    translation.execute(register_file_ptr);
+                    continue;
+                }
+
+                if current_pc == 56 {
+                    break;
+                }
+
+                let mut ctx = X86TranslationContext::new(pc_offset);
+                let mut emitter = X86Emitter::new(&mut ctx);
+
+                loop {
+                    let see_offset =
+                        emitter.constant(self.model.reg_offset("SEE") as u64, Type::Unsigned(64));
+                    let neg1 = emitter.constant(-1i32 as u64, Type::Signed(32));
+                    emitter.write_register(see_offset, neg1);
+
+                    let branch_taken_offset = emitter.constant(
+                        self.model.reg_offset("__BranchTaken") as u64,
+                        Type::Unsigned(64),
+                    );
+                    let _false = emitter.constant(0 as u64, Type::Unsigned(1));
+                    emitter.write_register(branch_taken_offset, _false);
+
+                    {
+                        let opcode = *(current_pc as *const u32);
+
+                        log::debug!("translating 0x{opcode:08x}");
+
+                        let opcode =
+                            emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
+                        let pc = emitter.constant(current_pc, Type::Unsigned(64));
+                        let _return_value =
+                            translate(&*self.model, "__DecodeA64", &[pc, opcode], &mut emitter);
+                    }
+
+                    if emitter.ctx().get_write_pc() {
+                        break;
+                    } else {
+                        let pc_offset = emitter.constant(pc_offset as u64, Type::Unsigned(64));
+                        let pc = emitter.read_register(pc_offset.clone(), Type::Unsigned(64));
+                        let _4 = emitter.constant(4, Type::Unsigned(64));
+                        let pc_inc = emitter.binary_operation(BinaryOperationKind::Add(pc, _4));
+                        emitter.write_register(pc_offset, pc_inc);
+
+                        current_pc += 4;
+                    }
+                }
+
+                // inc PC if branch not taken
+                {
+                    let branch_taken_offset = emitter.constant(
+                        self.model.reg_offset("__BranchTaken") as u64,
+                        Type::Unsigned(64),
+                    );
+                    let branch_taken =
+                        emitter.read_register(branch_taken_offset, Type::Unsigned(1));
+
+                    let _0 = emitter.constant(0, Type::Unsigned(64));
+                    let _4 = emitter.constant(4, Type::Unsigned(64));
+                    let addend = emitter.select(branch_taken, _0, _4);
+
+                    let pc_offset = emitter.constant(pc_offset as u64, Type::Unsigned(64));
+                    let pc = emitter.read_register(pc_offset.clone(), Type::Unsigned(64));
+                    let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
+                    emitter.write_register(pc_offset, new_pc);
+                }
+
+                emitter.leave();
+                let num_regs = emitter.next_vreg();
+                let translation = ctx.compile(num_regs);
+
+                // log::trace!("{translation:?}")
+
+                translation.execute(register_file_ptr);
+                blocks.insert(start_pc, translation);
+
+                log::trace!(
+                    "{:x} {}",
+                    *(register_file_ptr.add(self.model.reg_offset("_PC")) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("__BranchTaken")) as *mut u8)
+                );
+            }
+        }
     }
 
     fn stop(&self) {

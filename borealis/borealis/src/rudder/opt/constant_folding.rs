@@ -78,7 +78,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         BinaryOperationKind::Modulo => todo!(),
                         BinaryOperationKind::And => todo!(),
                         BinaryOperationKind::Or => todo!(),
-                        BinaryOperationKind::Xor => todo!(),
+                        BinaryOperationKind::Xor => lhs ^ rhs,
                         BinaryOperationKind::PowI => lhs.powi(rhs),
                         BinaryOperationKind::CompareEqual => {
                             ConstantValue::UnsignedInteger((lhs == rhs) as u64)
