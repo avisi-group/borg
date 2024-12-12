@@ -1201,7 +1201,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 )),
                 (typ, target_width) => todo!(
-                    "sail extend {typ:?} {target_width:?} {:?} {:?}",
+                    "sign extend {typ:?} {target_width:?} {:?} {:?}",
                     args[0],
                     args[1]
                 ),
