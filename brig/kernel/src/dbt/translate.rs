@@ -40,6 +40,7 @@ pub fn translate(
     function: &str,
     arguments: &[X86NodeRef],
     emitter: &mut X86Emitter,
+    register_file_ptr: *mut u8,
 ) -> Option<X86NodeRef> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot

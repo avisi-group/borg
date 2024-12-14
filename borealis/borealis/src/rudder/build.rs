@@ -96,11 +96,14 @@ struct BuildContext {
 
 impl BuildContext {
     fn add_register(&mut self, name: InternedString, typ: Type) {
+        const CACHEABLE: &[&str] = &["FeatureImpl"];
+
         self.registers.insert(
             name,
             RegisterDescriptor {
                 typ: typ.clone(),
                 offset: self.next_register_offset,
+                cacheable: CACHEABLE.contains(&name.as_ref()),
             },
         );
 

@@ -38,7 +38,14 @@ fn static_dynamic_chaos_smoke() {
             let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
             let mut emitter = X86Emitter::new(&mut ctx);
 
-            translate(&*model, "func_corrupted_var", &[], &mut emitter).unwrap();
+            translate(
+                &*model,
+                "func_corrupted_var",
+                &[],
+                &mut emitter,
+                register_file_ptr,
+            )
+            .unwrap();
 
             emitter.leave();
             let num_regs = emitter.next_vreg();
@@ -70,7 +77,14 @@ fn num_of_feature() {
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     let feature = emitter.read_register(r0_offset.clone(), Type::Unsigned(0x20));
 
-    translate(&*model, "num_of_Feature", &[feature], &mut emitter).unwrap();
+    translate(
+        &*model,
+        "num_of_Feature",
+        &[feature],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -90,7 +104,14 @@ fn statistical_profiling_disabled() {
 
     init_register_file(&*model, register_file_ptr);
 
-    let is_enabled = translate(&*model, "StatisticalProfilingEnabled", &[], &mut emitter).unwrap();
+    let is_enabled = translate(
+        &*model,
+        "StatisticalProfilingEnabled",
+        &[],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     emitter.write_register(r0_offset, is_enabled);
@@ -120,7 +141,8 @@ fn havebrbext_disabled() {
 
     init_register_file(&*model, register_file_ptr);
 
-    let is_enabled = translate(&*model, "HaveBRBExt", &[], &mut emitter).unwrap();
+    let is_enabled =
+        translate(&*model, "HaveBRBExt", &[], &mut emitter, register_file_ptr).unwrap();
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     emitter.write_register(r0_offset, is_enabled);
@@ -150,7 +172,14 @@ fn using_aarch32_disabled() {
 
     init_register_file(&*model, register_file_ptr);
 
-    let is_enabled = translate(&*model, "UsingAArch32", &[], &mut emitter).unwrap();
+    let is_enabled = translate(
+        &*model,
+        "UsingAArch32",
+        &[],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
 
     let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
     emitter.write_register(r0_offset, is_enabled);
@@ -188,6 +217,7 @@ fn branchto() {
         "BranchTo",
         &[target, branch_type, branch_conditional],
         &mut emitter,
+        register_file_ptr,
     );
 
     emitter.leave();
@@ -231,7 +261,13 @@ fn decodea64_addsub() {
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x8b020020, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -305,7 +341,13 @@ fn decodea64_mov() {
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -343,7 +385,13 @@ fn decodea64_branch() {
 
     let pc = emitter.constant(44, Type::Unsigned(64));
     let opcode = emitter.constant(0x17fffffa, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -380,7 +428,13 @@ fn branch_if_eq() {
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x540000c0, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -520,7 +574,13 @@ fn cmp_csel() {
         // cmp     x2, x0
         let pc = emitter.constant(0, Type::Unsigned(64));
         let opcode = emitter.constant(0xeb00005f, Type::Unsigned(32));
-        translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+        translate(
+            &*model,
+            "__DecodeA64",
+            &[pc, opcode],
+            &mut emitter,
+            register_file_ptr,
+        );
 
         let see_offset = emitter.constant(model.reg_offset("SEE") as u64, Type::Unsigned(64));
         let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
@@ -529,7 +589,13 @@ fn cmp_csel() {
         // csel    x2, x2, x0, ls  // ls = plast
         let pc = emitter.constant(0, Type::Unsigned(64));
         let opcode = emitter.constant(0x9a809042, Type::Unsigned(32));
-        translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+        translate(
+            &*model,
+            "__DecodeA64",
+            &[pc, opcode],
+            &mut emitter,
+            register_file_ptr,
+        );
 
         emitter.leave();
 
@@ -606,7 +672,13 @@ fn fibonacci_instr() {
             {
                 let opcode = emitter.constant(program[*pc as usize / 4], Type::Unsigned(32));
                 let pc = emitter.constant(*pc, Type::Unsigned(64));
-                translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+                translate(
+                    &*model,
+                    "__DecodeA64",
+                    &[pc, opcode],
+                    &mut emitter,
+                    register_file_ptr,
+                );
             }
 
             emitter.leave();
@@ -645,7 +717,13 @@ fn mem() {
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -701,7 +779,13 @@ fn mem_store() {
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -741,7 +825,13 @@ fn mem_load() {
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9400020, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -830,8 +920,13 @@ fn fibonacci_block() {
                     let opcode =
                         emitter.constant(program[current_pc as usize / 4], Type::Unsigned(32));
                     let pc = emitter.constant(current_pc, Type::Unsigned(64));
-                    let _return_value =
-                        translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+                    let _return_value = translate(
+                        &*model,
+                        "__DecodeA64",
+                        &[pc, opcode],
+                        &mut emitter,
+                        register_file_ptr,
+                    );
                 }
 
                 if emitter.ctx().get_write_pc() || (current_pc == ((program.len() * 4) - 8) as u64)
@@ -971,6 +1066,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
         "add_with_carry_test",
         &[x, y, carry_in],
         &mut emitter,
+        register_file_ptr,
     )
     .unwrap();
 
@@ -1077,7 +1173,13 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     // cmp    x0, x1
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xeb01001f, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -1113,6 +1215,7 @@ fn shiftreg() {
         "ShiftReg",
         &[_1, shift_type, amount, width],
         &mut emitter,
+        register_file_ptr,
     )
     .unwrap();
 
@@ -1142,11 +1245,15 @@ fn shiftreg() {
 fn floorpow2_constant() {
     let model = models::get("aarch64").unwrap();
 
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init_register_file(&*model, register_file_ptr);
+
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1155,7 +1262,7 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1164,7 +1271,7 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1173,7 +1280,7 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1187,11 +1294,15 @@ fn floorpow2_constant() {
 fn ceilpow2_constant() {
     let model = models::get("aarch64").unwrap();
 
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init_register_file(&*model, register_file_ptr);
+
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1200,7 +1311,7 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1209,7 +1320,7 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1218,7 +1329,7 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter).unwrap();
+    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1243,19 +1354,33 @@ fn ispow2() {
     let x = emitter.read_register(r3_offset, Type::Unsigned(0x40));
 
     {
-        let value = translate(&*model, "FloorPow2", &[x.clone()], &mut emitter).unwrap();
+        let value = translate(
+            &*model,
+            "FloorPow2",
+            &[x.clone()],
+            &mut emitter,
+            register_file_ptr,
+        )
+        .unwrap();
         let r0_offset = emitter.constant(model.reg_offset("R0") as u64, Type::Unsigned(0x40));
         emitter.write_register(r0_offset, value);
     }
 
     {
-        let value = translate(&*model, "CeilPow2", &[x.clone()], &mut emitter).unwrap();
+        let value = translate(
+            &*model,
+            "CeilPow2",
+            &[x.clone()],
+            &mut emitter,
+            register_file_ptr,
+        )
+        .unwrap();
         let r1_offset = emitter.constant(model.reg_offset("R1") as u64, Type::Unsigned(0x40));
         emitter.write_register(r1_offset, value);
     }
 
     {
-        let value = translate(&*model, "IsPow2", &[x], &mut emitter).unwrap();
+        let value = translate(&*model, "IsPow2", &[x], &mut emitter, register_file_ptr).unwrap();
         let r2_offset = emitter.constant(model.reg_offset("R2") as u64, Type::Unsigned(0x40));
         emitter.write_register(r2_offset, value);
     }
@@ -1328,7 +1453,13 @@ fn rbitx0() {
     // rbit x0
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xdac00000, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -1420,7 +1551,13 @@ fn ubfx() {
     // ubfx x3, x3, #16, #4
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd3504c63, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -1444,11 +1581,22 @@ fn ubfx() {
 fn highest_set_bit() {
     let model = models::get("aarch64").unwrap();
 
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init_register_file(&*model, register_file_ptr);
+
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(0b100, Type::Unsigned(64));
-    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter).unwrap();
+    let res = translate(
+        &*model,
+        "HighestSetBit",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1458,7 +1606,14 @@ fn highest_set_bit() {
     );
 
     let x = emitter.constant(u64::MAX, Type::Unsigned(64));
-    let res = translate(&*model, "HighestSetBit", &[x], &mut emitter).unwrap();
+    let res = translate(
+        &*model,
+        "HighestSetBit",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1472,12 +1627,16 @@ fn highest_set_bit() {
 fn ror() {
     let model = models::get("aarch64").unwrap();
 
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init_register_file(&*model, register_file_ptr);
+
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(0xff00, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter).unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1488,7 +1647,7 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter).unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1499,7 +1658,7 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(32));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter).unwrap();
+    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1513,12 +1672,16 @@ fn ror() {
 fn extsv() {
     let model = models::get("aarch64").unwrap();
 
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init_register_file(&*model, register_file_ptr);
+
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let m = emitter.constant(32, Type::Signed(64));
     let v = emitter.constant(0xFFFF_FFFF_FFFF_FFFF, Type::Unsigned(64));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1528,7 +1691,7 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(-1i32 as u64, Type::Unsigned(32));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1538,7 +1701,7 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1549,7 +1712,7 @@ fn extsv() {
 
     let m = emitter.constant(1, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter).unwrap();
+    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 }
 
@@ -1557,17 +1720,35 @@ fn extsv() {
 fn zext_ones() {
     let model = models::get("aarch64").unwrap();
 
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init_register_file(&*model, register_file_ptr);
+
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let n = emitter.constant(1, Type::Signed(64));
     let m = emitter.constant(1, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
+    let res = translate(
+        &*model,
+        "zext_ones",
+        &[n, m],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(0, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
+    let res = translate(
+        &*model,
+        "zext_ones",
+        &[n, m],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1578,7 +1759,14 @@ fn zext_ones() {
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(32, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
+    let res = translate(
+        &*model,
+        "zext_ones",
+        &[n, m],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1589,7 +1777,14 @@ fn zext_ones() {
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(64, Type::Signed(64));
-    let res = translate(&*model, "zext_ones", &[n, m], &mut emitter).unwrap();
+    let res = translate(
+        &*model,
+        "zext_ones",
+        &[n, m],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1661,6 +1856,7 @@ fn decodebitmasks() {
         "DecodeBitMasks",
         &[immn, imms, immr, immediate, m],
         &mut emitter,
+        register_file_ptr,
     )
     .unwrap();
 
@@ -1704,6 +1900,7 @@ fn replicate_bits() {
                 "replicate_bits_borealis_internal",
                 &[value, count],
                 &mut emitter,
+                register_file_ptr,
             )
             .unwrap()
             .kind()
@@ -1722,6 +1919,7 @@ fn replicate_bits() {
                 "replicate_bits_borealis_internal",
                 &[value, count],
                 &mut emitter,
+                register_file_ptr,
             )
             .unwrap()
             .kind()
@@ -1740,6 +1938,7 @@ fn replicate_bits() {
                 "replicate_bits_borealis_internal",
                 &[value, count],
                 &mut emitter,
+                register_file_ptr,
             )
             .unwrap()
             .kind()
@@ -1765,6 +1964,7 @@ fn rev_d00dfeed() {
         "execute_aarch64_instrs_integer_arithmetic_rev",
         &[_32.clone(), _3.clone(), _32, _3],
         &mut emitter,
+        register_file_ptr,
     );
 
     emitter.leave();
@@ -1788,6 +1988,10 @@ fn rev_d00dfeed() {
 fn place_slice() {
     let model = models::get("aarch64").unwrap();
 
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    init_register_file(&*model, register_file_ptr);
+
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -1802,6 +2006,7 @@ fn place_slice() {
         "place_slice_signed",
         &[m, xs, i, l, shift],
         &mut emitter,
+        register_file_ptr,
     )
     .unwrap();
     assert_eq!(
@@ -1827,7 +2032,13 @@ fn udiv() {
 
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
-    translate(&*model, "__DecodeA64", &[pc, opcode], &mut emitter);
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
 
     emitter.leave();
 
@@ -1944,7 +2155,43 @@ fn ceil() {
 
 #[ktest]
 fn msr() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = alloc::vec![0u8; model.register_file_size()];
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    init_register_file(&*model, register_file_ptr);
+
     //  d51be000        msr     cntfrq_el0, x0
     // todo: instruction takes multiple minutes and GB to translate, fix it
-    // todo!()
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd51be000, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    log::warn!("finished translate");
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r0 = register_file_ptr.add(model.reg_offset("R3")) as *mut u64;
+        let see = register_file_ptr.add(model.reg_offset("SEE")) as *mut i64;
+
+        let before = *r0;
+        *see = -1;
+
+        translation.execute(register_file_ptr);
+
+        panic!("{before:x} {:x}", *r0);
+    }
 }

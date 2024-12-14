@@ -174,8 +174,13 @@ impl Device for ModelDevice {
                         let opcode =
                             emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
                         let pc = emitter.constant(current_pc, Type::Unsigned(64));
-                        let _return_value =
-                            translate(&*self.model, "__DecodeA64", &[pc, opcode], &mut emitter);
+                        let _return_value = translate(
+                            &*self.model,
+                            "__DecodeA64",
+                            &[pc, opcode],
+                            &mut emitter,
+                            register_file_ptr,
+                        );
                     }
 
                     if emitter.ctx().get_write_pc() {
