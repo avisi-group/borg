@@ -62,7 +62,8 @@ fn function_constant_propogation(entry_block: ControlFlowBlock) -> bool {
                             panic!("cannot be a candidate but also a known mutable variable")
                         }
                         (true, false) => {
-                            // we are writing (again) to a variable we thought was constant, so it is not a constant
+                            // we are writing (again) to a variable we thought was constant, so it
+                            // is not a constant
                             candidate_constants.remove(target);
                             mutable_vars.insert(*target);
                         }

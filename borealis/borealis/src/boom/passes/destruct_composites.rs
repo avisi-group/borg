@@ -2,7 +2,9 @@ use {
     crate::boom::{
         control_flow::{ControlFlowBlock, Terminator},
         passes::Pass,
-        Ast, Expression, Literal, NamedType, Parameter, Size, Statement, Type, Value,
+        visitor::Walkable,
+        Ast, Expression, Literal, NamedType, Operation, Parameter, Size, Statement, Type, Value,
+        Visitor,
     },
     common::{intern::InternedString, HashMap},
     itertools::Itertools,
@@ -480,6 +482,9 @@ fn destruct_locals(
             }
         }
     });
+
+    let mut destructor_visitor = DestructorVisitor::new(destructed_local_variables);
+    //  destructor_visitor.visit_control_flow_block(&entry_block); // fails to terminate when neq_any<O<EInterruptID%>> is allowlisted
 }
 
 fn create_union_construction_copies(
@@ -507,7 +512,8 @@ fn create_union_construction_copies(
     match &*arguments[0].get() {
         // assign args[0] to the correct value variable, splitting if necessary
         Value::Identifier(source) => {
-            // need to write either the argument or a default_value to each field of the union
+            // need to write either the argument or a default_value to each field of the
+            // union
             iter.chain(
                 fields
                     .iter()
@@ -898,3 +904,70 @@ fn traverse_typ_from_location(
 //         _ => panic!(),
 //     }
 // }
+
+struct DestructorVisitor {
+    destructed: HashMap<InternedString, Shared<Type>>,
+}
+
+impl DestructorVisitor {
+    fn new(destructed: HashMap<InternedString, Shared<Type>>) -> Self {
+        Self { destructed }
+    }
+}
+
+impl Visitor for DestructorVisitor {
+    fn visit_value(&mut self, node: Shared<Value>) {
+        if let Value::Operation(op) = &*node.get() {
+            match op {
+                Operation::Equal(left, right) => {
+                    if let (Value::Identifier(left), Value::Identifier(right)) =
+                        (&*left.get(), &*right.get())
+                    {
+                        if let (Some(left_type), Some(right_type)) =
+                            (self.destructed.get(&*left), self.destructed.get(&*right))
+                        {
+                            let left_components = destruct_variable(*left, left_type.clone());
+                            let right_components = destruct_variable(*right, right_type.clone());
+
+                            let equals = left_components
+                                .into_iter()
+                                .map(|(name, _)| Value::Identifier(name))
+                                .map(Shared::new)
+                                .zip(
+                                    right_components
+                                        .into_iter()
+                                        .map(|(name, _)| Value::Identifier(name))
+                                        .map(Shared::new),
+                                )
+                                .map(|(left, right)| {
+                                    Value::Operation(Operation::Equal(left, right))
+                                })
+                                .collect::<Vec<_>>();
+
+                            *node.get_mut() = match &equals[..] {
+                                [] => unreachable!(),
+                                [op] => op.clone(),
+                                [first, second, ..] => {
+                                    let init = Value::Operation(Operation::And(
+                                        Shared::new(first.clone()),
+                                        Shared::new(second.clone()),
+                                    ));
+
+                                    equals.into_iter().skip(2).map(Shared::new).fold(
+                                        init,
+                                        |acc, next| {
+                                            Value::Operation(Operation::And(Shared::new(acc), next))
+                                        },
+                                    )
+                                }
+                            };
+                        }
+                    }
+                }
+                // Operation::NotEqual   (left, right) => {},//todo
+                _ => (),
+            }
+        }
+        node.get().walk(self);
+    }
+}

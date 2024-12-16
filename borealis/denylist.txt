@@ -1,12 +1,7 @@
-sail_branch_announce
-__monomorphize
 mem_read_request_is_exclusive<Uarm_acc_type<>,b,O<RTranslationInfo>>
 mem_read_request_is_ifetch<Uarm_acc_type<>,b,O<RTranslationInfo>>
 mem_write_request_is_exclusive<Uarm_acc_type<>,b,O<RTranslationInfo>>
 implies
-neq_any<O<EInterruptID%>>
-max_int
-Ones
 integer_access
 integer_update_subrange
 ZeroExtend1

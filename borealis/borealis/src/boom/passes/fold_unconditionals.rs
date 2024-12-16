@@ -106,7 +106,9 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                                 fallthrough.id() == current.id(),
                             ) {
                                 (true, true) => {
-                                    // both sides of conditional now point to the same target (the current block), so replace with unconditional to current's child
+                                    // both sides of conditional now point to the same target (the
+                                    // current block), so replace with unconditional to current's
+                                    // child
                                     Terminator::Unconditional {
                                         target: child.clone(),
                                     }

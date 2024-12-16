@@ -142,7 +142,8 @@ impl ControlFlowBlock {
         self.terminator()
             .targets()
             .iter()
-            .dedup_by(|x, y| x.id() == y.id()) // sequential dedup only, but any duplicates in conditional targets will be sequential anyway
+            .dedup_by(|x, y| x.id() == y.id()) // sequential dedup only, but any duplicates in conditional targets will be sequential
+            // anyway
             .for_each(|child| child.remove_parent(self));
 
         match &terminator {
