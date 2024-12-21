@@ -483,7 +483,7 @@ fn destruct_locals(
         }
     });
 
-    let mut destructor_visitor = DestructorVisitor::new(destructed_local_variables);
+    let mut _destructor_visitor = DestructorVisitor::new(destructed_local_variables);
     //  destructor_visitor.visit_control_flow_block(&entry_block); // fails to terminate when neq_any<O<EInterruptID%>> is allowlisted
 }
 

@@ -45,7 +45,15 @@ pub fn translate(
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = 8;
-    FunctionTranslator::new(model, function, arguments, emitter, current_stack_offset).translate()
+    FunctionTranslator::new(
+        model,
+        function,
+        arguments,
+        emitter,
+        current_stack_offset,
+        register_file_ptr,
+    )
+    .translate()
 }
 
 #[derive(Debug, Clone)]
@@ -60,13 +68,26 @@ enum LocalVariable {
 }
 
 struct FunctionTranslator<'m, 'e, 'c> {
+    /// The model we are translating guest code for
     model: &'m Model,
+    /// Name of the function being translated
     function_name: InternedString,
+
+    /// Host (x86) blocks, indexed by their corresponding rudder block
     x86_blocks: HashMap<Ref<Block>, Ref<X86Block>>,
+    /// Rudder blocks, indexed by their corresponding host block
     rudder_blocks: HashMap<Ref<X86Block>, Ref<Block>>,
+
+    /// Function local variables
     variables: HashMap<InternedString, LocalVariable>,
+    /// Stack offset used to allocate stack variables
     current_stack_offset: usize,
+
+    /// X86 instruction emitter
     emitter: &'e mut X86Emitter<'c>,
+
+    /// Pointer to the register file used for cached register reads
+    register_file_ptr: *mut u8,
 }
 
 impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
@@ -76,6 +97,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         arguments: &[X86NodeRef],
         emitter: &'e mut X86Emitter<'c>,
         current_stack_offset: usize,
+        register_file_ptr: *mut u8,
     ) -> Self {
         log::debug!("translating {function:?}");
 
@@ -87,6 +109,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             variables: HashMap::default(),
             current_stack_offset,
             emitter,
+            register_file_ptr,
         };
 
         let function = celf
@@ -369,6 +392,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 StatementResult::Data(None)
             }
             Statement::ReadRegister { typ, offset } => {
+                todo!();
+                // todo: if offset refers to a cacheable register, do a memory read of
+                // register_file_ptr and return a emitter.constant, otherwise...
                 let offset = statement_values.get(offset).unwrap().clone();
                 let typ = emit_rudder_type(typ);
                 StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
@@ -526,6 +552,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         self.current_stack_offset, /* pass in the current stack offset so
                                                     * called functions' stack variables
                                                     * don't corrupt this function's */
+                        self.register_file_ptr,
                     )
                     .translate(),
                 )
