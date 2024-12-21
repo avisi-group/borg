@@ -483,8 +483,7 @@ fn destruct_locals(
         }
     });
 
-    let mut _destructor_visitor = DestructorVisitor::new(destructed_local_variables);
-    //  destructor_visitor.visit_control_flow_block(&entry_block); // fails to terminate when neq_any<O<EInterruptID%>> is allowlisted
+    DestructorVisitor::new(destructed_local_variables).visit_control_flow_block(&entry_block);
 }
 
 fn create_union_construction_copies(
@@ -917,7 +916,9 @@ impl DestructorVisitor {
 
 impl Visitor for DestructorVisitor {
     fn visit_value(&mut self, node: Shared<Value>) {
-        if let Value::Operation(op) = &*node.get() {
+        let node = &mut *node.get_mut();
+
+        if let Value::Operation(op) = node.clone() {
             match op {
                 Operation::Equal(left, right) => {
                     if let (Value::Identifier(left), Value::Identifier(right)) =
@@ -931,11 +932,13 @@ impl Visitor for DestructorVisitor {
 
                             let equals = left_components
                                 .into_iter()
+                                .filter(|(_, typ)| !matches!(*typ.get(), Type::Unit))
                                 .map(|(name, _)| Value::Identifier(name))
                                 .map(Shared::new)
                                 .zip(
                                     right_components
                                         .into_iter()
+                                        .filter(|(_, typ)| !matches!(*typ.get(), Type::Unit))
                                         .map(|(name, _)| Value::Identifier(name))
                                         .map(Shared::new),
                                 )
@@ -944,7 +947,7 @@ impl Visitor for DestructorVisitor {
                                 })
                                 .collect::<Vec<_>>();
 
-                            *node.get_mut() = match &equals[..] {
+                            *node = match &equals[..] {
                                 [] => unreachable!(),
                                 [op] => op.clone(),
                                 [first, second, ..] => {
@@ -961,6 +964,8 @@ impl Visitor for DestructorVisitor {
                                     )
                                 }
                             };
+
+                            return;
                         }
                     }
                 }
@@ -968,6 +973,7 @@ impl Visitor for DestructorVisitor {
                 _ => (),
             }
         }
-        node.get().walk(self);
+
+        node.walk(self);
     }
 }
