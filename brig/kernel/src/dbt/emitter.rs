@@ -62,8 +62,8 @@ pub trait Emitter {
 
     fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef;
 
-    fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef;
-    fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef);
+    fn read_register(&mut self, offset: u64, typ: Type) -> Self::NodeRef;
+    fn write_register(&mut self, offset: u64, value: Self::NodeRef);
 
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef);

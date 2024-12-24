@@ -2,7 +2,10 @@ use {
     crate::{arch::x86::memory::ExecutableAllocator, dbt::interpret::interpret},
     alloc::{string::String, vec::Vec},
     common::{mask::mask, rudder::Model},
-    core::fmt::{self, Debug},
+    core::{
+        borrow::Borrow,
+        fmt::{self, Debug},
+    },
     iced_x86::{Formatter, Instruction},
 };
 
@@ -81,10 +84,16 @@ fn bit_extract(value: u64, start: u64, length: u64) -> u64 {
     (value >> start) & mask(u32::try_from(length).unwrap())
 }
 
-fn init_register_file(model: &Model, register_file: *mut u8) {
-    interpret(&*model, "borealis_register_init", &[], register_file);
-    configure_features(&*model, register_file);
-    interpret(&*model, "__InitSystem", &[], register_file);
+fn init_register_file<M: Borrow<Model>>(model: M) -> Vec<u8> {
+    let model = model.borrow();
+    let mut register_file = alloc::vec![0u8; model.register_file_size() as usize];
+    let register_file_ptr = register_file.as_mut_ptr();
+
+    interpret(model, "borealis_register_init", &[], register_file_ptr);
+    configure_features(model, register_file_ptr);
+    interpret(model, "__InitSystem", &[], register_file_ptr);
+
+    register_file
 }
 
 fn configure_features(model: &Model, register_file: *mut u8) {
@@ -378,6 +387,6 @@ fn configure_features(model: &Model, register_file: *mut u8) {
         .map(|name| (name, enabled.contains(name)))
         .for_each(|(name, value)| {
             let offset = model.reg_offset(name);
-            unsafe { register_file.add(offset).write(value as u8) };
+            unsafe { register_file.add(offset as usize).write(value as u8) };
         });
 }

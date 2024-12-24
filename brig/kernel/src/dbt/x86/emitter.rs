@@ -108,23 +108,11 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         }
     }
 
-    fn read_register(&mut self, offset: Self::NodeRef, typ: Type) -> Self::NodeRef {
-        match offset.kind() {
-            NodeKind::Constant { value, .. } => Self::NodeRef::from(X86Node {
-                typ,
-                kind: NodeKind::GuestRegister { offset: *value },
-            }),
-
-            _ => {
-                log::trace!("can't read non constant offset: {offset:#?}");
-                Self::NodeRef::from(X86Node {
-                    typ,
-                    kind: NodeKind::GuestRegister {
-                        offset: u64::try_from(INVALID_OFFSET).unwrap(),
-                    },
-                })
-            }
-        }
+    fn read_register(&mut self, offset: u64, typ: Type) -> Self::NodeRef {
+        Self::NodeRef::from(X86Node {
+            typ,
+            kind: NodeKind::GuestRegister { offset },
+        })
     }
 
     fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef {
@@ -746,16 +734,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         }
     }
 
-    fn write_register(&mut self, offset: Self::NodeRef, value: Self::NodeRef) {
-        let offset = match offset.kind() {
-            NodeKind::Constant { value, .. } => (*value).try_into().unwrap(),
-
-            _ => {
-                log::trace!("write register with non constant offset: {offset:?}");
-                INVALID_OFFSET
-            }
-        };
-
+    fn write_register(&mut self, offset: u64, value: Self::NodeRef) {
         // todo: validate offset + width is within register file
 
         let value = value.to_operand(self);
@@ -767,7 +746,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             Operand::mem_base_displ(
                 width,
                 Register::PhysicalRegister(PhysicalRegister::RBP),
-                offset,
+                offset.try_into().unwrap(),
             ),
         ));
     }

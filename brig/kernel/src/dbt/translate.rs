@@ -392,15 +392,24 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 StatementResult::Data(None)
             }
             Statement::ReadRegister { typ, offset } => {
-                todo!();
+                //    todo!();
                 // todo: if offset refers to a cacheable register, do a memory read of
                 // register_file_ptr and return a emitter.constant, otherwise...
-                let offset = statement_values.get(offset).unwrap().clone();
+
+                let offset = match statement_values.get(offset).unwrap().kind() {
+                    NodeKind::Constant { value, .. } => *value,
+                    k => panic!("can't read non constant offset: {k:#?}"),
+                };
+
                 let typ = emit_rudder_type(typ);
                 StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
             }
             Statement::WriteRegister { offset, value } => {
-                let offset = statement_values.get(offset).unwrap().clone();
+                let offset = match statement_values.get(offset).unwrap().kind() {
+                    NodeKind::Constant { value, .. } => *value,
+                    k => panic!("can't write non constant offset: {k:#?}"),
+                };
+
                 let value = statement_values.get(value).unwrap().clone();
                 self.emitter.write_register(offset, value);
                 StatementResult::Data(None)
@@ -433,10 +442,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             Statement::WritePc { value } => {
                 self.emitter.ctx().set_write_pc();
 
-                let pc_offset = self.emitter.ctx().pc_offset() as u64;
-
-                let offset = self.emitter.constant(pc_offset, Type::Unsigned(64));
+                let offset = self.emitter.ctx().pc_offset() as u64;
                 let value = statement_values.get(value).unwrap().clone();
+
                 self.emitter.write_register(offset, value);
                 StatementResult::Data(None)
             }

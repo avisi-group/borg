@@ -28,7 +28,7 @@ pub struct X86TranslationContext {
     initial_block: Ref<X86Block>,
     panic_block: Ref<X86Block>,
     writes_to_pc: bool,
-    pc_offset: usize,
+    pc_offset: u64,
 }
 
 impl Debug for X86TranslationContext {
@@ -62,7 +62,7 @@ impl Debug for X86TranslationContext {
 }
 
 impl X86TranslationContext {
-    pub fn new(pc_offset: usize) -> Self {
+    pub fn new(pc_offset: u64) -> Self {
         let mut arena = Arena::new();
 
         let initial_block = arena.insert(X86Block::new());
@@ -221,7 +221,7 @@ impl X86TranslationContext {
         self.writes_to_pc
     }
 
-    pub fn pc_offset(&self) -> usize {
+    pub fn pc_offset(&self) -> u64 {
         self.pc_offset
     }
 }

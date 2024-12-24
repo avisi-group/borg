@@ -28,7 +28,7 @@ pub struct Model {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterDescriptor {
     pub typ: Type,
-    pub offset: usize,
+    pub offset: u64,
     /// Registers that change infrequently can be cached during translation so reads of these registers are emitted as constant values rather than register reads
     pub cacheable: bool,
 }
@@ -57,15 +57,15 @@ impl Model {
         &self.registers
     }
 
-    pub fn register_file_size(&self) -> usize {
+    pub fn register_file_size(&self) -> u64 {
         self.registers
             .values()
-            .map(|d| d.offset + usize::from(d.typ.width_bytes()))
+            .map(|d| d.offset + u64::from(d.typ.width_bytes()))
             .max()
             .unwrap()
     }
 
-    pub fn reg_offset(&self, name: &'static str) -> usize {
+    pub fn reg_offset(&self, name: &'static str) -> u64 {
         self.registers
             .get(&InternedString::from_static(name))
             .unwrap_or_else(|| panic!("no register found with name {name:?}"))

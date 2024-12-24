@@ -108,12 +108,12 @@ struct ModelDevice {
 
 impl ModelDevice {
     fn new(name: String, model: Arc<Model>, initial_pc: u64) -> Self {
-        let mut register_file = alloc::vec![0u8; model.register_file_size()];
-
-        init_register_file(&*model, register_file.as_mut_ptr());
+        let mut register_file = init_register_file(&*model);
 
         unsafe {
-            *(register_file.as_mut_ptr().add(model.reg_offset("_PC")) as *mut u64) = initial_pc
+            *(register_file
+                .as_mut_ptr()
+                .add(model.reg_offset("_PC") as usize) as *mut u64) = initial_pc
         }
 
         Self {
@@ -139,7 +139,7 @@ impl Device for ModelDevice {
         loop {
             unsafe {
                 let pc_offset = self.model.reg_offset("_PC");
-                let mut current_pc = *(register_file_ptr.add(pc_offset) as *mut u64);
+                let mut current_pc = *(register_file_ptr.add(pc_offset as usize) as *mut u64);
                 let start_pc = current_pc;
                 if let Some(translation) = blocks.get(&start_pc) {
                     translation.execute(register_file_ptr);
@@ -154,17 +154,11 @@ impl Device for ModelDevice {
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 loop {
-                    let see_offset =
-                        emitter.constant(self.model.reg_offset("SEE") as u64, Type::Unsigned(64));
                     let neg1 = emitter.constant(-1i32 as u64, Type::Signed(32));
-                    emitter.write_register(see_offset, neg1);
+                    emitter.write_register(self.model.reg_offset("SEE") as u64, neg1);
 
-                    let branch_taken_offset = emitter.constant(
-                        self.model.reg_offset("__BranchTaken") as u64,
-                        Type::Unsigned(64),
-                    );
                     let _false = emitter.constant(0 as u64, Type::Unsigned(1));
-                    emitter.write_register(branch_taken_offset, _false);
+                    emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
 
                     {
                         let opcode = *(current_pc as *const u32);
@@ -186,11 +180,10 @@ impl Device for ModelDevice {
                     if emitter.ctx().get_write_pc() {
                         break;
                     } else {
-                        let pc_offset = emitter.constant(pc_offset as u64, Type::Unsigned(64));
-                        let pc = emitter.read_register(pc_offset.clone(), Type::Unsigned(64));
+                        let pc = emitter.read_register(pc_offset as u64, Type::Unsigned(64));
                         let _4 = emitter.constant(4, Type::Unsigned(64));
                         let pc_inc = emitter.binary_operation(BinaryOperationKind::Add(pc, _4));
-                        emitter.write_register(pc_offset, pc_inc);
+                        emitter.write_register(pc_offset as u64, pc_inc);
 
                         current_pc += 4;
                     }
@@ -198,21 +191,18 @@ impl Device for ModelDevice {
 
                 // inc PC if branch not taken
                 {
-                    let branch_taken_offset = emitter.constant(
+                    let branch_taken = emitter.read_register(
                         self.model.reg_offset("__BranchTaken") as u64,
-                        Type::Unsigned(64),
+                        Type::Unsigned(1),
                     );
-                    let branch_taken =
-                        emitter.read_register(branch_taken_offset, Type::Unsigned(1));
 
                     let _0 = emitter.constant(0, Type::Unsigned(64));
                     let _4 = emitter.constant(4, Type::Unsigned(64));
                     let addend = emitter.select(branch_taken, _0, _4);
 
-                    let pc_offset = emitter.constant(pc_offset as u64, Type::Unsigned(64));
-                    let pc = emitter.read_register(pc_offset.clone(), Type::Unsigned(64));
+                    let pc = emitter.read_register(pc_offset as u64, Type::Unsigned(64));
                     let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
-                    emitter.write_register(pc_offset, new_pc);
+                    emitter.write_register(pc_offset as u64, new_pc);
                 }
 
                 emitter.leave();
@@ -226,8 +216,9 @@ impl Device for ModelDevice {
 
                 log::trace!(
                     "{:x} {}",
-                    *(register_file_ptr.add(self.model.reg_offset("_PC")) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("__BranchTaken")) as *mut u8)
+                    *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("__BranchTaken") as usize)
+                        as *mut u8)
                 );
             }
         }

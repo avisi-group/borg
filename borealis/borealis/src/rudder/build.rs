@@ -88,7 +88,7 @@ struct BuildContext {
 
     /// Register name to type and offset mapping
     registers: HashMap<InternedString, RegisterDescriptor>,
-    next_register_offset: usize,
+    next_register_offset: u64,
 
     /// Functions
     functions: HashMap<InternedString, (Function, boom::FunctionDefinition)>,
@@ -110,7 +110,7 @@ impl BuildContext {
         log::debug!("adding register {name} @ {:x}", self.next_register_offset);
 
         // 8 byte aligned
-        self.next_register_offset += usize::from(typ.width_bytes()).next_multiple_of(8)
+        self.next_register_offset += u64::from(typ.width_bytes()).next_multiple_of(8)
     }
 
     fn add_function(&mut self, name: InternedString, definition: &boom::FunctionDefinition) {
