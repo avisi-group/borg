@@ -409,11 +409,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         let ptr = self.register_file_ptr.add(usize::try_from(offset).unwrap());
 
                         match typ.width() {
-                            1 => u64::from((ptr as *const u8).read()),
-                            8 => u64::from((ptr as *const u8).read()),
-                            16 => u64::from((ptr as *const u16).read()),
-                            32 => u64::from((ptr as *const u32).read()),
-                            64 => u64::from((ptr as *const u64).read()),
+                            1..=8 => u64::from((ptr as *const u8).read()),
+                            9..=16 => u64::from((ptr as *const u16).read()),
+                            17..=32 => u64::from((ptr as *const u32).read()),
+                            33..=64 => u64::from((ptr as *const u64).read()),
                             w => todo!("width {w}"),
                         }
                     };
