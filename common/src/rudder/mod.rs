@@ -7,7 +7,7 @@ use {
         },
         HashMap,
     },
-    alloc::format,
+    alloc::{collections::btree_map::BTreeMap, format},
     core::fmt::{self, Display, Formatter},
     itertools::Itertools,
 };
@@ -20,9 +20,10 @@ pub mod types;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Default)]
 pub struct Model {
-    fns: HashMap<InternedString, Function>,
-    // offset-type pairs, offsets may not be unique? todo: ask tom
+    functions: HashMap<InternedString, Function>,
     registers: HashMap<InternedString, RegisterDescriptor>,
+    // todo: wastes memory when serialized, don't serialize and regenerate when deserializing?
+    registers_by_offset: BTreeMap<u64, InternedString>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -38,19 +39,28 @@ impl Model {
         fns: HashMap<InternedString, Function>,
         registers: HashMap<InternedString, RegisterDescriptor>,
     ) -> Self {
-        Self { fns, registers }
+        let registers_by_offset = registers
+            .iter()
+            .map(|(name, RegisterDescriptor { offset, .. })| (*offset, *name))
+            .collect();
+
+        Self {
+            functions: fns,
+            registers,
+            registers_by_offset,
+        }
     }
 
     pub fn add_function(&mut self, name: InternedString, func: Function) {
-        self.fns.insert(name, func);
+        self.functions.insert(name, func);
     }
 
     pub fn functions(&self) -> &HashMap<InternedString, Function> {
-        &self.fns
+        &self.functions
     }
 
     pub fn functions_mut(&mut self) -> &mut HashMap<InternedString, Function> {
-        &mut self.fns
+        &mut self.functions
     }
 
     pub fn registers(&self) -> &HashMap<InternedString, RegisterDescriptor> {
@@ -70,6 +80,13 @@ impl Model {
             .get(&InternedString::from_static(name))
             .unwrap_or_else(|| panic!("no register found with name {name:?}"))
             .offset
+    }
+
+    pub fn get_register_by_offet(&self, offset: u64) -> Option<InternedString> {
+        self.registers_by_offset
+            .range(..=offset)
+            .map(|(_, name)| *name)
+            .next_back()
     }
 }
 

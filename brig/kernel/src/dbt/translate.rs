@@ -392,17 +392,35 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 StatementResult::Data(None)
             }
             Statement::ReadRegister { typ, offset } => {
-                //    todo!();
-                // todo: if offset refers to a cacheable register, do a memory read of
-                // register_file_ptr and return a emitter.constant, otherwise...
-
                 let offset = match statement_values.get(offset).unwrap().kind() {
                     NodeKind::Constant { value, .. } => *value,
                     k => panic!("can't read non constant offset: {k:#?}"),
                 };
 
+                let name = self
+                    .model
+                    .get_register_by_offet(offset)
+                    .unwrap_or_else(|| panic!("no register found for offset {offset}"));
+
                 let typ = emit_rudder_type(typ);
-                StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
+
+                if self.model.registers().get(&name).unwrap().cacheable {
+                    let value = unsafe {
+                        let ptr = self.register_file_ptr.add(usize::try_from(offset).unwrap());
+
+                        match typ.width() {
+                            1 => u64::from((ptr as *const u8).read()),
+                            8 => u64::from((ptr as *const u8).read()),
+                            16 => u64::from((ptr as *const u16).read()),
+                            32 => u64::from((ptr as *const u32).read()),
+                            64 => u64::from((ptr as *const u64).read()),
+                            w => todo!("width {w}"),
+                        }
+                    };
+                    StatementResult::Data(Some(self.emitter.constant(value, typ)))
+                } else {
+                    StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
+                }
             }
             Statement::WriteRegister { offset, value } => {
                 let offset = match statement_values.get(offset).unwrap().kind() {
