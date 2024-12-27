@@ -189,7 +189,6 @@ BTypeCompatible_BTI
 BTypeCompatible_PACIXSP
 SetBTypeCompatible
 SetBTypeNext
-CheckSPAlignment
 DebugAddrTop
 HaltOnBreakpointOrWatchpoint
 CheckValidStateMatch

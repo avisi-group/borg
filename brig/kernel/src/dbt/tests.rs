@@ -2082,22 +2082,17 @@ fn msr() {
         register_file_ptr,
     );
 
-    log::warn!("finished translate");
-
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
         let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
 
-        let before = *r0;
         *see = -1;
 
         translation.execute(register_file_ptr);
-
-        panic!("{before:x} {:x}", *r0);
+        // todo: test more here
     }
 }
