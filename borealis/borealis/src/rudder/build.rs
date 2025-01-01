@@ -1373,7 +1373,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let start = args[2].clone();
                 let source = args[3].clone();
 
-                let sum = build(
+                let diff = build(
                     self.block,
                     self.block_arena_mut(),
                     Statement::BinaryOperation {
@@ -1387,8 +1387,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block,
                     self.block_arena_mut(),
                     Statement::Constant {
-                        typ: (Type::u64()),
-                        value: ConstantValue::UnsignedInteger(1),
+                        typ: Type::s64(),
+                        value: ConstantValue::SignedInteger(1),
                     },
                 );
 
@@ -1397,7 +1397,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::BinaryOperation {
                         kind: BinaryOperationKind::Add,
-                        lhs: sum,
+                        lhs: diff,
                         rhs: const_1,
                     },
                 );
@@ -2194,6 +2194,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Type::Primitive(PrimitiveType::UnsignedInteger(left_width)),
                 Type::Primitive(PrimitiveType::UnsignedInteger(right_width)),
             ) => {
+                let target_width = left_width + right_width;
+
                 // cast left to width left + right
                 // shift left by width of right
                 // OR in right
@@ -2203,10 +2205,18 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     self.block_arena_mut(),
                     Statement::Cast {
                         kind: CastOperationKind::ZeroExtend,
-                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(
-                            left_width + right_width,
-                        )),
+                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(target_width)),
                         value: left,
+                    },
+                );
+
+                let right_cast = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Cast {
+                        kind: CastOperationKind::ZeroExtend,
+                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(target_width)),
+                        value: right,
                     },
                 );
 
@@ -2235,7 +2245,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::BinaryOperation {
                         kind: BinaryOperationKind::Or,
                         lhs: left_shift,
-                        rhs: right,
+                        rhs: right_cast,
                     },
                 )
             }

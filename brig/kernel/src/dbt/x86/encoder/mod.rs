@@ -560,6 +560,7 @@ pub struct Instruction(pub Opcode);
 macro_rules! alu_op {
     ($gen_name: ident, $opcode: ident) => {
         pub fn $gen_name(src: Operand, dst: Operand) -> Self {
+            assert_eq!(src.width(), dst.width());
             Instruction(Opcode::$opcode(src, dst))
         }
     };

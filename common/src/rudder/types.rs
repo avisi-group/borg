@@ -136,10 +136,6 @@ impl Type {
             }
         )
     }
-
-    pub fn is_compatible_with(&self, other: &Self) -> bool {
-        self == other
-    }
 }
 
 impl Display for Type {

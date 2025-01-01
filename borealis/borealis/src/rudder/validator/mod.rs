@@ -115,11 +115,8 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 
             for s in b.get(f.arena()).statements() {
                 if let Statement::BinaryOperation { lhs, rhs, .. } = s.get(s_arena) {
-                    if !lhs
-                        .get(s_arena)
-                        .typ(s_arena)
-                        .unwrap()
-                        .is_compatible_with(&rhs.get(s_arena).typ(s_arena).unwrap())
+                    if lhs.get(s_arena).typ(s_arena).unwrap()
+                        != rhs.get(s_arena).typ(s_arena).unwrap()
                     {
                         messages.push(ValidationMessage::stmt_err(
                             f.name(),

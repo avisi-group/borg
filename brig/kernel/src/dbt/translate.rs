@@ -257,7 +257,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         // finish translation with current block set to the exit block
         self.emitter.set_current_block(exit_block);
 
-        log::trace!("queue empty, reading return value and exiting");
+        log::debug!("finished translating {:?}", self.function_name);
 
         if function.return_type().is_some() {
             Some(

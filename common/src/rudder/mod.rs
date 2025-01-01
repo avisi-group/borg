@@ -116,7 +116,7 @@ impl Display for Model {
                 .join(", ");
             writeln!(
                 f,
-                "function {}({}) -> {} :",
+                "fn {}({}) -> {} :",
                 name,
                 parameters,
                 maybe_type_to_string(func.return_type())

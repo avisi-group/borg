@@ -170,6 +170,33 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef {
         use BinaryOperationKind::*;
 
+        // todo: re-enable me
+        // match &op {
+        //     Add(lhs, rhs)
+        //     | Sub(lhs, rhs)
+        //     | Multiply(lhs, rhs)
+        //     | Divide(lhs, rhs)
+        //     | Modulo(lhs, rhs)
+        //     | Or(lhs, rhs)
+        //     | Xor(lhs, rhs)
+        //     | And(lhs, rhs)
+        //     | PowI(lhs, rhs)
+        //     | CompareEqual(lhs, rhs)
+        //     | CompareNotEqual(lhs, rhs)
+        //     | CompareLessThan(lhs, rhs)
+        //     | CompareLessThanOrEqual(lhs, rhs)
+        //     | CompareGreaterThan(lhs, rhs)
+        //     | CompareGreaterThanOrEqual(lhs, rhs) => {
+        //         if lhs.typ() != rhs.typ() {
+        //             panic!(
+        //                 "binary operation {op:?} with different types: {:?} {:?}",
+        //                 lhs.typ(),
+        //                 rhs.typ()
+        //             );
+        //         }
+        //     }
+        // }
+
         match &op {
             Add(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
                 (

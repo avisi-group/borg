@@ -2071,7 +2071,6 @@ fn msr() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //  d51be000        msr     cntfrq_el0, x0
-    // todo: instruction takes multiple minutes and GB to translate, fix it
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd51be000, Type::Unsigned(32));
     translate(
@@ -2081,6 +2080,44 @@ fn msr() {
         &mut emitter,
         register_file_ptr,
     );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+
+        *see = -1;
+
+        translation.execute(register_file_ptr);
+        // todo: test more here
+    }
+}
+
+#[ktest]
+fn stp() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  a9bf7bfd        stp     x29, x30, [sp, #-16]!
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xa9bf7bfd, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+    //__DecodeA64_LoadStore
+    // decode_stp_gen_aarch64_instrs_memory_pair_general_pre_idx
+    // execute_aarch64_instrs_memory_pair_general_post_idx
 
     emitter.leave();
 
