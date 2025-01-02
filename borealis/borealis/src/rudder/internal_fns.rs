@@ -3,10 +3,11 @@ use {
     common::{
         intern::InternedString,
         rudder::{
+            self,
             constant_value::ConstantValue,
             function::{Function, Symbol},
             statement::{
-                build, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
+                build, cast, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
             },
             types::Type,
         },
@@ -47,8 +48,8 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
     // }
 
     let bits_symbol = Symbol::new("bits".into(), Type::Bits);
-    let count_symbol = Symbol::new("count".into(), Type::u64());
-    let local_count_symbol = Symbol::new("local_count".into(), Type::u64());
+    let count_symbol = Symbol::new("count".into(), Type::s64());
+    let local_count_symbol = Symbol::new("local_count".into(), Type::s64());
     let result_symbol = Symbol::new("result".into(), Type::Bits);
 
     let mut function = Function::new(
@@ -91,8 +92,8 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             check_block_ref,
             function.arena_mut(),
             Statement::Constant {
-                typ: (Type::u64()),
-                value: ConstantValue::UnsignedInteger(0),
+                typ: Type::s64(),
+                value: ConstantValue::SignedInteger(0),
             },
         );
 
@@ -139,8 +140,8 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             shift_block_ref,
             function.arena_mut(),
             Statement::Constant {
-                typ: (Type::u64()),
-                value: ConstantValue::UnsignedInteger(1),
+                typ: Type::s64(),
+                value: ConstantValue::SignedInteger(1),
             },
         );
 
@@ -180,21 +181,23 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             },
         );
 
+        let result_type = read_result
+            .get(shift_block_ref.get(function.arena()).arena())
+            .typ(shift_block_ref.get(function.arena()).arena())
+            .unwrap();
+        let cast_read_bits = cast(
+            shift_block_ref,
+            function.arena_mut(),
+            read_bits,
+            result_type,
+        );
+
         // get the length of bits, then cast from u8 to bundle
         let len = build(
             shift_block_ref,
             function.arena_mut(),
             Statement::SizeOf {
                 value: read_bits.clone(),
-            },
-        );
-
-        let _8 = build(
-            shift_block_ref,
-            function.arena_mut(),
-            Statement::Constant {
-                typ: (Type::u8()),
-                value: ConstantValue::UnsignedInteger(8),
             },
         );
 
@@ -216,7 +219,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             Statement::BinaryOperation {
                 kind: BinaryOperationKind::Or,
                 lhs: shift_result.clone(),
-                rhs: read_bits.clone(),
+                rhs: cast_read_bits.clone(),
             },
         );
 
@@ -266,7 +269,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             entry_block_ref,
             function.arena_mut(),
             Statement::Constant {
-                typ: (Type::u128()),
+                typ: (Type::u64()),
                 value: ConstantValue::UnsignedInteger(0),
             },
         );
@@ -287,24 +290,18 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             },
         );
 
-        let read_count_cast = build(
+        let read_count_cast = cast(
             entry_block_ref,
             function.arena_mut(),
-            Statement::Cast {
-                kind: CastOperationKind::Truncate,
-                typ: (Type::u16()),
-                value: read_count.clone(),
-            },
+            read_count.clone(),
+            Type::s16(),
         );
 
-        let bits_length_cast = build(
+        let bits_length_cast = cast(
             entry_block_ref,
             function.arena_mut(),
-            Statement::Cast {
-                kind: CastOperationKind::Truncate,
-                typ: (Type::u16()),
-                value: bits_length.clone(),
-            },
+            bits_length.clone(),
+            Type::s16(),
         );
 
         let length = build(
