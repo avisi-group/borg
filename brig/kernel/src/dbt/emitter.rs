@@ -73,7 +73,7 @@ pub trait Emitter {
     fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef;
     fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef);
 
-    // todo: change this to mutate `vector` in place without returning?
+    // returns the vector with the new element
     fn mutate_element(
         &mut self,
         vector: Self::NodeRef,
@@ -89,7 +89,9 @@ pub trait Emitter {
         true_target: Self::BlockRef,
         false_target: Self::BlockRef,
     ) -> BlockResult;
+
     fn jump(&mut self, target: Self::BlockRef) -> BlockResult;
+
     // cleanup and return
     fn leave(&mut self);
 

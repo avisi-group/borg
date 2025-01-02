@@ -6,7 +6,6 @@ use {
     alloc::{collections::BTreeMap, format, string::String, vec::Vec},
     plugins_api::util::parse_hex_prefix,
     serde::{de::Error as _, Deserialize, Deserializer},
-    thiserror_core as thiserror,
 };
 
 #[derive(Debug, thiserror::Error, displaydoc::Display)]

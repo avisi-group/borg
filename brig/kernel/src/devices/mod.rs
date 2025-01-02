@@ -5,7 +5,6 @@ use {
         ops::{Deref, DerefMut},
     },
     spin::{Mutex, MutexGuard},
-    thiserror_core as thiserror,
 };
 
 pub mod acpi;

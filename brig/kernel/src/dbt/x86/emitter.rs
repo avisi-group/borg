@@ -23,6 +23,15 @@ use {
 
 const INVALID_OFFSET: i32 = 0xDEAD00F;
 
+/// X86 emitter error
+#[derive(Debug, thiserror::Error, displaydoc::Display)]
+pub enum X86Error {
+    ///  Left and right types do not match in binary operation: {op:?}
+    BinaryOperationTypeMismatch { op: BinaryOperationKind },
+    /// Register allocation failed
+    RegisterAllocation,
+}
+
 pub struct X86Emitter<'ctx> {
     current_block: Ref<X86Block>,
     current_block_operands: HashMap<X86NodeRef, Operand>,
@@ -188,12 +197,8 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         //     | CompareGreaterThan(lhs, rhs)
         //     | CompareGreaterThanOrEqual(lhs, rhs) => {
         //         if lhs.typ() != rhs.typ() {
-        //             panic!(
-        //                 "binary operation {op:?} with different types: {:?} {:?}",
-        //                 lhs.typ(),
-        //                 rhs.typ()
-        //             );
-        //         }
+        //             return Err(X86Error::BinaryOperationTypeMismatch { op: op.clone()
+        // });         }
         //     }
         // }
 
@@ -1747,7 +1752,7 @@ pub enum NodeKind {
     },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BinaryOperationKind {
     Add(X86NodeRef, X86NodeRef),
     Sub(X86NodeRef, X86NodeRef),

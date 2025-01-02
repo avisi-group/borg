@@ -519,7 +519,12 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     }
                 };
 
-                StatementResult::Data(Some(self.emitter.binary_operation(op)))
+                StatementResult::Data(Some(
+                    self.emitter.binary_operation(op), /* .unwrap_or_else(|e| {
+                                                        *     panic!("{}::{}: {e}",
+                                                        * self.function_name, block.index())
+                                                        * }), */
+                ))
             }
             Statement::TernaryOperation { kind, a, b, c } => {
                 use {

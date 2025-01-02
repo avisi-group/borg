@@ -3,12 +3,9 @@ use {
     common::{
         intern::InternedString,
         rudder::{
-            self,
             constant_value::ConstantValue,
             function::{Function, Symbol},
-            statement::{
-                build, cast, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
-            },
+            statement::{build, cast, BinaryOperationKind, ShiftOperationKind, Statement},
             types::Type,
         },
         HashMap,

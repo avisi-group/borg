@@ -1,7 +1,4 @@
-use {
-    alloc::{string::String, vec::Vec},
-    thiserror_core as thiserror,
-};
+use alloc::{string::String, vec::Vec};
 
 pub mod tar;
 
