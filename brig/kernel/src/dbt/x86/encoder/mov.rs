@@ -554,6 +554,70 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .movzx::<AsmRegister32, AsmRegister8>(dst.into(), src.into())
                 .unwrap();
         }
+        (
+            // todo: fix this earlier in DBT
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            // todo: maybe zero extend src here?
+            assembler
+                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .unwrap();
+        }
+        (
+            // todo: fix this earlier in DBT
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            // no need to write high bits
+            assembler
+                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .unwrap();
+        }
+        (
+            // todo: fix this earlier in DBT
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            // todo: maybe zero extend src here?
+            assembler
+                .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .unwrap();
+        }
+        (
+            // todo: fix this earlier in DBT
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            // don't need to write high bits
+            assembler
+                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .unwrap();
+        }
         _ => todo!("mov {src} {dst}"),
     }
 }

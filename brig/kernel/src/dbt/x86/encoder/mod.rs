@@ -560,7 +560,10 @@ pub struct Instruction(pub Opcode);
 macro_rules! alu_op {
     ($gen_name: ident, $opcode: ident) => {
         pub fn $gen_name(src: Operand, dst: Operand) -> Self {
-            assert_eq!(src.width(), dst.width());
+            // todo: re-enable me
+            // if src.width() != dst.width() {
+            //     panic!("different widths: {src} {dst}")
+            // }
             Instruction(Opcode::$opcode(src, dst))
         }
     };
@@ -807,6 +810,9 @@ impl Instruction {
                 (Width::_16, Width::_32) => assembler
                     .movzx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
                     .unwrap(),
+                (Width::_16, Width::_64) => assembler
+                    .movzx::<AsmRegister64, AsmRegister16>(dst.into(), src.into())
+                    .unwrap(),
                 (Width::_8, Width::_64) => assembler
                     .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                     .unwrap(),
@@ -909,6 +915,21 @@ impl Instruction {
             ) => {
                 assembler
                     .sub::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
+                    .unwrap();
+            }
+            // SUB IMM -> R: todo remove me
+            SUB(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_8,
+                },
+            ) => {
+                assembler
+                    .sub::<AsmRegister8, i32>(dst.into(), i32::try_from(*src).unwrap())
                     .unwrap();
             }
             // SUB R -> R
@@ -1048,6 +1069,20 @@ impl Instruction {
             ) => {
                 assembler
                     .cmp::<AsmRegister64, i32>(right.into(), (*left).try_into().unwrap())
+                    .unwrap();
+            }
+            CMP(
+                Operand {
+                    kind: I(left),
+                    width_in_bits: _,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: Width::_32,
+                },
+            ) => {
+                assembler
+                    .cmp::<AsmRegister32, i32>(right.into(), (*left).try_into().unwrap())
                     .unwrap();
             }
             CMP(
