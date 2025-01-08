@@ -1919,8 +1919,8 @@ fn emit_compare(
 
             emitter.append(Instruction::cmp(left, right));
 
-            // setCC only sets the lowest bit
-
+            // setCC only sets the lowest bit, smallest unit is a byte, so use an 8 bit
+            // destination register
             let dst = Operand::vreg(Width::_8, emitter.next_vreg());
 
             emitter.append(match kind {

@@ -5,7 +5,7 @@ use {
             MachineContext,
         },
         guest::memory::AddressSpaceRegionKind,
-        scheduler,
+        qemu_exit, scheduler,
     },
     alloc::{alloc::alloc_zeroed, collections::BTreeSet},
     core::alloc::Layout,
@@ -21,6 +21,19 @@ use {
         VirtAddr,
     },
 };
+
+/// Print supplied message at `error` level, then exit QEMU
+///
+/// Panicking inside IRQ handler results in infinite loop and clutters log
+/// output
+macro_rules! exit_with_message {
+    ($($arg:tt)*) => {
+        (|| {
+            log::error!($($arg)*);
+            qemu_exit();
+        })()
+    }
+}
 
 static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;
 
@@ -51,14 +64,10 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         PageFaultErrorCode::from_bits(unsafe { (*machine_context).error_code }).unwrap();
 
     if faulting_address <= LOW_HALF_CANONICAL_END {
-        //  log::trace!("GUEST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
-
         let exec_ctx = crate::guest::GuestExecutionContext::current();
         let addrspace = unsafe { &*exec_ctx.current_address_space };
 
         if let Some(rgn) = addrspace.find_region(faulting_address.as_u64()) {
-            //log::trace!("located region {}", rgn);
-
             match rgn.kind() {
                 AddressSpaceRegionKind::Ram => {
                     let faulting_page = faulting_address.align_down(0x1000u64);
@@ -67,8 +76,6 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                     })
                     .to_phys();
 
-                    // log::trace!("mapping va={:x} to pa={:x}", faulting_page, backing_page);
-
                     VirtualMemoryArea::current().map_page(
                         Page::<Size4KiB>::from_start_address(faulting_page).unwrap(),
                         PhysFrame::from_start_address(backing_page).unwrap(),
@@ -76,14 +83,14 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                     );
                 }
                 _ => {
-                    panic!("cannot alloc non-ram @ {faulting_address:x?}");
+                    exit_with_message!("cannot alloc non-ram @ {faulting_address:x?}");
                 }
             }
         } else {
-            panic!("GUEST PAGE FAULT code {error_code:?} @ {faulting_address:x?}: no region -- this is a real fault");
+            exit_with_message!("GUEST PAGE FAULT code {error_code:?} @ {faulting_address:x?}: no region -- this is a real fault");
         }
     } else {
-        panic!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
+        exit_with_message!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
     }
 }
 
@@ -96,10 +103,6 @@ pub fn init() {
 
         IRQ_MANAGER.get_mut().unwrap().init_default();
     }
-
-    //IRQ_MANAGER.init_default();
-
-    //    IRQ_MANAGER.get().unwrap().load();
 }
 
 #[derive(Debug)]
@@ -205,18 +208,20 @@ fn gpf_exception(machine_context: *mut MachineContext) {
 
 #[irq_handler(with_code = true)]
 fn dbt_handler_undefined_terminator(_machine_context: *mut MachineContext) {
-    panic!("DBT interrupt: undefined terminator")
+    exit_with_message!("DBT interrupt: undefined terminator")
 }
 
 #[irq_handler(with_code = true)]
 fn dbt_handler_default_terminator(_machine_context: *mut MachineContext) {
-    panic!("DBT interrupt: default terminator")
+    exit_with_message!("DBT interrupt: default terminator")
 }
+
 #[irq_handler(with_code = true)]
 fn dbt_handler_const_assert(_machine_context: *mut MachineContext) {
-    panic!("DBT interrupt: const assert")
+    exit_with_message!("DBT interrupt: const assert")
 }
+
 #[irq_handler(with_code = true)]
 fn dbt_handler_panic(_machine_context: *mut MachineContext) {
-    panic!("DBT interrupt: panic")
+    exit_with_message!("DBT interrupt: panic")
 }
