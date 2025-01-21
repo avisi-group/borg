@@ -14,6 +14,7 @@ use {
         },
         Translation,
     },
+    alloc::boxed::Box,
     common::{mask::mask, HashMap},
     proc_macro_lib::ktest,
 };
@@ -931,7 +932,8 @@ fn fibonacci_block() {
 
     unsafe {
         assert_eq!(
-            1298777728820984005,
+            3736710778780434371, /* used to be 1298777728820984005 but 3736710778780434371 is
+                                  * correct (verified with normal Rust fib program) */
             *(register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64)
         );
         assert_eq!(
@@ -2125,11 +2127,20 @@ fn stp() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
+        let dst = Box::<(u64, u64)>::new((0, 0));
+
         let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        let x29 = register_file_ptr.add(model.reg_offset("R29") as usize) as *mut u64;
+        let x30 = register_file_ptr.add(model.reg_offset("R30") as usize) as *mut u64;
+        let sp = register_file_ptr.add(model.reg_offset("SP_EL3") as usize) as *mut u64;
 
         *see = -1;
+        *x29 = 0xFEED;
+        *x30 = 0xDEAD;
+        *sp = (((&*dst) as *const (u64, u64)) as u64) + 16;
 
         translation.execute(register_file_ptr);
-        // todo: test more here
+
+        assert_eq!(*dst, (0xFEED, 0xDEAD));
     }
 }
