@@ -932,8 +932,9 @@ fn fibonacci_block() {
 
     unsafe {
         assert_eq!(
-            3736710778780434371, /* used to be 1298777728820984005 but 3736710778780434371 is
-                                  * correct (verified with normal Rust fib program) */
+            1298777728820984005, /* technically this is fib 101, fib 100 = 3736710778780434371,
+                                  * but this depends whether you treat x0 or x1 as the final
+                                  * result */
             *(register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64)
         );
         assert_eq!(

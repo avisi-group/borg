@@ -20,21 +20,21 @@ virtio-drivers = { version = "0.7.5", features = ["alloc"] }
 spin = "0.9.8"
 buddy_system_allocator = "0.11.0"
 byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
-log = { version = "0.4.22", default-features = false }
+log = { version = "0.4.25", default-features = false }
 elf = { version = "0.7.4", default-features = false }
 rustc-demangle = { version = "0.1.24", default-features = false }
 serde = { version = "1.0.217", default-features = false, features = [
     "derive",
     "alloc",
 ] }
-serde_json = { version = "1.0.134", default-features = false, features = [
+serde_json = { version = "1.0.137", default-features = false, features = [
     "alloc",
 ] }
-phf = { version = "0.11.2", default-features = false, features = ["macros"] }
+phf = { version = "0.11.3", default-features = false, features = ["macros"] }
 tar-no-std = { version = "0.3.2", features = ["alloc"] }
-thiserror = { version = "2.0.9", default-features = false }
+thiserror = { version = "2.0.11", default-features = false }
 displaydoc = { version = "0.2.5", default-features = false }
-uuid = { version = "1.11.0", default-features = false }
+uuid = { version = "1.12.1", default-features = false }
 fastrand = { version = "2.3.0", default-features = false, features = ["alloc"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 byteorder = { version = "1.5.0", default-features = false }
