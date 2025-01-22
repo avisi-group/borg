@@ -1871,12 +1871,20 @@ impl X86Block {
             .for_each(|i| allocator.process(i));
     }
 
-    pub fn instructions(&self) -> Vec<Instruction> {
-        self.instructions.clone()
+    pub fn instructions(&self) -> &[Instruction] {
+        &self.instructions
+    }
+
+    pub fn instructions_mut(&mut self) -> &mut [Instruction] {
+        &mut self.instructions
     }
 
     pub fn next_blocks(&self) -> &[Ref<X86Block>] {
         &self.next
+    }
+
+    pub fn clear_next_blocks(&mut self) {
+        self.next.clear();
     }
 
     pub fn push_next(&mut self, target: Ref<X86Block>) {

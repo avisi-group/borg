@@ -873,8 +873,7 @@ fn fibonacci_block() {
             let mut emitter = X86Emitter::new(&mut ctx);
 
             loop {
-                let neg1 = emitter.constant(-1i32 as u64, Type::Signed(64));
-                emitter.write_register(model.reg_offset("SEE"), neg1);
+                *(register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64) = -1;
 
                 let _false = emitter.constant(0 as u64, Type::Unsigned(1));
                 emitter.write_register(model.reg_offset("__BranchTaken"), _false);

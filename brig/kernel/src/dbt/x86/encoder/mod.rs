@@ -314,7 +314,7 @@ impl From<PhysicalRegister> for AsmRegister32 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum SegmentRegister {
     /// fs
     FS,
@@ -369,7 +369,7 @@ impl Into<i32> for MemoryScale {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum OperandKind {
     Immediate(u64),
     Memory {
@@ -448,7 +448,7 @@ impl Debug for OperandKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Operand {
     kind: OperandKind,
     width_in_bits: Width,

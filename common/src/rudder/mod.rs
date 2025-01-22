@@ -100,7 +100,7 @@ impl Display for Model {
             .into_iter()
             .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
         {
-            writeln!(f, "register {name}: {reg:?}")?;
+            writeln!(f, "register {name}: {reg:x?}")?;
         }
 
         writeln!(f)?;

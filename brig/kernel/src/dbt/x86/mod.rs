@@ -137,16 +137,17 @@ impl X86TranslationContext {
         work_queue.push_back(self.initial_block());
         work_queue.push_back(self.panic_block());
 
-        while let Some(next) = work_queue.pop_front() {
-            if !next.get(self.arena()).is_linked() {
-                next.get_mut(self.arena_mut()).set_linked();
+        while let Some(block) = work_queue.pop_front() {
+            if !block.get(self.arena()).is_linked() {
+                block.get_mut(self.arena_mut()).set_linked();
 
-                if let Some(label) = label_map.insert(next, assembler.create_label()) {
-                    panic!("created label for {next:?} but label {label:?} already existed")
+                if let Some(label) = label_map.insert(block, assembler.create_label()) {
+                    panic!("created label for {block:?} but label {label:?} already existed")
                 }
-                all_blocks.push_back(next);
+                all_blocks.push_back(block);
 
-                for block in next.get(self.arena()).next_blocks() {
+                empty_block_jump_threading(self.arena_mut(), block);
+                for block in block.get(self.arena()).next_blocks() {
                     work_queue.push_back(*block);
                 }
             }
@@ -260,6 +261,35 @@ fn link_visit(
             sorted_blocks.push_front(block);
 
             true
+        }
+    }
+}
+
+fn empty_block_jump_threading(arena: &mut Arena<X86Block>, current_block: Ref<X86Block>) {
+    // if the current block only has one target
+    if let [child] = current_block.get(arena).next_blocks() {
+        // and that target only has a single instruction (a jump)
+        if let [Instruction(Opcode::JMP(op))] = child.get(arena).instructions() {
+            let op = *op;
+
+            // replace the jump in the current block with the jump of the child
+            *current_block
+                .get_mut(arena)
+                .instructions_mut()
+                .last_mut()
+                .unwrap() = Instruction(Opcode::JMP(op));
+
+            let OperandKind::Target(grandchild) = op.kind() else {
+                unreachable!();
+            };
+
+            // replace the child block in the current block's "next blocks" with the
+            // grandchild block
+            current_block.get_mut(arena).clear_next_blocks();
+            current_block.get_mut(arena).push_next(*grandchild);
+
+            // recurse
+            empty_block_jump_threading(arena, current_block);
         }
     }
 }

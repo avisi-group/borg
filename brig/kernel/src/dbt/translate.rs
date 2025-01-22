@@ -321,6 +321,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         function: &Function,
         arena: &Arena<Statement>,
     ) -> StatementResult {
+        log::debug!("translate stmt: {statement:?}");
+
         match statement {
             Statement::Constant { typ, value } => {
                 let typ = emit_rudder_constant_type(value, typ);
@@ -368,7 +370,11 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     if let LocalVariable::Virtual { .. } =
                         self.variables.get(&symbol.name()).unwrap()
                     {
-                        log::trace!("upgrading {:?} from virtual to stack", symbol.name());
+                        log::trace!(
+                            "promoting {:?} from virtual to stack @ {}",
+                            symbol.name(),
+                            self.current_stack_offset
+                        );
                         self.variables.insert(
                             symbol.name(),
                             LocalVariable::Stack {
