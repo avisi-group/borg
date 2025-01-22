@@ -1820,9 +1820,18 @@ pub enum ShiftOperationKind {
     RotateLeft,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum X86BlockMark {
+    None,
+    Temporary,
+    Permanent,
+}
+
 pub struct X86Block {
     instructions: Vec<Instruction>,
     next: Vec<Ref<X86Block>>,
+    linked: bool,
+    mark: X86BlockMark,
 }
 
 impl X86Block {
@@ -1830,7 +1839,25 @@ impl X86Block {
         Self {
             instructions: alloc::vec![],
             next: alloc::vec![],
+            linked: false,
+            mark: X86BlockMark::None,
         }
+    }
+
+    pub fn set_linked(&mut self) {
+        self.linked = true;
+    }
+
+    pub fn is_linked(&self) -> bool {
+        self.linked
+    }
+
+    pub fn set_mark(&mut self, mark: X86BlockMark) {
+        self.mark = mark;
+    }
+
+    pub fn get_mark(&self) -> X86BlockMark {
+        self.mark
     }
 
     pub fn append(&mut self, instruction: Instruction) {

@@ -824,6 +824,7 @@ fn mem_load() {
     }
 }
 
+/// failing due to cached SEE
 #[ktest]
 fn fibonacci_block() {
     let model = models::get("aarch64").unwrap();
@@ -872,7 +873,7 @@ fn fibonacci_block() {
             let mut emitter = X86Emitter::new(&mut ctx);
 
             loop {
-                let neg1 = emitter.constant(-1i32 as u64, Type::Signed(32));
+                let neg1 = emitter.constant(-1i32 as u64, Type::Signed(64));
                 emitter.write_register(model.reg_offset("SEE"), neg1);
 
                 let _false = emitter.constant(0 as u64, Type::Unsigned(1));
@@ -2193,6 +2194,12 @@ fn ldrsw() {
     let translation = ctx.compile(num_regs);
 
     log::trace!("executing");
+
+    log::trace!(
+        "{:p} {:x}",
+        translation.code.as_ptr(),
+        translation.code.len()
+    );
 
     unsafe {
         let src = Box::<u32>::new(0x8001_0000); // negative signed 32-bit int

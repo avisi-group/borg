@@ -4,13 +4,14 @@ use {
         dbt::{
             emitter::Emitter,
             x86::{
-                emitter::{X86Block, X86Emitter, X86SymbolRef},
+                emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
+                encoder::{Instruction, Opcode, Operand, OperandKind},
                 register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
             },
             Translation,
         },
     },
-    alloc::{rc::Rc, vec::Vec},
+    alloc::{collections::VecDeque, rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
         HashMap, HashSet,
@@ -126,68 +127,71 @@ impl X86TranslationContext {
     }
 
     pub fn compile(mut self, num_virtual_registers: usize) -> Translation {
-        log::debug!("{self:?}");
-
         self.allocate_registers(SolidStateRegisterAllocator::new(num_virtual_registers));
 
         let mut assembler = CodeAssembler::new(64).unwrap();
         let mut label_map = HashMap::default();
-        let mut visited = HashSet::default();
-        let mut to_visit = alloc::vec![];
 
-        {
-            let panic_label = assembler.create_label();
-            log::trace!("panic_block ({panic_label:?}) {:?}", self.panic_block());
-            label_map.insert(self.panic_block(), panic_label);
-            to_visit.push(self.panic_block())
-        }
+        let mut all_blocks = VecDeque::new();
+        let mut work_queue = VecDeque::new();
+        work_queue.push_back(self.initial_block());
+        work_queue.push_back(self.panic_block());
 
-        {
-            let initial_label = assembler.create_label();
-            log::trace!(
-                "initial_block ({initial_label:?}) {:?}",
-                self.initial_block()
-            );
-            label_map.insert(self.initial_block(), initial_label);
-            to_visit.push(self.initial_block())
-        }
+        while let Some(next) = work_queue.pop_front() {
+            if !next.get(self.arena()).is_linked() {
+                next.get_mut(self.arena_mut()).set_linked();
 
-        while let Some(next) = to_visit.pop() {
-            log::trace!("assembling {next:?}:");
+                if let Some(label) = label_map.insert(next, assembler.create_label()) {
+                    panic!("created label for {next:?} but label {label:?} already existed")
+                }
+                all_blocks.push_back(next);
 
-            if !visited.insert(next.clone()) {
-                // already visited
-                continue;
+                for block in next.get(self.arena()).next_blocks() {
+                    work_queue.push_back(*block);
+                }
             }
+        }
 
-            next.get(self.arena())
-                .next_blocks()
-                .iter()
-                .filter(|next| !visited.contains(*next))
-                .copied()
-                .for_each(|next| {
-                    let label = assembler.create_label();
-                    log::trace!("next: {label:?}");
-                    label_map.insert(next, label);
-                    to_visit.push(next);
-                });
-
-            // lower block
+        for (i, block) in all_blocks.iter().enumerate() {
             assembler
-                .set_label(label_map.get_mut(&next).unwrap())
+                .set_label(label_map.get_mut(block).unwrap())
                 .unwrap_or_else(|e| {
                     panic!(
-                        "{e}: label {:?} for block {next:?} re-used",
-                        label_map.get_mut(&next).unwrap()
+                        "{e}: label already set OR label {:?} for block {block:?} re-used",
+                        label_map.get_mut(block).unwrap()
                     )
                 });
             assembler
-                .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + next.index()))
+                .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + block.index()))
                 .unwrap();
-            for instr in next.get(self.arena()).instructions() {
+
+            let instrs = block.get(self.arena()).instructions();
+
+            let (last, rest) = instrs.split_last().unwrap();
+
+            // all but last
+            for instr in rest {
                 log::debug!("\t{instr}");
                 instr.encode(&mut assembler, &label_map);
             }
+
+            assert!(matches!(
+                last,
+                Instruction(Opcode::JMP(_) | Opcode::INT(_) | Opcode::RET)
+            ));
+
+            // fallthrough jump optimization
+            if let Instruction(Opcode::JMP(op)) = last {
+                if let OperandKind::Target(target) = op.kind() {
+                    if all_blocks.get(i + 1).copied() == Some(*target) {
+                        // do not emit jump
+                        continue;
+                    }
+                }
+            }
+
+            log::debug!("\t{last}");
+            last.encode(&mut assembler, &label_map);
         }
 
         // todo fix unnecessary allocation and byte copy, might require passing
@@ -225,5 +229,37 @@ impl X86TranslationContext {
 
     pub fn pc_offset(&self) -> u64 {
         self.pc_offset
+    }
+}
+
+fn link_visit(
+    block: Ref<X86Block>,
+    arena: &mut Arena<X86Block>,
+    sorted_blocks: &mut VecDeque<Ref<X86Block>>,
+) -> bool {
+    match block.get(arena).get_mark() {
+        X86BlockMark::Permanent => true,
+        X86BlockMark::Temporary => false,
+        X86BlockMark::None => {
+            block.get_mut(arena).set_mark(X86BlockMark::Temporary);
+
+            for next_block in block
+                .get(arena)
+                .next_blocks()
+                .iter()
+                .copied()
+                .collect::<Vec<_>>()
+            {
+                if !link_visit(next_block, arena, sorted_blocks) {
+                    return false;
+                }
+            }
+
+            block.get_mut(arena).set_mark(X86BlockMark::Permanent);
+
+            sorted_blocks.push_front(block);
+
+            true
+        }
     }
 }
