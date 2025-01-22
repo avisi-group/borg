@@ -80,6 +80,10 @@ struct FunctionTranslator<'m, 'e, 'c> {
 
     /// Function local variables
     variables: HashMap<InternedString, LocalVariable>,
+    // /// Originally-virtual local variables which were written to in a dynamic
+    // /// block once; if we write to them again in a different dynamic block, it
+    // /// must be promoted to a stack variable
+    // potential_stack_variables: HashMap<InternedString, (Ref<Block>, Ref<Statement>)>,
     /// Stack offset used to allocate stack variables
     current_stack_offset: usize,
 
@@ -107,6 +111,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             x86_blocks: HashMap::default(),
             rudder_blocks: HashMap::default(),
             variables: HashMap::default(),
+
             current_stack_offset,
             emitter,
             register_file_ptr,
@@ -416,6 +421,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                             w => todo!("width {w}"),
                         }
                     };
+                    log::warn!("read from cacheable {name:?}: {value:x}");
                     StatementResult::Data(Some(self.emitter.constant(value, typ)))
                 } else {
                     StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
@@ -427,7 +433,38 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     k => panic!("can't write non constant offset: {k:#?}"),
                 };
 
+                let name = self
+                    .model
+                    .get_register_by_offet(offset)
+                    .unwrap_or_else(|| panic!("no register found for offset {offset}"));
+
                 let value = statement_values.get(value).unwrap().clone();
+
+                // if cacheable and writing a constant, update the register file during
+                // translation
+                if self.model.registers().get(&name).unwrap().cacheable {
+                    log::warn!("attempting write to cacheable {name:?}: {value:?}");
+                    if let NodeKind::Constant { value, width } = value.kind() {
+                        unsafe {
+                            let ptr = self.register_file_ptr.add(usize::try_from(offset).unwrap());
+
+                            match width {
+                                1..=8 => (ptr as *mut u8).write(*value as u8),
+                                9..=16 => (ptr as *mut u16).write(*value as u16),
+                                17..=32 => (ptr as *mut u32).write(*value as u32),
+                                33..=64 => (ptr as *mut u64).write(*value),
+                                w => todo!("width {w}"),
+                            }
+                        };
+
+                        log::warn!("wrote to cacheable {name:?}: {value:x}");
+
+                        return StatementResult::Data(None);
+                    }
+                }
+
+                // otherwise emit a write register that will mutate the register file during
+                // execution
                 self.emitter.write_register(offset, value);
                 StatementResult::Data(None)
             }
@@ -436,7 +473,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let size = statement_values.get(size).unwrap().clone();
 
                 let NodeKind::Constant { value, .. } = size.kind() else {
-                    todo!()
+                    panic!("expected constant got {:#?}", size.kind());
                 };
 
                 let typ = match value {

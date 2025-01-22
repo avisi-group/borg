@@ -2146,3 +2146,60 @@ fn stp() {
         assert_eq!(*dst, (0xFEED, 0xDEAD));
     }
 }
+
+#[ktest]
+fn ldrsw() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    log::trace!("translating");
+
+    //  b9802fe0        ldrsw   x0, [sp, #44]
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xb9802fe0, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    // DEBUG [kernel::dbt::translate] translating "__DecodeA64_LoadStore"
+    // DEBUG [kernel::dbt::translate] translating
+    // "decode_ldrsw_imm_aarch64_instrs_memory_single_general_immediate_unsigned"
+    // DEBUG [kernel::dbt::translate] translating
+    // "execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx"
+
+    emitter.leave();
+
+    log::trace!("compiling");
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    log::trace!("executing");
+
+    unsafe {
+        let src = Box::<u32>::new(0x8001_0000); // negative signed 32-bit int
+
+        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+        let sp = register_file_ptr.add(model.reg_offset("SP_EL3") as usize) as *mut u64;
+
+        *x0 = 0xDEAD;
+        *sp = (((&*src) as *const u32) as u64) - 44;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*x0, 0xffff_ffff_8001_0000);
+    }
+}

@@ -102,6 +102,7 @@ impl BuildContext {
                 || name.as_ref().ends_with("EL0")
                 || name.as_ref().ends_with("EL1")
                 || name.as_ref().ends_with("EL2")
+                || name.as_ref() == "SEE"
         }
 
         self.registers.insert(

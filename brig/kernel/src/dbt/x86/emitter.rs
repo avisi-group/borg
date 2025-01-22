@@ -417,7 +417,20 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 ) => Self::NodeRef::from(X86Node {
                     typ: left.typ().clone(),
                     kind: NodeKind::Constant {
-                        value: if left_value < right_value { 1 } else { 0 },
+                        value: if let Type::Signed(_) = left.typ() {
+                            // todo: this is broken if signed size != 64
+                            if (*left_value as i64) < (*right_value as i64) {
+                                1
+                            } else {
+                                0
+                            }
+                        } else {
+                            if left_value < right_value {
+                                1
+                            } else {
+                                0
+                            }
+                        },
                         width: 1,
                     },
                 }),
