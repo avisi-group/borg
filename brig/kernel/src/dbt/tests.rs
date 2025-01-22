@@ -886,7 +886,8 @@ fn fibonacci_block() {
                     );
                 }
 
-                if emitter.ctx().get_write_pc() || (current_pc == ((program.len() * 4) - 8) as u64)
+                if emitter.ctx().get_pc_write_flag()
+                    || (current_pc == ((program.len() * 4) - 8) as u64)
                 {
                     break;
                 } else {

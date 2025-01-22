@@ -122,7 +122,7 @@ version = "0.0.0"
 dependencies = [
  "deepsize",
  "hashbrown 0.15.2",
- "itertools",
+ "itertools 0.14.0",
  "lasso",
  "log",
  "num-rational",
@@ -286,6 +286,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -309,7 +318,7 @@ dependencies = [
  "fastrand",
  "hex",
  "iced-x86",
- "itertools",
+ "itertools 0.13.0",
  "linkme",
  "log",
  "num-rational",

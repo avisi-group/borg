@@ -213,11 +213,13 @@ impl X86TranslationContext {
         X86SymbolRef(Rc::new(RefCell::new(None)))
     }
 
-    pub fn set_write_pc(&mut self) {
+    /// Sets the "PC was written to" flag
+    pub fn set_pc_write_flag(&mut self) {
         self.writes_to_pc = true;
     }
 
-    pub fn get_write_pc(&self) -> bool {
+    /// Gets the value of the "PC was written to" flag
+    pub fn get_pc_write_flag(&self) -> bool {
         self.writes_to_pc
     }
 

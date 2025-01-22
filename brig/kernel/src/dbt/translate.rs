@@ -457,7 +457,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
             Statement::ReadPc => todo!(),
             Statement::WritePc { value } => {
-                self.emitter.ctx().set_write_pc();
+                self.emitter.ctx().set_pc_write_flag();
 
                 let offset = self.emitter.ctx().pc_offset() as u64;
                 let value = statement_values.get(value).unwrap().clone();
