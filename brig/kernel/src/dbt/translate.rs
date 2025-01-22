@@ -421,7 +421,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                             w => todo!("width {w}"),
                         }
                     };
-                    log::warn!("read from cacheable {name:?}: {value:x}");
+                    log::trace!("read from cacheable {name:?}: {value:x}");
                     StatementResult::Data(Some(self.emitter.constant(value, typ)))
                 } else {
                     StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
@@ -443,7 +443,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 // if cacheable and writing a constant, update the register file during
                 // translation
                 if self.model.registers().get(&name).unwrap().cacheable {
-                    log::warn!("attempting write to cacheable {name:?}: {value:?}");
+                    log::trace!("attempting write to cacheable {name:?}: {value:?}");
                     if let NodeKind::Constant { value, width } = value.kind() {
                         unsafe {
                             let ptr = self.register_file_ptr.add(usize::try_from(offset).unwrap());
@@ -457,7 +457,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                             }
                         };
 
-                        log::warn!("wrote to cacheable {name:?}: {value:x}");
+                        log::trace!("wrote to cacheable {name:?}: {value:x}");
 
                         return StatementResult::Data(None);
                     }

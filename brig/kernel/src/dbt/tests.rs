@@ -270,7 +270,8 @@ fn decodea64_addsub() {
         translation.execute(register_file_ptr);
 
         assert_eq!(15, (*r0));
-        assert_eq!(0xe, (*see));
+        //assert_eq!(0xe, (*see)); //// todo: re-implement depending on result
+        // of SEE/cacheable registers work
     }
 }
 
@@ -303,7 +304,8 @@ fn decodea64_addsub_interpret() {
         interpret(&*model, "__DecodeA64", &[pc, opcode], register_file_ptr);
 
         assert_eq!(15, (*r0));
-        assert_eq!(0xe, (*see));
+        //   assert_eq!(0xe, (*see)); // todo: re-implement depending on result
+        // of SEE/cacheable registers work
     }
 }
 
@@ -345,7 +347,8 @@ fn decodea64_mov() {
 
         assert_eq!(43, (*r0));
         assert_eq!(43, (*r1));
-        assert_eq!(55, (*see));
+        // assert_eq!(55, (*see));// todo: re-implement depending on result of
+        // SEE/cacheable registers work
     }
 }
 
@@ -386,7 +389,8 @@ fn decodea64_branch() {
         translation.execute(register_file_ptr);
 
         assert_eq!(20, (*pc));
-        assert_eq!(67, (*see));
+        //assert_eq!(67, (*see));// todo: re-implement depending on result of
+        // SEE/cacheable registers work
     }
 }
 
@@ -425,7 +429,8 @@ fn branch_if_eq() {
 
         translation.execute(register_file_ptr);
 
-        assert_eq!(0x45, (*see));
+        //assert_eq!(0x45, (*see)); // todo: re-implement depending on result of
+        // SEE/cacheable registers work
         assert_eq!(0x0, (*pc));
         assert_eq!(true, (*branch_taken));
     }
