@@ -7,6 +7,8 @@ use {
     spin::Once,
 };
 
+const ENABLE_COLORS: bool = true;
+
 /*struct QemuWriter;
 
 impl fmt::Write for QemuWriter {
@@ -94,24 +96,43 @@ impl<const N: usize> Log for Logger<N> {
             record.module_path().unwrap_or_default()
         };
 
-        crate::println!(
-            "{} \x1b[0;30m[{}]\x1b[0m {}",
-            format_level(record.level()),
-            target,
-            record.args()
-        );
+        if ENABLE_COLORS {
+            crate::println!(
+                "{} \x1b[0;30m[{}]\x1b[0m {}",
+                format_level(record.level()),
+                target,
+                record.args()
+            );
+        } else {
+            crate::println!(
+                "{} [{}] {}",
+                format_level(record.level()),
+                target,
+                record.args()
+            );
+        }
     }
 
     fn flush(&self) {}
 }
 
 fn format_level(level: Level) -> &'static str {
-    match level {
-        Level::Trace => "\x1b[0;35mTRACE\x1b[0m",
-        Level::Debug => "\x1b[0;34mDEBUG\x1b[0m",
-        Level::Info => "\x1b[0;32mINFO \x1b[0m",
-        Level::Warn => "\x1b[0;33mWARN \x1b[0m",
-        Level::Error => "\x1b[0;31mERROR\x1b[0m",
+    if ENABLE_COLORS {
+        match level {
+            Level::Trace => "\x1b[0;35mTRACE\x1b[0m",
+            Level::Debug => "\x1b[0;34mDEBUG\x1b[0m",
+            Level::Info => "\x1b[0;32mINFO \x1b[0m",
+            Level::Warn => "\x1b[0;33mWARN \x1b[0m",
+            Level::Error => "\x1b[0;31mERROR\x1b[0m",
+        }
+    } else {
+        match level {
+            Level::Trace => "TRACE",
+            Level::Debug => "DEBUG",
+            Level::Info => "INFO ",
+            Level::Warn => "WARN ",
+            Level::Error => "ERROR",
+        }
     }
 }
 
