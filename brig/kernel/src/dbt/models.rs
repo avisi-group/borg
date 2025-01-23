@@ -3,6 +3,7 @@ use {
         dbt::{
             emitter::{Emitter, Type},
             init_register_file,
+            interpret::{interpret, Value},
             translate::translate,
             x86::{
                 emitter::{BinaryOperationKind, X86Emitter},
@@ -139,6 +140,34 @@ impl ModelDevice {
     fn new(name: String, model: Arc<Model>, initial_pc: u64) -> Self {
         let mut register_file = init_register_file(&*model);
 
+        // interpret(
+        //     &model,
+        //     "__SetConfig",
+        //     &[
+        //         Value::String("cpu.cpu0.RVBAR".into()),
+        //         Value::UnsignedInteger {
+        //             value: 0x8000_0000,
+        //             width: 64,
+        //         },
+        //     ],
+        //     register_file.as_mut_ptr(),
+        // );
+        // interpret(
+        //     &model,
+        //     "__SetConfig",
+        //     &[
+        //         Value::String("cpu.has_tlb".into()),
+        //         Value::UnsignedInteger {
+        //             value: 0x0,
+        //             width: 64,
+        //         },
+        //     ],
+        //     register_file.as_mut_ptr(),
+        // );
+        // // from boot.sh command line args to `armv9` binary
+        // u__SetConfig(&mut state, &NoopTracer, "cpu.cpu0.RVBAR", 0x8000_0000);
+        // u__SetConfig(&mut state, &NoopTracer, "cpu.has_tlb", 0x0);
+
         unsafe {
             *(register_file
                 .as_mut_ptr()
@@ -248,12 +277,11 @@ impl ModelDevice {
 
         loop {
             unsafe {
+                // reset SEE
+                *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
+
                 let mut ctx = X86TranslationContext::new(self.model.reg_offset("_PC"));
                 let mut emitter = X86Emitter::new(&mut ctx);
-
-                // reset SEE
-                let neg1 = emitter.constant(-1i32 as u64, Type::Signed(32));
-                emitter.write_register(self.model.reg_offset("SEE") as u64, neg1);
 
                 // reset BranchTaken
                 let _false = emitter.constant(0 as u64, Type::Unsigned(1));
@@ -303,10 +331,12 @@ impl ModelDevice {
                 translation.execute(register_file_ptr);
 
                 log::trace!(
-                    "{:x} {}",
+                    "{:x} {} {:x} {:x}",
                     *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("__BranchTaken") as usize)
-                        as *mut u8)
+                        as *mut u8),
+                    *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64)
                 );
             }
         }

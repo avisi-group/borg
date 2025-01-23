@@ -882,7 +882,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
         let mem = Operand::mem_base_displ(
             value.width(),
-            Register::PhysicalRegister(PhysicalRegister::RSP),
+            Register::PhysicalRegister(PhysicalRegister::R14),
             -(i32::try_from(offset).unwrap()),
         );
 
@@ -1207,7 +1207,7 @@ impl X86NodeRef {
                 emitter.append(Instruction::mov(
                     Operand::mem_base_displ(
                         width,
-                        Register::PhysicalRegister(PhysicalRegister::RSP),
+                        Register::PhysicalRegister(PhysicalRegister::R14),
                         -(i32::try_from(*offset).unwrap()),
                     ),
                     dst.clone(),

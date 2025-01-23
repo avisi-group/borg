@@ -108,73 +108,24 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
 
                     true
                 }
-                /*(
-                    Statement::Bundle {
-                        value: lv,
-                        length: ll,
-                    },
-                    Statement::Bundle {
-                        value: rv,
-                        length: rl,
-                    },
-                ) => {
-                    let (
-                        Statement::Constant {
-                            typ: lvt,
-                            value: lvv,
-                        },
-                        Statement::Constant {
-                            typ: llt,
-                            value: llv,
-                        },
-                        Statement::Constant {
-                            typ: rvt,
-                            value: rvv,
-                        },
-                        Statement::Constant {
-                            typ: rlt,
-                            value: rlv,
-                        },
-                    ) = (lv, ll, rv, rl)
-                    else {
-                        return false;
-                    };
-
-                    if llv != rlv {
-                        return false;
-                    }
-
-                    trace!("maybe foldable with two bundles");
-
-                    // replace this statement with a constant bundle
-                    // _get_HFGRTR_EL2_Type_SCTLR_EL1
-
-                    let cv = match kind {
-                        BinaryOperationKind::Add => lvv + rvv,
-                        BinaryOperationKind::Sub => lvv - rvv,
-                        BinaryOperationKind::Multiply => {
-                            return false;
+                (lhs, Statement::Constant { value: rhs, .. }) => match kind {
+                    BinaryOperationKind::Multiply => match rhs {
+                        ConstantValue::UnsignedInteger(rhs_value) => {
+                            if rhs_value == 8 {
+                                //stmt.get_mut(arena).replace_kind(Statement::ShiftOperation { kind: (), value: (), amount: () });
+                                false
+                            } else {
+                                false
+                            }
                         }
-                        BinaryOperationKind::Divide => todo!(),
-                        BinaryOperationKind::Modulo => todo!(),
-                        BinaryOperationKind::And => todo!(),
-                        BinaryOperationKind::Or => todo!(),
-                        BinaryOperationKind::Xor => todo!(),
-                        BinaryOperationKind::CompareEqual => todo!(),
-                        BinaryOperationKind::CompareNotEqual => todo!(),
-                        BinaryOperationKind::CompareLessThan => todo!(),
-                        BinaryOperationKind::CompareLessThanOrEqual => todo!(),
-                        BinaryOperationKind::CompareGreaterThan => todo!(),
-                        BinaryOperationKind::CompareGreaterThanOrEqual => todo!(),
-                    };
-
-                    stmt.replace_kind(Statement::Constant {
-                        typ: lhs.typ().clone(),
-                        value: cv,
-                    });
-
-                    true
-                }*/
+                        ConstantValue::SignedInteger(_) => false,
+                        ConstantValue::FloatingPoint(_) => false,
+                        ConstantValue::String(interned_string) => false,
+                        ConstantValue::Tuple(vec) => false,
+                        ConstantValue::Vector(vec) => false,
+                    },
+                    _ => false,
+                },
                 _ => false,
             }
         }

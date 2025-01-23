@@ -140,7 +140,7 @@ pub fn start() {
             let data = fs.open(&load.path).unwrap().read_to_vec().unwrap();
             let pointer = load.address as *mut u8;
 
-            log::info!("loading {:?} @ {:p}", load.path, pointer);
+            log::warn!("loading {:?} @ {:p}", load.path, pointer);
 
             unsafe {
                 ptr::copy(data.as_ptr(), pointer, data.len());
@@ -149,7 +149,7 @@ pub fn start() {
     }
 
     // go go go (start all devices)
-    log::info!("starting guest");
+    log::warn!("starting guest");
 
     for device in guest.devices.values_mut() {
         device.start();

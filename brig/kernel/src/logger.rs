@@ -7,7 +7,7 @@ use {
     spin::Once,
 };
 
-const ENABLE_COLORS: bool = true;
+const ENABLE_COLORS: bool = false;
 
 /*struct QemuWriter;
 

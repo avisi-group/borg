@@ -21,7 +21,10 @@ global_asm!(
         push %r15
 
         mov %rsi, %rbp
+        mov %rsp, %r14
+        sub $0x1000, %rsp
         call *%rdi
+        add $0x1000, %rsp
 
         pop %r15
         pop %r14
