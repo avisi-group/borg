@@ -1980,7 +1980,7 @@ fn udiv() {
 
         translation.execute(register_file_ptr);
 
-        assert_eq!(x / y, (*r19));
+        assert_eq!(0x7fffffc0045, (*r19));
     }
 }
 
@@ -2079,6 +2079,11 @@ fn msr() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
     //  d51be000        msr     cntfrq_el0, x0
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd51be000, Type::Unsigned(32));
@@ -2097,7 +2102,6 @@ fn msr() {
 
     unsafe {
         let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
         *see = -1;
 
         translation.execute(register_file_ptr);
@@ -2166,8 +2170,6 @@ fn ldrsw() {
         *see = -1;
     }
 
-    log::trace!("translating");
-
     //  b9802fe0        ldrsw   x0, [sp, #44]
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xb9802fe0, Type::Unsigned(32));
@@ -2187,18 +2189,25 @@ fn ldrsw() {
 
     emitter.leave();
 
-    log::trace!("compiling");
-
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::trace!("executing");
-
-    log::trace!(
-        "{:p} {:x}",
-        translation.code.as_ptr(),
-        translation.code.len()
-    );
+    // verified with this program:
+    // let input: u64 = 0x8001_0000;
+    // let input_ptr: u64 = (&input as *const u64) as u64;
+    // let mut result: u64;
+    // unsafe {
+    //     asm!(
+    //         "
+    //             mov sp, {:x}
+    //             ldrsw   x0, [sp, #0]
+    //             mov {:x}, x0
+    //         ",
+    //         in(reg) input_ptr,
+    //         out(reg) result
+    //     )
+    // }
+    // println!("{result:x}");
 
     unsafe {
         let src = Box::<u32>::new(0x8001_0000); // negative signed 32-bit int
@@ -2212,5 +2221,43 @@ fn ldrsw() {
         translation.execute(register_file_ptr);
 
         assert_eq!(*x0, 0xffff_ffff_8001_0000);
+    }
+}
+
+#[ktest]
+fn get_num_event_counters_accessible() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    let result = translate(
+        &*model,
+        "AArch64_GetNumEventCountersAccessible",
+        &[],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    emitter.write_register(model.reg_offset("R0"), result);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*x0, 31);
     }
 }

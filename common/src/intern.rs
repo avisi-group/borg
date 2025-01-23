@@ -1,7 +1,7 @@
 use {
     alloc::string::String,
     deepsize::DeepSizeOf,
-    lasso::Spur,
+    lasso::{Key, Spur},
     rkyv::{
         rancor::{Fallible, Source},
         string::{ArchivedString, StringResolver},
@@ -72,6 +72,14 @@ impl InternedString {
     /// Create a new interned string from a static str
     pub fn from_static(key: &'static str) -> Self {
         Self(interner::get_or_intern_static(key))
+    }
+
+    pub fn key(&self) -> u32 {
+        self.0.into_inner().into()
+    }
+
+    pub fn from_raw(key: u32) -> Self {
+        Self(Spur::try_from_usize(key as usize).unwrap())
     }
 }
 

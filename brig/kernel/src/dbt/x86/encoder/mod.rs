@@ -91,6 +91,12 @@ pub enum Opcode {
     SETA(Operand),
     /// setg {0}
     SETG(Operand),
+    /// setge {0}
+    SETGE(Operand),
+    /// setl {0}
+    SETL(Operand),
+    /// setle {0}
+    SETLE(Operand),
     /// setae {0}
     SETAE(Operand),
     /// jne {0}
@@ -725,6 +731,16 @@ impl Instruction {
     pub fn setb(r: Operand) -> Self {
         Self(Opcode::SETB(r))
     }
+    pub fn setl(r: Operand) -> Self {
+        Self(Opcode::SETL(r))
+    }
+
+    pub fn setle(r: Operand) -> Self {
+        Self(Opcode::SETLE(r))
+    }
+    pub fn setge(r: Operand) -> Self {
+        Self(Opcode::SETGE(r))
+    }
     pub fn setg(r: Operand) -> Self {
         Self(Opcode::SETG(r))
     }
@@ -1135,6 +1151,11 @@ impl Instruction {
             }) => {
                 assembler.sets::<AsmRegister8>(dst.into()).unwrap();
             }
+            SETGE(Operand {
+                kind: R(PHYS(dst)), ..
+            }) => {
+                assembler.setge::<AsmRegister8>(dst.into()).unwrap();
+            }
             NOT(Operand {
                 kind: R(PHYS(value)),
                 ..
@@ -1429,6 +1450,18 @@ impl Instruction {
             }) => {
                 assembler.setbe::<AsmRegister8>(dst.into()).unwrap();
             }
+            SETLE(Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_8,
+            }) => {
+                assembler.setle::<AsmRegister8>(dst.into()).unwrap();
+            }
+            SETL(Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_8,
+            }) => {
+                assembler.setl::<AsmRegister8>(dst.into()).unwrap();
+            }
             SETNE(dst) => setne::encode(assembler, dst),
 
             CMOVE(
@@ -1565,7 +1598,10 @@ impl Instruction {
             | Opcode::SETAE(r)
             | Opcode::SETS(r)
             | Opcode::SETO(r)
-            | Opcode::SETC(r) => [Some((OperandDirection::Out, r)), None, None].into_iter(),
+            | Opcode::SETC(r)
+            | Opcode::SETGE(r)
+            | Opcode::SETL(r)
+            | Opcode::SETLE(r) => [Some((OperandDirection::Out, r)), None, None].into_iter(),
             Opcode::NOT(r) | Opcode::NEG(r) => {
                 [Some((OperandDirection::InOut, r)), None, None].into_iter()
             }

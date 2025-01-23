@@ -406,6 +406,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     kind: NodeKind::BinaryOperation(op),
                 }),
             },
+
             CompareLessThan(left, right) => match (left.kind(), right.kind()) {
                 (
                     NodeKind::Constant {
@@ -888,6 +889,27 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         self.append(Instruction::mov(value, mem));
     }
 
+    fn assert_meta(&mut self, condition: Self::NodeRef, meta: u64) {
+        match condition.kind() {
+            NodeKind::Constant { value, .. } => {
+                if *value == 0 {
+                    self.panic("constant assert failed");
+                }
+            }
+            _ => {
+                let not_condition = self.unary_operation(UnaryOperationKind::Not(condition));
+                let op = not_condition.to_operand(self);
+
+                self.append(Instruction::test(op.clone(), op));
+                self.append(Instruction::mov(
+                    Operand::imm(Width::_64, meta),
+                    Operand::preg(Width::_64, PhysicalRegister::R15),
+                ));
+                self.append(Instruction::jne(self.panic_block.clone()));
+            }
+        }
+    }
+
     fn assert(&mut self, condition: Self::NodeRef) {
         match condition.kind() {
             NodeKind::Constant { value, .. } => {
@@ -1062,8 +1084,21 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
                 self.constant(*value_value, typ)
             }
+            (
+                _,
+                NodeKind::Constant {
+                    value: length_value,
+                    ..
+                },
+                CastOperationKind::SignExtend,
+            ) => self.cast(
+                value,
+                Type::Signed(u16::try_from(*length_value).unwrap()),
+                CastOperationKind::SignExtend,
+            ),
             _ => {
                 // todo: attach length information
+                // todo: fix other cast operation kinds!
                 value
             }
         }
@@ -1913,13 +1948,16 @@ pub struct X86SymbolRef(pub Rc<RefCell<Option<X86NodeRef>>>);
 fn emit_compare(
     kind: &BinaryOperationKind,
     emitter: &mut X86Emitter,
+    right: X86NodeRef, /* TODO: this was flipped in order to make tests pass, unflip right and
+                        * left and fix the body of the function */
     left: X86NodeRef,
-    right: X86NodeRef,
 ) -> Operand {
     use crate::dbt::x86::encoder::OperandKind::*;
 
     let (left, right) = match (left.kind(), right.kind()) {
-        (NodeKind::Constant { .. }, NodeKind::Constant { .. }) => todo!(),
+        (NodeKind::Constant { .. }, NodeKind::Constant { .. }) => {
+            panic!("should've been fixed earlier")
+        }
         (NodeKind::Tuple(left_real), NodeKind::Tuple(right_real)) => {
             match (left_real.clone().as_slice(), right_real.as_slice()) {
                 ([left_num, left_den], [right_num, right_den]) => (
@@ -1938,6 +1976,12 @@ fn emit_compare(
         _ => (left, right),
     };
 
+    let is_signed = match (left.typ(), right.typ()) {
+        (Type::Unsigned(_), Type::Unsigned(_)) => false,
+        (Type::Signed(_), Type::Signed(_)) => true,
+        _ => panic!(),
+    };
+
     let left = left.to_operand(emitter);
     let right = right.to_operand(emitter);
 
@@ -1950,7 +1994,7 @@ fn emit_compare(
 
     // anything else (imm on the right) must be reworked
 
-    let dst = match (left.kind(), right.kind()) {
+    match (left.kind(), right.kind()) {
         (Register(_), Register(_))
         | (Register(_), Memory { .. })
         | (Memory { .. }, Register(_))
@@ -1958,9 +2002,9 @@ fn emit_compare(
         | (Immediate(_), Memory { .. })
         | (Memory { .. }, Memory { .. }) => {
             let left = if let (Memory { .. }, Memory { .. }) = (left.kind(), right.kind()) {
-                let dst = Operand::vreg(left.width(), emitter.next_vreg());
-                emitter.append(Instruction::mov(left, dst.clone()));
-                dst
+                let new_left = Operand::vreg(left.width(), emitter.next_vreg());
+                emitter.append(Instruction::mov(left, new_left.clone()));
+                new_left
             } else {
                 left
             };
@@ -1971,16 +2015,34 @@ fn emit_compare(
             // destination register
             let dst = Operand::vreg(Width::_8, emitter.next_vreg());
 
-            emitter.append(match kind {
-                BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
-                BinaryOperationKind::CompareLessThan(_, _) => Instruction::setb(dst.clone()),
-                BinaryOperationKind::CompareNotEqual(_, _) => Instruction::setne(dst.clone()),
-                BinaryOperationKind::CompareLessThanOrEqual(_, _) => {
+            emitter.append(match (kind, is_signed) {
+                (BinaryOperationKind::CompareEqual(_, _), _) => Instruction::sete(dst.clone()),
+                (BinaryOperationKind::CompareNotEqual(_, _), _) => Instruction::setne(dst.clone()),
+
+                (BinaryOperationKind::CompareLessThan(_, _), false) => {
+                    Instruction::setb(dst.clone())
+                }
+                (BinaryOperationKind::CompareLessThanOrEqual(_, _), false) => {
                     Instruction::setbe(dst.clone())
                 }
-                BinaryOperationKind::CompareGreaterThan(_, _) => Instruction::seta(dst.clone()),
-                BinaryOperationKind::CompareGreaterThanOrEqual(_, _) => {
+                (BinaryOperationKind::CompareGreaterThan(_, _), false) => {
+                    Instruction::seta(dst.clone())
+                }
+                (BinaryOperationKind::CompareGreaterThanOrEqual(_, _), false) => {
                     Instruction::setae(dst.clone())
+                }
+
+                (BinaryOperationKind::CompareLessThan(_, _), true) => {
+                    Instruction::setl(dst.clone())
+                }
+                (BinaryOperationKind::CompareLessThanOrEqual(_, _), true) => {
+                    Instruction::setle(dst.clone())
+                }
+                (BinaryOperationKind::CompareGreaterThan(_, _), true) => {
+                    Instruction::setg(dst.clone())
+                }
+                (BinaryOperationKind::CompareGreaterThanOrEqual(_, _), true) => {
+                    Instruction::setge(dst.clone())
                 }
                 _ => panic!("{kind:?} is not a compare"),
             });
@@ -1992,14 +2054,34 @@ fn emit_compare(
             emitter.append(Instruction::cmp(right, left));
             let dst = Operand::vreg(Width::_8, emitter.next_vreg());
 
-            emitter.append(match kind {
-                BinaryOperationKind::CompareEqual(_, _) => Instruction::sete(dst.clone()),
-                BinaryOperationKind::CompareNotEqual(_, _) => Instruction::setne(dst.clone()),
-                BinaryOperationKind::CompareLessThan(_, _) => Instruction::setae(dst.clone()),
-                BinaryOperationKind::CompareLessThanOrEqual(_, _) => Instruction::seta(dst.clone()),
-                BinaryOperationKind::CompareGreaterThan(_, _) => Instruction::setbe(dst.clone()),
-                BinaryOperationKind::CompareGreaterThanOrEqual(_, _) => {
+            emitter.append(match (kind, is_signed) {
+                (BinaryOperationKind::CompareEqual(_, _), _) => Instruction::sete(dst.clone()),
+                (BinaryOperationKind::CompareNotEqual(_, _), _) => Instruction::setne(dst.clone()),
+
+                (BinaryOperationKind::CompareLessThan(_, _), false) => {
+                    Instruction::setae(dst.clone())
+                }
+                (BinaryOperationKind::CompareLessThanOrEqual(_, _), false) => {
+                    Instruction::seta(dst.clone())
+                }
+                (BinaryOperationKind::CompareGreaterThan(_, _), false) => {
+                    Instruction::setbe(dst.clone())
+                }
+                (BinaryOperationKind::CompareGreaterThanOrEqual(_, _), false) => {
                     Instruction::setb(dst.clone())
+                }
+
+                (BinaryOperationKind::CompareLessThan(_, _), true) => {
+                    Instruction::setge(dst.clone())
+                }
+                (BinaryOperationKind::CompareLessThanOrEqual(_, _), true) => {
+                    Instruction::setg(dst.clone())
+                }
+                (BinaryOperationKind::CompareGreaterThan(_, _), true) => {
+                    Instruction::setle(dst.clone())
+                }
+                (BinaryOperationKind::CompareGreaterThanOrEqual(_, _), true) => {
+                    Instruction::setl(dst.clone())
                 }
                 _ => panic!("{kind:?} is not a compare"),
             });
@@ -2009,25 +2091,7 @@ fn emit_compare(
 
         (Immediate(_), Immediate(_)) => panic!("why was this not const evaluated?"),
         (Target(_), _) | (_, Target(_)) => panic!("why"),
-    };
-
-    // setCC instructions only set the least significant byte to 0x00 or 0x01, we
-    // need to clear or set the other 63 bits
-    emitter.append(Instruction::and(Operand::imm(Width::_8, 1), dst.clone()));
-    emitter.append(Instruction::neg(dst.clone()));
-
-    dst
-
-    // BinaryOperationKind::CompareEqual(left, right) => {
-    //     let left = left.to_operand(emitter);
-    //     let right = right.to_operand(emitter);
-
-    // }
-    // BinaryOperationKind::CompareLessThan(left, right) => {
-    //     let left = left.to_operand(emitter);
-    //     let right = right.to_operand(emitter);
-
-    // }
+    }
 }
 
 // #[cfg(test)]

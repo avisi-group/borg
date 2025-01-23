@@ -798,8 +798,12 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
 
             Statement::Assert { condition } => {
+                let mut meta = (self.function_name.key() as u64) << 32;
+                meta |= (block.index() as u64 & 0xFFFF) << 16;
+                meta |= (condition.index() as u64) & 0xFFFF;
+
                 let condition = statement_values.get(condition).unwrap().clone();
-                self.emitter.assert(condition);
+                self.emitter.assert_meta(condition, meta);
                 StatementResult::Data(None)
             }
             Statement::CreateBits { value, width } => {

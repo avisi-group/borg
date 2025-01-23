@@ -58,6 +58,7 @@ pub trait Emitter {
         false_value: Self::NodeRef,
     ) -> Self::NodeRef;
 
+    fn assert_meta(&mut self, condition: Self::NodeRef, meta: u64);
     fn assert(&mut self, condition: Self::NodeRef);
 
     fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef;

@@ -8,6 +8,7 @@ use {
         qemu_exit, scheduler,
     },
     alloc::{alloc::alloc_zeroed, collections::BTreeSet},
+    common::intern::InternedString,
     core::alloc::Layout,
     proc_macro_lib::irq_handler,
     spin::Once,
@@ -222,6 +223,14 @@ fn dbt_handler_const_assert(_machine_context: *mut MachineContext) {
 }
 
 #[irq_handler(with_code = true)]
-fn dbt_handler_panic(_machine_context: *mut MachineContext) {
-    exit_with_message!("DBT interrupt: panic")
+fn dbt_handler_panic(machine_context: *mut MachineContext) {
+    let meta = unsafe { &*machine_context }.r15;
+
+    let key = (meta >> 32) as u32;
+    let function_name = InternedString::from_raw(key - 1);
+
+    let block = (meta >> 16) as u16;
+    let statement = meta as u16;
+
+    exit_with_message!("DBT interrupt: statement {statement:x} failed assert in block {block:x} of {function_name:?}")
 }
