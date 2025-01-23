@@ -103,7 +103,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         current_stack_offset: usize,
         register_file_ptr: *mut u8,
     ) -> Self {
-        log::debug!("translating {function:?}");
+        log::debug!("translating {function:?}: {:?}", arguments);
 
         let mut celf = Self {
             model,
@@ -321,7 +321,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         function: &Function,
         arena: &Arena<Statement>,
     ) -> StatementResult {
-        log::debug!("translate stmt: {statement:?}");
+        //        log::warn!("translate stmt: {statement:?}");
 
         match statement {
             Statement::Constant { typ, value } => {

@@ -49,36 +49,52 @@ fn function_constant_propogation(entry_block: ControlFlowBlock) -> bool {
             .flat_map(|b| b.statements())
             .for_each(|s| {
                 // only look at copy statements
-                if let Statement::Copy {
-                    expression: Expression::Identifier(target),
-                    value,
-                } = &*s.get()
-                {
-                    match (
-                        candidate_constants.contains_key(target),
-                        mutable_vars.contains(target),
-                    ) {
-                        (true, true) => {
-                            panic!("cannot be a candidate but also a known mutable variable")
-                        }
-                        (true, false) => {
-                            // we are writing (again) to a variable we thought was constant, so it
-                            // is not a constant
-                            candidate_constants.remove(target);
-                            mutable_vars.insert(*target);
-                        }
-                        (false, true) => {
-                            // known mutable being written to again, no-op
-                        }
-                        (false, false) => {
-                            // new variable written to for the first time
-                            // if it's a literal
-                            if let Value::Literal(literal) = &*value.get() {
-                                // save it as a potential constant
-                                candidate_constants.insert(*target, literal.get().clone());
+                // EDIT: 2025-01-23 function statements ALSO write variables you idiot
+                match &*s.get() {
+                    Statement::Copy {
+                        expression: Expression::Identifier(target),
+                        value,
+                    } => {
+                        {
+                            match (
+                                candidate_constants.contains_key(target),
+                                mutable_vars.contains(target),
+                            ) {
+                                (true, true) => {
+                                    panic!(
+                                        "cannot be a candidate but also a known mutable variable"
+                                    )
+                                }
+                                (true, false) => {
+                                    // we are writing (again) to a variable we thought was constant, so it
+                                    // is not a constant
+                                    candidate_constants.remove(target);
+                                    mutable_vars.insert(*target);
+                                }
+                                (false, true) => {
+                                    // known mutable being written to again, no-op
+                                }
+                                (false, false) => {
+                                    // new variable written to for the first time
+                                    // if it's a literal
+                                    if let Value::Literal(literal) = &*value.get() {
+                                        // save it as a potential constant
+                                        candidate_constants.insert(*target, literal.get().clone());
+                                    }
+                                }
                             }
                         }
                     }
+                    Statement::FunctionCall {
+                        expression: Some(Expression::Identifier(target)),
+                        ..
+                    } => {
+                        // we are writing to a variable we thought was constant, so it
+                        // is not a constant
+                        candidate_constants.remove(target);
+                        mutable_vars.insert(*target);
+                    }
+                    _ => (),
                 }
             });
 
