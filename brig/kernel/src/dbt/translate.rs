@@ -286,11 +286,11 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
     ) -> BlockResult {
         let block = block_ref.get(function.arena());
 
-        let mut statement_values = HashMap::<Ref<Statement>, Ref<X86Node>>::default();
+        let mut statement_value_store = StatementValueStore::new();
 
         for s in block.statements() {
             match self.translate_statement(
-                &statement_values,
+                &statement_value_store,
                 is_dynamic,
                 s.get(block.arena()),
                 block_ref,
@@ -298,7 +298,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 block.arena(),
             ) {
                 StatementResult::Data(Some(value)) => {
-                    statement_values.insert(*s, value);
+                    statement_value_store.insert(*s, value);
                 }
                 StatementResult::Data(None) => (),
                 StatementResult::ControlFlow(block_result) => return block_result,
@@ -314,7 +314,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
     // todo: fix these parameters this is silly
     fn translate_statement(
         &mut self,
-        statement_values: &HashMap<Ref<Statement>, Ref<X86Node>>,
+        statement_values: &StatementValueStore,
         is_dynamic: bool,
         statement: &Statement,
         block: Ref<Block>,
@@ -389,7 +389,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let var = self.variables.get(&symbol.name()).unwrap().clone();
 
                 let value = statement_values
-                    .get(value)
+                    .get(*value)
                     .unwrap_or_else(|| {
                         panic!(
                             "no value for {value} when writing to {symbol:?} in {} {block:?}",
@@ -404,7 +404,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
             Statement::ReadRegister { typ, offset } => {
                 let offset = match statement_values
-                    .get(offset)
+                    .get(*offset)
                     .unwrap()
                     .get(self.emitter.arena())
                     .kind()
@@ -442,7 +442,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
             Statement::WriteRegister { offset, value } => {
                 let offset = match statement_values
-                    .get(offset)
+                    .get(*offset)
                     .unwrap()
                     .get(self.emitter.arena())
                     .kind()
@@ -456,7 +456,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     .get_register_by_offet(*offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
 
-                let value = statement_values.get(value).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
 
                 // if cacheable and writing a constant, update the register file during
                 // translation
@@ -491,8 +491,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 StatementResult::Data(None)
             }
             Statement::ReadMemory { address, size } => {
-                let address = statement_values.get(address).unwrap().clone();
-                let size = statement_values.get(size).unwrap().clone();
+                let address = statement_values.get(*address).unwrap().clone();
+                let size = statement_values.get(*size).unwrap().clone();
 
                 let NodeKind::Constant { value, .. } = size.get(self.emitter.arena()).kind() else {
                     panic!(
@@ -512,8 +512,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 StatementResult::Data(Some(self.emitter.read_memory(address, typ)))
             }
             Statement::WriteMemory { address, value } => {
-                let address = statement_values.get(address).unwrap().clone();
-                let value = statement_values.get(value).unwrap().clone();
+                let address = statement_values.get(*address).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
                 self.emitter.write_memory(address, value);
                 StatementResult::Data(None)
             }
@@ -522,13 +522,13 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 self.emitter.ctx().set_pc_write_flag();
 
                 let offset = self.emitter.ctx().pc_offset() as u64;
-                let value = statement_values.get(value).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
 
                 self.emitter.write_register(offset, value);
                 StatementResult::Data(None)
             }
             Statement::GetFlags { operation } => {
-                let operation = statement_values.get(operation).unwrap().clone();
+                let operation = statement_values.get(*operation).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.get_flags(operation)))
             }
             Statement::UnaryOperation { kind, value } => {
@@ -537,7 +537,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     rudder::statement::UnaryOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(value).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
 
                 let op = match kind {
                     RudderOp::Not => EmitterOp::Not(value),
@@ -558,8 +558,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     rudder::statement::BinaryOperationKind as RudderOp,
                 };
 
-                let lhs = statement_values.get(lhs).unwrap().clone();
-                let rhs = statement_values.get(rhs).unwrap().clone();
+                let lhs = statement_values.get(*lhs).unwrap().clone();
+                let rhs = statement_values.get(*rhs).unwrap().clone();
 
                 let op = match kind {
                     RudderOp::Add => EmitterOp::Add(lhs, rhs),
@@ -594,9 +594,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     rudder::statement::TernaryOperationKind as RudderOp,
                 };
 
-                let a = statement_values.get(a).unwrap().clone();
-                let b = statement_values.get(b).unwrap().clone();
-                let c = statement_values.get(c).unwrap().clone();
+                let a = statement_values.get(*a).unwrap().clone();
+                let b = statement_values.get(*b).unwrap().clone();
+                let c = statement_values.get(*c).unwrap().clone();
 
                 let op = match kind {
                     RudderOp::AddWithCarry => EmitterOp::AddWithCarry(a, b, c),
@@ -614,8 +614,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     rudder::statement::ShiftOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(value).unwrap().clone();
-                let amount = statement_values.get(amount).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
+                let amount = statement_values.get(*amount).unwrap().clone();
 
                 let op = match kind {
                     RudderOp::LogicalShiftLeft => EmitterOp::LogicalShiftLeft,
@@ -631,8 +631,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             Statement::Call { target, args, .. } => {
                 let args = args
                     .iter()
-                    .map(|a| statement_values.get(a).unwrap())
-                    .cloned()
+                    .map(|a| statement_values.get(*a).unwrap())
                     .collect::<Vec<_>>();
 
                 StatementResult::Data(
@@ -660,7 +659,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 true_target,
                 false_target,
             } => {
-                let condition = statement_values.get(condition).unwrap().clone();
+                let condition = statement_values.get(*condition).unwrap().clone();
 
                 // todo: obviously refactor this to re-use jump logic
 
@@ -697,7 +696,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         .unwrap()
                         .clone();
 
-                    let value = statement_values.get(value).cloned().unwrap();
+                    let value = statement_values.get(*value).unwrap();
                     self.write_variable(var, value);
                 }
 
@@ -710,7 +709,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     rudder::statement::CastOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(value).unwrap().clone();
+                let value = statement_values.get(*value).unwrap();
                 let typ = emit_rudder_type(typ);
 
                 let kind = match kind {
@@ -735,8 +734,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     rudder::statement::CastOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(value).unwrap().clone();
-                let width = statement_values.get(width).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
+                let width = statement_values.get(*width).unwrap().clone();
                 let typ = emit_rudder_type(typ);
 
                 let kind = match kind {
@@ -758,9 +757,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 true_value,
                 false_value,
             } => {
-                let condition = statement_values.get(condition).unwrap().clone();
-                let true_value = statement_values.get(true_value).unwrap().clone();
-                let false_value = statement_values.get(false_value).unwrap().clone();
+                let condition = statement_values.get(*condition).unwrap().clone();
+                let true_value = statement_values.get(*true_value).unwrap().clone();
+                let false_value = statement_values.get(*false_value).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.select(
                     condition,
                     true_value,
@@ -772,9 +771,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 start,
                 width,
             } => {
-                let value = statement_values.get(value).unwrap().clone();
-                let start = statement_values.get(start).unwrap().clone();
-                let width = statement_values.get(width).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
+                let start = statement_values.get(*start).unwrap().clone();
+                let width = statement_values.get(*width).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.bit_extract(value, start, width)))
             }
             Statement::BitInsert {
@@ -783,10 +782,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 start,
                 width,
             } => {
-                let target = statement_values.get(target).unwrap().clone();
-                let source = statement_values.get(source).unwrap().clone();
-                let start = statement_values.get(start).unwrap().clone();
-                let width = statement_values.get(width).unwrap().clone();
+                let target = statement_values.get(*target).unwrap().clone();
+                let source = statement_values.get(*source).unwrap().clone();
+                let start = statement_values.get(*start).unwrap().clone();
+                let width = statement_values.get(*width).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.bit_insert(target, source, start, width)))
             }
             Statement::ReadElement { .. } => {
@@ -797,9 +796,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 value,
                 index,
             } => {
-                let vector = statement_values.get(vector).unwrap().clone();
-                let value = statement_values.get(value).unwrap().clone();
-                let index = statement_values.get(index).unwrap().clone();
+                let vector = statement_values.get(*vector).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
+                let index = statement_values.get(*index).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.mutate_element(vector, index, value)))
             }
             Statement::Panic(value) => {
@@ -821,17 +820,17 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 meta |= (block.index() as u64 & 0xFFFF) << 16;
                 meta |= (condition.index() as u64) & 0xFFFF;
 
-                let condition = statement_values.get(condition).unwrap().clone();
+                let condition = statement_values.get(*condition).unwrap().clone();
                 self.emitter.assert(condition, meta);
                 StatementResult::Data(None)
             }
             Statement::CreateBits { value, width } => {
-                let value = statement_values.get(value).unwrap().clone();
-                let width = statement_values.get(width).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
+                let width = statement_values.get(*width).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.create_bits(value, width)))
             }
             Statement::SizeOf { value } => {
-                let value = statement_values.get(value).unwrap().clone();
+                let value = statement_values.get(*value).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.size_of(value)))
             }
             Statement::MatchesUnion { .. } => todo!(),
@@ -839,13 +838,12 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             Statement::CreateTuple(values) => {
                 let values = values
                     .iter()
-                    .map(|v| statement_values.get(v).unwrap())
-                    .cloned()
+                    .map(|v| statement_values.get(*v).unwrap())
                     .collect();
                 StatementResult::Data(Some(self.emitter.create_tuple(values)))
             }
             Statement::TupleAccess { index, source } => {
-                let source = statement_values.get(source).unwrap().clone();
+                let source = statement_values.get(*source).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.access_tuple(source, *index)))
             }
         }
@@ -907,5 +905,29 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
         rudder::types::Type::Bits => emitter::Type::Bits,
         rudder::types::Type::Tuple(_) => emitter::Type::Tuple,
         t => panic!("todo codegen type instance: {t:?}"),
+    }
+}
+
+/// Stores the intermediate value of translated statements for use by future
+/// statements
+///
+/// Tried linear search vec but same perf
+struct StatementValueStore {
+    map: HashMap<Ref<Statement>, Ref<X86Node>>,
+}
+
+impl StatementValueStore {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::default(),
+        }
+    }
+
+    pub fn insert(&mut self, s: Ref<Statement>, v: Ref<X86Node>) {
+        self.map.insert(s, v);
+    }
+
+    pub fn get(&self, s: Ref<Statement>) -> Option<Ref<X86Node>> {
+        self.map.get(&s).copied()
     }
 }
