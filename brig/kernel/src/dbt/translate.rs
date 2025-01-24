@@ -803,7 +803,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 meta |= (condition.index() as u64) & 0xFFFF;
 
                 let condition = statement_values.get(condition).unwrap().clone();
-                self.emitter.assert_meta(condition, meta);
+                self.emitter.assert(condition, meta);
                 StatementResult::Data(None)
             }
             Statement::CreateBits { value, width } => {

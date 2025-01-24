@@ -407,99 +407,11 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 }),
             },
 
-            CompareLessThan(left, right) => match (left.kind(), right.kind()) {
-                (
-                    NodeKind::Constant {
-                        value: left_value, ..
-                    },
-                    NodeKind::Constant {
-                        value: right_value, ..
-                    },
-                ) => Self::NodeRef::from(X86Node {
-                    typ: left.typ().clone(),
-                    kind: NodeKind::Constant {
-                        value: if let Type::Signed(_) = left.typ() {
-                            // todo: this is broken if signed size != 64
-                            if (*left_value as i64) < (*right_value as i64) {
-                                1
-                            } else {
-                                0
-                            }
-                        } else {
-                            if left_value < right_value {
-                                1
-                            } else {
-                                0
-                            }
-                        },
-                        width: 1,
-                    },
-                }),
-                _ => Self::NodeRef::from(X86Node {
-                    typ: Type::Unsigned(1),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
-            },
-            CompareLessThanOrEqual(left, right) => match (left.kind(), right.kind()) {
-                (
-                    NodeKind::Constant {
-                        value: left_value, ..
-                    },
-                    NodeKind::Constant {
-                        value: right_value, ..
-                    },
-                ) => Self::NodeRef::from(X86Node {
-                    typ: left.typ().clone(),
-                    kind: NodeKind::Constant {
-                        value: if left_value <= right_value { 1 } else { 0 },
-                        width: 1,
-                    },
-                }),
-                _ => Self::NodeRef::from(X86Node {
-                    typ: Type::Unsigned(1),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
-            },
-            CompareGreaterThan(left, right) => match (left.kind(), right.kind()) {
-                (
-                    NodeKind::Constant {
-                        value: left_value, ..
-                    },
-                    NodeKind::Constant {
-                        value: right_value, ..
-                    },
-                ) => Self::NodeRef::from(X86Node {
-                    typ: left.typ().clone(),
-                    kind: NodeKind::Constant {
-                        value: if left_value > right_value { 1 } else { 0 },
-                        width: 1,
-                    },
-                }),
-                _ => Self::NodeRef::from(X86Node {
-                    typ: Type::Unsigned(1),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
-            },
-            CompareGreaterThanOrEqual(left, right) => match (left.kind(), right.kind()) {
-                (
-                    NodeKind::Constant {
-                        value: left_value, ..
-                    },
-                    NodeKind::Constant {
-                        value: right_value, ..
-                    },
-                ) => Self::NodeRef::from(X86Node {
-                    typ: left.typ().clone(),
-                    kind: NodeKind::Constant {
-                        value: if left_value >= right_value { 1 } else { 0 },
-                        width: 1,
-                    },
-                }),
-                _ => Self::NodeRef::from(X86Node {
-                    typ: Type::Unsigned(1),
-                    kind: NodeKind::BinaryOperation(op),
-                }),
-            },
+            CompareGreaterThan(_, _)
+            | CompareGreaterThanOrEqual(_, _)
+            | CompareLessThan(_, _)
+            | CompareLessThanOrEqual(_, _) => emit_compare(op),
+
             op => {
                 todo!("{op:?}")
             }
@@ -889,7 +801,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         self.append(Instruction::mov(value, mem));
     }
 
-    fn assert_meta(&mut self, condition: Self::NodeRef, meta: u64) {
+    fn assert(&mut self, condition: Self::NodeRef, meta: u64) {
         match condition.kind() {
             NodeKind::Constant { value, .. } => {
                 if *value == 0 {
@@ -905,23 +817,6 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     Operand::imm(Width::_64, meta),
                     Operand::preg(Width::_64, PhysicalRegister::R15),
                 ));
-                self.append(Instruction::jne(self.panic_block.clone()));
-            }
-        }
-    }
-
-    fn assert(&mut self, condition: Self::NodeRef) {
-        match condition.kind() {
-            NodeKind::Constant { value, .. } => {
-                if *value == 0 {
-                    self.panic("constant assert failed");
-                }
-            }
-            _ => {
-                let not_condition = self.unary_operation(UnaryOperationKind::Not(condition));
-                let op = not_condition.to_operand(self);
-
-                self.append(Instruction::test(op.clone(), op));
                 self.append(Instruction::jne(self.panic_block.clone()));
             }
         }
@@ -1306,7 +1201,7 @@ impl X86NodeRef {
                 | BinaryOperationKind::CompareGreaterThanOrEqual(left, right)
                 | BinaryOperationKind::CompareLessThan(left, right)
                 | BinaryOperationKind::CompareLessThanOrEqual(left, right) => {
-                    emit_compare(kind, emitter, left.clone(), right.clone())
+                    encode_compare(kind, emitter, left.clone(), right.clone())
                 }
 
                 op => todo!("{op:#?}"),
@@ -1800,6 +1695,7 @@ pub enum NodeKind {
     },
 }
 
+// todo: make me copy
 #[derive(Debug, PartialEq, Clone)]
 pub enum BinaryOperationKind {
     Add(X86NodeRef, X86NodeRef),
@@ -1945,7 +1841,7 @@ impl Debug for X86Block {
 #[derive(Debug, Clone)]
 pub struct X86SymbolRef(pub Rc<RefCell<Option<X86NodeRef>>>);
 
-fn emit_compare(
+fn encode_compare(
     kind: &BinaryOperationKind,
     emitter: &mut X86Emitter,
     right: X86NodeRef, /* TODO: this was flipped in order to make tests pass, unflip right and
@@ -2138,3 +2034,178 @@ fn emit_compare(
 //         }
 //     }
 // }
+
+fn emit_compare(op: BinaryOperationKind) -> X86NodeRef {
+    use BinaryOperationKind::*;
+
+    let (CompareLessThan(left, right)
+    | CompareLessThanOrEqual(left, right)
+    | CompareGreaterThan(left, right)
+    | CompareGreaterThanOrEqual(left, right)) = &op
+    else {
+        panic!("only greater/less than comparisons should be handled here");
+    };
+
+    // if constant, do constant evaluation
+    if let (
+        NodeKind::Constant {
+            value: left_value, ..
+        },
+        NodeKind::Constant {
+            value: right_value, ..
+        },
+    ) = (left.kind(), right.kind())
+    {
+        let (is_signed, width) = match (left.typ(), right.typ()) {
+            (Type::Signed(lw), Type::Signed(rw)) => {
+                assert_eq!(lw, rw);
+                (true, lw)
+            }
+            (Type::Unsigned(lw), Type::Unsigned(rw)) => {
+                assert_eq!(lw, rw);
+                (true, lw)
+            }
+            types => todo!("compare {types:?}"),
+        };
+
+        let result = if is_signed {
+            match width {
+                64 => {
+                    let left = *left_value as i64;
+                    let right = *right_value as i64;
+
+                    match &op {
+                        CompareLessThan(_, _) => left < right,
+                        CompareLessThanOrEqual(_, _) => left <= right,
+                        CompareGreaterThan(_, _) => left > right,
+                        CompareGreaterThanOrEqual(_, _) => left >= right,
+                        _ => panic!(),
+                    }
+                }
+                w => todo!("{w:?}"),
+            }
+        } else {
+            match &op {
+                CompareLessThan(_, _) => left_value < right_value,
+                CompareLessThanOrEqual(_, _) => left_value <= right_value,
+                CompareGreaterThan(_, _) => left_value > right_value,
+                CompareGreaterThanOrEqual(_, _) => left_value >= right_value,
+                _ => panic!(),
+            }
+        };
+
+        X86NodeRef::from(X86Node {
+            typ: left.typ().clone(),
+            kind: NodeKind::Constant {
+                value: result as u64,
+                width: 1,
+            },
+        })
+    } else {
+        // else emit an X86 node
+        X86NodeRef::from(X86Node {
+            typ: Type::Unsigned(1),
+            kind: NodeKind::BinaryOperation(op),
+        })
+    }
+
+    // match &op {
+    //     CompareLessThan(left, right)
+    //     | CompareLessThanOrEqual(left, right)
+    //     | CompareGreaterThan(left, right)
+    //     | CompareGreaterThanOrEqual(left, right) => match (left.kind(),
+    // right.kind()) {         (
+    //             NodeKind::Constant {
+    //                 value: left_value, ..
+    //             },
+    //             NodeKind::Constant {
+    //                 value: right_value, ..
+    //             },
+    //         ) => X86NodeRef::from(X86Node {
+    //             typ: left.typ().clone(),
+    //             kind: NodeKind::Constant {
+    //                 value: if let Type::Signed(_) = left.typ() {
+    //                     // todo: this is broken if signed size != 64
+    //                     if (*left_value as i64) < (*right_value as i64) {
+    //                         1
+    //                     } else {
+    //                         0
+    //                     }
+    //                 } else {
+    //                     if left_value < right_value {
+    //                         1
+    //                     } else {
+    //                         0
+    //                     }
+    //                 },
+    //                 width: 1,
+    //             },
+    //         }),
+    //         _ => X86NodeRef::from(X86Node {
+    //             typ: Type::Unsigned(1),
+    //             kind: NodeKind::BinaryOperation(op),
+    //         }),
+    //     },
+    //     CompareLessThanOrEqual(left, right) => match (left.kind(),
+    // right.kind()) {         (
+    //             NodeKind::Constant {
+    //                 value: left_value, ..
+    //             },
+    //             NodeKind::Constant {
+    //                 value: right_value, ..
+    //             },
+    //         ) => X86NodeRef::from(X86Node {
+    //             typ: left.typ().clone(),
+    //             kind: NodeKind::Constant {
+    //                 value: if left_value <= right_value { 1 } else { 0 },
+    //                 width: 1,
+    //             },
+    //         }),
+    //         _ => X86NodeRef::from(X86Node {
+    //             typ: Type::Unsigned(1),
+    //             kind: NodeKind::BinaryOperation(op),
+    //         }),
+    //     },
+    //     CompareGreaterThan(left, right) => match (left.kind(), right.kind())
+    // {         (
+    //             NodeKind::Constant {
+    //                 value: left_value, ..
+    //             },
+    //             NodeKind::Constant {
+    //                 value: right_value, ..
+    //             },
+    //         ) => X86NodeRef::from(X86Node {
+    //             typ: left.typ().clone(),
+    //             kind: NodeKind::Constant {
+    //                 value: if left_value > right_value { 1 } else { 0 },
+    //                 width: 1,
+    //             },
+    //         }),
+    //         _ => X86NodeRef::from(X86Node {
+    //             typ: Type::Unsigned(1),
+    //             kind: NodeKind::BinaryOperation(op),
+    //         }),
+    //     },
+    //     CompareGreaterThanOrEqual(left, right) => match (left.kind(),
+    // right.kind()) {         (
+    //             NodeKind::Constant {
+    //                 value: left_value, ..
+    //             },
+    //             NodeKind::Constant {
+    //                 value: right_value, ..
+    //             },
+    //         ) => X86NodeRef::from(X86Node {
+    //             typ: left.typ().clone(),
+    //             kind: NodeKind::Constant {
+    //                 value: if left_value >= right_value { 1 } else { 0 },
+    //                 width: 1,
+    //             },
+    //         }),
+    //         _ => X86NodeRef::from(X86Node {
+    //             typ: Type::Unsigned(1),
+    //             kind: NodeKind::BinaryOperation(op),
+    //         }),
+    //     },
+    //     _ => panic!("only greater/less than comparisons should be handled
+    // here"), }
+}
