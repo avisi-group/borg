@@ -1397,6 +1397,30 @@ impl Instruction {
             ADC(
                 Operand {
                     kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(carry)),
+                    ..
+                },
+            ) => {
+                // sets the carry flag
+                assembler
+                    .add::<AsmRegister8, _>(carry.into(), 0xffff_ffffu32 as i32)
+                    .unwrap();
+
+                assembler
+                    .adc::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                    .unwrap();
+            }
+
+            ADC(
+                Operand {
+                    kind: R(PHYS(src)),
                     width_in_bits: Width::_64,
                 },
                 Operand {
@@ -1417,6 +1441,33 @@ impl Instruction {
                     assembler.stc().unwrap();
                     assembler
                         .adc::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                        .unwrap();
+                }
+                _ => panic!(),
+            },
+            ADC(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: I(carry_in),
+                    width_in_bits: Width::_8,
+                },
+            ) => match carry_in {
+                0 => {
+                    assembler
+                        .add::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                        .unwrap();
+                }
+                1 => {
+                    assembler.stc().unwrap();
+                    assembler
+                        .adc::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                         .unwrap();
                 }
                 _ => panic!(),
