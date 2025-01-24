@@ -182,8 +182,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         let entry_x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
 
         // jump from the *current* emitter block to this function's entry block
-        self.emitter.append(Instruction::jmp(entry_x86));
-        self.emitter.add_target(entry_x86);
+        self.emitter.push_instruction(Instruction::jmp(entry_x86));
+        self.emitter.push_target(entry_x86);
 
         let mut block_queue = alloc::collections::VecDeque::new();
 

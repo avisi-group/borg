@@ -98,7 +98,7 @@ pub trait Emitter {
     fn set_current_block(&mut self, block: Self::BlockRef);
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Type {
     Unsigned(u16),
     Signed(u16),

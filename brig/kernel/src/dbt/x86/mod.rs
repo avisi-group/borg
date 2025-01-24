@@ -5,7 +5,7 @@ use {
             emitter::Emitter,
             x86::{
                 emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
-                encoder::{Instruction, Opcode, Operand, OperandKind},
+                encoder::{Instruction, Opcode, OperandKind},
                 register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
             },
             Translation,
