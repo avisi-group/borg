@@ -1,12 +1,14 @@
 use {
-    crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::Pass,
-        Ast, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
+    crate::boom::passes::Pass,
+    common::{
+        boom::{
+            control_flow::{ControlFlowBlock, Terminator},
+            Ast, FunctionDefinition, Literal, NamedType, Parameter, Size, Statement, Type, Value,
+        },
+        intern::InternedString,
+        shared::Shared,
     },
-    common::intern::InternedString,
     rayon::iter::ParallelIterator,
-    sailrs::shared::Shared,
 };
 
 #[derive(Debug, Default)]
@@ -36,9 +38,7 @@ impl Pass for LowerReals {
             let block = ControlFlowBlock::new();
             block.set_terminator(Terminator::Return(Some(Value::Tuple(vec![
                 Shared::new(Value::Identifier("p0".into())),
-                Shared::new(Value::Literal(Shared::new(crate::boom::Literal::Int(
-                    1.into(),
-                )))),
+                Shared::new(Value::Literal(Shared::new(Literal::Int(1.into())))),
             ]))));
             block
         };

@@ -1,10 +1,11 @@
 use {
     crate::{
-        boom::{self, bits_to_int, passes::destruct_composites},
+        boom::{bits_to_int, passes::destruct_composites},
         rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
     },
     common::{
         arena::{Arena, Ref},
+        boom,
         id::Id,
         intern::InternedString,
         rudder::{
@@ -18,12 +19,12 @@ use {
             types::{PrimitiveType, Type},
             Model, RegisterDescriptor,
         },
+        shared::Shared,
         width_helpers::signed_smallest_width_of_value,
         HashMap,
     },
     log::trace,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
-    sailrs::shared::Shared,
     std::cmp::Ordering,
 };
 
@@ -2342,7 +2343,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
 fn build_constant_value(literal: &boom::Literal) -> ConstantValue {
     match literal {
         boom::Literal::Int(i) => {
-            let value = i.try_into().unwrap_or_else(|_| {
+            let value = (*i).try_into().unwrap_or_else(|_| {
                 log::error!("failed to convert {i} to i64");
                 i64::MAX
             });

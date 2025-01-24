@@ -2,18 +2,14 @@
 // here to make the destruct_composites pass
 
 use {
-    crate::{
-        boom::{
-            passes::Pass, Ast, Bit, Expression, Literal, Operation, Size, Statement, Type, Value,
-        },
-        DELETED_CALLS,
-    },
+    crate::{boom::passes::Pass, DELETED_CALLS},
+    common::boom::{Ast, Bit, Expression, Literal, Operation, Size, Statement, Type, Value},
+    common::shared::Shared,
     common::{intern::InternedString, HashMap, HashSet},
     core::panic,
     once_cell::sync::Lazy,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     regex::Regex,
-    sailrs::shared::Shared,
 };
 
 const EQ_ANY_GENERIC: Lazy<Regex> =
@@ -131,7 +127,7 @@ impl Pass for HandleBuiltinFunctions {
                                         panic!()
                                     };
 
-                                    let n = usize::try_from(n).unwrap();
+                                    let n = usize::try_from(*n).unwrap();
 
                                     let Expression::Identifier(local) = expression else {
                                         panic!()

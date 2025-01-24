@@ -1,11 +1,9 @@
 use {
-    crate::boom::{
-        self,
-        control_flow::{ControlFlowBlock, Terminator},
-    },
+    crate::boom::pretty_print,
+    common::boom::control_flow::{ControlFlowBlock, Terminator},
+    common::shared::Shared,
     common::{id::Id, HashMap},
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
-    sailrs::shared::Shared,
     std::io,
 };
 
@@ -46,7 +44,7 @@ impl Graph {
                 let mut label = Vec::new();
 
                 for statement in node.statements() {
-                    boom::pretty_print::print_statement(&mut label, statement);
+                    pretty_print::print_statement(&mut label, statement);
                     label.extend(b"\\l");
                 }
 
@@ -66,7 +64,7 @@ impl Graph {
                     let value = value
                         .map(|value| {
                             let mut buf = Vec::new();
-                            boom::pretty_print::print_value(&mut buf, Shared::new(value));
+                            pretty_print::print_value(&mut buf, Shared::new(value));
                             String::from_utf8(buf).unwrap()
                         })
                         .unwrap_or_default();
@@ -76,7 +74,7 @@ impl Graph {
                 Terminator::Conditional { condition, .. } => {
                     let condition = {
                         let mut buf = Vec::new();
-                        boom::pretty_print::print_value(&mut buf, Shared::new(condition));
+                        pretty_print::print_value(&mut buf, Shared::new(condition));
                         String::from_utf8(buf).unwrap()
                     };
 

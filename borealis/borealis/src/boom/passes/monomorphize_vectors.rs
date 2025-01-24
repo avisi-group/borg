@@ -6,13 +6,10 @@
 //! Not a great heuristic, possible bugs if there are multiple copies, or ???
 
 use {
-    crate::boom::{
-        control_flow::ControlFlowBlock,
-        passes::{any::AnyExt, Pass},
-        Ast, Expression, Statement, Type, Value,
-    },
+    crate::boom::passes::{any::AnyExt, Pass},
+    common::boom::{control_flow::ControlFlowBlock, Ast, Expression, Statement, Type, Value},
+    common::shared::Shared,
     common::HashMap,
-    sailrs::shared::Shared,
 };
 
 #[derive(Debug, Default)]

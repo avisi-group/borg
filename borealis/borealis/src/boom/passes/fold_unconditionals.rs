@@ -1,15 +1,15 @@
 //! Unconditional folding logic
 
 use {
-    crate::boom::{
+    crate::boom::passes::{any::AnyExt, Pass},
+    common::boom::{
         control_flow::{ControlFlowBlock, Terminator},
-        passes::{any::AnyExt, Pass},
         Ast,
     },
+    common::shared::Shared,
     common::HashSet,
     log::{debug, trace},
     pretty_assertions::assert_eq,
-    sailrs::shared::Shared,
 };
 
 /// Control flow blocks with only one parent and one child (unconditional jump

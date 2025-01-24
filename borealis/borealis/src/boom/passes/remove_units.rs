@@ -1,10 +1,10 @@
 use {
-    crate::boom::{
-        control_flow::Terminator, passes::Pass, Ast, Expression, Literal, Parameter, Statement,
-        Type, Value,
+    crate::boom::passes::Pass,
+    common::boom::{
+        control_flow::Terminator, Ast, Expression, Literal, Parameter, Statement, Type, Value,
     },
+    common::shared::Shared,
     common::{intern::InternedString, HashSet},
-    sailrs::shared::Shared,
 };
 
 #[derive(Debug, Default)]

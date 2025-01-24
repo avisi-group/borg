@@ -2,8 +2,8 @@ use {
     borealis::{load_model, sail_to_brig, GenerationMode},
     clap::Parser,
     color_eyre::eyre::Result,
+    common::{shared::Shared, util::init_logger},
     log::info,
-    sailrs::init_logger,
     std::path::PathBuf,
 };
 
@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     // set up the logger, defaulting to no output if the CLI flag was not supplied
     init_logger(args.log.as_deref().unwrap_or("info")).unwrap();
 
-    let jib = load_model(&args.input);
+    let boom = load_model(&args.input);
 
     let mode = if let Some(ir_path) = args.dump_ir {
         std::fs::remove_dir_all(&ir_path).ok();
@@ -50,7 +50,7 @@ fn main() -> Result<()> {
         GenerationMode::CodeGen
     };
 
-    sail_to_brig(jib, args.output, mode);
+    sail_to_brig(Shared::new(boom), args.output, mode);
 
     info!("done");
 

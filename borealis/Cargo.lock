@@ -176,7 +176,7 @@ dependencies = [
  "displaydoc",
  "dot",
  "errctx",
- "itertools 0.13.0",
+ "itertools",
  "kinded",
  "log",
  "memmap2",
@@ -185,11 +185,9 @@ dependencies = [
  "parking_lot",
  "postcard",
  "pretty_assertions",
- "pretty_env_logger",
  "rayon",
  "regex",
- "rkyv 0.8.9",
- "sailrs",
+ "rkyv 0.8.10",
  "serde",
  "serde_json",
  "thiserror 2.0.11",
@@ -390,16 +388,21 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 name = "common"
 version = "0.0.0"
 dependencies = [
+ "byte-unit",
+ "color-eyre",
  "deepsize",
+ "errctx",
  "hashbrown 0.15.2",
- "itertools 0.14.0",
+ "itertools",
  "lasso",
  "log",
  "num-rational",
  "num-traits",
  "ocaml",
+ "parking_lot",
  "postcard",
- "rkyv 0.8.9",
+ "pretty_env_logger",
+ "rkyv 0.8.10",
  "serde",
  "twox-hash",
 ]
@@ -691,15 +694,6 @@ name = "is_terminal_polyfill"
 version = "1.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
 
 [[package]]
 name = "itertools"
@@ -1242,9 +1236,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv"
-version = "0.8.9"
+version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b11a153aec4a6ab60795f8ebe2923c597b16b05bb1504377451e705ef1a45323"
+checksum = "1e147371c75553e1e2fcdb483944a8540b8438c31426279553b9a8182a9b7b65"
 dependencies = [
  "bytecheck 0.8.0",
  "bytes",
@@ -1254,7 +1248,7 @@ dependencies = [
  "ptr_meta 0.3.0",
  "rancor",
  "rend 0.5.2",
- "rkyv_derive 0.8.9",
+ "rkyv_derive 0.8.10",
  "tinyvec",
  "uuid",
 ]
@@ -1272,9 +1266,9 @@ dependencies = [
 
 [[package]]
 name = "rkyv_derive"
-version = "0.8.9"
+version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "beb382a4d9f53bd5c0be86b10d8179c3f8a14c30bf774ff77096ed6581e35981"
+checksum = "246b40ac189af6c675d124b802e8ef6d5246c53e17367ce9501f8f66a81abb7a"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1344,7 +1338,6 @@ checksum = "f3cb5ba0dc43242ce17de99c180e96db90b235b8a9fdc9543c96d2209116bd9f"
 name = "sailrs"
 version = "0.1.1"
 dependencies = [
- "byte-unit",
  "cc",
  "clap",
  "color-eyre",
@@ -1352,17 +1345,17 @@ dependencies = [
  "deepsize",
  "displaydoc",
  "errctx",
+ "itertools",
  "log",
  "num-bigint",
  "ocaml",
  "once_cell",
  "parking_lot",
  "pretty_assertions",
- "pretty_env_logger",
  "proptest",
  "rayon",
  "regex",
- "rkyv 0.8.9",
+ "rkyv 0.8.10",
  "serde",
  "serde_json",
  "strum",

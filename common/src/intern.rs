@@ -137,14 +137,14 @@ impl serde::Serialize for InternedString {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "ocaml")]
 unsafe impl ocaml::FromValue for InternedString {
     fn from_value(v: ocaml::Value) -> Self {
         Self::new(String::from_value(v))
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "ocaml")]
 unsafe impl ocaml::ToValue for InternedString {
     fn to_value(&self, rt: &ocaml::Runtime) -> ocaml::Value {
         use alloc::string::ToString;

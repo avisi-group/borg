@@ -1,10 +1,10 @@
 use {
-    crate::boom::{
+    common::boom::{
         control_flow::{ControlFlowBlock, Terminator},
         Literal, Statement, Value,
     },
+    common::shared::{Shared, SharedKey},
     common::{intern::InternedString, HashMap},
-    sailrs::shared::{Shared, SharedKey},
 };
 
 /// Builder structure for a control flow graph

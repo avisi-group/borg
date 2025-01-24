@@ -2,15 +2,12 @@
 
 use {
     crate::{
-        boom::{
-            passes::{
-                builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
-                cycle_finder::CycleFinder, destruct_composites::DestructComposites,
-                fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
-                remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-                remove_units::RemoveUnits,
-            },
-            Ast,
+        boom::passes::{
+            builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
+            cycle_finder::CycleFinder, destruct_composites::DestructComposites,
+            fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
+            remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
+            remove_units::RemoveUnits,
         },
         rudder::{
             opt::{self, OptLevel},
@@ -18,6 +15,8 @@ use {
         },
     },
     common::{
+        boom::Ast as BoomAst,
+        bytes,
         intern::InternedString,
         rudder::{
             block::Block,
@@ -26,18 +25,13 @@ use {
             statement::Statement,
             types::Type,
         },
+        shared::Shared,
+        util::create_file_buffered,
         HashMap, HashSet,
     },
-    deepsize::DeepSizeOf,
     errctx::PathCtx,
     log::{debug, info},
     once_cell::sync::Lazy,
-    sailrs::{
-        bytes, create_file_buffered,
-        jib_ast::{self, Definition, DefinitionAux, Instruction},
-        sail_ast::Location,
-        types::{ArchivedListVec, ListVec},
-    },
     std::{
         fs::{create_dir_all, File},
         io::{BufRead, BufReader, Write},
@@ -53,18 +47,17 @@ pub mod util;
 ///
 /// Internally, deserialization is performed on a new thread with a sufficient
 /// stack size to perform the deserialization.
-pub fn load_model(path: &Path) -> ListVec<Definition> {
+pub fn load_model(path: &Path) -> BoomAst {
     let file = File::open(path).map_err(PathCtx::f(path)).unwrap();
     let mmap = unsafe { memmap2::Mmap::map(&file) }.unwrap();
 
     info!("deserializing");
 
-    let archived: &ArchivedListVec<Definition> = unsafe { rkyv::access_unchecked(&mmap) };
-    let jib: ListVec<Definition> = rkyv::deserialize::<_, rkyv::rancor::Error>(archived).unwrap();
+    // let archived: &ArchivedListVec<Definition> = unsafe { rkyv::access_unchecked(&mmap) };
+    // let jib: ListVec<Definition> = rkyv::deserialize::<_, rkyv::rancor::Error>(archived).unwrap();
 
-    info!("JIB size: {:.2}", bytes(jib.deep_size_of()));
-
-    jib
+    // jib
+    todo!()
 }
 
 #[derive(Debug, Clone)]
@@ -75,7 +68,7 @@ pub enum GenerationMode {
 }
 
 /// Compiles a Sail model to a Brig module
-pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: GenerationMode) {
+pub fn sail_to_brig(ast: Shared<BoomAst>, path: PathBuf, mode: GenerationMode) {
     let dump_ir = match &mode {
         GenerationMode::CodeGen => None,
         GenerationMode::CodeGenWithIr(p) | GenerationMode::IrOnly(p) => Some(p),
@@ -85,21 +78,11 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         create_dir_all(path).unwrap()
     }
 
-    if let Some(path) = &dump_ir {
-        sailrs::jib_ast::pretty_print::print_ast(
-            &mut create_file_buffered(path.join("ast.jib")).unwrap(),
-            jib_ast.iter(),
-        );
-    }
-
-    info!("Converting JIB to BOOM");
-    let ast = Ast::from_jib(jib_wip_filter(jib_ast));
-
     // // useful for debugging
     if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
             &mut create_file_buffered(path.join("ast.boom")).unwrap(),
-            ast.clone(),
+            &ast.get(),
         );
     }
 
@@ -129,7 +112,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     if let Some(path) = &dump_ir {
         boom::pretty_print::print_ast(
             &mut create_file_buffered(path.join("ast.processed.boom")).unwrap(),
-            ast.clone(),
+            &ast.get(),
         );
     }
 
@@ -218,28 +201,28 @@ fn fn_is_allowlisted(name: InternedString) -> bool {
     !FN_DENYLIST.contains(&name)
 }
 
-fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {
-    jib_ast.into_iter().map(|d| {
-        if let DefinitionAux::Fundef(name, ret, parameters, body) = d.def {
-            let new_body = if fn_is_allowlisted(name.as_interned()) {
-                body
-            } else {
-                vec![Instruction {
-                    inner: jib_ast::InstructionAux::Undefined(jib_ast::Type::Unit),
-                    annot: (0, Location::Unknown),
-                }]
-                .into()
-            };
+// fn jib_wip_filter(jib_ast: ListVec<Definition>) -> impl Iterator<Item = jib_ast::Definition> {
+//     jib_ast.into_iter().map(|d| {
+//         if let DefinitionAux::Fundef(name, ret, parameters, body) = d.def {
+//             let new_body = if fn_is_allowlisted(name.as_interned()) {
+//                 body
+//             } else {
+//                 vec![Instruction {
+//                     inner: jib_ast::InstructionAux::Undefined(jib_ast::Type::Unit),
+//                     annot: (0, Location::Unknown),
+//                 }]
+//                 .into()
+//             };
 
-            Definition {
-                def: DefinitionAux::Fundef(name, ret, parameters, new_body),
-                annot: d.annot,
-            }
-        } else {
-            d
-        }
-    })
-}
+//             Definition {
+//                 def: DefinitionAux::Fundef(name, ret, parameters, new_body),
+//                 annot: d.annot,
+//             }
+//         } else {
+//             d
+//         }
+//     })
+// }
 
 fn example_functions() -> HashMap<InternedString, Function> {
     let mut fns = HashMap::default();

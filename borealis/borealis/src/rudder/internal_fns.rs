@@ -1,6 +1,7 @@
 use {
-    crate::boom::{self, control_flow::ControlFlowBlock},
+    common::shared::Shared,
     common::{
+        boom::{self, control_flow::ControlFlowBlock},
         intern::InternedString,
         rudder::{
             constant_value::ConstantValue,
@@ -11,7 +12,6 @@ use {
         HashMap,
     },
     once_cell::sync::Lazy,
-    sailrs::shared::Shared,
 };
 
 pub fn insert_stub(

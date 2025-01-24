@@ -6,7 +6,6 @@ authors = ["AVISI Research Group"]
 description = "Sail frontend for GenSim"
 
 [dependencies]
-sailrs = { path = "../sailrs" }
 common = { path = "../../common", default-features = false, features = ["std"] }
 
 rkyv.workspace = true
@@ -24,11 +23,10 @@ num-bigint.workspace = true
 parking_lot.workspace = true
 color-eyre.workspace = true
 regex.workspace = true
-pretty_env_logger.workspace = true
 
 pretty_assertions = "1.4.1"
 dot = "0.1.4"
-itertools = "0.13.0"
+itertools = "0.14.0"
 kinded = "0.3.0"
 memmap2 = "0.9.5"
 postcard = { version = "1.1.1", features = ["alloc"], default-features = false }

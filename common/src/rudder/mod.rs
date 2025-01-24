@@ -30,7 +30,9 @@ pub struct Model {
 pub struct RegisterDescriptor {
     pub typ: Type,
     pub offset: u64,
-    /// Registers that change infrequently can be cached during translation so reads of these registers are emitted as constant values rather than register reads
+    /// Registers that change infrequently can be cached during translation so
+    /// reads of these registers are emitted as constant values rather than
+    /// register reads
     pub cacheable: bool,
 }
 

@@ -1,24 +1,113 @@
 //! JIB to BOOM conversion
 
 use {
-    crate::boom::{
-        self,
-        control_flow::{builder::ControlFlowGraphBuilder, ControlFlowBlock},
-        convert::sail_ast::Identifier,
-        Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Type,
-    },
-    common::{intern::InternedString, HashMap},
-    itertools::Itertools,
-    sailrs::{
+    crate::{
+        builder::ControlFlowGraphBuilder,
         jib_ast::{self, CReturn},
-        sail_ast,
-        shared::Shared,
+        sail_ast::{self, Identifier},
     },
+    common::{
+        boom::{
+            self,
+            control_flow::{ControlFlowBlock, Terminator},
+            Bit, Expression, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size,
+            Statement, Type, Value,
+        },
+        intern::InternedString,
+        shared::Shared,
+        HashMap,
+    },
+    itertools::Itertools,
     std::borrow::Borrow,
 };
 
 type Parameters = Vec<Shared<boom::Type>>;
 type Return = Shared<boom::Type>;
+
+pub fn jib_to_boom<I: IntoIterator<Item = jib_ast::Definition>>(iter: I) -> Shared<boom::Ast> {
+    let mut emitter = BoomEmitter::new();
+    emitter.process(iter);
+
+    let mut ast = emitter.finish();
+
+    {
+        ast.registers
+            .insert("have_exception".into(), Shared::new(Type::Bool));
+        ast.registers.insert(
+            "current_exception".into(),
+            Shared::new(Type::Union {
+                name: InternedString::from_static("exception"),
+                fields: ast
+                    .unions
+                    .get(&InternedString::from_static("exception"))
+                    .unwrap()
+                    .clone(),
+            }),
+        );
+        ast.registers
+            .insert("throw".into(), Shared::new(Type::String));
+    }
+
+    {
+        let return_type = Shared::new(Type::Struct {
+            name: "tuple#%bv_%bv4".into(),
+            fields: ast
+                .structs
+                .get(&InternedString::from("tuple#%bv_%bv4"))
+                .unwrap()
+                .clone(),
+        });
+        let entry_block = ControlFlowBlock::new();
+        entry_block.set_statements(vec![
+            Shared::new(Statement::VariableDeclaration {
+                name: "return".into(),
+                typ: return_type.clone(),
+            }),
+            Shared::new(Statement::FunctionCall {
+                expression: Some(Expression::Identifier("return".into())),
+                name: "AddWithCarry".into(),
+                arguments: vec![
+                    Shared::new(Value::Identifier("x".into())),
+                    Shared::new(Value::Identifier("y".into())),
+                    Shared::new(Value::Identifier("carry_in".into())),
+                ],
+            }),
+        ]);
+        entry_block.set_terminator(Terminator::Return(Some(Value::Identifier("return".into()))));
+        ast.functions.insert(
+            "add_with_carry_test".into(),
+            FunctionDefinition {
+                signature: FunctionSignature {
+                    name: "add_with_carry_test".into(),
+                    parameters: Shared::new(vec![
+                        Parameter {
+                            name: "x".into(),
+                            typ: Shared::new(Type::Bits {
+                                size: Size::Static(64),
+                            }),
+                        },
+                        Parameter {
+                            name: "y".into(),
+                            typ: Shared::new(Type::Bits {
+                                size: Size::Static(64),
+                            }),
+                        },
+                        Parameter {
+                            name: "carry_in".into(),
+                            typ: Shared::new(Type::Bits {
+                                size: Size::Static(1),
+                            }),
+                        },
+                    ]),
+                    return_type: Some(return_type),
+                },
+                entry_block,
+            },
+        );
+    }
+
+    Shared::new(ast)
+}
 
 /// Consumes JIB AST and produces BOOM
 #[derive(Debug, Default)]
@@ -452,7 +541,9 @@ fn convert_value(value: &jib_ast::Value) -> Shared<boom::Value> {
                 })
                 .0;
 
-            boom::Value::Literal(Shared::new(boom::Literal::Int(member_index.into())))
+            boom::Value::Literal(Shared::new(boom::Literal::Int(
+                member_index.try_into().unwrap(),
+            )))
         }
     })
 }
@@ -467,7 +558,7 @@ fn convert_literal(literal: &jib_ast::Vl) -> Shared<boom::Literal> {
         jib_ast::Vl::Bit(bit) => boom::Literal::Bit(convert_bit(bit)),
         jib_ast::Vl::Bool(b) => boom::Literal::Bool(*b),
         jib_ast::Vl::Unit => boom::Literal::Unit,
-        jib_ast::Vl::Int(bigint) => boom::Literal::Int(bigint.0.clone()),
+        jib_ast::Vl::Int(bigint) => boom::Literal::Int(bigint.0.clone().try_into().unwrap()),
         jib_ast::Vl::String(s) => boom::Literal::String(*s),
         jib_ast::Vl::Real(_) => todo!(),
         jib_ast::Vl::Enum(_) => todo!(),

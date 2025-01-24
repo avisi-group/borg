@@ -1,10 +1,6 @@
 //! Finds cycles in the control flow graph
 
-use {
-    crate::boom::{passes::Pass, Ast},
-    log::warn,
-    sailrs::shared::Shared,
-};
+use {crate::boom::passes::Pass, common::boom::Ast, common::shared::Shared, log::warn};
 /// Finds cycles in the control flow graph
 #[derive(Debug, Default)]
 pub struct CycleFinder {}

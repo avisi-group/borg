@@ -1,15 +1,17 @@
 //! BOOM AST pretty printing
 
 use {
-    crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        visitor::Visitor,
-        Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
-        NamedValue, Operation, Parameter, Size, Statement, Type, Value,
+    crate::boom::visitor::Visitor,
+    common::{
+        boom::{
+            control_flow::{ControlFlowBlock, Terminator},
+            Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
+            NamedValue, Operation, Parameter, Size, Statement, Type, Value,
+        },
+        intern::InternedString,
+        shared::Shared,
     },
-    common::intern::InternedString,
     itertools::Itertools,
-    sailrs::shared::Shared,
     std::{
         io::Write,
         rc::Rc,
@@ -20,8 +22,9 @@ use {
 const PADDING: &str = "  ";
 
 /// Pretty-print BOOM AST
-pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
-    let Ast {
+pub fn print_ast<W: Write>(
+    w: &mut W,
+    Ast {
         registers,
         functions,
         constants,
@@ -29,8 +32,8 @@ pub fn print_ast<W: Write>(w: &mut W, ast: Shared<Ast>) {
         structs,
         unions,
         pragmas,
-    } = &*ast.get();
-
+    }: &Ast,
+) {
     let mut visitor = PrettyPrinter::new(w);
 
     pragmas

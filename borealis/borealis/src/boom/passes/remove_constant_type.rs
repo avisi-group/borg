@@ -1,7 +1,8 @@
 use {
-    crate::boom::{passes::Pass, Ast, Size, Statement, Type},
+    crate::boom::passes::Pass,
+    common::boom::{Ast, Size, Statement, Type},
+    common::shared::Shared,
     common::width_helpers::signed_smallest_width_of_value,
-    sailrs::shared::Shared,
 };
 
 #[derive(Debug, Default)]

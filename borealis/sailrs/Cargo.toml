@@ -8,7 +8,7 @@ homepage = "https://avisi.org.uk"
 repository = "https://github.com/avisi-group/borealis"
 
 [dependencies]
-common = { path = "../../common", default-features = false, features = ["std"] }
+common = { path = "../../common", default-features = false, features = ["std", "ocaml"] }
 
 rkyv.workspace = true
 thiserror.workspace = true
@@ -25,11 +25,10 @@ num-bigint.workspace = true
 parking_lot.workspace = true
 color-eyre.workspace = true
 regex.workspace = true
-pretty_env_logger.workspace = true
 
 ocaml = { version = "1.1.0", features = ["no-panic-hook"] }
 strum = { version = "0.26.3", features = ["derive"] }
-byte-unit = "5.1.6"
+itertools = "0.14.0"
 
 [build-dependencies]
 cc = "1.2.10"

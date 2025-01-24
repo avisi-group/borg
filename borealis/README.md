@@ -6,11 +6,6 @@
 
 ## Build Requirements
 
-* [Docker](https://www.docker.com)
-* [Earthly](https://earthly.dev)
-
-**OR**
-
 * [Rust toolchain](https://rustup.rs)
 * [OCaml toolchain](https://ocaml.org)
 * [Z3](https://github.com/Z3Prover/z3)
@@ -19,41 +14,6 @@
 * [Dune](https://dune.build)
 * [`sail` opam package](https://opam.ocaml.org/packages/sail/)
 
-## Testing
-
-`earthly +test` to run all tests.
-
-## Docker/Earthly
-
-The included `Earthfile` builds, tests, and generates documentation for `borealis`. It is used by the GitHub Actions workflow for CI. For that reason, `borealis` should always be `x86_64` compatible, while `aarch64` (and non-Linux) support will be provided on a best-effort basis.
-
-### Usage
-
-To build:
-
-```
-$ earthly +build
-```
-
-To run both unit and the end-2-end test:
-
-```
-$ earthly +test
-```
-
-## Workspace Packages
-
-### `borealis`
-
-Sail frontend to GenSim. Depends on `sail` crate to parse Sail definition, which is then compiled to GenC.
-
-### `sail`
-
-Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes20/sail/) written in OCaml.
-
-### `common`
-
-Rust does not support cyclic dependencies among crates so this crate contains types and logic shared by multiple other crates in the workspace.
 
 ## Common Issues
 

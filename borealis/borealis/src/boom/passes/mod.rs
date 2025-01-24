@@ -6,10 +6,10 @@
 //! * Builtin function handling
 
 use {
-    crate::boom::Ast,
+    common::boom::Ast,
     common::intern::InternedString,
+    common::shared::Shared,
     log::info,
-    sailrs::shared::Shared,
     std::{
         fs::{create_dir_all, File},
         path::PathBuf,
@@ -64,11 +64,13 @@ fn _dump_func_dot(ast: Shared<Ast>, func: &'static str, filename: Option<&'stati
 
     create_dir_all(path.parent().unwrap()).unwrap();
 
-    ast.get()
-        .functions
-        .get(&InternedString::from_static(func))
-        .unwrap()
-        .entry_block
-        .as_dot(&mut File::create(path).unwrap())
-        .unwrap()
+    crate::boom::control_flow::dot::render(
+        &mut File::create(path).unwrap(),
+        &ast.get()
+            .functions
+            .get(&InternedString::from_static(func))
+            .unwrap()
+            .entry_block,
+    )
+    .unwrap()
 }

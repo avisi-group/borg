@@ -1,16 +1,21 @@
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
         passes::Pass,
-        visitor::Walkable,
-        Ast, Expression, Literal, NamedType, Operation, Parameter, Size, Statement, Type, Value,
-        Visitor,
+        visitor::{Visitor, Walkable},
     },
-    common::{intern::InternedString, HashMap},
+    common::{
+        boom::{
+            control_flow::{ControlFlowBlock, Terminator},
+            Ast, Expression, Literal, NamedType, Operation, Parameter, Size, Statement, Type,
+            Value,
+        },
+        intern::InternedString,
+        shared::Shared,
+        HashMap,
+    },
     itertools::Itertools,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
-    sailrs::shared::Shared,
-    std::{fmt, fmt::Display},
+    std::fmt::{self, Display},
 };
 
 #[derive(Debug, Default)]
@@ -504,7 +509,9 @@ fn create_union_construction_copies(
 
     let iter = [Shared::new(Statement::Copy {
         expression: Expression::Identifier(union_tag_ident(*dst)),
-        value: Shared::new(Value::Literal(Shared::new(Literal::Int(tag.into())))),
+        value: Shared::new(Value::Literal(Shared::new(Literal::Int(
+            tag.try_into().unwrap(),
+        )))),
     })]
     .into_iter();
 
