@@ -8,25 +8,25 @@ authors = ["AVISI Research Group"]
 rkyv = { version = "0.8.10", default-features = false, features = ["alloc", "hashbrown-0_15", "pointer_width_64"] }
 hashbrown = { version = "0.15.2", features = ["serde"] }
 twox-hash = { version = "2.1.0", default-features = false, features = ["alloc", "xxhash64"] }
-serde = { version = "1.0.217", default-features = false, features = ["alloc", "derive"] }
+serde = { version = "1.0.217", default-features = false, features = ["alloc", "derive", "rc"] }
 log = "0.4.25"
 num-rational = { version = "0.4.2", default-features = false, features = ["serde"] }
 num-traits = { version = "0.2.19", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 deepsize = { version = "0.2.0", default-features = false, features = ["derive"] }
 postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
-byte-unit = "5.1.6"
 
 lasso = { version = "0.7.3", default-features = false, features = ["deepsize", "serialize"] }
 ocaml = { version = "1.1.0", optional = true }
 spin = { version = "0.9.8", features = ["lazy"], optional = true }
-parking_lot = { version = "0.12.3", optional = true}
+parking_lot = { version = "0.12.3", features = ["serde"], optional = true}
 color-eyre = { version = "0.6.3", optional = true }
 errctx = { version = "1.0.0", optional = true }
 pretty_env_logger = {version = "0.5.0", optional = true }
+byte-unit = { version = "5.1.6", optional = true }
 
 [features]
 default = ["no-std"]
 no-std = ["lasso/no-std", "dep:spin"]
-std = ["dep:parking_lot", "dep:color-eyre", "dep:errctx", "dep:pretty_env_logger", "lasso/multi-threaded", "hashbrown/rayon"]
+std = ["dep:parking_lot", "dep:color-eyre", "dep:errctx", "dep:byte-unit", "dep:pretty_env_logger", "lasso/multi-threaded", "hashbrown/rayon"]
 ocaml = ["std", "dep:ocaml"]

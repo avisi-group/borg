@@ -29,12 +29,12 @@ use {
 
 /// Node in a control flow graph, contains a basic block of statements and a
 /// terminator
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct ControlFlowBlock {
     inner: Shared<ControlFlowBlockInner>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 struct ControlFlowBlockInner {
     /// Unique block ID
     id: Id,
@@ -268,7 +268,7 @@ impl ControlFlowBlock {
 }
 
 /// Non-owning reference to a `ControlFlowBlock`
-#[derive(Debug)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct ControlFlowBlockWeak(Weak<ControlFlowBlockInner>);
 
 impl ControlFlowBlockWeak {
@@ -295,7 +295,7 @@ impl Eq for ControlFlowBlockWeak {}
 /// Block terminator
 ///
 /// Describes how one block conditionally or unconditionally jumps to the next
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Terminator {
     /// Function return with value
     Return(Option<Value>),

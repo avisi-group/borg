@@ -17,7 +17,7 @@ use {
 /// Shared data
 ///
 /// Abstracts over Rc, Arc, Mutex, RwLock
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Deserialize, serde::Serialize)]
 pub struct Shared<T> {
     inner: Arc<RwLock<T>>,
 }
@@ -73,7 +73,7 @@ impl<T> Shared<T> {
 }
 
 /// Weak reference to a `Shared``
-#[derive(Debug)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct Weak<T> {
     inner: std::sync::Weak<RwLock<T>>,
 }

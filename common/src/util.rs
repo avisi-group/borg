@@ -1,6 +1,7 @@
 extern crate std;
 
 use {
+    byte_unit::{AdjustedByte, Byte},
     color_eyre::{eyre::WrapErr, Result},
     errctx::PathCtx,
     std::{fs::File, io::BufWriter, path::Path},
@@ -27,4 +28,9 @@ pub fn create_file_buffered<P: AsRef<Path>>(path: P) -> Result<BufWriter<File>> 
         .map(BufWriter::new)
         .map_err(PathCtx::f(path))
         .wrap_err("Failed to write to file")
+}
+
+/// Number of bytes to human-readable `Display`able
+pub fn bytes(num: usize) -> AdjustedByte {
+    Byte::from(num).get_appropriate_unit(byte_unit::UnitType::Binary)
 }

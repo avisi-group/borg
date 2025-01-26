@@ -16,7 +16,6 @@ use {
     },
     common::{
         boom::Ast as BoomAst,
-        bytes,
         intern::InternedString,
         rudder::{
             block::Block,
@@ -26,7 +25,7 @@ use {
             types::Type,
         },
         shared::Shared,
-        util::create_file_buffered,
+        util::{bytes, create_file_buffered},
         HashMap, HashSet,
     },
     errctx::PathCtx,

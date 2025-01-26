@@ -1,14 +1,10 @@
 use {
     clap::Parser,
     color_eyre::Result,
-    common::{
-        bytes,
-        util::{create_file_buffered, init_logger},
-    },
+    common::util::{bytes, create_file_buffered, init_logger},
     deepsize::DeepSizeOf,
     log::info,
-    rkyv::{api::high::to_bytes_with_alloc, ser::allocator::Arena},
-    sailrs::load_from_config,
+    sailrs::{convert::jib_to_boom, load_from_config},
     std::{io::Write, path::PathBuf},
 };
 
@@ -42,12 +38,24 @@ fn main() -> Result<()> {
         bytes(jib.deep_size_of())
     );
 
-    let mut writer = create_file_buffered(&args.output)?;
-    let mut arena = Arena::new();
-    let serialized = to_bytes_with_alloc::<_, rkyv::rancor::Error>(&jib, arena.acquire())?;
-    writer.write_all(&serialized)?;
+    info!("Converting JIB to BOOM");
+    let ast = jib_to_boom(jib);
 
-    info!("Serialized JIB to {:.2} bytes", bytes(serialized.len()));
+    {
+        info!("serializing to postcard");
+        let mut writer = create_file_buffered(&args.output.join("postcard"))?;
+        let serialized = postcard::to_stdvec(&ast).unwrap();
+        info!("done serializing to postcard");
+        writer.write_all(&serialized)?;
+    }
+
+    {
+        info!("serializing to bincode");
+        let mut writer = create_file_buffered(&args.output.join("bincode"))?;
+        let serialized = bincode::serialize(&ast).unwrap();
+        info!("done serializing to bincode");
+        writer.write_all(&serialized)?;
+    }
 
     info!("done");
 

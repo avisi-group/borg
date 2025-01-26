@@ -6,7 +6,6 @@ pub use hashbrown::hash_map::Entry;
 
 use {
     alloc::{string::String, vec::Vec},
-    byte_unit::{AdjustedByte, Byte},
     core::hash::BuildHasherDefault,
     serde::{Deserialize, Serialize},
 };
@@ -45,9 +44,4 @@ pub enum TestConfig {
     Exclude(Vec<String>),
     // Run all tests
     All,
-}
-
-/// Number of bytes to human-readable `Display`able
-pub fn bytes(num: usize) -> AdjustedByte {
-    Byte::from(num).get_appropriate_unit(byte_unit::UnitType::Binary)
 }

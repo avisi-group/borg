@@ -19,7 +19,7 @@ use {
 pub mod control_flow;
 
 /// BOOM AST
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct Ast {
     /// Register types by identifier
     pub registers: HashMap<InternedString, Shared<Type>>,
@@ -34,7 +34,7 @@ pub struct Ast {
 }
 
 /// Top-level definition of a BOOM item
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Definition {
     /// Struct definition
     Struct {
@@ -54,7 +54,7 @@ pub enum Definition {
 }
 
 /// Function signature and body
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct FunctionDefinition {
     /// Function type signature
     pub signature: FunctionSignature,
@@ -90,14 +90,14 @@ impl FunctionDefinition {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Parameter {
     pub name: InternedString,
     pub typ: Shared<Type>,
 }
 
 /// Function parameter and return types
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct FunctionSignature {
     pub name: InternedString,
     pub parameters: Shared<Vec<Parameter>>,
@@ -105,21 +105,21 @@ pub struct FunctionSignature {
 }
 
 /// Name and type of a union field, struct field, or function parameter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct NamedType {
     pub name: InternedString,
     pub typ: Shared<Type>,
 }
 
 /// Name and type of a union field, struct field, or function parameter
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct NamedValue {
     pub name: InternedString,
     pub value: Shared<Value>,
 }
 
 /// Type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Type {
     // removed before emitting
     Unit,
@@ -176,7 +176,7 @@ impl Type {
 }
 
 /// Size of a BOOM type in bits
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Size {
     /// Size is known statically at borealis compile time
     Static(usize),
@@ -215,7 +215,7 @@ impl Add for Size {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Statement {
     VariableDeclaration {
         name: InternedString,
@@ -256,7 +256,7 @@ impl From<Statement> for Shared<Statement> {
 }
 
 /// Expression
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Expression {
     Identifier(InternedString),
     Field {
@@ -267,7 +267,7 @@ pub enum Expression {
     Tuple(Vec<Self>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Value {
     Identifier(InternedString),
     Literal(Shared<Literal>),
@@ -368,7 +368,7 @@ impl From<Operation> for Shared<Value> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Literal {
     Int(i128),
     // Little-endian order
@@ -382,7 +382,7 @@ pub enum Literal {
     Undefined,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum Operation {
     Not(Shared<Value>),
     Complement(Shared<Value>),
@@ -412,7 +412,7 @@ pub enum Operation {
 }
 
 /// Bit
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, serde::Deserialize, serde::Serialize)]
 pub enum Bit {
     /// Fixed zero
     Zero,
