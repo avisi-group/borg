@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["AVISI Research Group"]
 
 [dependencies]
-rkyv = { version = "0.8.9", default-features = false, features = ["alloc", "hashbrown-0_15", "pointer_width_64"] }
+rkyv = { version = "0.8.10", default-features = false, features = ["alloc", "hashbrown-0_15", "pointer_width_64"] }
 hashbrown = { version = "0.15.2", features = ["serde"] }
 twox-hash = { version = "2.1.0", default-features = false, features = ["alloc", "xxhash64"] }
 serde = { version = "1.0.217", default-features = false, features = ["alloc", "derive"] }
