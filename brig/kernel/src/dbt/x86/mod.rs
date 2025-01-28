@@ -1,15 +1,12 @@
 use {
-    crate::{
-        arch::x86::memory::ExecutableAllocator,
-        dbt::{
-            emitter::Emitter,
-            x86::{
-                emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
-                encoder::{Instruction, Opcode, OperandKind},
-                register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
-            },
-            Translation,
+    crate::dbt::{
+        emitter::Emitter,
+        x86::{
+            emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
+            encoder::{Instruction, Opcode, OperandKind},
+            register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
         },
+        Translation,
     },
     alloc::{collections::VecDeque, rc::Rc, vec::Vec},
     common::{
@@ -103,55 +100,42 @@ impl X86TranslationContext {
         self.panic_block
     }
 
-    fn allocate_registers<R: RegisterAllocator>(&mut self, mut allocator: R) {
-        let mut visited = alloc::vec![];
-        let mut to_visit = alloc::vec![self.initial_block()];
-
-        while let Some(next) = to_visit.pop() {
-            visited.push(next);
-
-            to_visit.extend(
-                next.get(self.arena())
-                    .next_blocks()
-                    .iter()
-                    .filter(|next| !visited.contains(next))
-                    .copied(),
-            );
-        }
-
-        visited.into_iter().rev().for_each(|block| {
-            block
-                .get_mut(self.arena_mut())
-                .allocate_registers(&mut allocator);
-        });
-    }
-
     pub fn compile(mut self, num_virtual_registers: usize) -> Translation {
-        self.allocate_registers(SolidStateRegisterAllocator::new(num_virtual_registers));
-
         let mut assembler = CodeAssembler::new(64).unwrap();
         let mut label_map = HashMap::default();
 
-        let mut all_blocks = VecDeque::new();
-        let mut work_queue = VecDeque::new();
-        work_queue.push_back(self.initial_block());
-        work_queue.push_back(self.panic_block());
+        log::info!("building work queue");
 
-        while let Some(block) = work_queue.pop_front() {
+        let mut all_blocks = Vec::new();
+        let mut work_queue = Vec::new();
+        work_queue.push(self.panic_block());
+        work_queue.push(self.initial_block());
+
+        while let Some(block) = work_queue.pop() {
             if !block.get(self.arena()).is_linked() {
                 block.get_mut(self.arena_mut()).set_linked();
 
                 if let Some(label) = label_map.insert(block, assembler.create_label()) {
                     panic!("created label for {block:?} but label {label:?} already existed")
                 }
-                all_blocks.push_back(block);
+                all_blocks.push(block);
 
                 empty_block_jump_threading(self.arena_mut(), block);
                 for block in block.get(self.arena()).next_blocks() {
-                    work_queue.push_back(*block);
+                    work_queue.push(*block);
                 }
             }
         }
+
+        log::info!("allocating registers");
+        let mut allocator = SolidStateRegisterAllocator::new(num_virtual_registers);
+        all_blocks.iter().rev().for_each(|block| {
+            block
+                .get_mut(self.arena_mut())
+                .allocate_registers(&mut allocator);
+        });
+
+        log::info!("encoding all blocks");
 
         for (i, block) in all_blocks.iter().enumerate() {
             assembler
@@ -172,7 +156,6 @@ impl X86TranslationContext {
 
             // all but last
             for instr in rest {
-                log::debug!("\t{instr}");
                 instr.encode(&mut assembler, &label_map);
             }
 
@@ -191,23 +174,19 @@ impl X86TranslationContext {
                 }
             }
 
-            log::debug!("\t{last}");
             last.encode(&mut assembler, &label_map);
         }
 
-        // todo fix unnecessary allocation and byte copy, might require passing
-        // allocator T into assemble
-        let code = {
-            let output = assembler.assemble(0).unwrap();
+        log::info!("assembling");
+        let code = assembler.assemble(0).unwrap();
 
-            let mut code = Vec::with_capacity_in(output.len(), ExecutableAllocator::get());
-            for byte in output {
-                code.push(byte);
-            }
-            code
-        };
+        log::info!("making executable");
 
-        Translation { code }
+        let res = Translation::new(code);
+
+        log::info!("done");
+
+        res
     }
 
     pub fn create_block(&mut self) -> Ref<X86Block> {

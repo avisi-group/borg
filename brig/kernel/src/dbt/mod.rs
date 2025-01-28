@@ -1,5 +1,5 @@
 use {
-    crate::{arch::x86::memory::ExecutableAllocator, dbt::interpret::interpret},
+    crate::{arch::x86::memory::VirtualMemoryArea, dbt::interpret::interpret},
     alloc::{string::String, vec::Vec},
     common::{mask::mask, rudder::Model},
     core::{
@@ -7,6 +7,7 @@ use {
         fmt::{self, Debug},
     },
     iced_x86::{Formatter, Instruction},
+    x86_64::{structures::paging::PageTableFlags, VirtAddr},
 };
 
 pub mod emitter;
@@ -18,14 +19,33 @@ pub mod translate;
 pub mod x86;
 
 pub struct Translation {
-    pub code: Vec<u8, ExecutableAllocator>,
+    pub code: Vec<u8>,
 }
 
 impl Translation {
+    pub fn new(code: Vec<u8>) -> Self {
+        let start = VirtAddr::from_ptr(code.as_ptr());
+        VirtualMemoryArea::current().update_flags_range(
+            start..start + code.len() as u64,
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE, // removing  "NOEXECUTE" flag
+        );
+        Self { code }
+    }
+
     pub fn execute(&self, register_file: *mut u8) {
         let code_ptr = self.code.as_ptr();
 
         unsafe { trampoline::execute(code_ptr, register_file) };
+    }
+}
+
+impl Drop for Translation {
+    fn drop(&mut self) {
+        let start = VirtAddr::from_ptr(self.code.as_ptr());
+        VirtualMemoryArea::current().update_flags_range(
+            start..start + self.code.len() as u64,
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
+        );
     }
 }
 
