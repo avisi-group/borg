@@ -1,5 +1,6 @@
 use {
     crate::{
+        arch::x86::irq::get_jiffies,
         dbt::{
             emitter::{Emitter, Type},
             init_register_file,
@@ -276,6 +277,8 @@ impl ModelDevice {
         let register_file_ptr = self.register_file.lock().as_mut_ptr();
 
         loop {
+            log::info!("--------------------start");
+            let start = get_jiffies();
             unsafe {
                 // reset SEE
                 *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
@@ -292,7 +295,7 @@ impl ModelDevice {
                 let opcode = *(current_pc as *const u32);
 
                 log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
-
+                let start = get_jiffies();
                 let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
                 let pc = emitter.constant(current_pc, Type::Unsigned(64));
                 let _return_value = translate(
@@ -319,17 +322,20 @@ impl ModelDevice {
                     let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
                     emitter.write_register(self.model.reg_offset("_PC"), new_pc);
                 }
+                let end = get_jiffies();
+                log::trace!("translation took {}ms, compiling", (end - start) / 10);
 
-                log::trace!("compiling");
-
+                let start = get_jiffies();
                 emitter.leave();
                 let num_regs = emitter.next_vreg();
                 let translation = ctx.compile(num_regs);
-
-                log::trace!("executing");
+                let end = get_jiffies();
+                log::trace!("compilation took {}ms, executing", (end - start) / 10);
+                let start = get_jiffies();
 
                 translation.execute(register_file_ptr);
-
+                let end = get_jiffies();
+                log::trace!("execution took {}ms", (end - start) / 10);
                 log::trace!(
                     "{:x} {} {:x} {:x}",
                     *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64),
@@ -339,6 +345,8 @@ impl ModelDevice {
                     *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64)
                 );
             }
+            let end = get_jiffies();
+            log::info!("took {}ms\n\n", (end - start) / 10)
         }
 
         unreachable!();

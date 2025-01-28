@@ -102,7 +102,11 @@ impl BuildContext {
                 || name.as_ref().ends_with("EL0")
                 || name.as_ref().ends_with("EL1")
                 || name.as_ref().ends_with("EL2")
+                || name.as_ref().ends_with("EL3")
                 || name.as_ref() == "SEE"
+                // || name.as_ref() == "have_exception"
+                // || name.as_ref() == "current_exception"
+            || name.as_ref().starts_with("SCTLR")
         }
 
         self.registers.insert(
