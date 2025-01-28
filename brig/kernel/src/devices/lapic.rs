@@ -67,14 +67,14 @@ fn calibrate_timer_frequency(lapic: &mut x2apic::lapic::LocalApic) -> u32 {
 
     let factor = 1000;
     let calibration_period = 10;
-    let calibration_ticks = (PIT_FREQUENCY * calibration_period) / factor;
+    let calibration_ticks = u16::try_from((PIT_FREQUENCY * calibration_period) / factor).unwrap();
     pit::init_oneshot(calibration_ticks);
 
     pit::start();
     unsafe { lapic.set_timer_initial(u32::MAX) };
 
     while !pit::is_expired() {
-        x86_64::instructions::nop()
+        unsafe { core::arch::asm!("") };
     }
 
     unsafe { lapic.disable_timer() };
@@ -82,10 +82,9 @@ fn calibrate_timer_frequency(lapic: &mut x2apic::lapic::LocalApic) -> u32 {
     // Calculate the number of ticks per period (accounting for the LAPIC division)
     let ticks_per_period = (u32::MAX - unsafe { lapic.timer_current() }) << 4;
 
-    // Determine the LAPIC base frequency
-    let freq = ticks_per_period * (factor / calibration_period);
+    let freq = (u64::from(ticks_per_period) * u64::from(factor)) / u64::from(calibration_period);
 
     trace!("ticks-per-period={ticks_per_period}, freq={freq}");
 
-    freq
+    u32::try_from(freq).unwrap()
 }

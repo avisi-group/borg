@@ -15,7 +15,9 @@ use {
     },
     proc_macro_lib::irq_handler,
     spin::Once,
-    x86::irq::{BREAKPOINT_VECTOR, GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR},
+    x86::irq::{
+        BREAKPOINT_VECTOR, DOUBLE_FAULT_VECTOR, GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR,
+    },
     x86_64::{
         registers::control::Cr2,
         structures::{
@@ -49,7 +51,7 @@ struct IrqManager {
 static JIFFIES: AtomicU64 = AtomicU64::new(0);
 
 pub fn current_milliseconds() -> u64 {
-    JIFFIES.load(Ordering::Relaxed) / 10
+    JIFFIES.load(Ordering::Relaxed)
 }
 
 #[irq_handler(with_code = false)]
@@ -130,6 +132,7 @@ impl IrqManager {
         self.assign_irq(BREAKPOINT_VECTOR, breakpoint_exception);
         self.assign_irq(PAGE_FAULT_VECTOR, page_fault_exception);
         self.assign_irq(GENERAL_PROTECTION_FAULT_VECTOR, gpf_exception);
+        self.assign_irq(DOUBLE_FAULT_VECTOR, double_fault_exception);
 
         // TODO: Pop this out
         self.reserve_irq(0x20, timer_interrupt).unwrap();
@@ -162,6 +165,11 @@ impl IrqManager {
                 GENERAL_PROTECTION_FAULT_VECTOR => {
                     self.idt
                         .general_protection_fault
+                        .set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
+                }
+                DOUBLE_FAULT_VECTOR => {
+                    self.idt
+                        .double_fault
                         .set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
                 }
                 nr => {

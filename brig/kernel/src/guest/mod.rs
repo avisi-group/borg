@@ -10,6 +10,7 @@ use {
     plugins_api::guest,
     spin::{Mutex, Once},
     x86::current::segmentation::{rdfsbase, wrfsbase},
+    x86_64::instructions::interrupts::int3,
 };
 
 pub mod config;

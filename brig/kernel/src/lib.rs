@@ -19,7 +19,6 @@ use {
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
-    common::TestConfig,
     core::panic::PanicInfo,
     x86::io::outw,
 };

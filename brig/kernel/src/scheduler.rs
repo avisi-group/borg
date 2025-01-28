@@ -53,7 +53,7 @@ impl Scheduler {
 pub fn local_run() -> ! {
     trace!("scheduler started");
 
-    LAPIC.get().unwrap().lock().start_periodic(100);
+    LAPIC.get().unwrap().lock().start_periodic(1000);
 
     // The idle task is active at this point, and because its RFLAGS
     // enables interrupts, the following iretq will also enable
