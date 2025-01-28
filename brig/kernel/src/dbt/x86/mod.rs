@@ -1,15 +1,12 @@
 use {
-    crate::{
-        arch::x86::irq::get_jiffies,
-        dbt::{
-            emitter::Emitter,
-            x86::{
-                emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
-                encoder::{Instruction, Opcode, OperandKind},
-                register_allocator::{solid_state::SolidStateRegisterAllocator, RegisterAllocator},
-            },
-            Translation,
+    crate::dbt::{
+        emitter::Emitter,
+        x86::{
+            emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
+            encoder::{Instruction, Opcode, OperandKind},
+            register_allocator::solid_state::SolidStateRegisterAllocator,
         },
+        Translation,
     },
     alloc::{collections::VecDeque, rc::Rc, vec::Vec},
     common::{
@@ -131,15 +128,14 @@ impl X86TranslationContext {
         }
 
         log::info!("allocating registers");
-        let start = get_jiffies();
+
         let mut allocator = SolidStateRegisterAllocator::new(num_virtual_registers);
         all_blocks.iter().rev().for_each(|block| {
             block
                 .get_mut(self.arena_mut())
                 .allocate_registers(&mut allocator);
         });
-        let end = get_jiffies();
-        log::info!("register allocation took {}ms", (end - start) / 10);
+
         log::info!("encoding all blocks");
 
         for (i, block) in all_blocks.iter().enumerate() {

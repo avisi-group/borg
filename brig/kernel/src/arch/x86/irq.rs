@@ -9,7 +9,10 @@ use {
     },
     alloc::{alloc::alloc_zeroed, collections::BTreeSet},
     common::intern::InternedString,
-    core::{alloc::Layout, sync::atomic::AtomicU64},
+    core::{
+        alloc::Layout,
+        sync::atomic::{AtomicU64, Ordering},
+    },
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{BREAKPOINT_VECTOR, GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR},
@@ -45,14 +48,15 @@ struct IrqManager {
 
 static JIFFIES: AtomicU64 = AtomicU64::new(0);
 
-pub fn get_jiffies() -> u64 {
-    JIFFIES.load(core::sync::atomic::Ordering::Relaxed)
+pub fn current_milliseconds() -> u64 {
+    JIFFIES.load(Ordering::Relaxed) / 10
 }
 
 #[irq_handler(with_code = false)]
 fn timer_interrupt() {
+    JIFFIES.fetch_add(1, Ordering::Relaxed);
+
     scheduler::schedule();
-    JIFFIES.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
 
     unsafe {
         crate::devices::lapic::LAPIC

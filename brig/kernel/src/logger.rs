@@ -1,7 +1,7 @@
 //! Logger implementation
 
 use {
-    crate::devices::serial::UART16550Device,
+    crate::{arch::x86::irq::current_milliseconds, devices::serial::UART16550Device},
     core::fmt::{self, Write},
     log::{Level, LevelFilter, Log, Metadata, Record},
     spin::Once,
@@ -98,14 +98,16 @@ impl<const N: usize> Log for Logger<N> {
 
         if ENABLE_COLORS {
             crate::println!(
-                "{} \x1b[0;30m[{}]\x1b[0m {}",
+                "\x1b[0;30m({}ms)\x1b[0m {} \x1b[0;30m[{}]\x1b[0m {}",
+                current_milliseconds(),
                 format_level(record.level()),
                 target,
                 record.args()
             );
         } else {
             crate::println!(
-                "{} [{}] {}",
+                "({}ms) {} [{}] {}",
+                current_milliseconds(),
                 format_level(record.level()),
                 target,
                 record.args()

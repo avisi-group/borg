@@ -107,6 +107,7 @@ impl BuildContext {
                 // || name.as_ref() == "have_exception"
                 // || name.as_ref() == "current_exception"
             || name.as_ref().starts_with("SCTLR")
+            || name.as_ref().starts_with("EL")
         }
 
         self.registers.insert(
