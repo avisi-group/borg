@@ -5,14 +5,12 @@ use {
             MachineContext,
         },
         guest::memory::AddressSpaceRegionKind,
-        qemu_exit, scheduler,
+        qemu_exit,
     },
-    alloc::{alloc::alloc_zeroed, collections::BTreeSet},
+    alloc::alloc::alloc_zeroed,
+    bitset_core::BitSet,
     common::intern::InternedString,
-    core::{
-        alloc::Layout,
-        sync::atomic::{AtomicU64, Ordering},
-    },
+    core::alloc::Layout,
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{
@@ -43,31 +41,100 @@ macro_rules! exit_with_message {
 
 static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;
 
+pub fn init() {
+    unsafe {
+        IRQ_MANAGER.call_once(|| IrqManager::new());
+        let irqm = IRQ_MANAGER.get_mut().unwrap();
+        irqm.setup().unwrap();
+        irqm.idt.load();
+    };
+}
+
+pub fn assign_irq(nr: u8, handler: IrqHandlerFn) -> Result<(), IrqError> {
+    let irqm = unsafe { IRQ_MANAGER.get_mut() }.unwrap();
+    irqm.assign_irq(nr, handler)?;
+    irqm.idt.load();
+    Ok(())
+}
+
 struct IrqManager {
     idt: InterruptDescriptorTable,
-    avail: BTreeSet<u8>,
+    used: UsedInterruptVectors,
 }
 
-static JIFFIES: AtomicU64 = AtomicU64::new(0);
+impl IrqManager {
+    fn new() -> Self {
+        Self {
+            idt: InterruptDescriptorTable::new(),
+            used: UsedInterruptVectors::new(),
+        }
+    }
 
-pub fn current_milliseconds() -> u64 {
-    JIFFIES.load(Ordering::Relaxed)
+    fn setup(&mut self) -> Result<(), IrqError> {
+        unsafe {
+            // page fault
+            self.idt
+                .page_fault
+                .set_handler_addr(VirtAddr::from_ptr(page_fault_exception as *const u8));
+            self.used.set(PAGE_FAULT_VECTOR);
+
+            // general protection
+            self.idt
+                .general_protection_fault
+                .set_handler_addr(VirtAddr::from_ptr(gpf_exception as *const u8));
+            self.used.set(GENERAL_PROTECTION_FAULT_VECTOR);
+
+            // breakpoint
+            self.idt
+                .breakpoint
+                .set_handler_addr(VirtAddr::from_ptr(breakpoint_exception as *const u8));
+            self.used.set(BREAKPOINT_VECTOR);
+
+            // double fault
+            self.idt
+                .double_fault
+                .set_handler_addr(VirtAddr::from_ptr(double_fault_exception as *const u8));
+            self.used.set(DOUBLE_FAULT_VECTOR);
+        };
+
+        for (f, i) in [
+            (dbt_handler_undefined_terminator as IrqHandlerFn, 0x50),
+            (dbt_handler_default_terminator, 0x51),
+            (dbt_handler_const_assert, 0x52),
+            (dbt_handler_panic, 0x53),
+        ] {
+            self.assign_irq(i, f)?;
+        }
+
+        Ok(())
+    }
+
+    fn assign_irq(&mut self, nr: u8, handler: IrqHandlerFn) -> Result<(), IrqError> {
+        if !self.used.get(nr) {
+            unsafe { self.idt[nr].set_handler_addr(VirtAddr::from_ptr(handler as *const u8)) };
+            self.used.set(nr);
+            Ok(())
+        } else {
+            Err(IrqError::IrqAlreadyReserved(nr))
+        }
+    }
 }
 
-#[irq_handler(with_code = false)]
-fn timer_interrupt() {
-    JIFFIES.fetch_add(1, Ordering::Relaxed);
+/// IRQ Error
+#[derive(Debug, displaydoc::Display, thiserror::Error)]
+pub enum IrqError {
+    /// Attempted to assign IRQ {0} but it is already in use
+    IrqAlreadyReserved(u8),
+}
 
-    scheduler::schedule();
+pub type IrqHandlerFn = unsafe extern "C" fn();
 
-    unsafe {
-        crate::devices::lapic::LAPIC
-            .get()
-            .unwrap()
-            .lock()
-            .inner
-            .end_of_interrupt()
-    };
+pub fn _local_enable() {
+    x86_64::instructions::interrupts::enable();
+}
+
+pub fn local_disable() {
+    x86_64::instructions::interrupts::disable();
 }
 
 #[irq_handler(with_code = true)]
@@ -106,104 +173,6 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
     } else {
         exit_with_message!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
     }
-}
-
-pub fn init() {
-    unsafe {
-        IRQ_MANAGER.call_once(|| IrqManager {
-            idt: InterruptDescriptorTable::new(),
-            avail: BTreeSet::new(),
-        });
-
-        IRQ_MANAGER.get_mut().unwrap().init_default();
-    }
-}
-
-#[derive(Debug)]
-enum IrqError {
-    IrqAlreadyReserved,
-    NoAvailableIrqs,
-}
-
-pub type IrqHandlerFn = unsafe extern "C" fn();
-
-impl IrqManager {
-    pub fn init_default(&'static mut self) {
-        self.assign_irq(BREAKPOINT_VECTOR, breakpoint_exception);
-        self.assign_irq(PAGE_FAULT_VECTOR, page_fault_exception);
-        self.assign_irq(GENERAL_PROTECTION_FAULT_VECTOR, gpf_exception);
-        self.assign_irq(DOUBLE_FAULT_VECTOR, double_fault_exception);
-
-        // TODO: Pop this out
-        self.reserve_irq(0x20, timer_interrupt).unwrap();
-
-        for i in 32..=255 {
-            self.avail.insert(i);
-        }
-
-        for (f, i) in [
-            (dbt_handler_undefined_terminator as IrqHandlerFn, 0x50),
-            (dbt_handler_default_terminator, 0x51),
-            (dbt_handler_const_assert, 0x52),
-            (dbt_handler_panic, 0x53),
-        ] {
-            self.avail.remove(&i);
-            self.assign_irq(i, f);
-        }
-
-        self.idt.load();
-    }
-
-    pub fn assign_irq(&mut self, nr: u8, handler: IrqHandlerFn) {
-        unsafe {
-            match nr {
-                PAGE_FAULT_VECTOR => {
-                    self.idt
-                        .page_fault
-                        .set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
-                }
-                GENERAL_PROTECTION_FAULT_VECTOR => {
-                    self.idt
-                        .general_protection_fault
-                        .set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
-                }
-                DOUBLE_FAULT_VECTOR => {
-                    self.idt
-                        .double_fault
-                        .set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
-                }
-                nr => {
-                    self.idt[nr].set_handler_addr(VirtAddr::from_ptr(handler as *const u8));
-                }
-            }
-        }
-    }
-
-    pub fn reserve_irq(&mut self, nr: u8, handler: IrqHandlerFn) -> Result<(), IrqError> {
-        if self.avail.contains(&nr) {
-            return Err(IrqError::IrqAlreadyReserved);
-        }
-
-        self.assign_irq(nr, handler);
-
-        Ok(())
-    }
-
-    pub fn allocate_irq(&mut self, handler: IrqHandlerFn) -> Result<(), IrqError> {
-        let nr = self.avail.pop_first().ok_or(IrqError::NoAvailableIrqs)?;
-
-        self.assign_irq(nr, handler);
-
-        Ok(())
-    }
-}
-
-pub fn _local_enable() {
-    x86_64::instructions::interrupts::enable();
-}
-
-pub fn local_disable() {
-    x86_64::instructions::interrupts::disable();
 }
 
 #[irq_handler(with_code = false)]
@@ -252,4 +221,20 @@ fn dbt_handler_panic(machine_context: *mut MachineContext) {
     let statement = meta as u16;
 
     exit_with_message!("DBT interrupt: statement {statement:x} failed assert in block {block:x} of {function_name:?}")
+}
+
+struct UsedInterruptVectors([u64; 4]);
+
+impl UsedInterruptVectors {
+    pub fn new() -> Self {
+        Self([0; 4])
+    }
+
+    pub fn set(&mut self, nr: u8) {
+        self.0.bit_set(usize::from(nr));
+    }
+
+    pub fn get(&mut self, nr: u8) -> bool {
+        self.0.bit_test(usize::from(nr))
+    }
 }

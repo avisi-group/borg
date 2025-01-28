@@ -1,7 +1,7 @@
 //! Logger implementation
 
 use {
-    crate::{arch::x86::irq::current_milliseconds, devices::serial::UART16550Device},
+    crate::{devices::serial::UART16550Device, timer::current_milliseconds},
     core::fmt::{self, Write},
     log::{Level, LevelFilter, Log, Metadata, Record},
     spin::Once,

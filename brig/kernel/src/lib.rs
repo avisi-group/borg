@@ -34,6 +34,7 @@ mod rand;
 mod scheduler;
 mod tasks;
 mod tests;
+mod timer;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -55,6 +56,7 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
 
     // Host machine initialisation
     arch::platform_init(boot_info);
+    timer::init();
     tasks::init();
 
     // occurs per core
