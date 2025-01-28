@@ -11,6 +11,7 @@ pub mod acpi;
 pub mod lapic;
 pub mod manager;
 pub mod pcie;
+pub mod pic;
 pub mod pit;
 pub mod serial;
 pub mod virtio;

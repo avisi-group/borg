@@ -109,7 +109,6 @@ struct X86SystemBusProbeData {
 impl Bus<X86SystemBusProbeData> for X86SystemBus {
     fn probe(&self, probe_data: X86SystemBusProbeData) {
         acpi::ACPIBus.probe(probe_data.rsdp_phys);
-        lapic::init();
     }
 }
 

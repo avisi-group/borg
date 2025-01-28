@@ -1,7 +1,7 @@
 use {
     crate::{
         arch::x86::memory::PhysAddrExt,
-        devices::pit::{self, PIT_FREQUENCY},
+        devices::pit::{self},
     },
     log::trace,
     spin::{Mutex, Once},
@@ -37,12 +37,12 @@ impl LocalApic {
             lapic.disable_timer();
         }
 
-        let frequency = calibrate_timer_frequency(&mut lapic);
-        trace!("lapic frequency={}", frequency);
+        // let frequency = calibrate_timer_frequency(&mut lapic);
+        // trace!("lapic frequency={}", frequency);
 
         Self {
             inner: lapic,
-            frequency,
+            frequency: 0,
         }
     }
 
@@ -58,34 +58,47 @@ impl LocalApic {
 }
 
 fn calibrate_timer_frequency(lapic: &mut x2apic::lapic::LocalApic) -> u32 {
-    unsafe {
-        lapic.set_timer_initial(1);
-        lapic.set_timer_mode(TimerMode::OneShot);
-        lapic.set_timer_divide(TimerDivide::Div16);
-        lapic.enable_timer();
-    };
+    panic!()
+    // unsafe {
+    //     lapic.disable_timer();
+    //     lapic.set_timer_mode(TimerMode::OneShot);
+    //     lapic.set_timer_divide(TimerDivide::Div2);
+    // };
 
-    let factor = 1000;
-    let calibration_period = 10;
-    let calibration_ticks = (PIT_FREQUENCY * calibration_period) / factor;
-    pit::init_oneshot(calibration_ticks);
+    // let factor = 1000;
+    // let calibration_period = 1000;
+    // let calibration_ticks = (PIT_FREQUENCY * calibration_period) / factor;
+    // pit::init_oneshot(0xffff);
 
-    pit::start();
-    unsafe { lapic.set_timer_initial(u32::MAX) };
+    // unsafe {
+    //     lapic.set_timer_initial(u32::MAX);
+    //     lapic.enable_timer();
+    // };
+    // pit::start();
+    // if pit::is_expired() {
+    //     panic!();
+    // }
 
-    while !pit::is_expired() {
-        x86_64::instructions::nop()
-    }
+    // while !pit::is_expired() {
+    //     x86_64::instructions::nop()
+    // }
 
-    unsafe { lapic.disable_timer() };
+    // unsafe { lapic.disable_timer() };
 
-    // Calculate the number of ticks per period (accounting for the LAPIC division)
-    let ticks_per_period = (u32::MAX - unsafe { lapic.timer_current() }) << 4;
+    // trace!(
+    //     "lapic timer current: {}",
+    //     (u32::MAX - unsafe { lapic.timer_current() })
+    // );
+    // panic!();
 
-    // Determine the LAPIC base frequency
-    let freq = ticks_per_period * (factor / calibration_period);
+    // // Calculate the number of ticks per period (accounting for the LAPIC
+    // division) let ticks_per_period = (u32::MAX - unsafe {
+    // lapic.timer_current() }) << 4;
 
-    trace!("ticks-per-period={ticks_per_period}, freq={freq}");
+    // // Determine the LAPIC base frequency
+    // let freq = ticks_per_period * (factor / calibration_period);
 
-    freq
+    // trace!("ticks-per-period={ticks_per_period}, freq={freq}");
+
+    // freq
 }

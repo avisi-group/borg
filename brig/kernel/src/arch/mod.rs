@@ -19,6 +19,7 @@ pub const PAGE_SIZE: usize = 4096;
 /// initialization
 pub fn platform_init(boot_info: &BootInfo) {
     trace!("initializing platform");
+    CoreStorage::init_self();
     x86::init(boot_info);
 }
 

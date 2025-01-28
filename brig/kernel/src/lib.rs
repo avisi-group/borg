@@ -19,7 +19,6 @@ use {
     },
     bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
     byte_unit::{Byte, UnitType::Binary},
-    common::TestConfig,
     core::panic::PanicInfo,
     x86::io::outw,
 };
@@ -35,6 +34,7 @@ mod rand;
 mod scheduler;
 mod tasks;
 mod tests;
+mod timer;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -49,24 +49,27 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     // note: logging device initialized internally before platform
     logger::init();
 
-    arch::CoreStorage::init_self();
-
     // required for generating UUIDs
     rand::init();
 
     // Host machine initialisation
     arch::platform_init(boot_info);
+    timer::init();
     tasks::init();
 
     // occurs per core
     tasks::register_scheduler();
 
-    {
-        let continue_start_task = tasks::create_task(continue_start);
-        continue_start_task.start();
-    }
+    // {
+    //     let continue_start_task = tasks::create_task(continue_start);
+    //     continue_start_task.start();
+    // }
 
-    scheduler::local_run();
+    // scheduler::local_run();
+
+    continue_start();
+
+    loop {}
 }
 
 fn continue_start() {

@@ -14,6 +14,7 @@ use {
         devices::SharedDevice,
         fs::{tar::TarFilesystem, File, Filesystem},
         guest::register_device_factory,
+        timer::current_milliseconds,
     },
     alloc::{
         borrow::ToOwned,
@@ -117,6 +118,7 @@ impl Device for ModelDevice {
     fn start(&self) {
         //self.block_exec();
         self.single_step_exec();
+        panic!("should never reach here");
     }
 
     fn stop(&self) {
@@ -268,16 +270,14 @@ impl ModelDevice {
                 );
             }
         }
-
-        unreachable!();
     }
 
     fn single_step_exec(&self) {
         let register_file_ptr = self.register_file.lock().as_mut_ptr();
 
         loop {
-            log::info!("---- ---- ---- ---- starting block translation");
-
+            log::info!("---- ---- ---- ---- starting instruction translation");
+            let start = current_milliseconds();
             unsafe {
                 // reset SEE
                 *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
@@ -293,42 +293,52 @@ impl ModelDevice {
                     *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64);
                 let opcode = *(current_pc as *const u32);
 
-                log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
-
-                let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
-                let pc = emitter.constant(current_pc, Type::Unsigned(64));
-                let _return_value = translate(
-                    &*self.model,
-                    "__DecodeA64",
-                    &[pc, opcode],
-                    &mut emitter,
-                    register_file_ptr,
-                );
-
-                // if we didn't jump anywhere, increment PC by 4 bytes
+                // translate using decodea64 entrypoint
                 {
-                    let branch_taken = emitter.read_register(
-                        self.model.reg_offset("__BranchTaken") as u64,
-                        Type::Unsigned(1),
+                    log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
+                    let start = current_milliseconds();
+                    let opcode =
+                        emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
+                    let pc = emitter.constant(current_pc, Type::Unsigned(64));
+                    let _return_value = translate(
+                        &*self.model,
+                        "__DecodeA64",
+                        &[pc, opcode],
+                        &mut emitter,
+                        register_file_ptr,
                     );
 
-                    let _0 = emitter.constant(0, Type::Unsigned(64));
-                    let _4 = emitter.constant(4, Type::Unsigned(64));
-                    let addend = emitter.select(branch_taken, _0, _4);
+                    // if we didn't jump anywhere, increment PC by 4 bytes
+                    {
+                        let branch_taken = emitter.read_register(
+                            self.model.reg_offset("__BranchTaken") as u64,
+                            Type::Unsigned(1),
+                        );
 
-                    let pc =
-                        emitter.read_register(self.model.reg_offset("_PC"), Type::Unsigned(64));
-                    let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
-                    emitter.write_register(self.model.reg_offset("_PC"), new_pc);
+                        let _0 = emitter.constant(0, Type::Unsigned(64));
+                        let _4 = emitter.constant(4, Type::Unsigned(64));
+                        let addend = emitter.select(branch_taken, _0, _4);
+
+                        let pc =
+                            emitter.read_register(self.model.reg_offset("_PC"), Type::Unsigned(64));
+                        let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
+                        emitter.write_register(self.model.reg_offset("_PC"), new_pc);
+                    }
+                    let end = current_milliseconds();
+                    log::trace!("translation took {}ms", end - start);
                 }
-                log::trace!("compiling");
 
+                log::trace!("compiling");
+                let start = current_milliseconds();
                 emitter.leave();
                 let num_regs = emitter.next_vreg();
                 let translation = ctx.compile(num_regs);
+                log::trace!("compilation took {}ms", current_milliseconds() - start);
 
-                log::trace!("executing",);
+                log::trace!("executing");
+                let start = current_milliseconds();
                 translation.execute(register_file_ptr);
+                log::trace!("execution took {}ms", current_milliseconds() - start);
 
                 log::trace!(
                     "{:x} {} {:x} {:x}",
@@ -339,10 +349,8 @@ impl ModelDevice {
                     *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64)
                 );
             }
-
-            log::info!("finished\n\n")
+            let end = current_milliseconds();
+            log::info!("finished in {}ms\n\n", end - start)
         }
-
-        unreachable!();
     }
 }
