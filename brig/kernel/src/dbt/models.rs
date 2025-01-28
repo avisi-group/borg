@@ -3,7 +3,6 @@ use {
         dbt::{
             emitter::{Emitter, Type},
             init_register_file,
-            interpret::{interpret, Value},
             translate::translate,
             x86::{
                 emitter::{BinaryOperationKind, X86Emitter},

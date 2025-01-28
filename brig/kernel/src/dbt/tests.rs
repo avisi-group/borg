@@ -676,7 +676,7 @@ fn fibonacci_instr() {
 ///  4000dc:	91500421 	add	x1, x1, #0x401, lsl #12
 ///  4000e0:	f9000020 	str	x0, [x1]
 ///  4000e4:	f9400020 	ldr	x0, [x1]
-//#[ktest]
+#[ktest]
 fn mem() {
     let model = models::get("aarch64").unwrap();
 
@@ -686,6 +686,8 @@ fn mem() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
+    let see = unsafe { register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64 };
+    unsafe { *see = -1 };
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
@@ -707,7 +709,6 @@ fn mem() {
     unsafe {
         let mem = alloc::boxed::Box::new(0xdead_c0de_0000_0000u64);
 
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
         let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
         let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
 
@@ -715,25 +716,9 @@ fn mem() {
         *r0 = 0xdeadcafe;
         *r1 = &*mem as *const u64 as u64;
 
-        log::trace!(
-            "see: {:016x}, r0: {:016x}, r1: {:016x}, mem: {:016x}",
-            *see,
-            *r0,
-            *r1,
-            *mem
-        );
-
         translation.execute(register_file_ptr);
 
-        log::trace!(
-            "see: {:016x}, r0: {:016x}, r1: {:016x}, mem: {:016x}",
-            *see,
-            *r0,
-            *r1,
-            *mem
-        );
-
-        panic!();
+        assert_eq!(*mem, *r0);
     }
 }
 
@@ -1289,7 +1274,7 @@ fn ceilpow2_constant() {
 }
 
 //#[ktest]
-fn ispow2() {
+fn _ispow2() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = init_register_file(&*model);

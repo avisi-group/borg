@@ -1,5 +1,5 @@
 use {
-    crate::dbt::{bit_extract, bit_insert, x86::encoder::width},
+    crate::dbt::{bit_extract, bit_insert},
     alloc::vec::Vec,
     common::{
         arena::Ref,
