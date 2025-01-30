@@ -6,7 +6,7 @@ use {
             encoder::Instruction,
         },
     },
-    alloc::vec::Vec,
+    alloc::{rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
         intern::InternedString,
@@ -16,6 +16,10 @@ use {
         },
         width_helpers::unsigned_smallest_width_of_value,
         HashMap, HashSet,
+    },
+    core::{
+        cmp::max,
+        sync::atomic::{AtomicUsize, Ordering},
     },
 };
 
@@ -44,7 +48,7 @@ pub fn translate(
 ) -> Option<Ref<X86Node>> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
-    let current_stack_offset = 8;
+    let current_stack_offset = Rc::new(AtomicUsize::new(8));
     FunctionTranslator::new(
         model,
         function,
@@ -85,7 +89,7 @@ struct FunctionTranslator<'m, 'e, 'c> {
     // /// must be promoted to a stack variable
     // potential_stack_variables: HashMap<InternedString, (Ref<Block>, Ref<Statement>)>,
     /// Stack offset used to allocate stack variables
-    current_stack_offset: usize,
+    current_stack_offset: Rc<AtomicUsize>,
 
     /// X86 instruction emitter
     emitter: &'e mut X86Emitter<'c>,
@@ -100,7 +104,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         function: &str,
         arguments: &[Ref<X86Node>],
         emitter: &'e mut X86Emitter<'c>,
-        current_stack_offset: usize,
+        current_stack_offset: Rc<AtomicUsize>,
         register_file_ptr: *mut u8,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
@@ -371,18 +375,20 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         self.variables.get(&symbol.name()).unwrap()
                     {
                         log::trace!(
-                            "promoting {:?} from virtual to stack @ {}",
+                            "promoting {:?} from virtual to stack @ {:?}",
                             symbol.name(),
-                            self.current_stack_offset
+                            (*self.current_stack_offset)
                         );
                         self.variables.insert(
                             symbol.name(),
                             LocalVariable::Stack {
                                 typ: emit_rudder_type(&symbol.typ()),
-                                stack_offset: self.current_stack_offset,
+                                stack_offset: (*self.current_stack_offset).load(Ordering::Relaxed),
                             },
                         );
-                        self.current_stack_offset += usize::from(symbol.typ().width_bytes());
+                        let width = usize::from(symbol.typ().width_bytes());
+                        self.current_stack_offset
+                            .fetch_add(max(width, 8), Ordering::Relaxed);
                     }
                 }
 
@@ -653,9 +659,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         target.as_ref(),
                         &args,
                         self.emitter,
-                        self.current_stack_offset, /* pass in the current stack offset so
-                                                    * called functions' stack variables
-                                                    * don't corrupt this function's */
+                        self.current_stack_offset.clone(), /* pass in the current stack offset
+                                                            * so
+                                                            * called functions' stack variables
+                                                            * don't corrupt this function's */
                         self.register_file_ptr,
                     )
                     .translate(),
