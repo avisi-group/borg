@@ -170,9 +170,12 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     rudder
         .functions_mut()
         .extend(example_functions().into_iter());
+    let r0_offset = rudder.reg_offset("R0");
+    let r1_offset = rudder.reg_offset("R1");
+    let r2_offset = rudder.reg_offset("R2");
     rudder
         .functions_mut()
-        .extend(variable_corrupted_example().into_iter());
+        .extend(variable_corrupted_example(r0_offset, r1_offset, r2_offset).into_iter());
 
     let to_remove = rudder
         .functions()
@@ -324,7 +327,11 @@ fn example_functions() -> HashMap<InternedString, Function> {
     fns
 }
 
-fn variable_corrupted_example() -> HashMap<InternedString, Function> {
+fn variable_corrupted_example(
+    r0_offset: u64,
+    r1_offset: u64,
+    r2_offset: u64,
+) -> HashMap<InternedString, Function> {
     let mut fns = HashMap::default();
     let mut func = Function::new("func_corrupted_var".into(), Some(Type::u64()), vec![]);
     let ret_val = Symbol::new("x".into(), Type::u64());
@@ -349,20 +356,20 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
         {
             let a = a.get_mut(func.arena_mut());
             let s_arena = a.arena_mut();
-            let _0 = s_arena.insert(Statement::Constant {
+            let r0_offset = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(0),
+                value: ConstantValue::UnsignedInteger(r0_offset),
             });
             let read = s_arena.insert(Statement::ReadRegister {
                 typ: Type::u64(),
-                offset: _0,
+                offset: r0_offset,
             });
             let branch = s_arena.insert(Statement::Branch {
                 condition: read,
                 true_target: b,
                 false_target: c,
             });
-            a.set_statements([_0, read, branch].into_iter());
+            a.set_statements([r0_offset, read, branch].into_iter());
         }
 
         {
@@ -398,20 +405,20 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
         {
             let d = d.get_mut(func.arena_mut());
             let s_arena = d.arena_mut();
-            let _8 = s_arena.insert(Statement::Constant {
+            let r1_offset = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(8),
+                value: ConstantValue::UnsignedInteger(r1_offset),
             });
             let read = s_arena.insert(Statement::ReadRegister {
                 typ: Type::u64(),
-                offset: _8,
+                offset: r1_offset,
             });
             let branch = s_arena.insert(Statement::Branch {
                 condition: read,
                 true_target: e,
                 false_target: f,
             });
-            d.set_statements([_8, read, branch].into_iter());
+            d.set_statements([r1_offset, read, branch].into_iter());
         }
 
         {
@@ -434,16 +441,16 @@ fn variable_corrupted_example() -> HashMap<InternedString, Function> {
             let read = s_arena.insert(Statement::ReadVariable {
                 symbol: ret_val.clone(),
             });
-            let _16 = s_arena.insert(Statement::Constant {
+            let r2_offset = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(16),
+                value: ConstantValue::UnsignedInteger(r2_offset),
             });
             let w = s_arena.insert(Statement::WriteRegister {
-                offset: _16,
+                offset: r2_offset,
                 value: read,
             });
             let ret = s_arena.insert(Statement::Return { value: Some(read) });
-            g.set_statements([read, _16, w, ret].into_iter());
+            g.set_statements([read, r2_offset, w, ret].into_iter());
         }
     }
 

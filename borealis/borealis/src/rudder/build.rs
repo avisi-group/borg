@@ -16,7 +16,7 @@ use {
                 TernaryOperationKind, UnaryOperationKind,
             },
             types::{PrimitiveType, Type},
-            Model, RegisterDescriptor,
+            Model, RegisterCacheType, RegisterDescriptor,
         },
         width_helpers::signed_smallest_width_of_value,
         HashMap,
@@ -96,26 +96,12 @@ struct BuildContext {
 
 impl BuildContext {
     fn add_register(&mut self, name: InternedString, typ: Type) {
-        fn is_register_cacheable(name: InternedString) -> bool {
-            name.as_ref() == "FeatureImpl"
-                || name.as_ref().ends_with("IMPLEMENTED")
-                || name.as_ref().ends_with("EL0")
-                || name.as_ref().ends_with("EL1")
-                || name.as_ref().ends_with("EL2")
-                || name.as_ref().ends_with("EL3")
-                || name.as_ref() == "SEE"
-                // || name.as_ref() == "have_exception"
-                // || name.as_ref() == "current_exception"
-            || name.as_ref().starts_with("SCTLR")
-            || name.as_ref().starts_with("EL")
-        }
-
         self.registers.insert(
             name,
             RegisterDescriptor {
                 typ: typ.clone(),
                 offset: self.next_register_offset,
-                cacheable: is_register_cacheable(name),
+                cache: RegisterCacheType::None,
             },
         );
 

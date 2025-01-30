@@ -22,7 +22,11 @@ use {
         sync::Arc,
         vec::Vec,
     },
-    common::{rudder::Model, HashMap},
+    common::{
+        intern::InternedString,
+        rudder::{Model, RegisterCacheType, RegisterDescriptor},
+        HashMap,
+    },
     core::fmt::{self, Debug},
     plugins_api::{
         guest::{Device, DeviceFactory},
@@ -62,8 +66,11 @@ pub fn load_all(device: &SharedDevice) {
                 fs.open(path).unwrap().read_to_vec().unwrap(),
             )
         })
-        .map(|(name, data)| (name, postcard::from_bytes(&data).unwrap()))
-        .for_each(|(name, model)| {
+        .map(|(name, data)| (name, postcard::from_bytes::<Model>(&data).unwrap()))
+        .for_each(|(name, mut model)| {
+            model.registers_mut().iter_mut().for_each(
+                |(name, RegisterDescriptor { cache, .. })| *cache = register_cache_type(*name),
+            );
             register_model(name, model);
         });
 }
@@ -116,6 +123,7 @@ impl Device for ModelDevice {
     fn start(&self) {
         //self.block_exec();
         self.single_step_exec();
+        panic!("execution should never terminate here")
     }
 
     fn stop(&self) {
@@ -267,8 +275,6 @@ impl ModelDevice {
                 );
             }
         }
-
-        unreachable!();
     }
 
     fn single_step_exec(&self) {
@@ -343,5 +349,26 @@ impl ModelDevice {
         }
 
         unreachable!();
+    }
+}
+
+fn register_cache_type(name: InternedString) -> RegisterCacheType {
+    if name.as_ref() == "FeatureImpl"
+        || name.as_ref().ends_with("IMPLEMENTED")
+        || name.as_ref() == "EL0" // literally just 0,1,2,3
+        || name.as_ref() == "EL1"
+        || name.as_ref() == "EL2"
+        || name.as_ref() == "EL3"
+    {
+        RegisterCacheType::Constant
+    } else if name.as_ref() == "SEE"
+    // || name.as_ref() == "have_exception"
+    // || name.as_ref() == "current_exception"
+    // || name.as_ref().starts_with("SCTLR")
+    // || name.as_ref() == "EL"
+    {
+        RegisterCacheType::ReadWrite
+    } else {
+        RegisterCacheType::None
     }
 }

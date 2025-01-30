@@ -28,36 +28,46 @@ fn init_system() {
 
 #[ktest]
 fn static_dynamic_chaos_smoke() {
-    fn run(mut register_file: [u64; 3]) -> [u64; 3] {
-        let register_file_ptr = register_file.as_mut_ptr() as *mut u8;
+    fn run(r0_value: u64, r1_value: u64, r2_value: u64) -> (u64, u64, u64) {
         let model = models::get("aarch64").unwrap();
 
-        {
-            let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
-            let mut emitter = X86Emitter::new(&mut ctx);
+        let mut register_file = init_register_file(&*model);
+        let register_file_ptr = register_file.as_mut_ptr();
 
-            translate(
-                &*model,
-                "func_corrupted_var",
-                &[],
-                &mut emitter,
-                register_file_ptr,
-            )
-            .unwrap();
+        let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+        let mut emitter = X86Emitter::new(&mut ctx);
 
-            emitter.leave();
-            let num_regs = emitter.next_vreg();
-            let translation = ctx.compile(num_regs);
+        translate(
+            &*model,
+            "func_corrupted_var",
+            &[],
+            &mut emitter,
+            register_file_ptr,
+        )
+        .unwrap();
+
+        emitter.leave();
+        let num_regs = emitter.next_vreg();
+        let translation = ctx.compile(num_regs);
+
+        unsafe {
+            let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+            let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
+            let r2 = register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u64;
+            *r0 = r0_value;
+            *r1 = r1_value;
+            *r2 = r2_value;
+
             translation.execute(register_file_ptr);
-        }
 
-        register_file
+            (*r0, *r1, *r2)
+        }
     }
 
-    assert_eq!(run([0, 0, 0]), [0, 0, 10]);
-    assert_eq!(run([0, 1, 0]), [0, 1, 10]);
-    assert_eq!(run([1, 0, 0]), [1, 0, 5]);
-    assert_eq!(run([1, 1, 0]), [1, 1, 5]);
+    assert_eq!(run(0, 0, 0), (0, 0, 10));
+    assert_eq!(run(0, 1, 0), (0, 1, 10));
+    assert_eq!(run(1, 0, 0), (1, 0, 5));
+    assert_eq!(run(1, 1, 0), (1, 1, 5));
 }
 
 #[ktest]

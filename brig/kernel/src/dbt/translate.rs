@@ -12,7 +12,7 @@ use {
         intern::InternedString,
         rudder::{
             self, block::Block, constant_value::ConstantValue, function::Function,
-            statement::Statement, types::PrimitiveType, Model,
+            statement::Statement, types::PrimitiveType, Model, RegisterCacheType,
         },
         width_helpers::unsigned_smallest_width_of_value,
         HashMap, HashSet,
@@ -420,24 +420,29 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 let typ = emit_rudder_type(typ);
 
-                if self.model.registers().get(&name).unwrap().cacheable {
-                    let value = unsafe {
-                        let ptr = self
-                            .register_file_ptr
-                            .add(usize::try_from(*offset).unwrap());
+                match self.model.registers().get(&name).unwrap().cache {
+                    RegisterCacheType::Constant
+                    | RegisterCacheType::Read
+                    | RegisterCacheType::ReadWrite => {
+                        let value = unsafe {
+                            let ptr = self
+                                .register_file_ptr
+                                .add(usize::try_from(*offset).unwrap());
 
-                        match typ.width() {
-                            1..=8 => u64::from((ptr as *const u8).read()),
-                            9..=16 => u64::from((ptr as *const u16).read()),
-                            17..=32 => u64::from((ptr as *const u32).read()),
-                            33..=64 => u64::from((ptr as *const u64).read()),
-                            w => todo!("width {w}"),
-                        }
-                    };
-                    log::trace!("read from cacheable {name:?}: {value:x}");
-                    StatementResult::Data(Some(self.emitter.constant(value, typ)))
-                } else {
-                    StatementResult::Data(Some(self.emitter.read_register(*offset, typ)))
+                            match typ.width() {
+                                1..=8 => u64::from((ptr as *const u8).read()),
+                                9..=16 => u64::from((ptr as *const u16).read()),
+                                17..=32 => u64::from((ptr as *const u32).read()),
+                                33..=64 => u64::from((ptr as *const u64).read()),
+                                w => todo!("width {w}"),
+                            }
+                        };
+                        log::trace!("read from cacheable {name:?}: {value:x}");
+                        StatementResult::Data(Some(self.emitter.constant(value, typ)))
+                    }
+                    RegisterCacheType::None => {
+                        StatementResult::Data(Some(self.emitter.read_register(*offset, typ)))
+                    }
                 }
             }
             Statement::WriteRegister { offset, value } => {
@@ -460,35 +465,43 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 // if cacheable and writing a constant, update the register file during
                 // translation
-                if self.model.registers().get(&name).unwrap().cacheable {
-                    log::trace!("attempting write to cacheable {name:?}: {value:?}");
-                    if let NodeKind::Constant { value, width } =
-                        value.get(self.emitter.arena()).kind()
-                    {
-                        unsafe {
-                            let ptr = self
-                                .register_file_ptr
-                                .add(usize::try_from(*offset).unwrap());
+                match self.model.registers().get(&name).unwrap().cache {
+                    RegisterCacheType::Constant => {
+                        panic!("cannot write to constant register {name:?}")
+                    }
+                    RegisterCacheType::ReadWrite => {
+                        log::trace!("attempting write to cacheable {name:?}: {value:?}");
+                        if let NodeKind::Constant { value, width } =
+                            value.get(self.emitter.arena()).kind()
+                        {
+                            unsafe {
+                                let ptr = self
+                                    .register_file_ptr
+                                    .add(usize::try_from(*offset).unwrap());
 
-                            match width {
-                                1..=8 => (ptr as *mut u8).write(*value as u8),
-                                9..=16 => (ptr as *mut u16).write(*value as u16),
-                                17..=32 => (ptr as *mut u32).write(*value as u32),
-                                33..=64 => (ptr as *mut u64).write(*value),
-                                w => todo!("width {w}"),
-                            }
-                        };
+                                match width {
+                                    1..=8 => (ptr as *mut u8).write(*value as u8),
+                                    9..=16 => (ptr as *mut u16).write(*value as u16),
+                                    17..=32 => (ptr as *mut u32).write(*value as u32),
+                                    33..=64 => (ptr as *mut u64).write(*value),
+                                    w => todo!("width {w}"),
+                                }
+                            };
 
-                        log::trace!("wrote to cacheable {name:?}: {value:x}");
+                            log::trace!("wrote to cacheable {name:?}: {value:x}");
 
-                        return StatementResult::Data(None);
+                            StatementResult::Data(None)
+                        } else {
+                            panic!("attempting to write non-constant value to cacheable register {name:?}");
+                        }
+                    }
+                    RegisterCacheType::None | RegisterCacheType::Read => {
+                        // otherwise emit a write register that will mutate the register file during
+                        // execution
+                        self.emitter.write_register(*offset, value);
+                        StatementResult::Data(None)
                     }
                 }
-
-                // otherwise emit a write register that will mutate the register file during
-                // execution
-                self.emitter.write_register(*offset, value);
-                StatementResult::Data(None)
             }
             Statement::ReadMemory { address, size } => {
                 let address = statement_values.get(*address).unwrap().clone();

@@ -31,7 +31,21 @@ pub struct RegisterDescriptor {
     pub typ: Type,
     pub offset: u64,
     /// Registers that change infrequently can be cached during translation so reads of these registers are emitted as constant values rather than register reads
-    pub cacheable: bool,
+    pub cache: RegisterCacheType,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum RegisterCacheType {
+    /// Do not cache, always emit real reads/writes to registers
+    None,
+    /// Cache register reads during translation, but emit real writes
+    Read,
+    /// Cache register reads and writes, never emit real reads/writes
+    ///
+    /// This effectively makes the register a translation-time global variable.
+    ReadWrite,
+    /// Treat the value of the register as a constant, cache reads during translation, and return an error if it is ever written to
+    Constant,
 }
 
 impl Model {
@@ -65,6 +79,10 @@ impl Model {
 
     pub fn registers(&self) -> &HashMap<InternedString, RegisterDescriptor> {
         &self.registers
+    }
+
+    pub fn registers_mut(&mut self) -> &mut HashMap<InternedString, RegisterDescriptor> {
+        &mut self.registers
     }
 
     pub fn register_file_size(&self) -> u64 {
