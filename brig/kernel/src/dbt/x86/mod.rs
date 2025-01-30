@@ -104,7 +104,7 @@ impl X86TranslationContext {
         let mut assembler = CodeAssembler::new(64).unwrap();
         let mut label_map = HashMap::default();
 
-        log::info!("building work queue");
+        log::trace!("building work queue");
 
         let mut all_blocks = Vec::new();
         let mut work_queue = Vec::new();
@@ -127,16 +127,16 @@ impl X86TranslationContext {
             }
         }
 
-        log::info!("allocating registers");
+        log::trace!("allocating registers");
 
         let mut allocator = SolidStateRegisterAllocator::new(num_virtual_registers);
-        all_blocks.iter().rev().for_each(|block| {
+        all_blocks.iter().for_each(|block| {
             block
                 .get_mut(self.arena_mut())
                 .allocate_registers(&mut allocator);
         });
 
-        log::info!("encoding all blocks");
+        log::trace!("encoding all blocks");
 
         for (i, block) in all_blocks.iter().enumerate() {
             assembler
@@ -178,14 +178,14 @@ impl X86TranslationContext {
             last.encode(&mut assembler, &label_map);
         }
 
-        log::info!("assembling");
+        log::trace!("assembling");
         let code = assembler.assemble(0).unwrap();
 
-        log::info!("making executable");
+        log::trace!("making executable");
 
         let res = Translation::new(code);
 
-        log::info!("done");
+        log::trace!("done");
 
         res
     }

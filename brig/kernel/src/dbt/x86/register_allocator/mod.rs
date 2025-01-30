@@ -14,17 +14,121 @@ pub trait RegisterAllocator {
 }
 
 #[ktest]
-fn simple_allocation_regression() {
-    let mut instrs = [Instruction(Opcode::MOV(
-        Operand::vreg(Width::_64, 1),
-        Operand::mem_base_displ(
-            Width::_64,
-            Register::PhysicalRegister(PhysicalRegister::RBP),
-            0x4321,
-        ),
-    ))];
+fn shr_rcx_rcx() {
+    let mut instrs = [
+        Instruction(Opcode::MOV(
+            Operand::imm(Width::_64, 0xaaaa),
+            Operand::vreg(Width::_64, 0),
+        )),
+        Instruction(Opcode::SHR(
+            Operand::preg(Width::_8, PhysicalRegister::RCX),
+            Operand::vreg(Width::_64, 1),
+        )),
+        Instruction(Opcode::MOV(
+            Operand::vreg(Width::_64, 0),
+            Operand::mem_base(Width::_64, Register::VirtualRegister(0)),
+        )),
+    ];
 
-    /*Instruction {
+    let mut allocator = SolidStateRegisterAllocator::new(2);
+    instrs.iter_mut().rev().for_each(|i| allocator.process(i));
+    todo!()
+}
+
+/*Instruction {
+        opcode: Opcode::MOV,
+        operands: alloc::vec![
+            (
+                OperandDirection::In,
+                Operand {
+                    kind: OperandKind::Memory {
+                        base: Some(Register::PhysicalRegister(PhysicalRegister::RBP)),
+                        index: None,
+                        scale: MemoryScale::S1,
+                        displacement: 0x1234,
+                        segment_override: None,
+                    },
+                    width_in_bits: 0x40,
+                },
+            ),
+            (
+                OperandDirection::Out,
+                Operand {
+                    kind: OperandKind::Register(Register::VirtualRegister(0x1)),
+                    width_in_bits: 0x40,
+                },
+            ),
+        ],
+    },
+    Instruction {
+        opcode: Opcode::MOV,
+        operands: alloc::vec![
+            (
+                OperandDirection::In,
+                Operand {
+                    kind: OperandKind::Register(Register::VirtualRegister(0x1)),
+                    width_in_bits: 0x40,
+                },
+            ),
+            (
+                OperandDirection::Out,
+                Operand {
+                    kind: OperandKind::Register(Register::VirtualRegister(0x0)),
+                    width_in_bits: 0x40,
+                },
+            ),
+        ],
+    },
+    Instruction {
+        opcode: Opcode::ADD,
+        operands: alloc::vec![
+            (
+                OperandDirection::In,
+                Operand {
+                    kind: OperandKind::Immediate(0x1),
+                    width_in_bits: 0x20,
+                },
+            ),
+            (
+                OperandDirection::InOut,
+                Operand {
+                    kind: OperandKind::Register(Register::VirtualRegister(0x0)),
+                    width_in_bits: 0x40,
+                },
+            ),
+        ],
+    },
+    Instruction {
+        opcode: Opcode::MOV,
+        operands: alloc::vec![
+            (
+                OperandDirection::In,
+                Operand {
+                    kind: OperandKind::Register(Register::VirtualRegister(0x0)),
+                    width_in_bits: 0x40,
+                },
+            ),
+            (
+                OperandDirection::Out,
+                Operand {
+                    kind: OperandKind::Memory {
+                        base: Some(Register::PhysicalRegister(PhysicalRegister::RBP)),
+                        index: None,
+                        scale: MemoryScale::S1,
+                        displacement: 0x1234,
+                        segment_override: None,
+                    },
+                    width_in_bits: 0x40,
+                },
+            ),
+        ],
+    },
+];*/
+
+/*assert_eq!(
+    instrs,
+    [
+        Instruction {
             opcode: Opcode::MOV,
             operands: alloc::vec![
                 (
@@ -43,7 +147,9 @@ fn simple_allocation_regression() {
                 (
                     OperandDirection::Out,
                     Operand {
-                        kind: OperandKind::Register(Register::VirtualRegister(0x1)),
+                        kind: OperandKind::Register(Register::PhysicalRegister(
+                            PhysicalRegister::RCX
+                        )),
                         width_in_bits: 0x40,
                     },
                 ),
@@ -55,14 +161,18 @@ fn simple_allocation_regression() {
                 (
                     OperandDirection::In,
                     Operand {
-                        kind: OperandKind::Register(Register::VirtualRegister(0x1)),
+                        kind: OperandKind::Register(Register::PhysicalRegister(
+                            PhysicalRegister::RCX
+                        )),
                         width_in_bits: 0x40,
                     },
                 ),
                 (
                     OperandDirection::Out,
                     Operand {
-                        kind: OperandKind::Register(Register::VirtualRegister(0x0)),
+                        kind: OperandKind::Register(Register::PhysicalRegister(
+                            PhysicalRegister::RAX
+                        )),
                         width_in_bits: 0x40,
                     },
                 ),
@@ -81,7 +191,9 @@ fn simple_allocation_regression() {
                 (
                     OperandDirection::InOut,
                     Operand {
-                        kind: OperandKind::Register(Register::VirtualRegister(0x0)),
+                        kind: OperandKind::Register(Register::PhysicalRegister(
+                            PhysicalRegister::RAX
+                        )),
                         width_in_bits: 0x40,
                     },
                 ),
@@ -93,7 +205,9 @@ fn simple_allocation_regression() {
                 (
                     OperandDirection::In,
                     Operand {
-                        kind: OperandKind::Register(Register::VirtualRegister(0x0)),
+                        kind: OperandKind::Register(Register::PhysicalRegister(
+                            PhysicalRegister::RAX
+                        )),
                         width_in_bits: 0x40,
                     },
                 ),
@@ -112,112 +226,5 @@ fn simple_allocation_regression() {
                 ),
             ],
         },
-    ];*/
-
-    let mut allocator = SolidStateRegisterAllocator::new(4);
-    instrs.iter_mut().rev().for_each(|i| allocator.process(i));
-
-    /*assert_eq!(
-        instrs,
-        [
-            Instruction {
-                opcode: Opcode::MOV,
-                operands: alloc::vec![
-                    (
-                        OperandDirection::In,
-                        Operand {
-                            kind: OperandKind::Memory {
-                                base: Some(Register::PhysicalRegister(PhysicalRegister::RBP)),
-                                index: None,
-                                scale: MemoryScale::S1,
-                                displacement: 0x1234,
-                                segment_override: None,
-                            },
-                            width_in_bits: 0x40,
-                        },
-                    ),
-                    (
-                        OperandDirection::Out,
-                        Operand {
-                            kind: OperandKind::Register(Register::PhysicalRegister(
-                                PhysicalRegister::RCX
-                            )),
-                            width_in_bits: 0x40,
-                        },
-                    ),
-                ],
-            },
-            Instruction {
-                opcode: Opcode::MOV,
-                operands: alloc::vec![
-                    (
-                        OperandDirection::In,
-                        Operand {
-                            kind: OperandKind::Register(Register::PhysicalRegister(
-                                PhysicalRegister::RCX
-                            )),
-                            width_in_bits: 0x40,
-                        },
-                    ),
-                    (
-                        OperandDirection::Out,
-                        Operand {
-                            kind: OperandKind::Register(Register::PhysicalRegister(
-                                PhysicalRegister::RAX
-                            )),
-                            width_in_bits: 0x40,
-                        },
-                    ),
-                ],
-            },
-            Instruction {
-                opcode: Opcode::ADD,
-                operands: alloc::vec![
-                    (
-                        OperandDirection::In,
-                        Operand {
-                            kind: OperandKind::Immediate(0x1),
-                            width_in_bits: 0x20,
-                        },
-                    ),
-                    (
-                        OperandDirection::InOut,
-                        Operand {
-                            kind: OperandKind::Register(Register::PhysicalRegister(
-                                PhysicalRegister::RAX
-                            )),
-                            width_in_bits: 0x40,
-                        },
-                    ),
-                ],
-            },
-            Instruction {
-                opcode: Opcode::MOV,
-                operands: alloc::vec![
-                    (
-                        OperandDirection::In,
-                        Operand {
-                            kind: OperandKind::Register(Register::PhysicalRegister(
-                                PhysicalRegister::RAX
-                            )),
-                            width_in_bits: 0x40,
-                        },
-                    ),
-                    (
-                        OperandDirection::Out,
-                        Operand {
-                            kind: OperandKind::Memory {
-                                base: Some(Register::PhysicalRegister(PhysicalRegister::RBP)),
-                                index: None,
-                                scale: MemoryScale::S1,
-                                displacement: 0x1234,
-                                segment_override: None,
-                            },
-                            width_in_bits: 0x40,
-                        },
-                    ),
-                ],
-            },
-        ]
-    );*/
-}
+    ]
+);*/

@@ -53,3 +53,4 @@ itertools = { version = "0.13.0", default-features = false, features = ["use_all
 linkme = "0.3.31"
 num-rational = { version = "0.4.2", default-features = false }
 postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
+disarm64 = { git = "https://github.com/fmckeogh/disarm64", rev = "3d137ba"}

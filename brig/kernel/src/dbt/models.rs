@@ -280,8 +280,20 @@ impl ModelDevice {
     fn single_step_exec(&self) {
         let register_file_ptr = self.register_file.lock().as_mut_ptr();
 
+        let mut instr_cache = HashMap::<u64, Translation>::default();
+
         loop {
-            log::info!("---- ---- ---- ---- starting block translation");
+            let current_pc = unsafe {
+                *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
+            };
+
+            if let Some(translation) = instr_cache.get(&current_pc) {
+                log::info!("executing cached translation @ {current_pc:x}");
+                translation.execute(register_file_ptr);
+                continue;
+            }
+
+            log::info!("---- ---- ---- ---- starting instr translation");
 
             unsafe {
                 // reset SEE
@@ -299,6 +311,7 @@ impl ModelDevice {
                 let opcode = *(current_pc as *const u32);
 
                 log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
+                log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
 
                 let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
                 let pc = emitter.constant(current_pc, Type::Unsigned(64));
@@ -335,13 +348,13 @@ impl ModelDevice {
                 log::trace!("executing",);
                 translation.execute(register_file_ptr);
 
+                instr_cache.insert(current_pc, translation);
+
                 log::trace!(
-                    "{:x} {} {:x} {:x}",
-                    *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("__BranchTaken") as usize)
-                        as *mut u8),
+                    "sp: {:x}, x0: {:x}, x1: {:x}",
+                    *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64)
+                    *(register_file_ptr.add(self.model.reg_offset("R1") as usize) as *mut u64),
                 );
             }
 
@@ -355,19 +368,19 @@ impl ModelDevice {
 fn register_cache_type(name: InternedString) -> RegisterCacheType {
     if name.as_ref() == "FeatureImpl"
         || name.as_ref().ends_with("IMPLEMENTED")
-        || name.as_ref() == "EL0" // literally just 0,1,2,3
+        || name.as_ref() == "EL0"
         || name.as_ref() == "EL1"
         || name.as_ref() == "EL2"
         || name.as_ref() == "EL3"
     {
         RegisterCacheType::Constant
-    } else if name.as_ref() == "SEE"
-    // || name.as_ref() == "have_exception"
-    // || name.as_ref() == "current_exception"
-    // || name.as_ref().starts_with("SCTLR")
-    // || name.as_ref() == "EL"
-    {
+    } else if name.as_ref() == "SEE" {
         RegisterCacheType::ReadWrite
+    } else if name.as_ref() == "EL"
+        || name.as_ref() == "PSTATE_EL"
+        || name.as_ref().starts_with("SPE")
+    {
+        RegisterCacheType::Read
     } else {
         RegisterCacheType::None
     }

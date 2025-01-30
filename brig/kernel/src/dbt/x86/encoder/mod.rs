@@ -1158,8 +1158,20 @@ impl Instruction {
             }
             NOT(Operand {
                 kind: R(PHYS(value)),
-                ..
+                width_in_bits: Width::_64,
             }) => assembler.not::<AsmRegister64>(value.into()).unwrap(),
+            NOT(Operand {
+                kind: R(PHYS(value)),
+                width_in_bits: Width::_32,
+            }) => assembler.not::<AsmRegister32>(value.into()).unwrap(),
+            NOT(Operand {
+                kind: R(PHYS(value)),
+                width_in_bits: Width::_16,
+            }) => assembler.not::<AsmRegister16>(value.into()).unwrap(),
+            NOT(Operand {
+                kind: R(PHYS(value)),
+                width_in_bits: Width::_8,
+            }) => assembler.not::<AsmRegister8>(value.into()).unwrap(),
             NEG(Operand {
                 kind: R(PHYS(value)),
                 ..

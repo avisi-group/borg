@@ -237,6 +237,28 @@ impl<'ctx> X86Emitter<'ctx> {
 
                     lo
                 }
+
+                BinaryOperationKind::Modulo(dividend, divisor) => {
+                    assert_eq!(dividend.get(&self.arena).typ().width(), 64);
+                    assert_eq!(divisor.get(&self.arena).typ().width(), 64);
+
+                    let width = Width::from_uncanonicalized(divisor.get(&self.arena).typ().width())
+                        .unwrap();
+
+                    let dividend = self.to_operand(dividend);
+                    let divisor = self.to_operand_reg_promote(divisor);
+
+                    let _0 = Operand::imm(Width::_64, 0);
+
+                    let hi = Operand::preg(width, PhysicalRegister::RDX);
+                    let lo = Operand::preg(width, PhysicalRegister::RAX);
+
+                    self.push_instruction(Instruction::mov(_0, hi.clone()));
+                    self.push_instruction(Instruction::mov(dividend, lo.clone()));
+                    self.push_instruction(Instruction::idiv(hi, lo.clone(), divisor));
+
+                    hi
+                }
                 BinaryOperationKind::CompareEqual(left, right)
                 | BinaryOperationKind::CompareNotEqual(left, right)
                 | BinaryOperationKind::CompareGreaterThan(left, right)
