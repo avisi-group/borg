@@ -105,6 +105,9 @@ pub enum Opcode {
     NOP,
     /// int {0}
     INT(Operand),
+
+    /// special marker for dead instructions
+    DEAD,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash)]
@@ -813,6 +816,8 @@ impl Instruction {
         };
 
         match &self.0 {
+            // do not emit dead instructions
+            DEAD => (),
             MOV(src, dst) => mov::encode(assembler, src, dst),
             MOVSX(
                 Operand {
@@ -1701,6 +1706,7 @@ impl Instruction {
             .into_iter(),
             Opcode::PUSH(src) => [Some((OperandDirection::In, src)), None, None].into_iter(),
             Opcode::POP(dest) => [Some((OperandDirection::Out, dest)), None, None].into_iter(),
+            Opcode::DEAD => panic!(),
         }
     }
 

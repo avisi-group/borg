@@ -14,16 +14,17 @@ use {
 
 pub struct FreshAllocator {
     live_ranges: HashMap<Register, Vec<(usize, Option<usize>)>>,
+
     allocation_plan: HashMap<usize, usize>,
 }
 
 impl RegisterAllocator for FreshAllocator {
     fn allocate(&mut self, instructions: &mut [Instruction]) {
-        log::info!("----------------------");
+        log::debug!("----------------------");
 
         self.build_live_ranges(instructions);
         self.live_ranges.iter().for_each(|(reg, ranges)| {
-            log::info!(
+            log::debug!(
                 "{reg:?} = {}",
                 ranges
                     .iter()
@@ -35,9 +36,9 @@ impl RegisterAllocator for FreshAllocator {
         self.build_allocation_plan(instructions);
         self.allocation_plan
             .iter()
-            .for_each(|(vreg, preg)| log::info!("{vreg} = {preg}",));
+            .for_each(|(vreg, preg)| log::debug!("{vreg} = {preg}",));
 
-        // apply allocation plan (todo kill instrucitons too )
+        // apply allocation plan
         instructions.iter_mut().for_each(|instruction| {
             instruction.get_use_defs().for_each(|ud| {
                 let (UseDef::Def(reg) | UseDef::Use(reg) | UseDef::UseDef(reg)) = ud;
@@ -49,9 +50,17 @@ impl RegisterAllocator for FreshAllocator {
             });
         });
 
-        log::info!("post alloc----------------------------");
+        instructions.iter_mut().for_each(|instruction| {
+            if let Opcode::MOV(src, dst) = instruction.0 {
+                if src == dst {
+                    instruction.0 = Opcode::DEAD;
+                }
+            }
+        });
+
+        log::debug!("post alloc----------------------------");
         for i in instructions {
-            log::info!("{i}");
+            log::debug!("{i}");
         }
     }
 }
@@ -87,9 +96,9 @@ impl FreshAllocator {
         );
 
         let instrs_clone = instructions.to_vec();
-        log::info!("before alloc ----------------------------");
+        log::debug!("before alloc ----------------------------");
         for (idx, i) in instrs_clone.iter().enumerate() {
-            log::info!("{idx}: {i}");
+            log::debug!("{idx}: {i}");
         }
 
         instructions

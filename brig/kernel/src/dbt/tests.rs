@@ -1989,8 +1989,6 @@ fn udiv() {
 
         assert_eq!(0x7fffffc0045, (*r19));
     }
-
-    panic!();
 }
 
 #[ktest]
