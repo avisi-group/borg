@@ -1,5 +1,8 @@
 use {
-    common::rudder::{function::Function, statement::Statement},
+    common::rudder::{
+        function::Function,
+        statement::{Statement, UnaryOperationKind},
+    },
     log::trace,
 };
 
@@ -20,7 +23,9 @@ pub fn run(f: &mut Function) -> bool {
             false_target,
         } = terminator_ref.get(block.arena()).clone()
         {
-            if let Statement::Constant { value, .. } = condition.get(block.arena()).clone() {
+            let condition = condition.get(block.arena()).clone();
+
+            if let Statement::Constant { value, .. } = condition {
                 trace!("found constant branch statement {}", value);
 
                 if value.is_zero() {
@@ -38,6 +43,24 @@ pub fn run(f: &mut Function) -> bool {
                 }
 
                 changed = true;
+            } else if let Statement::UnaryOperation { kind, value } = condition {
+                match kind {
+                    UnaryOperationKind::Not => {
+                        let new_true = false_target;
+                        let new_false = true_target;
+
+                        terminator_ref
+                            .get_mut(block.arena_mut())
+                            .replace_kind(Statement::Branch {
+                                condition: value,
+                                true_target: new_true,
+                                false_target: new_false,
+                            });
+
+                        changed = true;
+                    }
+                    _ => {}
+                }
             } else if true_target == false_target {
                 terminator_ref
                     .get_mut(block.arena_mut())
