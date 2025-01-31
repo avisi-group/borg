@@ -128,7 +128,11 @@ impl FreshAllocator {
                                 let last_range = live_ranges.as_mut_slice().last_mut().unwrap();
 
                                 if last_range.1.is_none() {
-                                    log::warn!("last live range had no end, but re-def'd");
+                                    // silenced due to CMOVNE, will give it an end in a second
+                                    // log::warn!(
+                                    //     "last live range had no end, but re-def'd: {reg} in {}",
+                                    //     instr_clone
+                                    // );
                                     last_range.1 = Some(instruction_index);
                                 }
 

@@ -2349,6 +2349,52 @@ fn lsrv() {
 
         translation.execute(register_file_ptr);
 
-        assert_eq!(*x0, 0xb000AAAA);
+        assert_eq!(*x0, 0x0);
+    }
+}
+
+#[ktest]
+fn mem_load_immediate() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  ldr                w0, 0xdc
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x180006e0, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let mut src = Box::<u64>::new(0xBEE5BEE5);
+
+        let pc = register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64;
+        let w0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+
+        *pc = (&mut *src) as *mut u64 as u64 - 0xdc;
+        log::warn!("{pc:p} {src:p}");
+        *w0 = 0x0;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*w0, 0xBEE5BEE5);
     }
 }

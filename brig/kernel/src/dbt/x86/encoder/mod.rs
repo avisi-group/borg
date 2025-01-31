@@ -854,14 +854,9 @@ impl Instruction {
                 (Width::_8, Width::_64) => assembler
                     .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                     .unwrap(),
-                (Width::_32, Width::_64) => {
-                    assembler
-                        .xor::<AsmRegister64, AsmRegister64>(dst.into(), dst.into())
-                        .unwrap();
-                    assembler
-                        .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
-                        .unwrap()
-                }
+                (Width::_32, Width::_64) => assembler
+                    .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
+                    .unwrap(),
                 (Width::_32, Width::_32) => assembler
                     .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                     .unwrap(),
