@@ -640,10 +640,7 @@ impl<'f> Interpreter<'f> {
                 Statement::Assert { condition } => {
                     let condition = self.resolve_u64(condition);
                     if condition == 0 {
-                        panic!(
-                            "{}: block {block_ref:?}: {statement_ref:?} assert failed: {condition:?} != 0",
-                            self.function_name
-                        );
+                        panic!("{}: block {block_ref:?}: {statement_ref:?} assert failed: {condition:?} != 0", self.function_name);
                     }
 
                     None

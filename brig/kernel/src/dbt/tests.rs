@@ -1823,7 +1823,7 @@ fn replicate_bits() {
         assert_eq!(
             &NodeKind::Constant {
                 value: 0xaaaa,
-                width: 16,
+                width: 16
             },
             translate(
                 &model,
@@ -1843,7 +1843,7 @@ fn replicate_bits() {
         assert_eq!(
             &NodeKind::Constant {
                 value: 0xffff_ffff,
-                width: 32,
+                width: 32
             },
             translate(
                 &model,
@@ -1863,7 +1863,7 @@ fn replicate_bits() {
         assert_eq!(
             &NodeKind::Constant {
                 value: 0xaaff_aaff_aaff_aaff,
-                width: 64,
+                width: 64
             },
             translate(
                 &model,
@@ -1989,6 +1989,8 @@ fn udiv() {
 
         assert_eq!(0x7fffffc0045, (*r19));
     }
+
+    panic!();
 }
 
 #[ktest]
@@ -2157,8 +2159,6 @@ fn stp() {
         *x30 = 0xDEAD;
         *sp = (((&*dst) as *const (u64, u64)) as u64) + 16;
 
-        log::error!("{:x}", *sp);
-
         translation.execute(register_file_ptr);
 
         assert_eq!(*dst, (0xFEED, 0xDEAD));
@@ -2309,5 +2309,48 @@ fn sub_pc() {
         translation.execute(register_file_ptr);
 
         assert_eq!(*sp, 0xdeadbe80);
+    }
+}
+
+#[ktest]
+fn lsrv() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  lsrv              x0, x1, x0
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x9ac02420, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
+
+        *x0 = 0x3c;
+        *x1 = 0x3;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*x0, 0xb000AAAA);
     }
 }

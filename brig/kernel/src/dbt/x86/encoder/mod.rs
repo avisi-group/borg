@@ -107,7 +107,7 @@ pub enum Opcode {
     INT(Operand),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash)]
 pub enum PhysicalRegister {
     /// rax
     RAX,
@@ -328,7 +328,7 @@ pub enum SegmentRegister {
     GS,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Register {
     PhysicalRegister(PhysicalRegister),
     VirtualRegister(usize),
@@ -456,8 +456,8 @@ impl Debug for OperandKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Operand {
-    kind: OperandKind,
-    width_in_bits: Width,
+    pub kind: OperandKind,
+    pub width_in_bits: Width,
 }
 
 impl Operand {
@@ -582,9 +582,14 @@ pub enum OperandDirection {
     InOut,
 }
 
+/// UseDef
+#[derive(Debug, displaydoc::Display)]
 pub enum UseDef<'a> {
+    /// use {0}
     Use(&'a mut Register),
+    /// def {0}
     Def(&'a mut Register),
+    /// usedef {0}
     UseDef(&'a mut Register),
 }
 
@@ -599,6 +604,18 @@ impl<'a> UseDef<'a> {
             OperandDirection::Out => Some(UseDef::Def(register)),
             OperandDirection::InOut => Some(UseDef::UseDef(register)),
         }
+    }
+
+    pub fn has_use(&self) -> bool {
+        matches!(self, Self::Use(_) | Self::UseDef(_))
+    }
+
+    pub fn has_def(&self) -> bool {
+        matches!(self, Self::Def(_) | Self::UseDef(_))
+    }
+
+    pub fn is_usedef(&self) -> bool {
+        matches!(self, Self::UseDef(_))
     }
 }
 

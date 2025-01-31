@@ -2,6 +2,7 @@ use {
     crate::dbt::x86::encoder::{
         Operand,
         OperandKind::{Immediate as I, Register as R},
+        PhysicalRegister,
         Register::PhysicalRegister as PHYS,
         Width,
     },
@@ -47,6 +48,23 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
         ) => {
             assembler
                 .shr::<AsmRegister64, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(PhysicalRegister::RCX)),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(value_reg)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            if *value_reg == PhysicalRegister::RCX {
+                panic!("can't shr %rcx %rcx");
+            }
+            assembler
+                .shr::<AsmRegister64, AsmRegister8>(value_reg.into(), PhysicalRegister::RCX.into())
                 .unwrap();
         }
         _ => todo!("shr {amount} {value}"),

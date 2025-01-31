@@ -14,7 +14,8 @@ use {
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{
-        BREAKPOINT_VECTOR, DOUBLE_FAULT_VECTOR, GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR,
+        BREAKPOINT_VECTOR, DIVIDE_ERROR_VECTOR, DOUBLE_FAULT_VECTOR,
+        GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR,
     },
     x86_64::{
         registers::control::Cr2,
@@ -95,6 +96,12 @@ impl IrqManager {
                 .double_fault
                 .set_handler_addr(VirtAddr::from_ptr(double_fault_exception as *const u8));
             self.used.set(DOUBLE_FAULT_VECTOR);
+
+            // double fault
+            self.idt
+                .divide_error
+                .set_handler_addr(VirtAddr::from_ptr(div0_exception as *const u8));
+            self.used.set(DIVIDE_ERROR_VECTOR);
         };
 
         for (f, i) in [
@@ -176,18 +183,23 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 }
 
 #[irq_handler(with_code = false)]
+fn div0_exception() {
+    exit_with_message!("EXCEPTION: DIVIDE BY 0");
+}
+
+#[irq_handler(with_code = false)]
 fn breakpoint_exception() {
-    log::error!("EXCEPTION: BREAKPOINT");
+    exit_with_message!("EXCEPTION: BREAKPOINT");
 }
 
 #[irq_handler(with_code = true)]
 fn double_fault_exception() {
-    log::error!("EXCEPTION: DOUBLE-FAULT");
+    exit_with_message!("EXCEPTION: DOUBLE-FAULT");
 }
 
 #[irq_handler(with_code = true)]
 fn gpf_exception(machine_context: *mut MachineContext) {
-    log::error!(
+    exit_with_message!(
         "EXCEPTION: GENERAL PROTECTION FAULT\nrip = {:x}",
         unsafe { &*machine_context }.rip
     );

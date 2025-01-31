@@ -115,7 +115,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             x86_blocks: HashMap::default(),
             rudder_blocks: HashMap::default(),
             variables: HashMap::default(),
-
             current_stack_offset,
             emitter,
             register_file_ptr,

@@ -1933,10 +1933,7 @@ impl X86Block {
     }
 
     pub fn allocate_registers<R: RegisterAllocator>(&mut self, allocator: &mut R) {
-        self.instructions
-            .iter_mut()
-            .rev()
-            .for_each(|i| allocator.process(i));
+        allocator.allocate(self.instructions_mut());
     }
 
     pub fn instructions(&self) -> &[Instruction] {

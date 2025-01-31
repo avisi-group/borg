@@ -4,7 +4,7 @@ use {
         x86::{
             emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
             encoder::{Instruction, Opcode, OperandKind},
-            register_allocator::solid_state::SolidStateRegisterAllocator,
+            register_allocator::naive::FreshAllocator,
         },
         Translation,
     },
@@ -129,11 +129,10 @@ impl X86TranslationContext {
 
         log::trace!("allocating registers");
 
-        let mut allocator = SolidStateRegisterAllocator::new(num_virtual_registers);
         all_blocks.iter().for_each(|block| {
             block
                 .get_mut(self.arena_mut())
-                .allocate_registers(&mut allocator);
+                .allocate_registers(&mut FreshAllocator::new(num_virtual_registers));
         });
 
         log::trace!("encoding all blocks");
