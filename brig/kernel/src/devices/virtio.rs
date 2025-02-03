@@ -17,7 +17,7 @@ use {
     virtio_drivers::{
         device::blk::{VirtIOBlk, SECTOR_SIZE},
         transport::pci::{
-            bus::{Command, DeviceFunction, PciRoot},
+            bus::{Command, DeviceFunction, MmioCam, PciRoot},
             PciTransport,
         },
     },
@@ -92,7 +92,7 @@ unsafe impl virtio_drivers::Hal for VirtioHal {
     }
 }
 
-pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
+pub fn probe_virtio_block(root: &mut PciRoot<MmioCam>, device_function: DeviceFunction) {
     trace!("probing virtio block device");
 
     root.set_command(
@@ -102,7 +102,7 @@ pub fn probe_virtio_block(root: &mut PciRoot, device_function: DeviceFunction) {
 
     allocate_bars(root, device_function);
 
-    let transport = PciTransport::new::<VirtioHal>(root, device_function).unwrap();
+    let transport = PciTransport::new::<VirtioHal, _>(root, device_function).unwrap();
 
     let blk = Mutex::new(VirtIOBlk::<VirtioHal, _>::new(transport).unwrap());
 

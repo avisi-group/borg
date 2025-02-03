@@ -1,9 +1,10 @@
 use {
-    cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message},
+    cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message, TargetKind},
     clap::{Parser, Subcommand},
     common::TestConfig,
     elf::{endian::AnyEndian, section::SectionHeader, ElfBytes},
     itertools::Itertools,
+    ovmf_prebuilt::{Arch, FileType, Source},
     std::{
         fs::{self, File},
         io::{BufReader, Write},
@@ -84,31 +85,27 @@ fn main() -> color_eyre::Result<()> {
     let guest_tar = build_guest_tar("./guest_data", &artifacts, test_config);
 
     // create an UEFI disk image of kernel
-    let uefi_path = {
-        let kernel_path = get_kernel_from_artifacts(&artifacts);
+    let kernel_path = get_kernel_from_artifacts(&artifacts);
 
-        if cli.verbose {
-            println!("got kernel @ {kernel_path:?}");
-        }
+    if cli.verbose {
+        println!("got kernel @ {kernel_path:?}");
+    }
 
-        let uefi_path = kernel_path.parent().unwrap().join("uefi.img");
-        bootloader::UefiBoot::new(&kernel_path)
-            .create_disk_image(&uefi_path)
-            .unwrap();
+    let uefi_kernel_path = kernel_path.parent().unwrap().join("uefi.img");
+    bootloader::UefiBoot::new(&kernel_path)
+        .create_disk_image(&uefi_kernel_path)
+        .unwrap();
 
-        if cli.verbose {
-            println!("built UEFI image @ {uefi_path:?}");
-        }
-
-        uefi_path
-    };
+    if cli.verbose {
+        println!("built UEFI image @ {uefi_kernel_path:?}");
+    }
 
     if cli.no_run {
         return Ok(());
     }
 
     // start QEMU with UEFI disk image
-    run_brig(&uefi_path, &guest_tar, cli.gdb);
+    run_brig(&uefi_kernel_path, &guest_tar, cli.gdb);
 
     Ok(())
 }
@@ -221,7 +218,7 @@ fn build_guest_tar<P: AsRef<Path>>(
 
     let plugins = artifacts
         .iter()
-        .filter(|a| a.target.kind == ["cdylib"])
+        .filter(|a| a.target.kind.contains(&TargetKind::CDyLib))
         .flat_map(|a| a.filenames.iter())
         .map(|path| path.canonicalize().unwrap())
         .map(|source| {
@@ -312,12 +309,31 @@ fn build_dtb<P0: AsRef<Path>, P1: AsRef<Path>, P2: AsRef<Path>>(
     (dtb_source_path, dtb_destination_path)
 }
 
-fn run_brig(uefi_path: &Path, guest_tar_path: &Path, gdb: bool) {
+fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
+    let prebuilt = ovmf_prebuilt::Prebuilt::fetch(
+        Source::LATEST,
+        guest_tar_path.parent().unwrap().join("ovmf"),
+    )
+    .expect("failed to update prebuilt");
+
     println!("starting QEMU");
     let mut cmd = std::process::Command::new("qemu-system-x86_64");
-    cmd.arg("-bios").arg(ovmf_prebuilt::ovmf_pure_efi());
+    cmd.arg("-drive").arg(format!(
+        "if=pflash,unit=0,format=raw,readonly=on,file={}",
+        prebuilt
+            .get_file(Arch::X64, FileType::Code)
+            .to_str()
+            .unwrap()
+    ));
+    cmd.arg("-drive").arg(format!(
+        "if=pflash,unit=1,format=raw,readonly=on,file={}",
+        prebuilt
+            .get_file(Arch::X64, FileType::Vars)
+            .to_str()
+            .unwrap()
+    ));
     cmd.arg("-drive")
-        .arg(format!("format=raw,file={}", uefi_path.to_str().unwrap()));
+        .arg(format!("format=raw,file={}", kernel_path.to_str().unwrap()));
     cmd.arg("-nographic");
 
     #[cfg(target_arch = "x86_64")]
@@ -405,3 +421,14 @@ fn gdb_cli(artifacts: &[Artifact]) {
     gdb.wait().expect("Child process wasn't running properly");
     std::process::exit(0);
 }
+
+/*
+ fn = some_function(...);
+
+ .
+ .
+ .
+
+
+ return fn ? fn(regs, ints) : 1;
+*/
