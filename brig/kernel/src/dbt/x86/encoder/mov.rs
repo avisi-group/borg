@@ -618,6 +618,22 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
                 .unwrap();
         }
+        (
+            // todo: fix this earlier in DBT
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            // don't need to write high bits
+            assembler
+                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .unwrap();
+        }
         _ => todo!("mov {src} {dst}"),
     }
 }
