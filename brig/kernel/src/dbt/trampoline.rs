@@ -1,5 +1,7 @@
 use core::arch::global_asm;
 
+pub const MAX_STACK_SIZE: usize = 0x1000;
+
 global_asm!(
     r#"
         .global execute
@@ -22,9 +24,9 @@ global_asm!(
 
         mov %rsi, %rbp
         mov %rsp, %r14
-        sub $0x1000, %rsp
+        sub ${max_stack_size}, %rsp
         call *%rdi
-        add $0x1000, %rsp
+        add ${max_stack_size}, %rsp
 
         pop %r15
         pop %r14
@@ -43,7 +45,8 @@ global_asm!(
         pop %rax
 
         ret
-   "#,
+    "#,
+    max_stack_size = const MAX_STACK_SIZE,
     options(att_syntax)
 );
 

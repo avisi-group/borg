@@ -1,6 +1,7 @@
 use {
     crate::dbt::{
         emitter::{self, BlockResult, Emitter, Type},
+        trampoline::MAX_STACK_SIZE,
         x86::{
             emitter::{NodeKind, X86Block, X86Emitter, X86Node, X86SymbolRef},
             encoder::Instruction,
@@ -388,6 +389,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         let width = usize::from(symbol.typ().width_bytes());
                         self.current_stack_offset
                             .fetch_add(max(width, 8), Ordering::Relaxed);
+
+                        if self.current_stack_offset.load(Ordering::Relaxed) >= MAX_STACK_SIZE {
+                            panic!("stack offset exceeded MAX_STACK_SIZE ({MAX_STACK_SIZE:x})")
+                        }
                     }
                 }
 
