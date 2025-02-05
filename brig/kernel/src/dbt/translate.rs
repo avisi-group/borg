@@ -374,16 +374,17 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     if let LocalVariable::Virtual { .. } =
                         self.variables.get(&symbol.name()).unwrap()
                     {
-                        log::trace!(
-                            "promoting {:?} from virtual to stack @ {:?}",
+                        let stack_offset = (*self.current_stack_offset).load(Ordering::Relaxed);
+                        log::debug!(
+                            "promoting {:?} from virtual to stack @ {:#x}",
                             symbol.name(),
-                            (*self.current_stack_offset)
+                            stack_offset
                         );
                         self.variables.insert(
                             symbol.name(),
                             LocalVariable::Stack {
                                 typ: emit_rudder_type(&symbol.typ()),
-                                stack_offset: (*self.current_stack_offset).load(Ordering::Relaxed),
+                                stack_offset,
                             },
                         );
                         let width = usize::from(symbol.typ().width_bytes());

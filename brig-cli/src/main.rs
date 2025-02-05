@@ -398,6 +398,7 @@ fn gdb_cli(artifacts: &[Artifact]) {
         .stdout(Stdio::inherit()) // Use terminal's stdout
         .stderr(Stdio::inherit()) // Use terminal's stderr
         .args(
+            // todo: layout split source and regs
             format!(
                 r#"
                     set trace-commands on
@@ -408,6 +409,8 @@ fn gdb_cli(artifacts: &[Artifact]) {
                     add-symbol-file {} {:#x}
 
                     target remote :1234
+
+                    hbreak trampoline
                 "#,
                 kernel_path.to_string_lossy(),
                 offset,
@@ -421,14 +424,3 @@ fn gdb_cli(artifacts: &[Artifact]) {
     gdb.wait().expect("Child process wasn't running properly");
     std::process::exit(0);
 }
-
-/*
- fn = some_function(...);
-
- .
- .
- .
-
-
- return fn ? fn(regs, ints) : 1;
-*/

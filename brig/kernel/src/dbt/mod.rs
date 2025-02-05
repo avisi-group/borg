@@ -35,7 +35,7 @@ impl Translation {
     pub fn execute(&self, register_file: *mut u8) {
         let code_ptr = self.code.as_ptr();
 
-        unsafe { trampoline::execute(code_ptr, register_file) };
+        unsafe { trampoline::trampoline(code_ptr, register_file) };
     }
 }
 

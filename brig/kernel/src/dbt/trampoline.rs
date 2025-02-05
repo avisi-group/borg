@@ -1,11 +1,11 @@
 use core::arch::global_asm;
 
-pub const MAX_STACK_SIZE: usize = 0x1000;
+pub const MAX_STACK_SIZE: usize = 0x2000;
 
 global_asm!(
     r#"
-        .global execute
-    execute:
+        .global trampoline
+    trampoline:
         push %rax
         push %rcx
         push %rdx
@@ -51,5 +51,5 @@ global_asm!(
 );
 
 unsafe extern "C" {
-    pub fn execute(code_ptr: *const u8, register_file: *mut u8);
+    pub fn trampoline(code_ptr: *const u8, register_file: *mut u8);
 }

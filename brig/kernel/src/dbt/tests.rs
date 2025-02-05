@@ -2432,11 +2432,22 @@ fn eret() {
     unsafe {
         let pc = register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64;
         let elr_el3 = register_file_ptr.add(model.reg_offset("ELR_EL3") as usize) as *mut u64;
+        let el = register_file_ptr.add(model.reg_offset("PSTATE_EL") as usize) as *mut u64;
+        let _sp = register_file_ptr.add(model.reg_offset("PSTATE_SP") as usize) as *mut u64;
+        let spsr_el3 =
+            register_file_ptr.add(model.reg_offset("SPSR_EL3_bits") as usize) as *mut u64;
+
+        *spsr_el3 = 6;
+
+        assert_eq!(*el, 3);
 
         *elr_el3 = 0x8000_0020;
 
+        // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
+        // log::info!("{translation:?}");
+
         translation.execute(register_file_ptr);
 
-        assert_eq!(*pc, 0xBEE5BEE5);
+        assert_eq!(*pc, 0x8000_0020);
     }
 }
