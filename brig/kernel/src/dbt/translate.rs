@@ -85,10 +85,7 @@ struct FunctionTranslator<'m, 'e, 'c> {
 
     /// Function local variables
     variables: HashMap<InternedString, LocalVariable>,
-    // /// Originally-virtual local variables which were written to in a dynamic
-    // /// block once; if we write to them again in a different dynamic block, it
-    // /// must be promoted to a stack variable
-    // potential_stack_variables: HashMap<InternedString, (Ref<Block>, Ref<Statement>)>,
+
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize>,
 
@@ -130,13 +127,23 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         // set up symbols for local variables
         let locals = function.local_variables();
 
-        locals.iter().map(|sym| sym.name()).for_each(|name| {
-            celf.variables.insert(
-                name,
-                LocalVariable::Virtual {
-                    symbol: celf.emitter.ctx().create_symbol(),
-                },
-            );
+        locals.iter().for_each(|symbol| {
+            if symbol.name().as_ref() == "new_pc" {
+                celf.variables.insert(
+                    symbol.name(),
+                    LocalVariable::Stack {
+                        typ: emit_rudder_type(&symbol.typ()),
+                        stack_offset: celf.allocate_stack_offset(&symbol.typ()),
+                    },
+                );
+            } else {
+                celf.variables.insert(
+                    symbol.name(),
+                    LocalVariable::Virtual {
+                        symbol: celf.emitter.ctx().create_symbol(),
+                    },
+                );
+            }
         });
 
         // set up symbols for parameters, and write arguments into them
@@ -145,9 +152,17 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             .iter()
             .zip(arguments)
             .for_each(|(parameter, argument)| {
-                let var = LocalVariable::Virtual {
-                    symbol: celf.emitter.ctx().create_symbol(),
+                let var = if parameter.name().as_ref() == "new_pc" {
+                    LocalVariable::Stack {
+                        typ: emit_rudder_type(&parameter.typ()),
+                        stack_offset: celf.allocate_stack_offset(&parameter.typ()),
+                    }
+                } else {
+                    LocalVariable::Virtual {
+                        symbol: celf.emitter.ctx().create_symbol(),
+                    }
                 };
+
                 celf.variables.insert(parameter.name(), var.clone());
                 celf.write_variable(var, argument.clone());
             });
@@ -374,7 +389,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     if let LocalVariable::Virtual { .. } =
                         self.variables.get(&symbol.name()).unwrap()
                     {
-                        let stack_offset = (*self.current_stack_offset).load(Ordering::Relaxed);
+                        let stack_offset = self.allocate_stack_offset(&symbol.typ());
                         log::debug!(
                             "promoting {:?} from virtual to stack @ {:#x}",
                             symbol.name(),
@@ -387,13 +402,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                                 stack_offset,
                             },
                         );
-                        let width = usize::from(symbol.typ().width_bytes());
-                        self.current_stack_offset
-                            .fetch_add(max(width, 8), Ordering::Relaxed);
-
-                        if self.current_stack_offset.load(Ordering::Relaxed) >= MAX_STACK_SIZE {
-                            panic!("stack offset exceeded MAX_STACK_SIZE ({MAX_STACK_SIZE:x})")
-                        }
                     }
                 }
 
@@ -899,6 +907,21 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 stack_offset,
             } => self.emitter.write_stack_variable(stack_offset, value),
         }
+    }
+
+    fn allocate_stack_offset(&self, typ: &rudder::types::Type) -> usize {
+        let width = max(usize::from(typ.width_bytes()), 8);
+        let offset = self
+            .current_stack_offset
+            .fetch_add(width, Ordering::Relaxed);
+
+        let next_offset = self.current_stack_offset.load(Ordering::Relaxed);
+
+        if next_offset >= MAX_STACK_SIZE {
+            panic!("stack offset {next_offset:#x} exceeded MAX_STACK_SIZE ({MAX_STACK_SIZE:#x})")
+        }
+
+        offset
     }
 }
 
