@@ -3,7 +3,7 @@ use {
         emitter::{self, BlockResult, Emitter, Type},
         trampoline::MAX_STACK_SIZE,
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86Node, X86SymbolRef},
+            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
             encoder::Instruction,
         },
     },
@@ -36,17 +36,17 @@ enum JumpKind {
 }
 
 enum StatementResult {
-    Data(Option<Ref<X86Node>>),
+    Data(Option<X86NodeRef>),
     ControlFlow(BlockResult),
 }
 
 pub fn translate(
     model: &Model,
     function: &str,
-    arguments: &[Ref<X86Node>],
+    arguments: &[X86NodeRef],
     emitter: &mut X86Emitter,
     register_file_ptr: *mut u8,
-) -> Option<Ref<X86Node>> {
+) -> Option<X86NodeRef> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = Rc::new(AtomicUsize::new(8));
@@ -100,7 +100,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
     fn new(
         model: &'m Model,
         function: &str,
-        arguments: &[Ref<X86Node>],
+        arguments: &[X86NodeRef],
         emitter: &'e mut X86Emitter<'c>,
         current_stack_offset: Rc<AtomicUsize>,
         register_file_ptr: *mut u8,
@@ -187,7 +187,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         celf
     }
 
-    fn translate(&mut self) -> Option<Ref<X86Node>> {
+    fn translate(&mut self) -> Option<X86NodeRef> {
         let function = self
             .model
             .functions()
@@ -422,19 +422,14 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 StatementResult::Data(None)
             }
             Statement::ReadRegister { typ, offset } => {
-                let offset = match statement_values
-                    .get(*offset)
-                    .unwrap()
-                    .get(self.emitter.arena())
-                    .kind()
-                {
-                    NodeKind::Constant { value, .. } => value,
+                let offset = match statement_values.get(*offset).unwrap().kind() {
+                    NodeKind::Constant { value, .. } => *value,
                     k => panic!("can't read non constant offset: {k:#?}"),
                 };
 
                 let name = self
                     .model
-                    .get_register_by_offet(*offset)
+                    .get_register_by_offset(offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
 
                 let typ = emit_rudder_type(typ);
@@ -444,9 +439,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     | RegisterCacheType::Read
                     | RegisterCacheType::ReadWrite => {
                         let value = unsafe {
-                            let ptr = self
-                                .register_file_ptr
-                                .add(usize::try_from(*offset).unwrap());
+                            let ptr = self.register_file_ptr.add(usize::try_from(offset).unwrap());
 
                             match typ.width() {
                                 1..=8 => u64::from((ptr as *const u8).read()),
@@ -460,24 +453,19 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         StatementResult::Data(Some(self.emitter.constant(value, typ)))
                     }
                     RegisterCacheType::None => {
-                        StatementResult::Data(Some(self.emitter.read_register(*offset, typ)))
+                        StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
                     }
                 }
             }
             Statement::WriteRegister { offset, value } => {
-                let offset = match statement_values
-                    .get(*offset)
-                    .unwrap()
-                    .get(self.emitter.arena())
-                    .kind()
-                {
-                    NodeKind::Constant { value, .. } => value,
+                let offset = match statement_values.get(*offset).unwrap().kind() {
+                    NodeKind::Constant { value, .. } => *value,
                     k => panic!("can't write non constant offset: {k:#?}"),
                 };
 
                 let name = self
                     .model
-                    .get_register_by_offet(*offset)
+                    .get_register_by_offset(offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
 
                 let value = statement_values.get(*value).unwrap().clone();
@@ -490,13 +478,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     }
                     RegisterCacheType::ReadWrite => {
                         log::trace!("attempting write to cacheable {name:?}: {value:?}");
-                        if let NodeKind::Constant { value, width } =
-                            value.get(self.emitter.arena()).kind()
-                        {
+                        if let NodeKind::Constant { value, width } = value.kind() {
                             unsafe {
-                                let ptr = self
-                                    .register_file_ptr
-                                    .add(usize::try_from(*offset).unwrap());
+                                let ptr =
+                                    self.register_file_ptr.add(usize::try_from(offset).unwrap());
 
                                 match width {
                                     1..=8 => (ptr as *mut u8).write(*value as u8),
@@ -517,7 +502,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     RegisterCacheType::None | RegisterCacheType::Read => {
                         // otherwise emit a write register that will mutate the register file during
                         // execution
-                        self.emitter.write_register(*offset, value);
+                        self.emitter.write_register(offset, value);
                         StatementResult::Data(None)
                     }
                 }
@@ -526,11 +511,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let address = statement_values.get(*address).unwrap().clone();
                 let size = statement_values.get(*size).unwrap().clone();
 
-                let NodeKind::Constant { value, .. } = size.get(self.emitter.arena()).kind() else {
-                    panic!(
-                        "expected constant got {:#?}",
-                        size.get(self.emitter.arena()).kind()
-                    );
+                let NodeKind::Constant { value, .. } = size.kind() else {
+                    panic!("expected constant got {:#?}", size.kind());
                 };
 
                 let typ = match value {
@@ -696,7 +678,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 // todo: obviously refactor this to re-use jump logic
 
-                return match condition.get(self.emitter.arena()).kind() {
+                return match condition.kind() {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
                             let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
@@ -890,7 +872,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         *self.rudder_blocks.get(&x86).unwrap()
     }
 
-    fn read_variable(&mut self, variable: LocalVariable) -> Ref<X86Node> {
+    fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
         match variable {
             LocalVariable::Virtual { symbol } => self.emitter.read_virt_variable(symbol),
             LocalVariable::Stack { stack_offset, typ } => {
@@ -899,7 +881,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         }
     }
 
-    fn write_variable(&mut self, variable: LocalVariable, value: Ref<X86Node>) {
+    fn write_variable(&mut self, variable: LocalVariable, value: X86NodeRef) {
         match variable {
             LocalVariable::Virtual { symbol } => self.emitter.write_virt_variable(symbol, value),
             LocalVariable::Stack {
@@ -961,7 +943,7 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
 ///
 /// Tried linear search vec but same perf
 struct StatementValueStore {
-    map: HashMap<Ref<Statement>, Ref<X86Node>>,
+    map: HashMap<Ref<Statement>, X86NodeRef>,
 }
 
 impl StatementValueStore {
@@ -971,11 +953,11 @@ impl StatementValueStore {
         }
     }
 
-    pub fn insert(&mut self, s: Ref<Statement>, v: Ref<X86Node>) {
+    pub fn insert(&mut self, s: Ref<Statement>, v: X86NodeRef) {
         self.map.insert(s, v);
     }
 
-    pub fn get(&self, s: Ref<Statement>) -> Option<Ref<X86Node>> {
-        self.map.get(&s).copied()
+    pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef> {
+        self.map.get(&s).cloned()
     }
 }

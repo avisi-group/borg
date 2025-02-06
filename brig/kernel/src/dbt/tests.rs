@@ -472,7 +472,7 @@ fn branch_uncond_imm_offset_math() {
     // s9: cast sx s5 -> u64
     let s9 = emitter.cast(s5, Type::Unsigned(64), CastOperationKind::SignExtend);
 
-    let NodeKind::Constant { value, width } = s9.get(emitter.arena()).kind() else {
+    let NodeKind::Constant { value, width } = s9.kind() else {
         panic!()
     };
     assert_eq!(*value, 0xffffffffffffffe8);
@@ -1200,7 +1200,7 @@ fn floorpow2_constant() {
     let x = emitter.constant(2048, Type::Signed(64));
     let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 2048,
             width: 64
@@ -1209,7 +1209,7 @@ fn floorpow2_constant() {
     let x = emitter.constant(2397, Type::Signed(64));
     let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 2048,
             width: 64
@@ -1218,7 +1218,7 @@ fn floorpow2_constant() {
     let x = emitter.constant(4095, Type::Signed(64));
     let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 2048,
             width: 64
@@ -1227,7 +1227,7 @@ fn floorpow2_constant() {
     let x = emitter.constant(1231, Type::Signed(64));
     let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 1024,
             width: 64
@@ -1248,7 +1248,7 @@ fn ceilpow2_constant() {
     let x = emitter.constant(2048, Type::Signed(64));
     let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 2048,
             width: 64
@@ -1257,7 +1257,7 @@ fn ceilpow2_constant() {
     let x = emitter.constant(2397, Type::Signed(64));
     let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 4096,
             width: 64
@@ -1266,7 +1266,7 @@ fn ceilpow2_constant() {
     let x = emitter.constant(4095, Type::Signed(64));
     let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 4096,
             width: 64
@@ -1275,7 +1275,7 @@ fn ceilpow2_constant() {
     let x = emitter.constant(1231, Type::Signed(64));
     let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        value.get(emitter.arena()).kind(),
+        value.kind(),
         &NodeKind::Constant {
             value: 2048,
             width: 64
@@ -1526,7 +1526,7 @@ fn highest_set_bit() {
     )
     .unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 2,
             width: 64
@@ -1543,7 +1543,7 @@ fn highest_set_bit() {
     )
     .unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 63,
             width: 64
@@ -1565,7 +1565,7 @@ fn ror() {
     let shift = emitter.constant(8, Type::Signed(64));
     let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 0xff,
             width: 64
@@ -1576,7 +1576,7 @@ fn ror() {
     let shift = emitter.constant(8, Type::Signed(64));
     let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 0xff00_0000_0000_0000,
             width: 64
@@ -1587,7 +1587,7 @@ fn ror() {
     let shift = emitter.constant(8, Type::Signed(64));
     let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 0xff00_0000,
             width: 32
@@ -1609,7 +1609,7 @@ fn extsv() {
     let v = emitter.constant(0xFFFF_FFFF_FFFF_FFFF, Type::Unsigned(64));
     let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 0xFFFF_FFFF,
             width: 32
@@ -1619,7 +1619,7 @@ fn extsv() {
     let v = emitter.constant(-1i32 as u64, Type::Unsigned(32));
     let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: -1i64 as u64,
             width: 64
@@ -1629,7 +1629,7 @@ fn extsv() {
     let v = emitter.constant(1, Type::Unsigned(1));
     let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: u64::MAX,
             width: 64
@@ -1639,10 +1639,7 @@ fn extsv() {
     let m = emitter.constant(1, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
     let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
-    assert_eq!(
-        res.get(emitter.arena()).kind(),
-        &NodeKind::Constant { value: 1, width: 1 }
-    );
+    assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 }
 
 #[ktest]
@@ -1665,10 +1662,7 @@ fn zext_ones() {
         register_file_ptr,
     )
     .unwrap();
-    assert_eq!(
-        res.get(emitter.arena()).kind(),
-        &NodeKind::Constant { value: 1, width: 1 }
-    );
+    assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(0, Type::Signed(64));
@@ -1681,7 +1675,7 @@ fn zext_ones() {
     )
     .unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 0,
             width: 64
@@ -1699,7 +1693,7 @@ fn zext_ones() {
     )
     .unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 0xFFFF_FFFF,
             width: 64
@@ -1717,7 +1711,7 @@ fn zext_ones() {
     )
     .unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: u64::MAX,
             width: 64
@@ -1790,17 +1784,14 @@ fn decodebitmasks() {
     .unwrap();
 
     assert_eq!(
-        emitter
-            .access_tuple(res.clone(), 0)
-            .get(emitter.arena())
-            .kind(),
+        emitter.access_tuple(res.clone(), 0).kind(),
         &NodeKind::Constant {
             value: 0xFFFF00000000000F,
             width: 64
         }
     );
     assert_eq!(
-        emitter.access_tuple(res, 1).get(emitter.arena()).kind(),
+        emitter.access_tuple(res, 1).kind(),
         &NodeKind::Constant {
             value: 0xF,
             width: 64
@@ -1833,7 +1824,6 @@ fn replicate_bits() {
                 register_file_ptr,
             )
             .unwrap()
-            .get(emitter.arena())
             .kind()
         );
     }
@@ -1853,7 +1843,6 @@ fn replicate_bits() {
                 register_file_ptr,
             )
             .unwrap()
-            .get(emitter.arena())
             .kind()
         );
     }
@@ -1873,7 +1862,6 @@ fn replicate_bits() {
                 register_file_ptr,
             )
             .unwrap()
-            .get(emitter.arena())
             .kind()
         );
     }
@@ -1940,7 +1928,7 @@ fn place_slice() {
     )
     .unwrap();
     assert_eq!(
-        res.get(emitter.arena()).kind(),
+        res.kind(),
         &NodeKind::Constant {
             value: 0xffffffffffffffd8,
             width: 64

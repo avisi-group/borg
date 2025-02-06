@@ -100,7 +100,7 @@ impl Model {
             .offset
     }
 
-    pub fn get_register_by_offet(&self, offset: u64) -> Option<InternedString> {
+    pub fn get_register_by_offset(&self, offset: u64) -> Option<InternedString> {
         self.registers_by_offset
             .range(..=offset)
             .map(|(_, name)| *name)
