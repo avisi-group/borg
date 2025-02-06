@@ -189,6 +189,20 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         function.set_entry_block(block);
     }
 
+    {
+        let func = rudder
+            .functions()
+            .get(&InternedString::from_static("AArch64_ExceptionReturn"))
+            .unwrap();
+        rudder::dot::render(
+            &mut create_file_buffered(dump_ir.unwrap().join("aarch64_exceptionreturn.dot"))
+                .unwrap(),
+            func.arena(),
+            func.entry_block(),
+        )
+        .unwrap();
+    }
+
     if matches!(
         &mode,
         GenerationMode::CodeGen | GenerationMode::CodeGenWithIr(_)
