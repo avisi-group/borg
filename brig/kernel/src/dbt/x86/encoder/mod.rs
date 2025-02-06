@@ -1239,6 +1239,21 @@ impl Instruction {
                     .or::<AsmRegister32, i32>(right.into(), i32::try_from(*left).unwrap())
                     .unwrap();
             }
+            // OR I R
+            OR(
+                Operand {
+                    kind: I(left),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(right)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assembler
+                    .or::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
+                    .unwrap();
+            }
             // OR R R
             OR(
                 Operand {
