@@ -32,6 +32,7 @@ static LOGGER: &'static dyn Log = &Logger {
                                            * archive */
         ("elfloader", LevelFilter::Info),
         ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
+        ("kernel::dbt::x86::register_allocator", LevelFilter::Info),
         ("kernel::dbt::x86", LevelFilter::Info),
         ("kernel::dbt::translate", LevelFilter::Info),
         ("kernel::dbt::interpret", LevelFilter::Info),

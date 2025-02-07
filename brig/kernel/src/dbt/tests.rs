@@ -2415,6 +2415,7 @@ fn eret() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
+
     let translation = ctx.compile(num_regs);
 
     unsafe {

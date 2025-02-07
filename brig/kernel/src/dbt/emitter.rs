@@ -96,6 +96,7 @@ pub trait Emitter {
     fn leave(&mut self);
 
     fn set_current_block(&mut self, block: Self::BlockRef);
+    fn get_current_block(&self) -> Self::BlockRef;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

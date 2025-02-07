@@ -86,6 +86,14 @@ struct FunctionTranslator<'m, 'e, 'c> {
     /// Function local variables
     variables: HashMap<InternedString, LocalVariable>,
 
+    /// Map from a local variable to all the blocks in which a virtual write
+    /// occurs, the value written, and the index into the list of instructions
+    /// where the write must occur
+    ///
+    /// If the variable is later promoted to the stack, a stack write needs to
+    /// be appended to the end of each block
+    virtual_variable_blocks: HashMap<InternedString, Vec<(Ref<X86Block>, X86NodeRef, usize)>>,
+
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize>,
 
@@ -113,6 +121,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             x86_blocks: HashMap::default(),
             rudder_blocks: HashMap::default(),
             variables: HashMap::default(),
+            virtual_variable_blocks: HashMap::default(),
             current_stack_offset,
             emitter,
             register_file_ptr,
@@ -128,41 +137,26 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         let locals = function.local_variables();
 
         locals.iter().for_each(|symbol| {
-            if symbol.name().as_ref() == "new_pc" {
-                celf.variables.insert(
-                    symbol.name(),
-                    LocalVariable::Stack {
-                        typ: emit_rudder_type(&symbol.typ()),
-                        stack_offset: celf.allocate_stack_offset(&symbol.typ()),
-                    },
-                );
-            } else {
-                celf.variables.insert(
-                    symbol.name(),
-                    LocalVariable::Virtual {
-                        symbol: celf.emitter.ctx().create_symbol(),
-                    },
-                );
-            }
+            celf.variables.insert(
+                symbol.name(),
+                LocalVariable::Virtual {
+                    symbol: celf.emitter.ctx_mut().create_symbol(),
+                },
+            );
         });
 
         // set up symbols for parameters, and write arguments into them
+        //
+        // todo: add these to `virtual_variable_blocks`?? or will they always be virtual
+        // and never promoted? I think so because parameters are read-only?
         function
             .parameters()
             .iter()
             .zip(arguments)
             .for_each(|(parameter, argument)| {
-                let var = if parameter.name().as_ref() == "new_pc" {
-                    LocalVariable::Stack {
-                        typ: emit_rudder_type(&parameter.typ()),
-                        stack_offset: celf.allocate_stack_offset(&parameter.typ()),
-                    }
-                } else {
-                    LocalVariable::Virtual {
-                        symbol: celf.emitter.ctx().create_symbol(),
-                    }
+                let var = LocalVariable::Virtual {
+                    symbol: celf.emitter.ctx_mut().create_symbol(),
                 };
-
                 celf.variables.insert(parameter.name(), var.clone());
                 celf.write_variable(var, argument.clone());
             });
@@ -171,13 +165,13 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         celf.variables.insert(
             "borealis_fn_return_value".into(),
             LocalVariable::Virtual {
-                symbol: celf.emitter.ctx().create_symbol(),
+                symbol: celf.emitter.ctx_mut().create_symbol(),
             },
         );
 
         // set up block maps
         function.block_iter().for_each(|rudder_block| {
-            let x86_block = celf.emitter.ctx().create_block();
+            let x86_block = celf.emitter.ctx_mut().create_block();
             celf.rudder_blocks.insert(x86_block.clone(), rudder_block);
             celf.x86_blocks.insert(rudder_block, x86_block);
         });
@@ -195,10 +189,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             .unwrap_or_else(|| panic!("failed to find function {:?} in model", self.function_name));
 
         // create an empty block all control flow will end at
-        let exit_block = self.emitter.ctx().arena_mut().insert(X86Block::new());
+        let exit_block = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
 
         // create an empty entry block for this function
-        let entry_x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
+        let entry_x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
 
         // jump from the *current* emitter block to this function's entry block
         self.emitter.push_instruction(Instruction::jmp(entry_x86));
@@ -340,7 +334,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         function: &Function,
         arena: &Arena<Statement>,
     ) -> StatementResult {
-        //        log::warn!("translate stmt: {statement:?}");
+        //        log::debug!("translate stmt: {statement:?}");
 
         match statement {
             Statement::Constant { typ, value } => {
@@ -377,34 +371,80 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 }))
             }
             Statement::ReadVariable { symbol } => {
-                log::trace!("reading var {}", symbol.name());
+                log::debug!(
+                    "reading var {} in block {:#x} in {:?}",
+                    symbol.name(),
+                    block.index(),
+                    self.function_name
+                );
                 let var = self.variables.get(&symbol.name()).unwrap().clone();
                 StatementResult::Data(Some(self.read_variable(var)))
             }
             Statement::WriteVariable { symbol, value } => {
-                log::trace!("writing var {}", symbol.name());
+                log::debug!(
+                    "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}",
+                    symbol.name(),
+                    block.index(),
+                    self.function_name
+                );
                 if is_dynamic {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
-                    if let LocalVariable::Virtual { .. } =
-                        self.variables.get(&symbol.name()).unwrap()
-                    {
-                        let stack_offset = self.allocate_stack_offset(&symbol.typ());
-                        log::debug!(
-                            "promoting {:?} from virtual to stack @ {:#x}",
-                            symbol.name(),
-                            stack_offset
-                        );
-                        self.variables.insert(
-                            symbol.name(),
-                            LocalVariable::Stack {
-                                typ: emit_rudder_type(&symbol.typ()),
+                    match self.variables.get(&symbol.name()).unwrap() {
+                        LocalVariable::Virtual { .. } => {
+                            let stack_offset = self.allocate_stack_offset(&symbol.typ());
+                            log::debug!(
+                                "promoting {:?} from virtual to stack @ {:#x} in block {:#x} in {:?}, was written to in {:x?}",
+                                symbol.name(),
                                 stack_offset,
-                            },
-                        );
+                                block.index(),
+                                self.function_name,
+                                self.virtual_variable_blocks.get(&symbol.name()),
+                            );
+
+                            self.variables.insert(
+                                symbol.name(),
+                                LocalVariable::Stack {
+                                    typ: emit_rudder_type(&symbol.typ()),
+                                    stack_offset,
+                                },
+                            );
+
+                            let current_block = self.emitter.get_current_block();
+
+                            if let Some(blocks) =
+                                self.virtual_variable_blocks.remove(&symbol.name())
+                            {
+                                blocks.into_iter().for_each(|(block, value, index)| {
+                                    self.emitter.set_current_block(block);
+
+                                    let post = block
+                                        .get_mut(self.emitter.ctx_mut().arena_mut())
+                                        .instructions_mut()
+                                        .split_off(index);
+
+                                    self.emitter.write_stack_variable(stack_offset, value);
+
+                                    block
+                                        .get_mut(self.emitter.ctx_mut().arena_mut())
+                                        .instructions_mut()
+                                        .extend_from_slice(&post);
+                                });
+                            }
+
+                            self.emitter.set_current_block(current_block);
+                        }
+                        LocalVariable::Stack { stack_offset, .. } => {
+                            log::debug!(
+                                "local var {:?} already on stack @ {:#x} in block {:#x} in {:?}",
+                                symbol.name(),
+                                stack_offset,
+                                block.index(),
+                                self.function_name
+                            );
+                        }
                     }
                 }
-
                 let var = self.variables.get(&symbol.name()).unwrap().clone();
 
                 let value = statement_values
@@ -416,6 +456,20 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         )
                     })
                     .clone();
+
+                if let LocalVariable::Virtual { .. } = self.variables.get(&symbol.name()).unwrap() {
+                    let current_block = self.emitter.get_current_block();
+                    let index = current_block
+                        .get(self.emitter.ctx().arena())
+                        .instructions()
+                        .len();
+
+                    let metadata = (current_block, value.clone(), index);
+                    self.virtual_variable_blocks
+                        .entry(symbol.name())
+                        .and_modify(|e| e.push(metadata.clone()))
+                        .or_insert(alloc::vec![metadata]);
+                }
 
                 self.write_variable(var, value);
 
@@ -533,7 +587,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
             Statement::ReadPc => todo!(),
             Statement::WritePc { value } => {
-                self.emitter.ctx().set_pc_write_flag();
+                self.emitter.ctx_mut().set_pc_write_flag();
 
                 let offset = self.emitter.ctx().pc_offset() as u64;
                 let value = statement_values.get(*value).unwrap().clone();
@@ -665,7 +719,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
-                let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
+                let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
                 self.rudder_blocks.insert(x86, *target);
                 StatementResult::ControlFlow(self.emitter.jump(x86))
             }
@@ -681,11 +735,11 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 return match condition.kind() {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
-                            let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
+                            let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
                             self.rudder_blocks.insert(x86, *false_target);
                             StatementResult::ControlFlow(self.emitter.jump(x86))
                         } else {
-                            let x86 = self.emitter.ctx().arena_mut().insert(X86Block::new());
+                            let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
                             self.rudder_blocks.insert(x86, *true_target);
                             StatementResult::ControlFlow(self.emitter.jump(x86))
                         }

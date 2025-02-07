@@ -57,7 +57,11 @@ impl<'ctx> X86Emitter<'ctx> {
         }
     }
 
-    pub fn ctx(&mut self) -> &mut X86TranslationContext {
+    pub fn ctx(&self) -> &X86TranslationContext {
+        &self.ctx
+    }
+
+    pub fn ctx_mut(&mut self) -> &mut X86TranslationContext {
         &mut self.ctx
     }
 
@@ -594,7 +598,7 @@ impl<'ctx> X86Emitter<'ctx> {
                         let block_instructions = &mut self
                             .current_block
                             .clone()
-                            .get_mut(self.ctx().arena_mut())
+                            .get_mut(self.ctx_mut().arena_mut())
                             .instructions;
 
                         let (index, adc) = block_instructions
@@ -619,7 +623,7 @@ impl<'ctx> X86Emitter<'ctx> {
 
                         self.current_block
                             .clone()
-                            .get_mut(self.ctx().arena_mut())
+                            .get_mut(self.ctx_mut().arena_mut())
                             .instructions
                             .extend_from_slice(&instrs);
                     }
@@ -691,6 +695,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     fn set_current_block(&mut self, block: Self::BlockRef) {
         self.current_block = block;
         self.current_block_operands = HashMap::default();
+    }
+
+    fn get_current_block(&self) -> Self::BlockRef {
+        self.current_block
     }
 
     fn constant(&mut self, value: u64, typ: Type) -> Self::NodeRef {
@@ -1397,6 +1405,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             kind: NodeKind::ReadStackVariable { offset, width },
         })
     }
+
     fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef) {
         let value = self.to_operand(&value);
 
@@ -1832,7 +1841,7 @@ impl X86Block {
         &self.instructions
     }
 
-    pub fn instructions_mut(&mut self) -> &mut [Instruction] {
+    pub fn instructions_mut(&mut self) -> &mut Vec<Instruction> {
         &mut self.instructions
     }
 
