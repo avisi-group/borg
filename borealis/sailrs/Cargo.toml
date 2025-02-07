@@ -32,7 +32,7 @@ strum = { version = "0.26.3", features = ["derive"] }
 byte-unit = "5.1.6"
 
 [build-dependencies]
-cc = "1.2.11"
+cc = "1.2.12"
 color-eyre = "0.6.3"
 
 [dev-dependencies]
