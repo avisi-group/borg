@@ -10,8 +10,8 @@ use {
     },
 };
 
-#[no_mangle]
-#[link_section = ".plugin_header"]
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".plugin_header")]
 pub static PLUGIN_HEADER: PluginHeader = PluginHeader {
     name: "pl011",
     entrypoint,

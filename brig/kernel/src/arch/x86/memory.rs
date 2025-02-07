@@ -215,6 +215,6 @@ unsafe impl<const N: usize> Allocator for AlignedAllocator<N> {
         Global.allocate(layout.align_to(N).unwrap())
     }
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        Global.deallocate(ptr, layout.align_to(N).unwrap())
+        unsafe { Global.deallocate(ptr, layout.align_to(N).unwrap()) }
     }
 }

@@ -58,11 +58,16 @@ unsafe impl virtio_drivers::Hal for VirtioHal {
         pages: usize,
     ) -> i32 {
         log::trace!("dma_dealloc: {paddr:x} {vaddr:p} {pages:x}");
-        dealloc(
-            vaddr.as_ptr(),
-            Layout::from_size_align(pages * virtio_drivers::PAGE_SIZE, virtio_drivers::PAGE_SIZE)
+        unsafe {
+            dealloc(
+                vaddr.as_ptr(),
+                Layout::from_size_align(
+                    pages * virtio_drivers::PAGE_SIZE,
+                    virtio_drivers::PAGE_SIZE,
+                )
                 .unwrap(),
-        );
+            )
+        };
 
         0
     }

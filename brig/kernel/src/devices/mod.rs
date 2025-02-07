@@ -49,7 +49,7 @@ pub enum Device {
 impl Device {
     /// Panics if underlying device is not a block device
     pub fn as_block(&mut self) -> &mut Box<dyn BlockDevice> {
-        let Device::Block(ref mut blk) = self else {
+        let &mut Device::Block(ref mut blk) = self else {
             panic!("not a block device");
         };
 

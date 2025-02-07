@@ -30,13 +30,15 @@ impl AcpiHandler for Handler {
     ) -> acpi::PhysicalMapping<Self, T> {
         let virt_addr = PhysAddr::new(u64::try_from(physical_address).unwrap()).to_virt();
 
-        PhysicalMapping::new(
-            physical_address,
-            NonNull::new(virt_addr.as_mut_ptr()).unwrap(),
-            size,
-            size,
-            Self,
-        )
+        unsafe {
+            PhysicalMapping::new(
+                physical_address,
+                NonNull::new(virt_addr.as_mut_ptr()).unwrap(),
+                size,
+                size,
+                Self,
+            )
+        }
     }
 
     fn unmap_physical_region<T>(_region: &acpi::PhysicalMapping<Self, T>) {}
