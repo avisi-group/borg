@@ -9,6 +9,7 @@ use {
     },
 };
 
+mod and;
 mod mov;
 mod setne;
 mod shl;
@@ -656,15 +657,20 @@ impl Instruction {
         Self(Opcode::ADC(a, b, c))
     }
 
-    pub fn mov(src: Operand, dst: Operand) -> Self {
-        Self(Opcode::MOV(src, dst))
+    pub fn mov(src: Operand, dst: Operand) -> Result<Self, ()> {
+        if src.width() != dst.width() {
+            return Err(());
+        }
+        Ok(Self(Opcode::MOV(src, dst)))
     }
 
     pub fn movzx(src: Operand, dst: Operand) -> Self {
+        assert!(src.width() < dst.width());
         Self(Opcode::MOVZX(src, dst))
     }
 
     pub fn movsx(src: Operand, dst: Operand) -> Self {
+        assert!(src.width() < dst.width());
         Self(Opcode::MOVSX(src, dst))
     }
 
@@ -819,6 +825,10 @@ impl Instruction {
             // do not emit dead instructions
             DEAD => (),
             MOV(src, dst) => mov::encode(assembler, src, dst),
+            SHL(amount, value) => shl::encode(assembler, amount, value),
+            SHR(amount, value) => shr::encode(assembler, amount, value),
+            AND(src, dst) => and::encode(assembler, src, dst),
+            SETNE(dst) => setne::encode(assembler, dst),
             MOVSX(
                 Operand {
                     kind: R(PHYS(src)),
@@ -832,7 +842,47 @@ impl Instruction {
                 (Width::_32, Width::_64) => assembler
                     .movsxd::<AsmRegister64, AsmRegister32>(dst.into(), src.into())
                     .unwrap(),
+                (Width::_16, Width::_64) => assembler
+                    .movsx::<AsmRegister64, AsmRegister16>(dst.into(), src.into())
+                    .unwrap(),
                 (src, dst) => todo!("{src} -> {dst} sign extend mov not implemented"),
+            },
+            // MOVZX I -> R
+            MOVZX(
+                Operand {
+                    kind: I(src),
+                    width_in_bits: src_width,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: dst_width,
+                },
+            ) => match (*src_width, *dst_width) {
+                (Width::_8, Width::_32) => {
+                    assembler
+                        .mov::<AsmRegister32, i32>(dst.into(), u8::try_from(*src).unwrap().into())
+                        .unwrap();
+                }
+                (Width::_8, Width::_64) => {
+                    // high 32 bits will be cleared automatically
+                    assembler
+                        .mov::<AsmRegister32, i32>(dst.into(), u8::try_from(*src).unwrap().into())
+                        .unwrap();
+                }
+                (Width::_16, Width::_64) => {
+                    // high 32 bits will be cleared automatically
+                    assembler
+                        .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
+                        .unwrap();
+                }
+                (Width::_32, Width::_64) => {
+                    // high 32 bits will be cleared automatically
+                    assembler
+                        .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
+                        .unwrap();
+                }
+
+                (src, dst) => todo!("{src} -> {dst} zero extend mov not implemented"),
             },
             // MOVZX R -> R
             MOVZX(
@@ -845,19 +895,19 @@ impl Instruction {
                     width_in_bits: dst_width,
                 },
             ) => match (*src_width, *dst_width) {
+                (Width::_8, Width::_32) => assembler
+                    .movzx::<AsmRegister32, AsmRegister8>(dst.into(), src.into())
+                    .unwrap(),
+                (Width::_8, Width::_64) => assembler
+                    .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
+                    .unwrap(),
                 (Width::_16, Width::_32) => assembler
                     .movzx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
                     .unwrap(),
                 (Width::_16, Width::_64) => assembler
                     .movzx::<AsmRegister64, AsmRegister16>(dst.into(), src.into())
                     .unwrap(),
-                (Width::_8, Width::_64) => assembler
-                    .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
-                    .unwrap(),
                 (Width::_32, Width::_64) => assembler
-                    .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
-                    .unwrap(),
-                (Width::_32, Width::_32) => assembler
                     .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                     .unwrap(),
 
@@ -1193,8 +1243,7 @@ impl Instruction {
                 kind: R(PHYS(value)),
                 ..
             }) => assembler.neg::<AsmRegister64>(value.into()).unwrap(),
-            SHL(amount, value) => shl::encode(assembler, amount, value),
-            SHR(amount, value) => shr::encode(assembler, amount, value),
+
             SAR(
                 Operand {
                     kind: R(PHYS(amount)),
@@ -1250,9 +1299,13 @@ impl Instruction {
                     width_in_bits: Width::_64,
                 },
             ) => {
-                assembler
-                    .or::<AsmRegister64, i32>(right.into(), i32::try_from(*left).unwrap())
-                    .unwrap();
+                if *left < u32::MAX as u64 {
+                    assembler
+                        .or::<AsmRegister64, i32>(right.into(), *left as i32)
+                        .unwrap();
+                } else {
+                    panic!("{left:?}")
+                }
             }
             // OR R R
             OR(
@@ -1293,11 +1346,11 @@ impl Instruction {
                     width_in_bits: Width::_64,
                 },
             ) => {
-                //assert_eq!(src_width, dst_width);
                 assembler
                     .or::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
             }
+
             XOR(
                 Operand {
                     kind: R(PHYS(src)),
@@ -1308,7 +1361,6 @@ impl Instruction {
                     width_in_bits: Width::_64,
                 },
             ) => {
-                //assert_eq!(src_width, dst_width);
                 assembler
                     .xor::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                     .unwrap();
@@ -1323,82 +1375,23 @@ impl Instruction {
                     width_in_bits: Width::_8,
                 },
             ) => {
-                //assert_eq!(src_width, dst_width);
                 assembler
                     .xor::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
                     .unwrap();
             }
 
-            AND(
-                Operand { kind: I(left), .. },
-                Operand {
-                    kind: R(PHYS(right)),
-                    ..
-                },
-            ) => {
-                if *left == u64::MAX {
-                    // no-op
-                } else {
-                    if *left > u32::MAX as u64 {
-                        panic!("AND immediate too large: {left:x}");
-                    }
-                    assembler
-                        .and::<AsmRegister64, i32>(right.into(), *left as i32)
-                        .unwrap();
-                }
-            }
-            AND(
-                Operand {
-                    kind: R(PHYS(left)),
-                    width_in_bits: Width::_64,
-                },
-                Operand {
-                    kind: R(PHYS(right)),
-                    width_in_bits: Width::_64,
-                },
-            ) => {
-                assembler
-                    .and::<AsmRegister64, AsmRegister64>(right.into(), left.into())
-                    .unwrap();
-            }
-            AND(
-                Operand {
-                    kind: R(PHYS(left)),
-                    width_in_bits: Width::_32,
-                },
-                Operand {
-                    kind: R(PHYS(right)),
-                    width_in_bits: Width::_32,
-                },
-            ) => {
-                assembler
-                    .and::<AsmRegister32, AsmRegister32>(right.into(), left.into())
-                    .unwrap();
-            }
-            AND(
-                Operand {
-                    kind: R(PHYS(left)),
-                    width_in_bits: Width::_8,
-                },
-                Operand {
-                    kind: R(PHYS(right)),
-                    width_in_bits: Width::_8,
-                },
-            ) => {
-                assembler
-                    .and::<AsmRegister8, AsmRegister8>(right.into(), left.into())
-                    .unwrap();
-            }
             BEXTR(
                 Operand {
                     kind: R(PHYS(ctrl)),
-                    ..
+                    width_in_bits: Width::_64,
                 },
                 Operand {
-                    kind: R(PHYS(src)), ..
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_64,
                 },
                 Operand {
-                    kind: R(PHYS(dst)), ..
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_64,
                 },
             ) => {
                 assembler
@@ -1425,7 +1418,7 @@ impl Instruction {
                 },
                 Operand {
                     kind: R(PHYS(carry)),
-                    ..
+                    width_in_bits: Width::_8,
                 },
             ) => {
                 // sets the carry flag
@@ -1449,7 +1442,7 @@ impl Instruction {
                 },
                 Operand {
                     kind: R(PHYS(carry)),
-                    ..
+                    width_in_bits: Width::_8,
                 },
             ) => {
                 // sets the carry flag
@@ -1557,7 +1550,6 @@ impl Instruction {
             }) => {
                 assembler.setl::<AsmRegister8>(dst.into()).unwrap();
             }
-            SETNE(dst) => setne::encode(assembler, dst),
 
             CMOVE(
                 Operand {

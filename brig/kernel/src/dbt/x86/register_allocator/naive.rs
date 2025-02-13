@@ -182,7 +182,7 @@ impl FreshAllocator {
 
         instructions.iter().enumerate().for_each(|(instruction_index, instruction)| {
             {
-                let ended_registers = self.live_ranges.iter().map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range))).flatten().filter(|(_, (_, end))| end.unwrap() == instruction_index).map(|(reg, _)| reg).collect::<Vec<_>>();
+                let ended_registers = self.live_ranges.iter().map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range))).flatten().filter(|(_, (_, end))| *end == Some(instruction_index)).map(|(reg, _)| reg).collect::<Vec<_>>();
 
                 ended_registers.iter().for_each(|reg| match reg {
                     Register::PhysicalRegister(idx) => {

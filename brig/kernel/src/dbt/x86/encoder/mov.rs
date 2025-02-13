@@ -30,39 +30,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                 .unwrap();
         }
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_8,
-            },
-        ) => {
-            //assert_eq!(src_width_in_bits, dst_width_in_bits);
 
-            assembler
-                .mov::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
-                .unwrap();
-        }
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_32,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_8,
-            },
-        ) => {
-            //assert_eq!(src_width_in_bits, dst_width_in_bits);
-
-            assembler
-                .mov::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
-                .unwrap();
-        }
         // MOV R -> R
         (
             Operand {
@@ -78,23 +46,6 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
 
             assembler
                 .mov::<AsmRegister8, AsmRegister8>(dst.into(), src.into())
-                .unwrap();
-        }
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_16,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_64,
-            },
-        ) => {
-            // todo: check high bits of src are clear?
-            // this should be a movzx
-            assembler
-                .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                 .unwrap();
         }
         // MOV R -> R
@@ -113,38 +64,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                 .unwrap();
         }
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_8,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_64,
-            },
-        ) => {
-            // todo: check high bits of src are zero?
-            assembler
-                .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
-                .unwrap();
-        }
-        // MOV R -> R
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_16,
-            },
-        ) => {
-            // todo: check high bits of src are zero?
-            assembler
-                .mov::<AsmRegister16, AsmRegister16>(dst.into(), src.into())
-                .unwrap();
-        }
+
         // MOV R -> R
         (
             Operand {
@@ -156,7 +76,6 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 width_in_bits: Width::_16,
             },
         ) => {
-            // todo: check high bits of src are zero?
             assembler
                 .mov::<AsmRegister16, AsmRegister16>(dst.into(), src.into())
                 .unwrap();
@@ -525,35 +444,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .mov::<AsmRegister32, u32>(dst.into(), u32::try_from(*src).unwrap())
                 .unwrap();
         }
-        (
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_64,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_32,
-            },
-        ) => {
-            assembler
-                .mov::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
-                .unwrap();
-        }
-        (
-            // todo: move me to movzx
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_8,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_32,
-            },
-        ) => {
-            assembler
-                .movzx::<AsmRegister32, AsmRegister8>(dst.into(), src.into())
-                .unwrap();
-        }
+
         (
             // todo: fix this earlier in DBT
             Operand {
@@ -571,7 +462,6 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 .unwrap();
         }
         (
-            // todo: fix this earlier in DBT
             Operand {
                 kind: I(src),
                 width_in_bits: Width::_8,
@@ -584,22 +474,6 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             // no need to write high bits
             assembler
                 .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
-                .unwrap();
-        }
-        (
-            // todo: fix this earlier in DBT
-            Operand {
-                kind: R(PHYS(src)),
-                width_in_bits: Width::_32,
-            },
-            Operand {
-                kind: R(PHYS(dst)),
-                width_in_bits: Width::_64,
-            },
-        ) => {
-            // todo: maybe zero extend src here?
-            assembler
-                .mov::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
                 .unwrap();
         }
         (

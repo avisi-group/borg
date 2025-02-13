@@ -11,6 +11,18 @@ pub enum Width {
     _64,
 }
 
+impl PartialOrd for Width {
+    fn partial_cmp(&self, other: &Width) -> Option<Ordering> {
+        Some(self.cmp(&other))
+    }
+}
+
+impl Ord for Width {
+    fn cmp(&self, other: &Width) -> Ordering {
+        self.as_u16().cmp(&other.as_u16())
+    }
+}
+
 impl Width {
     pub fn from_uncanonicalized(bits: u16) -> Result<Self, WidthError> {
         match bits {
@@ -37,12 +49,6 @@ impl Width {
 impl Display for Width {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_u16())
-    }
-}
-
-impl PartialOrd for Width {
-    fn partial_cmp(&self, other: &Width) -> Option<Ordering> {
-        self.as_u16().partial_cmp(&other.as_u16())
     }
 }
 

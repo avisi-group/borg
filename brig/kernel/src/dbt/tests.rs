@@ -1010,7 +1010,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(0x40));
     let y = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(0x40));
-    let carry_in = emitter.read_register(model.reg_offset("R2"), Type::Unsigned(0x8));
+    let carry_in = emitter.read_register(model.reg_offset("R2"), Type::Unsigned(0x1));
 
     let res = translate(
         &*model,

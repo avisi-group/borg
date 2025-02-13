@@ -18,6 +18,7 @@ use {
     },
     core::{
         cell::RefCell,
+        cmp::{max, Ordering},
         fmt::Debug,
         hash::{Hash, Hasher},
         panic,
@@ -95,7 +96,7 @@ impl<'ctx> X86Emitter<'ctx> {
             let width = Width::from_uncanonicalized(node.typ().width()).unwrap();
             let value_reg = Operand::vreg(width, self.next_vreg());
             let value_imm = self.to_operand(node);
-            self.push_instruction(Instruction::mov(value_imm, value_reg.clone()));
+            self.push_instruction(Instruction::mov(value_imm, value_reg.clone()).unwrap());
             value_reg
         } else {
             self.to_operand(node)
@@ -119,14 +120,17 @@ impl<'ctx> X86Emitter<'ctx> {
                 });
                 let dst = Operand::vreg(width, self.next_vreg());
 
-                self.push_instruction(Instruction::mov(
-                    Operand::mem_base_displ(
-                        width,
-                        Register::PhysicalRegister(PhysicalRegister::RBP),
-                        (*offset).try_into().unwrap(),
-                    ),
-                    dst.clone(),
-                ));
+                self.push_instruction(
+                    Instruction::mov(
+                        Operand::mem_base_displ(
+                            width,
+                            Register::PhysicalRegister(PhysicalRegister::RBP),
+                            (*offset).try_into().unwrap(),
+                        ),
+                        dst.clone(),
+                    )
+                    .unwrap(),
+                );
 
                 dst
             }
@@ -134,143 +138,35 @@ impl<'ctx> X86Emitter<'ctx> {
                 let width = Width::from_uncanonicalized(*width).unwrap();
                 let dst = Operand::vreg(width, self.next_vreg());
 
-                self.push_instruction(Instruction::mov(
-                    Operand::mem_base_displ(
-                        width,
-                        Register::PhysicalRegister(PhysicalRegister::R14),
-                        -(i32::try_from(*offset).unwrap()),
-                    ),
-                    dst.clone(),
-                ));
+                self.push_instruction(
+                    Instruction::mov(
+                        Operand::mem_base_displ(
+                            width,
+                            Register::PhysicalRegister(PhysicalRegister::R14),
+                            -(i32::try_from(*offset).unwrap()),
+                        ),
+                        dst.clone(),
+                    )
+                    .unwrap(),
+                );
 
                 dst
             }
-            NodeKind::BinaryOperation(kind) => match kind {
-                BinaryOperationKind::Add(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, self.next_vreg());
-
-                    let left = self.to_operand(left);
-                    let right = self.to_operand(right);
-                    self.push_instruction(Instruction::mov(left, dst.clone()));
-                    self.push_instruction(Instruction::add(right, dst.clone()));
-
-                    dst
-                }
-                BinaryOperationKind::Sub(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, self.next_vreg());
-
-                    let left = self.to_operand(left);
-                    let right = self.to_operand(right);
-                    self.push_instruction(Instruction::mov(left, dst.clone()));
-                    self.push_instruction(Instruction::sub(right, dst.clone()));
-
-                    dst
-                }
-                BinaryOperationKind::Or(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, self.next_vreg());
-
-                    let left = self.to_operand(left);
-                    let right = self.to_operand(right);
-                    self.push_instruction(Instruction::mov(left, dst.clone()));
-                    self.push_instruction(Instruction::or(right, dst.clone()));
-
-                    dst
-                }
-                BinaryOperationKind::And(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, self.next_vreg());
-
-                    let left = self.to_operand(left);
-                    let mut right = self.to_operand(right);
-
-                    if let OperandKind::Immediate(i) = right.kind() {
-                        if *i > u32::MAX as u64 {
-                            let new = Operand::vreg(width, self.next_vreg());
-                            self.push_instruction(Instruction::mov(right, new.clone()));
-                            right = new;
-                        }
-                    }
-
-                    self.push_instruction(Instruction::mov(left, dst.clone()));
-                    self.push_instruction(Instruction::and(right, dst.clone()));
-
-                    dst
-                }
-                BinaryOperationKind::Multiply(left, right) => {
-                    let width = Width::from_uncanonicalized(left.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, self.next_vreg());
-
-                    let left = self.to_operand(left);
-                    let right = self.to_operand(right);
-                    self.push_instruction(Instruction::mov(left, dst.clone()));
-                    self.push_instruction(Instruction::imul(right, dst.clone()));
-
-                    dst
-                }
-                BinaryOperationKind::Divide(dividend, divisor) => {
-                    assert_eq!(dividend.typ().width(), 64);
-                    assert_eq!(divisor.typ().width(), 64);
-
-                    let width = Width::from_uncanonicalized(divisor.typ().width()).unwrap();
-
-                    let dividend = self.to_operand(dividend);
-                    let divisor = self.to_operand_reg_promote(divisor);
-
-                    let _0 = Operand::imm(Width::_64, 0);
-
-                    let hi = Operand::preg(width, PhysicalRegister::RDX);
-                    let lo = Operand::preg(width, PhysicalRegister::RAX);
-
-                    self.push_instruction(Instruction::mov(_0, hi.clone()));
-                    self.push_instruction(Instruction::mov(dividend, lo.clone()));
-                    self.push_instruction(Instruction::idiv(hi, lo.clone(), divisor));
-
-                    lo
-                }
-
-                BinaryOperationKind::Modulo(dividend, divisor) => {
-                    assert_eq!(dividend.typ().width(), 64);
-                    assert_eq!(divisor.typ().width(), 64);
-
-                    let width = Width::from_uncanonicalized(divisor.typ().width()).unwrap();
-
-                    let dividend = self.to_operand(dividend);
-                    let divisor = self.to_operand_reg_promote(divisor);
-
-                    let _0 = Operand::imm(Width::_64, 0);
-
-                    let hi = Operand::preg(width, PhysicalRegister::RDX);
-                    let lo = Operand::preg(width, PhysicalRegister::RAX);
-
-                    self.push_instruction(Instruction::mov(_0, hi.clone()));
-                    self.push_instruction(Instruction::mov(dividend, lo.clone()));
-                    self.push_instruction(Instruction::idiv(hi, lo.clone(), divisor));
-
-                    hi
-                }
-                BinaryOperationKind::CompareEqual(left, right)
-                | BinaryOperationKind::CompareNotEqual(left, right)
-                | BinaryOperationKind::CompareGreaterThan(left, right)
-                | BinaryOperationKind::CompareGreaterThanOrEqual(left, right)
-                | BinaryOperationKind::CompareLessThan(left, right)
-                | BinaryOperationKind::CompareLessThanOrEqual(left, right) => {
-                    encode_compare(kind, self, left.clone(), right.clone())
-                }
-
-                op => todo!("{op:#?}"),
-            },
+            NodeKind::BinaryOperation(kind) => self.binary_operation_to_operand(kind),
             NodeKind::TernaryOperation(kind) => match kind {
                 TernaryOperationKind::AddWithCarry(a, b, carry) => {
-                    let width = Width::from_uncanonicalized(a.typ().width()).unwrap();
-                    let dst = Operand::vreg(width, self.next_vreg());
+                    let a_width = Width::from_uncanonicalized(a.typ().width()).unwrap();
+                    let b_width = Width::from_uncanonicalized(b.typ().width()).unwrap();
+
+                    assert_eq!(a_width, b_width);
+                    assert_eq!(carry.typ().width(), 1);
+
+                    let dst = Operand::vreg(a_width, self.next_vreg());
 
                     let a = self.to_operand(a);
                     let b = self.to_operand(b);
                     let carry = self.to_operand(carry);
-                    self.push_instruction(Instruction::mov(b.clone(), dst.clone()));
+                    self.push_instruction(Instruction::mov(b.clone(), dst.clone()).unwrap());
                     self.push_instruction(Instruction::adc(a, dst.clone(), carry));
 
                     dst
@@ -281,7 +177,7 @@ impl<'ctx> X86Emitter<'ctx> {
                     let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
                     let dst = Operand::vreg(width, self.next_vreg());
                     let value = self.to_operand(value);
-                    self.push_instruction(Instruction::mov(value, dst.clone()));
+                    self.push_instruction(Instruction::mov(value, dst.clone()).unwrap());
                     self.push_instruction(Instruction::not(dst.clone()));
                     dst
                 }
@@ -305,6 +201,8 @@ impl<'ctx> X86Emitter<'ctx> {
                         panic!();
                     };
 
+                    assert_eq!(num.typ().width(), den.typ().width());
+
                     let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
                     let num = self.to_operand(num);
                     let den = self.to_operand(den);
@@ -314,14 +212,16 @@ impl<'ctx> X86Emitter<'ctx> {
                     let rdx = Operand::preg(width, PhysicalRegister::RDX);
 
                     self.push_instruction(Instruction::xor(rdx.clone(), rdx.clone()));
-                    self.push_instruction(Instruction::mov(num.clone(), rax.clone()));
-                    self.push_instruction(Instruction::mov(den, divisor.clone()));
+                    self.push_instruction(Instruction::mov(num.clone(), rax.clone()).unwrap());
+                    self.push_instruction(Instruction::mov(den, divisor.clone()).unwrap());
                     self.push_instruction(Instruction::idiv(rdx.clone(), rax.clone(), divisor));
 
                     let quotient = Operand::vreg(width, self.next_vreg());
                     let remainder = Operand::vreg(width, self.next_vreg());
-                    self.push_instruction(Instruction::mov(rax.clone(), quotient.clone()));
-                    self.push_instruction(Instruction::mov(rdx.clone(), remainder.clone()));
+                    self.push_instruction(Instruction::mov(rax.clone(), quotient.clone()).unwrap());
+                    self.push_instruction(
+                        Instruction::mov(rdx.clone(), remainder.clone()).unwrap(),
+                    );
 
                     let nz = Operand::vreg(Width::_8, self.next_vreg());
                     let g = Operand::vreg(Width::_8, self.next_vreg());
@@ -347,6 +247,8 @@ impl<'ctx> X86Emitter<'ctx> {
                         panic!();
                     };
 
+                    assert_eq!(num.typ().width(), den.typ().width());
+
                     let width = Width::from_uncanonicalized(num.typ().width()).unwrap();
                     let num = self.to_operand(num);
                     let den = self.to_operand(den);
@@ -356,14 +258,16 @@ impl<'ctx> X86Emitter<'ctx> {
                     let rdx = Operand::preg(width, PhysicalRegister::RDX);
 
                     self.push_instruction(Instruction::xor(rdx.clone(), rdx.clone()));
-                    self.push_instruction(Instruction::mov(num.clone(), rax.clone()));
-                    self.push_instruction(Instruction::mov(den, divisor.clone()));
+                    self.push_instruction(Instruction::mov(num.clone(), rax.clone()).unwrap());
+                    self.push_instruction(Instruction::mov(den, divisor.clone()).unwrap());
                     self.push_instruction(Instruction::idiv(rdx.clone(), rax.clone(), divisor));
 
                     let quotient = Operand::vreg(width, self.next_vreg());
                     let remainder = Operand::vreg(width, self.next_vreg());
-                    self.push_instruction(Instruction::mov(rax.clone(), quotient.clone()));
-                    self.push_instruction(Instruction::mov(rdx.clone(), remainder.clone()));
+                    self.push_instruction(Instruction::mov(rax.clone(), quotient.clone()).unwrap());
+                    self.push_instruction(
+                        Instruction::mov(rdx.clone(), remainder.clone()).unwrap(),
+                    );
 
                     let nz = Operand::vreg(Width::_8, self.next_vreg());
                     let s = Operand::vreg(Width::_8, self.next_vreg());
@@ -391,7 +295,7 @@ impl<'ctx> X86Emitter<'ctx> {
                     let width = Width::from_uncanonicalized(value.typ().width()).unwrap();
                     let value_reg = Operand::vreg(width, self.next_vreg());
                     let value_imm = self.to_operand(value);
-                    self.push_instruction(Instruction::mov(value_imm, value_reg.clone()));
+                    self.push_instruction(Instruction::mov(value_imm, value_reg.clone()).unwrap());
                     value_reg
                 } else {
                     self.to_operand(value)
@@ -406,14 +310,14 @@ impl<'ctx> X86Emitter<'ctx> {
 
                     let start = {
                         let dst = Operand::vreg(Width::_64, self.next_vreg());
-                        self.push_instruction(Instruction::mov(start, dst.clone()));
+                        self.push_instruction(Instruction::mov(start, dst.clone()).unwrap());
                         self.push_instruction(Instruction::and(mask.clone(), dst.clone()));
                         dst
                     };
 
                     let length = {
                         let dst = Operand::vreg(Width::_64, self.next_vreg());
-                        self.push_instruction(Instruction::mov(length, dst.clone()));
+                        self.push_instruction(Instruction::mov(length, dst.clone()).unwrap());
                         self.push_instruction(Instruction::and(mask.clone(), dst.clone()));
                         self.push_instruction(Instruction::shl(
                             Operand::imm(Width::_8, 8),
@@ -424,7 +328,7 @@ impl<'ctx> X86Emitter<'ctx> {
 
                     let dst = Operand::vreg(Width::_64, self.next_vreg());
 
-                    self.push_instruction(Instruction::mov(start, dst.clone()));
+                    self.push_instruction(Instruction::mov(start, dst.clone()).unwrap());
                     self.push_instruction(Instruction::or(length, dst.clone()));
 
                     dst
@@ -440,22 +344,22 @@ impl<'ctx> X86Emitter<'ctx> {
             NodeKind::Cast { value, kind } => {
                 let target_width = Width::from_uncanonicalized(node.typ().width()).unwrap();
                 let dst = Operand::vreg(target_width, self.next_vreg());
-                let src = self.to_operand(value);
+                let mut src = self.to_operand(value);
 
                 if node.typ() == value.typ() {
-                    self.push_instruction(Instruction::mov(src, dst.clone()));
+                    self.push_instruction(Instruction::mov(src, dst.clone()).unwrap());
                 } else {
                     match kind {
                         CastOperationKind::ZeroExtend => {
                             if src.width() == dst.width() {
-                                self.push_instruction(Instruction::mov(src, dst.clone()));
+                                self.push_instruction(Instruction::mov(src, dst.clone()).unwrap());
                             } else {
                                 self.push_instruction(Instruction::movzx(src, dst.clone()));
                             }
                         }
                         CastOperationKind::SignExtend => {
                             if src.width() == dst.width() {
-                                self.push_instruction(Instruction::mov(src, dst.clone()));
+                                self.push_instruction(Instruction::mov(src, dst.clone()).unwrap());
                             } else {
                                 self.push_instruction(Instruction::movsx(src, dst.clone()));
                             }
@@ -470,16 +374,23 @@ impl<'ctx> X86Emitter<'ctx> {
                                 panic!("src ({src_width} bits) must be larger than dst ({dst_width} bits)");
                             }
 
-                            self.push_instruction(Instruction::mov(src, dst.clone()));
+                            src.width_in_bits = dst.width_in_bits;
+
+                            self.push_instruction(Instruction::mov(src, dst.clone()).unwrap());
                         }
 
-                        CastOperationKind::Reinterpret => {
-                            // todo: actually reinterpret and fix the following:
-                            // if src.width_in_bits != dst.width_in_bits {
-                            //     panic!("failed to reinterpret\n{value:#?}\n as {:?}",
-                            // node.typ()); }
-                            self.push_instruction(Instruction::mov(src, dst.clone()));
-                        }
+                        CastOperationKind::Reinterpret => match src.width().cmp(&dst.width()) {
+                            Ordering::Equal => {
+                                self.push_instruction(Instruction::mov(src, dst.clone()).unwrap())
+                            }
+                            Ordering::Less => {
+                                self.push_instruction(Instruction::movzx(src, dst.clone()))
+                            }
+                            Ordering::Greater => {
+                                src.width_in_bits = dst.width_in_bits;
+                                self.push_instruction(Instruction::mov(src, dst.clone()).unwrap())
+                            }
+                        },
                         _ => todo!("{kind:?} to {:?}\n{value:#?}", node.typ()),
                     }
                 }
@@ -495,11 +406,13 @@ impl<'ctx> X86Emitter<'ctx> {
                 let value = self.to_operand(value);
 
                 let dst = Operand::vreg(value.width(), self.next_vreg());
-                self.push_instruction(Instruction::mov(value, dst.clone()));
+                self.push_instruction(Instruction::mov(value, dst.clone()).unwrap());
 
                 if let OperandKind::Register(_) = amount.kind() {
+                    // truncate (high bits don't matter anyway)
+                    amount.width_in_bits = Width::_8;
                     let amount_dst = Operand::preg(Width::_8, PhysicalRegister::RCX);
-                    self.push_instruction(Instruction::mov(amount, amount_dst.clone()));
+                    self.push_instruction(Instruction::mov(amount, amount_dst.clone()).unwrap());
                     amount = amount_dst;
                 }
 
@@ -532,30 +445,47 @@ impl<'ctx> X86Emitter<'ctx> {
                 let start = self.to_operand(start);
                 let length = self.to_operand(length);
 
+                let source = match source.width().cmp(&target.width()) {
+                    Ordering::Equal => source,
+                    Ordering::Greater => {
+                        panic!("source width exceeds target")
+                    }
+                    Ordering::Less => {
+                        let new_source = Operand::vreg(target.width(), self.next_vreg());
+                        self.push_instruction(Instruction::movzx(source, new_source));
+                        new_source
+                    }
+                };
+                assert_eq!(start.width(), length.width());
+
                 let width = target.width();
 
                 // mask off target bits
                 let mask = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::mov(Operand::imm(width, 1), mask.clone()));
+                self.push_instruction(
+                    Instruction::mov(Operand::imm(width, 1), mask.clone()).unwrap(),
+                );
                 self.push_instruction(Instruction::shl(length.clone(), mask.clone()));
                 self.push_instruction(Instruction::sub(Operand::imm(width, 1), mask.clone()));
                 self.push_instruction(Instruction::shl(start.clone(), mask.clone()));
                 self.push_instruction(Instruction::not(mask.clone()));
 
                 let masked_target = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::mov(target, masked_target.clone()));
+                self.push_instruction(Instruction::mov(target, masked_target.clone()).unwrap());
                 self.push_instruction(Instruction::and(mask.clone(), masked_target.clone()));
 
                 // shift source by start
                 let shifted_source = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::mov(source, shifted_source.clone()));
+                self.push_instruction(Instruction::mov(source, shifted_source.clone()).unwrap());
                 self.push_instruction(Instruction::shl(start, shifted_source.clone()));
 
                 // apply ~mask to source
                 {
                     // not strictly necessary but may avoid issues if there is junk data
                     let invert_mask = Operand::vreg(width, self.next_vreg());
-                    self.push_instruction(Instruction::mov(mask.clone(), invert_mask.clone()));
+                    self.push_instruction(
+                        Instruction::mov(mask.clone(), invert_mask.clone()).unwrap(),
+                    );
                     self.push_instruction(Instruction::not(invert_mask.clone()));
                     self.push_instruction(Instruction::and(
                         invert_mask.clone(),
@@ -658,7 +588,7 @@ impl<'ctx> X86Emitter<'ctx> {
 
                 // if this sequence is modified, the register allocator must be fixed
                 self.push_instruction(Instruction::test(condition.clone(), condition.clone()));
-                self.push_instruction(Instruction::mov(false_value, dest.clone()));
+                self.push_instruction(Instruction::mov(false_value, dest.clone()).unwrap());
                 self.push_instruction(Instruction::cmovne(true_value, dest.clone())); // this write to dest does not result in deallocation
 
                 dest
@@ -673,10 +603,13 @@ impl<'ctx> X86Emitter<'ctx> {
 
                 let dest = Operand::vreg(width, self.next_vreg());
 
-                self.push_instruction(Instruction::mov(
-                    Operand::mem_base_displ(width, *address_reg, 0),
-                    dest.clone(),
-                ));
+                self.push_instruction(
+                    Instruction::mov(
+                        Operand::mem_base_displ(width, *address_reg, 0),
+                        dest.clone(),
+                    )
+                    .unwrap(),
+                );
 
                 dest
             }
@@ -684,6 +617,164 @@ impl<'ctx> X86Emitter<'ctx> {
 
         self.current_block_operands.insert(node.clone(), op.clone());
         op
+    }
+
+    fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind) -> Operand {
+        use BinaryOperationKind::*;
+
+        let (Add(left, right)
+        | Sub(left, right)
+        | Or(left, right)
+        | Modulo(left, right)
+        | Divide(left, right)
+        | Multiply(left, right)
+        | And(left, right)
+        | Xor(left, right)
+        | PowI(left, right)
+        | CompareEqual(left, right)
+        | CompareNotEqual(left, right)
+        | CompareLessThan(left, right)
+        | CompareLessThanOrEqual(left, right)
+        | CompareGreaterThan(left, right)
+        | CompareGreaterThanOrEqual(left, right)) = kind;
+
+        // do this first to avoid tuple issues
+        if let BinaryOperationKind::CompareEqual(left, right)
+        | BinaryOperationKind::CompareNotEqual(left, right)
+        | BinaryOperationKind::CompareGreaterThan(left, right)
+        | BinaryOperationKind::CompareGreaterThanOrEqual(left, right)
+        | BinaryOperationKind::CompareLessThan(left, right)
+        | BinaryOperationKind::CompareLessThanOrEqual(left, right) = kind
+        {
+            return encode_compare(kind, self, left.clone(), right.clone());
+        }
+
+        // pull out widths but also validate types are compatible
+        let (left, mut right) = match (left.typ(), right.typ()) {
+            (Type::Unsigned(l), Type::Unsigned(r)) => match l.cmp(r) {
+                Ordering::Less => {
+                    todo!("zero extend {l} to {r}")
+                }
+                Ordering::Equal => (self.to_operand(left), self.to_operand(right)),
+                Ordering::Greater => {
+                    todo!("zero extend {r} to {l}")
+                }
+            },
+
+            (Type::Bits, Type::Unsigned(_)) => todo!(), // (64, r)
+            (Type::Unsigned(_), Type::Bits) => {
+                let left = self.to_operand(left);
+                let right = self.to_operand(right);
+
+                if left.width() == right.width() {
+                    (left, right)
+                } else {
+                    todo!()
+                }
+            }
+            (Type::Signed(l), Type::Signed(r)) => match l.cmp(r) {
+                Ordering::Less => {
+                    let left = self.to_operand(left);
+                    let right = self.to_operand(right);
+                    let tmp = Operand::vreg(right.width(), self.next_vreg());
+                    self.push_instruction(Instruction::movsx(left, tmp.clone()));
+                    (tmp, right)
+                }
+                Ordering::Equal => (self.to_operand(left), self.to_operand(right)),
+                Ordering::Greater => {
+                    todo!("sign extend {r} to {l}")
+                }
+            },
+
+            (Type::Floating(l), Type::Floating(r)) => todo!(),
+
+            (Type::Tuple, Type::Tuple) => {
+                todo!()
+            } //(self.to_operand(left), self.to_operand(right)),
+
+            (left, right) => todo!("{left:?} {right:?}"),
+        };
+
+        let width = left.width();
+        assert_eq!(width, right.width());
+
+        let dst = Operand::vreg(width, self.next_vreg());
+
+        match kind {
+            BinaryOperationKind::Add(_, _) => {
+                self.push_instruction(Instruction::mov(left, dst.clone()).unwrap());
+                self.push_instruction(Instruction::add(right, dst.clone()));
+                dst
+            }
+            BinaryOperationKind::Sub(_, _) => {
+                self.push_instruction(Instruction::mov(left, dst.clone()).unwrap());
+                self.push_instruction(Instruction::sub(right, dst.clone()));
+                dst
+            }
+            BinaryOperationKind::Or(_, _) => {
+                self.push_instruction(Instruction::mov(left, dst.clone()).unwrap());
+                self.push_instruction(Instruction::or(right, dst.clone()));
+                dst
+            }
+            BinaryOperationKind::Multiply(_, _) => {
+                self.push_instruction(Instruction::mov(left, dst.clone()).unwrap());
+                self.push_instruction(Instruction::imul(right, dst.clone()));
+                dst
+            }
+            BinaryOperationKind::And(_, _) => {
+                if let OperandKind::Immediate(i) = right.kind() {
+                    if *i > u32::MAX as u64 {
+                        let new = Operand::vreg(width, self.next_vreg());
+                        self.push_instruction(Instruction::mov(right, new.clone()).unwrap());
+                        right = new;
+                    }
+                }
+                self.push_instruction(Instruction::mov(left, dst.clone()).unwrap());
+                self.push_instruction(Instruction::and(right, dst.clone()));
+
+                dst
+            }
+
+            BinaryOperationKind::Divide(dividend, divisor) => {
+                assert_eq!(dividend.typ().width(), 64);
+                assert_eq!(divisor.typ().width(), 64);
+
+                let dividend = self.to_operand(dividend);
+                let divisor = self.to_operand_reg_promote(divisor);
+
+                let _0 = Operand::imm(Width::_64, 0);
+
+                let hi = Operand::preg(width, PhysicalRegister::RDX);
+                let lo = Operand::preg(width, PhysicalRegister::RAX);
+
+                self.push_instruction(Instruction::mov(_0, hi.clone()).unwrap());
+                self.push_instruction(Instruction::mov(dividend, lo.clone()).unwrap());
+                self.push_instruction(Instruction::idiv(hi, lo.clone(), divisor));
+
+                lo
+            }
+
+            BinaryOperationKind::Modulo(dividend, divisor) => {
+                assert_eq!(dividend.typ().width(), 64);
+                assert_eq!(divisor.typ().width(), 64);
+
+                let dividend = self.to_operand(dividend);
+                let divisor = self.to_operand_reg_promote(divisor);
+
+                let _0 = Operand::imm(Width::_64, 0);
+
+                let hi = Operand::preg(width, PhysicalRegister::RDX);
+                let lo = Operand::preg(width, PhysicalRegister::RAX);
+
+                self.push_instruction(Instruction::mov(_0, hi.clone()).unwrap());
+                self.push_instruction(Instruction::mov(dividend, lo.clone()).unwrap());
+                self.push_instruction(Instruction::idiv(hi, lo.clone(), divisor));
+
+                hi
+            }
+
+            op => todo!("{op:#?}"),
+        }
     }
 }
 
@@ -1315,14 +1406,17 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
         let width = value.width();
 
-        self.push_instruction(Instruction::mov(
-            value,
-            Operand::mem_base_displ(
-                width,
-                Register::PhysicalRegister(PhysicalRegister::RBP),
-                offset.try_into().unwrap(),
-            ),
-        ));
+        self.push_instruction(
+            Instruction::mov(
+                value,
+                Operand::mem_base_displ(
+                    width,
+                    Register::PhysicalRegister(PhysicalRegister::RBP),
+                    offset.try_into().unwrap(),
+                ),
+            )
+            .unwrap(),
+        );
     }
 
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef {
@@ -1341,10 +1435,9 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         let value = self.to_operand(&value);
         let width = value.width();
 
-        self.push_instruction(Instruction::mov(
-            value,
-            Operand::mem_base_displ(width, *address_reg, 0),
-        ));
+        self.push_instruction(
+            Instruction::mov(value, Operand::mem_base_displ(width, *address_reg, 0)).unwrap(),
+        );
     }
 
     fn branch(
@@ -1415,7 +1508,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             -(i32::try_from(offset).unwrap()),
         );
 
-        self.push_instruction(Instruction::mov(value, mem));
+        self.push_instruction(Instruction::mov(value, mem).unwrap());
     }
 
     fn assert(&mut self, condition: Self::NodeRef, meta: u64) {
@@ -1430,10 +1523,13 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 let op = self.to_operand(&not_condition);
 
                 self.push_instruction(Instruction::test(op.clone(), op));
-                self.push_instruction(Instruction::mov(
-                    Operand::imm(Width::_64, meta),
-                    Operand::preg(Width::_64, PhysicalRegister::R15),
-                ));
+                self.push_instruction(
+                    Instruction::mov(
+                        Operand::imm(Width::_64, meta),
+                        Operand::preg(Width::_64, PhysicalRegister::R15),
+                    )
+                    .unwrap(),
+                );
                 self.push_instruction(Instruction::jne(self.panic_block.clone()));
             }
         }
@@ -1934,7 +2030,7 @@ fn encode_compare(
         | (Memory { .. }, Memory { .. }) => {
             let left = if let (Memory { .. }, Memory { .. }) = (left.kind(), right.kind()) {
                 let new_left = Operand::vreg(left.width(), emitter.next_vreg());
-                emitter.push_instruction(Instruction::mov(left, new_left.clone()));
+                emitter.push_instruction(Instruction::mov(left, new_left.clone()).unwrap());
                 new_left
             } else {
                 left

@@ -2,7 +2,7 @@ use {
     crate::dbt::x86::encoder::{
         Operand, OperandKind::Register as R, Register::PhysicalRegister as PHYS, Width,
     },
-    iced_x86::code_asm::{AsmRegister64, AsmRegister8, CodeAssembler},
+    iced_x86::code_asm::{AsmRegister32, AsmRegister8, CodeAssembler},
 };
 
 pub fn encode(assembler: &mut CodeAssembler, dst: &Operand) {
@@ -12,7 +12,7 @@ pub fn encode(assembler: &mut CodeAssembler, dst: &Operand) {
             width_in_bits: Width::_64,
         } => {
             assembler
-                .xor::<AsmRegister64, AsmRegister64>(target.into(), target.into())
+                .xor::<AsmRegister32, AsmRegister32>(target.into(), target.into())
                 .unwrap();
             assembler.setne::<AsmRegister8>(target.into()).unwrap();
         }
