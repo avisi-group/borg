@@ -103,6 +103,22 @@ impl<'ctx> X86Emitter<'ctx> {
         }
     }
 
+    /// Same as `to_operand` but if the value is a constant and larger than 32
+    /// bits, move it to a register
+    fn to_operand_oversize_reg_promote(&mut self, node: &X86NodeRef) -> Operand {
+        let op = self.to_operand(node);
+
+        if let OperandKind::Immediate(value) = op.kind() {
+            if *value > (u32::MAX as u64) {
+                let tmp = Operand::vreg(op.width(), self.next_vreg());
+                self.push_instruction(Instruction::mov(op, tmp).unwrap());
+                return tmp;
+            }
+        }
+
+        op
+    }
+
     fn to_operand(&mut self, node: &X86NodeRef) -> Operand {
         if let Some(operand) = self.current_block_operands.get(node) {
             return *operand;
@@ -639,10 +655,13 @@ impl<'ctx> X86Emitter<'ctx> {
                 Ordering::Less => {
                     todo!("zero extend {l} to {r}")
                 }
-                Ordering::Equal => (self.to_operand(left), self.to_operand(right)),
+                Ordering::Equal => (
+                    self.to_operand_oversize_reg_promote(left),
+                    self.to_operand_oversize_reg_promote(right),
+                ),
                 Ordering::Greater => {
-                    let left = self.to_operand(left);
-                    let right = self.to_operand(right);
+                    let left = self.to_operand_oversize_reg_promote(left);
+                    let right = self.to_operand_oversize_reg_promote(right);
 
                     let tmp = Operand::vreg(left.width(), self.next_vreg());
                     self.push_instruction(Instruction::movzx(right, tmp));
@@ -653,8 +672,8 @@ impl<'ctx> X86Emitter<'ctx> {
 
             (Type::Bits, Type::Unsigned(_)) => todo!(), // (64, r)
             (Type::Unsigned(_), Type::Bits) => {
-                let left = self.to_operand(left);
-                let right = self.to_operand(right);
+                let left = self.to_operand_oversize_reg_promote(left);
+                let right = self.to_operand_oversize_reg_promote(right);
 
                 if left.width() == right.width() {
                     (left, right)
@@ -664,13 +683,16 @@ impl<'ctx> X86Emitter<'ctx> {
             }
             (Type::Signed(l), Type::Signed(r)) => match l.cmp(r) {
                 Ordering::Less => {
-                    let left = self.to_operand(left);
-                    let right = self.to_operand(right);
+                    let left = self.to_operand_oversize_reg_promote(left);
+                    let right = self.to_operand_oversize_reg_promote(right);
                     let tmp = Operand::vreg(right.width(), self.next_vreg());
                     self.push_instruction(Instruction::movsx(left, tmp));
                     (tmp, right)
                 }
-                Ordering::Equal => (self.to_operand(left), self.to_operand(right)),
+                Ordering::Equal => (
+                    self.to_operand_oversize_reg_promote(left),
+                    self.to_operand_oversize_reg_promote(right),
+                ),
                 Ordering::Greater => {
                     todo!("sign extend {r} to {l}")
                 }
@@ -680,7 +702,7 @@ impl<'ctx> X86Emitter<'ctx> {
 
             (Type::Tuple, Type::Tuple) => {
                 todo!()
-            } //(self.to_operand(left), self.to_operand(right)),
+            }
 
             (left, right) => todo!("{left:?} {right:?}"),
         };

@@ -278,11 +278,14 @@ impl ModelDevice {
     }
 
     fn single_step_exec(&self) {
+        let mut instructions_retired = 0;
+
         let register_file_ptr = self.register_file.lock().as_mut_ptr();
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
         loop {
+            log::info!("instrs: {instructions_retired}");
             let current_pc = unsafe {
                 *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
             };
@@ -290,6 +293,7 @@ impl ModelDevice {
             if let Some(translation) = instr_cache.get(&current_pc) {
                 log::info!("executing cached translation @ {current_pc:x}");
                 translation.execute(register_file_ptr);
+                instructions_retired += 1;
                 continue;
             }
 
@@ -347,6 +351,8 @@ impl ModelDevice {
 
                 log::trace!("executing",);
                 translation.execute(register_file_ptr);
+
+                instructions_retired += 1;
 
                 instr_cache.insert(current_pc, translation);
 
