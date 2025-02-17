@@ -2679,3 +2679,36 @@ fn count_leading_zero_bits_const() {
         }
     );
 }
+
+#[ktest]
+fn highest_set_bit_dynamic() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let r0 = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
+    let n = translate(
+        &*model,
+        "HighestSetBit",
+        &[r0],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    emitter.write_register(model.reg_offset("R0"), n);
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+        *r0 = 0x1;
+
+        translation.execute(register_file_ptr);
+        assert_eq!(*r0, 0);
+    }
+}

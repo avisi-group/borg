@@ -311,10 +311,30 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 block.arena(),
             ) {
                 StatementResult::Data(Some(value)) => {
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        value.kind(),
+                    );
                     statement_value_store.insert(*s, value);
                 }
-                StatementResult::Data(None) => (),
-                StatementResult::ControlFlow(block_result) => return block_result,
+                StatementResult::Data(None) => {
+                    log::trace!(
+                        "{} {} = ()",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                    );
+                }
+                StatementResult::ControlFlow(block_result) => {
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        block_result
+                    );
+                    return block_result;
+                }
             }
         }
 
