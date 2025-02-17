@@ -934,7 +934,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 ) => Self::NodeRef::from(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
-                        value: lhs_value + rhs_value,
+                        value: lhs_value.wrapping_add(*rhs_value),// todo: THIS WILL WRAP AT 64 NOT *width*!
                         width: *width,
                     },
                 }),
@@ -955,7 +955,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 ) => Self::NodeRef::from(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
-                        value: lhs_value.wrapping_sub(*rhs_value),
+                        value: lhs_value.wrapping_sub(*rhs_value),// todo: THIS WILL WRAP AT 64 NOT *width*!
                         width: *width,
                     },
                 }),

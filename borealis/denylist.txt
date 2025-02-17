@@ -10,8 +10,6 @@ ASR_C
 ROR_C
 LowestSetBit
 BitCount
-CountLeadingZeroBits
-CountLeadingSignBits
 write_gpr_bits
 set_R_bits
 Split
