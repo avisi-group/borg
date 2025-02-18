@@ -2483,201 +2483,201 @@ fn clz() {
     }
 }
 
-// #[ktest]
-// fn highest_set_bit_const() {
-//     let model = models::get("aarch64").unwrap();
+#[ktest]
+fn highest_set_bit_const() {
+    let model = models::get("aarch64").unwrap();
 
-//     let mut register_file = init_register_file(&*model);
-//     let register_file_ptr = register_file.as_mut_ptr();
-//     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
-//     let mut emitter = X86Emitter::new(&mut ctx);
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-//     let bv = emitter.constant(0x1, Type::Unsigned(64));
-//     let n = translate(
-//         &*model,
-//         "HighestSetBit",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 0,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(0x1, Type::Unsigned(64));
+    let n = translate(
+        &*model,
+        "HighestSetBit",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 0,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(0b1000, Type::Unsigned(64));
-//     let n = translate(
-//         &*model,
-//         "HighestSetBit",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 3,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(0b1000, Type::Unsigned(64));
+    let n = translate(
+        &*model,
+        "HighestSetBit",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 3,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
-//     let n = translate(
-//         &*model,
-//         "HighestSetBit",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 63,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
+    let n = translate(
+        &*model,
+        "HighestSetBit",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 63,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
-//     let n = translate(
-//         &*model,
-//         "HighestSetBit",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 7,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
+    let n = translate(
+        &*model,
+        "HighestSetBit",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 7,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(
-//         0b0001_0000_0001_1010_1000_1010_1000_1010,
-//         Type::Unsigned(32),
-//     );
-//     let n = translate(
-//         &*model,
-//         "HighestSetBit",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 28,
-//             width: 64
-//         }
-//     );
-// }
+    let bv = emitter.constant(
+        0b0001_0000_0001_1010_1000_1010_1000_1010,
+        Type::Unsigned(32),
+    );
+    let n = translate(
+        &*model,
+        "HighestSetBit",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 28,
+            width: 64
+        }
+    );
+}
 
-// #[ktest]
-// fn count_leading_zero_bits_const() {
-//     let model = models::get("aarch64").unwrap();
+#[ktest]
+fn count_leading_zero_bits_const() {
+    let model = models::get("aarch64").unwrap();
 
-//     let mut register_file = init_register_file(&*model);
-//     let register_file_ptr = register_file.as_mut_ptr();
-//     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
-//     let mut emitter = X86Emitter::new(&mut ctx);
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
 
-//     let bv = emitter.constant(0x0, Type::Unsigned(64));
-//     let n = translate(
-//         &*model,
-//         "CountLeadingZeroBits",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 64,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(0x0, Type::Unsigned(64));
+    let n = translate(
+        &*model,
+        "CountLeadingZeroBits",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 64,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(0b1000, Type::Unsigned(64));
-//     let n = translate(
-//         &*model,
-//         "CountLeadingZeroBits",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 60,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(0b1000, Type::Unsigned(64));
+    let n = translate(
+        &*model,
+        "CountLeadingZeroBits",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 60,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
-//     let n = translate(
-//         &*model,
-//         "CountLeadingZeroBits",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 0,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
+    let n = translate(
+        &*model,
+        "CountLeadingZeroBits",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 0,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
-//     let n = translate(
-//         &*model,
-//         "CountLeadingZeroBits",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 0,
-//             width: 64
-//         }
-//     );
+    let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
+    let n = translate(
+        &*model,
+        "CountLeadingZeroBits",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 0,
+            width: 64
+        }
+    );
 
-//     let bv = emitter.constant(
-//         0b0001_0000_0001_1010_1000_1010_1000_1010,
-//         Type::Unsigned(32),
-//     );
-//     let n = translate(
-//         &*model,
-//         "CountLeadingZeroBits",
-//         &[bv],
-//         &mut emitter,
-//         register_file_ptr,
-//     )
-//     .unwrap();
-//     assert_eq!(
-//         *n.kind(),
-//         NodeKind::Constant {
-//             value: 3,
-//             width: 64
-//         }
-//     );
-// }
+    let bv = emitter.constant(
+        0b0001_0000_0001_1010_1000_1010_1000_1010,
+        Type::Unsigned(32),
+    );
+    let n = translate(
+        &*model,
+        "CountLeadingZeroBits",
+        &[bv],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
+    assert_eq!(
+        *n.kind(),
+        NodeKind::Constant {
+            value: 3,
+            width: 64
+        }
+    );
+}
 
 #[ktest]
 fn highest_set_bit_dynamic() {
