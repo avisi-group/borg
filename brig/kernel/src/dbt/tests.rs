@@ -2477,7 +2477,6 @@ fn clz() {
 
         *x9 = 0x1;
 
-        log::warn!("{translation:?}");
         translation.execute(register_file_ptr);
 
         assert_eq!(*x9, 63);
