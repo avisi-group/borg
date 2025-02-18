@@ -455,8 +455,8 @@ impl<'ctx> X86Emitter<'ctx> {
                 // todo: test this
                 let target = self.to_operand(target);
                 let source = self.to_operand(source);
-                let start = self.to_operand(start);
-                let length = self.to_operand(length);
+                let mut start = self.to_operand(start);
+                let mut length = self.to_operand(length);
 
                 let source = match source.width().cmp(&target.width()) {
                     Ordering::Equal => source,
@@ -471,12 +471,30 @@ impl<'ctx> X86Emitter<'ctx> {
                 };
                 assert_eq!(start.width(), length.width());
 
+                // fix length for shl
+                if let OperandKind::Register(_) = length.kind() {
+                    // truncate (high bits don't matter anyway)
+                    length.width_in_bits = Width::_8;
+                    let tmp = Operand::preg(Width::_8, PhysicalRegister::RCX);
+                    self.push_instruction(Instruction::mov(length, tmp).unwrap());
+                    length = tmp;
+                }
+
+                // fix start for shl
+                if let OperandKind::Register(_) = start.kind() {
+                    // truncate (high bits don't matter anyway)
+                    start.width_in_bits = Width::_8;
+                    let tmp = Operand::preg(Width::_8, PhysicalRegister::RCX);
+                    self.push_instruction(Instruction::mov(start, tmp).unwrap());
+                    start = tmp;
+                }
+
                 let width = target.width();
 
                 // mask off target bits
                 let mask = Operand::vreg(width, self.next_vreg());
                 self.push_instruction(Instruction::mov(Operand::imm(width, 1), mask).unwrap());
-                self.push_instruction(Instruction::shl(length, mask));
+                self.push_instruction(Instruction::shl(length, mask)); // cast length here
                 self.push_instruction(Instruction::sub(Operand::imm(width, 1), mask));
                 self.push_instruction(Instruction::shl(start, mask));
                 self.push_instruction(Instruction::not(mask));

@@ -40,55 +40,9 @@ enum JumpKind {
     Dynamic(Ref<Block>),
 }
 
-enum StatementValue {
+enum StatementResult {
     Data(Option<X86NodeRef>),
     ControlFlow(BlockResult),
-}
-
-enum TranslationError {
-    /// Promote variable and re-translate function
-    VariablePromote(Symbol),
-}
-
-fn translate_with_stack(
-    model: &Model,
-    function: &str,
-    arguments: &[X86NodeRef],
-    emitter: &mut X86Emitter,
-    register_file_ptr: *mut u8,
-    current_stack_offset: Rc<AtomicUsize>,
-) -> Option<X86NodeRef> {
-    let mut translator = FunctionTranslator::new(
-        model,
-        function,
-        arguments,
-        emitter,
-        current_stack_offset,
-        register_file_ptr,
-    );
-
-    loop {
-        match translator.translate() {
-            Ok(value) => return value,
-            Err(TranslationError::VariablePromote(symbol)) => {
-                let stack_offset = translator.allocate_stack_offset(&symbol.typ());
-
-                log::debug!(
-                    "promoting {:?} from virtual to stack @ {:#x} in {:?}",
-                    symbol.name(),
-                    stack_offset,
-                    translator.function_name,
-                );
-
-                *translator.variables.get_mut(&symbol.name()).unwrap() = LocalVariable::Stack {
-                    typ: emit_rudder_type(&symbol.typ()),
-                    stack_offset,
-                };
-
-                continue;
-            }
-        }
-    }
 }
 
 pub fn translate(
@@ -100,14 +54,16 @@ pub fn translate(
 ) -> Option<X86NodeRef> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
-    translate_with_stack(
+    let current_stack_offset = Rc::new(AtomicUsize::new(8));
+    FunctionTranslator::new(
         model,
         function,
         arguments,
         emitter,
+        current_stack_offset,
         register_file_ptr,
-        Rc::new(AtomicUsize::new(8)),
     )
+    .translate()
 }
 
 #[derive(Debug, Clone)]
@@ -132,13 +88,16 @@ struct FunctionTranslator<'m, 'e, 'c> {
     /// Rudder blocks, indexed by their corresponding host block
     rudder_blocks: HashMap<Ref<X86Block>, Ref<Block>>,
 
-    /// X86 entry block
-    entry_block: Ref<X86Block>,
-    /// X86 exit block
-    exit_block: Ref<X86Block>,
-
     /// Function local variables
     variables: HashMap<InternedString, LocalVariable>,
+
+    /// Map from a local variable to all the blocks in which a virtual write
+    /// occurs, the value written, and the index into the list of instructions
+    /// where the write must occur
+    ///
+    /// If the variable is later promoted to the stack, a stack write needs to
+    /// be appended to the end of each block
+    virtual_variable_blocks: HashMap<InternedString, Vec<(Ref<X86Block>, X86NodeRef, usize)>>,
 
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize>,
@@ -161,25 +120,13 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
 
-        // create an empty block all control flow will end at
-        let exit_block = emitter.ctx_mut().arena_mut().insert(X86Block::new());
-
-        // create an empty entry block for this function
-        let entry_block = emitter.ctx_mut().arena_mut().insert(X86Block::new());
-
-        // jump from the *current* emitter block (exit block of the last function) to
-        // this function's entry block
-        emitter.push_instruction(Instruction::jmp(entry_block));
-        emitter.push_target(entry_block);
-
         let mut celf = Self {
             model,
             function_name: InternedString::from(function),
             x86_blocks: HashMap::default(),
             rudder_blocks: HashMap::default(),
-            entry_block,
-            exit_block,
             variables: HashMap::default(),
+            virtual_variable_blocks: HashMap::default(),
             current_stack_offset,
             emitter,
             register_file_ptr,
@@ -234,35 +181,43 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             celf.x86_blocks.insert(rudder_block, x86_block);
         });
 
+        // find loops and pre-promote variables
+        crate::dbg!(find_loopy_variables(function))
+            .iter()
+            .for_each(|sym| {
+                *celf.variables.get_mut(&sym.name()).unwrap() = LocalVariable::Stack {
+                    typ: emit_rudder_type(&sym.typ()),
+                    stack_offset: celf.allocate_stack_offset(&sym.typ()),
+                }
+            });
+
         log::trace!("blocks: {:#?}", celf.x86_blocks);
 
         celf
     }
 
-    fn translate(&mut self) -> Result<Option<X86NodeRef>, TranslationError> {
+    fn translate(&mut self) -> Option<X86NodeRef> {
         let function = self
             .model
             .functions()
             .get(&self.function_name)
             .unwrap_or_else(|| panic!("failed to find function {:?} in model", self.function_name));
 
-        // reset emitter state
-        for x86 in self
-            .x86_blocks
-            .values()
-            .copied()
-            .chain([self.entry_block, self.exit_block])
-        {
-            let block = x86.get_mut(self.emitter.ctx_mut().arena_mut());
-            block.clear_next_blocks();
-            block.instructions_mut().clear();
-        }
+        // create an empty block all control flow will end at
+        let exit_block = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
+
+        // create an empty entry block for this function
+        let entry_x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
+
+        // jump from the *current* emitter block to this function's entry block
+        self.emitter.push_instruction(Instruction::jmp(entry_x86));
+        self.emitter.push_target(entry_x86);
 
         let mut block_queue = alloc::collections::VecDeque::new();
 
         // start translation of the function's rudder entry block to the new (empty) X86
         // entry block
-        block_queue.push_front(JumpKind::Static(function.entry_block(), self.entry_block));
+        block_queue.push_front(JumpKind::Static(function.entry_block(), entry_x86));
 
         let mut visited_dynamic_blocks = HashSet::default();
 
@@ -301,7 +256,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 }
             };
 
-            match result? {
+            match result {
                 BlockResult::Static(x86) => {
                     let rudder = self.lookup_rudder_block(x86);
                     log::trace!("block result: static(rudder={rudder:?},x86={x86:?})",);
@@ -319,8 +274,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     block_queue.push_back(JumpKind::Dynamic(block1));
                 }
                 BlockResult::Return => {
-                    log::trace!("block result: return ({:?})", self.exit_block);
-                    self.emitter.jump(self.exit_block);
+                    log::trace!("block result: return ({exit_block:?})");
+                    self.emitter.jump(exit_block);
                 }
                 BlockResult::Panic => {
                     let panic = self.emitter.ctx().panic_block();
@@ -333,21 +288,21 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         }
 
         // finish translation with current block set to the exit block
-        self.emitter.set_current_block(self.exit_block);
+        self.emitter.set_current_block(exit_block);
 
         log::debug!("finished translating {:?}", self.function_name);
 
         if function.return_type().is_some() {
-            Ok(Some(
+            Some(
                 self.read_variable(
                     self.variables
                         .get(&InternedString::from_static("borealis_fn_return_value"))
                         .unwrap()
                         .clone(),
                 ),
-            ))
+            )
         } else {
-            Ok(None)
+            None
         }
     }
 
@@ -356,7 +311,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         function: &Function,
         block_ref: Ref<Block>,
         is_dynamic: bool,
-    ) -> Result<BlockResult, TranslationError> {
+    ) -> BlockResult {
         let block = block_ref.get(function.arena());
 
         let mut statement_value_store = StatementValueStore::new();
@@ -369,8 +324,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 block_ref,
                 function,
                 block.arena(),
-            )? {
-                StatementValue::Data(Some(value)) => {
+            ) {
+                StatementResult::Data(Some(value)) => {
                     log::trace!(
                         "{} {} = {:?}",
                         s,
@@ -379,21 +334,21 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     );
                     statement_value_store.insert(*s, value);
                 }
-                StatementValue::Data(None) => {
+                StatementResult::Data(None) => {
                     log::trace!(
                         "{} {} = ()",
                         s,
                         s.get(block.arena()).to_string(block.arena()),
                     );
                 }
-                StatementValue::ControlFlow(block_result) => {
+                StatementResult::ControlFlow(block_result) => {
                     log::trace!(
                         "{} {} = {:?}",
                         s,
                         s.get(block.arena()).to_string(block.arena()),
                         block_result
                     );
-                    return Ok(block_result);
+                    return block_result;
                 }
             }
         }
@@ -413,13 +368,13 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         block: Ref<Block>,
         function: &Function,
         arena: &Arena<Statement>,
-    ) -> Result<StatementValue, TranslationError> {
+    ) -> StatementResult {
         //        log::debug!("translate stmt: {statement:?}");
 
-        Ok(match statement {
+        match statement {
             Statement::Constant { typ, value } => {
                 let typ = emit_rudder_constant_type(value, typ);
-                StatementValue::Data(Some(match value {
+                StatementResult::Data(Some(match value {
                     ConstantValue::UnsignedInteger(v) => self.emitter.constant(*v, typ),
                     ConstantValue::SignedInteger(v) => self.emitter.constant(*v as u64, typ),
                     ConstantValue::FloatingPoint(v) => self.emitter.constant(*v as u64, typ),
@@ -458,7 +413,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     self.function_name
                 );
                 let var = self.variables.get(&symbol.name()).unwrap().clone();
-                StatementValue::Data(Some(self.read_variable(var)))
+                StatementResult::Data(Some(self.read_variable(var)))
             }
             Statement::WriteVariable { symbol, value } => {
                 log::debug!(
@@ -467,14 +422,52 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     block.index(),
                     self.function_name
                 );
-
                 if is_dynamic {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
                     match self.variables.get(&symbol.name()).unwrap() {
                         LocalVariable::Virtual { .. } => {
-                            // promote and re-translate function
-                            return Err(TranslationError::VariablePromote(symbol.clone()));
+                            let stack_offset = self.allocate_stack_offset(&symbol.typ());
+                            log::debug!(
+                                "promoting {:?} from virtual to stack @ {:#x} in block {:#x} in {:?}, was written to in {:x?}",
+                                symbol.name(),
+                                stack_offset,
+                                block.index(),
+                                self.function_name,
+                                self.virtual_variable_blocks.get(&symbol.name()),
+                            );
+
+                            self.variables.insert(
+                                symbol.name(),
+                                LocalVariable::Stack {
+                                    typ: emit_rudder_type(&symbol.typ()),
+                                    stack_offset,
+                                },
+                            );
+
+                            let current_block = self.emitter.get_current_block();
+
+                            if let Some(blocks) =
+                                self.virtual_variable_blocks.remove(&symbol.name())
+                            {
+                                blocks.into_iter().for_each(|(block, value, index)| {
+                                    self.emitter.set_current_block(block);
+
+                                    let post = block
+                                        .get_mut(self.emitter.ctx_mut().arena_mut())
+                                        .instructions_mut()
+                                        .split_off(index);
+
+                                    self.emitter.write_stack_variable(stack_offset, value);
+
+                                    block
+                                        .get_mut(self.emitter.ctx_mut().arena_mut())
+                                        .instructions_mut()
+                                        .extend_from_slice(&post);
+                                });
+                            }
+
+                            self.emitter.set_current_block(current_block);
                         }
                         LocalVariable::Stack { stack_offset, .. } => {
                             log::debug!(
@@ -487,7 +480,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         }
                     }
                 }
-
                 let var = self.variables.get(&symbol.name()).unwrap().clone();
 
                 let value = statement_values
@@ -500,9 +492,23 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     })
                     .clone();
 
+                if let LocalVariable::Virtual { .. } = self.variables.get(&symbol.name()).unwrap() {
+                    let current_block = self.emitter.get_current_block();
+                    let index = current_block
+                        .get(self.emitter.ctx().arena())
+                        .instructions()
+                        .len();
+
+                    let metadata = (current_block, value.clone(), index);
+                    self.virtual_variable_blocks
+                        .entry(symbol.name())
+                        .and_modify(|e| e.push(metadata.clone()))
+                        .or_insert(alloc::vec![metadata]);
+                }
+
                 self.write_variable(var, value);
 
-                StatementValue::Data(None)
+                StatementResult::Data(None)
             }
             Statement::ReadRegister { typ, offset } => {
                 let offset = match statement_values.get(*offset).unwrap().kind() {
@@ -533,10 +539,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                             }
                         };
                         log::trace!("read from cacheable {name:?}: {value:x}");
-                        StatementValue::Data(Some(self.emitter.constant(value, typ)))
+                        StatementResult::Data(Some(self.emitter.constant(value, typ)))
                     }
                     RegisterCacheType::None => {
-                        StatementValue::Data(Some(self.emitter.read_register(offset, typ)))
+                        StatementResult::Data(Some(self.emitter.read_register(offset, typ)))
                     }
                 }
             }
@@ -577,7 +583,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                             log::trace!("wrote to cacheable {name:?}: {value:x}");
 
-                            StatementValue::Data(None)
+                            StatementResult::Data(None)
                         } else {
                             panic!("attempting to write non-constant value to cacheable register {name:?}");
                         }
@@ -586,7 +592,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         // otherwise emit a write register that will mutate the register file during
                         // execution
                         self.emitter.write_register(offset, value);
-                        StatementValue::Data(None)
+                        StatementResult::Data(None)
                     }
                 }
             }
@@ -606,13 +612,13 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     _ => todo!("{value}"),
                 };
 
-                StatementValue::Data(Some(self.emitter.read_memory(address, typ)))
+                StatementResult::Data(Some(self.emitter.read_memory(address, typ)))
             }
             Statement::WriteMemory { address, value } => {
                 let address = statement_values.get(*address).unwrap().clone();
                 let value = statement_values.get(*value).unwrap().clone();
                 self.emitter.write_memory(address, value);
-                StatementValue::Data(None)
+                StatementResult::Data(None)
             }
             Statement::ReadPc => todo!(),
             Statement::WritePc { value } => {
@@ -622,11 +628,11 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let value = statement_values.get(*value).unwrap().clone();
 
                 self.emitter.write_register(offset, value);
-                StatementValue::Data(None)
+                StatementResult::Data(None)
             }
             Statement::GetFlags { operation } => {
                 let operation = statement_values.get(*operation).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.get_flags(operation)))
+                StatementResult::Data(Some(self.emitter.get_flags(operation)))
             }
             Statement::UnaryOperation { kind, value } => {
                 use {
@@ -647,7 +653,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     RudderOp::SquareRoot => EmitterOp::SquareRoot(value),
                 };
 
-                StatementValue::Data(Some(self.emitter.unary_operation(op)))
+                StatementResult::Data(Some(self.emitter.unary_operation(op)))
             }
             Statement::BinaryOperation { kind, lhs, rhs } => {
                 use {
@@ -678,7 +684,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     }
                 };
 
-                StatementValue::Data(Some(
+                StatementResult::Data(Some(
                     self.emitter.binary_operation(op), /* .unwrap_or_else(|e| {
                                                         *     panic!("{}::{}: {e}",
                                                         * self.function_name, block.index())
@@ -699,7 +705,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     RudderOp::AddWithCarry => EmitterOp::AddWithCarry(a, b, c),
                 };
 
-                StatementValue::Data(Some(self.emitter.ternary_operation(op)))
+                StatementResult::Data(Some(self.emitter.ternary_operation(op)))
             }
             Statement::ShiftOperation {
                 kind,
@@ -722,7 +728,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     RudderOp::RotateLeft => EmitterOp::RotateLeft,
                 };
 
-                StatementValue::Data(Some(self.emitter.shift(value, amount, op)))
+                StatementResult::Data(Some(self.emitter.shift(value, amount, op)))
             }
 
             Statement::Call { target, args, .. } => {
@@ -731,20 +737,26 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     .map(|a| statement_values.get(*a).unwrap())
                     .collect::<Vec<_>>();
 
-                StatementValue::Data(translate_with_stack(
-                    &self.model,
-                    target.as_ref(),
-                    &args,
-                    self.emitter,
-                    self.register_file_ptr,
-                    self.current_stack_offset.clone(),
-                ))
+                StatementResult::Data(
+                    FunctionTranslator::new(
+                        self.model,
+                        target.as_ref(),
+                        &args,
+                        self.emitter,
+                        self.current_stack_offset.clone(), /* pass in the current stack offset
+                                                            * so
+                                                            * called functions' stack variables
+                                                            * don't corrupt this function's */
+                        self.register_file_ptr,
+                    )
+                    .translate(),
+                )
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
                 let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
                 self.rudder_blocks.insert(x86, *target);
-                StatementValue::ControlFlow(self.emitter.jump(x86))
+                StatementResult::ControlFlow(self.emitter.jump(x86))
             }
             Statement::Branch {
                 condition,
@@ -755,28 +767,28 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 // todo: obviously refactor this to re-use jump logic
 
-                return Ok(match condition.kind() {
+                return match condition.kind() {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
                             let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
                             self.rudder_blocks.insert(x86, *false_target);
-                            StatementValue::ControlFlow(self.emitter.jump(x86))
+                            StatementResult::ControlFlow(self.emitter.jump(x86))
                         } else {
                             let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
                             self.rudder_blocks.insert(x86, *true_target);
-                            StatementValue::ControlFlow(self.emitter.jump(x86))
+                            StatementResult::ControlFlow(self.emitter.jump(x86))
                         }
                     }
                     _ => {
                         let true_target = self.lookup_x86_block(*true_target);
                         let false_target = self.lookup_x86_block(*false_target);
-                        StatementValue::ControlFlow(self.emitter.branch(
+                        StatementResult::ControlFlow(self.emitter.branch(
                             condition,
                             true_target,
                             false_target,
                         ))
                     }
-                });
+                };
             }
             Statement::Return { value } => {
                 if let Some(value) = value {
@@ -792,7 +804,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     self.write_variable(var, value);
                 }
 
-                StatementValue::ControlFlow(BlockResult::Return)
+                StatementResult::ControlFlow(BlockResult::Return)
             }
 
             Statement::Cast { kind, typ, value } => {
@@ -813,7 +825,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     RudderOp::Broadcast => EmitterOp::Broadcast,
                 };
 
-                StatementValue::Data(Some(self.emitter.cast(value, typ, kind)))
+                StatementResult::Data(Some(self.emitter.cast(value, typ, kind)))
             }
             Statement::BitsCast {
                 kind,
@@ -839,7 +851,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     RudderOp::Broadcast => EmitterOp::Broadcast,
                 };
 
-                StatementValue::Data(Some(self.emitter.bits_cast(value, width, typ, kind)))
+                StatementResult::Data(Some(self.emitter.bits_cast(value, width, typ, kind)))
             }
 
             Statement::PhiNode { .. } => todo!(),
@@ -852,7 +864,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let condition = statement_values.get(*condition).unwrap().clone();
                 let true_value = statement_values.get(*true_value).unwrap().clone();
                 let false_value = statement_values.get(*false_value).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.select(
+                StatementResult::Data(Some(self.emitter.select(
                     condition,
                     true_value,
                     false_value,
@@ -866,7 +878,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let value = statement_values.get(*value).unwrap().clone();
                 let start = statement_values.get(*start).unwrap().clone();
                 let width = statement_values.get(*width).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.bit_extract(value, start, width)))
+                StatementResult::Data(Some(self.emitter.bit_extract(value, start, width)))
             }
             Statement::BitInsert {
                 target,
@@ -878,7 +890,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let source = statement_values.get(*source).unwrap().clone();
                 let start = statement_values.get(*start).unwrap().clone();
                 let width = statement_values.get(*width).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.bit_insert(target, source, start, width)))
+                StatementResult::Data(Some(self.emitter.bit_insert(target, source, start, width)))
             }
             Statement::ReadElement { .. } => {
                 todo!()
@@ -891,7 +903,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let vector = statement_values.get(*vector).unwrap().clone();
                 let value = statement_values.get(*value).unwrap().clone();
                 let index = statement_values.get(*index).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.mutate_element(vector, index, value)))
+                StatementResult::Data(Some(self.emitter.mutate_element(vector, index, value)))
             }
             Statement::Panic(value) => {
                 let Statement::Constant {
@@ -904,7 +916,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 self.emitter.panic(msg.as_ref());
 
-                StatementValue::ControlFlow(BlockResult::Panic)
+                StatementResult::ControlFlow(BlockResult::Panic)
             }
 
             Statement::Assert { condition } => {
@@ -914,16 +926,16 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 let condition = statement_values.get(*condition).unwrap().clone();
                 self.emitter.assert(condition, meta);
-                StatementValue::Data(None)
+                StatementResult::Data(None)
             }
             Statement::CreateBits { value, width } => {
                 let value = statement_values.get(*value).unwrap().clone();
                 let width = statement_values.get(*width).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.create_bits(value, width)))
+                StatementResult::Data(Some(self.emitter.create_bits(value, width)))
             }
             Statement::SizeOf { value } => {
                 let value = statement_values.get(*value).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.size_of(value)))
+                StatementResult::Data(Some(self.emitter.size_of(value)))
             }
             Statement::MatchesUnion { .. } => todo!(),
             Statement::UnwrapUnion { .. } => todo!(),
@@ -932,13 +944,13 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     .iter()
                     .map(|v| statement_values.get(*v).unwrap())
                     .collect();
-                StatementValue::Data(Some(self.emitter.create_tuple(values)))
+                StatementResult::Data(Some(self.emitter.create_tuple(values)))
             }
             Statement::TupleAccess { index, source } => {
                 let source = statement_values.get(*source).unwrap().clone();
-                StatementValue::Data(Some(self.emitter.access_tuple(source, *index)))
+                StatementResult::Data(Some(self.emitter.access_tuple(source, *index)))
             }
-        })
+        }
     }
 
     fn lookup_x86_block(&self, rudder: Ref<Block>) -> Ref<X86Block> {
@@ -1037,4 +1049,64 @@ impl StatementValueStore {
     pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef> {
         self.map.get(&s).cloned()
     }
+}
+
+fn find_loopy_variables(function: &Function) -> HashSet<Symbol> {
+    let arena = function.arena();
+
+    let mut visited = HashSet::default();
+    let mut stack_set = HashSet::default();
+    let mut cycles = HashSet::default();
+
+    fn dfs(
+        arena: &Arena<Block>,
+        node: Ref<Block>,
+        visited: &mut HashSet<Ref<Block>>,
+        stack_set: &mut HashSet<Ref<Block>>,
+        cycles: &mut HashSet<Ref<Block>>,
+    ) {
+        if stack_set.contains(&node) {
+            cycles.insert(node);
+            return;
+        }
+        if visited.contains(&node) {
+            return;
+        }
+
+        visited.insert(node);
+        stack_set.insert(node);
+
+        for neighbor in node.get(arena).targets() {
+            dfs(arena, neighbor, visited, stack_set, cycles);
+            if cycles.contains(&neighbor) {
+                cycles.insert(node);
+            }
+        }
+
+        stack_set.remove(&node);
+    }
+
+    dfs(
+        arena,
+        function.entry_block(),
+        &mut visited,
+        &mut stack_set,
+        &mut cycles,
+    );
+
+    log::debug!("{:?}", cycles);
+
+    cycles
+        .iter()
+        .map(|r| r.get(arena))
+        .flat_map(|b| {
+            b.statements().iter().filter_map(|s| {
+                if let Statement::WriteVariable { symbol, .. } = s.get(b.arena()) {
+                    Some(symbol.clone())
+                } else {
+                    None
+                }
+            })
+        })
+        .collect()
 }

@@ -1,7 +1,10 @@
 use {
     crate::dbt::x86::{emitter::X86Block, encoder::width::Width},
     common::{arena::Ref, HashMap},
-    core::fmt::{Debug, Display, Formatter},
+    core::{
+        fmt::{Debug, Display, Formatter},
+        panic,
+    },
     displaydoc::Display,
     iced_x86::code_asm::{
         qword_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8,
