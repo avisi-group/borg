@@ -108,7 +108,7 @@ impl FreshAllocator {
                 let instr_clone = instruction.clone();
                 instruction.get_use_defs().for_each(|ud| {
                     let is_usedef = ud.is_usedef();
-                    if let (UseDef::Def(reg) | UseDef::UseDef(reg)) = ud {
+                    if let UseDef::Def(reg) | UseDef::UseDef(reg) = ud {
                         if is_usedef {
                             if let Opcode::XOR(l, r) = instr_clone.0 {
                                 if l == r {

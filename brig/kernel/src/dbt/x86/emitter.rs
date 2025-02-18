@@ -18,7 +18,7 @@ use {
     },
     core::{
         cell::RefCell,
-        cmp::{max, Ordering},
+        cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
         panic,

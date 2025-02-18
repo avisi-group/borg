@@ -3,14 +3,12 @@ use {
         devices::manager::SharedDeviceManager,
         fs::{tar::TarFilesystem, File, Filesystem},
         guest::memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
-        qemu_exit,
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::ptr,
     plugins_api::guest,
     spin::{Mutex, Once},
     x86::current::segmentation::{rdfsbase, wrfsbase},
-    x86_64::instructions::interrupts::int3,
 };
 
 pub mod config;
