@@ -1,0 +1,107 @@
+use {
+    crate::dbt::x86::encoder::{
+        Operand,
+        OperandKind::{Immediate as I, Register as R},
+        Register::PhysicalRegister as PHYS,
+        Width,
+    },
+    iced_x86::code_asm::{AsmRegister32, AsmRegister64, AsmRegister8, CodeAssembler},
+};
+
+pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
+    match (src, dst) {
+        // OR I R
+        (
+            Operand {
+                kind: I(left),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_8,
+            },
+        ) => {
+            assembler
+                .or::<AsmRegister8, i32>(right.into(), i32::try_from(*left).unwrap())
+                .unwrap();
+        }
+        // OR I R
+        (
+            Operand {
+                kind: I(left),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .or::<AsmRegister32, i32>(right.into(), i32::try_from(*left).unwrap())
+                .unwrap();
+        }
+        // OR I R
+        (
+            Operand {
+                kind: I(left),
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            if *left < u32::MAX as u64 {
+                assembler
+                    .or::<AsmRegister64, i32>(right.into(), *left as i32)
+                    .unwrap();
+            } else {
+                panic!("{left:?}")
+            }
+        }
+        // OR R R
+        (
+            Operand {
+                kind: R(PHYS(left)),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_8,
+            },
+        ) => {
+            assembler
+                .or::<AsmRegister8, AsmRegister8>(right.into(), left.into())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(left)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .or::<AsmRegister32, AsmRegister32>(right.into(), left.into())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(src)),
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            assembler
+                .or::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                .unwrap();
+        }
+        _ => todo!("or {src} {dst}"),
+    }
+}
