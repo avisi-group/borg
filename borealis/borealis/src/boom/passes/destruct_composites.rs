@@ -128,6 +128,7 @@ impl DataLocation {
                         fields.push(field_name);
                         current_value = value.get().clone();
                     }
+
                     v => panic!("{v:?}"),
                 }
             }

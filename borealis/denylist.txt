@@ -1896,11 +1896,6 @@ __SetConfig
 __EndCycle
 __ListConfig
 __WakeupRequest
-AArch32_IsExclusiveVA
-AArch32_MarkExclusiveVA
-AArch32_ReportedInnerAttrs
-AArch32_ReportedOuterAttrs
-AArch32_SetLSInstructionSyndrome
 AddressSupportsLS64
 BPIMVA
 CPYPostSizeChoice
@@ -1909,12 +1904,6 @@ CPYSizeChoice
 CTI_SetEventLevel
 ChooseRandomNonExcludedTag
 ClearExclusiveByAddress
-ComputePACIMPDEF
-DC_CIGDPAPA
-DC_CIPAPA
-GPTTLBCache
-GPTTLBLookup
-GetCacheInfo
 GetPendingPhysicalSError
 Hint_Prefetch
 Hint_PreloadData
@@ -1924,11 +1913,6 @@ Hint_RangePrefetch
 LocalTimeoutEvent
 MarkExclusiveGlobal
 MarkExclusiveLocal
-MemCpyDirectionChoice
-MemCpyParametersIllformedE
-MemCpyParametersIllformedM
-MemSetParametersIllformedE
-MemSetParametersIllformedM
 PendSErrorInterrupt
 ReportedPARAttrs
 ReportedPARShareability

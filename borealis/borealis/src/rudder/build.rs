@@ -1924,6 +1924,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         boom::Literal::Bits(vec) => Type::Primitive(
                             PrimitiveType::UnsignedInteger(u16::try_from(vec.len()).unwrap()),
                         ),
+                        boom::Literal::Bit(_) => Type::Primitive(PrimitiveType::UnsignedInteger(1)),
+                        boom::Literal::Int(_) => Type::Primitive(PrimitiveType::SignedInteger(64)),
                         l => todo!("{l:?}"),
                     }),
                 },
