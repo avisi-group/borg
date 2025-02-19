@@ -10,6 +10,7 @@ use {
     },
     common::{intern::InternedString, HashMap, HashSet},
     core::panic,
+    num_bigint::BigInt,
     once_cell::sync::Lazy,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     regex::Regex,
@@ -145,6 +146,10 @@ impl Pass for HandleBuiltinFunctions {
                                         Type::Bits {
                                             size: Size::Static(width),
                                         } => Shared::new(Literal::Bits(vec![Bit::Zero; *width])),
+                                        Type::Integer {
+                                            size: Size::Unknown,
+                                        } => Shared::new(Literal::Int(BigInt::ZERO)),
+                                        Type::Bool => Shared::new(Literal::Bit(Bit::Zero)),
                                         t => todo!("{t:?}"),
                                     };
 
