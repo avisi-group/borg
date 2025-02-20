@@ -1224,25 +1224,35 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         .unwrap()
                         .typ();
 
-                    let Type::Primitive(PrimitiveType::UnsignedInteger(dest_width)) = dest_typ
-                    else {
-                        todo!()
-                    };
-
-                    match dest_width.cmp(&src_width) {
-                        Ordering::Equal => Some(args[0]),
-                        Ordering::Greater => Some(build(
+                    match dest_typ {
+                        Type::Primitive(PrimitiveType::UnsignedInteger(dest_width)) => {
+                            match dest_width.cmp(&src_width) {
+                                Ordering::Equal => Some(args[0]),
+                                Ordering::Greater => Some(build(
+                                    self.block,
+                                    self.block_arena_mut(),
+                                    Statement::Cast {
+                                        kind: CastOperationKind::SignExtend,
+                                        typ: dest_typ,
+                                        value: args[0],
+                                    },
+                                )),
+                                Ordering::Less => {
+                                    panic!("truncation");
+                                }
+                            }
+                        }
+                        Type::Bits => Some(build(
                             self.block,
                             self.block_arena_mut(),
-                            Statement::Cast {
+                            Statement::BitsCast {
                                 kind: CastOperationKind::SignExtend,
                                 typ: dest_typ,
                                 value: args[0],
+                                width: args[1],
                             },
                         )),
-                        Ordering::Less => {
-                            panic!("truncation");
-                        }
+                        t => todo!("{t:?}"),
                     }
                 }
                 (typ, target_width) => todo!(
