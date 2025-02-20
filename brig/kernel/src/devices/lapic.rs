@@ -20,6 +20,10 @@ pub struct LocalApic {
     pub frequency: u32,
 }
 
+// :(
+unsafe impl Send for LocalApic {}
+unsafe impl Sync for LocalApic {}
+
 impl LocalApic {
     pub fn new() -> Self {
         let base = PhysAddr::new(unsafe { xapic_base() }).to_virt();

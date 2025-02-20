@@ -9,10 +9,10 @@ common = { path = "../../common", features = ["no-std"] }
 proc_macro_lib.workspace = true
 plugins_api.workspace = true
 
-bootloader_api = "0.11.9"
+bootloader_api = "0.11.10"
 x86_64 = "0.15.2"
 x86 = "0.52.0"
-x2apic = "0.4.3"
+x2apic = "0.5.0"
 uart_16550 = "0.3.2"
 acpi = "5.1.0"
 virtio-drivers = { version = "0.9.0", features = ["alloc"] }
@@ -23,18 +23,18 @@ byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
 log = { version = "0.4.25", default-features = false }
 elf = { version = "0.7.4", default-features = false }
 rustc-demangle = { version = "0.1.24", default-features = false }
-serde = { version = "1.0.217", default-features = false, features = [
+serde = { version = "1.0.218", default-features = false, features = [
     "derive",
     "alloc",
 ] }
-serde_json = { version = "1.0.138", default-features = false, features = [
+serde_json = { version = "1.0.139", default-features = false, features = [
     "alloc",
 ] }
 phf = { version = "0.11.3", default-features = false, features = ["macros"] }
 tar-no-std = { version = "0.3.2", features = ["alloc"] }
 thiserror = { version = "2.0.11", default-features = false }
 displaydoc = { version = "0.2.5", default-features = false }
-uuid = { version = "1.13.1", default-features = false }
+uuid = { version = "1.13.2", default-features = false }
 fastrand = { version = "2.3.0", default-features = false, features = ["alloc"] }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 byteorder = { version = "1.5.0", default-features = false }
