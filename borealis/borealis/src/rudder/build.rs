@@ -1,6 +1,6 @@
 use {
     crate::{
-        boom::{self, bits_to_int, passes::destruct_composites},
+        boom::{self, bits_to_int, passes::destruct_composites, Expression},
         rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
     },
     common::{
@@ -21,6 +21,7 @@ use {
         width_helpers::signed_smallest_width_of_value,
         HashMap,
     },
+    core::panic,
     log::trace,
     rayon::iter::{IntoParallelIterator, ParallelIterator},
     sailrs::shared::Shared,
@@ -405,7 +406,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             .collect::<Vec<_>>();
 
         let fn_statement = {
-            if let Some(statement) = self.build_specialized_function(*name, &args) {
+            if let Some(statement) = self.build_specialized_function(*name, &args, expression) {
                 statement
             } else {
                 let return_type = self
@@ -453,6 +454,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         &mut self,
         name: InternedString,
         args: &[Ref<Statement>],
+        expression: &Option<boom::Expression>, // occasionally needed to find destination type of function
     ) -> Option<Ref<Statement>> {
         match name.as_ref() {
             "%i64->%i" => {
@@ -1201,6 +1203,48 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         width: args[1].clone(),
                     },
                 )),
+                // used to fix SignExtend0(..., esize) in execute_FCVTZU_Z_P_Z_D2X. esize is constant 64, and it's extending from a bv64 to a bv64?
+                // todo: check that it's not doing any extra logic we need to replicate
+                (Type::Primitive(PrimitiveType::UnsignedInteger(src_width)), _) => {
+                    // target width is not a constant
+                    let Some(expr) = expression else {
+                        panic!("sign extend called with no destination")
+                    };
+
+                    let Expression::Identifier(ident) = expr else {
+                        todo!()
+                    };
+
+                    let dest_typ = self
+                        .fn_ctx()
+                        .rudder_fn
+                        .local_variables()
+                        .iter()
+                        .find(|sym| sym.name() == *ident)
+                        .unwrap()
+                        .typ();
+
+                    let Type::Primitive(PrimitiveType::UnsignedInteger(dest_width)) = dest_typ
+                    else {
+                        todo!()
+                    };
+
+                    match dest_width.cmp(&src_width) {
+                        Ordering::Equal => Some(args[0]),
+                        Ordering::Greater => Some(build(
+                            self.block,
+                            self.block_arena_mut(),
+                            Statement::Cast {
+                                kind: CastOperationKind::SignExtend,
+                                typ: dest_typ,
+                                value: args[0],
+                            },
+                        )),
+                        Ordering::Less => {
+                            panic!("truncation");
+                        }
+                    }
+                }
                 (typ, target_width) => todo!(
                     "sign extend {typ:?} {target_width:?} {:?} {:?}",
                     args[0],
