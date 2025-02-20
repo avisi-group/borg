@@ -363,6 +363,9 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
     cmd.arg("-M");
     cmd.arg("q35");
 
+    cmd.arg("-qmp");
+    cmd.arg("unix:/tmp/qmp.sock,server,nowait");
+
     #[cfg(target_arch = "x86_64")]
     cmd.args(["-cpu", "host"]);
 
