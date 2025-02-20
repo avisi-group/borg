@@ -8,7 +8,7 @@ authors = ["AVISI Research Group"]
 rkyv = { version = "0.8.10", default-features = false, features = ["alloc", "hashbrown-0_15", "pointer_width_64"] }
 hashbrown = { version = "0.15.2", features = ["serde"] }
 twox-hash = { version = "2.1.0", default-features = false, features = ["alloc", "xxhash64"] }
-serde = { version = "1.0.217", default-features = false, features = ["alloc", "derive"] }
+serde = { version = "1.0.218", default-features = false, features = ["alloc", "derive"] }
 log = "0.4.25"
 num-rational = { version = "0.4.2", default-features = false, features = ["serde"] }
 num-traits = { version = "0.2.19", default-features = false }
@@ -17,7 +17,7 @@ deepsize = { version = "0.2.0", default-features = false, features = ["derive"] 
 postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
 
 lasso = { version = "0.7.3", default-features = false, features = ["deepsize", "serialize"] }
-ocaml = { version = "1.1.0", optional = true }
+ocaml = { version = "1.2.0", optional = true }
 spin = { version = "0.9.8", features = ["lazy"], optional = true }
 
 [features]
