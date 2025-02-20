@@ -1,5 +1,3 @@
-#![warn(missing_docs)]
-
 //! Rust interface to `Sail` compiler library
 
 use {

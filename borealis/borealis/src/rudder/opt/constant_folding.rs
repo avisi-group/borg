@@ -108,7 +108,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
 
                     true
                 }
-                (lhs, Statement::Constant { value: rhs, .. }) => match kind {
+                (_lhs, Statement::Constant { value: rhs, .. }) => match kind {
                     BinaryOperationKind::Multiply => match rhs {
                         ConstantValue::UnsignedInteger(rhs_value) => {
                             if rhs_value == 8 {
@@ -120,9 +120,9 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         }
                         ConstantValue::SignedInteger(_) => false,
                         ConstantValue::FloatingPoint(_) => false,
-                        ConstantValue::String(interned_string) => false,
-                        ConstantValue::Tuple(vec) => false,
-                        ConstantValue::Vector(vec) => false,
+                        ConstantValue::String(_interned_string) => false,
+                        ConstantValue::Tuple(_vec) => false,
+                        ConstantValue::Vector(_vec) => false,
                     },
                     _ => false,
                 },
