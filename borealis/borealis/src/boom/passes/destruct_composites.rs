@@ -1,12 +1,12 @@
 use {
     crate::boom::{
+        Ast, Expression, Literal, NamedType, Operation, Parameter, Size, Statement, Type, Value,
+        Visitor,
         control_flow::{ControlFlowBlock, Terminator},
         passes::Pass,
         visitor::Walkable,
-        Ast, Expression, Literal, NamedType, Operation, Parameter, Size, Statement, Type, Value,
-        Visitor,
     },
-    common::{intern::InternedString, HashMap},
+    common::{HashMap, intern::InternedString},
     itertools::Itertools,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     sailrs::shared::Shared,
@@ -238,7 +238,7 @@ fn destruct_locals(
                                     element,
                                     index,
                                 } => {
-                                    let Value::Identifier(vector) = &*vector.get() else {
+                                    let Value::Identifier(_vector) = &*vector.get() else {
                                         todo!()
                                     };
                                     let Value::Identifier(element) = &*element.get() else {
@@ -250,8 +250,6 @@ fn destruct_locals(
                                             value: value.clone(),
                                         })];
                                     };
-
-                                    assert_eq!(destination.to_ident(), *vector);
 
                                     // was element destructed?
                                     // assumes element and vector have same type (this is
@@ -266,7 +264,10 @@ fn destruct_locals(
                                         // foo_b = (foo_b[0] = bar_b)
                                         return destruct_variable(*element, typ.clone())
                                             .into_iter()
-                                            .zip(destruct_variable(*vector, typ.clone()))
+                                            .zip(destruct_variable(
+                                                destination.to_ident(),
+                                                typ.clone(),
+                                            ))
                                             .map(|((element_part, _), (vector_part, _))| {
                                                 Statement::Copy {
                                                     expression: Expression::Identifier(vector_part),
@@ -297,7 +298,7 @@ fn destruct_locals(
                                     return vec![Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(destination.to_ident()),
                                         value: value.clone(),
-                                    })]
+                                    })];
                                 }
                             },
                         };
