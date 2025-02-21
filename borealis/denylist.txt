@@ -3,14 +3,6 @@ mem_read_request_is_ifetch<Uarm_acc_type<>,b,O<RTranslationInfo>>
 mem_write_request_is_exclusive<Uarm_acc_type<>,b,O<RTranslationInfo>>
 MaybeZeroSVEUppers
 ResetSVEState
-TakeTransactionCheckpoint
-TransactionStartTrap
-AArch32_ITAdvance
-DebugTarget
-SSAdvance
-BankedRegisterAccessValid
-ConditionPassed
-CPSRWriteByInstr
 InITBlock
 LastInITBlock
 gic_read_ram
