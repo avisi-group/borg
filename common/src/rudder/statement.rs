@@ -1319,11 +1319,13 @@ pub fn cast_at(
                     panic!()
                 };
 
+                // todo: fix this silliness
                 let (num, den) = match s.as_ref() {
                     "0.0" => (0, 1),
                     "0.5" => (1, 2),
                     "1.0" => (1, 1),
                     "2.0" => (2, 1),
+                    "3.0" => (3, 1),
                     _ => todo!("{s:?}"),
                 };
 
