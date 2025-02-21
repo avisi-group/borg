@@ -1,7 +1,7 @@
 [package]
 name = "sailrs"
 version = "0.1.1"
-edition = "2021"
+edition = "2024"
 authors = ["AVISI Research Group"]
 description = "Rust interface for the the [Sail compiler and AST](https://www.cl.cam.ac.uk/~pes20/sail/) written in OCaml."
 homepage = "https://avisi.org.uk"

@@ -14,10 +14,10 @@ unsafe impl Sync for RefAllocator {}
 
 unsafe impl GlobalAlloc for RefAllocator {
     unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
-        ((self.0).unwrap()).alloc(layout)
+        unsafe { (self.0).unwrap().alloc(layout) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
-        ((self.0).unwrap()).dealloc(ptr, layout)
+        unsafe { (self.0).unwrap().dealloc(ptr, layout) }
     }
 }

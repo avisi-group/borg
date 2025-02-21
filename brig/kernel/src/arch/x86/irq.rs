@@ -1,8 +1,8 @@
 use {
     crate::{
         arch::x86::{
-            memory::{VirtAddrExt, VirtualMemoryArea, LOW_HALF_CANONICAL_END},
             MachineContext,
+            memory::{LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea},
         },
         guest::memory::AddressSpaceRegionKind,
         qemu_exit,
@@ -18,12 +18,12 @@ use {
         GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR,
     },
     x86_64::{
+        VirtAddr,
         registers::control::Cr2,
         structures::{
             idt::{InterruptDescriptorTable, PageFaultErrorCode},
             paging::{Page, PageTableFlags, PhysFrame, Size4KiB},
         },
-        VirtAddr,
     },
 };
 
@@ -175,7 +175,9 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                 }
             }
         } else {
-            exit_with_message!("GUEST PAGE FAULT code {error_code:?} @ {faulting_address:x?}: no region -- this is a real fault");
+            exit_with_message!(
+                "GUEST PAGE FAULT code {error_code:?} @ {faulting_address:x?}: no region -- this is a real fault"
+            );
         }
     } else {
         exit_with_message!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
@@ -232,7 +234,9 @@ fn dbt_handler_panic(machine_context: *mut MachineContext) {
     let block = (meta >> 16) as u16;
     let statement = meta as u16;
 
-    exit_with_message!("DBT interrupt: statement {statement:x} failed assert in block {block:x} of {function_name:?}")
+    exit_with_message!(
+        "DBT interrupt: statement {statement:x} failed assert in block {block:x} of {function_name:?}"
+    )
 }
 
 struct UsedInterruptVectors([u64; 4]);

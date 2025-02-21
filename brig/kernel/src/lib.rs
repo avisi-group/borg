@@ -3,6 +3,7 @@
 #![feature(allocator_api)] // needed for pci config regions and alignedallocator
 #![feature(naked_functions)] // for interrupts with glorious purpose
 #![feature(btree_cursors)]
+#![allow(static_mut_refs)] // todo: fix me
 
 extern crate alloc;
 
@@ -14,10 +15,10 @@ use {
         },
         dbt::models,
         devices::manager::SharedDeviceManager,
-        fs::{tar::TarFilesystem, File, Filesystem},
+        fs::{File, Filesystem, tar::TarFilesystem},
         logger::WRITER,
     },
-    bootloader_api::{config::Mapping, BootInfo, BootloaderConfig},
+    bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
     byte_unit::{Byte, UnitType::Binary},
     core::panic::PanicInfo,
     x86::io::outw,

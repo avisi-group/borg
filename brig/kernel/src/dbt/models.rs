@@ -1,17 +1,17 @@
 use {
     crate::{
         dbt::{
+            Translation,
             emitter::{Emitter, Type},
             init_register_file,
             translate::translate,
             x86::{
-                emitter::{BinaryOperationKind, X86Emitter},
                 X86TranslationContext,
+                emitter::{BinaryOperationKind, X86Emitter},
             },
-            Translation,
         },
         devices::SharedDevice,
-        fs::{tar::TarFilesystem, File, Filesystem},
+        fs::{File, Filesystem, tar::TarFilesystem},
         guest::register_device_factory,
     },
     alloc::{
@@ -23,9 +23,9 @@ use {
         vec::Vec,
     },
     common::{
+        HashMap,
         intern::InternedString,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
-        HashMap,
     },
     core::fmt::{self, Debug},
     plugins_api::{
@@ -123,7 +123,7 @@ impl Device for ModelDevice {
     fn start(&self) {
         //self.block_exec();
         self.single_step_exec();
-        panic!("execution should never terminate here")
+        unreachable!("execution should never terminate here")
     }
 
     fn stop(&self) {
@@ -366,8 +366,6 @@ impl ModelDevice {
 
             log::info!("finished\n\n")
         }
-
-        unreachable!();
     }
 }
 

@@ -3,18 +3,18 @@ use {
         bit_extract, bit_insert,
         emitter::Type,
         x86::{
+            Emitter, X86TranslationContext,
             encoder::{
-                width::Width, Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register,
+                Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register, width::Width,
             },
             register_allocator::RegisterAllocator,
-            Emitter, X86TranslationContext,
         },
     },
     alloc::{rc::Rc, vec::Vec},
     common::{
+        HashMap,
         arena::{Arena, Ref},
         mask::mask,
-        HashMap,
     },
     core::{
         cell::RefCell,
@@ -386,7 +386,9 @@ impl<'ctx> X86Emitter<'ctx> {
                             let src_width = src.width();
                             let dst_width = dst.width();
                             if src_width < dst_width {
-                                panic!("src ({src_width} bits) must be larger than dst ({dst_width} bits)");
+                                panic!(
+                                    "src ({src_width} bits) must be larger than dst ({dst_width} bits)"
+                                );
                             }
 
                             src.width_in_bits = dst.width_in_bits;
@@ -698,7 +700,7 @@ impl<'ctx> X86Emitter<'ctx> {
                 }
             },
 
-            (Type::Floating(l), Type::Floating(r)) => todo!(),
+            (Type::Floating(_), Type::Floating(_)) => todo!(),
 
             (Type::Tuple, Type::Tuple) => {
                 todo!()

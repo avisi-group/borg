@@ -1,12 +1,11 @@
 use {
     proc_macro::TokenStream,
     proc_macro2::{Ident, Span},
-    quote::{quote, ToTokens},
+    quote::{ToTokens, quote},
     syn::{
-        parse_macro_input,
+        Abi, Attribute, ItemFn, LitStr, MetaList, Path, PathSegment, parse_macro_input,
         punctuated::Punctuated,
         token::{Bracket, Extern, Pound},
-        Abi, Attribute, ItemFn, LitStr, Path, PathSegment,
     },
 };
 
@@ -125,12 +124,16 @@ pub fn irq_handler(args: TokenStream, input: TokenStream) -> TokenStream {
         },
         style: syn::AttrStyle::Outer,
         bracket_token: Bracket::default(),
-        meta: syn::Meta::Path(Path {
-            leading_colon: None,
-            segments: Punctuated::from_iter([PathSegment {
-                ident: Ident::new("no_mangle", Span::call_site()),
-                arguments: syn::PathArguments::None,
-            }]),
+        meta: syn::Meta::List(MetaList {
+            path: Path {
+                leading_colon: None,
+                segments: Punctuated::from_iter([PathSegment {
+                    ident: Ident::new("unsafe", Span::call_site()),
+                    arguments: syn::PathArguments::None,
+                }]),
+            },
+            delimiter: syn::MacroDelimiter::Paren(syn::token::Paren(Span::call_site())),
+            tokens: quote!(no_mangle),
         }),
     });
 
