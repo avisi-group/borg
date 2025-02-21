@@ -66,7 +66,7 @@ impl RegisterAllocator for FreshAllocator {
 }
 
 impl FreshAllocator {
-    pub fn new(num_virt_regs: usize) -> Self {
+    pub fn new(_num_virt_regs: usize) -> Self {
         Self {
             live_ranges: HashMap::default(),
             allocation_plan: HashMap::default(),
@@ -180,7 +180,7 @@ impl FreshAllocator {
     fn build_allocation_plan(&mut self, instructions: &mut [Instruction]) {
         let mut physical_used = 0u16;
 
-        instructions.iter().enumerate().for_each(|(instruction_index, instruction)| {
+        instructions.iter().enumerate().for_each(|(instruction_index, _instruction)| {
             {
                 let ended_registers = self.live_ranges.iter().map(|(reg, ranges)| ranges.iter().map(move |range| (*reg, *range))).flatten().filter(|(_, (_, end))| *end == Some(instruction_index)).map(|(reg, _)| reg).collect::<Vec<_>>();
 
