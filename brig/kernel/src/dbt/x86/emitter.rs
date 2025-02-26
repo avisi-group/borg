@@ -1,7 +1,7 @@
 use {
     crate::dbt::{
         bit_extract, bit_insert,
-        emitter::{BlockResult, Type},
+        emitter::Type,
         x86::{
             encoder::{
                 width::Width, Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register,
@@ -1457,7 +1457,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         condition: Self::NodeRef,
         true_target: Self::BlockRef,
         false_target: Self::BlockRef,
-    ) -> BlockResult {
+    ) {
         match condition.kind() {
             NodeKind::Constant { .. } => {
                 todo!("this was handled in models.rs")
@@ -1472,18 +1472,13 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
                 self.push_instruction(Instruction::jmp(false_target.clone()));
                 self.push_target(false_target.clone());
-
-                // if condition is static, return BlockResult::Static
-                // else
-                BlockResult::Dynamic(true_target, false_target)
             }
         }
     }
 
-    fn jump(&mut self, target: Self::BlockRef) -> BlockResult {
+    fn jump(&mut self, target: Self::BlockRef) {
         self.push_instruction(Instruction::jmp(target.clone()));
         self.push_target(target.clone());
-        BlockResult::Static(target)
     }
 
     fn leave(&mut self) {

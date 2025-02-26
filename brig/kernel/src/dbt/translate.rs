@@ -1,13 +1,13 @@
 use {
     crate::dbt::{
-        emitter::{self, BlockResult, Emitter, Type},
+        emitter::{self, Emitter, Type},
         trampoline::MAX_STACK_SIZE,
         x86::{
             emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
             encoder::Instruction,
         },
     },
-    alloc::{rc::Rc, vec::Vec},
+    alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
         intern::InternedString,
@@ -16,7 +16,7 @@ use {
             statement::Statement, types::PrimitiveType, Model, RegisterCacheType,
         },
         width_helpers::unsigned_smallest_width_of_value,
-        HashMap, HashSet,
+        HashMap,
     },
     core::{
         cmp::max,
@@ -30,14 +30,31 @@ const BLOCK_QUEUE_LIMIT: usize = 1000;
 #[derive(Debug)]
 enum JumpKind {
     // static jump (jump or branch with constant condition)
-    Static(Ref<Block>, Ref<X86Block>),
+    Static {
+        rudder: Ref<Block>,
+        x86: Ref<X86Block>,
+        variables: BTreeMap<InternedString, bool>,
+    },
     // branch with non-constant condition
-    Dynamic(Ref<Block>),
+    Dynamic {
+        rudder: Ref<Block>,
+        x86: Ref<X86Block>,
+        variables: BTreeMap<InternedString, bool>,
+    },
 }
 
+#[derive(Debug, Clone)]
 enum StatementResult {
     Data(Option<X86NodeRef>),
-    ControlFlow(BlockResult),
+    ControlFlow(ControlFlow),
+}
+
+#[derive(Debug, Clone)]
+enum ControlFlow {
+    Jump(Ref<Block>, Ref<X86Block>, BTreeMap<InternedString, bool>),
+    Branch(Ref<Block>, Ref<Block>, BTreeMap<InternedString, bool>),
+    Panic,
+    Return,
 }
 
 pub fn translate(
@@ -78,21 +95,11 @@ struct FunctionTranslator<'m, 'e, 'c> {
     /// Name of the function being translated
     function_name: InternedString,
 
-    /// Host (x86) blocks, indexed by their corresponding rudder block
-    x86_blocks: HashMap<Ref<Block>, Ref<X86Block>>,
-    /// Rudder blocks, indexed by their corresponding host block
-    rudder_blocks: HashMap<Ref<X86Block>, Ref<Block>>,
+    dynamic_blocks: HashMap<(Ref<Block>, BTreeMap<InternedString, bool>), (Ref<X86Block>, bool)>,
+    static_blocks: HashMap<Ref<Block>, Vec<Ref<X86Block>>>,
 
     /// Function local variables
     variables: HashMap<InternedString, LocalVariable>,
-
-    /// Map from a local variable to all the blocks in which a virtual write
-    /// occurs, the value written, and the index into the list of instructions
-    /// where the write must occur
-    ///
-    /// If the variable is later promoted to the stack, a stack write needs to
-    /// be appended to the end of each block
-    virtual_variable_blocks: HashMap<InternedString, Vec<(Ref<X86Block>, X86NodeRef, usize)>>,
 
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize>,
@@ -118,10 +125,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         let mut celf = Self {
             model,
             function_name: InternedString::from(function),
-            x86_blocks: HashMap::default(),
-            rudder_blocks: HashMap::default(),
+            dynamic_blocks: HashMap::default(),
+            static_blocks: HashMap::default(),
             variables: HashMap::default(),
-            virtual_variable_blocks: HashMap::default(),
             current_stack_offset,
             emitter,
             register_file_ptr,
@@ -169,15 +175,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             },
         );
 
-        // set up block maps
-        function.block_iter().for_each(|rudder_block| {
-            let x86_block = celf.emitter.ctx_mut().create_block();
-            celf.rudder_blocks.insert(x86_block.clone(), rudder_block);
-            celf.x86_blocks.insert(rudder_block, x86_block);
-        });
-
-        log::trace!("blocks: {:#?}", celf.x86_blocks);
-
         celf
     }
 
@@ -202,9 +199,15 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
         // start translation of the function's rudder entry block to the new (empty) X86
         // entry block
-        block_queue.push_front(JumpKind::Static(function.entry_block(), entry_x86));
-
-        let mut visited_dynamic_blocks = HashSet::default();
+        block_queue.push_front(JumpKind::Static {
+            rudder: function.entry_block(),
+            x86: entry_x86,
+            variables: function
+                .parameters()
+                .into_iter()
+                .map(|s| (s.name(), false))
+                .collect(),
+        });
 
         while let Some(block) = block_queue.pop_front() {
             if block_queue.len() > BLOCK_QUEUE_LIMIT {
@@ -212,57 +215,82 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             }
 
             let result = match block {
-                JumpKind::Static(rudder_block, x86_block) => {
+                JumpKind::Static {
+                    rudder: rudder_block,
+                    x86: x86_block,
+                    variables,
+                } => {
                     self.emitter.set_current_block(x86_block);
                     log::trace!(
                         "translating static block rudder={rudder_block:?}, x86={x86_block:?}",
                     );
-                    let res = self.translate_block(function, rudder_block, false);
-                    log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
-                    res
+                    self.translate_block(function, rudder_block, false, variables)
+                    // log::trace!("emitted: {:?}",
+                    // x86_block.get(self.emitter.ctx().arena()));
                 }
-                JumpKind::Dynamic(b) => {
-                    log::trace!("dynamic block {}", b.index());
-
-                    if visited_dynamic_blocks.contains(&b) {
+                JumpKind::Dynamic {
+                    rudder: rudder_block,
+                    x86: x86_block,
+                    variables: variables_out,
+                } => {
+                    //  log::trace!("dynamic block {}", b.index());
+                    if !x86_block
+                        .get(self.emitter.ctx_mut().arena_mut())
+                        .instructions()
+                        .is_empty()
+                    {
                         log::trace!("already visited");
                         continue;
                     }
 
-                    let x86_block = *self.x86_blocks.get(&b).unwrap();
                     self.emitter.set_current_block(x86_block);
 
-                    log::trace!("translating dynamic block rudder={b:?}, x86={x86_block:?}",);
+                    log::trace!(
+                        "translating dynamic block rudder={rudder_block:?}, x86={x86_block:?}",
+                    );
 
-                    let res = self.translate_block(function, b, true);
-                    log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
-                    visited_dynamic_blocks.insert(b);
+                    let res =
+                        self.translate_block(function, rudder_block, true, variables_out.clone());
+
                     res
                 }
             };
 
             match result {
-                BlockResult::Static(x86) => {
-                    let rudder = self.lookup_rudder_block(x86);
+                ControlFlow::Jump(rudder, x86, lives) => {
                     log::trace!("block result: static(rudder={rudder:?},x86={x86:?})",);
-                    block_queue.push_front(JumpKind::Static(rudder, x86));
+
+                    block_queue.push_front(JumpKind::Static {
+                        rudder,
+                        x86,
+                        variables: lives,
+                    });
                 }
-                BlockResult::Dynamic(b0, b1) => {
-                    let block0 = self.lookup_rudder_block(b0);
-                    let block1 = self.lookup_rudder_block(b1);
+                ControlFlow::Branch(block0, block1, lives) => {
+                    let block0_x86 = self.dynamic_blocks.get(&(block0, lives.clone())).unwrap().0;
+                    let block1_x86 = self.dynamic_blocks.get(&(block1, lives.clone())).unwrap().0;
                     log::trace!(
                         "block result: dynamic({}, {})",
                         block0.index(),
                         block1.index()
                     );
-                    block_queue.push_back(JumpKind::Dynamic(block0));
-                    block_queue.push_back(JumpKind::Dynamic(block1));
+
+                    block_queue.push_back(JumpKind::Dynamic {
+                        rudder: block0,
+                        x86: block0_x86,
+                        variables: lives.clone(),
+                    });
+                    block_queue.push_back(JumpKind::Dynamic {
+                        rudder: block1,
+                        x86: block1_x86,
+                        variables: lives,
+                    });
                 }
-                BlockResult::Return => {
+                ControlFlow::Return => {
                     log::trace!("block result: return ({exit_block:?})");
                     self.emitter.jump(exit_block);
                 }
-                BlockResult::Panic => {
+                ControlFlow::Panic => {
                     let panic = self.emitter.ctx().panic_block();
                     log::trace!("block result: panic ({panic:?})");
                     // unreachable but inserted just to make sure *every* block has a path to the
@@ -296,7 +324,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         function: &Function,
         block_ref: Ref<Block>,
         is_dynamic: bool,
-    ) -> BlockResult {
+        mut live_ins: BTreeMap<InternedString, bool>,
+    ) -> ControlFlow {
         let block = block_ref.get(function.arena());
 
         let mut statement_value_store = StatementValueStore::new();
@@ -309,6 +338,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 block_ref,
                 function,
                 block.arena(),
+                &mut live_ins,
             ) {
                 StatementResult::Data(Some(value)) => {
                     log::trace!(
@@ -353,6 +383,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         block: Ref<Block>,
         function: &Function,
         arena: &Arena<Statement>,
+        live_ins: &mut BTreeMap<InternedString, bool>,
     ) -> StatementResult {
         //        log::debug!("translate stmt: {statement:?}");
 
@@ -397,16 +428,19 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     block.index(),
                     self.function_name
                 );
+
                 let var = self.variables.get(&symbol.name()).unwrap().clone();
                 StatementResult::Data(Some(self.read_variable(var)))
             }
             Statement::WriteVariable { symbol, value } => {
+                live_ins.insert(symbol.name(), is_dynamic);
                 log::debug!(
                     "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}",
                     symbol.name(),
                     block.index(),
                     self.function_name
                 );
+
                 if is_dynamic {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
@@ -414,12 +448,11 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         LocalVariable::Virtual { .. } => {
                             let stack_offset = self.allocate_stack_offset(&symbol.typ());
                             log::debug!(
-                                "promoting {:?} from virtual to stack @ {:#x} in block {:#x} in {:?}, was written to in {:x?}",
+                                "promoting {:?} from virtual to stack @ {:#x} in block {:#x} in {:?}",
                                 symbol.name(),
                                 stack_offset,
                                 block.index(),
                                 self.function_name,
-                                self.virtual_variable_blocks.get(&symbol.name()),
                             );
 
                             self.variables.insert(
@@ -431,26 +464,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                             );
 
                             let current_block = self.emitter.get_current_block();
-
-                            if let Some(blocks) =
-                                self.virtual_variable_blocks.remove(&symbol.name())
-                            {
-                                blocks.into_iter().for_each(|(block, value, index)| {
-                                    self.emitter.set_current_block(block);
-
-                                    let post = block
-                                        .get_mut(self.emitter.ctx_mut().arena_mut())
-                                        .instructions_mut()
-                                        .split_off(index);
-
-                                    self.emitter.write_stack_variable(stack_offset, value);
-
-                                    block
-                                        .get_mut(self.emitter.ctx_mut().arena_mut())
-                                        .instructions_mut()
-                                        .extend_from_slice(&post);
-                                });
-                            }
 
                             self.emitter.set_current_block(current_block);
                         }
@@ -476,20 +489,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         )
                     })
                     .clone();
-
-                if let LocalVariable::Virtual { .. } = self.variables.get(&symbol.name()).unwrap() {
-                    let current_block = self.emitter.get_current_block();
-                    let index = current_block
-                        .get(self.emitter.ctx().arena())
-                        .instructions()
-                        .len();
-
-                    let metadata = (current_block, value.clone(), index);
-                    self.virtual_variable_blocks
-                        .entry(symbol.name())
-                        .and_modify(|e| e.push(metadata.clone()))
-                        .or_insert(alloc::vec![metadata]);
-                }
 
                 self.write_variable(var, value);
 
@@ -740,8 +739,14 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             Statement::Jump { target } => {
                 // make new empty x86 block
                 let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
-                self.rudder_blocks.insert(x86, *target);
-                StatementResult::ControlFlow(self.emitter.jump(x86))
+
+                self.static_blocks
+                    .entry(*target)
+                    .and_modify(|blocks| blocks.push(x86))
+                    .or_insert(alloc::vec![x86]);
+
+                self.emitter.jump(x86);
+                StatementResult::ControlFlow(ControlFlow::Jump(*target, x86, live_ins.clone()))
             }
             Statement::Branch {
                 condition,
@@ -756,21 +761,60 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
                             let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
-                            self.rudder_blocks.insert(x86, *false_target);
-                            StatementResult::ControlFlow(self.emitter.jump(x86))
+
+                            self.static_blocks
+                                .entry(*false_target)
+                                .and_modify(|blocks| blocks.push(x86))
+                                .or_insert(alloc::vec![x86]);
+
+                            self.emitter.jump(x86);
+                            StatementResult::ControlFlow(ControlFlow::Jump(
+                                *false_target,
+                                x86,
+                                live_ins.clone(),
+                            ))
                         } else {
                             let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
-                            self.rudder_blocks.insert(x86, *true_target);
-                            StatementResult::ControlFlow(self.emitter.jump(x86))
+
+                            self.static_blocks
+                                .entry(*true_target)
+                                .and_modify(|blocks| blocks.push(x86))
+                                .or_insert(alloc::vec![x86]);
+
+                            self.emitter.jump(x86);
+                            StatementResult::ControlFlow(ControlFlow::Jump(
+                                *true_target,
+                                x86,
+                                live_ins.clone(),
+                            ))
                         }
                     }
                     _ => {
-                        let true_target = self.lookup_x86_block(*true_target);
-                        let false_target = self.lookup_x86_block(*false_target);
-                        StatementResult::ControlFlow(self.emitter.branch(
-                            condition,
-                            true_target,
-                            false_target,
+                        let true_x86 = (*self
+                            .dynamic_blocks
+                            .entry((*true_target, live_ins.clone()))
+                            .or_insert_with(|| {
+                                (
+                                    self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
+                                    false,
+                                )
+                            }))
+                        .0;
+                        let false_x86 = (*self
+                            .dynamic_blocks
+                            .entry((*false_target, live_ins.clone()))
+                            .or_insert_with(|| {
+                                (
+                                    self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
+                                    false,
+                                )
+                            }))
+                        .0;
+                        self.emitter.branch(condition, true_x86, false_x86);
+                        StatementResult::ControlFlow(ControlFlow::Branch(
+                            *true_target,
+                            *false_target,
+                            live_ins.clone(),
                         ))
                     }
                 };
@@ -789,7 +833,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     self.write_variable(var, value);
                 }
 
-                StatementResult::ControlFlow(BlockResult::Return)
+                StatementResult::ControlFlow(ControlFlow::Return)
             }
 
             Statement::Cast { kind, typ, value } => {
@@ -901,7 +945,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                 self.emitter.panic(msg.as_ref());
 
-                StatementResult::ControlFlow(BlockResult::Panic)
+                StatementResult::ControlFlow(ControlFlow::Panic)
             }
 
             Statement::Assert { condition } => {
@@ -938,14 +982,6 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         }
     }
 
-    fn lookup_x86_block(&self, rudder: Ref<Block>) -> Ref<X86Block> {
-        self.x86_blocks.get(&rudder).unwrap().clone()
-    }
-
-    fn lookup_rudder_block(&self, x86: Ref<X86Block>) -> Ref<Block> {
-        *self.rudder_blocks.get(&x86).unwrap()
-    }
-
     fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
         match variable {
             LocalVariable::Virtual { symbol } => self.emitter.read_virt_variable(symbol),
@@ -979,6 +1015,31 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
         offset
     }
+
+    // fn get_x86(
+    //     &mut self,
+    //     rudder: Ref<Block>,
+    //     live_ins: BTreeMap<InternedString, bool>,
+    // ) -> Ref<X86Block> {
+    //     (*self.translated_blocks.get(&(rudder, live_ins)).unwrap()).0
+    // }
+
+    // fn get_or_insert_x86(
+    //     &mut self,
+    //     rudder: Ref<Block>,
+    //     live_ins: BTreeMap<InternedString, bool>,
+    // ) -> Ref<X86Block> {
+    //     (*self
+    //         .translated_blocks
+    //         .entry((rudder, live_ins))
+    //         .or_insert_with(|| {
+    //             (
+    //                 self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
+    //                 false,
+    //             )
+    //         }))
+    //     .0
+    // }
 }
 
 /// Converts a rudder type to a `Type` value

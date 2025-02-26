@@ -88,9 +88,9 @@ pub trait Emitter {
         condition: Self::NodeRef,
         true_target: Self::BlockRef,
         false_target: Self::BlockRef,
-    ) -> BlockResult;
+    );
 
-    fn jump(&mut self, target: Self::BlockRef) -> BlockResult;
+    fn jump(&mut self, target: Self::BlockRef);
 
     // cleanup and return
     fn leave(&mut self);
@@ -232,11 +232,3 @@ impl Type {
 //         todo!()
 //     }
 // }
-
-#[derive(Debug, Clone)]
-pub enum BlockResult {
-    Static(Ref<X86Block>),
-    Dynamic(Ref<X86Block>, Ref<X86Block>),
-    Return,
-    Panic,
-}
