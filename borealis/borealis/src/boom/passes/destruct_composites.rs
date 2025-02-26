@@ -294,6 +294,55 @@ fn destruct_locals(
                                         })];
                                     }
                                 }
+                                Value::CtorUnwrap {
+                                    value: source,
+                                    identifier: variant,
+                                    ..
+                                } => {
+                                    // foo = bar as FooType;
+                                    // =>
+                                    // foo = bar_FooType;
+                                    // =>
+                                    // foo_a = bar_FooType_a;
+                                    // foo_b = bar_FooType_b;
+
+                                    let Value::Identifier(source) = &*source.get() else {
+                                        // bail out
+                                        // todo: warn here
+                                        return vec![Shared::new(Statement::Copy {
+                                            expression: Expression::Identifier(
+                                                destination.to_ident(),
+                                            ),
+                                            value: value.clone(),
+                                        })];
+                                    };
+
+                                    let Some(typ) =
+                                        destructed_local_variables.get(&destination.root())
+                                    else {
+                                        // bail out
+                                        // todo: warn here
+                                        return vec![Shared::new(Statement::Copy {
+                                            expression: Expression::Identifier(
+                                                destination.to_ident(),
+                                            ),
+                                            value: value.clone(),
+                                        })];
+                                    };
+
+                                    return destruct_variable(
+                                        union_value_ident(*source, *variant),
+                                        typ.clone(),
+                                    )
+                                    .into_iter()
+                                    .zip(destruct_variable(destination.to_ident(), typ.clone()))
+                                    .map(|((src, _), (dst, _))| Statement::Copy {
+                                        expression: Expression::Identifier(dst),
+                                        value: Shared::new(Value::Identifier(src)),
+                                    })
+                                    .map(Shared::new)
+                                    .collect();
+                                }
                                 _ => {
                                     return vec![Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(destination.to_ident()),
