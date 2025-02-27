@@ -2,10 +2,10 @@
 
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        visitor::Visitor,
         Ast, Definition, Expression, FunctionDefinition, FunctionSignature, Literal, NamedType,
         NamedValue, Operation, Parameter, Size, Statement, Type, Value,
+        control_flow::{ControlFlowBlock, Terminator},
+        visitor::Visitor,
     },
     common::intern::InternedString,
     itertools::Itertools,

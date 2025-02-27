@@ -1,9 +1,9 @@
 use {
     common::{
+        HashMap, HashSet,
         arena::Ref,
         intern::InternedString,
-        rudder::{block::Block, function::Function, statement::Statement, Model},
-        HashMap, HashSet,
+        rudder::{Model, block::Block, function::Function, statement::Statement},
     },
     dot::{GraphWalk, Labeller},
     log::trace,

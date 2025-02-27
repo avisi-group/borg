@@ -1,11 +1,11 @@
 use {
     crate::{
         devices::SharedDevice,
-        fs::{tar::TarFilesystem, File, Filesystem},
+        fs::{File, Filesystem, tar::TarFilesystem},
     },
     alloc::{collections::BTreeMap, format, string::String, vec::Vec},
     plugins_api::util::parse_hex_prefix,
-    serde::{de::Error as _, Deserialize, Deserializer},
+    serde::{Deserialize, Deserializer, de::Error as _},
 };
 
 #[derive(Debug, thiserror::Error, displaydoc::Display)]

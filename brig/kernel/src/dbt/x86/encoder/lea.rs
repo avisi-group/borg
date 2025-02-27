@@ -1,11 +1,11 @@
 use {
     crate::dbt::x86::encoder::{
-        memory_operand_to_iced, Operand,
+        Operand,
         OperandKind::{Memory as M, Register as R},
         Register::PhysicalRegister as PHYS,
-        Width,
+        Width, memory_operand_to_iced,
     },
-    iced_x86::code_asm::{qword_ptr, AsmMemoryOperand, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr},
 };
 
 pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {

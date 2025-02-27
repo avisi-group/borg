@@ -2,7 +2,7 @@ use {
     alloc::{collections::BTreeMap, string::String, sync::Arc},
     core::{
         fmt::Display,
-        mem::{size_of, MaybeUninit},
+        mem::{MaybeUninit, size_of},
         slice,
     },
     plugins_api::guest::Device,

@@ -3,12 +3,12 @@
 
 use {
     crate::{
-        boom::{
-            passes::Pass, Ast, Bit, Expression, Literal, Operation, Size, Statement, Type, Value,
-        },
         DELETED_CALLS,
+        boom::{
+            Ast, Bit, Expression, Literal, Operation, Size, Statement, Type, Value, passes::Pass,
+        },
     },
-    common::{intern::InternedString, HashMap, HashSet},
+    common::{HashMap, HashSet, intern::InternedString},
     core::panic,
     num_bigint::BigInt,
     once_cell::sync::Lazy,

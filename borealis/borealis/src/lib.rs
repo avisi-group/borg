@@ -3,6 +3,7 @@
 use {
     crate::{
         boom::{
+            Ast,
             passes::{
                 builtin_fns::HandleBuiltinFunctions, constant_propogation::ConstantPropogation,
                 cycle_finder::CycleFinder, destruct_composites::DestructComposites,
@@ -10,7 +11,6 @@ use {
                 remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
                 remove_units::RemoveUnits,
             },
-            Ast,
         },
         rudder::{
             opt::{self, OptLevel},
@@ -18,6 +18,7 @@ use {
         },
     },
     common::{
+        HashMap, HashSet,
         intern::InternedString,
         rudder::{
             block::Block,
@@ -26,7 +27,6 @@ use {
             statement::Statement,
             types::Type,
         },
-        HashMap, HashSet,
     },
     deepsize::DeepSizeOf,
     errctx::PathCtx,
@@ -39,7 +39,7 @@ use {
         types::{ArchivedListVec, ListVec},
     },
     std::{
-        fs::{create_dir_all, File},
+        fs::{File, create_dir_all},
         io::{BufRead, BufReader, Write},
         path::{Path, PathBuf},
     },
@@ -195,7 +195,8 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     //         .get(&InternedString::from_static("HighestSetBit"))
     //         .unwrap();
     //     rudder::dot::render(
-    //         &mut create_file_buffered(dump_ir.unwrap().join("highestsetbit.dot")).unwrap(),
+    //         &mut
+    // create_file_buffered(dump_ir.unwrap().join("highestsetbit.dot")).unwrap(),
     //         func.arena(),
     //         func.entry_block(),
     //     )

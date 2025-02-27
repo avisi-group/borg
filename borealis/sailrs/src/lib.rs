@@ -3,7 +3,7 @@
 use {
     crate::{error::Error, ffi::run_sail, json::ModelConfig, runtime::RT, types::ListVec},
     byte_unit::{AdjustedByte, Byte},
-    color_eyre::{eyre::WrapErr, Result},
+    color_eyre::{Result, eyre::WrapErr},
     errctx::PathCtx,
     log::trace,
     ocaml::FromValue,

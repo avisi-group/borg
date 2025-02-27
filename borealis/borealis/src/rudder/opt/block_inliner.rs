@@ -1,11 +1,11 @@
 use common::{
+    HashMap,
     arena::Ref,
     rudder::{
         block::Block,
         function::Function,
-        statement::{import_statement, Statement},
+        statement::{Statement, import_statement},
     },
-    HashMap,
 };
 
 const INLINE_SIZE_THRESHOLD: usize = 5;

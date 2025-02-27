@@ -1,7 +1,7 @@
 use {
     crate::{
         devices::SharedDevice,
-        fs::{tar::TarFilesystem, File, Filesystem},
+        fs::{File, Filesystem, tar::TarFilesystem},
         plugins::{host::Host, shared_object::SharedObject},
     },
     alloc::collections::BTreeMap,

@@ -3,12 +3,12 @@
 use {
     crate::{
         jib_ast::{
-            visitor::Visitor, CReturn, Definition, DefinitionAux, Expression, Instruction,
-            InstructionAux, Name, Type, TypeDefinition, Value,
+            CReturn, Definition, DefinitionAux, Expression, Instruction, InstructionAux, Name,
+            Type, TypeDefinition, Value, visitor::Visitor,
         },
         sail_ast::Identifier,
     },
-    common::{intern::InternedString, HashSet},
+    common::{HashSet, intern::InternedString},
     std::{
         io::Write,
         rc::Rc,

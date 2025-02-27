@@ -1,9 +1,9 @@
 use {
     crate::boom::{
-        control_flow::Terminator, passes::Pass, Ast, Expression, Literal, Parameter, Statement,
-        Type, Value,
+        Ast, Expression, Literal, Parameter, Statement, Type, Value, control_flow::Terminator,
+        passes::Pass,
     },
-    common::{intern::InternedString, HashSet},
+    common::{HashSet, intern::InternedString},
     sailrs::shared::Shared,
 };
 

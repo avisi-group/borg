@@ -7,7 +7,7 @@ use {
         fmt::{self, Debug},
     },
     iced_x86::{Formatter, Instruction},
-    x86_64::{structures::paging::PageTableFlags, VirtAddr},
+    x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 
 pub mod emitter;

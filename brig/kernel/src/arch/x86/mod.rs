@@ -1,15 +1,15 @@
 use {
     crate::{
         arch::x86::memory::PHYSICAL_MEMORY_OFFSET,
-        devices::{self, acpi, lapic, Bus},
+        devices::{self, Bus, acpi, lapic},
     },
     bootloader_api::BootInfo,
     core::fmt::Display,
     log::trace,
-    x86::controlregs::{cr0, cr0_write, cr4, cr4_write, Cr0, Cr4},
+    x86::controlregs::{Cr0, Cr4, cr0, cr0_write, cr4, cr4_write},
     x86_64::{
-        registers::model_specific::{Efer, EferFlags},
         PhysAddr, VirtAddr,
+        registers::model_specific::{Efer, EferFlags},
     },
 };
 

@@ -1,7 +1,7 @@
 use {
     crate::{
         devices::manager::SharedDeviceManager,
-        fs::{tar::TarFilesystem, File, Filesystem},
+        fs::{File, Filesystem, tar::TarFilesystem},
         guest::memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},

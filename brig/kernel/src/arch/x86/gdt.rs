@@ -2,8 +2,9 @@ use {
     core::ptr::addr_of,
     spin::Once,
     x86_64::{
+        VirtAddr,
         instructions::{
-            segmentation::{Segment, CS},
+            segmentation::{CS, Segment},
             tables::load_tss,
         },
         registers::segmentation::{DS, ES, FS, GS, SS},
@@ -11,7 +12,6 @@ use {
             gdt::{Descriptor, GlobalDescriptorTable, SegmentSelector},
             tss::TaskStateSegment,
         },
-        VirtAddr,
     },
 };
 

@@ -7,9 +7,9 @@
 
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock,
-        passes::{any::AnyExt, Pass},
         Ast, Expression, Statement, Type, Value,
+        control_flow::ControlFlowBlock,
+        passes::{Pass, any::AnyExt},
     },
     common::HashMap,
     sailrs::shared::Shared,

@@ -3,12 +3,12 @@ use {
         arena::Ref,
         intern::InternedString,
         rudder::{
+            Model,
             block::Block,
             constant_value::ConstantValue,
             function::Function,
             statement::Statement,
             types::{PrimitiveType, Type},
-            Model,
         },
     },
     std::fmt::Display,

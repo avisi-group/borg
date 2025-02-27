@@ -11,7 +11,7 @@ use {
     log::info,
     sailrs::shared::Shared,
     std::{
-        fs::{create_dir_all, File},
+        fs::{File, create_dir_all},
         path::PathBuf,
     },
 };

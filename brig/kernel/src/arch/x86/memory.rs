@@ -1,5 +1,5 @@
 use {
-    alloc::alloc::{alloc_zeroed, Global},
+    alloc::alloc::{Global, alloc_zeroed},
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
     byte_unit::{Byte, UnitType},
@@ -9,13 +9,13 @@ use {
         ptr::NonNull,
     },
     x86_64::{
+        PhysAddr, VirtAddr,
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
-            mapper::{MappedFrame, TranslateResult},
             FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame,
             Size4KiB, Translate,
+            mapper::{MappedFrame, TranslateResult},
         },
-        PhysAddr, VirtAddr,
     },
 };
 

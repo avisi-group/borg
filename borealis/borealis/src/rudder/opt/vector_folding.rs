@@ -4,7 +4,7 @@ use common::{
         block::Block,
         constant_value::ConstantValue,
         function::Function,
-        statement::{build_at, cast_at, BinaryOperationKind, Location, Statement},
+        statement::{BinaryOperationKind, Location, Statement, build_at, cast_at},
         types::Type,
     },
 };

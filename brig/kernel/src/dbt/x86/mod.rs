@@ -1,20 +1,20 @@
 use {
     crate::dbt::{
+        Translation,
         emitter::Emitter,
         x86::{
             emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
             encoder::{Instruction, Opcode, OperandKind},
             register_allocator::naive::FreshAllocator,
         },
-        Translation,
     },
     alloc::{collections::VecDeque, rc::Rc, vec::Vec},
     common::{
-        arena::{Arena, Ref},
         HashMap, HashSet,
+        arena::{Arena, Ref},
     },
     core::{cell::RefCell, fmt::Debug},
-    iced_x86::code_asm::{qword_ptr, rax, AsmMemoryOperand, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr, rax},
 };
 
 pub mod emitter;

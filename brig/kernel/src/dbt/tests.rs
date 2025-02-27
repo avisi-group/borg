@@ -1,21 +1,20 @@
 use {
     crate::dbt::{
-        bit_insert,
+        Translation, bit_insert,
         emitter::{Emitter, Type},
         init_register_file,
-        interpret::{interpret, Value},
+        interpret::{Value, interpret},
         models::{self},
         translate::translate,
         x86::{
+            X86TranslationContext,
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind, X86Emitter,
             },
-            X86TranslationContext,
         },
-        Translation,
     },
     alloc::boxed::Box,
-    common::{mask::mask, HashMap},
+    common::{HashMap, mask::mask},
     proc_macro_lib::ktest,
 };
 
@@ -2477,7 +2476,6 @@ fn clz() {
 
         *x9 = 0x1;
 
-        log::warn!("{translation:?}");
         translation.execute(register_file_ptr);
 
         assert_eq!(*x9, 63);

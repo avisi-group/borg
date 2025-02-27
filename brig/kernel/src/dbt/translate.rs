@@ -9,14 +9,14 @@ use {
     },
     alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
     common::{
+        HashMap,
         arena::{Arena, Ref},
         intern::InternedString,
         rudder::{
-            self, block::Block, constant_value::ConstantValue, function::Function,
-            statement::Statement, types::PrimitiveType, Model, RegisterCacheType,
+            self, Model, RegisterCacheType, block::Block, constant_value::ConstantValue,
+            function::Function, statement::Statement, types::PrimitiveType,
         },
         width_helpers::unsigned_smallest_width_of_value,
-        HashMap,
     },
     core::{
         cmp::max,
@@ -569,7 +569,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                             StatementResult::Data(None)
                         } else {
-                            panic!("attempting to write non-constant value to cacheable register {name:?}");
+                            panic!(
+                                "attempting to write non-constant value to cacheable register {name:?}"
+                            );
                         }
                     }
                     RegisterCacheType::None | RegisterCacheType::Read => {

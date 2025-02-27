@@ -2,7 +2,7 @@ use {
     crate::{arch::x86::memory::HEAP_ALLOCATOR, guest::register_device_factory, print},
     alloc::{borrow::ToOwned, boxed::Box},
     core::{alloc::GlobalAlloc, panic::PanicInfo},
-    plugins_api::{guest::DeviceFactory, PluginHost},
+    plugins_api::{PluginHost, guest::DeviceFactory},
 };
 
 pub struct Host;

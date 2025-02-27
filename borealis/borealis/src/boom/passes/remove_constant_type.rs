@@ -1,5 +1,5 @@
 use {
-    crate::boom::{passes::Pass, Ast, Size, Statement, Type},
+    crate::boom::{Ast, Size, Statement, Type, passes::Pass},
     common::width_helpers::signed_smallest_width_of_value,
     sailrs::shared::Shared,
 };

@@ -1,8 +1,8 @@
 use {
     common::{
+        HashMap,
         arena::{Arena, Ref},
         rudder::block::Block,
-        HashMap,
     },
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},
     std::io,

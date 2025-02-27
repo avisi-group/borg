@@ -4,15 +4,15 @@ use {
         arch::x86::memory::{PhysAddrExt, VirtualMemoryArea},
         devices::virtio::probe_virtio_block,
     },
-    acpi::{mcfg::PciConfigEntry, PciConfigRegions},
+    acpi::{PciConfigRegions, mcfg::PciConfigEntry},
     log::trace,
     phf::phf_map,
     virtio_drivers::transport::pci::bus::{
         BarInfo, Cam, DeviceFunction, MemoryBarType, MmioCam, PciRoot,
     },
     x86_64::{
-        structures::paging::{Page, PageSize, PageTableFlags, PhysFrame, Size4KiB},
         PhysAddr,
+        structures::paging::{Page, PageSize, PageTableFlags, PhysFrame, Size4KiB},
     },
 };
 

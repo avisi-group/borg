@@ -5,7 +5,7 @@ use {
     },
     log::trace,
     spin::{Mutex, Once},
-    x2apic::lapic::{xapic_base, LocalApicBuilder, TimerDivide, TimerMode},
+    x2apic::lapic::{LocalApicBuilder, TimerDivide, TimerMode, xapic_base},
     x86_64::PhysAddr,
 };
 

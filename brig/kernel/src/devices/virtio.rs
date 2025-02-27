@@ -2,7 +2,7 @@ use {
     crate::{
         arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
         devices::{
-            manager::SharedDeviceManager, pcie::allocate_bars, BlockDevice, Device, SharedDevice,
+            BlockDevice, Device, SharedDevice, manager::SharedDeviceManager, pcie::allocate_bars,
         },
     },
     alloc::{
@@ -15,10 +15,10 @@ use {
     log::trace,
     spin::Mutex,
     virtio_drivers::{
-        device::blk::{VirtIOBlk, SECTOR_SIZE},
+        device::blk::{SECTOR_SIZE, VirtIOBlk},
         transport::pci::{
-            bus::{Command, DeviceFunction, MmioCam, PciRoot},
             PciTransport,
+            bus::{Command, DeviceFunction, MmioCam, PciRoot},
         },
     },
     x86_64::{PhysAddr, VirtAddr},

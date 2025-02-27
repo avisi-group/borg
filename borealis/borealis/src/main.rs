@@ -1,5 +1,5 @@
 use {
-    borealis::{load_model, sail_to_brig, GenerationMode},
+    borealis::{GenerationMode, load_model, sail_to_brig},
     clap::Parser,
     color_eyre::eyre::Result,
     log::info,

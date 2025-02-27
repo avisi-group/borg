@@ -1,6 +1,6 @@
 use {
     crate::{
-        arch::{x86::MachineContext, PAGE_SIZE},
+        arch::{PAGE_SIZE, x86::MachineContext},
         scheduler::Scheduler,
     },
     alloc::{

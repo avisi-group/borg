@@ -1,8 +1,8 @@
 use {
     crate::boom::{
+        Ast, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
         control_flow::{ControlFlowBlock, Terminator},
         passes::Pass,
-        Ast, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
     },
     common::intern::InternedString,
     rayon::iter::ParallelIterator,

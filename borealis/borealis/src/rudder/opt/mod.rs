@@ -1,5 +1,5 @@
 use {
-    common::rudder::{function::Function, Model},
+    common::rudder::{Model, function::Function},
     log::trace,
     rayon::iter::{IntoParallelRefMutIterator, ParallelIterator},
 };

@@ -1,17 +1,17 @@
 use {
     crate::arch::{
-        x86::memory::{AlignedAllocator, VirtualMemoryArea},
         PAGE_SIZE,
+        x86::memory::{AlignedAllocator, VirtualMemoryArea},
     },
     alloc::{boxed::Box, vec::Vec},
     core::pin::Pin,
     elfloader::{
-        arch::x86_64::RelocationTypes::{R_AMD64_64, R_AMD64_GLOB_DAT, R_AMD64_RELATIVE},
-        xmas_elf::program,
         ElfBinary, ElfLoader, ElfLoaderErr, Flags, ProgramHeader, RelocationEntry, RelocationType,
         VAddr,
+        arch::x86_64::RelocationTypes::{R_AMD64_64, R_AMD64_GLOB_DAT, R_AMD64_RELATIVE},
+        xmas_elf::program,
     },
-    x86_64::{structures::paging::PageTableFlags, VirtAddr},
+    x86_64::{VirtAddr, structures::paging::PageTableFlags},
 };
 
 pub struct SharedObject {

@@ -1,4 +1,5 @@
 use common::{
+    HashMap, HashSet,
     arena::{Arena, Ref},
     intern::InternedString,
     rudder::{
@@ -6,7 +7,6 @@ use common::{
         function::{Function, Symbol},
         statement::Statement,
     },
-    HashMap, HashSet,
 };
 
 pub struct SymbolUseAnalysis {

@@ -1,25 +1,25 @@
 use {
     crate::{
-        boom::{self, bits_to_int, passes::destruct_composites, Expression},
+        boom::{self, Expression, bits_to_int, passes::destruct_composites},
         rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
     },
     common::{
+        HashMap,
         arena::{Arena, Ref},
         id::Id,
         intern::InternedString,
         rudder::{
+            Model, RegisterCacheType, RegisterDescriptor,
             block::Block,
             constant_value::ConstantValue,
             function::{Function, Symbol},
             statement::{
-                build, cast, BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
-                TernaryOperationKind, UnaryOperationKind,
+                BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
+                TernaryOperationKind, UnaryOperationKind, build, cast,
             },
             types::{PrimitiveType, Type},
-            Model, RegisterCacheType, RegisterDescriptor,
         },
         width_helpers::signed_smallest_width_of_value,
-        HashMap,
     },
     core::panic,
     log::trace,
@@ -454,7 +454,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         &mut self,
         name: InternedString,
         args: &[Ref<Statement>],
-        expression: &Option<boom::Expression>, // occasionally needed to find destination type of function
+        expression: &Option<boom::Expression>, /* occasionally needed to find destination type
+                                                * of function */
     ) -> Option<Ref<Statement>> {
         match name.as_ref() {
             "%i64->%i" => {
@@ -1203,7 +1204,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                         width: args[1].clone(),
                     },
                 )),
-                // used to fix SignExtend0(..., esize) in execute_FCVTZU_Z_P_Z_D2X. esize is constant 64, and it's extending from a bv64 to a bv64?
+                // used to fix SignExtend0(..., esize) in execute_FCVTZU_Z_P_Z_D2X. esize is
+                // constant 64, and it's extending from a bv64 to a bv64?
                 // todo: check that it's not doing any extra logic we need to replicate
                 (Type::Primitive(PrimitiveType::UnsignedInteger(src_width)), _) => {
                     // target width is not a constant

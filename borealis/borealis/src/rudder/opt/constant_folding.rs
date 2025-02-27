@@ -112,7 +112,8 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                     BinaryOperationKind::Multiply => match rhs {
                         ConstantValue::UnsignedInteger(rhs_value) => {
                             if rhs_value == 8 {
-                                //stmt.get_mut(arena).replace_kind(Statement::ShiftOperation { kind: (), value: (), amount: () });
+                                //stmt.get_mut(arena).replace_kind(Statement::ShiftOperation {
+                                // kind: (), value: (), amount: () });
                                 false
                             } else {
                                 false

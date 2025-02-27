@@ -1,7 +1,7 @@
 use {
     crate::{
         arch::x86::memory::PhysAddrExt,
-        devices::{pcie::PCIEBus, Bus},
+        devices::{Bus, pcie::PCIEBus},
     },
     acpi::{AcpiHandler, AcpiTables, PciConfigRegions, PhysicalMapping},
     core::ptr::NonNull,

@@ -1,10 +1,10 @@
 use {
     crate::dbt::x86::{emitter::X86Block, encoder::width::Width},
-    common::{arena::Ref, HashMap},
+    common::{HashMap, arena::Ref},
     core::fmt::{Debug, Display, Formatter},
     displaydoc::Display,
     iced_x86::code_asm::{
-        AsmMemoryOperand, AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8, CodeAssembler,
+        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
         CodeLabel,
     },
 };
@@ -205,7 +205,7 @@ impl PhysicalRegister {
 impl From<&PhysicalRegister> for AsmRegister64 {
     fn from(phys: &PhysicalRegister) -> Self {
         use iced_x86::code_asm::{
-            r10, r11, r12, r13, r14, r15, r8, r9, rax, rbp, rbx, rcx, rdi, rdx, rsi, rsp,
+            r8, r9, r10, r11, r12, r13, r14, r15, rax, rbp, rbx, rcx, rdi, rdx, rsi, rsp,
         };
 
         match phys {
@@ -238,7 +238,7 @@ impl From<PhysicalRegister> for AsmRegister64 {
 impl From<&PhysicalRegister> for AsmRegister8 {
     fn from(phys: &PhysicalRegister) -> Self {
         use iced_x86::code_asm::{
-            al, bl, bpl, cl, dil, dl, r10b, r11b, r12b, r13b, r14b, r15b, r8b, r9b, sil, spl,
+            al, bl, bpl, cl, dil, dl, r8b, r9b, r10b, r11b, r12b, r13b, r14b, r15b, sil, spl,
         };
 
         match phys {
@@ -271,7 +271,7 @@ impl From<PhysicalRegister> for AsmRegister8 {
 impl From<&PhysicalRegister> for AsmRegister16 {
     fn from(phys: &PhysicalRegister) -> Self {
         use iced_x86::code_asm::{
-            ax, bp, bx, cx, di, dx, r10w, r11w, r12w, r13w, r14w, r15w, r8w, r9w, si, sp,
+            ax, bp, bx, cx, di, dx, r8w, r9w, r10w, r11w, r12w, r13w, r14w, r15w, si, sp,
         };
 
         match phys {
@@ -298,7 +298,7 @@ impl From<&PhysicalRegister> for AsmRegister16 {
 impl From<&PhysicalRegister> for AsmRegister32 {
     fn from(phys: &PhysicalRegister) -> Self {
         use iced_x86::code_asm::{
-            eax, ebp, ebx, ecx, edi, edx, esi, esp, r10d, r11d, r12d, r13d, r14d, r15d, r8d, r9d,
+            eax, ebp, ebx, ecx, edi, edx, esi, esp, r8d, r9d, r10d, r11d, r12d, r13d, r14d, r15d,
         };
 
         match phys {

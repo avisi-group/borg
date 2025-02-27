@@ -1,9 +1,9 @@
 use {
     crate::rudder::analysis,
     common::{
+        Entry, HashMap,
         arena::{Arena, Ref},
         rudder::{block::Block, function::Function, statement::Statement},
-        Entry, HashMap,
     },
     log::trace,
 };

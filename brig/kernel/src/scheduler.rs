@@ -2,7 +2,7 @@ use {
     crate::{
         arch::CoreStorage,
         devices::lapic::LAPIC,
-        tasks::{create_idle_task, Task, TaskControlBlock},
+        tasks::{Task, TaskControlBlock, create_idle_task},
     },
     alloc::collections::LinkedList,
     log::trace,

@@ -1,5 +1,5 @@
 use {
-    ::x86::msr::{rdmsr, wrmsr, IA32_TSC_AUX},
+    ::x86::msr::{IA32_TSC_AUX, rdmsr, wrmsr},
     alloc::boxed::Box,
     bootloader_api::BootInfo,
     common::HashMap,

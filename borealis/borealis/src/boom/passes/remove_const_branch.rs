@@ -2,9 +2,9 @@
 
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::{any::AnyExt, Pass},
         Ast,
+        control_flow::{ControlFlowBlock, Terminator},
+        passes::{Pass, any::AnyExt},
     },
     common::HashSet,
     log::{debug, trace},

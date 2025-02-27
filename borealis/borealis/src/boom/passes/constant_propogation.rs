@@ -1,11 +1,11 @@
 use {
     crate::boom::{
-        control_flow::ControlFlowBlock,
-        passes::{any::AnyExt, Pass},
-        visitor::Visitor,
         Ast, Expression, Literal, Statement, Value,
+        control_flow::ControlFlowBlock,
+        passes::{Pass, any::AnyExt},
+        visitor::Visitor,
     },
-    common::{intern::InternedString, HashMap, HashSet},
+    common::{HashMap, HashSet, intern::InternedString},
     sailrs::shared::Shared,
 };
 
@@ -66,13 +66,14 @@ fn function_constant_propogation(entry_block: ControlFlowBlock) -> bool {
                                     )
                                 }
                                 (true, false) => {
-                                    // we are writing (again) to a variable we thought was constant, so it
-                                    // is not a constant
+                                    // we are writing (again) to a variable we thought was constant,
+                                    // so it is not a constant
                                     candidate_constants.remove(target);
                                     mutable_vars.insert(*target);
                                 }
                                 (false, true) => {
-                                    // known mutable being written to again, no-op
+                                    // known mutable being written to again,
+                                    // no-op
                                 }
                                 (false, false) => {
                                     // new variable written to for the first time

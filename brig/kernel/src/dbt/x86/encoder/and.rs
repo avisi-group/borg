@@ -6,7 +6,7 @@ use {
         Width,
     },
     iced_x86::code_asm::{
-        AsmRegister16, AsmRegister32, AsmRegister64, AsmRegister8, CodeAssembler,
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
     },
 };
 

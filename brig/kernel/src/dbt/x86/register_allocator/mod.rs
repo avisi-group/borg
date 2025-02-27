@@ -1,7 +1,7 @@
 use {
     crate::dbt::x86::{
         encoder::{
-            width::Width, Instruction, MemoryScale, Opcode, Operand, PhysicalRegister, Register,
+            Instruction, MemoryScale, Opcode, Operand, PhysicalRegister, Register, width::Width,
         },
         register_allocator::naive::FreshAllocator, //solid_state::SolidStateRegisterAllocator,
     },
@@ -45,8 +45,8 @@ fn conflicted_physical_allocation() {
 fn shr_full() {
     use {
         crate::dbt::x86::{
-            register_allocator::{PhysicalRegister::*, Register::*},
             OperandKind::*,
+            register_allocator::{PhysicalRegister::*, Register::*},
         },
         Opcode::*,
     };

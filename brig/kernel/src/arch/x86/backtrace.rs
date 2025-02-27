@@ -2,7 +2,7 @@ use {
     crate::{arch::x86::memory::PhysAddrExt, qemu_exit},
     core::{arch::asm, slice},
     elf::{
-        endian::AnyEndian, parse::ParsingTable, string_table::StringTable, symbol::Symbol, ElfBytes,
+        ElfBytes, endian::AnyEndian, parse::ParsingTable, string_table::StringTable, symbol::Symbol,
     },
     spin::Once,
     x86_64::{PhysAddr, VirtAddr},

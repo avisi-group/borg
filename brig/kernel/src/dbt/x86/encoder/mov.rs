@@ -1,13 +1,13 @@
 use {
     crate::dbt::x86::encoder::{
-        memory_operand_to_iced, Operand,
+        Operand,
         OperandKind::{Immediate as I, Memory as M, Register as R},
         Register::PhysicalRegister as PHYS,
-        Width,
+        Width, memory_operand_to_iced,
     },
     iced_x86::code_asm::{
-        byte_ptr, dword_ptr, word_ptr, AsmMemoryOperand, AsmRegister16, AsmRegister32,
-        AsmRegister64, AsmRegister8, CodeAssembler,
+        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+        byte_ptr, dword_ptr, word_ptr,
     },
 };
 

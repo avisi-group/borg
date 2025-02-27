@@ -2,9 +2,9 @@
 
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::{any::AnyExt, Pass},
         Ast,
+        control_flow::{ControlFlowBlock, Terminator},
+        passes::{Pass, any::AnyExt},
     },
     common::HashSet,
     log::{debug, trace},
@@ -124,7 +124,9 @@ fn fold_graph(entry_block: ControlFlowBlock) -> bool {
                                     fallthrough: child.clone(),
                                 },
                                 (false, false) => {
-                                    panic!("neither child ({target}, {fallthrough}) of parent ({parent}) of current node ({current}) was current node");
+                                    panic!(
+                                        "neither child ({target}, {fallthrough}) of parent ({parent}) of current node ({current}) was current node"
+                                    );
                                 }
                             }
                         }

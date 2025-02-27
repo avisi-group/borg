@@ -1,14 +1,14 @@
 use {
     crate::boom::{self, control_flow::ControlFlowBlock},
     common::{
+        HashMap,
         intern::InternedString,
         rudder::{
             constant_value::ConstantValue,
             function::{Function, Symbol},
-            statement::{build, cast, BinaryOperationKind, ShiftOperationKind, Statement},
+            statement::{BinaryOperationKind, ShiftOperationKind, Statement, build, cast},
             types::Type,
         },
-        HashMap,
     },
     once_cell::sync::Lazy,
     sailrs::shared::Shared,

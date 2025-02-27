@@ -2,10 +2,10 @@
 
 use {
     crate::boom::{
-        control_flow::{dot, ControlFlowBlock},
         Expression, Statement, Value,
+        control_flow::{ControlFlowBlock, dot},
     },
-    common::{intern::InternedString, HashSet},
+    common::{HashSet, intern::InternedString},
     itertools::Itertools,
     log::trace,
     sailrs::shared::Shared,
@@ -92,11 +92,7 @@ impl ControlFlowBlock {
                     return None;
                 };
 
-                if assign == ident {
-                    Some(value)
-                } else {
-                    None
-                }
+                if assign == ident { Some(value) } else { None }
             })
             .at_most_one()
             .unwrap_or_else(|e| panic!("Multiple assignments to {ident} found: {e}"))

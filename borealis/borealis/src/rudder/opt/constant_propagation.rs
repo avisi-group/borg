@@ -1,9 +1,9 @@
 use {
     crate::rudder::analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
     common::{
+        HashMap,
         arena::{Arena, Ref},
         rudder::{block::Block, function::Function, statement::Statement},
-        HashMap,
     },
     log::trace,
 };

@@ -10,10 +10,10 @@
 
 use {
     crate::boom::{
-        visitor::{Visitor, Walkable},
         Literal, Statement, Value,
+        visitor::{Visitor, Walkable},
     },
-    common::{id::Id, intern::InternedString, HashSet},
+    common::{HashSet, id::Id, intern::InternedString},
     itertools::Itertools,
     sailrs::shared::{Shared, Weak},
     std::{

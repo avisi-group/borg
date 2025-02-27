@@ -2,12 +2,11 @@
 
 use {
     crate::boom::{
-        self,
-        control_flow::{builder::ControlFlowGraphBuilder, ControlFlowBlock},
+        self, Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Type,
+        control_flow::{ControlFlowBlock, builder::ControlFlowGraphBuilder},
         convert::sail_ast::Identifier,
-        Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Type,
     },
-    common::{intern::InternedString, HashMap},
+    common::{HashMap, intern::InternedString},
     itertools::Itertools,
     sailrs::{
         jib_ast::{self, CReturn},

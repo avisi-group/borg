@@ -6,9 +6,9 @@ use {
     deepsize::DeepSizeOf,
     ocaml::{FromValue, Int, ToValue, Value},
     rkyv::{
+        Place,
         rancor::Fallible,
         vec::{ArchivedVec, VecResolver},
-        Place,
     },
     std::str::FromStr,
 };

@@ -5,8 +5,8 @@ extern crate alloc;
 use {
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     plugins_rt::api::{
-        guest::{Device, DeviceFactory, Environment},
         PluginHeader, PluginHost,
+        guest::{Device, DeviceFactory, Environment},
     },
 };
 

@@ -1,10 +1,10 @@
 use {
     crate::rudder::analysis::loopy::LoopAnalysis,
     common::{
+        HashMap,
         arena::Ref,
         intern::InternedString,
         rudder::{block::Block, function::Function, statement::Statement},
-        HashMap,
     },
     log::trace,
 };

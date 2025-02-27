@@ -1,8 +1,8 @@
 use {
-    cargo_metadata::{diagnostic::DiagnosticLevel, Artifact, Message, TargetKind},
+    cargo_metadata::{Artifact, Message, TargetKind, diagnostic::DiagnosticLevel},
     clap::{Parser, Subcommand},
     common::TestConfig,
-    elf::{endian::AnyEndian, section::SectionHeader, ElfBytes},
+    elf::{ElfBytes, endian::AnyEndian, section::SectionHeader},
     itertools::Itertools,
     ovmf_prebuilt::{Arch, FileType, Source},
     std::{
@@ -64,7 +64,9 @@ fn main() -> color_eyre::Result<()> {
     let cli = Cli::parse();
 
     if cli.no_build {
-        todo!("use existing artifacts somehow, useful for building on one machine and running on another");
+        todo!(
+            "use existing artifacts somehow, useful for building on one machine and running on another"
+        );
     }
 
     let artifacts = build_cargo("../brig", cli.release, cli.verbose);

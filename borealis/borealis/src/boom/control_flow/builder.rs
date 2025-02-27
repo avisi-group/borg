@@ -1,9 +1,9 @@
 use {
     crate::boom::{
-        control_flow::{ControlFlowBlock, Terminator},
         Literal, Statement, Value,
+        control_flow::{ControlFlowBlock, Terminator},
     },
-    common::{intern::InternedString, HashMap},
+    common::{HashMap, intern::InternedString},
     sailrs::shared::{Shared, SharedKey},
 };
 
@@ -192,7 +192,9 @@ impl ControlFlowGraphBuilder {
             .resolved_blocks
             .insert(unresolved.clone().into(), resolved.clone())
         {
-            panic!("unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}")
+            panic!(
+                "unresolved control flow block {unresolved:?} already resolved {block:?} when inserting {resolved:?}"
+            )
         }
 
         resolved.set_label(unresolved.get().label);
@@ -271,7 +273,9 @@ impl MaybeUnresolvedControlFlowBlock {
 
     fn set_terminator(&mut self, terminator: MaybeUnresolvedTerminator) {
         if self.has_terminator() {
-            panic!("attempted to set terminator to block with terminator: \n{self:#?}\n{terminator:#?}")
+            panic!(
+                "attempted to set terminator to block with terminator: \n{self:#?}\n{terminator:#?}"
+            )
         } else {
             self.terminator = terminator;
         }
