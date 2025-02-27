@@ -20,6 +20,7 @@ use {
     },
     core::{
         cmp::max,
+        hash::{Hash, Hasher},
         sync::atomic::{AtomicUsize, Ordering},
     },
 };
@@ -33,13 +34,13 @@ enum JumpKind {
     Static {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: BTreeMap<InternedString, bool>,
+        variables: BTreeMap<InternedString, LocalVariable>,
     },
     // branch with non-constant condition
     Dynamic {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: BTreeMap<InternedString, bool>,
+        variables: BTreeMap<InternedString, LocalVariable>,
     },
 }
 
@@ -51,8 +52,16 @@ enum StatementResult {
 
 #[derive(Debug, Clone)]
 enum ControlFlow {
-    Jump(Ref<Block>, Ref<X86Block>, BTreeMap<InternedString, bool>),
-    Branch(Ref<Block>, Ref<Block>, BTreeMap<InternedString, bool>),
+    Jump(
+        Ref<Block>,
+        Ref<X86Block>,
+        BTreeMap<InternedString, LocalVariable>,
+    ),
+    Branch(
+        Ref<Block>,
+        Ref<Block>,
+        BTreeMap<InternedString, LocalVariable>,
+    ),
     Panic,
     Return,
 }
@@ -89,17 +98,37 @@ enum LocalVariable {
     },
 }
 
+// we only care if the variable is virtual or on the stack?
+impl Hash for LocalVariable {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+    }
+}
+
+impl PartialEq for LocalVariable {
+    fn eq(&self, other: &LocalVariable) -> bool {
+        core::mem::discriminant(self).eq(&core::mem::discriminant(other))
+    }
+}
+
+impl Eq for LocalVariable {}
+
 struct FunctionTranslator<'m, 'e, 'c> {
     /// The model we are translating guest code for
     model: &'m Model,
     /// Name of the function being translated
     function_name: InternedString,
 
-    dynamic_blocks: HashMap<(Ref<Block>, BTreeMap<InternedString, bool>), (Ref<X86Block>, bool)>,
+    dynamic_blocks:
+        HashMap<(Ref<Block>, BTreeMap<InternedString, LocalVariable>), (Ref<X86Block>, bool)>,
     static_blocks: HashMap<Ref<Block>, Vec<Ref<X86Block>>>,
 
-    /// Function local variables
-    variables: HashMap<InternedString, LocalVariable>,
+    entry_variables: BTreeMap<InternedString, LocalVariable>,
+
+    // don't re-promote to a different location
+    promoted_locations: HashMap<InternedString, usize>,
+
+    return_value: LocalVariable,
 
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize>,
@@ -127,7 +156,11 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             function_name: InternedString::from(function),
             dynamic_blocks: HashMap::default(),
             static_blocks: HashMap::default(),
-            variables: HashMap::default(),
+            entry_variables: BTreeMap::new(),
+            promoted_locations: HashMap::default(),
+            return_value: LocalVariable::Virtual {
+                symbol: emitter.ctx_mut().create_symbol(),
+            },
             current_stack_offset,
             emitter,
             register_file_ptr,
@@ -140,10 +173,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             .unwrap_or_else(|| panic!("function named {function:?} not found"));
 
         // set up symbols for local variables
-        let locals = function.local_variables();
 
-        locals.iter().for_each(|symbol| {
-            celf.variables.insert(
+        function.local_variables().iter().for_each(|symbol| {
+            celf.entry_variables.insert(
                 symbol.name(),
                 LocalVariable::Virtual {
                     symbol: celf.emitter.ctx_mut().create_symbol(),
@@ -163,17 +195,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 let var = LocalVariable::Virtual {
                     symbol: celf.emitter.ctx_mut().create_symbol(),
                 };
-                celf.variables.insert(parameter.name(), var.clone());
+                celf.entry_variables.insert(parameter.name(), var.clone());
                 celf.write_variable(var, argument.clone());
             });
-
-        // and the return value
-        celf.variables.insert(
-            "borealis_fn_return_value".into(),
-            LocalVariable::Virtual {
-                symbol: celf.emitter.ctx_mut().create_symbol(),
-            },
-        );
 
         celf
     }
@@ -202,11 +226,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         block_queue.push_front(JumpKind::Static {
             rudder: function.entry_block(),
             x86: entry_x86,
-            variables: function
-                .parameters()
-                .into_iter()
-                .map(|s| (s.name(), false))
-                .collect(),
+            variables: self.entry_variables.clone(),
         });
 
         while let Some(block) = block_queue.pop_front() {
@@ -306,14 +326,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         log::debug!("finished translating {:?}", self.function_name);
 
         if function.return_type().is_some() {
-            Some(
-                self.read_variable(
-                    self.variables
-                        .get(&InternedString::from_static("borealis_fn_return_value"))
-                        .unwrap()
-                        .clone(),
-                ),
-            )
+            Some(self.read_variable(self.return_value.clone()))
         } else {
             None
         }
@@ -324,7 +337,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         function: &Function,
         block_ref: Ref<Block>,
         is_dynamic: bool,
-        mut live_ins: BTreeMap<InternedString, bool>,
+        mut variables: BTreeMap<InternedString, LocalVariable>,
     ) -> ControlFlow {
         let block = block_ref.get(function.arena());
 
@@ -338,31 +351,31 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 block_ref,
                 function,
                 block.arena(),
-                &mut live_ins,
+                &mut variables,
             ) {
                 StatementResult::Data(Some(value)) => {
-                    log::trace!(
-                        "{} {} = {:?}",
-                        s,
-                        s.get(block.arena()).to_string(block.arena()),
-                        value.kind(),
-                    );
+                    // log::trace!(
+                    //     "{} {} = {:?}",
+                    //     s,
+                    //     s.get(block.arena()).to_string(block.arena()),
+                    //     value.kind(),
+                    // );
                     statement_value_store.insert(*s, value);
                 }
                 StatementResult::Data(None) => {
-                    log::trace!(
-                        "{} {} = ()",
-                        s,
-                        s.get(block.arena()).to_string(block.arena()),
-                    );
+                    // log::trace!(
+                    //     "{} {} = ()",
+                    //     s,
+                    //     s.get(block.arena()).to_string(block.arena()),
+                    // );
                 }
                 StatementResult::ControlFlow(block_result) => {
-                    log::trace!(
-                        "{} {} = {:?}",
-                        s,
-                        s.get(block.arena()).to_string(block.arena()),
-                        block_result
-                    );
+                    // log::trace!(
+                    //     "{} {} = {:?}",
+                    //     s,
+                    //     s.get(block.arena()).to_string(block.arena()),
+                    //     block_result
+                    // );
                     return block_result;
                 }
             }
@@ -383,7 +396,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         block: Ref<Block>,
         function: &Function,
         arena: &Arena<Statement>,
-        live_ins: &mut BTreeMap<InternedString, bool>,
+        variables: &mut BTreeMap<InternedString, LocalVariable>,
     ) -> StatementResult {
         //        log::debug!("translate stmt: {statement:?}");
 
@@ -422,18 +435,19 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 }))
             }
             Statement::ReadVariable { symbol } => {
+                let var = variables.get(&symbol.name()).unwrap().clone();
+
                 log::debug!(
-                    "reading var {} in block {:#x} in {:?}",
+                    "reading var {} in block {:#x} in {:?} = {:?}",
                     symbol.name(),
                     block.index(),
-                    self.function_name
+                    self.function_name,
+                    var
                 );
 
-                let var = self.variables.get(&symbol.name()).unwrap().clone();
                 StatementResult::Data(Some(self.read_variable(var)))
             }
             Statement::WriteVariable { symbol, value } => {
-                live_ins.insert(symbol.name(), is_dynamic);
                 log::debug!(
                     "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}",
                     symbol.name(),
@@ -444,9 +458,17 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 if is_dynamic {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
-                    match self.variables.get(&symbol.name()).unwrap() {
+                    match variables.get(&symbol.name()).unwrap() {
                         LocalVariable::Virtual { .. } => {
-                            let stack_offset = self.allocate_stack_offset(&symbol.typ());
+                            let stack_offset =
+                                if let Some(offset) = self.promoted_locations.get(&symbol.name()) {
+                                    *offset
+                                } else {
+                                    let offset = self.allocate_stack_offset(&symbol.typ());
+                                    self.promoted_locations.insert(symbol.name(), offset);
+                                    offset
+                                };
+
                             log::debug!(
                                 "promoting {:?} from virtual to stack @ {:#x} in block {:#x} in {:?}",
                                 symbol.name(),
@@ -455,7 +477,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                                 self.function_name,
                             );
 
-                            self.variables.insert(
+                            variables.insert(
                                 symbol.name(),
                                 LocalVariable::Stack {
                                     typ: emit_rudder_type(&symbol.typ()),
@@ -478,7 +500,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         }
                     }
                 }
-                let var = self.variables.get(&symbol.name()).unwrap().clone();
+                let var = variables.get(&symbol.name()).unwrap().clone();
 
                 let value = statement_values
                     .get(*value)
@@ -748,7 +770,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     .or_insert(alloc::vec![x86]);
 
                 self.emitter.jump(x86);
-                StatementResult::ControlFlow(ControlFlow::Jump(*target, x86, live_ins.clone()))
+                StatementResult::ControlFlow(ControlFlow::Jump(*target, x86, variables.clone()))
             }
             Statement::Branch {
                 condition,
@@ -773,7 +795,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                             StatementResult::ControlFlow(ControlFlow::Jump(
                                 *false_target,
                                 x86,
-                                live_ins.clone(),
+                                variables.clone(),
                             ))
                         } else {
                             let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
@@ -787,14 +809,14 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                             StatementResult::ControlFlow(ControlFlow::Jump(
                                 *true_target,
                                 x86,
-                                live_ins.clone(),
+                                variables.clone(),
                             ))
                         }
                     }
                     _ => {
                         let true_x86 = (*self
                             .dynamic_blocks
-                            .entry((*true_target, live_ins.clone()))
+                            .entry((*true_target, variables.clone()))
                             .or_insert_with(|| {
                                 (
                                     self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
@@ -804,7 +826,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         .0;
                         let false_x86 = (*self
                             .dynamic_blocks
-                            .entry((*false_target, live_ins.clone()))
+                            .entry((*false_target, variables.clone()))
                             .or_insert_with(|| {
                                 (
                                     self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
@@ -816,23 +838,19 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                         StatementResult::ControlFlow(ControlFlow::Branch(
                             *true_target,
                             *false_target,
-                            live_ins.clone(),
+                            variables.clone(),
                         ))
                     }
                 };
             }
             Statement::Return { value } => {
                 if let Some(value) = value {
-                    log::trace!("writing var borealis_fn_return_value");
-
-                    let var = self
-                        .variables
-                        .get(&InternedString::from_static("borealis_fn_return_value"))
-                        .unwrap()
-                        .clone();
-
                     let value = statement_values.get(*value).unwrap();
-                    self.write_variable(var, value);
+                    self.write_variable(self.return_value.clone(), value);
+                    log::trace!(
+                        "writing var borealis_fn_return_value: is dynamic {is_dynamic}, {:?}",
+                        self.return_value
+                    );
                 }
 
                 StatementResult::ControlFlow(ControlFlow::Return)

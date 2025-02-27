@@ -1858,7 +1858,7 @@ pub enum BinaryOperationKind {
     CompareGreaterThanOrEqual(X86NodeRef, X86NodeRef),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Hash)]
 pub enum UnaryOperationKind {
     Not(X86NodeRef),
     Negate(X86NodeRef),

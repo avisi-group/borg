@@ -1325,7 +1325,7 @@ fn _ispow2() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    log::debug!("{translation:?}");
+    // log::debug!("{translation:?}");
 
     unsafe {
         let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
@@ -2701,6 +2701,8 @@ fn highest_set_bit_dynamic() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
+
+    //   log::info!("{translation:?}");
 
     unsafe {
         let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;

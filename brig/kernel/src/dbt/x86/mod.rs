@@ -152,7 +152,12 @@ impl X86TranslationContext {
 
             let instrs = block.get(self.arena()).instructions();
 
-            let (last, rest) = instrs.split_last().unwrap();
+            let (last, rest) = instrs.split_last().unwrap_or_else(|| {
+                panic!(
+                    "block {:?} {block:?} was empty",
+                    label_map.get_mut(block).unwrap()
+                )
+            });
 
             // all but last
             for instr in rest {
