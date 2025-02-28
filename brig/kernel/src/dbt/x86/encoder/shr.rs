@@ -6,7 +6,9 @@ use {
         Register::PhysicalRegister as PHYS,
         Width,
     },
-    iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+    },
 };
 
 pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) {
@@ -22,6 +24,19 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
         ) => {
             assembler
                 .shr::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: I(amount), ..
+            },
+            Operand {
+                kind: R(PHYS(value)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .shr::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
                 .unwrap();
         }
         (

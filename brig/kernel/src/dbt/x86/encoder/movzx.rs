@@ -66,6 +66,9 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
             (Width::_8, Width::_64) => assembler
                 .movzx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                 .unwrap(),
+            (Width::_8, Width::_16) => assembler
+                .movzx::<AsmRegister16, AsmRegister8>(dst.into(), src.into())
+                .unwrap(),
             (Width::_16, Width::_32) => assembler
                 .movzx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
                 .unwrap(),

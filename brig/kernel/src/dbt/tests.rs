@@ -2797,3 +2797,42 @@ fn highest_set_bit_dynamic() {
         assert_eq!(*r0, 0);
     }
 }
+
+#[ktest]
+fn msr_daifclr() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  d50348ff        msr               daifclr, #0x8
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd50348ff, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+
+        translation.execute(register_file_ptr);
+        // todo: test more here
+    }
+}
