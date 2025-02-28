@@ -2027,6 +2027,42 @@ fn udiv() {
     }
 }
 
+// #[ktest]
+// fn to_real_const() {
+//     let model = models::get("aarch64").unwrap();
+
+//     let mut register_file = init_register_file(&*model);
+//     let register_file_ptr = register_file.as_mut_ptr();
+
+//     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     let i = emitter.constant(1, Type::Signed(64));
+
+//     let res = translate(&*model, "to_real", &[i], &mut emitter,
+// register_file_ptr);
+
+//     panic!("{res:?}")
+// }
+
+// #[ktest]
+// fn to_real_dyn() {
+//     let model = models::get("aarch64").unwrap();
+
+//     let mut register_file = init_register_file(&*model);
+//     let register_file_ptr = register_file.as_mut_ptr();
+
+//     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     let r = emitter.read_register(0, Type::Signed(64));
+
+//     let res = translate(&*model, "to_real", &[r], &mut emitter,
+// register_file_ptr);
+
+//     panic!("{res:?}")
+// }
+
 #[ktest]
 fn floor() {
     assert_eq!(0, harness(3, 4));

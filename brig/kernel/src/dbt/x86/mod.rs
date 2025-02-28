@@ -138,7 +138,7 @@ impl X86TranslationContext {
 
         log::trace!("encoding all blocks");
 
-        //  crate::println!("{}", dot::render(self.arena(), self.initial_block()));
+        //crate::println!("{}", dot::render(self.arena(), self.initial_block()));
 
         for (i, block) in all_blocks.iter().enumerate() {
             assembler

@@ -3,6 +3,7 @@
 #![feature(allocator_api)] // needed for pci config regions and alignedallocator
 #![feature(naked_functions)] // for interrupts with glorious purpose
 #![feature(btree_cursors)]
+#![feature(int_roundings)]
 #![allow(static_mut_refs)] // todo: fix me
 
 extern crate alloc;
