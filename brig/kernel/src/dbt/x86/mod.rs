@@ -17,6 +17,7 @@ use {
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr, rax},
 };
 
+pub mod dot;
 pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
@@ -136,6 +137,8 @@ impl X86TranslationContext {
         });
 
         log::trace!("encoding all blocks");
+
+        //  crate::println!("{}", dot::render(self.arena(), self.initial_block()));
 
         for (i, block) in all_blocks.iter().enumerate() {
             assembler
