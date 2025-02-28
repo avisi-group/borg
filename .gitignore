@@ -1,5 +1,8 @@
 *.rkyv
 *.trace
+*.graph
+*.dot
+*.svg
 /aarch64
 /ir
 /borealis/_sbuild

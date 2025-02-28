@@ -69,8 +69,52 @@ fn static_dynamic_chaos_smoke() {
     assert_eq!(run(1, 1, 0), (1, 1, 5));
 }
 
+// #[ktest]
+// fn num_of_feature_dynamic() {
+//     let model = &*models::get("aarch64").unwrap();
+
+//     let mut register_file = init_register_file(&*model);
+//     let register_file_ptr = register_file.as_mut_ptr();
+
+//     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
+//     let mut emitter = X86Emitter::new(&mut ctx);
+
+//     let feature = emitter.read_register(model.reg_offset("R0"),
+// Type::Signed(32));
+
+//     let out = translate(
+//         &*model,
+//         "num_of_Feature",
+//         &[feature],
+//         &mut emitter,
+//         register_file_ptr,
+//     )
+//     .unwrap();
+//     emitter.write_register(model.reg_offset("R1"), out);
+//     emitter.leave();
+//     let num_regs = emitter.next_vreg();
+
+//     let translation = ctx.compile(num_regs);
+
+//     unsafe {
+//         let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as
+// *mut i32;         let r1 = register_file_ptr.add(model.reg_offset("R1") as
+// usize) as *mut i64;
+
+//         *r0 = 4;
+//         *r1 = 0;
+
+//         translation.execute(register_file_ptr);
+
+//         assert_eq!(4, (*r0));
+//         assert_eq!(4, (*r1));
+//         //assert_eq!(0xe, (*see)); //// todo: re-implement depending on
+// result         // of SEE/cacheable registers work
+//     }
+// }
+
 #[ktest]
-fn num_of_feature() {
+fn num_of_feature_const_123() {
     let model = &*models::get("aarch64").unwrap();
 
     let mut register_file = init_register_file(&*model);
@@ -79,9 +123,9 @@ fn num_of_feature() {
     let mut ctx = X86TranslationContext::new(model.reg_offset("_PC"));
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let feature = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(0x20));
+    let feature = emitter.constant(123, Type::Signed(32));
 
-    translate(
+    let out = translate(
         &*model,
         "num_of_Feature",
         &[feature],
@@ -91,9 +135,14 @@ fn num_of_feature() {
     .unwrap();
 
     emitter.leave();
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
-    translation.execute(register_file_ptr);
+
+    assert_eq!(
+        *out.kind(),
+        NodeKind::Constant {
+            value: 159,
+            width: 64
+        }
+    );
 }
 
 #[ktest]

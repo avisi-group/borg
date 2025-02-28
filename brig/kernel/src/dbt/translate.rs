@@ -129,6 +129,7 @@ struct FunctionTranslator<'m, 'e, 'c> {
     promoted_locations: HashMap<InternedString, usize>,
 
     return_value: LocalVariable,
+    return_value_written: Option<(Ref<X86Block>, usize)>,
 
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize>,
@@ -161,6 +162,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             return_value: LocalVariable::Virtual {
                 symbol: emitter.ctx_mut().create_symbol(),
             },
+            return_value_written: None,
             current_stack_offset,
             emitter,
             register_file_ptr,
@@ -172,21 +174,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             .get(&celf.function_name)
             .unwrap_or_else(|| panic!("function named {function:?} not found"));
 
-        // set up symbols for local variables
-
-        function.local_variables().iter().for_each(|symbol| {
-            celf.entry_variables.insert(
-                symbol.name(),
-                LocalVariable::Virtual {
-                    symbol: celf.emitter.ctx_mut().create_symbol(),
-                },
-            );
-        });
-
         // set up symbols for parameters, and write arguments into them
-        //
-        // todo: add these to `virtual_variable_blocks`?? or will they always be virtual
-        // and never promoted? I think so because parameters are read-only?
         function
             .parameters()
             .iter()
@@ -242,7 +230,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 } => {
                     self.emitter.set_current_block(x86_block);
                     log::trace!(
-                        "translating static block rudder={rudder_block:?}, x86={x86_block:?}",
+                        "translating static block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
                     );
                     self.translate_block(function, rudder_block, false, variables)
                     // log::trace!("emitted: {:?}",
@@ -251,7 +239,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 JumpKind::Dynamic {
                     rudder: rudder_block,
                     x86: x86_block,
-                    variables: variables_out,
+                    variables,
                 } => {
                     //  log::trace!("dynamic block {}", b.index());
                     if !x86_block
@@ -266,11 +254,10 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     self.emitter.set_current_block(x86_block);
 
                     log::trace!(
-                        "translating dynamic block rudder={rudder_block:?}, x86={x86_block:?}",
+                        "translating dynamic block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
                     );
 
-                    let res =
-                        self.translate_block(function, rudder_block, true, variables_out.clone());
+                    let res = self.translate_block(function, rudder_block, true, variables);
 
                     res
                 }
@@ -435,7 +422,14 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 }))
             }
             Statement::ReadVariable { symbol } => {
-                let var = variables.get(&symbol.name()).unwrap().clone();
+                let Some(var) = variables.get(&symbol.name()).cloned() else {
+                    panic!(
+                        "attempted to read {} in block {:#x} in {:?} before it was written to",
+                        symbol.name(),
+                        block.index(),
+                        self.function_name
+                    )
+                };
 
                 log::debug!(
                     "reading var {} in block {:#x} in {:?} = {:?}",
@@ -455,27 +449,46 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     self.function_name
                 );
 
+                if variables.get(&symbol.name()).is_none() {
+                    log::debug!("writing var {} for the first time", symbol.name());
+                    variables.insert(
+                        symbol.name(),
+                        LocalVariable::Virtual {
+                            symbol: self.emitter.ctx_mut().create_symbol(),
+                        },
+                    );
+                }
+
                 if is_dynamic {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
                     match variables.get(&symbol.name()).unwrap() {
                         LocalVariable::Virtual { .. } => {
+                            log::debug!(
+                                "promoting {:?} from virtual to stack in block {:#x} in {:?}",
+                                symbol.name(),
+                                block.index(),
+                                self.function_name,
+                            );
+
                             let stack_offset =
                                 if let Some(offset) = self.promoted_locations.get(&symbol.name()) {
+                                    log::debug!(
+                                        "variable {:?} already promoted to stack @ {offset:#x}",
+                                        symbol.name()
+                                    );
                                     *offset
                                 } else {
                                     let offset = self.allocate_stack_offset(&symbol.typ());
                                     self.promoted_locations.insert(symbol.name(), offset);
+
+                                    log::debug!(
+                                        "variable {:?} promoted to stack @ {offset:#x}",
+                                        symbol.name()
+                                    );
+
                                     offset
                                 };
-
-                            log::debug!(
-                                "promoting {:?} from virtual to stack @ {:#x} in block {:#x} in {:?}",
-                                symbol.name(),
-                                stack_offset,
-                                block.index(),
-                                self.function_name,
-                            );
 
                             variables.insert(
                                 symbol.name(),
@@ -846,7 +859,56 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             Statement::Return { value } => {
                 if let Some(value) = value {
                     let value = statement_values.get(*value).unwrap();
-                    self.write_variable(self.return_value.clone(), value);
+
+                    // if we haven't promoted already
+                    if let LocalVariable::Virtual { symbol } = &self.return_value {
+                        let current_block = self.emitter.get_current_block();
+
+                        // if this is the second write, promote
+                        if let Some((previous_block, previous_index)) = self.return_value_written {
+                            let stack_offset =
+                                self.allocate_stack_offset(&function.return_type().unwrap());
+
+                            // fix up the previous write
+                            {
+                                self.emitter.set_current_block(previous_block);
+
+                                let post = previous_block
+                                    .get_mut(self.emitter.ctx_mut().arena_mut())
+                                    .instructions_mut()
+                                    .split_off(previous_index);
+
+                                self.emitter.write_stack_variable(
+                                    stack_offset,
+                                    (symbol.0.borrow()).clone().unwrap(),
+                                );
+
+                                previous_block
+                                    .get_mut(self.emitter.ctx_mut().arena_mut())
+                                    .instructions_mut()
+                                    .extend_from_slice(&post);
+
+                                self.emitter.set_current_block(current_block);
+                            }
+
+                            // promote
+                            self.return_value = LocalVariable::Stack {
+                                typ: emit_rudder_type(&function.return_type().unwrap()),
+                                stack_offset,
+                            }
+                        } else {
+                            self.return_value_written = Some((
+                                current_block,
+                                current_block
+                                    .get(self.emitter.ctx().arena())
+                                    .instructions()
+                                    .len(),
+                            ));
+                        }
+                    }
+
+                    self.write_variable(self.return_value.clone(), value.clone());
+
                     log::trace!(
                         "writing var borealis_fn_return_value: is dynamic {is_dynamic}, {:?}",
                         self.return_value
