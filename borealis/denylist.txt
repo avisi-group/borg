@@ -1,6 +1,3 @@
-mem_read_request_is_exclusive<Uarm_acc_type<>,b,O<RTranslationInfo>>
-mem_read_request_is_ifetch<Uarm_acc_type<>,b,O<RTranslationInfo>>
 gic_read_ram
-PhysMemTagRead
 PhysMemRead
 initialize_registers
