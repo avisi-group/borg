@@ -1136,6 +1136,36 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         width: *width,
                     },
                 }),
+                (
+                    NodeKind::Constant {
+                        value: lhs_value, ..
+                    },
+                    ..,
+                ) => {
+                    if *lhs_value == 0 {
+                        self.constant(0, *rhs.typ())
+                    } else {
+                        Self::NodeRef::from(X86Node {
+                            typ: lhs.typ().clone(),
+                            kind: NodeKind::BinaryOperation(op),
+                        })
+                    }
+                }
+                (
+                    ..,
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => {
+                    if *rhs_value == 0 {
+                        self.constant(0, *lhs.typ())
+                    } else {
+                        Self::NodeRef::from(X86Node {
+                            typ: rhs.typ().clone(),
+                            kind: NodeKind::BinaryOperation(op),
+                        })
+                    }
+                }
                 _ => Self::NodeRef::from(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
