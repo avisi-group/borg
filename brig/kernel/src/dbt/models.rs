@@ -383,6 +383,7 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
     } else if name.as_ref() == "EL"
         || name.as_ref() == "PSTATE_EL"
         || name.as_ref().starts_with("SPE")
+        || name.as_ref() == "have_exception"
     {
         RegisterCacheType::Read
     } else {

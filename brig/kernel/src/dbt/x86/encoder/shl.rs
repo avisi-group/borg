@@ -64,6 +64,20 @@ pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) 
                 .shl::<AsmRegister64, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
                 .unwrap();
         }
+        (
+            Operand {
+                kind: R(PHYS(PhysicalRegister::RCX)),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(value)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .shl::<AsmRegister32, AsmRegister8>(value.into(), PhysicalRegister::RCX.into())
+                .unwrap();
+        }
 
         _ => todo!("shl {amount} {value}"),
     }

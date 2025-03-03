@@ -1,4 +1,7 @@
-use {alloc::vec::Vec, common::TestConfig, linkme::distributed_slice, proc_macro_lib::ktest};
+use {
+    crate::qemu_exit, alloc::vec::Vec, common::TestConfig, linkme::distributed_slice,
+    proc_macro_lib::ktest,
+};
 
 #[distributed_slice]
 pub static TESTS: [(&str, fn())];
@@ -49,6 +52,9 @@ pub fn run(config: TestConfig) {
         log::trace!("running {name:?}");
         test();
     }
+
+    log::info!("all tests ran successfully");
+    qemu_exit();
 }
 
 #[ktest]
