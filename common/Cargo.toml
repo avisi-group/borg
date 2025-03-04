@@ -9,7 +9,7 @@ rkyv = { version = "0.8.10", default-features = false, features = ["alloc", "has
 hashbrown = { version = "0.15.2", features = ["serde"] }
 twox-hash = { version = "2.1.0", default-features = false, features = ["alloc", "xxhash64"] }
 serde = { version = "1.0.218", default-features = false, features = ["alloc", "derive"] }
-log = "0.4.25"
+log = "0.4.26"
 num-rational = { version = "0.4.2", default-features = false, features = ["serde"] }
 num-traits = { version = "0.2.19", default-features = false }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
