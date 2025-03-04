@@ -168,14 +168,29 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         .downcast_ref::<ModelDevice>()
         .unwrap();
 
-        let mmu_enabled = *device.get_register_mut::<u64>("SCTLR_EL1") & 1;
-        let ttbr0_el1 = *device.get_register_mut::<u64>("TTBR0_EL1");
-        let ttbr1_el1 = *device.get_register_mut::<u64>("TTBR1_EL1");
+        let mmu_enabled = *device.get_register_mut::<u64>("SCTLR_EL1_bits") & 1 == 1;
 
-        if let Some(rgn) = addrspace.find_region(faulting_address.as_u64()) {
+        let guest_physical = if mmu_enabled {
+            // translate:
+            // * walk guest page tables from top level page table translate faulting address
+            // * if it doesnt exist: guest page fault
+            // * if it does exist but is invalid (write to a read only mapped page)
+            // * or it works, we get a guest physical address, we do the next logic on line
+            //   186 and map it as writeable, but if it was a read then map as read only
+            // * map that guest physical address into the correct location in host virtual
+            //   memory
+
+            let ttbr0_el1 = *device.get_register_mut::<u64>("_TTBR0_EL1_bits");
+
+            guest_translate(ttbr0_el1, faulting_address.as_u64()).unwrap()
+        } else {
+            faulting_address.as_u64()
+        };
+
+        if let Some(rgn) = addrspace.find_region(guest_physical) {
             match rgn.kind() {
                 AddressSpaceRegionKind::Ram => {
-                    let faulting_page = faulting_address.align_down(0x1000u64);
+                    let faulting_page = VirtAddr::new(guest_physical).align_down(0x1000u64);
                     let backing_page = VirtAddr::from_ptr(unsafe {
                         alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
                     })
@@ -188,12 +203,12 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                     );
                 }
                 _ => {
-                    exit_with_message!("cannot alloc non-ram @ {faulting_address:x?}");
+                    exit_with_message!("cannot alloc non-ram @ {guest_physical:x?}");
                 }
             }
         } else {
             exit_with_message!(
-                "GUEST PAGE FAULT code {error_code:?} @ {faulting_address:x?}: no region -- this is a real fault"
+                "GUEST PAGE FAULT code {error_code:?} @ {guest_physical:x?}: no region -- this is a real fault"
             );
         }
     } else {
@@ -270,4 +285,11 @@ impl UsedInterruptVectors {
     pub fn get(&mut self, nr: u8) -> bool {
         self.0.bit_test(usize::from(nr))
     }
+}
+
+// returns guest physical address
+fn guest_translate(ttbr0: u64, guest_virtual_address: u64) -> Option<u64> {
+    // ttbr0 is guest physical
+
+    todo!()
 }

@@ -108,6 +108,19 @@ impl VirtualMemoryArea {
         }
     }
 
+    pub fn invalidate_guest_mappings(&mut self) {
+        self.opt
+            .level_4_table_mut()
+            .iter_mut()
+            .take(0x100) //only clear guest half of address space
+            .for_each(|e| {
+                let mut flags = e.flags();
+                flags.remove(PageTableFlags::PRESENT);
+                e.set_flags(flags)
+            });
+        self.invalidate();
+    }
+
     pub fn invalidate(&self) {
         assert!(Self::get_current_cr3() == self.pml4_base);
         self.activate();

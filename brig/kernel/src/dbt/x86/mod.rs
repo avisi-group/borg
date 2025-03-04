@@ -12,6 +12,7 @@ use {
     common::{
         HashMap, HashSet,
         arena::{Arena, Ref},
+        rudder::Model,
     },
     core::{cell::RefCell, fmt::Debug},
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr, rax},
@@ -27,7 +28,9 @@ pub struct X86TranslationContext {
     initial_block: Ref<X86Block>,
     panic_block: Ref<X86Block>,
     writes_to_pc: bool,
+    writes_to_sctlr: bool,
     pc_offset: u64,
+    sctlr_el1_offset: u64,
 }
 
 impl Debug for X86TranslationContext {
@@ -61,7 +64,7 @@ impl Debug for X86TranslationContext {
 }
 
 impl X86TranslationContext {
-    pub fn new(pc_offset: u64) -> Self {
+    pub fn new(model: &Model) -> Self {
         let mut arena = Arena::new();
 
         let initial_block = arena.insert(X86Block::new());
@@ -72,7 +75,9 @@ impl X86TranslationContext {
             initial_block,
             panic_block,
             writes_to_pc: false,
-            pc_offset,
+            writes_to_sctlr: false,
+            pc_offset: model.reg_offset("_PC"),
+            sctlr_el1_offset: model.reg_offset("SCTLR_EL1_bits"),
         };
 
         // add panic to the panic block
@@ -213,6 +218,16 @@ impl X86TranslationContext {
     /// Gets the value of the "PC was written to" flag
     pub fn get_pc_write_flag(&self) -> bool {
         self.writes_to_pc
+    }
+
+    /// Sets the "SCTLR register was written to" flag
+    pub fn set_mmu_write_flag(&mut self) {
+        self.writes_to_sctlr = true;
+    }
+
+    /// Gets the value of the "SCTLR register was written to" flag
+    pub fn get_mmu_write_flag(&self) -> bool {
+        self.writes_to_sctlr
     }
 
     pub fn pc_offset(&self) -> u64 {

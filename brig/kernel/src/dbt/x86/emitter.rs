@@ -1504,6 +1504,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
         let width = value.width();
 
+        if offset == self.ctx().sctlr_el1_offset {
+            self.ctx_mut().set_mmu_write_flag(); // block contains an instr that modifies sctlr
+        }
+
         self.push_instruction(
             Instruction::mov(
                 value,

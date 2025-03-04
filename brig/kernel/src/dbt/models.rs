@@ -1,5 +1,6 @@
 use {
     crate::{
+        arch::x86::memory::VirtualMemoryArea,
         dbt::{
             Translation,
             emitter::{Emitter, Type},
@@ -208,7 +209,7 @@ impl ModelDevice {
                     continue;
                 }
 
-                let mut ctx = X86TranslationContext::new(pc_offset);
+                let mut ctx = X86TranslationContext::new(&self.model);
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 loop {
@@ -297,6 +298,8 @@ impl ModelDevice {
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
+        let mut mmu_enabled = false;
+
         loop {
             log::info!("instrs: {instructions_retired}");
             let current_pc = unsafe {
@@ -316,7 +319,7 @@ impl ModelDevice {
                 // reset SEE
                 *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
 
-                let mut ctx = X86TranslationContext::new(self.model.reg_offset("_PC"));
+                let mut ctx = X86TranslationContext::new(&self.model);
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 // reset BranchTaken
@@ -360,14 +363,31 @@ impl ModelDevice {
 
                 emitter.leave();
                 let num_regs = emitter.next_vreg();
+
+                let contains_mmu_write = ctx.get_mmu_write_flag();
+
                 let translation = ctx.compile(num_regs);
 
                 log::trace!("executing",);
                 translation.execute(register_file_ptr);
 
-                instructions_retired += 1;
+                if contains_mmu_write {
+                    mmu_enabled = *(register_file_ptr
+                        .add(self.model.reg_offset("SCTLR_EL1_bits") as usize)
+                        as *mut u64)
+                        & 1
+                        == 1;
 
-                instr_cache.insert(current_pc, translation);
+                    if mmu_enabled {
+                        instr_cache.clear();
+                        VirtualMemoryArea::current().invalidate_guest_mappings();
+                        // clear guest page tables
+                    }
+                } else {
+                    instr_cache.insert(current_pc, translation);
+                }
+
+                instructions_retired += 1;
 
                 log::trace!(
                     "sp: {:x}, x0: {:x}, x1: {:x}",
