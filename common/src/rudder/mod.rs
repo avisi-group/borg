@@ -1,11 +1,11 @@
 use {
     crate::{
+        HashMap,
         intern::InternedString,
         rudder::{
             function::Function,
-            types::{maybe_type_to_string, Type},
+            types::{Type, maybe_type_to_string},
         },
-        HashMap,
     },
     alloc::{collections::btree_map::BTreeMap, format},
     core::fmt::{self, Display, Formatter},
@@ -93,9 +93,10 @@ impl Model {
             .unwrap()
     }
 
-    pub fn reg_offset(&self, name: &'static str) -> u64 {
+    pub fn reg_offset<S: Into<InternedString>>(&self, name: S) -> u64 {
+        let name = name.into();
         self.registers
-            .get(&InternedString::from_static(name))
+            .get(&name)
             .unwrap_or_else(|| panic!("no register found with name {name:?}"))
             .offset
     }

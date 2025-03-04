@@ -610,7 +610,10 @@ impl<'f> Interpreter<'f> {
                 }
                 Statement::WriteMemory { .. } => todo!(),
                 Statement::WritePc { value } => {
-                    self.write_reg(self.model.reg_offset("_PC") as u64, self.resolve_u64(value));
+                    self.write_reg(
+                        self.model.reg_offset(InternedString::from_static("_PC")) as u64,
+                        self.resolve_u64(value),
+                    );
                     None
                 }
                 Statement::PhiNode { .. } => todo!(),

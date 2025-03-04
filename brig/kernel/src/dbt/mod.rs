@@ -406,7 +406,7 @@ fn configure_features(model: &Model, register_file: *mut u8) {
         .iter()
         .map(|name| (name, enabled.contains(name)))
         .for_each(|(name, value)| {
-            let offset = model.reg_offset(name);
+            let offset = model.reg_offset(*name);
             unsafe { register_file.add(offset as usize).write(value as u8) };
         });
 }

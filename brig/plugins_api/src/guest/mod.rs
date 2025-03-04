@@ -2,7 +2,7 @@
 
 use {
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
-    core::fmt::Debug,
+    core::{any::Any, fmt::Debug},
 };
 
 /// Guest's external environment (the host system)
@@ -21,7 +21,7 @@ pub trait DeviceFactory {
 }
 
 /// Emulated guest device
-pub trait Device: Debug {
+pub trait Device: Debug + AsAny {
     fn start(&self);
     fn stop(&self);
 
@@ -35,4 +35,14 @@ pub trait Device: Debug {
 
     /// Write `value` bytes into the device starting at `offset`
     fn write(&self, offset: u64, value: &[u8]);
+}
+
+pub trait AsAny: 'static {
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl<T: 'static> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }

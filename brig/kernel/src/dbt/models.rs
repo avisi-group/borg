@@ -107,7 +107,7 @@ impl DeviceFactory for ModelDeviceFactory {
     }
 }
 
-struct ModelDevice {
+pub struct ModelDevice {
     name: String,
     model: Arc<Model>,
     register_file: Mutex<Vec<u8>>,
@@ -186,6 +186,11 @@ impl ModelDevice {
             model,
             register_file: Mutex::new(register_file),
         }
+    }
+
+    pub fn get_register_mut<'a, T>(&self, register: &'a str) -> &mut T {
+        let offset = self.model.reg_offset(register);
+        unsafe { &mut *(self.register_file.lock().as_mut_ptr().add(offset as usize) as *mut T) }
     }
 
     fn block_exec(&self) {
@@ -280,7 +285,15 @@ impl ModelDevice {
     fn single_step_exec(&self) {
         let mut instructions_retired = 0;
 
-        let register_file_ptr = self.register_file.lock().as_mut_ptr();
+        let register_file_ptr = {
+            let mut lock = self.register_file.lock();
+
+            let ptr = lock.as_mut_ptr();
+
+            drop(lock);
+
+            ptr
+        };
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
 

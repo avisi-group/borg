@@ -15,7 +15,7 @@ pub mod config;
 pub mod devices;
 pub mod memory;
 
-static mut GUEST: Once<Guest> = Once::INIT;
+pub static mut GUEST: Once<Guest> = Once::INIT;
 
 static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn guest::DeviceFactory>>> =
     Mutex::new(BTreeMap::new());
@@ -26,8 +26,8 @@ pub fn register_device_factory(name: String, factory: Box<dyn guest::DeviceFacto
 
 #[derive(Default)]
 pub struct Guest {
-    address_spaces: BTreeMap<String, Box<AddressSpace>>,
-    devices: BTreeMap<String, Arc<dyn guest::Device>>,
+    pub address_spaces: BTreeMap<String, Box<AddressSpace>>,
+    pub devices: BTreeMap<String, Arc<dyn guest::Device>>,
 }
 
 impl Guest {

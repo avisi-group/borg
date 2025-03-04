@@ -4,6 +4,7 @@ use {
             MachineContext,
             memory::{LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea},
         },
+        dbt::models::ModelDevice,
         guest::memory::AddressSpaceRegionKind,
         qemu_exit,
     },
@@ -154,6 +155,22 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
     if faulting_address <= LOW_HALF_CANONICAL_END {
         let exec_ctx = crate::guest::GuestExecutionContext::current();
         let addrspace = unsafe { &*exec_ctx.current_address_space };
+
+        let device = unsafe {
+            crate::guest::GUEST
+                .get()
+                .unwrap()
+                .devices
+                .get("core0")
+                .unwrap()
+        }
+        .as_any()
+        .downcast_ref::<ModelDevice>()
+        .unwrap();
+
+        let mmu_enabled = *device.get_register_mut::<u64>("SCTLR_EL1") & 1;
+        let ttbr0_el1 = *device.get_register_mut::<u64>("TTBR0_EL1");
+        let ttbr1_el1 = *device.get_register_mut::<u64>("TTBR1_EL1");
 
         if let Some(rgn) = addrspace.find_region(faulting_address.as_u64()) {
             match rgn.kind() {
