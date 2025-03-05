@@ -1470,6 +1470,7 @@ fn bitinsert() {
         (0x0, 0xff, 0, 8),
         (0xffff_0000_ffff, 0xffff, 16, 16),
         (0xdeadfeed, 0xaaa, 13, 7),
+        (0xbbbb_bbbb_bbbb_bbbb, 0xaaaa_aaaa_aaaa_aaaa, 0, 64),
     ] {
         assert_eq!(
             bit_insert(target, source, start, length),
@@ -2904,5 +2905,149 @@ fn sys_movzx_investigation() {
         translation.execute(register_file_ptr);
 
         assert_eq!(*x0, 0x0);
+    }
+}
+
+#[ktest]
+fn ttbr1_el1_write() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    let val = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
+
+    translate(
+        &*model,
+        "TTBR1_EL1_write",
+        &[val],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+        let ttbr1_el1 =
+            register_file_ptr.add(model.reg_offset("_TTBR1_EL1_bits") as usize) as *mut u64;
+
+        *x0 = 0xF0F0_0000_F0F0_0000;
+        *ttbr1_el1 = 0x0;
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*ttbr1_el1, 0xF0F0_0000_F0F0_0000);
+    }
+}
+
+#[ktest]
+fn aarch64_sysregwrite() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    // [X86NodeRef(X86Node { typ: Unsigned(2), kind: Constant { value: 3, width: 2 }
+    // }), X86NodeRef(X86Node { typ: Unsigned(2), kind: Constant { value: 3, width:
+    // 2 } }), X86NodeRef(X86Node { typ: Unsigned(3), kind: Constant { value: 0,
+    // width: 3 } }), X86NodeRef(X86Node { typ: Unsigned(4), kind: Constant { value:
+    // 2, width: 4 } }), X86NodeRef(X86Node { typ: Unsigned(3), kind: Constant {
+    // value: 1, width: 3 } }), X86NodeRef(X86Node { typ: Unsigned(4), kind:
+    // Constant { value: 0, width: 4 } }), X86NodeRef(X86Node { typ: Signed(64),
+    // kind: Constant { value: 1, width: 64 } })]
+
+    let el = emitter.constant(3, Type::Unsigned(2));
+    let op0 = emitter.constant(3, Type::Unsigned(2));
+    let op1 = emitter.constant(0, Type::Unsigned(3));
+    let crn = emitter.constant(2, Type::Unsigned(4));
+    let op2 = emitter.constant(1, Type::Unsigned(3));
+    let crm = emitter.constant(0, Type::Unsigned(4));
+    let t = emitter.constant(1, Type::Signed(64));
+
+    translate(
+        &*model,
+        "TTBR1_EL1_SysRegWrite_949dc27ace2a7dbe",
+        &[el, op0, op1, crn, op2, crm, t],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
+        let ttbr1_el1 =
+            register_file_ptr.add(model.reg_offset("_TTBR1_EL1_bits") as usize) as *mut u64;
+
+        *ttbr1_el1 = 0x0;
+        *x1 = 0x8224e000;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*ttbr1_el1, 0x8224e000);
+    }
+}
+
+#[ktest]
+fn msr_ttbr() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  msr               ttbr1_el1, x1
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd5182021, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
+        let ttbr1_el1 =
+            register_file_ptr.add(model.reg_offset("_TTBR1_EL1_bits") as usize) as *mut u64;
+
+        *ttbr1_el1 = 0x0;
+        *x1 = 0x8224e000;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*ttbr1_el1, 0x8224e000);
     }
 }

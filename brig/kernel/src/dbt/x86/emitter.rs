@@ -477,11 +477,16 @@ impl<'ctx> X86Emitter<'ctx> {
 
                 // mask off target bits
                 let mask = Operand::vreg(width, self.next_vreg());
-                self.push_instruction(Instruction::mov(Operand::imm(width, 1), mask).unwrap());
-                self.push_instruction(Instruction::shl(length, mask));
-                self.push_instruction(Instruction::sub(Operand::imm(width, 1), mask));
-                self.push_instruction(Instruction::shl(start, mask));
-                self.push_instruction(Instruction::not(mask));
+
+                if let OperandKind::Immediate(64) = length.kind() {
+                    self.push_instruction(Instruction::mov(Operand::imm(width, 0), mask).unwrap());
+                } else {
+                    self.push_instruction(Instruction::mov(Operand::imm(width, 1), mask).unwrap());
+                    self.push_instruction(Instruction::shl(length, mask));
+                    self.push_instruction(Instruction::sub(Operand::imm(width, 1), mask));
+                    self.push_instruction(Instruction::shl(start, mask));
+                    self.push_instruction(Instruction::not(mask));
+                }
 
                 let masked_target = Operand::vreg(width, self.next_vreg());
                 self.push_instruction(Instruction::mov(target, masked_target).unwrap());
@@ -494,7 +499,6 @@ impl<'ctx> X86Emitter<'ctx> {
 
                 // apply ~mask to source
                 {
-                    // not strictly necessary but may avoid issues if there is junk data
                     let invert_mask = Operand::vreg(width, self.next_vreg());
                     self.push_instruction(Instruction::mov(mask, invert_mask).unwrap());
                     self.push_instruction(Instruction::not(invert_mask));

@@ -181,6 +181,9 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             //   memory
 
             let ttbr0_el1 = *device.get_register_mut::<u64>("_TTBR0_EL1_bits");
+            let ttbr1_el1 = *device.get_register_mut::<u64>("_TTBR1_EL1_bits");
+
+            panic!("{ttbr0_el1:x} {ttbr1_el1:x}");
 
             guest_translate(ttbr0_el1, faulting_address.as_u64()).unwrap()
         } else {
@@ -290,6 +293,9 @@ impl UsedInterruptVectors {
 // returns guest physical address
 fn guest_translate(ttbr0: u64, guest_virtual_address: u64) -> Option<u64> {
     // ttbr0 is guest physical
+    // create mapping from guest physical to host virtual space
+    let ttbr0_translated = todo!("translate guest physical to host virtual");
+    let table = unsafe { &*(ttbr0 as *const [u64; 512]) };
 
-    todo!()
+    todo!("{table:x?}")
 }

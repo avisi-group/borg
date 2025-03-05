@@ -193,11 +193,16 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         let func = rudder
             .functions()
             .get(&InternedString::from_static(
-                "decode_msr_imm_aarch64_instrs_system_register_cpsr",
+                "TTBR1_EL1_SysRegWrite_949dc27ace2a7dbe",
             ))
             .unwrap();
         rudder::dot::render(
-            &mut create_file_buffered(dump_ir.unwrap().join("decode_msr.dot")).unwrap(),
+            &mut create_file_buffered(
+                dump_ir
+                    .unwrap()
+                    .join("TTBR1_EL1_SysRegWrite_949dc27ace2a7dbe.dot"),
+            )
+            .unwrap(),
             func.arena(),
             func.entry_block(),
         )

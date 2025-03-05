@@ -110,6 +110,8 @@ impl X86TranslationContext {
         let mut assembler = CodeAssembler::new(64).unwrap();
         let mut label_map = HashMap::default();
 
+        log::trace!("{}", dot::render(self.arena(), self.initial_block()));
+
         log::trace!("building work queue");
 
         let mut all_blocks = Vec::new();
@@ -143,7 +145,7 @@ impl X86TranslationContext {
 
         log::trace!("encoding all blocks");
 
-        //crate::println!("{}", dot::render(self.arena(), self.initial_block()));
+        log::trace!("{}", dot::render(self.arena(), self.initial_block()));
 
         for (i, block) in all_blocks.iter().enumerate() {
             assembler

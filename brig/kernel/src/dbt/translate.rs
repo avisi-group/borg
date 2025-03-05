@@ -368,9 +368,9 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     log::trace!(
                         "translating static block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
                     );
-                    self.translate_block(rudder_block, false, variables)
-                    // log::trace!("emitted: {:?}",
-                    // x86_block.get(self.emitter.ctx().arena()));
+                    let res = self.translate_block(rudder_block, false, variables);
+                    log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
+                    res
                 }
                 JumpKind::Dynamic {
                     rudder: rudder_block,
@@ -394,7 +394,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     );
 
                     let res = self.translate_block(rudder_block, true, variables);
-
+                    log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
                     res
                 }
             };
