@@ -7,7 +7,7 @@ use {
             encoder::Instruction,
         },
     },
-    alloc::{borrow::ToOwned, collections::BTreeMap, rc::Rc, vec::Vec},
+    alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
     common::{
         HashMap,
         arena::{Arena, Ref},

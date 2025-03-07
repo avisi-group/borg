@@ -13,6 +13,7 @@ use {
     },
 };
 
+pub mod aarch64_mmu;
 pub mod backtrace;
 mod gdt;
 pub mod irq;

@@ -12,9 +12,10 @@ use {
         PhysAddr, VirtAddr,
         registers::control::{Cr3, Cr3Flags},
         structures::paging::{
-            FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTableFlags, PhysFrame,
-            Size4KiB, Translate,
+            FrameAllocator, Mapper, OffsetPageTable, Page, PageSize, PageTable, PageTableFlags,
+            PhysFrame, Size4KiB, Translate,
             mapper::{MappedFrame, TranslateResult},
+            page_table::PageTableLevel,
         },
     },
 };
@@ -24,6 +25,11 @@ pub const LOW_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0x0000_7fff_
 pub const HIGH_HALF_CANONICAL_START: VirtAddr = VirtAddr::new_truncate(0xffff_8000_0000_0000);
 pub const HIGH_HALF_CANONICAL_END: VirtAddr = VirtAddr::new_truncate(0xffff_ffff_ffff_ffff);
 pub const PHYSICAL_MEMORY_OFFSET: VirtAddr = VirtAddr::new_truncate(0xffff_8180_0000_0000);
+pub const GUEST_PHYSICAL_START: VirtAddr = VirtAddr::new_truncate(0xffff_9000_0000_0000);
+
+pub fn guest_physical_to_host_virt(guest_physical: u64) -> VirtAddr {
+    GUEST_PHYSICAL_START + guest_physical
+}
 
 #[global_allocator]
 pub static HEAP_ALLOCATOR: LockedHeap<64> = LockedHeap::empty();
@@ -144,11 +150,32 @@ impl VirtualMemoryArea {
         OffsetPageTable<'static>: Mapper<S>,
     {
         unsafe {
-            let _ = self
+            let _flush = self
                 .opt
                 .map_to(page, frame, flags, &mut HeapStealingFrameAllocator)
                 .unwrap();
         }
+    }
+
+    pub fn map_page_propagate_invalidation<S: PageSize + core::fmt::Debug>(
+        &mut self,
+        page: Page<S>,
+        frame: PhysFrame<S>,
+        flags: PageTableFlags,
+    ) where
+        OffsetPageTable<'static>: Mapper<S>,
+    {
+        let l3_table = walk_table(
+            self.opt.level_4_table_mut(),
+            page.start_address(),
+            PageTableLevel::Four,
+        );
+        let l2_table = walk_table(l3_table, page.start_address(), PageTableLevel::Three);
+        let l1_table = walk_table(l2_table, page.start_address(), PageTableLevel::Two);
+
+        let l1_entry = &mut l1_table[page.start_address().p1_index()];
+
+        l1_entry.set_addr(frame.start_address(), flags);
     }
 
     pub fn translate_address(&self, addr: VirtAddr) -> Option<PhysAddr> {
@@ -230,4 +257,42 @@ unsafe impl<const N: usize> Allocator for AlignedAllocator<N> {
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         unsafe { Global.deallocate(ptr, layout.align_to(N).unwrap()) }
     }
+}
+
+fn clear_all_present_bits(table: &mut PageTable) {
+    table.iter_mut().for_each(|e| {
+        let mut flags = e.flags();
+        flags.remove(PageTableFlags::PRESENT);
+        e.set_flags(flags)
+    });
+}
+
+fn walk_table(table: &mut PageTable, address: VirtAddr, level: PageTableLevel) -> &mut PageTable {
+    let entry = &mut table[address.page_table_index(level)];
+    let mut should_clear = false;
+
+    if !entry.flags().contains(PageTableFlags::PRESENT) {
+        if entry.is_unused() {
+            let frame = HeapStealingFrameAllocator.allocate_frame().unwrap();
+            entry.set_addr(
+                frame.start_address(),
+                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+            );
+        } else {
+            entry.set_flags(entry.flags().union(PageTableFlags::PRESENT));
+            should_clear = true;
+        }
+    }
+
+    if entry.flags().contains(PageTableFlags::HUGE_PAGE) {
+        panic!();
+    }
+
+    let next_table = unsafe { &mut *entry.addr().to_virt().as_mut_ptr::<PageTable>() };
+
+    if should_clear {
+        clear_all_present_bits(next_table);
+    }
+
+    next_table
 }

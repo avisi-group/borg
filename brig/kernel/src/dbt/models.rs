@@ -298,8 +298,6 @@ impl ModelDevice {
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
-        let mut mmu_enabled = false;
-
         loop {
             log::info!("instrs: {instructions_retired}");
             let current_pc = unsafe {
@@ -372,7 +370,7 @@ impl ModelDevice {
                 translation.execute(register_file_ptr);
 
                 if contains_mmu_write {
-                    mmu_enabled = *(register_file_ptr
+                    let mmu_enabled = *(register_file_ptr
                         .add(self.model.reg_offset("SCTLR_EL1_bits") as usize)
                         as *mut u64)
                         & 1
@@ -390,10 +388,11 @@ impl ModelDevice {
                 instructions_retired += 1;
 
                 log::trace!(
-                    "sp: {:x}, x0: {:x}, x1: {:x}",
+                    "sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}",
                     *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R1") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("R2") as usize) as *mut u64),
                 );
             }
 

@@ -2,7 +2,10 @@ use {
     crate::{
         arch::x86::{
             MachineContext,
-            memory::{LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea},
+            aarch64_mmu::guest_translate,
+            memory::{
+                GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea,
+            },
         },
         dbt::models::ModelDevice,
         guest::memory::AddressSpaceRegionKind,
@@ -23,7 +26,7 @@ use {
         registers::control::Cr2,
         structures::{
             idt::{InterruptDescriptorTable, PageFaultErrorCode},
-            paging::{Page, PageTableFlags, PhysFrame, Size4KiB},
+            paging::{Page, PageTableFlags, PhysFrame, Size4KiB, Translate},
         },
     },
 };
@@ -180,40 +183,55 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             // * map that guest physical address into the correct location in host virtual
             //   memory
 
-            let ttbr0_el1 = *device.get_register_mut::<u64>("_TTBR0_EL1_bits");
-            let ttbr1_el1 = *device.get_register_mut::<u64>("_TTBR1_EL1_bits");
-
-            panic!("{ttbr0_el1:x} {ttbr1_el1:x}");
-
-            guest_translate(ttbr0_el1, faulting_address.as_u64()).unwrap()
+            guest_translate(device, faulting_address.as_u64()).unwrap()
         } else {
             faulting_address.as_u64()
         };
 
-        if let Some(rgn) = addrspace.find_region(guest_physical) {
-            match rgn.kind() {
-                AddressSpaceRegionKind::Ram => {
-                    let faulting_page = VirtAddr::new(guest_physical).align_down(0x1000u64);
-                    let backing_page = VirtAddr::from_ptr(unsafe {
-                        alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
-                    })
-                    .to_phys();
+        let guest_backing_frame = VirtualMemoryArea::current()
+            .opt
+            .translate_addr((GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64));
 
-                    VirtualMemoryArea::current().map_page(
-                        Page::<Size4KiB>::from_start_address(faulting_page).unwrap(),
-                        PhysFrame::from_start_address(backing_page).unwrap(),
-                        PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
-                    );
-                }
-                _ => {
-                    exit_with_message!("cannot alloc non-ram @ {guest_physical:x?}");
+        // have we already allocated this gues physical address?
+        let backing_page = match guest_backing_frame {
+            None => {
+                if let Some(rgn) = addrspace.find_region(guest_physical) {
+                    match rgn.kind() {
+                        AddressSpaceRegionKind::Ram => {
+                            let backing_page = VirtAddr::from_ptr(unsafe {
+                                alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
+                            })
+                            .to_phys();
+
+                            VirtualMemoryArea::current().map_page(
+                                Page::<Size4KiB>::from_start_address(
+                                    (GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64),
+                                )
+                                .unwrap(),
+                                PhysFrame::from_start_address(backing_page).unwrap(),
+                                PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+                            );
+
+                            backing_page
+                        }
+                        _ => {
+                            exit_with_message!("cannot alloc non-ram @ {guest_physical:x?}")
+                        }
+                    }
+                } else {
+                    exit_with_message!(
+                        "GUEST PAGE FAULT code {error_code:?} @ {guest_physical:x?}: no region -- this is a real fault"
+                    )
                 }
             }
-        } else {
-            exit_with_message!(
-                "GUEST PAGE FAULT code {error_code:?} @ {guest_physical:x?}: no region -- this is a real fault"
-            );
-        }
+            Some(phys_addr) => phys_addr,
+        };
+
+        VirtualMemoryArea::current().map_page_propagate_invalidation(
+            Page::<Size4KiB>::from_start_address(faulting_address.align_down(0x1000u64)).unwrap(),
+            PhysFrame::from_start_address(backing_page).unwrap(),
+            PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
+        );
     } else {
         exit_with_message!("HOST PAGE FAULT code {error_code:?} @ {faulting_address:?}");
     }
@@ -288,14 +306,4 @@ impl UsedInterruptVectors {
     pub fn get(&mut self, nr: u8) -> bool {
         self.0.bit_test(usize::from(nr))
     }
-}
-
-// returns guest physical address
-fn guest_translate(ttbr0: u64, guest_virtual_address: u64) -> Option<u64> {
-    // ttbr0 is guest physical
-    // create mapping from guest physical to host virtual space
-    let ttbr0_translated = todo!("translate guest physical to host virtual");
-    let table = unsafe { &*(ttbr0 as *const [u64; 512]) };
-
-    todo!("{table:x?}")
 }

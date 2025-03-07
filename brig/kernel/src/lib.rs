@@ -12,7 +12,10 @@ use {
     crate::{
         arch::x86::{
             backtrace::backtrace,
-            memory::{HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET},
+            memory::{
+                HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
+                VirtualMemoryArea,
+            },
         },
         dbt::models,
         devices::manager::SharedDeviceManager,
@@ -43,6 +46,11 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     config.mappings.physical_memory = Some(Mapping::FixedAddress(PHYSICAL_MEMORY_OFFSET.as_u64()));
     config.mappings.dynamic_range_start = Some(HIGH_HALF_CANONICAL_START.as_u64());
     config.mappings.dynamic_range_end = Some(HIGH_HALF_CANONICAL_END.as_u64());
+    config.mappings.framebuffer = Mapping::Dynamic;
+    config.mappings.kernel_stack = Mapping::Dynamic;
+    config.mappings.ramdisk_memory = Mapping::Dynamic;
+    config.mappings.boot_info = Mapping::Dynamic;
+    config.mappings.aslr = false;
     config.kernel_stack_size = 0x10_0000;
     config
 };
@@ -50,6 +58,8 @@ pub static BOOTLOADER_CONFIG: BootloaderConfig = {
 pub fn start(boot_info: &'static mut BootInfo) -> ! {
     // note: logging device initialized internally before platform
     logger::init();
+
+    VirtualMemoryArea::current().opt.level_4_table_mut()[0].set_unused();
 
     arch::CoreStorage::init_self();
 
