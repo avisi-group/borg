@@ -6,7 +6,7 @@ use {
 // returns guest physical address
 pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Option<u64> {
     let tcr_el1 = *device.get_register_mut::<u64>("TCR_EL1_bits");
-    log::warn!("tcr_el1: {tcr_el1:x}");
+    log::trace!("tcr_el1: {tcr_el1:x}");
 
     let translation_table_base_guest_phys = match guest_virtual_address {
         ..0x1000000000000 => *device.get_register_mut::<u64>("_TTBR0_EL1_bits"),
@@ -16,25 +16,26 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
 
     let ttbgp_masked = translation_table_base_guest_phys & !0xffff000000000fff;
 
-    log::warn!("guest_virtual_address: {guest_virtual_address:x?}");
-    log::warn!("translation_table_base_guest_phys: {translation_table_base_guest_phys:x?}");
-    log::warn!("ttbgp_masked: {ttbgp_masked:x?}");
+    log::trace!("guest_virtual_address: {guest_virtual_address:x?}");
+    log::trace!("translation_table_base_guest_phys: {translation_table_base_guest_phys:x?}");
+    log::trace!("ttbgp_masked: {ttbgp_masked:x?}");
 
     let translation_table_base = guest_physical_to_host_virt(ttbgp_masked);
-    log::warn!("translation_table_base: {translation_table_base:x?}");
+    log::trace!("translation_table_base: {translation_table_base:x?}");
     let table = unsafe { &*(translation_table_base.as_ptr::<[Descriptor; 512]>()) };
 
-    log::warn!("table: {table:x?}");
+    //log::trace!("table: {table:x?}");
 
+    // Skip L0, because 3-level page tables.
     translate_l1(table, guest_virtual_address)
 }
 
 fn translate_l0(table: &[Descriptor; 512], guest_virtual_address: u64) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 39) & 0x1ff) as usize;
 
-    log::warn!("entry_idx: {entry_idx:x?}");
+    log::trace!("entry_idx: {entry_idx:x?}");
     let entry = table[entry_idx];
-    log::warn!("entry: {entry:x?}");
+    log::trace!("entry: {entry:x?}");
 
     if entry.is_table_or_page() {
         translate_l1(entry_to_table(&entry), guest_virtual_address)
@@ -45,9 +46,9 @@ fn translate_l0(table: &[Descriptor; 512], guest_virtual_address: u64) -> Option
 
 fn translate_l1(table: &[Descriptor; 512], guest_virtual_address: u64) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 30) & 0x1ff) as usize;
-    log::warn!("entry_idx: {entry_idx:x?}");
+    log::trace!("l1 entry_idx: {entry_idx:x?}");
     let entry = table[entry_idx];
-    log::warn!("entry: {entry:x?}");
+    log::trace!("l1 entry: {entry:x?}");
 
     if !entry.is_valid() {
         panic!("invalid")
@@ -62,9 +63,9 @@ fn translate_l1(table: &[Descriptor; 512], guest_virtual_address: u64) -> Option
 
 fn translate_l2(table: &[Descriptor; 512], guest_virtual_address: u64) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 21) & 0x1ff) as usize;
-    log::warn!("entry_idx: {entry_idx:x?}");
+    log::trace!("l2 entry_idx: {entry_idx:x?}");
     let entry = table[entry_idx];
-    log::warn!("entry: {entry:x?}");
+    log::trace!("l2 entry: {entry:x?}");
 
     if !entry.is_valid() {
         panic!("invalid")
@@ -73,15 +74,15 @@ fn translate_l2(table: &[Descriptor; 512], guest_virtual_address: u64) -> Option
     if entry.is_table_or_page() {
         translate_l3(entry_to_table(&entry), guest_virtual_address)
     } else {
-        Some(entry.output_address().0 as u64)
+        Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 21) - 1)))
     }
 }
 
 fn translate_l3(table: &[Descriptor; 512], guest_virtual_address: u64) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 21) & 0x1ff) as usize;
-    log::warn!("entry_idx: {entry_idx:x?}");
+    log::trace!("l3 entry_idx: {entry_idx:x?}");
     let entry = table[entry_idx];
-    log::warn!("entry: {entry:x?}");
+    log::trace!("l3 entry: {entry:x?}");
     if entry.is_valid() && entry.is_table_or_page() {
         panic!("{entry:x?}")
     } else {

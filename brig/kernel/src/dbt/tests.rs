@@ -2880,6 +2880,7 @@ fn sys_movzx_investigation() {
     }
 
     //  sys               #3, c7, c4, #1, x8
+    // (dc      zva, x8)
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd50b7428, Type::Unsigned(32));
     translate(
@@ -3050,4 +3051,36 @@ fn msr_ttbr() {
 
         assert_eq!(*ttbr1_el1, 0x8224e000);
     }
+}
+
+#[ktest]
+fn branch_link_pc_flag() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model);
+    assert!(!ctx.get_pc_write_flag());
+
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  bl         0x1134
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x9400044d, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    assert!(ctx.get_pc_write_flag());
 }

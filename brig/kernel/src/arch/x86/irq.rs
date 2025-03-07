@@ -192,17 +192,24 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             .opt
             .translate_addr((GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64));
 
+        log::debug!("guest backing frame: {guest_backing_frame:x?}");
+
         // have we already allocated this gues physical address?
         let backing_page = match guest_backing_frame {
             None => {
+                // No existing backing page, so lookup what to do.
                 if let Some(rgn) = addrspace.find_region(guest_physical) {
+                    // Physical address lies within a valid guest region, determine region type...
                     match rgn.kind() {
                         AddressSpaceRegionKind::Ram => {
+                            // Physical address lies within a RAM-backed region, so allocate a
+                            // backing page.
                             let backing_page = VirtAddr::from_ptr(unsafe {
                                 alloc_zeroed(Layout::from_size_align(0x1000, 0x1000).unwrap())
                             })
                             .to_phys();
 
+                            // Map the allocated backing page into the 1-1 guest phyical memory area
                             VirtualMemoryArea::current().map_page(
                                 Page::<Size4KiB>::from_start_address(
                                     (GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64),
@@ -212,20 +219,35 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                 PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
                             );
 
+                            log::debug!(
+                                "allocated backing page {backing_page:x?} -> {:x?}",
+                                (GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64)
+                            );
+
                             backing_page
                         }
                         _ => {
-                            exit_with_message!("cannot alloc non-ram @ {guest_physical:x?}")
+                            // Physical address is not in RAM-backed region; could be a device...
+                            exit_with_message!("fault in non-ram memory @ {guest_physical:x?}")
                         }
                     }
                 } else {
+                    // Physical address not in valid guest region -- real fault.
                     exit_with_message!(
                         "GUEST PAGE FAULT code {error_code:?} @ {guest_physical:x?}: no region -- this is a real fault"
                     )
                 }
             }
-            Some(phys_addr) => phys_addr,
+            Some(phys_addr) => {
+                // Backing page already exists at this host physical address
+                phys_addr
+            }
         };
+
+        log::debug!(
+            "guest backing page: {backing_page:x?} mapping to {:x?}",
+            faulting_address.align_down(0x1000u64)
+        );
 
         VirtualMemoryArea::current().map_page_propagate_invalidation(
             Page::<Size4KiB>::from_start_address(faulting_address.align_down(0x1000u64)).unwrap(),

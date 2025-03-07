@@ -213,8 +213,9 @@ impl ModelDevice {
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 loop {
-                    let neg1 = emitter.constant(-1i32 as u64, Type::Signed(32));
-                    emitter.write_register(self.model.reg_offset("SEE") as u64, neg1);
+                    // reset SEE
+                    *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) =
+                        -1;
 
                     let _false = emitter.constant(0 as u64, Type::Unsigned(1));
                     emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
@@ -266,12 +267,29 @@ impl ModelDevice {
 
                 emitter.leave();
                 let num_regs = emitter.next_vreg();
+
+                let contains_mmu_write = ctx.get_mmu_write_flag();
+
                 let translation = ctx.compile(num_regs);
 
-                log::trace!("executing");
-
+                log::trace!("executing",);
                 translation.execute(register_file_ptr);
-                blocks.insert(start_pc, translation);
+
+                if contains_mmu_write {
+                    let mmu_enabled = *(register_file_ptr
+                        .add(self.model.reg_offset("SCTLR_EL1_bits") as usize)
+                        as *mut u64)
+                        & 1
+                        == 1;
+
+                    if mmu_enabled {
+                        blocks.clear();
+                        VirtualMemoryArea::current().invalidate_guest_mappings();
+                        // clear guest page tables
+                    }
+                } else {
+                    blocks.insert(start_pc, translation);
+                }
 
                 log::trace!(
                     "{:x} {}",
@@ -311,7 +329,7 @@ impl ModelDevice {
                 continue;
             }
 
-            log::info!("---- ---- ---- ---- starting instr translation");
+            log::info!("---- ---- ---- ---- starting instr translation: {current_pc:x}");
 
             unsafe {
                 // reset SEE
@@ -388,11 +406,12 @@ impl ModelDevice {
                 instructions_retired += 1;
 
                 log::trace!(
-                    "sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}",
+                    "sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x19: {:x}",
                     *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R1") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R2") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("R19") as usize) as *mut u64),
                 );
             }
 

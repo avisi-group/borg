@@ -657,24 +657,23 @@ impl<'ctx> X86Emitter<'ctx> {
 
         // pull out widths but also validate types are compatible
         let (left, mut right) = match (left.typ(), right.typ()) {
-            (Type::Unsigned(l), Type::Unsigned(r)) => match l.cmp(r) {
-                Ordering::Less => {
-                    todo!("zero extend {l} to {r}")
-                }
-                Ordering::Equal => (
-                    self.to_operand_oversize_reg_promote(left),
-                    self.to_operand_oversize_reg_promote(right),
-                ),
-                Ordering::Greater => {
-                    let left = self.to_operand_oversize_reg_promote(left);
-                    let right = self.to_operand_oversize_reg_promote(right);
+            (Type::Unsigned(l), Type::Unsigned(r)) => {
+                let left = self.to_operand_oversize_reg_promote(left);
+                let right = self.to_operand_oversize_reg_promote(right);
 
-                    let tmp = Operand::vreg(left.width(), self.next_vreg());
-                    self.push_instruction(Instruction::movzx(right, tmp));
+                match left.width().cmp(&right.width()) {
+                    Ordering::Less => {
+                        todo!("zero extend {l} to {r}")
+                    }
+                    Ordering::Equal => (left, right),
+                    Ordering::Greater => {
+                        let tmp = Operand::vreg(left.width(), self.next_vreg());
+                        self.push_instruction(Instruction::movzx(right, tmp));
 
-                    (left, tmp)
+                        (left, tmp)
+                    }
                 }
-            },
+            }
 
             (Type::Bits, Type::Unsigned(_)) => todo!(), // (64, r)
             (Type::Unsigned(_), Type::Bits) => {
@@ -732,6 +731,12 @@ impl<'ctx> X86Emitter<'ctx> {
             BinaryOperationKind::Or(_, _) => {
                 self.push_instruction(Instruction::mov(left, dst).unwrap());
                 self.push_instruction(Instruction::or(right, dst));
+                dst
+            }
+
+            BinaryOperationKind::Xor(_, _) => {
+                self.push_instruction(Instruction::mov(left, dst).unwrap());
+                self.push_instruction(Instruction::xor(right, dst));
                 dst
             }
             BinaryOperationKind::Multiply(_, _) => {
@@ -1116,6 +1121,27 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value | rhs_value,
+                        width: *width,
+                    },
+                }),
+                _ => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::BinaryOperation(op),
+                }),
+            },
+            Xor(lhs, rhs) => match (lhs.kind(), rhs.kind()) {
+                (
+                    NodeKind::Constant {
+                        value: lhs_value,
+                        width,
+                    },
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => Self::NodeRef::from(X86Node {
+                    typ: lhs.typ().clone(),
+                    kind: NodeKind::Constant {
+                        value: lhs_value ^ rhs_value,
                         width: *width,
                     },
                 }),
@@ -2108,7 +2134,7 @@ fn encode_compare(
     let is_signed = match (left.typ(), right.typ()) {
         (Type::Unsigned(_), Type::Unsigned(_)) => false,
         (Type::Signed(_), Type::Signed(_)) => true,
-        _ => panic!(),
+        _ => panic!("different types in comparison:\n{left:?}\nand\n{right:?}"),
     };
 
     let left_op = emitter.to_operand(&left);
