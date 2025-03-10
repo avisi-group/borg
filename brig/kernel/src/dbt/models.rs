@@ -381,23 +381,23 @@ impl ModelDevice {
                 let num_regs = emitter.next_vreg();
 
                 let contains_mmu_write = ctx.get_mmu_write_flag();
+                let needs_invalidate = ctx.get_mmu_needs_invalidate_flag();
 
                 let translation = ctx.compile(num_regs);
 
                 log::trace!("executing",);
                 translation.execute(register_file_ptr);
 
-                if contains_mmu_write {
+                if contains_mmu_write | needs_invalidate {
                     let mmu_enabled = *(register_file_ptr
                         .add(self.model.reg_offset("SCTLR_EL1_bits") as usize)
                         as *mut u64)
                         & 1
                         == 1;
 
-                    if mmu_enabled {
+                    if mmu_enabled | needs_invalidate {
                         instr_cache.clear();
                         VirtualMemoryArea::current().invalidate_guest_mappings();
-                        // clear guest page tables
                     }
                 } else {
                     instr_cache.insert(current_pc, translation);
@@ -431,8 +431,7 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         RegisterCacheType::Constant
     } else if name.as_ref() == "SEE" {
         RegisterCacheType::ReadWrite
-    } else if name.as_ref() == "EL"
-        || name.as_ref() == "PSTATE_EL"
+    } else if name.as_ref() == "PSTATE_EL"
         || name.as_ref().starts_with("SPE")
         || name.as_ref() == "have_exception"
     {

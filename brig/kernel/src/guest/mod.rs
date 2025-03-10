@@ -36,6 +36,7 @@ impl Guest {
     }
 }
 
+#[repr(C)]
 pub struct GuestExecutionContext {
     pub current_address_space: *mut AddressSpace,
 }

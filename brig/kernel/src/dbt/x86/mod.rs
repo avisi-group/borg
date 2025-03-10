@@ -29,8 +29,11 @@ pub struct X86TranslationContext {
     panic_block: Ref<X86Block>,
     writes_to_pc: bool,
     writes_to_sctlr: bool,
+    mmu_invalidate: bool,
     pc_offset: u64,
     sctlr_el1_offset: u64,
+    ttbr0_el1_offset: u64,
+    ttbr1_el1_offset: u64,
 }
 
 impl Debug for X86TranslationContext {
@@ -76,8 +79,11 @@ impl X86TranslationContext {
             panic_block,
             writes_to_pc: false,
             writes_to_sctlr: false,
+            mmu_invalidate: false,
             pc_offset: model.reg_offset("_PC"),
             sctlr_el1_offset: model.reg_offset("SCTLR_EL1_bits"),
+            ttbr0_el1_offset: model.reg_offset("_TTBR0_EL1_bits"),
+            ttbr1_el1_offset: model.reg_offset("_TTBR1_EL1_bits"),
         };
 
         // add panic to the panic block
@@ -223,13 +229,23 @@ impl X86TranslationContext {
     }
 
     /// Sets the "SCTLR register was written to" flag
-    pub fn set_mmu_write_flag(&mut self) {
+    pub fn set_mmu_config_flag(&mut self) {
         self.writes_to_sctlr = true;
     }
 
     /// Gets the value of the "SCTLR register was written to" flag
     pub fn get_mmu_write_flag(&self) -> bool {
         self.writes_to_sctlr
+    }
+
+    /// Sets the "SCTLR register was written to" flag
+    pub fn set_mmu_needs_invalidate_flag(&mut self) {
+        self.mmu_invalidate = true;
+    }
+
+    /// Gets the "SCTLR register was written to" flag
+    pub fn get_mmu_needs_invalidate_flag(&mut self) -> bool {
+        self.mmu_invalidate
     }
 
     pub fn pc_offset(&self) -> u64 {

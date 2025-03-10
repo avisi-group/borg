@@ -1535,7 +1535,9 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         let width = value.width();
 
         if offset == self.ctx().sctlr_el1_offset {
-            self.ctx_mut().set_mmu_write_flag(); // block contains an instr that modifies sctlr
+            self.ctx_mut().set_mmu_config_flag(); // block contains an instr that modifies sctlr
+        } else if offset == self.ctx().ttbr0_el1_offset || offset == self.ctx().ttbr1_el1_offset {
+            self.ctx_mut().set_mmu_needs_invalidate_flag();
         }
 
         self.push_instruction(
@@ -1567,6 +1569,39 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         let value = self.to_operand(&value);
         let width = value.width();
 
+        // It occurs to me that the Arm distribution we're running is a 39-bit address
+        // space
+
+        //  Well we've got a fucking 48-bit address space
+
+        //  So we can do high and low in one page table?
+
+        //  So, we can just treat their canonical upper addresses, as access in our
+        // canonical lower range
+
+        //  Yes
+
+        //   Just a simple bit of bit shifting and masking should do the trick
+
+        // Amazing
+
+        // wait so the high address I'm seeing in the store instruction is a bug then?
+
+        // So, Arm's address space looks like this:
+        // 0000 0000 0000 0000 .. 0000 007F FFFF FFFF
+        // FFFF FF80 0000 0000 .. FFFF FFFF FFFF FFFF
+
+        // x86_64 with 48-bit addressing looks like
+        // 0000 0000 0000 0000 .. 0000 7FFF FFFF FFFF
+        // FFFF 8000 0000 0000 .. FFFF FFFF FFFF FFFF
+
+        // if we mask highest 6 nibbles we get a contiguous address space
+
+        let mask = Operand::vreg(Width::_64, self.next_vreg());
+        self.push_instruction(
+            Instruction::mov(Operand::imm(Width::_64, 0x0000_00FF_FFFF_FFFF), mask).unwrap(),
+        );
+        self.push_instruction(Instruction::and(mask, address));
         self.push_instruction(
             Instruction::mov(value, Operand::mem_base_displ(width, *address_reg, 0)).unwrap(),
         );
