@@ -1516,6 +1516,25 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             //  * specific model, however memory access is the one exception to this, and must be
             //  * intercepted */
 
+            // bits(64), CacheType
+            "AArch64_MemZero" => {
+                let address = args[0].clone();
+                let value = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant {
+                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(8)),
+                        value: ConstantValue::UnsignedInteger(0),
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::WriteMemory { address, value },
+                ))
+            }
+
             // val Mem_read : (%bv64, %i, struct AccessDescriptor) -> %bv
             "Mem_read" => {
                 let address = args[0].clone();

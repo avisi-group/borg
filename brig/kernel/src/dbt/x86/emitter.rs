@@ -2132,7 +2132,7 @@ fn encode_compare(
     };
 
     let is_signed = match (left.typ(), right.typ()) {
-        (Type::Unsigned(_), Type::Unsigned(_)) => false,
+        (Type::Unsigned(_) | Type::Bits, Type::Unsigned(_) | Type::Bits) => false,
         (Type::Signed(_), Type::Signed(_)) => true,
         _ => panic!("different types in comparison:\n{left:?}\nand\n{right:?}"),
     };

@@ -1,14 +1,14 @@
 use {
     crate::{
+        HashMap,
         arena::{Arena, Ref},
         intern::InternedString,
         rudder::{
             block::Block,
             constant_value::ConstantValue,
             function::Symbol,
-            types::{maybe_type_to_string, PrimitiveType, Type},
+            types::{PrimitiveType, Type, maybe_type_to_string},
         },
-        HashMap,
     },
     alloc::{
         format,
@@ -360,12 +360,12 @@ impl Statement {
                     })
                 } else {
                     value.get(arena).typ(arena) // potentially should be Bits,
-                                                // but this type will always be
-                                                // wide enough (for example,
-                                                // extracted 32 bits from a u64,
-                                                // not the end of the world to
-                                                // store those 32 bits in a u64,
-                                                // but ideally a u32)
+                    // but this type will always be
+                    // wide enough (for example,
+                    // extracted 32 bits from a u64,
+                    // not the end of the world to
+                    // store those 32 bits in a u64,
+                    // but ideally a u32)
                 }
             }
             Self::BitInsert {

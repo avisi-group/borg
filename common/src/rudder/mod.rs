@@ -119,7 +119,7 @@ impl Display for Model {
             .into_iter()
             .sorted_by(|a, b| a.0.as_ref().cmp(b.0.as_ref()))
         {
-            writeln!(f, "register {name}: {reg:x?}")?;
+            writeln!(f, "register {name}: {reg}")?;
         }
 
         writeln!(f)?;
@@ -155,5 +155,15 @@ impl Display for Function {
             writeln!(f, "  block {:#x}:", block.index())?;
             write!(f, "{}", block.get(self.arena()))
         })
+    }
+}
+
+impl Display for RegisterDescriptor {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} @ {:#x} (cachetype={:?})",
+            self.typ, self.offset, self.cache
+        )
     }
 }

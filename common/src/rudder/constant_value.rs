@@ -212,7 +212,7 @@ impl PartialOrd for ConstantValue {
 impl Display for ConstantValue {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ConstantValue::UnsignedInteger(v) => write!(f, "{v}u"),
+            ConstantValue::UnsignedInteger(v) => write!(f, "{v:#x}u"),
             ConstantValue::SignedInteger(v) => write!(f, "{v}s"),
             ConstantValue::FloatingPoint(v) => write!(f, "{v}f"),
             ConstantValue::String(str) => write!(f, "{str:?}"),
