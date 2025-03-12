@@ -173,6 +173,10 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
         let mmu_enabled = *device.get_register_mut::<u64>("SCTLR_EL1_bits") & 1 == 1;
 
+        // correct the address as it was masked off in emitter.rs:read/write-memory
+        let faulting_address =
+            VirtAddr::new((((faulting_address.as_u64() as i64) << 24) >> 24) as u64);
+
         let guest_physical = if mmu_enabled {
             // translate:
             // * walk guest page tables from top level page table translate faulting address

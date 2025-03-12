@@ -1,6 +1,7 @@
 use {
     crate::{arch::x86::memory::guest_physical_to_host_virt, dbt::models::ModelDevice},
     aarch64_paging::paging::Descriptor,
+    iced_x86::code_asm::zmm,
 };
 
 // returns guest physical address
@@ -134,4 +135,117 @@ fn guest_page_fault(device: &ModelDevice) {
 
     // get page fault handler
     // set PC and execute until we hit an eret
+}
+
+fn take_arm_exception(
+    device: &ModelDevice,
+    target_el: u8,
+    typ: u8,
+    syndrome: u32,
+    vaddr: u64,
+    retaddr: u64,
+    mut voff: u64,
+) {
+    let spsr = get_psr_from_pstate(device);
+    let current_el = *device.get_register_mut::<u8>("PSTATE_EL");
+
+    if target_el > current_el {
+        voff += 0x400;
+    } else if *device.get_register_mut::<u8>("PSTATE_SP") == 1 {
+        voff += 0x200;
+    }
+
+    // Update the execution level
+    *device.get_register_mut::<u8>("PSTATE_EL") = target_el;
+
+    // Update spsel
+    *device.get_register_mut::<u8>("PSTATE_SP") = 1;
+
+    if target_el == 1 {
+        *device.get_register_mut::<u32>("SPSR_EL1") = spsr;
+        *device.get_register_mut::<u64>("ELR_EL1") = retaddr;
+
+        // If it's NOT an IRQ...
+        if typ != 255 {
+            let ec = get_exception_class(current_el, target_el, typ);
+            *device.get_register_mut::<u32>("ESR_EL1") =
+                (ec << 26) | (1 << 25) | (syndrome & 0x1ffffff);
+
+            if typ == 1 || typ == 4 {
+                *device.get_register_mut::<u64>("FAR_EL1") = vaddr;
+            }
+        }
+    } else {
+        panic!("trap");
+    }
+
+    *device.get_register_mut::<u8>("PSTATE_D") = 1;
+    *device.get_register_mut::<u8>("PSTATE_A") = 1;
+    *device.get_register_mut::<u8>("PSTATE_I") = 1;
+    *device.get_register_mut::<u8>("PSTATE_F") = 1;
+
+    // let vbar = read_register(VBAR);
+    let vbar: u64 = match target_el {
+        1 => *device.get_register_mut("VBAR_EL1"),
+        2 => *device.get_register_mut("VBAR_EL2"),
+        3 => *device.get_register_mut("VBAR_EL3"),
+        _ => panic!(),
+    };
+    *device.get_register_mut::<u64>("_PC") = vbar + voff;
+    return;
+}
+
+fn get_psr_from_pstate(device: &ModelDevice) -> u32 {
+    let n = *device.get_register_mut::<u8>("PSTATE_N") as u32;
+    let z = *device.get_register_mut::<u8>("PSTATE_Z") as u32;
+    let c = *device.get_register_mut::<u8>("PSTATE_C") as u32;
+    let v = *device.get_register_mut::<u8>("PSTATE_V") as u32;
+    let d = *device.get_register_mut::<u8>("PSTATE_D") as u32;
+    let a = *device.get_register_mut::<u8>("PSTATE_A") as u32;
+    let i = *device.get_register_mut::<u8>("PSTATE_I") as u32;
+    let f = *device.get_register_mut::<u8>("PSTATE_F") as u32;
+    let el = *device.get_register_mut::<u8>("PSTATE_EL") as u32;
+    let sp = *device.get_register_mut::<u8>("PSTATE_SP") as u32;
+
+    n << 31 | z << 30 | c << 29 | v << 28 | d << 9 | a << 8 | i << 7 | f << 6 | el << 2 | sp
+}
+
+fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u32 {
+    match typ {
+        0 => {
+            // Software Breakpoint
+            0x38 + 4
+        }
+        1 => {
+            if target_el == current_el {
+                0x25
+            } else {
+                0x24
+            }
+        }
+
+        2 => {
+            // Undefined Fault
+            0
+        }
+        3 => {
+            // Supervisor Call
+            0x11 + 4
+        }
+        4 => {
+            // Instruction Abort
+            if target_el == current_el { 0x21 } else { 0x20 }
+        }
+        5 => {
+            // FPAccessTrap
+            0x07
+        }
+        6 => {
+            // Single Step
+            0x32
+        }
+        _ => {
+            panic!("trap");
+        }
+    }
 }

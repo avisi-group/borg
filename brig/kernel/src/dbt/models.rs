@@ -406,12 +406,15 @@ impl ModelDevice {
                 instructions_retired += 1;
 
                 log::trace!(
-                    "sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x19: {:x}",
+                    "sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x4: {:x}, x12: {:x}, x14: {:x}, x23: {:x}",
                     *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R1") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R2") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R19") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("R4") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("R12") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("R14") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("R23") as usize) as *mut u64),
                 );
             }
 

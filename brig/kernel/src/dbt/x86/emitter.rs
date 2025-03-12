@@ -612,6 +612,12 @@ impl<'ctx> X86Emitter<'ctx> {
 
                 let dest = Operand::vreg(width, self.next_vreg());
 
+                let mask = Operand::vreg(Width::_64, self.next_vreg());
+                self.push_instruction(
+                    Instruction::mov(Operand::imm(Width::_64, 0x0000_00FF_FFFF_FFFF), mask)
+                        .unwrap(),
+                );
+                self.push_instruction(Instruction::and(mask, address));
                 self.push_instruction(
                     Instruction::mov(Operand::mem_base_displ(width, *address_reg, 0), dest)
                         .unwrap(),

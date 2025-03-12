@@ -29,6 +29,9 @@ use {
 
 const BLOCK_QUEUE_LIMIT: usize = 1000;
 
+// if we attempt to translate any of these , something went wrong
+const FN_DENYLIST: &[&str] = &["AArch64_TranslateAddress"];
+
 /// Kind of jump to a target block
 #[derive(Debug)]
 enum JumpKind {
@@ -295,6 +298,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         register_file_ptr: *mut u8,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
+        assert!(!FN_DENYLIST.contains(&function));
 
         let function_name = InternedString::from(function);
 
