@@ -17,11 +17,9 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
     log::trace!("ttbr1_el1: {ttbr1_el1:x}");
 
     let translation_table_base_guest_phys = match guest_virtual_address {
-        // because we masked off in emitter.rs:write_memory
-        // todo: check this
-        ..=0x0000_007F_FFFF_FFFF => ttbr0_el1,
-        0x0000_0080_0000_0000.. => ttbr1_el1,
-        // addr => todo!("fault at {addr:x}"),
+        ..0x1000000000000 => ttbr0_el1,
+        0xffff000000000000.. => ttbr1_el1,
+        addr => todo!("fault at {addr:x}"),
     };
 
     let ttbgp_masked = translation_table_base_guest_phys & !0xffff000000000fff;

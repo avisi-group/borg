@@ -736,6 +736,23 @@ impl<'ctx> X86Emitter<'ctx> {
             }
             BinaryOperationKind::Or(_, _) => {
                 self.push_instruction(Instruction::mov(left, dst).unwrap());
+
+                let right = if width >= Width::_32 {
+                    if let OperandKind::Immediate(i) = *right.kind() {
+                        if i > i32::MAX as u64 {
+                            let tmp = Operand::vreg(width, self.next_vreg());
+                            self.push_instruction(Instruction::mov(right, tmp).unwrap());
+                            tmp
+                        } else {
+                            right
+                        }
+                    } else {
+                        right
+                    }
+                } else {
+                    right
+                };
+
                 self.push_instruction(Instruction::or(right, dst));
                 dst
             }
@@ -1488,13 +1505,16 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         let typ = target.typ().clone();
         match (target.kind(), source.kind(), start.kind(), length.kind()) {
             (
-                NodeKind::Constant { value: target, .. },
+                NodeKind::Constant {
+                    value: target,
+                    width: target_width,
+                },
                 NodeKind::Constant { value: source, .. },
                 NodeKind::Constant { value: start, .. },
                 NodeKind::Constant { value: length, .. },
             ) => self.constant(
                 bit_insert(*target, *source, *start, *length),
-                Type::Unsigned(u16::try_from(*length).unwrap()),
+                Type::Unsigned(*target_width),
             ),
             _ => Self::NodeRef::from(X86Node {
                 typ,

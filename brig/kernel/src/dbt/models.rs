@@ -194,6 +194,24 @@ impl ModelDevice {
         unsafe { &mut *(self.register_file.lock().as_mut_ptr().add(offset as usize) as *mut T) }
     }
 
+    fn print_regs(&self) {
+        let register_file_ptr = self.register_file.lock().as_mut_ptr();
+        unsafe {
+            crate::print!(
+                "PC = {:016x}\n",
+                *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
+            );
+            for reg in 0..=30 {
+                crate::print!(
+                    "R{reg:02} = {:016x}\n",
+                    *(register_file_ptr
+                        .add(self.model.reg_offset(alloc::format!("R{reg}")) as usize)
+                        as *mut u64)
+                );
+            }
+        }
+    }
+
     fn block_exec(&self) {
         let register_file_ptr = self.register_file.lock().as_mut_ptr();
 
@@ -326,6 +344,7 @@ impl ModelDevice {
                 log::info!("executing cached translation @ {current_pc:x}");
                 translation.execute(register_file_ptr);
                 instructions_retired += 1;
+                self.print_regs();
                 continue;
             }
 
@@ -416,6 +435,8 @@ impl ModelDevice {
                     *(register_file_ptr.add(self.model.reg_offset("R14") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R23") as usize) as *mut u64),
                 );
+
+                self.print_regs()
             }
 
             log::info!("finished\n\n")

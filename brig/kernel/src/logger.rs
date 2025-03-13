@@ -34,7 +34,7 @@ static LOGGER: &'static dyn Log = &Logger {
         ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
         ("kernel::dbt::x86::register_allocator", LevelFilter::Info),
         ("kernel::dbt::x86", LevelFilter::Info),
-        ("kernel::dbt::translate", LevelFilter::Info),
+        ("kernel::dbt::translate", LevelFilter::Debug),
         ("kernel::dbt::interpret", LevelFilter::Info),
     ],
 };
@@ -48,7 +48,7 @@ const SERIAL_IO_PORT: u16 = 0x3F8;
 pub fn init() {
     unsafe { WRITER.call_once(|| UART16550Device::new(SERIAL_IO_PORT)) };
 
-    log::set_logger(&LOGGER).expect("Failed to set logger");
+    //    log::set_logger(&LOGGER).expect("Failed to set logger");
     log::set_max_level(LevelFilter::Trace);
 
     log::info!(

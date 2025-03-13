@@ -400,6 +400,8 @@ fn configure_features(model: &Model, register_file: *mut u8) {
         "FEAT_AA64EL3_IMPLEMENTED",
         "FEAT_D128_IMPLEMENTED",
         "FEAT_LVA3_IMPLEMENTED",
+        "FEAT_MTE2_IMPLEMENTED",
+        "FEAT_BRBE_IMPLEMENTED",
     ];
 
     features

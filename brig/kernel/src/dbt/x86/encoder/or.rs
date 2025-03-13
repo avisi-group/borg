@@ -51,7 +51,7 @@ pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
                 width_in_bits: Width::_64,
             },
         ) => {
-            if *left < u32::MAX as u64 {
+            if *left < i32::MAX as u64 {
                 assembler
                     .or::<AsmRegister64, i32>(right.into(), *left as i32)
                     .unwrap();
