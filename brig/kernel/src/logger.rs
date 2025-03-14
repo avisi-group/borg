@@ -8,6 +8,7 @@ use {
 };
 
 const ENABLE_COLORS: bool = true;
+pub const REG_TRACE_ONLY: bool = true;
 
 /*struct QemuWriter;
 
@@ -34,7 +35,7 @@ static LOGGER: &'static dyn Log = &Logger {
         ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
         ("kernel::dbt::x86::register_allocator", LevelFilter::Info),
         ("kernel::dbt::x86", LevelFilter::Info),
-        ("kernel::dbt::translate", LevelFilter::Debug),
+        ("kernel::dbt::translate", LevelFilter::Info),
         ("kernel::dbt::interpret", LevelFilter::Info),
     ],
 };
@@ -48,7 +49,7 @@ const SERIAL_IO_PORT: u16 = 0x3F8;
 pub fn init() {
     unsafe { WRITER.call_once(|| UART16550Device::new(SERIAL_IO_PORT)) };
 
-    //    log::set_logger(&LOGGER).expect("Failed to set logger");
+    log::set_logger(&LOGGER).expect("Failed to set logger");
     log::set_max_level(LevelFilter::Trace);
 
     log::info!(
@@ -74,16 +75,20 @@ struct Logger<const N: usize> {
 
 impl<const N: usize> Log for Logger<N> {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        &metadata.level().to_level_filter()
-            <= self
-                .module_levels
-                .iter()
-                /* At this point the Vec is already sorted so that we can simply take
-                 * the first match
-                 */
-                .find(|(name, _level)| metadata.target().starts_with(name))
-                .map(|(_name, level)| level)
-                .unwrap_or(&self.default_level)
+        if REG_TRACE_ONLY {
+            false
+        } else {
+            &metadata.level().to_level_filter()
+                <= self
+                    .module_levels
+                    .iter()
+                    /* At this point the Vec is already sorted so that we can simply take
+                     * the first match
+                     */
+                    .find(|(name, _level)| metadata.target().starts_with(name))
+                    .map(|(_name, level)| level)
+                    .unwrap_or(&self.default_level)
+        }
     }
 
     fn log(&self, record: &Record) {

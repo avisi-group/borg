@@ -14,6 +14,7 @@ use {
         devices::SharedDevice,
         fs::{File, Filesystem, tar::TarFilesystem},
         guest::register_device_factory,
+        logger::REG_TRACE_ONLY,
     },
     alloc::{
         borrow::ToOwned,
@@ -195,19 +196,21 @@ impl ModelDevice {
     }
 
     fn print_regs(&self) {
-        let register_file_ptr = self.register_file.lock().as_mut_ptr();
-        unsafe {
-            crate::print!(
-                "PC = {:016x}\n",
-                *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
-            );
-            for reg in 0..=30 {
+        if REG_TRACE_ONLY {
+            let register_file_ptr = self.register_file.lock().as_mut_ptr();
+            unsafe {
                 crate::print!(
-                    "R{reg:02} = {:016x}\n",
-                    *(register_file_ptr
-                        .add(self.model.reg_offset(alloc::format!("R{reg}")) as usize)
-                        as *mut u64)
+                    "PC = {:016x}\n",
+                    *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
                 );
+                for reg in 0..=30 {
+                    crate::print!(
+                        "R{reg:02} = {:016x}\n",
+                        *(register_file_ptr
+                            .add(self.model.reg_offset(alloc::format!("R{reg}")) as usize)
+                            as *mut u64)
+                    );
+                }
             }
         }
     }

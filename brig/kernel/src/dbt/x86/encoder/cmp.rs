@@ -5,7 +5,9 @@ use {
         Register::PhysicalRegister as PHYS,
         Width,
     },
-    iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+    },
 };
 
 pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
@@ -83,7 +85,7 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
         (
             Operand {
                 kind: I(left),
-                width_in_bits: _,
+                width_in_bits: Width::_8,
             },
             Operand {
                 kind: R(PHYS(right)),
@@ -92,6 +94,20 @@ pub fn encode(assembler: &mut CodeAssembler, left: &Operand, right: &Operand) {
         ) => {
             assembler
                 .cmp::<AsmRegister8, i32>(right.into(), (*left).try_into().unwrap())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: I(left),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .cmp::<AsmRegister16, i32>(right.into(), (*left).try_into().unwrap())
                 .unwrap();
         }
 

@@ -1792,6 +1792,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                             Type::Unsigned(w) => self.constant(u64::from(*w), Type::Unsigned(16)),
                             _ => todo!(),
                         },
+                        NodeKind::ReadStackVariable { .. } => self.constant(64, Type::Unsigned(16)),
                         _ => todo!("size of {value:#?}"),
                     }
                 }

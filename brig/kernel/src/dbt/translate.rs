@@ -765,6 +765,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     2 => Type::Unsigned(16),
                     4 => Type::Unsigned(32),
                     8 => Type::Unsigned(64),
+                    16 => Type::Unsigned(128),
                     _ => todo!("{value}"),
                 };
 
