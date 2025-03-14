@@ -34,6 +34,7 @@ pub struct X86TranslationContext {
     sctlr_el1_offset: u64,
     ttbr0_el1_offset: u64,
     ttbr1_el1_offset: u64,
+    memory_mask: bool,
 }
 
 impl Debug for X86TranslationContext {
@@ -67,7 +68,7 @@ impl Debug for X86TranslationContext {
 }
 
 impl X86TranslationContext {
-    pub fn new(model: &Model) -> Self {
+    pub fn new(model: &Model, memory_mask: bool) -> Self {
         let mut arena = Arena::new();
 
         let initial_block = arena.insert(X86Block::new());
@@ -84,6 +85,7 @@ impl X86TranslationContext {
             sctlr_el1_offset: model.reg_offset("SCTLR_EL1_bits"),
             ttbr0_el1_offset: model.reg_offset("_TTBR0_EL1_bits"),
             ttbr1_el1_offset: model.reg_offset("_TTBR1_EL1_bits"),
+            memory_mask,
         };
 
         // add panic to the panic block

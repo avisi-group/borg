@@ -1,7 +1,6 @@
 use {
     crate::{arch::x86::memory::guest_physical_to_host_virt, dbt::models::ModelDevice},
     aarch64_paging::paging::Descriptor,
-    iced_x86::code_asm::zmm,
 };
 
 // returns guest physical address

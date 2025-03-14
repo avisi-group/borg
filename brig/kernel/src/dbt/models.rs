@@ -230,7 +230,7 @@ impl ModelDevice {
                     continue;
                 }
 
-                let mut ctx = X86TranslationContext::new(&self.model);
+                let mut ctx = X86TranslationContext::new(&self.model, true);
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 loop {
@@ -357,7 +357,7 @@ impl ModelDevice {
                 // reset SEE
                 *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
 
-                let mut ctx = X86TranslationContext::new(&self.model);
+                let mut ctx = X86TranslationContext::new(&self.model, true);
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 // reset BranchTaken
