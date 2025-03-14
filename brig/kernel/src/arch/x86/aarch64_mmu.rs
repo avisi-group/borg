@@ -1,5 +1,9 @@
 use {
-    crate::{arch::x86::memory::guest_physical_to_host_virt, dbt::models::ModelDevice},
+    crate::{
+        arch::x86::{irq::exit_with_message, memory::guest_physical_to_host_virt},
+        dbt::models::ModelDevice,
+        qemu_exit,
+    },
     aarch64_paging::paging::Descriptor,
 };
 
@@ -8,7 +12,7 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
     let tcr_el1 = *device.get_register_mut::<u64>("TCR_EL1_bits");
     log::trace!("tcr_el1: {tcr_el1:x}");
     // let ttbcr = *device.get_register_mut::<u32>("TTBCR_S_bits");
-    // panic!("{ttbcr:032b}");
+    // exit_with_message!("{ttbcr:032b}");
     // let ttbcr_n = ttbcr & 0b111;
     let ttbr0_el1 = *device.get_register_mut::<u64>("_TTBR0_EL1_bits");
     let ttbr1_el1 = *device.get_register_mut::<u64>("_TTBR1_EL1_bits");
@@ -51,7 +55,7 @@ fn translate_l0(
     if entry.is_table_or_page() {
         translate_l1(device, entry_to_table(&entry), guest_virtual_address)
     } else {
-        panic!("entry was not table or page")
+        exit_with_message!("entry was not table or page")
     }
 }
 
@@ -68,7 +72,7 @@ fn translate_l1(
     if !entry.is_valid() {
         // guest page fault, look up exception vector table (VBAR_EL2)
         guest_page_fault(device);
-        panic!("invalid")
+        exit_with_message!("invalid")
     }
 
     if entry.is_table_or_page() {
@@ -89,7 +93,7 @@ fn translate_l2(
     log::trace!("l2 entry: {entry:x?}");
 
     if !entry.is_valid() {
-        panic!("invalid")
+        exit_with_message!("invalid")
     }
 
     if entry.is_table_or_page() {
@@ -108,10 +112,11 @@ fn translate_l3(
     log::trace!("l3 entry_idx: {entry_idx:x?}");
     let entry = table[entry_idx];
     log::trace!("l3 entry: {entry:x?}");
+
     if entry.is_valid() && entry.is_table_or_page() {
-        panic!("{entry:x?}")
+        exit_with_message!("{entry:x?}")
     } else {
-        panic!("invalid")
+        exit_with_message!("invalid")
     }
 }
 
@@ -128,7 +133,7 @@ fn guest_page_fault(device: &ModelDevice) {
 
     // get VBAR_ELx
     let vbar_el1: u64 = *device.get_register_mut("VBAR_EL1");
-    panic!("{vbar_el1:x}");
+    exit_with_message!("{vbar_el1:x}");
 
     // get page fault handler
     // set PC and execute until we hit an eret
@@ -173,7 +178,7 @@ fn take_arm_exception(
             }
         }
     } else {
-        panic!("trap");
+        exit_with_message!("trap");
     }
 
     *device.get_register_mut::<u8>("PSTATE_D") = 1;
@@ -186,7 +191,7 @@ fn take_arm_exception(
         1 => *device.get_register_mut("VBAR_EL1"),
         2 => *device.get_register_mut("VBAR_EL2"),
         3 => *device.get_register_mut("VBAR_EL3"),
-        _ => panic!(),
+        _ => exit_with_message!("invalid EL"),
     };
     *device.get_register_mut::<u64>("_PC") = vbar + voff;
     return;
@@ -242,7 +247,7 @@ fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u32 {
             0x32
         }
         _ => {
-            panic!("trap");
+            exit_with_message!("trap")
         }
     }
 }

@@ -1667,7 +1667,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "print_endline"
             | "check_cycle_count"
             | "sail_take_exception"
-            | "CheckSPAlignment" =>
+            | "CheckSPAlignment"
+            | "AArch64_SetExclusiveMonitors" =>
             // todo: don't replace with constant, delete
             {
                 Some(build(
@@ -1679,6 +1680,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     },
                 ))
             }
+
+            // replace with "true"
+            "AArch64_ExclusiveMonitorsPass" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant {
+                    typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(1))),
+                    value: ConstantValue::UnsignedInteger(1),
+                },
+            )),
             _ => None,
         }
     }

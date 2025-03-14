@@ -39,10 +39,11 @@ macro_rules! exit_with_message {
     ($($arg:tt)*) => {
         (|| {
             log::error!($($arg)*);
-            qemu_exit();
+            qemu_exit()
         })()
     }
 }
+pub(crate) use exit_with_message;
 
 static mut IRQ_MANAGER: Once<IrqManager> = Once::INIT;
 
@@ -156,6 +157,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         PageFaultErrorCode::from_bits(unsafe { (*machine_context).error_code }).unwrap();
 
     if faulting_address <= LOW_HALF_CANONICAL_END {
+        log::debug!("guest fault @ {faulting_address:#x}");
         let exec_ctx = crate::guest::GuestExecutionContext::current();
         let addrspace = unsafe { &*exec_ctx.current_address_space };
 
@@ -174,7 +176,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         let mmu_enabled = *device.get_register_mut::<u64>("SCTLR_EL1_bits") & 1 == 1;
 
         // correct the address as it was masked off in emitter.rs:read/write-memory
-        let faulting_address =
+        let unmasked_address =
             VirtAddr::new((((faulting_address.as_u64() as i64) << 24) >> 24) as u64);
 
         let guest_physical = if mmu_enabled {
@@ -187,9 +189,9 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             // * map that guest physical address into the correct location in host virtual
             //   memory
 
-            guest_translate(device, faulting_address.as_u64()).unwrap()
+            guest_translate(device, unmasked_address.as_u64()).unwrap()
         } else {
-            faulting_address.as_u64()
+            unmasked_address.as_u64()
         };
 
         let guest_backing_frame = VirtualMemoryArea::current()

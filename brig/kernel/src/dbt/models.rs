@@ -341,7 +341,7 @@ impl ModelDevice {
             log::info!("instrs: {instructions_retired}");
             let current_pc = unsafe {
                 *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
-            };
+            } & 0x0000_00FF_FFFF_FFFF;
 
             if let Some(translation) = instr_cache.get(&current_pc) {
                 log::info!("executing cached translation @ {current_pc:x}");
@@ -364,8 +364,9 @@ impl ModelDevice {
                 let _false = emitter.constant(0 as u64, Type::Unsigned(1));
                 emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
 
-                let current_pc =
-                    *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64);
+                let current_pc = *(register_file_ptr.add(self.model.reg_offset("_PC") as usize)
+                    as *mut u64)
+                    & 0x0000_00FF_FFFF_FFFF;
                 let opcode = *(current_pc as *const u32);
 
                 log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");

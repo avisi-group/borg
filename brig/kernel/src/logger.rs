@@ -8,7 +8,7 @@ use {
 };
 
 const ENABLE_COLORS: bool = true;
-pub const REG_TRACE_ONLY: bool = false;
+pub const REG_TRACE_ONLY: bool = true;
 
 /*struct QemuWriter;
 

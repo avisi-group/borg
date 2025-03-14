@@ -3310,3 +3310,34 @@ fn mrs_id_aa64dfr0_el1() {
 //         assert_eq!(*x1, 0x1311211130111112);
 //     }
 // }
+
+#[ktest]
+fn ldaxr() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    // ldaxr            x3, [x0]
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xc85ffc03, Type::Unsigned(32));
+    translate(
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let _translation = ctx.compile(num_regs);
+}
