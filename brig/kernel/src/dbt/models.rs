@@ -1,6 +1,6 @@
 use {
     crate::{
-        arch::x86::memory::VirtualMemoryArea,
+        arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         dbt::{
             Translation,
             emitter::{Emitter, Type},
@@ -336,6 +336,11 @@ impl ModelDevice {
         };
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
+
+        let status = record_safepoint();
+        if status != 0 {
+            panic!("returned to safe point")
+        }
 
         loop {
             log::info!("instrs: {instructions_retired}");

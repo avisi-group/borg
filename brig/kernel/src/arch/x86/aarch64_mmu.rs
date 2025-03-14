@@ -1,6 +1,9 @@
 use {
     crate::{
-        arch::x86::{irq::exit_with_message, memory::guest_physical_to_host_virt},
+        arch::x86::{
+            irq::exit_with_message, memory::guest_physical_to_host_virt,
+            safepoint::interrupt_restore_safepoint,
+        },
         dbt::models::ModelDevice,
         qemu_exit,
     },
@@ -116,7 +119,9 @@ fn translate_l3(
     if entry.is_valid() && entry.is_table_or_page() {
         exit_with_message!("{entry:x?}")
     } else {
-        exit_with_message!("invalid")
+        log::warn!("invalid");
+        guest_page_fault(device);
+        None
     }
 }
 
@@ -129,11 +134,18 @@ fn entry_to_table(entry: &Descriptor) -> &[Descriptor; 512] {
 fn guest_page_fault(device: &ModelDevice) {
     // get EL
     let el: u8 = *device.get_register_mut("PSTATE_EL");
-    assert_eq!(el, 1);
+    log::warn!("el = {el}");
 
     // get VBAR_ELx
     let vbar_el1: u64 = *device.get_register_mut("VBAR_EL1");
-    exit_with_message!("{vbar_el1:x}");
+    let vbar_el2: u64 = *device.get_register_mut("VBAR_EL2");
+    let vbar_el3: u64 = *device.get_register_mut("VBAR_EL3");
+
+    log::warn!("{vbar_el1:x}");
+    log::warn!("{vbar_el2:x}");
+    log::warn!("{vbar_el3:x}");
+
+    interrupt_restore_safepoint(1);
 
     // get page fault handler
     // set PC and execute until we hit an eret

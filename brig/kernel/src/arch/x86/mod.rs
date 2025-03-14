@@ -18,6 +18,7 @@ pub mod backtrace;
 mod gdt;
 pub mod irq;
 pub mod memory;
+pub mod safepoint;
 
 pub fn init(
     BootInfo {
