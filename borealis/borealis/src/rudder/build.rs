@@ -1535,8 +1535,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ))
             }
 
-            // val Mem_read : (%bv64, %i, struct AccessDescriptor) -> %bv
-            "Mem_read" => {
+            // val Mem_read__2 : (%bv64, %i64, struct AccessDescriptor, %bool, %bool) -> %bv
+            "Mem_read__2" => {
                 let address = args[0].clone();
                 let size = args[1].clone();
                 let _accdesc = args[2].clone();
@@ -1548,8 +1548,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 ))
             }
 
-            //val Mem_set : (%bv64, %i, struct AccessDescriptor, %bv) -> %unit
-            "Mem_set" => {
+            // val Mem_set__2 : (%bv64, %i, struct AccessDescriptor, %bool, %bool, %bv) -> %unit
+            "Mem_set__2" => {
                 let address = args[0].clone();
                 let _size = args[1].clone();
                 let _accdesc = args[2].clone();
@@ -1666,7 +1666,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "print"
             | "print_endline"
             | "check_cycle_count"
-            | "sail_take_exception" =>
+            | "sail_take_exception"
+            | "CheckSPAlignment" =>
             // todo: don't replace with constant, delete
             {
                 Some(build(
