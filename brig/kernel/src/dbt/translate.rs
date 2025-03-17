@@ -566,7 +566,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     )
                 };
 
-                log::debug!(
+                log::trace!(
                     "reading var {} in block {:#x} in {:?} = {:?}",
                     symbol.name(),
                     block.index(),
@@ -577,7 +577,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 StatementResult::Data(Some(self.read_variable(var)))
             }
             Statement::WriteVariable { symbol, value } => {
-                log::debug!(
+                log::trace!(
                     "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}",
                     symbol.name(),
                     block.index(),
@@ -585,7 +585,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                 );
 
                 if variables.get(&symbol.name()).is_none() {
-                    log::debug!("writing var {} for the first time", symbol.name());
+                    log::trace!("writing var {} for the first time", symbol.name());
                     variables.insert(
                         symbol.name(),
                         LocalVariable::Virtual {
@@ -599,7 +599,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                     // stack, put it there
                     match variables.get(&symbol.name()).unwrap() {
                         LocalVariable::Virtual { .. } => {
-                            log::debug!(
+                            log::trace!(
                                 "promoting {:?} from virtual to stack in block {:#x} in {:?}",
                                 symbol.name(),
                                 block.index(),
@@ -608,7 +608,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
                             let stack_offset =
                                 if let Some(offset) = self.promoted_locations.get(&symbol.name()) {
-                                    log::debug!(
+                                    log::trace!(
                                         "variable {:?} already promoted to stack @ {offset:#x}",
                                         symbol.name()
                                     );
@@ -617,7 +617,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
                                     let offset = self.allocate_stack_offset(&symbol.typ());
                                     self.promoted_locations.insert(symbol.name(), offset);
 
-                                    log::debug!(
+                                    log::trace!(
                                         "variable {:?} promoted to stack @ {offset:#x}",
                                         symbol.name()
                                     );

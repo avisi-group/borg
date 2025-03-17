@@ -34,6 +34,7 @@ mod devices;
 mod fs;
 pub mod guest;
 mod logger;
+pub mod memory;
 pub mod plugins;
 mod rand;
 mod scheduler;

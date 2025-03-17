@@ -117,7 +117,11 @@ fn init_register_file<M: Borrow<Model>>(model: M) -> Vec<u8> {
 }
 
 fn configure_features(model: &Model, register_file: *mut u8) {
-    let disabled = ["FEAT_LSE2_IMPLEMENTED", "FEAT_TME_IMPLEMENTED"];
+    let disabled = [
+        "FEAT_LSE2_IMPLEMENTED",
+        "FEAT_TME_IMPLEMENTED",
+        "FEAT_BTI_IMPLEMENTED",
+    ];
 
     disabled.iter().for_each(|name| {
         let offset = model.reg_offset(*name);

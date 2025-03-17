@@ -18,7 +18,6 @@ acpi = "5.2.0"
 virtio-drivers = { version = "0.9.0", features = ["alloc"] }
 
 spin = "0.9.8"
-buddy_system_allocator = "0.11.0"
 byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
 log = { version = "0.4.26", default-features = false }
 elf = { version = "0.7.4", default-features = false }
@@ -54,4 +53,8 @@ linkme = "0.3.32"
 num-rational = { version = "0.4.2", default-features = false }
 postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
 disarm64 = "0.1.24"
-aarch64-paging = { git = "https://github.com/fmckeogh/aarch64-paging" }
+aarch64-paging = "0.8.1"
+
+buddy_system_allocator = "0.11.0"
+#talc = { version = "4.4.2", features = ["counters"] } // weirdly slow
+#linked_list_allocator = "0.10.5" // only supports single backing chunk

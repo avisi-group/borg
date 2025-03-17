@@ -1,0 +1,59 @@
+use {
+    alloc::boxed::Box,
+    core::{
+        alloc::{AllocError, Allocator, Layout},
+        cell::RefCell,
+        ptr::NonNull,
+        sync::atomic::{AtomicUsize, Ordering},
+    },
+};
+
+pub struct BumpAllocator {
+    data: RefCell<Box<[u8]>>,
+    position: AtomicUsize,
+}
+
+impl BumpAllocator {
+    pub fn new(len: usize) -> Self {
+        Self {
+            data: RefCell::new(unsafe {
+                Box::new_uninit_slice(len)
+                    // safe because all possible byte values for a `u8` is a valid `u8`
+                    .assume_init()
+            }),
+            position: AtomicUsize::new(0),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.position.store(0, Ordering::Relaxed);
+    }
+}
+
+unsafe impl Allocator for BumpAllocator {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        let position = self.position.load(Ordering::Relaxed);
+
+        // aligned position for this allocation
+        let aligned = position + (layout.align() - (position % layout.align()));
+
+        let next_position = aligned + layout.size();
+
+        if next_position >= self.data.borrow().len() {
+            // insufficient memory for the current allocation
+            return Err(AllocError);
+        }
+
+        self.position.store(next_position, Ordering::Relaxed);
+
+        Ok(unsafe {
+            NonNull::new_unchecked(
+                &mut self.data.borrow_mut()[aligned..aligned + layout.size()] as *mut _,
+            )
+        })
+    }
+
+    unsafe fn deallocate(&self, _ptr: NonNull<u8>, _layout: Layout) {
+        // no-op
+    }
+}

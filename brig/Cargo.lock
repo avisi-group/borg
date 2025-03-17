@@ -4,8 +4,9 @@ version = 4
 
 [[package]]
 name = "aarch64-paging"
-version = "0.8.0"
-source = "git+https://github.com/fmckeogh/aarch64-paging#cc3b46ae228245b48c66b1331c03f139d3110747"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a99e1041d545949fa732edf65cab7067ce8f05825c4f6fd4020b70dd76a88df"
 dependencies = [
  "bitflags 2.9.0",
  "thiserror",
