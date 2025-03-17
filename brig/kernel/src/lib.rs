@@ -4,6 +4,7 @@
 #![feature(naked_functions)] // for interrupts with glorious purpose
 #![feature(btree_cursors)]
 #![feature(int_roundings)]
+#![feature(new_zeroed_alloc)] // bump allocator
 #![allow(static_mut_refs)] // todo: fix me
 
 extern crate alloc;

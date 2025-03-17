@@ -1,11 +1,11 @@
 #![no_std]
+#![feature(allocator_api)]
 
 extern crate alloc;
 
 pub use hashbrown::hash_map::Entry;
 use {
-    alloc::string::String,
-    alloc::vec::Vec,
+    alloc::{string::String, vec::Vec},
     core::hash::BuildHasherDefault,
     serde::{Deserialize, Serialize},
 };
