@@ -8,11 +8,11 @@ use {
         HashSet,
         arena::{Arena, Ref},
     },
-    core::fmt::Write,
+    core::{alloc::Allocator, fmt::Write},
     itertools::Itertools,
 };
 
-pub fn render(arena: &Arena<X86Block>, entry: Ref<X86Block>) -> String {
+pub fn render<A: Allocator>(arena: &Arena<X86Block, A>, entry: Ref<X86Block>) -> String {
     let mut out = String::new();
 
     let mut blocks = HashSet::default();

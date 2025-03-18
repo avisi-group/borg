@@ -15,6 +15,7 @@ use {
         fs::{File, Filesystem, tar::TarFilesystem},
         guest::register_device_factory,
         logger::REG_TRACE_ONLY,
+        memory::bump::{BumpAllocator, BumpAllocatorRef},
     },
     alloc::{
         borrow::ToOwned,
@@ -335,6 +336,8 @@ impl ModelDevice {
             ptr
         };
 
+        let mut allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
+
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
         let status = record_safepoint();
@@ -343,6 +346,8 @@ impl ModelDevice {
         }
 
         loop {
+            allocator.clear();
+
             log::info!("instrs: {instructions_retired}");
             let current_pc = unsafe {
                 *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
@@ -362,7 +367,11 @@ impl ModelDevice {
                 // reset SEE
                 *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
 
-                let mut ctx = X86TranslationContext::new(&self.model, true);
+                let mut ctx = X86TranslationContext::new_with_allocator(
+                    BumpAllocatorRef::new(&allocator),
+                    &self.model,
+                    true,
+                );
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 // reset BranchTaken

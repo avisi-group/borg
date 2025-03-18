@@ -1,5 +1,8 @@
 use {
-    alloc::vec::Vec,
+    alloc::{
+        alloc::{Allocator, Global},
+        vec::Vec,
+    },
     core::{
         fmt::Debug,
         hash::{Hash, Hasher},
@@ -7,18 +10,47 @@ use {
     },
 };
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Arena<T> {
-    vec: Vec<T>,
+#[derive(Debug, Clone)]
+pub struct Arena<T, A: Allocator = Global> {
+    vec: Vec<T, A>,
 
     #[cfg(feature = "arena-debug")]
     id: crate::id::Id,
 }
 
-impl<T> Arena<T> {
+impl<T: serde::Serialize> serde::Serialize for Arena<T, Global> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.vec.serialize(serializer)
+    }
+}
+
+impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Arena<T, Global> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        <Vec<T> as serde::Deserialize>::deserialize(deserializer).map(|vec| Arena { vec })
+    }
+}
+
+impl<T> Arena<T, Global> {
     pub fn new() -> Self {
         Self {
             vec: Vec::new(),
+
+            #[cfg(feature = "arena-debug")]
+            id: crate::id::Id::new(),
+        }
+    }
+}
+
+impl<T, A: Allocator> Arena<T, A> {
+    pub fn new_in(allocator: A) -> Self {
+        Self {
+            vec: Vec::new_in(allocator),
 
             #[cfg(feature = "arena-debug")]
             id: crate::id::Id::new(),
@@ -36,7 +68,7 @@ impl<T> Arena<T> {
         }
     }
 
-    pub fn into_inner(self) -> Vec<T> {
+    pub fn into_inner(self) -> Vec<T, A> {
         self.vec
     }
 }
@@ -45,19 +77,24 @@ impl<T> Arena<T> {
 pub struct Ref<T> {
     index: usize,
     _phantom: PhantomData<T>,
+    //_phantom: PhantomData<A>, TODO: make Ref generic over allocator too for mild safety
+    //_phantom: improvement
     #[cfg(feature = "arena-debug")]
     arena: crate::id::Id,
 }
 
 impl<T> Ref<T> {
-    pub fn get_mut<'reph, 'arena: 'reph>(&self, arena: &'arena mut Arena<T>) -> &'reph mut T {
+    pub fn get_mut<'reph, 'arena: 'reph, A: Allocator>(
+        &self,
+        arena: &'arena mut Arena<T, A>,
+    ) -> &'reph mut T {
         #[cfg(feature = "arena-debug")]
         assert_eq!(arena.id, self.arena);
 
         unsafe { arena.vec.get_unchecked_mut(self.index) }
     }
 
-    pub fn get<'reph, 'arena: 'reph>(&self, arena: &'arena Arena<T>) -> &'reph T {
+    pub fn get<'reph, 'arena: 'reph, A: Allocator>(&self, arena: &'arena Arena<T, A>) -> &'reph T {
         #[cfg(feature = "arena-debug")]
         assert_eq!(arena.id, self.arena);
 

@@ -21,7 +21,7 @@ ocaml = { version = "1.2.0", optional = true }
 spin = { version = "0.9.8", features = ["lazy"], optional = true }
 
 [features]
-default = ["no-std"]#"arena-debug"
+default = ["no-std"] #"arena-debug"
 no-std = ["lasso/no-std", "dep:spin"]
 std = ["dep:ocaml", "lasso/multi-threaded", "hashbrown/rayon"]
 arena-debug = []

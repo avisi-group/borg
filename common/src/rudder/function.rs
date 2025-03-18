@@ -1,12 +1,12 @@
 use {
     crate::{
+        HashMap,
         arena::{Arena, Ref},
         intern::InternedString,
         rudder::{
             block::{Block, BlockIterator},
             types::Type,
         },
-        HashMap,
     },
     alloc::vec::Vec,
     core::fmt::{self, Debug, Display, Formatter},
