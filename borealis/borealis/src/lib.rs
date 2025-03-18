@@ -18,8 +18,8 @@ use {
         },
     },
     common::{
-        HashMap, HashSet,
         intern::InternedString,
+        modname::{HashMap, HashSet},
         rudder::{
             block::Block,
             constant_value::ConstantValue,

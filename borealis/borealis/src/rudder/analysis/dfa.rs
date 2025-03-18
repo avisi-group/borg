@@ -1,7 +1,7 @@
 use common::{
-    HashMap, HashSet,
     arena::{Arena, Ref},
     intern::InternedString,
+    modname::{HashMap, HashSet},
     rudder::{
         block::Block,
         function::{Function, Symbol},

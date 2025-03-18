@@ -1,8 +1,8 @@
 use {
     crate::{
         arena::{Arena, Ref},
+        modname::HashSet,
         rudder::statement::Statement,
-        HashSet,
     },
     alloc::vec::Vec,
     core::fmt::{self, Display, Formatter},

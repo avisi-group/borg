@@ -1,18 +1,18 @@
 use {
-    crate::dbt::x86::emitter::X86Block,
+    crate::dbt::{Alloc, x86::emitter::X86Block},
     alloc::{
         format,
         string::{String, ToString},
     },
     common::{
-        HashSet,
         arena::{Arena, Ref},
+        modname::HashSet,
     },
     core::{alloc::Allocator, fmt::Write},
     itertools::Itertools,
 };
 
-pub fn render<A: Allocator>(arena: &Arena<X86Block, A>, entry: Ref<X86Block>) -> String {
+pub fn render<A: Alloc>(arena: &Arena<X86Block<A>, A>, entry: Ref<X86Block<A>>) -> String {
     let mut out = String::new();
 
     let mut blocks = HashSet::default();
@@ -71,6 +71,6 @@ pub fn render<A: Allocator>(arena: &Arena<X86Block, A>, entry: Ref<X86Block>) ->
     out
 }
 
-fn ref_label(r: Ref<X86Block>) -> String {
+fn ref_label<A: Alloc>(r: Ref<X86Block<A>>) -> String {
     format!("n{:x}", r.index())
 }

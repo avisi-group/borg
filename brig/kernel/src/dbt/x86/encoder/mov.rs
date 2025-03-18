@@ -1,9 +1,12 @@
 use {
-    crate::dbt::x86::encoder::{
-        Operand,
-        OperandKind::{Immediate as I, Memory as M, Register as R},
-        Register::PhysicalRegister as PHYS,
-        Width, memory_operand_to_iced,
+    crate::dbt::{
+        Alloc,
+        x86::encoder::{
+            Operand,
+            OperandKind::{Immediate as I, Memory as M, Register as R},
+            Register::PhysicalRegister as PHYS,
+            Width, memory_operand_to_iced,
+        },
     },
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
@@ -11,7 +14,7 @@ use {
     },
 };
 
-pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
+pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
     match (src, dst) {
         // MOV R -> R
         (

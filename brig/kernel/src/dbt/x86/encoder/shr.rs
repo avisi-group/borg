@@ -1,17 +1,20 @@
 use {
-    crate::dbt::x86::encoder::{
-        Operand,
-        OperandKind::{Immediate as I, Register as R},
-        PhysicalRegister,
-        Register::PhysicalRegister as PHYS,
-        Width,
+    crate::dbt::{
+        Alloc,
+        x86::encoder::{
+            Operand,
+            OperandKind::{Immediate as I, Register as R},
+            PhysicalRegister,
+            Register::PhysicalRegister as PHYS,
+            Width,
+        },
     },
     iced_x86::code_asm::{
         AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
     },
 };
 
-pub fn encode(assembler: &mut CodeAssembler, amount: &Operand, value: &Operand) {
+pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, value: &Operand<A>) {
     match (amount, value) {
         (
             Operand {

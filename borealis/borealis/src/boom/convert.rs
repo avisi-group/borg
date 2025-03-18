@@ -6,7 +6,7 @@ use {
         control_flow::{ControlFlowBlock, builder::ControlFlowGraphBuilder},
         convert::sail_ast::Identifier,
     },
-    common::{HashMap, intern::InternedString},
+    common::{intern::InternedString, modname::HashMap},
     itertools::Itertools,
     sailrs::{
         jib_ast::{self, CReturn},

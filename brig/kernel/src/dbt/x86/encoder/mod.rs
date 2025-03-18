@@ -1,7 +1,11 @@
 use {
-    crate::dbt::x86::{emitter::X86Block, encoder::width::Width},
-    common::{HashMap, arena::Ref},
+    crate::dbt::{
+        Alloc,
+        x86::{emitter::X86Block, encoder::width::Width},
+    },
+    common::{arena::Ref, modname::HashMap},
     core::fmt::{Debug, Display, Formatter},
+    derive_where::derive_where,
     displaydoc::Display,
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
@@ -27,95 +31,95 @@ pub mod width;
 mod xor;
 
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
-pub enum Opcode {
+pub enum Opcode<A: Alloc> {
     /// mov {0}, {1}
-    MOV(Operand, Operand),
+    MOV(Operand<A>, Operand<A>),
     /// movzx {0}, {1}
-    MOVZX(Operand, Operand),
+    MOVZX(Operand<A>, Operand<A>),
     /// movsx {0}, {1}
-    MOVSX(Operand, Operand),
+    MOVSX(Operand<A>, Operand<A>),
     /// cmove {0}, {1}
-    CMOVE(Operand, Operand),
+    CMOVE(Operand<A>, Operand<A>),
     /// cmovne {0}, {1}
-    CMOVNE(Operand, Operand),
+    CMOVNE(Operand<A>, Operand<A>),
     /// lea {0}, {1}
-    LEA(Operand, Operand),
+    LEA(Operand<A>, Operand<A>),
     /// shl {0}, {1}
-    SHL(Operand, Operand),
+    SHL(Operand<A>, Operand<A>),
     /// shr {0}, {1}
-    SHR(Operand, Operand),
+    SHR(Operand<A>, Operand<A>),
     /// sar {0}, {1}
-    SAR(Operand, Operand),
+    SAR(Operand<A>, Operand<A>),
     /// add {0}, {1}
-    ADD(Operand, Operand),
+    ADD(Operand<A>, Operand<A>),
     /// adc {0}, {1}, {2}
-    ADC(Operand, Operand, Operand),
+    ADC(Operand<A>, Operand<A>, Operand<A>),
     /// sub {0}, {1}
-    SUB(Operand, Operand),
+    SUB(Operand<A>, Operand<A>),
     /// or {0}, {1},
-    OR(Operand, Operand),
+    OR(Operand<A>, Operand<A>),
     /// xor {0}, {1},
-    XOR(Operand, Operand),
+    XOR(Operand<A>, Operand<A>),
     /// and {0}, {1},
-    AND(Operand, Operand),
+    AND(Operand<A>, Operand<A>),
     /// imul {0}, {1},
-    IMUL(Operand, Operand),
+    IMUL(Operand<A>, Operand<A>),
     /// idiv {0}, {1}, {2}
-    IDIV(Operand, Operand, Operand),
+    IDIV(Operand<A>, Operand<A>, Operand<A>),
     /// not {0}
-    NOT(Operand),
+    NOT(Operand<A>),
     /// neg {0}
-    NEG(Operand),
+    NEG(Operand<A>),
     /// bextr {0}, {1}, {2}
-    BEXTR(Operand, Operand, Operand),
+    BEXTR(Operand<A>, Operand<A>, Operand<A>),
     /// jmp {0}
-    JMP(Operand),
+    JMP(Operand<A>),
     /// push {0}
-    PUSH(Operand),
+    PUSH(Operand<A>),
     /// pop {0}
-    POP(Operand),
+    POP(Operand<A>),
     /// ret
     RET,
     /// test {0}, {1}
-    TEST(Operand, Operand),
+    TEST(Operand<A>, Operand<A>),
     /// cmp {0}, {1}
-    CMP(Operand, Operand),
+    CMP(Operand<A>, Operand<A>),
 
     /// sets {0}
-    SETS(Operand), //n
+    SETS(Operand<A>), //n
     /// sete {0}
-    SETE(Operand), //z
+    SETE(Operand<A>), //z
     /// setc {0}
-    SETC(Operand), //c
+    SETC(Operand<A>), //c
     /// seto {0}
-    SETO(Operand), //v
+    SETO(Operand<A>), //v
 
     /// setne {0}
-    SETNE(Operand),
+    SETNE(Operand<A>),
     /// setnz {0}
-    SETNZ(Operand),
+    SETNZ(Operand<A>),
     /// setb {0}
-    SETB(Operand),
+    SETB(Operand<A>),
     /// setbe {0}
-    SETBE(Operand),
+    SETBE(Operand<A>),
     /// seta {0}
-    SETA(Operand),
+    SETA(Operand<A>),
     /// setg {0}
-    SETG(Operand),
+    SETG(Operand<A>),
     /// setge {0}
-    SETGE(Operand),
+    SETGE(Operand<A>),
     /// setl {0}
-    SETL(Operand),
+    SETL(Operand<A>),
     /// setle {0}
-    SETLE(Operand),
+    SETLE(Operand<A>),
     /// setae {0}
-    SETAE(Operand),
+    SETAE(Operand<A>),
     /// jne {0}
-    JNE(Operand),
+    JNE(Operand<A>),
     /// nop
     NOP,
     /// int {0}
-    INT(Operand),
+    INT(Operand<A>),
 
     /// special marker for dead instructions
     DEAD,
@@ -389,8 +393,9 @@ impl Into<i32> for MemoryScale {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum OperandKind {
+#[derive(Clone, Copy)]
+#[derive_where(PartialEq, Eq)]
+pub enum OperandKind<A: Alloc> {
     Immediate(u64),
     Memory {
         base: Option<Register>,
@@ -400,16 +405,16 @@ pub enum OperandKind {
         segment_override: Option<SegmentRegister>,
     },
     Register(Register),
-    Target(Ref<X86Block>),
+    Target(Ref<X86Block<A>>),
 }
 
-impl Display for Operand {
+impl<A: Alloc> Display for Operand<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}:{}", self.kind, self.width_in_bits)
     }
 }
 
-impl Display for OperandKind {
+impl<A: Alloc> Display for OperandKind<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match self {
             OperandKind::Immediate(immval) => write!(f, "${immval}"),
@@ -444,7 +449,7 @@ impl Display for OperandKind {
     }
 }
 
-impl Debug for OperandKind {
+impl<A: Alloc> Debug for OperandKind<A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Immediate(arg0) => f.debug_tuple("Immediate").field(arg0).finish(),
@@ -468,14 +473,15 @@ impl Debug for OperandKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Operand {
-    pub kind: OperandKind,
+#[derive(Debug, Clone, Copy)]
+#[derive_where(PartialEq, Eq)]
+pub struct Operand<A: Alloc> {
+    pub kind: OperandKind<A>,
     pub width_in_bits: Width,
 }
 
-impl Operand {
-    pub fn kind(&self) -> &OperandKind {
+impl<A: Alloc> Operand<A> {
+    pub fn kind(&self) -> &OperandKind<A> {
         &self.kind
     }
 
@@ -483,32 +489,32 @@ impl Operand {
         self.width_in_bits
     }
 
-    pub fn imm(width_in_bits: Width, value: u64) -> Operand {
+    pub fn imm(width_in_bits: Width, value: u64) -> Operand<A> {
         Operand {
             kind: OperandKind::Immediate(value),
             width_in_bits: (width_in_bits),
         }
     }
 
-    pub fn preg(width_in_bits: Width, reg: PhysicalRegister) -> Operand {
+    pub fn preg(width_in_bits: Width, reg: PhysicalRegister) -> Operand<A> {
         Operand {
             kind: OperandKind::Register(Register::PhysicalRegister(reg)),
             width_in_bits: (width_in_bits),
         }
     }
 
-    pub fn vreg(width_in_bits: Width, reg: usize) -> Operand {
+    pub fn vreg(width_in_bits: Width, reg: usize) -> Operand<A> {
         Operand {
             kind: OperandKind::Register(Register::VirtualRegister(reg)),
             width_in_bits: (width_in_bits),
         }
     }
 
-    pub fn mem_base(width_in_bits: Width, base: Register) -> Operand {
+    pub fn mem_base(width_in_bits: Width, base: Register) -> Operand<A> {
         Self::mem_base_displ(width_in_bits, base, 0)
     }
 
-    pub fn mem_base_displ(width_in_bits: Width, base: Register, displacement: i32) -> Operand {
+    pub fn mem_base_displ(width_in_bits: Width, base: Register, displacement: i32) -> Operand<A> {
         Operand {
             kind: OperandKind::Memory {
                 base: Some(base),
@@ -526,7 +532,7 @@ impl Operand {
         base: Register,
         idx: Register,
         scale: MemoryScale,
-    ) -> Operand {
+    ) -> Operand<A> {
         Self::mem_base_idx_scale_displ(width_in_bits, base, idx, scale, 0)
     }
 
@@ -536,7 +542,7 @@ impl Operand {
         idx: Register,
         scale: MemoryScale,
         displacement: i32,
-    ) -> Operand {
+    ) -> Operand<A> {
         Operand {
             kind: OperandKind::Memory {
                 base: Some(base),
@@ -553,7 +559,7 @@ impl Operand {
         width_in_bits: u16,
         segment: SegmentRegister,
         displacement: i32,
-    ) -> Operand {
+    ) -> Operand<A> {
         Operand {
             kind: OperandKind::Memory {
                 base: None,
@@ -566,7 +572,7 @@ impl Operand {
         }
     }
 
-    pub fn target(target: Ref<X86Block>) -> Self {
+    pub fn target(target: Ref<X86Block<A>>) -> Self {
         Self {
             kind: OperandKind::Target(target),
             width_in_bits: Width::_64, // todo: not really true, fix this
@@ -575,11 +581,11 @@ impl Operand {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Instruction(pub Opcode);
+pub struct Instruction<A: Alloc>(pub Opcode<A>);
 
 macro_rules! alu_op {
     ($gen_name: ident, $opcode: ident) => {
-        pub fn $gen_name(src: Operand, dst: Operand) -> Self {
+        pub fn $gen_name(src: Operand<A>, dst: Operand<A>) -> Self {
             // todo: re-enable me
             // if src.width() != dst.width() {
             //     panic!("different widths: {src} {dst}")
@@ -633,7 +639,7 @@ impl<'a> UseDef<'a> {
     }
 }
 
-impl Display for Instruction {
+impl<A: Alloc> Display for Instruction<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -662,69 +668,69 @@ fn memory_operand_to_iced(
     mem
 }
 
-impl Instruction {
-    pub fn adc(a: Operand, b: Operand, c: Operand) -> Self {
+impl<A: Alloc> Instruction<A> {
+    pub fn adc(a: Operand<A>, b: Operand<A>, c: Operand<A>) -> Self {
         Self(Opcode::ADC(a, b, c))
     }
 
-    pub fn mov(src: Operand, dst: Operand) -> Result<Self, ()> {
+    pub fn mov(src: Operand<A>, dst: Operand<A>) -> Result<Self, ()> {
         if src.width() != dst.width() {
             return Err(());
         }
         Ok(Self(Opcode::MOV(src, dst)))
     }
 
-    pub fn movzx(src: Operand, dst: Operand) -> Self {
+    pub fn movzx(src: Operand<A>, dst: Operand<A>) -> Self {
         assert!(src.width() < dst.width());
         Self(Opcode::MOVZX(src, dst))
     }
 
-    pub fn movsx(src: Operand, dst: Operand) -> Self {
+    pub fn movsx(src: Operand<A>, dst: Operand<A>) -> Self {
         assert!(src.width() < dst.width());
         Self(Opcode::MOVSX(src, dst))
     }
 
-    pub fn lea(src: Operand, dst: Operand) -> Self {
+    pub fn lea(src: Operand<A>, dst: Operand<A>) -> Self {
         Self(Opcode::LEA(src, dst))
     }
 
-    pub fn and(src: Operand, dst: Operand) -> Self {
+    pub fn and(src: Operand<A>, dst: Operand<A>) -> Self {
         Self(Opcode::AND(src, dst))
     }
 
-    pub fn imul(src: Operand, dst: Operand) -> Self {
+    pub fn imul(src: Operand<A>, dst: Operand<A>) -> Self {
         Self(Opcode::IMUL(src, dst))
     }
 
-    pub fn idiv(dividend_hi: Operand, dividend_lo: Operand, divisor: Operand) -> Self {
+    pub fn idiv(dividend_hi: Operand<A>, dividend_lo: Operand<A>, divisor: Operand<A>) -> Self {
         Self(Opcode::IDIV(dividend_hi, dividend_lo, divisor))
     }
 
-    pub fn shl(amount: Operand, op0: Operand) -> Self {
+    pub fn shl(amount: Operand<A>, op0: Operand<A>) -> Self {
         Self(Opcode::SHL(amount, op0))
     }
 
-    pub fn shr(amount: Operand, op0: Operand) -> Self {
+    pub fn shr(amount: Operand<A>, op0: Operand<A>) -> Self {
         Self(Opcode::SHR(amount, op0))
     }
 
-    pub fn sar(amount: Operand, op0: Operand) -> Self {
+    pub fn sar(amount: Operand<A>, op0: Operand<A>) -> Self {
         Self(Opcode::SAR(amount, op0))
     }
 
-    pub fn bextr(ctrl: Operand, src: Operand, dst: Operand) -> Self {
+    pub fn bextr(ctrl: Operand<A>, src: Operand<A>, dst: Operand<A>) -> Self {
         Self(Opcode::BEXTR(ctrl, src, dst))
     }
 
-    pub fn jmp(block: Ref<X86Block>) -> Self {
+    pub fn jmp(block: Ref<X86Block<A>>) -> Self {
         Self(Opcode::JMP(Operand::target(block)))
     }
 
-    pub fn push(src: Operand) -> Self {
+    pub fn push(src: Operand<A>) -> Self {
         Self(Opcode::PUSH(src))
     }
 
-    pub fn pop(dest: Operand) -> Self {
+    pub fn pop(dest: Operand<A>) -> Self {
         Self(Opcode::POP(dest))
     }
 
@@ -736,82 +742,82 @@ impl Instruction {
         Self(Opcode::NOP)
     }
 
-    pub fn test(op0: Operand, op1: Operand) -> Self {
+    pub fn test(op0: Operand<A>, op1: Operand<A>) -> Self {
         Self(Opcode::TEST(op0, op1))
     }
 
-    pub fn cmp(op0: Operand, op1: Operand) -> Self {
+    pub fn cmp(op0: Operand<A>, op1: Operand<A>) -> Self {
         Self(Opcode::CMP(op0, op1))
     }
-    pub fn seto(r: Operand) -> Self {
+    pub fn seto(r: Operand<A>) -> Self {
         Self(Opcode::SETO(r))
     }
-    pub fn setc(r: Operand) -> Self {
+    pub fn setc(r: Operand<A>) -> Self {
         Self(Opcode::SETC(r))
     }
-    pub fn sete(r: Operand) -> Self {
+    pub fn sete(r: Operand<A>) -> Self {
         Self(Opcode::SETE(r))
     }
 
-    pub fn sets(r: Operand) -> Self {
+    pub fn sets(r: Operand<A>) -> Self {
         Self(Opcode::SETS(r))
     }
 
-    pub fn setne(r: Operand) -> Self {
+    pub fn setne(r: Operand<A>) -> Self {
         Self(Opcode::SETNE(r))
     }
-    pub fn setnz(r: Operand) -> Self {
+    pub fn setnz(r: Operand<A>) -> Self {
         Self(Opcode::SETNZ(r))
     }
 
-    pub fn setb(r: Operand) -> Self {
+    pub fn setb(r: Operand<A>) -> Self {
         Self(Opcode::SETB(r))
     }
-    pub fn setl(r: Operand) -> Self {
+    pub fn setl(r: Operand<A>) -> Self {
         Self(Opcode::SETL(r))
     }
 
-    pub fn setle(r: Operand) -> Self {
+    pub fn setle(r: Operand<A>) -> Self {
         Self(Opcode::SETLE(r))
     }
-    pub fn setge(r: Operand) -> Self {
+    pub fn setge(r: Operand<A>) -> Self {
         Self(Opcode::SETGE(r))
     }
-    pub fn setg(r: Operand) -> Self {
+    pub fn setg(r: Operand<A>) -> Self {
         Self(Opcode::SETG(r))
     }
-    pub fn setbe(r: Operand) -> Self {
+    pub fn setbe(r: Operand<A>) -> Self {
         Self(Opcode::SETBE(r))
     }
 
-    pub fn seta(r: Operand) -> Self {
+    pub fn seta(r: Operand<A>) -> Self {
         Self(Opcode::SETA(r))
     }
-    pub fn setae(r: Operand) -> Self {
+    pub fn setae(r: Operand<A>) -> Self {
         Self(Opcode::SETAE(r))
     }
 
-    pub fn jne(block: Ref<X86Block>) -> Self {
+    pub fn jne(block: Ref<X86Block<A>>) -> Self {
         Self(Opcode::JNE(Operand::target(block)))
     }
 
-    pub fn not(r: Operand) -> Self {
+    pub fn not(r: Operand<A>) -> Self {
         Self(Opcode::NOT(r))
     }
 
-    pub fn neg(r: Operand) -> Self {
+    pub fn neg(r: Operand<A>) -> Self {
         Self(Opcode::NEG(r))
     }
 
-    pub fn int(n: Operand) -> Self {
+    pub fn int(n: Operand<A>) -> Self {
         Self(Opcode::INT(n))
     }
 
-    pub fn cmove(src: Operand, dest: Operand) -> Self {
+    pub fn cmove(src: Operand<A>, dest: Operand<A>) -> Self {
         Self(Opcode::CMOVE(src, dest))
     }
 
-    pub fn cmovne(src: Operand, dest: Operand) -> Self {
+    pub fn cmovne(src: Operand<A>, dest: Operand<A>) -> Self {
         Self(Opcode::CMOVNE(src, dest))
     }
 
@@ -823,7 +829,7 @@ impl Instruction {
     pub fn encode(
         &self,
         assembler: &mut CodeAssembler,
-        label_map: &HashMap<Ref<X86Block>, CodeLabel>,
+        label_map: &HashMap<Ref<X86Block<A>>, CodeLabel>,
     ) {
         use {
             Opcode::*,
@@ -1095,7 +1101,7 @@ impl Instruction {
 
     pub fn get_operands(
         &mut self,
-    ) -> impl Iterator<Item = Option<(OperandDirection, &mut Operand)>> + '_ {
+    ) -> impl Iterator<Item = Option<(OperandDirection, &mut Operand<A>)>> + '_ {
         match &mut self.0 {
             Opcode::MOV(src, dst)
             | Opcode::MOVZX(src, dst)

@@ -1,9 +1,9 @@
 use {
     crate::rudder::analysis::loopy::LoopAnalysis,
     common::{
-        HashMap,
         arena::Ref,
         intern::InternedString,
+        modname::HashMap,
         rudder::{block::Block, function::Function, statement::Statement},
     },
     log::trace,

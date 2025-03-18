@@ -1,14 +1,17 @@
 use {
-    crate::dbt::x86::encoder::{
-        Operand,
-        OperandKind::{Memory as M, Register as R},
-        Register::PhysicalRegister as PHYS,
-        Width, memory_operand_to_iced,
+    crate::dbt::{
+        Alloc,
+        x86::encoder::{
+            Operand,
+            OperandKind::{Memory as M, Register as R},
+            Register::PhysicalRegister as PHYS,
+            Width, memory_operand_to_iced,
+        },
     },
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr},
 };
 
-pub fn encode(assembler: &mut CodeAssembler, src: &Operand, dst: &Operand) {
+pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
     match (src, dst) {
         (
             Operand {

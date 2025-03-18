@@ -1,13 +1,16 @@
 use {
-    crate::dbt::x86::emitter::{
-        BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
-        UnaryOperationKind,
+    crate::dbt::{
+        Alloc,
+        x86::emitter::{
+            BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
+            UnaryOperationKind,
+        },
     },
     alloc::vec::Vec,
     core::alloc::Allocator,
 };
 
-pub trait Emitter<A: Allocator + Clone> {
+pub trait Emitter<A: Alloc> {
     type BlockRef;
     type NodeRef;
     type SymbolRef;

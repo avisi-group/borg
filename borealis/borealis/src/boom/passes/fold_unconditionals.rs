@@ -6,7 +6,7 @@ use {
         control_flow::{ControlFlowBlock, Terminator},
         passes::{Pass, any::AnyExt},
     },
-    common::HashSet,
+    common::modname::HashSet,
     log::{debug, trace},
     pretty_assertions::assert_eq,
     sailrs::shared::Shared,

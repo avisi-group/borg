@@ -3,16 +3,16 @@ use {
     deepsize::DeepSizeOf,
     lasso::{Key, Spur},
     rkyv::{
+        Archive, DeserializeUnsized, Place, SerializeUnsized,
         rancor::{Fallible, Source},
         string::{ArchivedString, StringResolver},
-        Archive, DeserializeUnsized, Place, SerializeUnsized,
     },
 };
 
 #[cfg(feature = "no-std")]
 mod interner {
     use {
-        crate::Hasher,
+        crate::modname::Hasher,
         core::hash::BuildHasherDefault,
         lasso::Spur,
         spin::{lazy::Lazy, mutex::Mutex},
@@ -42,7 +42,9 @@ mod interner {
 mod interner {
     extern crate std;
 
-    use {crate::Hasher, core::hash::BuildHasherDefault, lasso::Spur, std::sync::LazyLock};
+    use {
+        crate::modname::Hasher, core::hash::BuildHasherDefault, lasso::Spur, std::sync::LazyLock,
+    };
 
     static INTERNER: LazyLock<lasso::ThreadedRodeo<Spur, BuildHasherDefault<Hasher>>> =
         LazyLock::new(|| lasso::ThreadedRodeo::with_hasher(Default::default()));

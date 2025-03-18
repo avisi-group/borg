@@ -1,13 +1,16 @@
 //! Based on SSRA by Matt Keeter https://www.mattkeeter.com/blog/2022-10-04-ssra/
 
 use {
-    crate::dbt::x86::{
-        encoder::{Instruction, Opcode, PhysicalRegister, Register, UseDef},
-        register_allocator::RegisterAllocator,
+    crate::dbt::{
+        Alloc as MemAlloc,
+        x86::{
+            encoder::{Instruction, Opcode, PhysicalRegister, Register, UseDef},
+            register_allocator::RegisterAllocator,
+        },
     },
     alloc::vec::Vec,
     bitset_core::BitSet,
-    common::{HashMap, HashSet},
+    common::modname::{HashMap, HashSet},
     core::panic,
     itertools::Itertools,
 };
@@ -19,7 +22,7 @@ pub struct FreshAllocator {
 }
 
 impl RegisterAllocator for FreshAllocator {
-    fn allocate(&mut self, instructions: &mut [Instruction]) {
+    fn allocate<M: MemAlloc>(&mut self, instructions: &mut [Instruction<M>]) {
         log::debug!("----------------------");
 
         self.build_live_ranges(instructions);
@@ -73,7 +76,7 @@ impl FreshAllocator {
         }
     }
 
-    fn build_live_ranges(&mut self, instructions: &mut [Instruction]) {
+    fn build_live_ranges<M: MemAlloc>(&mut self, instructions: &mut [Instruction<M>]) {
         // stores stack pointer from brig, can't clobber
         self.live_ranges.insert(
             Register::PhysicalRegister(PhysicalRegister::RSP),
@@ -177,7 +180,7 @@ impl FreshAllocator {
             });
     }
 
-    fn build_allocation_plan(&mut self, instructions: &mut [Instruction]) {
+    fn build_allocation_plan<M: MemAlloc>(&mut self, instructions: &mut [Instruction<M>]) {
         let mut physical_used = 0u16;
 
         instructions.iter().enumerate().for_each(|(instruction_index, _instruction)| {

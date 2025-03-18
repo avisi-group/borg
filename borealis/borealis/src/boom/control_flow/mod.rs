@@ -13,7 +13,7 @@ use {
         Literal, Statement, Value,
         visitor::{Visitor, Walkable},
     },
-    common::{HashSet, id::Id, intern::InternedString},
+    common::{id::Id, intern::InternedString, modname::HashSet},
     itertools::Itertools,
     sailrs::shared::{Shared, Weak},
     std::{

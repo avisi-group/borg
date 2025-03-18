@@ -6,7 +6,7 @@ use {
         passes::Pass,
         visitor::Walkable,
     },
-    common::{HashMap, intern::InternedString},
+    common::{intern::InternedString, modname::HashMap},
     itertools::Itertools,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     sailrs::shared::Shared,

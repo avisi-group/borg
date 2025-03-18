@@ -1,8 +1,9 @@
 use {
     crate::{arch::x86::memory::VirtualMemoryArea, dbt::interpret::interpret},
-    alloc::{string::String, vec::Vec},
+    alloc::{alloc::Global, string::String, vec::Vec},
     common::{mask::mask, rudder::Model},
     core::{
+        alloc::Allocator,
         borrow::Borrow,
         fmt::{self, Debug},
     },
@@ -17,6 +18,12 @@ pub mod models;
 mod trampoline;
 pub mod translate;
 pub mod x86;
+
+/// Allocator convenience trait
+pub trait Alloc: Allocator + Clone + Copy + Debug {}
+
+// implement Alloc on everything that implements it's constituent traits
+impl<T: Allocator + Clone + Copy + Debug> Alloc for T {}
 
 pub struct Translation {
     pub code: Vec<u8>,

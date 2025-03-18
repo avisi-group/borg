@@ -1,8 +1,8 @@
 use {
     crate::boom::{self, control_flow::ControlFlowBlock},
     common::{
-        HashMap,
         intern::InternedString,
+        modname::HashMap,
         rudder::{
             constant_value::ConstantValue,
             function::{Function, Symbol},

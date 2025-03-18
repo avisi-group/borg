@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        bit_extract, bit_insert,
+        Alloc, bit_extract, bit_insert,
         emitter::Type,
         x86::{
             Emitter, X86TranslationContext,
@@ -12,9 +12,9 @@ use {
     },
     alloc::{rc::Rc, vec::Vec},
     common::{
-        HashMap,
         arena::{Arena, Ref},
         mask::mask,
+        modname::HashMap,
     },
     core::{
         alloc::Allocator,
@@ -39,15 +39,15 @@ pub enum X86Error {
     RegisterAllocation,
 }
 
-pub struct X86Emitter<'ctx, A: Allocator + Clone> {
-    current_block: Ref<X86Block>,
-    current_block_operands: HashMap<X86NodeRef<A>, Operand>,
-    panic_block: Ref<X86Block>,
+pub struct X86Emitter<'ctx, A: Alloc> {
+    current_block: Ref<X86Block<A>>,
+    current_block_operands: HashMap<X86NodeRef<A>, Operand<A>>,
+    panic_block: Ref<X86Block<A>>,
     next_vreg: usize,
     ctx: &'ctx mut X86TranslationContext<A>,
 }
 
-impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
+impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     pub fn new(ctx: &'ctx mut X86TranslationContext<A>) -> Self {
         Self {
             current_block: ctx.initial_block(),
@@ -76,13 +76,13 @@ impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
         vreg
     }
 
-    pub fn push_instruction(&mut self, instr: Instruction) {
+    pub fn push_instruction(&mut self, instr: Instruction<A>) {
         self.current_block
             .get_mut(self.ctx.arena_mut())
             .append(instr);
     }
 
-    pub fn push_target(&mut self, target: Ref<X86Block>) {
+    pub fn push_target(&mut self, target: Ref<X86Block<A>>) {
         log::debug!("adding target {target:?} to {:?}", self.current_block);
         self.current_block
             .get_mut(self.ctx.arena_mut())
@@ -95,7 +95,7 @@ impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
 
     /// Same as `to_operand` but if the value is a constant, move it to a
     /// register
-    fn to_operand_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand {
+    fn to_operand_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         if let NodeKind::Constant { .. } = node.kind() {
             let width = Width::from_uncanonicalized(node.typ().width()).unwrap();
             let value_reg = Operand::vreg(width, self.next_vreg());
@@ -109,7 +109,7 @@ impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
 
     /// Same as `to_operand` but if the value is a constant and larger than 32
     /// bits, move it to a register
-    fn to_operand_oversize_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand {
+    fn to_operand_oversize_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         let op = self.to_operand(node);
 
         if let OperandKind::Immediate(value) = op.kind() {
@@ -123,7 +123,7 @@ impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
         op
     }
 
-    fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand {
+    fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
         if let Some(operand) = self.current_block_operands.get(node) {
             return *operand;
         }
@@ -638,7 +638,7 @@ impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
         op
     }
 
-    fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind<A>) -> Operand {
+    fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind<A>) -> Operand<A> {
         use BinaryOperationKind::*;
 
         let (Add(left, right)
@@ -831,9 +831,9 @@ impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
     }
 }
 
-impl<'ctx, A: Allocator + Clone> Emitter<A> for X86Emitter<'ctx, A> {
+impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     type NodeRef = X86NodeRef<A>;
-    type BlockRef = Ref<X86Block>;
+    type BlockRef = Ref<X86Block<A>>;
     type SymbolRef = X86SymbolRef<A>;
 
     fn set_current_block(&mut self, block: Self::BlockRef) {
@@ -1940,29 +1940,29 @@ fn signextend_64() {
 }
 
 #[derive_where(Debug)]
-pub struct X86NodeRef<A: Allocator + Clone>(Rc<X86Node<A>, A>);
+pub struct X86NodeRef<A: Alloc>(Rc<X86Node<A>, A>);
 
-impl<A: Allocator + Clone> Clone for X86NodeRef<A> {
+impl<A: Alloc> Clone for X86NodeRef<A> {
     fn clone(&self) -> Self {
         Self(Rc::clone(&self.0))
     }
 }
 
-impl<A: Allocator + Clone> Hash for X86NodeRef<A> {
+impl<A: Alloc> Hash for X86NodeRef<A> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Rc::as_ptr(&self.0).hash(state);
     }
 }
 
-impl<A: Allocator + Clone> Eq for X86NodeRef<A> {}
+impl<A: Alloc> Eq for X86NodeRef<A> {}
 
-impl<A: Allocator + Clone> PartialEq for X86NodeRef<A> {
+impl<A: Alloc> PartialEq for X86NodeRef<A> {
     fn eq(&self, other: &X86NodeRef<A>) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl<A: Allocator + Clone> X86NodeRef<A> {
+impl<A: Alloc> X86NodeRef<A> {
     pub fn kind(&self) -> &NodeKind<A> {
         &self.0.kind
     }
@@ -1973,13 +1973,13 @@ impl<A: Allocator + Clone> X86NodeRef<A> {
 }
 
 #[derive_where(Debug)]
-pub struct X86Node<A: Allocator + Clone> {
+pub struct X86Node<A: Alloc> {
     pub typ: Type,
     pub kind: NodeKind<A>,
 }
 
 #[derive_where(Debug)]
-pub enum NodeKind<A: Allocator + Clone> {
+pub enum NodeKind<A: Alloc> {
     Constant {
         value: u64,
         width: u16,
@@ -2031,7 +2031,7 @@ pub enum NodeKind<A: Allocator + Clone> {
 
 #[derive(Clone)]
 #[derive_where(Debug)]
-pub enum BinaryOperationKind<A: Allocator + Clone> {
+pub enum BinaryOperationKind<A: Alloc> {
     Add(X86NodeRef<A>, X86NodeRef<A>),
     Sub(X86NodeRef<A>, X86NodeRef<A>),
     Multiply(X86NodeRef<A>, X86NodeRef<A>),
@@ -2051,7 +2051,7 @@ pub enum BinaryOperationKind<A: Allocator + Clone> {
 
 #[derive(Clone)]
 #[derive_where(Debug)]
-pub enum UnaryOperationKind<A: Allocator + Clone> {
+pub enum UnaryOperationKind<A: Alloc> {
     Not(X86NodeRef<A>),
     Negate(X86NodeRef<A>),
     Complement(X86NodeRef<A>),
@@ -2064,7 +2064,7 @@ pub enum UnaryOperationKind<A: Allocator + Clone> {
 
 #[derive(Clone)]
 #[derive_where(Debug)]
-pub enum TernaryOperationKind<A: Allocator + Clone> {
+pub enum TernaryOperationKind<A: Alloc> {
     AddWithCarry(X86NodeRef<A>, X86NodeRef<A>, X86NodeRef<A>),
 }
 
@@ -2094,18 +2094,18 @@ pub enum X86BlockMark {
     Permanent,
 }
 
-pub struct X86Block {
-    instructions: Vec<Instruction>,
-    next: Vec<Ref<X86Block>>,
+pub struct X86Block<A: Alloc> {
+    instructions: Vec<Instruction<A>, A>,
+    next: Vec<Ref<X86Block<A>>, A>,
     linked: bool,
     mark: X86BlockMark,
 }
 
-impl X86Block {
-    pub fn new() -> Self {
+impl<A: Alloc> X86Block<A> {
+    pub fn new_in(allocator: A) -> Self {
         Self {
-            instructions: alloc::vec![],
-            next: alloc::vec![],
+            instructions: Vec::new_in(allocator.clone()),
+            next: Vec::new_in(allocator),
             linked: false,
             mark: X86BlockMark::None,
         }
@@ -2127,7 +2127,7 @@ impl X86Block {
         self.mark
     }
 
-    pub fn append(&mut self, instruction: Instruction) {
+    pub fn append(&mut self, instruction: Instruction<A>) {
         self.instructions.push(instruction);
     }
 
@@ -2135,15 +2135,15 @@ impl X86Block {
         allocator.allocate(self.instructions_mut());
     }
 
-    pub fn instructions(&self) -> &[Instruction] {
+    pub fn instructions(&self) -> &[Instruction<A>] {
         &self.instructions
     }
 
-    pub fn instructions_mut(&mut self) -> &mut Vec<Instruction> {
+    pub fn instructions_mut(&mut self) -> &mut Vec<Instruction<A>, A> {
         &mut self.instructions
     }
 
-    pub fn next_blocks(&self) -> &[Ref<X86Block>] {
+    pub fn next_blocks(&self) -> &[Ref<X86Block<A>>] {
         &self.next
     }
 
@@ -2151,7 +2151,7 @@ impl X86Block {
         self.next.clear();
     }
 
-    pub fn push_next(&mut self, target: Ref<X86Block>) {
+    pub fn push_next(&mut self, target: Ref<X86Block<A>>) {
         self.next.push(target);
         if self.next.len() > 2 {
             panic!(
@@ -2161,7 +2161,7 @@ impl X86Block {
     }
 }
 
-impl Debug for X86Block {
+impl<A: Alloc> Debug for X86Block<A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         for instr in &self.instructions {
             writeln!(f, "\t{instr}")?;
@@ -2173,15 +2173,15 @@ impl Debug for X86Block {
 
 #[derive(Clone)]
 #[derive_where(Debug)]
-pub struct X86SymbolRef<A: Allocator + Clone>(pub Rc<RefCell<Option<X86NodeRef<A>>>, A>);
+pub struct X86SymbolRef<A: Alloc>(pub Rc<RefCell<Option<X86NodeRef<A>>>, A>);
 
-fn encode_compare<A: Allocator + Clone>(
+fn encode_compare<A: Alloc>(
     kind: &BinaryOperationKind<A>,
     emitter: &mut X86Emitter<A>,
     right: X86NodeRef<A>, /* TODO: this was flipped in order to make tests pass, unflip right
                            * and left and fix the body of the function */
     left: X86NodeRef<A>,
-) -> Operand {
+) -> Operand<A> {
     use crate::dbt::x86::encoder::OperandKind::*;
 
     let (left, right) = match (left.kind(), right.kind()) {
@@ -2358,7 +2358,7 @@ fn encode_compare<A: Allocator + Clone>(
 //     }
 // }
 
-fn emit_compare<A: Allocator + Clone>(
+fn emit_compare<A: Alloc>(
     op: BinaryOperationKind<A>,
     emitter: &mut X86Emitter<A>,
 ) -> X86NodeRef<A> {

@@ -2,10 +2,10 @@ use {
     crate::dbt::{bit_extract, bit_insert},
     alloc::vec::Vec,
     common::{
-        HashMap,
         arena::Ref,
         intern::InternedString,
         mask::mask,
+        modname::HashMap,
         rudder::{
             Model,
             block::Block,

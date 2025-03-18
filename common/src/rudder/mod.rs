@@ -1,7 +1,7 @@
 use {
     crate::{
-        HashMap,
         intern::InternedString,
+        modname::HashMap,
         rudder::{
             function::Function,
             types::{Type, maybe_type_to_string},
@@ -30,7 +30,9 @@ pub struct Model {
 pub struct RegisterDescriptor {
     pub typ: Type,
     pub offset: u64,
-    /// Registers that change infrequently can be cached during translation so reads of these registers are emitted as constant values rather than register reads
+    /// Registers that change infrequently can be cached during translation so
+    /// reads of these registers are emitted as constant values rather than
+    /// register reads
     pub cache: RegisterCacheType,
 }
 
@@ -44,7 +46,8 @@ pub enum RegisterCacheType {
     ///
     /// This effectively makes the register a translation-time global variable.
     ReadWrite,
-    /// Treat the value of the register as a constant, cache reads during translation, and return an error if it is ever written to
+    /// Treat the value of the register as a constant, cache reads during
+    /// translation, and return an error if it is ever written to
     Constant,
 }
 

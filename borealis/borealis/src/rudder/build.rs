@@ -4,10 +4,10 @@ use {
         rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
     },
     common::{
-        HashMap,
         arena::{Arena, Ref},
         id::Id,
         intern::InternedString,
+        modname::HashMap,
         rudder::{
             Model, RegisterCacheType, RegisterDescriptor,
             block::Block,

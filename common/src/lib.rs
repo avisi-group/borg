@@ -6,7 +6,6 @@ extern crate alloc;
 pub use hashbrown::hash_map::Entry;
 use {
     alloc::{string::String, vec::Vec},
-    core::hash::BuildHasherDefault,
     serde::{Deserialize, Serialize},
 };
 
@@ -17,13 +16,34 @@ pub mod mask;
 pub mod rudder;
 pub mod width_helpers;
 
-pub type Hasher = twox_hash::XxHash64;
+pub mod modname {
+    use {
+        alloc::{self, alloc::Global},
+        core::{alloc::Allocator, hash::BuildHasherDefault},
+    };
 
-/// HashMap with non-default hasher
-pub type HashMap<K, V> = hashbrown::HashMap<K, V, BuildHasherDefault<Hasher>>;
+    pub type Hasher = twox_hash::XxHash64;
 
-/// HashSet with non-default hasher
-pub type HashSet<T> = hashbrown::HashSet<T, BuildHasherDefault<Hasher>>;
+    /// HashMap with XxHash64 hasher and custom allocator
+    pub type HashMapA<K, V, A> = hashbrown::HashMap<K, V, BuildHasherDefault<Hasher>, A>;
+
+    pub fn hashmap_in<K, V, A: Allocator>(allocator: A) -> HashMapA<K, V, A> {
+        HashMapA::with_hasher_in(Default::default(), allocator)
+    }
+
+    /// HashSet with XxHash64 hasher and custom allocator
+    pub type HashSetA<T, A> = hashbrown::HashSet<T, BuildHasherDefault<Hasher>, A>;
+
+    pub fn hashset_in<T, A: Allocator>(allocator: A) -> HashSetA<T, A> {
+        HashSetA::with_hasher_in(Default::default(), allocator)
+    }
+
+    /// HashMap with XxHash64 hasher
+    pub type HashMap<K, V> = HashMapA<K, V, Global>;
+
+    /// HashSet with XxHash64 hasher
+    pub type HashSet<T> = HashSetA<T, Global>;
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum TestConfig {

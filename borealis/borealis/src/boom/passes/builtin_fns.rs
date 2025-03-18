@@ -8,7 +8,10 @@ use {
             Ast, Bit, Expression, Literal, Operation, Size, Statement, Type, Value, passes::Pass,
         },
     },
-    common::{HashMap, HashSet, intern::InternedString},
+    common::{
+        intern::InternedString,
+        modname::{HashMap, HashSet},
+    },
     core::panic,
     num_bigint::BigInt,
     once_cell::sync::Lazy,

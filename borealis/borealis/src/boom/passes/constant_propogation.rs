@@ -5,7 +5,10 @@ use {
         passes::{Pass, any::AnyExt},
         visitor::Visitor,
     },
-    common::{HashMap, HashSet, intern::InternedString},
+    common::{
+        intern::InternedString,
+        modname::{HashMap, HashSet},
+    },
     sailrs::shared::Shared,
 };
 

@@ -1,6 +1,6 @@
 use common::{
-    HashMap,
     arena::Ref,
+    modname::HashMap,
     rudder::{
         block::Block,
         function::Function,

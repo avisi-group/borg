@@ -11,7 +11,7 @@ use {
         control_flow::ControlFlowBlock,
         passes::{Pass, any::AnyExt},
     },
-    common::HashMap,
+    common::modname::HashMap,
     sailrs::shared::Shared,
 };
 

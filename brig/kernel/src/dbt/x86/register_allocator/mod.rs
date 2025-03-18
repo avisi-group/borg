@@ -1,10 +1,14 @@
 use {
-    crate::dbt::x86::{
-        encoder::{
-            Instruction, MemoryScale, Opcode, Operand, PhysicalRegister, Register, width::Width,
+    crate::dbt::{
+        Alloc as MemAlloc,
+        x86::{
+            encoder::{
+                Instruction, MemoryScale, Opcode, Operand, PhysicalRegister, Register, width::Width,
+            },
+            register_allocator::naive::FreshAllocator, //solid_state::SolidStateRegisterAllocator,
         },
-        register_allocator::naive::FreshAllocator, //solid_state::SolidStateRegisterAllocator,
     },
+    alloc::alloc::Global,
     proc_macro_lib::ktest,
 };
 
@@ -13,14 +17,16 @@ pub mod naive;
 //pub mod solid_state;
 
 pub trait RegisterAllocator {
-    fn allocate(&mut self, instructions: &mut [Instruction]);
+    // A is for the generic memory allocator, NOT anything to do with the register
+    // allocator
+    fn allocate<A: MemAlloc>(&mut self, instructions: &mut [Instruction<A>]);
 }
 
 #[ktest]
 fn conflicted_physical_allocation() {
     let mut instrs = [
         Instruction(Opcode::MOV(
-            Operand::imm(Width::_64, 0xaaaa),
+            Operand::<Global>::imm(Width::_64, 0xaaaa),
             Operand::vreg(Width::_64, 0),
         )),
         Instruction(Opcode::MOV(
@@ -53,7 +59,7 @@ fn shr_full() {
 
     let mut instructions = [
         Instruction(MOV(
-            Operand {
+            Operand::<Global> {
                 kind: Memory {
                     base: Some(PhysicalRegister(RBP)),
                     index: None,

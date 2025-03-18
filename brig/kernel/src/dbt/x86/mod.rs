@@ -1,6 +1,6 @@
 use {
     crate::dbt::{
-        Translation,
+        Alloc, Translation,
         emitter::Emitter,
         x86::{
             emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
@@ -10,8 +10,8 @@ use {
     },
     alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
     common::{
-        HashMap, HashSet,
         arena::{Arena, Ref},
+        modname::{HashMap, HashSet},
         rudder::Model,
     },
     core::{alloc::Allocator, cell::RefCell, fmt::Debug},
@@ -23,11 +23,11 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
-pub struct X86TranslationContext<A: Allocator> {
+pub struct X86TranslationContext<A: Alloc> {
     allocator: A,
-    blocks: Arena<X86Block, A>,
-    initial_block: Ref<X86Block>,
-    panic_block: Ref<X86Block>,
+    blocks: Arena<X86Block<A>, A>,
+    initial_block: Ref<X86Block<A>>,
+    panic_block: Ref<X86Block<A>>,
     writes_to_pc: bool,
     writes_to_sctlr: bool,
     mmu_invalidate: bool,
@@ -38,7 +38,7 @@ pub struct X86TranslationContext<A: Allocator> {
     memory_mask: bool,
 }
 
-impl<A: Allocator + Clone> Debug for X86TranslationContext<A> {
+impl<A: Alloc> Debug for X86TranslationContext<A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "X86TranslationContext:")?;
         writeln!(f, "\tinitial: {:?}", self.initial_block())?;
@@ -74,12 +74,12 @@ impl X86TranslationContext<Global> {
     }
 }
 
-impl<'a, A: Allocator + Clone> X86TranslationContext<A> {
+impl<'a, A: Alloc> X86TranslationContext<A> {
     pub fn new_with_allocator(allocator: A, model: &Model, memory_mask: bool) -> Self {
         let mut arena = Arena::new_in(allocator.clone());
 
-        let initial_block = arena.insert(X86Block::new());
-        let panic_block = arena.insert(X86Block::new());
+        let initial_block = arena.insert(X86Block::new_in(allocator.clone()));
+        let panic_block = arena.insert(X86Block::new_in(allocator.clone()));
 
         let mut celf = Self {
             allocator,
@@ -110,19 +110,19 @@ impl<'a, A: Allocator + Clone> X86TranslationContext<A> {
         self.allocator.clone()
     }
 
-    pub fn arena(&self) -> &Arena<X86Block, A> {
+    pub fn arena(&self) -> &Arena<X86Block<A>, A> {
         &self.blocks
     }
 
-    pub fn arena_mut(&mut self) -> &mut Arena<X86Block, A> {
+    pub fn arena_mut(&mut self) -> &mut Arena<X86Block<A>, A> {
         &mut self.blocks
     }
 
-    fn initial_block(&self) -> Ref<X86Block> {
+    fn initial_block(&self) -> Ref<X86Block<A>> {
         self.initial_block
     }
 
-    pub fn panic_block(&self) -> Ref<X86Block> {
+    pub fn panic_block(&self) -> Ref<X86Block<A>> {
         self.panic_block
     }
 
@@ -224,8 +224,9 @@ impl<'a, A: Allocator + Clone> X86TranslationContext<A> {
         res
     }
 
-    pub fn create_block(&mut self) -> Ref<X86Block> {
-        self.arena_mut().insert(X86Block::new())
+    pub fn create_block(&mut self) -> Ref<X86Block<A>> {
+        let b = X86Block::new_in(self.allocator());
+        self.arena_mut().insert(b)
     }
 
     pub fn create_symbol(&mut self) -> X86SymbolRef<A> {
@@ -267,10 +268,10 @@ impl<'a, A: Allocator + Clone> X86TranslationContext<A> {
     }
 }
 
-fn link_visit(
-    block: Ref<X86Block>,
-    arena: &mut Arena<X86Block>,
-    sorted_blocks: &mut VecDeque<Ref<X86Block>>,
+fn link_visit<A: Alloc>(
+    block: Ref<X86Block<A>>,
+    arena: &mut Arena<X86Block<A>>,
+    sorted_blocks: &mut VecDeque<Ref<X86Block<A>>>,
 ) -> bool {
     match block.get(arena).get_mark() {
         X86BlockMark::Permanent => true,
@@ -299,9 +300,9 @@ fn link_visit(
     }
 }
 
-fn empty_block_jump_threading<A: Allocator>(
-    arena: &mut Arena<X86Block, A>,
-    current_block: Ref<X86Block>,
+fn empty_block_jump_threading<A: Alloc>(
+    arena: &mut Arena<X86Block<A>, A>,
+    current_block: Ref<X86Block<A>>,
 ) {
     // if the current block only has one target
     if let [child] = current_block.get(arena).next_blocks() {

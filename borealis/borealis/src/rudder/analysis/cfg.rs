@@ -1,8 +1,8 @@
 use {
     common::{
-        HashMap, HashSet,
         arena::Ref,
         intern::InternedString,
+        modname::{HashMap, HashSet},
         rudder::{Model, block::Block, function::Function, statement::Statement},
     },
     dot::{GraphWalk, Labeller},
@@ -118,8 +118,10 @@ impl FunctionCallGraphAnalysis {
         for (fname, f) in ctx.functions() {
             assert!(*fname == f.name());
 
-            self.fn_callees.insert(f.name(), HashSet::default());
-            self.fn_callers.insert(f.name(), HashSet::default());
+            self.fn_callees
+                .insert(f.name(), HashSet::default());
+            self.fn_callers
+                .insert(f.name(), HashSet::default());
         }
 
         for (_, f) in ctx.functions() {

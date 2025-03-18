@@ -1,8 +1,8 @@
 use {
     crate::{
-        HashMap,
         arena::{Arena, Ref},
         intern::InternedString,
+        modname::HashMap,
         rudder::{
             block::Block,
             constant_value::ConstantValue,

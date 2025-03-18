@@ -18,6 +18,7 @@ use {
         memory::bump::{BumpAllocator, BumpAllocatorRef},
     },
     alloc::{
+        alloc::Global,
         borrow::ToOwned,
         boxed::Box,
         collections::btree_map::BTreeMap,
@@ -26,8 +27,8 @@ use {
         vec::Vec,
     },
     common::{
-        HashMap,
         intern::InternedString,
+        modname::HashMap,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
     },
     core::fmt::{self, Debug},
@@ -251,6 +252,7 @@ impl ModelDevice {
                             emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
                         let pc = emitter.constant(current_pc, Type::Unsigned(64));
                         let _return_value = translate(
+                            Global,
                             &*self.model,
                             "__DecodeA64",
                             &[pc, opcode],
@@ -336,7 +338,7 @@ impl ModelDevice {
             ptr
         };
 
-        let mut allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
+        let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
@@ -347,6 +349,7 @@ impl ModelDevice {
 
         loop {
             allocator.clear();
+            let alloc_ref = BumpAllocatorRef::new(&allocator);
 
             log::info!("instrs: {instructions_retired}");
             let current_pc = unsafe {
@@ -367,11 +370,8 @@ impl ModelDevice {
                 // reset SEE
                 *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
 
-                let mut ctx = X86TranslationContext::new_with_allocator(
-                    BumpAllocatorRef::new(&allocator),
-                    &self.model,
-                    true,
-                );
+                let mut ctx =
+                    X86TranslationContext::new_with_allocator(alloc_ref.clone(), &self.model, true);
                 let mut emitter = X86Emitter::new(&mut ctx);
 
                 // reset BranchTaken
@@ -389,6 +389,7 @@ impl ModelDevice {
                 let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
                 let pc = emitter.constant(current_pc, Type::Unsigned(64));
                 let _return_value = translate(
+                    alloc_ref,
                     &*self.model,
                     "__DecodeA64",
                     &[pc, opcode],

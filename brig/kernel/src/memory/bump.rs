@@ -3,6 +3,7 @@ use {
     core::{
         alloc::{AllocError, Allocator, Layout},
         cell::RefCell,
+        fmt::{self, Debug},
         ptr::NonNull,
         sync::atomic::{AtomicUsize, Ordering},
     },
@@ -11,6 +12,15 @@ use {
 pub struct BumpAllocator {
     data: RefCell<Box<[u8]>>,
     position: AtomicUsize,
+}
+
+impl Debug for BumpAllocator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BumpAllocator")
+            .field("data_len", &self.data.borrow().len())
+            .field("position", &self.position)
+            .finish()
+    }
 }
 
 impl BumpAllocator {
@@ -58,7 +68,7 @@ unsafe impl Allocator for BumpAllocator {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct BumpAllocatorRef<'a>(&'a BumpAllocator);
 
 impl<'a> BumpAllocatorRef<'a> {

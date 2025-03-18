@@ -1,5 +1,6 @@
 use {
     crate::dbt::{
+        Alloc,
         emitter::{self, Emitter, Type},
         trampoline::MAX_STACK_SIZE,
         x86::{
@@ -9,9 +10,9 @@ use {
     },
     alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
     common::{
-        HashMap,
         arena::{Arena, Ref},
         intern::InternedString,
+        modname::{HashMapA, hashmap_in},
         rudder::{
             self, Model, RegisterCacheType, block::Block, constant_value::ConstantValue,
             function::Function, statement::Statement, types::PrimitiveType,
@@ -36,32 +37,32 @@ const FN_DENYLIST: &[&str] = &["AArch64_TranslateAddress"];
 
 /// Kind of jump to a target block
 #[derive(Debug)]
-enum JumpKind<A: Allocator + Clone> {
+enum JumpKind<A: Alloc> {
     // static jump (jump or branch with constant condition)
     Static {
         rudder: Ref<Block>,
-        x86: Ref<X86Block>,
+        x86: Ref<X86Block<A>>,
         variables: BTreeMap<InternedString, LocalVariable<A>, A>,
     },
     // branch with non-constant condition
     Dynamic {
         rudder: Ref<Block>,
-        x86: Ref<X86Block>,
+        x86: Ref<X86Block<A>>,
         variables: BTreeMap<InternedString, LocalVariable<A>, A>,
     },
 }
 
 #[derive(Debug, Clone)]
-enum StatementResult<A: Allocator + Clone> {
+enum StatementResult<A: Alloc> {
     Data(Option<X86NodeRef<A>>),
     ControlFlow(ControlFlow<A>),
 }
 
 #[derive(Debug, Clone)]
-enum ControlFlow<A: Allocator + Clone> {
+enum ControlFlow<A: Alloc> {
     Jump(
         Ref<Block>,
-        Ref<X86Block>,
+        Ref<X86Block<A>>,
         BTreeMap<InternedString, LocalVariable<A>, A>,
     ),
     Branch(
@@ -73,7 +74,8 @@ enum ControlFlow<A: Allocator + Clone> {
     Return,
 }
 
-pub fn translate<A: Allocator + Clone>(
+pub fn translate<A: Alloc>(
+    allocator: A,
     model: &Model,
     function: &str,
     arguments: &[X86NodeRef<A>],
@@ -82,8 +84,9 @@ pub fn translate<A: Allocator + Clone>(
 ) -> Option<X86NodeRef<A>> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
-    let current_stack_offset = Rc::new(AtomicUsize::new(8));
+    let current_stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
     FunctionTranslator::new(
+        allocator,
         model,
         function,
         arguments,
@@ -96,7 +99,7 @@ pub fn translate<A: Allocator + Clone>(
 
 #[derive(Clone)]
 #[derive_where(Debug)]
-enum LocalVariable<A: Allocator + Clone> {
+enum LocalVariable<A: Alloc> {
     Virtual {
         symbol: X86SymbolRef<A>,
     },
@@ -107,27 +110,27 @@ enum LocalVariable<A: Allocator + Clone> {
 }
 
 // we only care if the variable is virtual or on the stack?
-impl<A: Allocator + Clone> Hash for LocalVariable<A> {
+impl<A: Alloc> Hash for LocalVariable<A> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
 }
 
-impl<A: Allocator + Clone> PartialEq for LocalVariable<A> {
+impl<A: Alloc> PartialEq for LocalVariable<A> {
     fn eq(&self, other: &LocalVariable<A>) -> bool {
         core::mem::discriminant(self).eq(&core::mem::discriminant(other))
     }
 }
 
-impl<A: Allocator + Clone> Eq for LocalVariable<A> {}
+impl<A: Alloc> Eq for LocalVariable<A> {}
 
 #[derive_where(Debug)]
-struct ReturnValue<A: Allocator + Clone> {
+struct ReturnValue<A: Alloc> {
     variables: Vec<LocalVariable<A>>,
-    previous_write: Option<(Ref<X86Block>, usize)>,
+    previous_write: Option<(Ref<X86Block<A>>, usize)>,
 }
 
-impl<A: Allocator + Clone> ReturnValue<A> {
+impl<A: Alloc> ReturnValue<A> {
     pub fn new<'e, 'c>(
         emitter: &'e mut X86Emitter<'c, A>,
         return_type: Option<rudder::types::Type>,
@@ -153,26 +156,31 @@ impl<A: Allocator + Clone> ReturnValue<A> {
     }
 }
 
-struct FunctionTranslator<'model, 'emitter, 'context, A: Allocator + Clone> {
+struct FunctionTranslator<'model, 'emitter, 'context, A: Alloc> {
+    allocator: A,
+
     /// The model we are translating guest code for
     model: &'model Model,
 
     /// Function being translated
     function: &'model Function,
 
-    dynamic_blocks:
-        HashMap<(Ref<Block>, BTreeMap<InternedString, LocalVariable<A>, A>), (Ref<X86Block>, bool)>,
-    static_blocks: HashMap<Ref<Block>, Vec<Ref<X86Block>>>,
+    dynamic_blocks: HashMapA<
+        (Ref<Block>, BTreeMap<InternedString, LocalVariable<A>, A>),
+        (Ref<X86Block<A>>, bool),
+        A,
+    >,
+    static_blocks: HashMapA<Ref<Block>, Vec<Ref<X86Block<A>>>, A>,
 
     entry_variables: BTreeMap<InternedString, LocalVariable<A>, A>,
 
     // don't re-promote to a different location
-    promoted_locations: HashMap<InternedString, usize>,
+    promoted_locations: HashMapA<InternedString, usize, A>,
 
     return_value: ReturnValue<A>,
 
     /// Stack offset used to allocate stack variables
-    current_stack_offset: Rc<AtomicUsize>,
+    current_stack_offset: Rc<AtomicUsize, A>,
 
     /// X86 instruction emitter
     emitter: &'emitter mut X86Emitter<'context, A>,
@@ -181,7 +189,7 @@ struct FunctionTranslator<'model, 'emitter, 'context, A: Allocator + Clone> {
     register_file_ptr: *mut u8,
 }
 
-impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
+impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
     fn read_return_value(&mut self) -> Option<X86NodeRef<A>> {
         match self.function.return_type() {
             Some(rudder::types::Type::Tuple(_)) => {
@@ -293,11 +301,12 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
     }
 
     fn new(
+        allocator: A,
         model: &'m Model,
         function: &str,
         arguments: &[X86NodeRef<A>],
         emitter: &'e mut X86Emitter<'c, A>,
-        current_stack_offset: Rc<AtomicUsize>,
+        current_stack_offset: Rc<AtomicUsize, A>,
         register_file_ptr: *mut u8,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
@@ -311,12 +320,13 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
             .unwrap_or_else(|| panic!("function named {function:?} not found"));
 
         let mut celf = Self {
+            allocator,
             model,
             function,
-            dynamic_blocks: HashMap::default(),
-            static_blocks: HashMap::default(),
+            dynamic_blocks: hashmap_in(emitter.ctx().allocator()),
+            static_blocks: hashmap_in(emitter.ctx().allocator()),
             entry_variables: BTreeMap::new_in(emitter.ctx().allocator()),
-            promoted_locations: HashMap::default(),
+            promoted_locations: hashmap_in(emitter.ctx().allocator()),
             return_value: ReturnValue::new(emitter, function.return_type()),
             current_stack_offset,
             emitter,
@@ -341,16 +351,24 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
 
     fn translate(&mut self) -> Option<X86NodeRef<A>> {
         // create an empty block all control flow will end at
-        let exit_block = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
+        let exit_block = self
+            .emitter
+            .ctx_mut()
+            .arena_mut()
+            .insert(X86Block::new_in(self.allocator.clone()));
 
         // create an empty entry block for this function
-        let entry_x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
+        let entry_x86 = self
+            .emitter
+            .ctx_mut()
+            .arena_mut()
+            .insert(X86Block::new_in(self.allocator.clone()));
 
         // jump from the *current* emitter block to this function's entry block
         self.emitter.push_instruction(Instruction::jmp(entry_x86));
         self.emitter.push_target(entry_x86);
 
-        let mut block_queue = alloc::collections::VecDeque::new();
+        let mut block_queue = alloc::collections::VecDeque::new_in(self.allocator.clone());
 
         // start translation of the function's rudder entry block to the new (empty) X86
         // entry block
@@ -467,7 +485,7 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
     ) -> ControlFlow<A> {
         let block = block_ref.get(self.function.arena());
 
-        let mut statement_value_store = StatementValueStore::new();
+        let mut statement_value_store = StatementValueStore::new(self.allocator.clone());
 
         for s in block.statements() {
             match self.translate_statement(
@@ -899,6 +917,7 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
 
                 StatementResult::Data(
                     FunctionTranslator::new(
+                        self.allocator.clone(),
                         self.model,
                         target.as_ref(),
                         &args,
@@ -914,7 +933,11 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
-                let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
+                let x86 = self
+                    .emitter
+                    .ctx_mut()
+                    .arena_mut()
+                    .insert(X86Block::new_in(self.allocator.clone()));
 
                 self.static_blocks
                     .entry(*target)
@@ -936,7 +959,11 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
                 return match condition.kind() {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
-                            let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
+                            let x86 = self
+                                .emitter
+                                .ctx_mut()
+                                .arena_mut()
+                                .insert(X86Block::new_in(self.allocator.clone()));
 
                             self.static_blocks
                                 .entry(*false_target)
@@ -950,7 +977,11 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
                                 variables.clone(),
                             ))
                         } else {
-                            let x86 = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
+                            let x86 = self
+                                .emitter
+                                .ctx_mut()
+                                .arena_mut()
+                                .insert(X86Block::new_in(self.allocator.clone()));
 
                             self.static_blocks
                                 .entry(*true_target)
@@ -971,7 +1002,10 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
                             .entry((*true_target, variables.clone()))
                             .or_insert_with(|| {
                                 (
-                                    self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
+                                    self.emitter
+                                        .ctx_mut()
+                                        .arena_mut()
+                                        .insert(X86Block::new_in(self.allocator.clone())),
                                     false,
                                 )
                             }))
@@ -981,7 +1015,10 @@ impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
                             .entry((*false_target, variables.clone()))
                             .or_insert_with(|| {
                                 (
-                                    self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
+                                    self.emitter
+                                        .ctx_mut()
+                                        .arena_mut()
+                                        .insert(X86Block::new_in(self.allocator.clone())),
                                     false,
                                 )
                             }))
@@ -1245,14 +1282,14 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
 /// statements
 ///
 /// Tried linear search vec but same perf
-struct StatementValueStore<A: Allocator + Clone> {
-    map: HashMap<Ref<Statement>, X86NodeRef<A>>,
+struct StatementValueStore<A: Alloc> {
+    map: HashMapA<Ref<Statement>, X86NodeRef<A>, A>,
 }
 
-impl<A: Allocator + Clone> StatementValueStore<A> {
-    pub fn new() -> Self {
+impl<A: Alloc> StatementValueStore<A> {
+    pub fn new(allocator: A) -> Self {
         Self {
-            map: HashMap::default(),
+            map: hashmap_in(allocator),
         }
     }
 

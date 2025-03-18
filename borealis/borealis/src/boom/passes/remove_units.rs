@@ -3,7 +3,7 @@ use {
         Ast, Expression, Literal, Parameter, Statement, Type, Value, control_flow::Terminator,
         passes::Pass,
     },
-    common::{HashSet, intern::InternedString},
+    common::{intern::InternedString, modname::HashSet},
     sailrs::shared::Shared,
 };
 
