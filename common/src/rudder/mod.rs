@@ -1,7 +1,7 @@
 use {
     crate::{
+        hashmap::HashMap,
         intern::InternedString,
-        modname::HashMap,
         rudder::{
             function::Function,
             types::{Type, maybe_type_to_string},

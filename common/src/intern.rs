@@ -12,7 +12,7 @@ use {
 #[cfg(feature = "no-std")]
 mod interner {
     use {
-        crate::modname::Hasher,
+        crate::hashmap::Hasher,
         core::hash::BuildHasherDefault,
         lasso::Spur,
         spin::{lazy::Lazy, mutex::Mutex},
@@ -43,7 +43,7 @@ mod interner {
     extern crate std;
 
     use {
-        crate::modname::Hasher, core::hash::BuildHasherDefault, lasso::Spur, std::sync::LazyLock,
+        crate::hashmap::Hasher, core::hash::BuildHasherDefault, lasso::Spur, std::sync::LazyLock,
     };
 
     static INTERNER: LazyLock<lasso::ThreadedRodeo<Spur, BuildHasherDefault<Hasher>>> =

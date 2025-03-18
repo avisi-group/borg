@@ -5,7 +5,7 @@ use {
         arena::Ref,
         intern::InternedString,
         mask::mask,
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{
             Model,
             block::Block,

@@ -3,7 +3,7 @@ use {
         Alloc,
         x86::{emitter::X86Block, encoder::width::Width},
     },
-    common::{arena::Ref, modname::HashMapA},
+    common::{arena::Ref, hashmap::HashMapA},
     core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
     displaydoc::Display,
@@ -952,6 +952,20 @@ impl<A: Alloc> Instruction<A> {
             ) => {
                 assembler
                     .sar::<AsmRegister64, AsmRegister8>(value.into(), amount.into())
+                    .unwrap();
+            }
+            SAR(
+                Operand {
+                    kind: I(amount),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(value)),
+                    width_in_bits: Width::_64,
+                },
+            ) => {
+                assembler
+                    .sar::<AsmRegister64, i32>(value.into(), i32::try_from(*amount).unwrap())
                     .unwrap();
             }
             BEXTR(

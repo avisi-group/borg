@@ -8,7 +8,7 @@ use {
         },
         sail_ast::Identifier,
     },
-    common::{intern::InternedString, HashSet},
+    common::{intern::InternedString, hashmap::HashSet},
     std::{
         io::Write,
         rc::Rc,

@@ -1,7 +1,7 @@
 use {
     common::{
         arena::{Arena, Ref},
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::block::Block,
     },
     dot::{Edges, GraphWalk, LabelText, Labeller, Nodes},

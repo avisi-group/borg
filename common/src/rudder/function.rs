@@ -2,7 +2,7 @@ use {
     crate::{
         arena::{Arena, Ref},
         intern::InternedString,
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{
             block::{Block, BlockIterator},
             types::Type,

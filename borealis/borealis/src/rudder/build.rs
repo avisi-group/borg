@@ -7,7 +7,7 @@ use {
         arena::{Arena, Ref},
         id::Id,
         intern::InternedString,
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{
             Model, RegisterCacheType, RegisterDescriptor,
             block::Block,

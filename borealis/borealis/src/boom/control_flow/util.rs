@@ -5,7 +5,7 @@ use {
         Expression, Statement, Value,
         control_flow::{ControlFlowBlock, dot},
     },
-    common::{intern::InternedString, modname::HashSet},
+    common::{intern::InternedString, hashmap::HashSet},
     itertools::Itertools,
     log::trace,
     sailrs::shared::Shared,

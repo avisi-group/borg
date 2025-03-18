@@ -6,8 +6,8 @@ use {
         visitor::Visitor,
     },
     common::{
+        hashmap::{HashMap, HashSet},
         intern::InternedString,
-        modname::{HashMap, HashSet},
     },
     sailrs::shared::Shared,
 };

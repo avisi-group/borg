@@ -2,7 +2,7 @@ use {
     ::x86::msr::{IA32_TSC_AUX, rdmsr, wrmsr},
     alloc::boxed::Box,
     bootloader_api::BootInfo,
-    common::modname::HashMap,
+    common::hashmap::HashMap,
     core::{
         any::{Any, TypeId},
         sync::atomic::{AtomicU64, Ordering},

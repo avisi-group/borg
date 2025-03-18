@@ -3,7 +3,7 @@ use {
     common::{
         arena::Ref,
         intern::InternedString,
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{block::Block, function::Function, statement::Statement},
     },
     log::trace,

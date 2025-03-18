@@ -1,7 +1,7 @@
 use {
     crate::{
         arena::{Arena, Ref},
-        modname::HashSet,
+        hashmap::HashSet,
         rudder::statement::Statement,
     },
     alloc::vec::Vec,

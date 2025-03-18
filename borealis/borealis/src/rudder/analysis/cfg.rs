@@ -2,7 +2,7 @@ use {
     common::{
         arena::Ref,
         intern::InternedString,
-        modname::{HashMap, HashSet},
+        hashmap::{HashMap, HashSet},
         rudder::{Model, block::Block, function::Function, statement::Statement},
     },
     dot::{GraphWalk, Labeller},

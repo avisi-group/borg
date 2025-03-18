@@ -2,7 +2,7 @@ use {
     crate::rudder::analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
     common::{
         arena::{Arena, Ref},
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{block::Block, function::Function, statement::Statement},
     },
     log::trace,

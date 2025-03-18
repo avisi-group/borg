@@ -6,7 +6,7 @@ use {
         control_flow::{ControlFlowBlock, Terminator},
         passes::{Pass, any::AnyExt},
     },
-    common::modname::HashSet,
+    common::hashmap::HashSet,
     log::{debug, trace},
     sailrs::shared::Shared,
 };

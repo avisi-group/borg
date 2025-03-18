@@ -12,7 +12,7 @@ use {
     common::{
         arena::{Arena, Ref},
         intern::InternedString,
-        modname::{HashMapA, hashmap_in},
+        hashmap::{HashMapA, hashmap_in},
         rudder::{
             self, Model, RegisterCacheType, block::Block, constant_value::ConstantValue,
             function::Function, statement::Statement, types::PrimitiveType,

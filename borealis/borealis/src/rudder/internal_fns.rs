@@ -2,7 +2,7 @@ use {
     crate::boom::{self, control_flow::ControlFlowBlock},
     common::{
         intern::InternedString,
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{
             constant_value::ConstantValue,
             function::{Function, Symbol},

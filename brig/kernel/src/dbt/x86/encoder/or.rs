@@ -47,6 +47,25 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         (
             Operand {
                 kind: I(left),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            if *left < i32::MAX as u64 {
+                assembler
+                    .or::<AsmRegister32, i32>(right.into(), *left as i32)
+                    .unwrap();
+            } else {
+                panic!("{left:?}")
+            }
+        }
+        // OR I R
+        (
+            Operand {
+                kind: I(left),
                 width_in_bits: Width::_64,
             },
             Operand {

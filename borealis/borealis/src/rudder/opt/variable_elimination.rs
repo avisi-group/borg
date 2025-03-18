@@ -3,7 +3,7 @@ use {
     common::{
         Entry,
         arena::{Arena, Ref},
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{block::Block, function::Function, statement::Statement},
     },
     log::trace,

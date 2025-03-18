@@ -14,7 +14,7 @@ use {
     common::{
         arena::{Arena, Ref},
         mask::mask,
-        modname::HashMap,
+        hashmap::HashMap,
     },
     core::{
         alloc::Allocator,
@@ -688,7 +688,16 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 }
             }
 
-            (Type::Bits, Type::Unsigned(_)) => todo!(), // (64, r)
+            (Type::Bits, Type::Unsigned(_)) => {
+                let l = self.to_operand_oversize_reg_promote(left);
+                let r = self.to_operand_oversize_reg_promote(right);
+
+                if l.width() == r.width() {
+                    (l, r)
+                } else {
+                    todo!("{left:?} {right:?} => {l:?} {r:?}")
+                }
+            }
             (Type::Unsigned(_), Type::Bits) => {
                 let left = self.to_operand_oversize_reg_promote(left);
                 let right = self.to_operand_oversize_reg_promote(right);

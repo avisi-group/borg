@@ -10,7 +10,7 @@ use {
     },
     alloc::vec::Vec,
     bitset_core::BitSet,
-    common::modname::{HashMap, HashSet},
+    common::hashmap::{HashMap, HashSet},
     core::panic,
     itertools::Itertools,
 };

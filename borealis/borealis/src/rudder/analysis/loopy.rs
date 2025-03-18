@@ -1,5 +1,5 @@
 use {
-    common::{modname::HashSet, rudder::function::Function},
+    common::{hashmap::HashSet, rudder::function::Function},
     std::collections::VecDeque,
 };
 

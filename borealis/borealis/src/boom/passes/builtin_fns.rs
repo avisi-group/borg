@@ -9,8 +9,8 @@ use {
         },
     },
     common::{
+        hashmap::{HashMap, HashSet},
         intern::InternedString,
-        modname::{HashMap, HashSet},
     },
     core::panic,
     num_bigint::BigInt,

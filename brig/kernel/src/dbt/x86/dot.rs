@@ -6,7 +6,7 @@ use {
     },
     common::{
         arena::{Arena, Ref},
-        modname::HashSet,
+        hashmap::HashSet,
     },
     core::{alloc::Allocator, fmt::Write},
     itertools::Itertools,

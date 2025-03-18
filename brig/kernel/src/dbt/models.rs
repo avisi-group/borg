@@ -28,7 +28,7 @@ use {
     },
     common::{
         intern::InternedString,
-        modname::HashMap,
+        hashmap::HashMap,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
     },
     core::fmt::{self, Debug},
@@ -343,9 +343,6 @@ impl ModelDevice {
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
         let status = record_safepoint();
-        if status != 0 {
-            panic!("returned to safe point")
-        }
 
         loop {
             allocator.clear();

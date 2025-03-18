@@ -11,7 +11,7 @@ use {
     alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
-        modname::{hashmap_in, hashset_in},
+        hashmap::{hashmap_in, hashset_in},
         rudder::Model,
     },
     core::{cell::RefCell, fmt::Debug},
