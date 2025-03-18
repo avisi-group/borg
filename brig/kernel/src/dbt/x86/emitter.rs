@@ -1107,7 +1107,11 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                                 left_den.clone(),
                                 right_num.clone(),
                             ));
-                            self.create_tuple(alloc::vec![num, den])
+                            let mut tuple = Vec::new_in(self.ctx().allocator());
+                            tuple.push(num);
+                            tuple.push(den);
+
+                            self.create_tuple(tuple)
                         }
                         _ => panic!(),
                     }
@@ -1769,7 +1773,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction::int(n));
     }
 
-    fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef {
+    fn create_tuple(&mut self, values: Vec<Self::NodeRef, A>) -> Self::NodeRef {
         self.node(X86Node {
             typ: Type::Tuple,
             kind: NodeKind::Tuple(values),
@@ -2021,7 +2025,7 @@ pub enum NodeKind<A: Alloc> {
     GetFlags {
         operation: X86NodeRef<A>,
     },
-    Tuple(Vec<X86NodeRef<A>>),
+    Tuple(Vec<X86NodeRef<A>, A>),
     Select {
         condition: X86NodeRef<A>,
         true_value: X86NodeRef<A>,

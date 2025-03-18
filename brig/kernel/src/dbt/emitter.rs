@@ -7,7 +7,6 @@ use {
         },
     },
     alloc::vec::Vec,
-    core::alloc::Allocator,
 };
 
 pub trait Emitter<A: Alloc> {
@@ -18,7 +17,7 @@ pub trait Emitter<A: Alloc> {
     fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef;
-    fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef;
+    fn create_tuple(&mut self, values: Vec<Self::NodeRef, A>) -> Self::NodeRef;
     fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
 
     fn unary_operation(&mut self, op: UnaryOperationKind<A>) -> Self::NodeRef;

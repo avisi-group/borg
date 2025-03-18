@@ -4,17 +4,17 @@ use {
         emitter::Emitter,
         x86::{
             emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
-            encoder::{Instruction, Opcode, OperandKind, Register::PhysicalRegister},
+            encoder::{Instruction, Opcode, OperandKind},
             register_allocator::naive::FreshAllocator,
         },
     },
     alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
-        modname::{HashMap, HashSet},
+        modname::{hashmap_in, hashset_in},
         rudder::Model,
     },
-    core::{alloc::Allocator, cell::RefCell, fmt::Debug},
+    core::{cell::RefCell, fmt::Debug},
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr, rax},
 };
 
@@ -45,8 +45,9 @@ impl<A: Alloc> Debug for X86TranslationContext<A> {
         writeln!(f, "\tpanic: {:?}", self.panic_block())?;
         writeln!(f)?;
 
-        let mut visited = HashSet::default();
-        let mut to_visit = alloc::vec![self.initial_block()];
+        let mut visited = hashset_in(self.allocator());
+        let mut to_visit = Vec::new_in(self.allocator());
+        to_visit.push(self.initial_block());
 
         while let Some(next) = to_visit.pop() {
             writeln!(f, "{next:x?}:")?;
@@ -128,14 +129,14 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
     pub fn compile(mut self, num_virtual_registers: usize) -> Translation {
         let mut assembler = CodeAssembler::new(64).unwrap();
-        let mut label_map = HashMap::default();
+        let mut label_map = hashmap_in(self.allocator());
 
         log::trace!("{}", dot::render(self.arena(), self.initial_block()));
 
         log::trace!("building work queue");
 
-        let mut all_blocks = Vec::new();
-        let mut work_queue = Vec::new();
+        let mut all_blocks = Vec::new_in(self.allocator());
+        let mut work_queue = Vec::new_in(self.allocator());
         work_queue.push(self.panic_block());
         work_queue.push(self.initial_block());
 

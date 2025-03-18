@@ -126,7 +126,7 @@ impl<A: Alloc> Eq for LocalVariable<A> {}
 
 #[derive_where(Debug)]
 struct ReturnValue<A: Alloc> {
-    variables: Vec<LocalVariable<A>>,
+    variables: Vec<LocalVariable<A>, A>,
     previous_write: Option<(Ref<X86Block<A>>, usize)>,
 }
 
@@ -141,7 +141,7 @@ impl<A: Alloc> ReturnValue<A> {
             None => 0,
         };
 
-        let mut variables = alloc::vec![];
+        let mut variables = Vec::new_in(emitter.ctx().allocator());
 
         for _ in 0..num_variables {
             variables.push(LocalVariable::Virtual {
@@ -193,13 +193,15 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
     fn read_return_value(&mut self) -> Option<X86NodeRef<A>> {
         match self.function.return_type() {
             Some(rudder::types::Type::Tuple(_)) => {
-                let values = self
-                    .return_value
+                let mut values = Vec::new_in(self.allocator);
+
+                self.return_value
                     .variables
                     .clone()
                     .into_iter()
                     .map(|var| self.read_variable(var))
-                    .collect();
+                    .collect_into(&mut values);
+
                 Some(self.emitter.create_tuple(values))
             }
             Some(_) => Some(self.read_variable(self.return_value.variables[0].clone())),
@@ -210,7 +212,11 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
     fn write_return_value(&mut self, value: X86NodeRef<A>) {
         let values = match value.kind() {
             NodeKind::Tuple(elements) => (*elements).clone(),
-            _ => alloc::vec![value.clone()],
+            _ => {
+                let mut values = Vec::new_in(self.allocator);
+                values.push(value.clone());
+                values
+            }
         };
 
         // we should never have some promoted and some not
@@ -242,8 +248,8 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     .instructions_mut()
                     .split_off(previous_index);
 
-                let stack_variables = self
-                    .return_value
+                let mut stack_variables = Vec::new_in(self.allocator);
+                self.return_value
                     .variables
                     .clone()
                     .into_iter()
@@ -265,7 +271,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                             stack_offset,
                         }
                     })
-                    .collect();
+                    .collect_into(&mut stack_variables);
 
                 previous_block
                     .get_mut(self.emitter.ctx_mut().arena_mut())
@@ -1174,11 +1180,12 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
             Statement::MatchesUnion { .. } => todo!(),
             Statement::UnwrapUnion { .. } => todo!(),
             Statement::CreateTuple(values) => {
-                let values = values
+                let mut tuple = Vec::new_in(self.allocator);
+                values
                     .iter()
                     .map(|v| statement_values.get(*v).unwrap())
-                    .collect();
-                StatementResult::Data(Some(self.emitter.create_tuple(values)))
+                    .collect_into(&mut tuple);
+                StatementResult::Data(Some(self.emitter.create_tuple(tuple)))
             }
             Statement::TupleAccess { index, source } => {
                 let source = statement_values.get(*source).unwrap().clone();

@@ -3,7 +3,7 @@ use {
         Alloc,
         x86::{emitter::X86Block, encoder::width::Width},
     },
-    common::{arena::Ref, modname::HashMap},
+    common::{arena::Ref, modname::HashMapA},
     core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
     displaydoc::Display,
@@ -829,7 +829,7 @@ impl<A: Alloc> Instruction<A> {
     pub fn encode(
         &self,
         assembler: &mut CodeAssembler,
-        label_map: &HashMap<Ref<X86Block<A>>, CodeLabel>,
+        label_map: &HashMapA<Ref<X86Block<A>>, CodeLabel, A>,
     ) {
         use {
             Opcode::*,
