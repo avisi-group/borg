@@ -57,3 +57,22 @@ unsafe impl Allocator for BumpAllocator {
         // no-op
     }
 }
+
+#[derive(Clone)]
+pub struct BumpAllocatorRef<'a>(&'a BumpAllocator);
+
+impl<'a> BumpAllocatorRef<'a> {
+    pub fn new(allocator: &'a BumpAllocator) -> Self {
+        Self(allocator)
+    }
+}
+
+unsafe impl<'a> Allocator for BumpAllocatorRef<'a> {
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        self.0.allocate(layout)
+    }
+
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+        unsafe { self.0.deallocate(ptr, layout) }
+    }
+}

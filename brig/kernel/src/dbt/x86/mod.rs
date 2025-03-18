@@ -4,17 +4,17 @@ use {
         emitter::Emitter,
         x86::{
             emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
-            encoder::{Instruction, Opcode, OperandKind},
+            encoder::{Instruction, Opcode, OperandKind, Register::PhysicalRegister},
             register_allocator::naive::FreshAllocator,
         },
     },
-    alloc::{collections::VecDeque, rc::Rc, vec::Vec},
+    alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
     common::{
         HashMap, HashSet,
         arena::{Arena, Ref},
         rudder::Model,
     },
-    core::{cell::RefCell, fmt::Debug},
+    core::{alloc::Allocator, cell::RefCell, fmt::Debug},
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr, rax},
 };
 
@@ -23,8 +23,9 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
-pub struct X86TranslationContext {
-    blocks: Arena<X86Block>,
+pub struct X86TranslationContext<A: Allocator> {
+    allocator: A,
+    blocks: Arena<X86Block, A>,
     initial_block: Ref<X86Block>,
     panic_block: Ref<X86Block>,
     writes_to_pc: bool,
@@ -37,7 +38,7 @@ pub struct X86TranslationContext {
     memory_mask: bool,
 }
 
-impl Debug for X86TranslationContext {
+impl<A: Allocator + Clone> Debug for X86TranslationContext<A> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         writeln!(f, "X86TranslationContext:")?;
         writeln!(f, "\tinitial: {:?}", self.initial_block())?;
@@ -67,14 +68,21 @@ impl Debug for X86TranslationContext {
     }
 }
 
-impl X86TranslationContext {
+impl X86TranslationContext<Global> {
     pub fn new(model: &Model, memory_mask: bool) -> Self {
-        let mut arena = Arena::new();
+        Self::new_with_allocator(Global, model, memory_mask)
+    }
+}
+
+impl<'a, A: Allocator + Clone> X86TranslationContext<A> {
+    pub fn new_with_allocator(allocator: A, model: &Model, memory_mask: bool) -> Self {
+        let mut arena = Arena::new_in(allocator.clone());
 
         let initial_block = arena.insert(X86Block::new());
         let panic_block = arena.insert(X86Block::new());
 
         let mut celf = Self {
+            allocator,
             blocks: arena,
             initial_block,
             panic_block,
@@ -98,11 +106,15 @@ impl X86TranslationContext {
         celf
     }
 
-    pub fn arena(&self) -> &Arena<X86Block> {
+    pub fn allocator(&self) -> A {
+        self.allocator.clone()
+    }
+
+    pub fn arena(&self) -> &Arena<X86Block, A> {
         &self.blocks
     }
 
-    pub fn arena_mut(&mut self) -> &mut Arena<X86Block> {
+    pub fn arena_mut(&mut self) -> &mut Arena<X86Block, A> {
         &mut self.blocks
     }
 
@@ -216,8 +228,8 @@ impl X86TranslationContext {
         self.arena_mut().insert(X86Block::new())
     }
 
-    pub fn create_symbol(&mut self) -> X86SymbolRef {
-        X86SymbolRef(Rc::new(RefCell::new(None)))
+    pub fn create_symbol(&mut self) -> X86SymbolRef<A> {
+        X86SymbolRef(Rc::new_in(RefCell::new(None), self.allocator()))
     }
 
     /// Sets the "PC was written to" flag
@@ -287,7 +299,10 @@ fn link_visit(
     }
 }
 
-fn empty_block_jump_threading(arena: &mut Arena<X86Block>, current_block: Ref<X86Block>) {
+fn empty_block_jump_threading<A: Allocator>(
+    arena: &mut Arena<X86Block, A>,
+    current_block: Ref<X86Block>,
+) {
     // if the current block only has one target
     if let [child] = current_block.get(arena).next_blocks() {
         // and that target only has a single instruction (a jump)

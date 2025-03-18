@@ -1,13 +1,13 @@
 use {
     crate::dbt::x86::emitter::{
         BinaryOperationKind, CastOperationKind, ShiftOperationKind, TernaryOperationKind,
-        UnaryOperationKind, X86Block,
+        UnaryOperationKind,
     },
     alloc::vec::Vec,
-    common::arena::Ref,
+    core::alloc::Allocator,
 };
 
-pub trait Emitter {
+pub trait Emitter<A: Allocator + Clone> {
     type BlockRef;
     type NodeRef;
     type SymbolRef;
@@ -18,9 +18,9 @@ pub trait Emitter {
     fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef;
     fn access_tuple(&mut self, tuple: Self::NodeRef, index: usize) -> Self::NodeRef;
 
-    fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef;
-    fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef;
-    fn ternary_operation(&mut self, op: TernaryOperationKind) -> Self::NodeRef;
+    fn unary_operation(&mut self, op: UnaryOperationKind<A>) -> Self::NodeRef;
+    fn binary_operation(&mut self, op: BinaryOperationKind<A>) -> Self::NodeRef;
+    fn ternary_operation(&mut self, op: TernaryOperationKind<A>) -> Self::NodeRef;
     fn cast(&mut self, value: Self::NodeRef, typ: Type, kind: CastOperationKind) -> Self::NodeRef;
     fn bits_cast(
         &mut self,

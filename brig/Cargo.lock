@@ -190,6 +190,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive-where"
+version = "1.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62d671cc41a825ebabc75757b62d3d168c577f9149b2d49ece1dad1f72119d25"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "disarm64"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -356,6 +367,7 @@ dependencies = [
  "byteorder",
  "common",
  "concat-idents",
+ "derive-where",
  "disarm64",
  "displaydoc",
  "elf",

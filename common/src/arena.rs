@@ -77,19 +77,24 @@ impl<T, A: Allocator> Arena<T, A> {
 pub struct Ref<T> {
     index: usize,
     _phantom: PhantomData<T>,
+    //_phantom: PhantomData<A>, TODO: make Ref generic over allocator too for mild safety
+    //_phantom: improvement
     #[cfg(feature = "arena-debug")]
     arena: crate::id::Id,
 }
 
 impl<T> Ref<T> {
-    pub fn get_mut<'reph, 'arena: 'reph>(&self, arena: &'arena mut Arena<T>) -> &'reph mut T {
+    pub fn get_mut<'reph, 'arena: 'reph, A: Allocator>(
+        &self,
+        arena: &'arena mut Arena<T, A>,
+    ) -> &'reph mut T {
         #[cfg(feature = "arena-debug")]
         assert_eq!(arena.id, self.arena);
 
         unsafe { arena.vec.get_unchecked_mut(self.index) }
     }
 
-    pub fn get<'reph, 'arena: 'reph>(&self, arena: &'arena Arena<T>) -> &'reph T {
+    pub fn get<'reph, 'arena: 'reph, A: Allocator>(&self, arena: &'arena Arena<T, A>) -> &'reph T {
         #[cfg(feature = "arena-debug")]
         assert_eq!(arena.id, self.arena);
 

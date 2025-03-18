@@ -17,12 +17,14 @@ use {
         mask::mask,
     },
     core::{
+        alloc::Allocator,
         cell::RefCell,
         cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
         panic,
     },
+    derive_where::derive_where,
     proc_macro_lib::ktest,
 };
 
@@ -31,39 +33,41 @@ const INVALID_OFFSET: i32 = 0xDEAD00F;
 /// X86 emitter error
 #[derive(Debug, thiserror::Error, displaydoc::Display)]
 pub enum X86Error {
-    ///  Left and right types do not match in binary operation: {op:?}
-    BinaryOperationTypeMismatch { op: BinaryOperationKind },
+    /// Left and right types do not match in binary operation
+    BinaryOperationTypeMismatch,
     /// Register allocation failed
     RegisterAllocation,
 }
 
-pub struct X86Emitter<'ctx> {
+pub struct X86Emitter<'ctx, A: Allocator + Clone> {
     current_block: Ref<X86Block>,
-    current_block_operands: HashMap<X86NodeRef, Operand>,
+    current_block_operands: HashMap<X86NodeRef<A>, Operand>,
     panic_block: Ref<X86Block>,
     next_vreg: usize,
-    arena: Arena<X86Node>,
-    ctx: &'ctx mut X86TranslationContext,
+    ctx: &'ctx mut X86TranslationContext<A>,
 }
 
-impl<'ctx> X86Emitter<'ctx> {
-    pub fn new(ctx: &'ctx mut X86TranslationContext) -> Self {
+impl<'a, 'ctx, A: Allocator + Clone> X86Emitter<'ctx, A> {
+    pub fn new(ctx: &'ctx mut X86TranslationContext<A>) -> Self {
         Self {
             current_block: ctx.initial_block(),
             current_block_operands: HashMap::default(),
             panic_block: ctx.panic_block(),
             next_vreg: 0,
-            arena: Arena::new(),
             ctx,
         }
     }
 
-    pub fn ctx(&self) -> &X86TranslationContext {
+    pub fn ctx(&self) -> &X86TranslationContext<A> {
         &self.ctx
     }
 
-    pub fn ctx_mut(&mut self) -> &mut X86TranslationContext {
+    pub fn ctx_mut(&mut self) -> &mut X86TranslationContext<A> {
         &mut self.ctx
+    }
+
+    fn node(&self, node: X86Node<A>) -> X86NodeRef<A> {
+        X86NodeRef(Rc::new_in(node, self.ctx().allocator.clone()))
     }
 
     pub fn next_vreg(&mut self) -> usize {
@@ -85,13 +89,13 @@ impl<'ctx> X86Emitter<'ctx> {
             .push_next(target);
     }
 
-    pub fn new_node(&mut self, node: X86Node) -> Ref<X86Node> {
-        self.arena.insert(node)
-    }
+    // pub fn new_node(&mut self, node: X86Node<A>) -> Ref<X86Node<A>> {
+    //     self.arena.insert(node)
+    // }
 
     /// Same as `to_operand` but if the value is a constant, move it to a
     /// register
-    fn to_operand_reg_promote(&mut self, node: &X86NodeRef) -> Operand {
+    fn to_operand_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand {
         if let NodeKind::Constant { .. } = node.kind() {
             let width = Width::from_uncanonicalized(node.typ().width()).unwrap();
             let value_reg = Operand::vreg(width, self.next_vreg());
@@ -105,7 +109,7 @@ impl<'ctx> X86Emitter<'ctx> {
 
     /// Same as `to_operand` but if the value is a constant and larger than 32
     /// bits, move it to a register
-    fn to_operand_oversize_reg_promote(&mut self, node: &X86NodeRef) -> Operand {
+    fn to_operand_oversize_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand {
         let op = self.to_operand(node);
 
         if let OperandKind::Immediate(value) = op.kind() {
@@ -119,7 +123,7 @@ impl<'ctx> X86Emitter<'ctx> {
         op
     }
 
-    fn to_operand(&mut self, node: &X86NodeRef) -> Operand {
+    fn to_operand(&mut self, node: &X86NodeRef<A>) -> Operand {
         if let Some(operand) = self.current_block_operands.get(node) {
             return *operand;
         }
@@ -634,7 +638,7 @@ impl<'ctx> X86Emitter<'ctx> {
         op
     }
 
-    fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind) -> Operand {
+    fn binary_operation_to_operand(&mut self, kind: &BinaryOperationKind<A>) -> Operand {
         use BinaryOperationKind::*;
 
         let (Add(left, right)
@@ -827,10 +831,10 @@ impl<'ctx> X86Emitter<'ctx> {
     }
 }
 
-impl<'ctx> Emitter for X86Emitter<'ctx> {
-    type NodeRef = X86NodeRef;
+impl<'ctx, A: Allocator + Clone> Emitter<A> for X86Emitter<'ctx, A> {
+    type NodeRef = X86NodeRef<A>;
     type BlockRef = Ref<X86Block>;
-    type SymbolRef = X86SymbolRef;
+    type SymbolRef = X86SymbolRef<A>;
 
     fn set_current_block(&mut self, block: Self::BlockRef) {
         self.current_block = block;
@@ -849,7 +853,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 self.current_block
             )
         }
-        Self::NodeRef::from(X86Node {
+        self.node(X86Node {
             typ,
             kind: NodeKind::Constant { value, width },
         })
@@ -874,13 +878,13 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     }
 
     fn read_register(&mut self, offset: u64, typ: Type) -> Self::NodeRef {
-        Self::NodeRef::from(X86Node {
+        self.node(X86Node {
             typ,
             kind: NodeKind::GuestRegister { offset },
         })
     }
 
-    fn unary_operation(&mut self, op: UnaryOperationKind) -> Self::NodeRef {
+    fn unary_operation(&mut self, op: UnaryOperationKind<A>) -> Self::NodeRef {
         use UnaryOperationKind::*;
 
         match &op {
@@ -888,14 +892,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 NodeKind::Constant {
                     value: constant_value,
                     width,
-                } => Self::NodeRef::from(X86Node {
+                } => self.node(X86Node {
                     typ: value.typ().clone(),
                     kind: NodeKind::Constant {
                         value: (*constant_value == 0) as u64,
                         width: *width,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: value.typ().clone(),
                     kind: NodeKind::UnaryOperation(op),
                 }),
@@ -905,7 +909,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: constant_value,
                         width,
-                    } => Self::NodeRef::from(X86Node {
+                    } => self.node(X86Node {
                         typ: value.typ().clone(),
                         kind: NodeKind::Constant {
                             value: (!constant_value) & mask(*width), /* only invert the bits that
@@ -915,7 +919,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                             width: *width,
                         },
                     }),
-                    _ => Self::NodeRef::from(X86Node {
+                    _ => self.node(X86Node {
                         typ: value.typ().clone(),
                         kind: NodeKind::UnaryOperation(op),
                     }),
@@ -932,7 +936,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 {
                     todo!()
                 } else {
-                    Self::NodeRef::from(X86Node {
+                    self.node(X86Node {
                         typ: Type::Signed(64),
                         kind: NodeKind::UnaryOperation(op),
                     })
@@ -968,12 +972,12 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
                     let value = num.div_floor(den) as u64;
 
-                    Self::NodeRef::from(X86Node {
+                    self.node(X86Node {
                         typ: Type::Signed(64),
                         kind: NodeKind::Constant { value, width: 64 },
                     })
                 } else {
-                    Self::NodeRef::from(X86Node {
+                    self.node(X86Node {
                         typ: Type::Signed(64),
                         kind: NodeKind::UnaryOperation(op),
                     })
@@ -986,7 +990,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         }
     }
 
-    fn binary_operation(&mut self, op: BinaryOperationKind) -> Self::NodeRef {
+    fn binary_operation(&mut self, op: BinaryOperationKind<A>) -> Self::NodeRef {
         use BinaryOperationKind::*;
 
         // todo: re-enable me
@@ -1022,14 +1026,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value.wrapping_add(*rhs_value),// todo: THIS WILL WRAP AT 64 NOT *width*!
                         width: *width,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1043,14 +1047,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value.wrapping_sub(*rhs_value),// todo: THIS WILL WRAP AT 64 NOT *width*!
                         width: *width,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1064,14 +1068,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value * rhs_value,
                         width: *width,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1085,7 +1089,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value / rhs_value,
@@ -1108,7 +1112,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                         _ => panic!(),
                     }
                 }
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1122,14 +1126,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value % rhs_value,
                         width: *width,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1143,14 +1147,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value | rhs_value,
                         width: *width,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1164,14 +1168,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value ^ rhs_value,
                         width: *width,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1185,7 +1189,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: lhs_value & rhs_value,
@@ -1201,7 +1205,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     if *lhs_value == 0 {
                         self.constant(0, *rhs.typ())
                     } else {
-                        Self::NodeRef::from(X86Node {
+                        self.node(X86Node {
                             typ: lhs.typ().clone(),
                             kind: NodeKind::BinaryOperation(op),
                         })
@@ -1216,13 +1220,13 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     if *rhs_value == 0 {
                         self.constant(0, *lhs.typ())
                     } else {
-                        Self::NodeRef::from(X86Node {
+                        self.node(X86Node {
                             typ: rhs.typ().clone(),
                             kind: NodeKind::BinaryOperation(op),
                         })
                     }
                 }
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1235,14 +1239,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: if lhs_value == rhs_value { 1 } else { 0 },
                         width: 1,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1255,14 +1259,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     NodeKind::Constant {
                         value: rhs_value, ..
                     },
-                ) => Self::NodeRef::from(X86Node {
+                ) => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::Constant {
                         value: if lhs_value != rhs_value { 1 } else { 0 },
                         width: 1,
                     },
                 }),
-                _ => Self::NodeRef::from(X86Node {
+                _ => self.node(X86Node {
                     typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 }),
@@ -1279,10 +1283,10 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
         }
     }
 
-    fn ternary_operation(&mut self, op: TernaryOperationKind) -> Self::NodeRef {
+    fn ternary_operation(&mut self, op: TernaryOperationKind<A>) -> Self::NodeRef {
         use TernaryOperationKind::*;
         match &op {
-            AddWithCarry(src, _dst, _carry) => Self::NodeRef::from(X86Node {
+            AddWithCarry(src, _dst, _carry) => self.node(X86Node {
                 typ: src.typ().clone(),
                 kind: NodeKind::TernaryOperation(op),
             }),
@@ -1333,7 +1337,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
                 self.constant(casted_value, target_type)
             }
-            _ => Self::NodeRef::from(X86Node {
+            _ => self.node(X86Node {
                 typ: target_type,
                 kind: NodeKind::Cast {
                     value,
@@ -1413,7 +1417,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             (NodeKind::Constant { .. }, NodeKind::Constant { .. }, k) => {
                 todo!("{k:?}")
             }
-            (_, _, _) => Self::NodeRef::from(X86Node {
+            (_, _, _) => self.node(X86Node {
                 typ,
                 kind: NodeKind::Shift {
                     value,
@@ -1477,7 +1481,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             // // known value, unknown start and length
             // (NodeKind::Constant { .. }, _, _) => {
             //     let value =
-            //     Self::NodeRef::from(X86Node {
+            //     self.node(X86Node {
             //         typ,
             //         kind: NodeKind::BitExtract {
             //             value,
@@ -1487,7 +1491,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
             //     })
             // }
             // todo: constant start and length with non-constant value can still be specialized?
-            _ => Self::NodeRef::from(X86Node {
+            _ => self.node(X86Node {
                 typ,
                 kind: NodeKind::BitExtract {
                     value,
@@ -1519,7 +1523,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                 bit_insert(*target, *source, *start, *length),
                 Type::Unsigned(*target_width),
             ),
-            _ => Self::NodeRef::from(X86Node {
+            _ => self.node(X86Node {
                 typ,
                 kind: NodeKind::BitInsert {
                     target,
@@ -1545,7 +1549,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
                     true_value
                 }
             }
-            _ => Self::NodeRef::from(X86Node {
+            _ => self.node(X86Node {
                 typ: true_value.typ().clone(),
                 kind: NodeKind::Select {
                     condition,
@@ -1583,7 +1587,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     }
 
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef {
-        Self::NodeRef::from(X86Node {
+        self.node(X86Node {
             typ,
             kind: NodeKind::ReadMemory { address },
         })
@@ -1687,7 +1691,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
         let width = typ.width();
 
-        Self::NodeRef::from(X86Node {
+        self.node(X86Node {
             typ,
             kind: NodeKind::ReadStackVariable { offset, width },
         })
@@ -1740,14 +1744,14 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
 
     // returns a tuple of (operation_result, flags)
     fn get_flags(&mut self, operation: Self::NodeRef) -> Self::NodeRef {
-        Self::NodeRef::from(X86Node {
+        self.node(X86Node {
             typ: Type::Unsigned(4),
             kind: NodeKind::GetFlags { operation },
         })
     }
 
     fn panic(&mut self, msg: &str) {
-        let n = self.to_operand(&Self::NodeRef::from(X86Node {
+        let n = self.to_operand(&self.node(X86Node {
             typ: Type::Unsigned(8),
             kind: NodeKind::Constant {
                 value: match msg {
@@ -1766,7 +1770,7 @@ impl<'ctx> Emitter for X86Emitter<'ctx> {
     }
 
     fn create_tuple(&mut self, values: Vec<Self::NodeRef>) -> Self::NodeRef {
-        Self::NodeRef::from(X86Node {
+        self.node(X86Node {
             typ: Type::Tuple,
             kind: NodeKind::Tuple(values),
         })
@@ -1935,25 +1939,31 @@ fn signextend_64() {
     assert_eq!(64, sign_extend(64, 8, 64));
 }
 
-#[derive(Debug, Clone)]
-pub struct X86NodeRef(Rc<X86Node>);
+#[derive_where(Debug)]
+pub struct X86NodeRef<A: Allocator + Clone>(Rc<X86Node<A>, A>);
 
-impl Hash for X86NodeRef {
+impl<A: Allocator + Clone> Clone for X86NodeRef<A> {
+    fn clone(&self) -> Self {
+        Self(Rc::clone(&self.0))
+    }
+}
+
+impl<A: Allocator + Clone> Hash for X86NodeRef<A> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Rc::as_ptr(&self.0).hash(state);
     }
 }
 
-impl Eq for X86NodeRef {}
+impl<A: Allocator + Clone> Eq for X86NodeRef<A> {}
 
-impl PartialEq for X86NodeRef {
-    fn eq(&self, other: &X86NodeRef) -> bool {
+impl<A: Allocator + Clone> PartialEq for X86NodeRef<A> {
+    fn eq(&self, other: &X86NodeRef<A>) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
-impl X86NodeRef {
-    pub fn kind(&self) -> &NodeKind {
+impl<A: Allocator + Clone> X86NodeRef<A> {
+    pub fn kind(&self) -> &NodeKind<A> {
         &self.0.kind
     }
 
@@ -1962,20 +1972,14 @@ impl X86NodeRef {
     }
 }
 
-impl From<X86Node> for X86NodeRef {
-    fn from(node: X86Node) -> Self {
-        Self(Rc::new(node))
-    }
-}
-
-#[derive(Debug)]
-pub struct X86Node {
+#[derive_where(Debug)]
+pub struct X86Node<A: Allocator + Clone> {
     pub typ: Type,
-    pub kind: NodeKind,
+    pub kind: NodeKind<A>,
 }
 
-#[derive(Debug, PartialEq)]
-pub enum NodeKind {
+#[derive_where(Debug)]
+pub enum NodeKind<A: Allocator + Clone> {
     Constant {
         value: u64,
         width: u16,
@@ -1984,18 +1988,18 @@ pub enum NodeKind {
         offset: u64,
     },
     ReadMemory {
-        address: X86NodeRef,
+        address: X86NodeRef<A>,
     },
-    UnaryOperation(UnaryOperationKind),
-    BinaryOperation(BinaryOperationKind),
-    TernaryOperation(TernaryOperationKind),
+    UnaryOperation(UnaryOperationKind<A>),
+    BinaryOperation(BinaryOperationKind<A>),
+    TernaryOperation(TernaryOperationKind<A>),
     Cast {
-        value: X86NodeRef,
+        value: X86NodeRef<A>,
         kind: CastOperationKind,
     },
     Shift {
-        value: X86NodeRef,
-        amount: X86NodeRef,
+        value: X86NodeRef<A>,
+        amount: X86NodeRef<A>,
         kind: ShiftOperationKind,
     },
     ReadStackVariable {
@@ -2004,62 +2008,64 @@ pub enum NodeKind {
         width: u16,
     },
     BitExtract {
-        value: X86NodeRef,
-        start: X86NodeRef,
-        length: X86NodeRef,
+        value: X86NodeRef<A>,
+        start: X86NodeRef<A>,
+        length: X86NodeRef<A>,
     },
     BitInsert {
-        target: X86NodeRef,
-        source: X86NodeRef,
-        start: X86NodeRef,
-        length: X86NodeRef,
+        target: X86NodeRef<A>,
+        source: X86NodeRef<A>,
+        start: X86NodeRef<A>,
+        length: X86NodeRef<A>,
     },
     GetFlags {
-        operation: X86NodeRef,
+        operation: X86NodeRef<A>,
     },
-    Tuple(Vec<X86NodeRef>),
+    Tuple(Vec<X86NodeRef<A>>),
     Select {
-        condition: X86NodeRef,
-        true_value: X86NodeRef,
-        false_value: X86NodeRef,
+        condition: X86NodeRef<A>,
+        true_value: X86NodeRef<A>,
+        false_value: X86NodeRef<A>,
     },
 }
 
-// todo: make me copy
-#[derive(Debug, PartialEq, Clone)]
-pub enum BinaryOperationKind {
-    Add(X86NodeRef, X86NodeRef),
-    Sub(X86NodeRef, X86NodeRef),
-    Multiply(X86NodeRef, X86NodeRef),
-    Divide(X86NodeRef, X86NodeRef),
-    Modulo(X86NodeRef, X86NodeRef),
-    And(X86NodeRef, X86NodeRef),
-    Or(X86NodeRef, X86NodeRef),
-    Xor(X86NodeRef, X86NodeRef),
-    PowI(X86NodeRef, X86NodeRef),
-    CompareEqual(X86NodeRef, X86NodeRef),
-    CompareNotEqual(X86NodeRef, X86NodeRef),
-    CompareLessThan(X86NodeRef, X86NodeRef),
-    CompareLessThanOrEqual(X86NodeRef, X86NodeRef),
-    CompareGreaterThan(X86NodeRef, X86NodeRef),
-    CompareGreaterThanOrEqual(X86NodeRef, X86NodeRef),
+#[derive(Clone)]
+#[derive_where(Debug)]
+pub enum BinaryOperationKind<A: Allocator + Clone> {
+    Add(X86NodeRef<A>, X86NodeRef<A>),
+    Sub(X86NodeRef<A>, X86NodeRef<A>),
+    Multiply(X86NodeRef<A>, X86NodeRef<A>),
+    Divide(X86NodeRef<A>, X86NodeRef<A>),
+    Modulo(X86NodeRef<A>, X86NodeRef<A>),
+    And(X86NodeRef<A>, X86NodeRef<A>),
+    Or(X86NodeRef<A>, X86NodeRef<A>),
+    Xor(X86NodeRef<A>, X86NodeRef<A>),
+    PowI(X86NodeRef<A>, X86NodeRef<A>),
+    CompareEqual(X86NodeRef<A>, X86NodeRef<A>),
+    CompareNotEqual(X86NodeRef<A>, X86NodeRef<A>),
+    CompareLessThan(X86NodeRef<A>, X86NodeRef<A>),
+    CompareLessThanOrEqual(X86NodeRef<A>, X86NodeRef<A>),
+    CompareGreaterThan(X86NodeRef<A>, X86NodeRef<A>),
+    CompareGreaterThanOrEqual(X86NodeRef<A>, X86NodeRef<A>),
 }
 
-#[derive(Debug, PartialEq, Hash)]
-pub enum UnaryOperationKind {
-    Not(X86NodeRef),
-    Negate(X86NodeRef),
-    Complement(X86NodeRef),
-    Power2(X86NodeRef),
-    Absolute(X86NodeRef),
-    Ceil(X86NodeRef),
-    Floor(X86NodeRef),
-    SquareRoot(X86NodeRef),
+#[derive(Clone)]
+#[derive_where(Debug)]
+pub enum UnaryOperationKind<A: Allocator + Clone> {
+    Not(X86NodeRef<A>),
+    Negate(X86NodeRef<A>),
+    Complement(X86NodeRef<A>),
+    Power2(X86NodeRef<A>),
+    Absolute(X86NodeRef<A>),
+    Ceil(X86NodeRef<A>),
+    Floor(X86NodeRef<A>),
+    SquareRoot(X86NodeRef<A>),
 }
 
-#[derive(Debug, PartialEq)]
-pub enum TernaryOperationKind {
-    AddWithCarry(X86NodeRef, X86NodeRef, X86NodeRef),
+#[derive(Clone)]
+#[derive_where(Debug)]
+pub enum TernaryOperationKind<A: Allocator + Clone> {
+    AddWithCarry(X86NodeRef<A>, X86NodeRef<A>, X86NodeRef<A>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2165,15 +2171,16 @@ impl Debug for X86Block {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct X86SymbolRef(pub Rc<RefCell<Option<X86NodeRef>>>);
+#[derive(Clone)]
+#[derive_where(Debug)]
+pub struct X86SymbolRef<A: Allocator + Clone>(pub Rc<RefCell<Option<X86NodeRef<A>>>, A>);
 
-fn encode_compare(
-    kind: &BinaryOperationKind,
-    emitter: &mut X86Emitter,
-    right: X86NodeRef, /* TODO: this was flipped in order to make tests pass, unflip right and
-                        * left and fix the body of the function */
-    left: X86NodeRef,
+fn encode_compare<A: Allocator + Clone>(
+    kind: &BinaryOperationKind<A>,
+    emitter: &mut X86Emitter<A>,
+    right: X86NodeRef<A>, /* TODO: this was flipped in order to make tests pass, unflip right
+                           * and left and fix the body of the function */
+    left: X86NodeRef<A>,
 ) -> Operand {
     use crate::dbt::x86::encoder::OperandKind::*;
 
@@ -2259,7 +2266,7 @@ fn encode_compare(
                 (BinaryOperationKind::CompareGreaterThanOrEqual(_, _), true) => {
                     Instruction::setge(dst)
                 }
-                _ => panic!("{kind:?} is not a compare"),
+                _ => todo!("panic!(\"{{kind:?}} is not a compare\")"),
             });
 
             dst
@@ -2288,7 +2295,7 @@ fn encode_compare(
                 (BinaryOperationKind::CompareGreaterThanOrEqual(_, _), true) => {
                     Instruction::setl(dst)
                 }
-                _ => panic!("{kind:?} is not a compare"),
+                _ => todo!(), //panic!("{kind:?} is not a compare"),
             });
 
             dst
@@ -2297,7 +2304,9 @@ fn encode_compare(
         (Immediate(_), Immediate(_)) => {
             panic!(
                 "why was this not const evaluated? {:?} {:?} {:?}",
-                left, right, kind
+                left,
+                right,
+                todo!() // kind
             )
         }
         (Target(_), _) | (_, Target(_)) => panic!("why"),
@@ -2349,7 +2358,10 @@ fn encode_compare(
 //     }
 // }
 
-fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef {
+fn emit_compare<A: Allocator + Clone>(
+    op: BinaryOperationKind<A>,
+    emitter: &mut X86Emitter<A>,
+) -> X86NodeRef<A> {
     use BinaryOperationKind::*;
 
     let (CompareLessThan(left, right)
@@ -2407,7 +2419,7 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
                 }
             };
 
-            X86NodeRef::from(X86Node {
+            emitter.node(X86Node {
                 typ: left.typ().clone(),
                 kind: NodeKind::Constant {
                     value: result as u64,
@@ -2455,7 +2467,7 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
                 }
             } else {
                 // else emit an X86 node
-                X86NodeRef::from(X86Node {
+                emitter.node(X86Node {
                     typ: Type::Unsigned(1),
                     kind: NodeKind::BinaryOperation(op),
                 })
@@ -2463,7 +2475,7 @@ fn emit_compare(op: BinaryOperationKind, emitter: &mut X86Emitter) -> X86NodeRef
         }
         _ => {
             // else emit an X86 node
-            X86NodeRef::from(X86Node {
+            emitter.node(X86Node {
                 typ: Type::Unsigned(1),
                 kind: NodeKind::BinaryOperation(op),
             })

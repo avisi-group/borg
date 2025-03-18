@@ -19,11 +19,13 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
+        alloc::Allocator,
         cmp::max,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
     },
+    derive_where::derive_where,
     itertools::Itertools,
 };
 
@@ -34,50 +36,50 @@ const FN_DENYLIST: &[&str] = &["AArch64_TranslateAddress"];
 
 /// Kind of jump to a target block
 #[derive(Debug)]
-enum JumpKind {
+enum JumpKind<A: Allocator + Clone> {
     // static jump (jump or branch with constant condition)
     Static {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: BTreeMap<InternedString, LocalVariable>,
+        variables: BTreeMap<InternedString, LocalVariable<A>, A>,
     },
     // branch with non-constant condition
     Dynamic {
         rudder: Ref<Block>,
         x86: Ref<X86Block>,
-        variables: BTreeMap<InternedString, LocalVariable>,
+        variables: BTreeMap<InternedString, LocalVariable<A>, A>,
     },
 }
 
 #[derive(Debug, Clone)]
-enum StatementResult {
-    Data(Option<X86NodeRef>),
-    ControlFlow(ControlFlow),
+enum StatementResult<A: Allocator + Clone> {
+    Data(Option<X86NodeRef<A>>),
+    ControlFlow(ControlFlow<A>),
 }
 
 #[derive(Debug, Clone)]
-enum ControlFlow {
+enum ControlFlow<A: Allocator + Clone> {
     Jump(
         Ref<Block>,
         Ref<X86Block>,
-        BTreeMap<InternedString, LocalVariable>,
+        BTreeMap<InternedString, LocalVariable<A>, A>,
     ),
     Branch(
         Ref<Block>,
         Ref<Block>,
-        BTreeMap<InternedString, LocalVariable>,
+        BTreeMap<InternedString, LocalVariable<A>, A>,
     ),
     Panic,
     Return,
 }
 
-pub fn translate(
+pub fn translate<A: Allocator + Clone>(
     model: &Model,
     function: &str,
-    arguments: &[X86NodeRef],
-    emitter: &mut X86Emitter,
+    arguments: &[X86NodeRef<A>],
+    emitter: &mut X86Emitter<A>,
     register_file_ptr: *mut u8,
-) -> Option<X86NodeRef> {
+) -> Option<X86NodeRef<A>> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = Rc::new(AtomicUsize::new(8));
@@ -92,10 +94,11 @@ pub fn translate(
     .translate()
 }
 
-#[derive(Debug, Clone)]
-enum LocalVariable {
+#[derive(Clone)]
+#[derive_where(Debug)]
+enum LocalVariable<A: Allocator + Clone> {
     Virtual {
-        symbol: X86SymbolRef,
+        symbol: X86SymbolRef<A>,
     },
     Stack {
         typ: emitter::Type,
@@ -104,29 +107,29 @@ enum LocalVariable {
 }
 
 // we only care if the variable is virtual or on the stack?
-impl Hash for LocalVariable {
+impl<A: Allocator + Clone> Hash for LocalVariable<A> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         core::mem::discriminant(self).hash(state);
     }
 }
 
-impl PartialEq for LocalVariable {
-    fn eq(&self, other: &LocalVariable) -> bool {
+impl<A: Allocator + Clone> PartialEq for LocalVariable<A> {
+    fn eq(&self, other: &LocalVariable<A>) -> bool {
         core::mem::discriminant(self).eq(&core::mem::discriminant(other))
     }
 }
 
-impl Eq for LocalVariable {}
+impl<A: Allocator + Clone> Eq for LocalVariable<A> {}
 
-#[derive(Debug)]
-struct ReturnValue {
-    variables: Vec<LocalVariable>,
+#[derive_where(Debug)]
+struct ReturnValue<A: Allocator + Clone> {
+    variables: Vec<LocalVariable<A>>,
     previous_write: Option<(Ref<X86Block>, usize)>,
 }
 
-impl ReturnValue {
+impl<A: Allocator + Clone> ReturnValue<A> {
     pub fn new<'e, 'c>(
-        emitter: &'e mut X86Emitter<'c>,
+        emitter: &'e mut X86Emitter<'c, A>,
         return_type: Option<rudder::types::Type>,
     ) -> Self {
         let num_variables = match return_type {
@@ -150,36 +153,36 @@ impl ReturnValue {
     }
 }
 
-struct FunctionTranslator<'m, 'e, 'c> {
+struct FunctionTranslator<'model, 'emitter, 'context, A: Allocator + Clone> {
     /// The model we are translating guest code for
-    model: &'m Model,
+    model: &'model Model,
 
     /// Function being translated
-    function: &'m Function,
+    function: &'model Function,
 
     dynamic_blocks:
-        HashMap<(Ref<Block>, BTreeMap<InternedString, LocalVariable>), (Ref<X86Block>, bool)>,
+        HashMap<(Ref<Block>, BTreeMap<InternedString, LocalVariable<A>, A>), (Ref<X86Block>, bool)>,
     static_blocks: HashMap<Ref<Block>, Vec<Ref<X86Block>>>,
 
-    entry_variables: BTreeMap<InternedString, LocalVariable>,
+    entry_variables: BTreeMap<InternedString, LocalVariable<A>, A>,
 
     // don't re-promote to a different location
     promoted_locations: HashMap<InternedString, usize>,
 
-    return_value: ReturnValue,
+    return_value: ReturnValue<A>,
 
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize>,
 
     /// X86 instruction emitter
-    emitter: &'e mut X86Emitter<'c>,
+    emitter: &'emitter mut X86Emitter<'context, A>,
 
     /// Pointer to the register file used for cached register reads
     register_file_ptr: *mut u8,
 }
 
-impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
-    fn read_return_value(&mut self) -> Option<X86NodeRef> {
+impl<'m, 'e, 'c, A: Allocator + Clone> FunctionTranslator<'m, 'e, 'c, A> {
+    fn read_return_value(&mut self) -> Option<X86NodeRef<A>> {
         match self.function.return_type() {
             Some(rudder::types::Type::Tuple(_)) => {
                 let values = self
@@ -196,7 +199,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         }
     }
 
-    fn write_return_value(&mut self, value: X86NodeRef) {
+    fn write_return_value(&mut self, value: X86NodeRef<A>) {
         let values = match value.kind() {
             NodeKind::Tuple(elements) => (*elements).clone(),
             _ => alloc::vec![value.clone()],
@@ -292,8 +295,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
     fn new(
         model: &'m Model,
         function: &str,
-        arguments: &[X86NodeRef],
-        emitter: &'e mut X86Emitter<'c>,
+        arguments: &[X86NodeRef<A>],
+        emitter: &'e mut X86Emitter<'c, A>,
         current_stack_offset: Rc<AtomicUsize>,
         register_file_ptr: *mut u8,
     ) -> Self {
@@ -312,7 +315,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
             function,
             dynamic_blocks: HashMap::default(),
             static_blocks: HashMap::default(),
-            entry_variables: BTreeMap::new(),
+            entry_variables: BTreeMap::new_in(emitter.ctx().allocator()),
             promoted_locations: HashMap::default(),
             return_value: ReturnValue::new(emitter, function.return_type()),
             current_stack_offset,
@@ -336,7 +339,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         celf
     }
 
-    fn translate(&mut self) -> Option<X86NodeRef> {
+    fn translate(&mut self) -> Option<X86NodeRef<A>> {
         // create an empty block all control flow will end at
         let exit_block = self.emitter.ctx_mut().arena_mut().insert(X86Block::new());
 
@@ -460,8 +463,8 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
 
         block_ref: Ref<Block>,
         is_dynamic: bool,
-        mut variables: BTreeMap<InternedString, LocalVariable>,
-    ) -> ControlFlow {
+        mut variables: BTreeMap<InternedString, LocalVariable<A>, A>,
+    ) -> ControlFlow<A> {
         let block = block_ref.get(self.function.arena());
 
         let mut statement_value_store = StatementValueStore::new();
@@ -512,14 +515,14 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
     // todo: fix these parameters this is silly
     fn translate_statement(
         &mut self,
-        statement_values: &StatementValueStore,
+        statement_values: &StatementValueStore<A>,
         is_dynamic: bool,
         statement: &Statement,
         block: Ref<Block>,
 
         arena: &Arena<Statement>,
-        variables: &mut BTreeMap<InternedString, LocalVariable>,
-    ) -> StatementResult {
+        variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
+    ) -> StatementResult<A> {
         //        log::debug!("translate stmt: {statement:?}");
 
         match statement {
@@ -1147,7 +1150,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         }
     }
 
-    fn read_variable(&mut self, variable: LocalVariable) -> X86NodeRef {
+    fn read_variable(&mut self, variable: LocalVariable<A>) -> X86NodeRef<A> {
         match variable {
             LocalVariable::Virtual { symbol } => self.emitter.read_virt_variable(symbol),
             LocalVariable::Stack { stack_offset, typ } => {
@@ -1156,7 +1159,7 @@ impl<'m, 'e, 'c> FunctionTranslator<'m, 'e, 'c> {
         }
     }
 
-    fn write_variable(&mut self, variable: LocalVariable, value: X86NodeRef) {
+    fn write_variable(&mut self, variable: LocalVariable<A>, value: X86NodeRef<A>) {
         match variable {
             LocalVariable::Virtual { symbol } => self.emitter.write_virt_variable(symbol, value),
             LocalVariable::Stack {
@@ -1242,22 +1245,22 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
 /// statements
 ///
 /// Tried linear search vec but same perf
-struct StatementValueStore {
-    map: HashMap<Ref<Statement>, X86NodeRef>,
+struct StatementValueStore<A: Allocator + Clone> {
+    map: HashMap<Ref<Statement>, X86NodeRef<A>>,
 }
 
-impl StatementValueStore {
+impl<A: Allocator + Clone> StatementValueStore<A> {
     pub fn new() -> Self {
         Self {
             map: HashMap::default(),
         }
     }
 
-    pub fn insert(&mut self, s: Ref<Statement>, v: X86NodeRef) {
+    pub fn insert(&mut self, s: Ref<Statement>, v: X86NodeRef<A>) {
         self.map.insert(s, v);
     }
 
-    pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef> {
+    pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef<A>> {
         self.map.get(&s).cloned()
     }
 }
