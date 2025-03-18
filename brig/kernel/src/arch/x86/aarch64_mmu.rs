@@ -74,7 +74,7 @@ fn translate_l1(
 
     if !entry.is_valid() {
         // guest page fault, look up exception vector table (VBAR_EL2)
-        guest_page_fault(device);
+        guest_page_fault(device, guest_virtual_address);
         exit_with_message!("invalid")
     }
 
@@ -120,7 +120,7 @@ fn translate_l3(
         exit_with_message!("{entry:x?}")
     } else {
         log::warn!("invalid");
-        guest_page_fault(device);
+        guest_page_fault(device, guest_virtual_address);
         None
     }
 }
@@ -131,24 +131,14 @@ fn entry_to_table(entry: &Descriptor) -> &[Descriptor; 512] {
     }
 }
 
-fn guest_page_fault(device: &ModelDevice) {
-    // get EL
-    let el: u8 = *device.get_register_mut("PSTATE_EL");
-    log::warn!("el = {el}");
+fn guest_page_fault(device: &ModelDevice, guest_virtual_address: u64) {
+    log::warn!("guest page fault @ {guest_virtual_address}");
 
-    // get VBAR_ELx
-    let vbar_el1: u64 = *device.get_register_mut("VBAR_EL1");
-    let vbar_el2: u64 = *device.get_register_mut("VBAR_EL2");
-    let vbar_el3: u64 = *device.get_register_mut("VBAR_EL3");
+    let retaddr = *device.get_register_mut::<u64>("_PC");
 
-    log::warn!("{vbar_el1:x}");
-    log::warn!("{vbar_el2:x}");
-    log::warn!("{vbar_el3:x}");
+    take_arm_exception(device, 1, 1, 0, guest_virtual_address, retaddr, 0);
 
     interrupt_restore_safepoint(1);
-
-    // get page fault handler
-    // set PC and execute until we hit an eret
 }
 
 fn take_arm_exception(
@@ -161,13 +151,18 @@ fn take_arm_exception(
     mut voff: u64,
 ) {
     let spsr = get_psr_from_pstate(device);
+    log::trace!("spsr: {spsr:032b}");
+
     let current_el = *device.get_register_mut::<u8>("PSTATE_EL");
+    log::trace!("current_el: {current_el}");
 
     if target_el > current_el {
         voff += 0x400;
     } else if *device.get_register_mut::<u8>("PSTATE_SP") == 1 {
         voff += 0x200;
     }
+
+    log::trace!("voff: {voff:x}");
 
     // Update the execution level
     *device.get_register_mut::<u8>("PSTATE_EL") = target_el;
@@ -176,13 +171,13 @@ fn take_arm_exception(
     *device.get_register_mut::<u8>("PSTATE_SP") = 1;
 
     if target_el == 1 {
-        *device.get_register_mut::<u32>("SPSR_EL1") = spsr;
+        *device.get_register_mut::<u32>("SPSR_EL1_bits") = spsr;
         *device.get_register_mut::<u64>("ELR_EL1") = retaddr;
 
         // If it's NOT an IRQ...
         if typ != 255 {
             let ec = get_exception_class(current_el, target_el, typ);
-            *device.get_register_mut::<u32>("ESR_EL1") =
+            *device.get_register_mut::<u32>("ESR_EL1_bits") =
                 (ec << 26) | (1 << 25) | (syndrome & 0x1ffffff);
 
             if typ == 1 || typ == 4 {
@@ -198,15 +193,13 @@ fn take_arm_exception(
     *device.get_register_mut::<u8>("PSTATE_I") = 1;
     *device.get_register_mut::<u8>("PSTATE_F") = 1;
 
-    // let vbar = read_register(VBAR);
-    let vbar: u64 = match target_el {
-        1 => *device.get_register_mut("VBAR_EL1"),
-        2 => *device.get_register_mut("VBAR_EL2"),
-        3 => *device.get_register_mut("VBAR_EL3"),
-        _ => exit_with_message!("invalid EL"),
-    };
+    let vbar = *device.get_register_mut::<u64>(match current_el {
+        1 => "VBAR_EL1",
+        2 => "VBAR_EL2",
+        3 => "VBAR_EL3",
+        _ => exit_with_message!("invalid EL \"{current_el}\""),
+    });
     *device.get_register_mut::<u64>("_PC") = vbar + voff;
-    return;
 }
 
 fn get_psr_from_pstate(device: &ModelDevice) -> u32 {
