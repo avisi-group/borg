@@ -3639,3 +3639,49 @@ fn csinc() {
         assert_eq!(*x3, 0x1);
     }
 }
+
+#[ktest]
+fn ldrh() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //   78635823        ldrh    w3, [x1, w3, uxtw #1]
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x78635823, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let src = Box::<u32>::new(0xAAAA_DEAD); // negative signed 32-bit int
+
+        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
+        let x3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
+
+        *x3 = 0xAB;
+        *x1 = ((&*src) as *const u32) as u64 - (*x3 << 1);
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*x3, 0x0000_DEAD);
+    }
+}

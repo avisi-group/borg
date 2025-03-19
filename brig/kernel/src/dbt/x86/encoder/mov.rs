@@ -152,7 +152,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             assembler
-                .mov::<AsmRegister8, AsmMemoryOperand>(
+                .mov::<AsmRegister16, AsmMemoryOperand>(
                     dst.into(),
                     memory_operand_to_iced(*base, *index, *scale, *displacement),
                 )
