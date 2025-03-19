@@ -1,6 +1,4 @@
-use core::arch::global_asm;
-
-use proc_macro_lib::ktest;
+use {core::arch::global_asm, proc_macro_lib::ktest};
 
 global_asm!(
     r#"

@@ -13,8 +13,8 @@ use {
             },
         },
     },
-    alloc::boxed::Box,
-    common::{HashMap, mask::mask},
+    alloc::{alloc::Global, boxed::Box},
+    common::{hashmap::HashMap, mask::mask},
     proc_macro_lib::ktest,
 };
 
@@ -37,6 +37,7 @@ fn static_dynamic_chaos_smoke() {
         let mut emitter = X86Emitter::new(&mut ctx);
 
         translate(
+            Global,
             &*model,
             "func_corrupted_var",
             &[],
@@ -82,7 +83,7 @@ fn static_dynamic_chaos_smoke() {
 //     let feature = emitter.read_register(model.reg_offset("R0"),
 // Type::Signed(32));
 
-//     let out = translate(
+//     let out = translate(Global,
 //         &*model,
 //         "num_of_Feature",
 //         &[feature],
@@ -126,6 +127,7 @@ fn num_of_feature_const_123() {
     let feature = emitter.constant(123, Type::Signed(32));
 
     let out = translate(
+        Global,
         &*model,
         "num_of_Feature",
         &[feature],
@@ -156,6 +158,7 @@ fn statistical_profiling_disabled() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let is_enabled = translate(
+        Global,
         &*model,
         "StatisticalProfilingEnabled",
         &[],
@@ -191,7 +194,7 @@ fn statistical_profiling_disabled() {
 //     let mut emitter = X86Emitter::new(&mut ctx);
 
 //     let is_enabled =
-//         translate(&*model, "HaveBRBExt", &[], &mut emitter,
+//         translate(Global,&*model, "HaveBRBExt", &[], &mut emitter,
 // register_file_ptr).unwrap();
 
 //     emitter.write_register(model.reg_offset("R0"), is_enabled);
@@ -220,6 +223,7 @@ fn using_aarch32_disabled() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let is_enabled = translate(
+        Global,
         &*model,
         "UsingAArch32",
         &[],
@@ -257,6 +261,7 @@ fn branchto() {
     let branch_type = emitter.constant(1, Type::Unsigned(32));
     let branch_conditional = emitter.constant(1, Type::Unsigned(1));
     translate(
+        Global,
         &*model,
         "BranchTo",
         &[target, branch_type, branch_conditional],
@@ -304,6 +309,7 @@ fn decodea64_addsub() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x8b020020, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -382,6 +388,7 @@ fn decodea64_mov() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -425,6 +432,7 @@ fn decodea64_branch() {
     let pc = emitter.constant(44, Type::Unsigned(64));
     let opcode = emitter.constant(0x17fffffa, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -467,6 +475,7 @@ fn branch_if_eq() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x540000c0, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -613,6 +622,7 @@ fn cmp_csel() {
         let pc = emitter.constant(0, Type::Unsigned(64));
         let opcode = emitter.constant(0xeb00005f, Type::Unsigned(32));
         translate(
+            Global,
             &*model,
             "__DecodeA64",
             &[pc, opcode],
@@ -627,6 +637,7 @@ fn cmp_csel() {
         let pc = emitter.constant(0, Type::Unsigned(64));
         let opcode = emitter.constant(0x9a809042, Type::Unsigned(32));
         translate(
+            Global,
             &*model,
             "__DecodeA64",
             &[pc, opcode],
@@ -708,6 +719,7 @@ fn fibonacci_instr() {
                 let opcode = emitter.constant(program[*pc as usize / 4], Type::Unsigned(32));
                 let pc = emitter.constant(*pc, Type::Unsigned(64));
                 translate(
+                    Global,
                     &*model,
                     "__DecodeA64",
                     &[pc, opcode],
@@ -753,6 +765,7 @@ fn mem() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -796,6 +809,7 @@ fn mem_store() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -840,6 +854,7 @@ fn mem_load() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9400020, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -929,6 +944,7 @@ fn fibonacci_block() {
                         emitter.constant(program[current_pc as usize / 4], Type::Unsigned(32));
                     let pc = emitter.constant(current_pc, Type::Unsigned(64));
                     let _return_value = translate(
+                        Global,
                         &*model,
                         "__DecodeA64",
                         &[pc, opcode],
@@ -1064,6 +1080,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let carry_in = emitter.read_register(model.reg_offset("R2"), Type::Unsigned(0x1));
 
     let res = translate(
+        Global,
         &*model,
         "add_with_carry_test",
         &[x, y, carry_in],
@@ -1174,6 +1191,7 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xeb01001f, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -1209,6 +1227,7 @@ fn shiftreg() {
     let amount = emitter.constant(0, Type::Signed(64));
     let width = emitter.constant(64, Type::Signed(64));
     let value = translate(
+        Global,
         &*model,
         "ShiftReg",
         &[_1, shift_type, amount, width],
@@ -1249,7 +1268,15 @@ fn floorpow2_constant() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "FloorPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1258,7 +1285,15 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "FloorPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1267,7 +1302,15 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "FloorPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1276,7 +1319,15 @@ fn floorpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(&*model, "FloorPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "FloorPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1297,7 +1348,15 @@ fn ceilpow2_constant() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "CeilPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1306,7 +1365,15 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(2397, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "CeilPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1315,7 +1382,15 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(4095, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "CeilPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1324,7 +1399,15 @@ fn ceilpow2_constant() {
         }
     );
     let x = emitter.constant(1231, Type::Signed(64));
-    let value = translate(&*model, "CeilPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+    let value = translate(
+        Global,
+        &*model,
+        "CeilPow2",
+        &[x],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         value.kind(),
         &NodeKind::Constant {
@@ -1347,6 +1430,7 @@ fn _ispow2() {
 
     {
         let value = translate(
+            Global,
             &*model,
             "FloorPow2",
             &[x.clone()],
@@ -1359,6 +1443,7 @@ fn _ispow2() {
 
     {
         let value = translate(
+            Global,
             &*model,
             "CeilPow2",
             &[x.clone()],
@@ -1370,7 +1455,15 @@ fn _ispow2() {
     }
 
     {
-        let value = translate(&*model, "IsPow2", &[x], &mut emitter, register_file_ptr).unwrap();
+        let value = translate(
+            Global,
+            &*model,
+            "IsPow2",
+            &[x],
+            &mut emitter,
+            register_file_ptr,
+        )
+        .unwrap();
         emitter.write_register(model.reg_offset("R2"), value);
     }
 
@@ -1440,6 +1533,7 @@ fn rbitx0() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xdac00000, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -1533,6 +1627,7 @@ fn ubfx() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd3504c63, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -1570,6 +1665,7 @@ fn highest_set_bit() {
 
     let x = emitter.constant(0b100, Type::Unsigned(64));
     let res = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[x],
@@ -1587,6 +1683,7 @@ fn highest_set_bit() {
 
     let x = emitter.constant(u64::MAX, Type::Unsigned(64));
     let res = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[x],
@@ -1615,7 +1712,15 @@ fn ror() {
 
     let x = emitter.constant(0xff00, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1626,7 +1731,15 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(64));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1637,7 +1750,15 @@ fn ror() {
 
     let x = emitter.constant(0xff, Type::Unsigned(32));
     let shift = emitter.constant(8, Type::Signed(64));
-    let res = translate(&*model, "ROR", &[x, shift], &mut emitter, register_file_ptr).unwrap();
+    let res = translate(
+        Global,
+        &*model,
+        "ROR",
+        &[x, shift],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1659,7 +1780,15 @@ fn extsv() {
 
     let m = emitter.constant(32, Type::Signed(64));
     let v = emitter.constant(0xFFFF_FFFF_FFFF_FFFF, Type::Unsigned(64));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
+    let res = translate(
+        Global,
+        &*model,
+        "extsv",
+        &[m, v],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1669,7 +1798,15 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(-1i32 as u64, Type::Unsigned(32));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
+    let res = translate(
+        Global,
+        &*model,
+        "extsv",
+        &[m, v],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1679,7 +1816,15 @@ fn extsv() {
     );
     let m = emitter.constant(64, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
+    let res = translate(
+        Global,
+        &*model,
+        "extsv",
+        &[m, v],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(
         res.kind(),
         &NodeKind::Constant {
@@ -1690,7 +1835,15 @@ fn extsv() {
 
     let m = emitter.constant(1, Type::Signed(64));
     let v = emitter.constant(1, Type::Unsigned(1));
-    let res = translate(&*model, "extsv", &[m, v], &mut emitter, register_file_ptr).unwrap();
+    let res = translate(
+        Global,
+        &*model,
+        "extsv",
+        &[m, v],
+        &mut emitter,
+        register_file_ptr,
+    )
+    .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 }
 
@@ -1707,6 +1860,7 @@ fn zext_ones() {
     let n = emitter.constant(1, Type::Signed(64));
     let m = emitter.constant(1, Type::Signed(64));
     let res = translate(
+        Global,
         &*model,
         "zext_ones",
         &[n, m],
@@ -1719,6 +1873,7 @@ fn zext_ones() {
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(0, Type::Signed(64));
     let res = translate(
+        Global,
         &*model,
         "zext_ones",
         &[n, m],
@@ -1737,6 +1892,7 @@ fn zext_ones() {
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(32, Type::Signed(64));
     let res = translate(
+        Global,
         &*model,
         "zext_ones",
         &[n, m],
@@ -1755,6 +1911,7 @@ fn zext_ones() {
     let n = emitter.constant(64, Type::Signed(64));
     let m = emitter.constant(64, Type::Signed(64));
     let res = translate(
+        Global,
         &*model,
         "zext_ones",
         &[n, m],
@@ -1827,6 +1984,7 @@ fn decodebitmasks() {
     let immediate = emitter.constant(0, Type::Unsigned(1));
     let m = emitter.constant(0x40, Type::Signed(64));
     let res = translate(
+        Global,
         &*model,
         "DecodeBitMasks",
         &[immn, imms, immr, immediate, m],
@@ -1869,6 +2027,7 @@ fn replicate_bits() {
                 width: 16
             },
             translate(
+                Global,
                 &model,
                 "replicate_bits_borealis_internal",
                 &[value, count],
@@ -1888,6 +2047,7 @@ fn replicate_bits() {
                 width: 32
             },
             translate(
+                Global,
                 &model,
                 "replicate_bits_borealis_internal",
                 &[value, count],
@@ -1907,6 +2067,7 @@ fn replicate_bits() {
                 width: 64
             },
             translate(
+                Global,
                 &model,
                 "replicate_bits_borealis_internal",
                 &[value, count],
@@ -1931,6 +2092,7 @@ fn rev_d00dfeed() {
     let _32 = emitter.constant(32, Type::Signed(64));
     let _3 = emitter.constant(3, Type::Signed(64));
     translate(
+        Global,
         &*model,
         "execute_aarch64_instrs_integer_arithmetic_rev",
         &[_32.clone(), _3.clone(), _32, _3],
@@ -1972,6 +2134,7 @@ fn place_slice() {
     let shift = emitter.constant(0, Type::Signed(64));
 
     let res = translate(
+        Global,
         &*model,
         "place_slice_signed",
         &[m, xs, i, l, shift],
@@ -2001,6 +2164,7 @@ fn udiv() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x9ac10a73, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2043,7 +2207,7 @@ fn udiv() {
 
 //     let i = emitter.constant(1, Type::Signed(64));
 
-//     let res = translate(&*model, "to_real", &[i], &mut emitter,
+//     let res = translate(Global,&*model, "to_real", &[i], &mut emitter,
 // register_file_ptr);
 
 //     panic!("{res:?}")
@@ -2061,7 +2225,7 @@ fn udiv() {
 
 //     let r = emitter.read_register(0, Type::Signed(64));
 
-//     let res = translate(&*model, "to_real", &[r], &mut emitter,
+//     let res = translate(Global,&*model, "to_real", &[r], &mut emitter,
 // register_file_ptr);
 
 //     panic!("{res:?}")
@@ -2171,6 +2335,7 @@ fn msr() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd51be000, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2205,6 +2370,7 @@ fn stp() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xa9bf7bfd, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2257,6 +2423,7 @@ fn ldrsw() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xb9802fe0, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2322,6 +2489,7 @@ fn get_num_event_counters_accessible() {
     }
 
     let result = translate(
+        Global,
         &*model,
         "AArch64_GetNumEventCountersAccessible",
         &[],
@@ -2363,6 +2531,7 @@ fn sub_pc() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd10043ff, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2404,6 +2573,7 @@ fn lsrv() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x9ac02420, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2447,6 +2617,7 @@ fn mem_load_immediate() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x180006e0, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2492,6 +2663,7 @@ fn eret() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2546,6 +2718,7 @@ fn clz() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xdac01129, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2581,6 +2754,7 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(0x1, Type::Unsigned(64));
     let n = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2598,6 +2772,7 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(0b1000, Type::Unsigned(64));
     let n = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2615,6 +2790,7 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
     let n = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2632,6 +2808,7 @@ fn highest_set_bit_const() {
 
     let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
     let n = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2652,6 +2829,7 @@ fn highest_set_bit_const() {
         Type::Unsigned(32),
     );
     let n = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[bv],
@@ -2679,6 +2857,7 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(0x0, Type::Unsigned(64));
     let n = translate(
+        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2696,6 +2875,7 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(0b1000, Type::Unsigned(64));
     let n = translate(
+        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2713,6 +2893,7 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(u64::MAX, Type::Unsigned(64));
     let n = translate(
+        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2730,6 +2911,7 @@ fn count_leading_zero_bits_const() {
 
     let bv = emitter.constant(u8::MAX as u64, Type::Unsigned(8));
     let n = translate(
+        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2750,6 +2932,7 @@ fn count_leading_zero_bits_const() {
         Type::Unsigned(32),
     );
     let n = translate(
+        Global,
         &*model,
         "CountLeadingZeroBits",
         &[bv],
@@ -2777,6 +2960,7 @@ fn highest_set_bit_dynamic() {
 
     let r0 = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
     let n = translate(
+        Global,
         &*model,
         "HighestSetBit",
         &[r0],
@@ -2819,6 +3003,7 @@ fn msr_daifclr() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd50348ff, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2850,6 +3035,7 @@ fn current_security_state_is_const() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let state = translate(
+        Global,
         &*model,
         "CurrentSecurityState",
         &[],
@@ -2885,6 +3071,7 @@ fn sys_movzx_investigation() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd50b7428, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -2929,6 +3116,7 @@ fn ttbr1_el1_write() {
     let val = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
 
     translate(
+        Global,
         &*model,
         "TTBR1_EL1_write",
         &[val],
@@ -2986,6 +3174,7 @@ fn aarch64_sysregwrite() {
     let t = emitter.constant(1, Type::Signed(64));
 
     translate(
+        Global,
         &*model,
         "TTBR1_EL1_SysRegWrite_949dc27ace2a7dbe",
         &[el, op0, op1, crn, op2, crm, t],
@@ -3030,6 +3219,7 @@ fn msr_ttbr() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd5182021, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3076,6 +3266,7 @@ fn branch_link_pc_flag() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0x9400044d, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3111,6 +3302,7 @@ fn mrs_mpidr_el1() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd53800a5, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3151,6 +3343,7 @@ fn mov_300000() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd2a00604, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3190,6 +3383,7 @@ fn mrs_ctr_el0() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd53b0023, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3233,6 +3427,7 @@ fn mrs_id_aa64dfr0_el1() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd5380501, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3288,7 +3483,7 @@ fn mrs_id_aa64dfr0_el1() {
 //     // mrs               x1, id_aa64pfr0_el1
 //     let pc = emitter.constant(0, Type::Unsigned(64));
 //     let opcode = emitter.constant(0xd5380501, Type::Unsigned(32));
-//     translate(
+//     translate(Global,
 //         &*model,
 //         "__DecodeA64",
 //         &[pc, opcode],
@@ -3328,6 +3523,7 @@ fn ldaxr() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xc85ffc03, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3357,6 +3553,7 @@ fn slow_msr() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd5184000, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3386,6 +3583,7 @@ fn slow_msr_2() {
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd5181000, Type::Unsigned(32));
     translate(
+        Global,
         &*model,
         "__DecodeA64",
         &[pc, opcode],
@@ -3396,7 +3594,48 @@ fn slow_msr_2() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    log::warn!("compiling");
     let _translation = ctx.compile(num_regs);
-    panic!("{}", _translation.code.len());
+}
+
+#[ktest]
+fn csinc() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    // csinc		w3, wzr, wzr, ne
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x1a9f17e3, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    log::warn!("{translation:?}");
+
+    unsafe {
+        let x3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
+        *(register_file_ptr.add(model.reg_offset("PSTATE_Z") as usize) as *mut u8) = 1;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*x3, 0x1);
+    }
 }

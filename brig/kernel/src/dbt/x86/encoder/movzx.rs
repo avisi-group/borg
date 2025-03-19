@@ -32,19 +32,21 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .unwrap();
             }
             (Width::_8, Width::_64) => {
-                // high 32 bits will be cleared automatically
                 assembler
                     .mov::<AsmRegister32, i32>(dst.into(), u8::try_from(*src).unwrap().into())
                     .unwrap();
             }
             (Width::_16, Width::_64) => {
-                // high 32 bits will be cleared automatically
+                assembler
+                    .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
+                    .unwrap();
+            }
+            (Width::_16, Width::_32) => {
                 assembler
                     .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
                     .unwrap();
             }
             (Width::_32, Width::_64) => {
-                // high 32 bits will be cleared automatically
                 assembler
                     .mov::<AsmRegister32, i32>(dst.into(), *src as i32)
                     .unwrap();

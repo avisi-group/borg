@@ -1,6 +1,6 @@
 use {
     crate::{arch::x86::memory::VirtualMemoryArea, dbt::interpret::interpret},
-    alloc::{alloc::Global, string::String, vec::Vec},
+    alloc::{string::String, vec::Vec},
     common::{mask::mask, rudder::Model},
     core::{
         alloc::Allocator,
@@ -14,7 +14,7 @@ use {
 pub mod emitter;
 pub mod interpret;
 pub mod models;
-//mod tests;
+mod tests;
 mod trampoline;
 pub mod translate;
 pub mod x86;

@@ -15,17 +15,21 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
     let tcr_el1 = *device.get_register_mut::<u64>("TCR_EL1_bits");
     log::trace!("tcr_el1: {tcr_el1:x}");
     // let ttbcr = *device.get_register_mut::<u32>("TTBCR_S_bits");
-    // exit_with_message!("{ttbcr:032b}");
+    // log::trace!("{ttbcr:032b}");
     // let ttbcr_n = ttbcr & 0b111;
+    // exit_with_message!("{ttbcr_n:03b}");
+
     let ttbr0_el1 = *device.get_register_mut::<u64>("_TTBR0_EL1_bits");
     let ttbr1_el1 = *device.get_register_mut::<u64>("_TTBR1_EL1_bits");
     log::trace!("ttbr0_el1: {ttbr0_el1:x}");
     log::trace!("ttbr1_el1: {ttbr1_el1:x}");
 
-    let translation_table_base_guest_phys = match guest_virtual_address {
-        ..0x1000000000000 => ttbr0_el1,
-        0xffff000000000000.. => ttbr1_el1,
-        addr => todo!("fault at {addr:x}"),
+    // assumes 39-bit VA
+    let top_bit = (guest_virtual_address >> 39) & 1;
+    let translation_table_base_guest_phys = match top_bit {
+        0 => ttbr0_el1,
+        1 => ttbr1_el1,
+        _ => exit_with_message!(""),
     };
 
     let ttbgp_masked = translation_table_base_guest_phys & !0xffff000000000fff;
@@ -111,13 +115,13 @@ fn translate_l3(
     table: &[Descriptor; 512],
     guest_virtual_address: u64,
 ) -> Option<u64> {
-    let entry_idx = ((guest_virtual_address >> 21) & 0x1ff) as usize;
+    let entry_idx = ((guest_virtual_address >> 12) & 0x1ff) as usize;
     log::trace!("l3 entry_idx: {entry_idx:x?}");
     let entry = table[entry_idx];
     log::trace!("l3 entry: {entry:x?}");
 
     if entry.is_valid() && entry.is_table_or_page() {
-        exit_with_message!("{entry:x?}")
+        Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 12) - 1)))
     } else {
         log::warn!("invalid");
         guest_page_fault(device, guest_virtual_address);
@@ -199,6 +203,9 @@ fn take_arm_exception(
         3 => "VBAR_EL3",
         _ => exit_with_message!("invalid EL \"{current_el}\""),
     });
+    log::trace!("vbar: {:x}", vbar);
+
+    log::trace!("pc: {:x}", vbar + voff);
     *device.get_register_mut::<u64>("_PC") = vbar + voff;
 }
 

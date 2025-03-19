@@ -13,8 +13,8 @@ use {
     alloc::{rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
-        mask::mask,
         hashmap::HashMap,
+        mask::mask,
     },
     core::{
         alloc::Allocator,
@@ -1991,7 +1991,7 @@ pub struct X86Node<A: Alloc> {
     pub kind: NodeKind<A>,
 }
 
-#[derive_where(Debug)]
+#[derive_where(Debug, PartialEq, Eq)]
 pub enum NodeKind<A: Alloc> {
     Constant {
         value: u64,
@@ -2043,7 +2043,7 @@ pub enum NodeKind<A: Alloc> {
 }
 
 #[derive(Clone)]
-#[derive_where(Debug)]
+#[derive_where(Debug, PartialEq, Eq)]
 pub enum BinaryOperationKind<A: Alloc> {
     Add(X86NodeRef<A>, X86NodeRef<A>),
     Sub(X86NodeRef<A>, X86NodeRef<A>),
@@ -2063,7 +2063,7 @@ pub enum BinaryOperationKind<A: Alloc> {
 }
 
 #[derive(Clone)]
-#[derive_where(Debug)]
+#[derive_where(Debug, PartialEq, Eq)]
 pub enum UnaryOperationKind<A: Alloc> {
     Not(X86NodeRef<A>),
     Negate(X86NodeRef<A>),
@@ -2076,12 +2076,12 @@ pub enum UnaryOperationKind<A: Alloc> {
 }
 
 #[derive(Clone)]
-#[derive_where(Debug)]
+#[derive_where(Debug, PartialEq, Eq)]
 pub enum TernaryOperationKind<A: Alloc> {
     AddWithCarry(X86NodeRef<A>, X86NodeRef<A>, X86NodeRef<A>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CastOperationKind {
     ZeroExtend,
     SignExtend,
@@ -2091,7 +2091,7 @@ pub enum CastOperationKind {
     Broadcast,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShiftOperationKind {
     LogicalShiftLeft,
     LogicalShiftRight,

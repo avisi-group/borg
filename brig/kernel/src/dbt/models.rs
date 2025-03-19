@@ -27,8 +27,8 @@ use {
         vec::Vec,
     },
     common::{
-        intern::InternedString,
         hashmap::HashMap,
+        intern::InternedString,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
     },
     core::fmt::{self, Debug},
@@ -342,7 +342,7 @@ impl ModelDevice {
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
-        let status = record_safepoint();
+        let _status = record_safepoint();
 
         loop {
             allocator.clear();

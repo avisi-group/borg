@@ -11,8 +11,8 @@ use {
     alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
-        intern::InternedString,
         hashmap::{HashMapA, hashmap_in},
+        intern::InternedString,
         rudder::{
             self, Model, RegisterCacheType, block::Block, constant_value::ConstantValue,
             function::Function, statement::Statement, types::PrimitiveType,
@@ -677,7 +677,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                 }
                 let var = variables.get(&symbol.name()).unwrap().clone();
 
-                let value = statement_values
+                let mut value = statement_values
                     .get(*value)
                     .unwrap_or_else(|| {
                         panic!(
@@ -686,6 +686,21 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                         )
                     })
                     .clone();
+
+                // todo: handle this better
+                // if we have a `Bits` stack variable, we see corruption if we write a Bits that
+                // has been evaluated to be a u32 but later read a full `Bits`
+                if is_dynamic {
+                    if matches!(symbol.typ(), rudder::types::Type::Bits) {
+                        if matches!(value.typ(), Type::Unsigned(_)) {
+                            value = self.emitter.cast(
+                                value,
+                                Type::Unsigned(64),
+                                crate::dbt::x86::emitter::CastOperationKind::ZeroExtend,
+                            );
+                        }
+                    }
+                }
 
                 self.write_variable(var, value);
 
@@ -1214,7 +1229,8 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
     }
 
     fn allocate_stack_offset(&self, typ: &rudder::types::Type) -> usize {
-        let width = max(usize::from(typ.width_bytes()), 8);
+        assert!(typ.width_bytes() <= 8);
+        let width = 8;
         let offset = self
             .current_stack_offset
             .fetch_add(width, Ordering::Relaxed);
