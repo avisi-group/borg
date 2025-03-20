@@ -14,7 +14,7 @@ use {
         devices::SharedDevice,
         fs::{File, Filesystem, tar::TarFilesystem},
         guest::register_device_factory,
-        logger::REG_TRACE_ONLY,
+        logger::PRINT_REGISTERS,
         memory::bump::{BumpAllocator, BumpAllocatorRef},
     },
     alloc::{
@@ -198,7 +198,7 @@ impl ModelDevice {
     }
 
     fn print_regs(&self) {
-        if REG_TRACE_ONLY {
+        if PRINT_REGISTERS {
             let register_file_ptr = self.register_file.lock().as_mut_ptr();
             unsafe {
                 crate::print!(

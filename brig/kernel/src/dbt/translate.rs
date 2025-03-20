@@ -20,8 +20,6 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
-        alloc::Allocator,
-        cmp::max,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
@@ -174,10 +172,13 @@ struct FunctionTranslator<'model, 'emitter, 'context, A: Alloc> {
 
     entry_variables: BTreeMap<InternedString, LocalVariable<A>, A>,
 
-    // don't re-promote to a different location
+    return_value: ReturnValue<A>,
+
+    // don't re-promote stack variables to a different location
     promoted_locations: HashMapA<InternedString, usize, A>,
 
-    return_value: ReturnValue<A>,
+    /// Dynamic bitvector stack lengths
+    bits_stack_widths: HashMapA<usize, u16, A>,
 
     /// Stack offset used to allocate stack variables
     current_stack_offset: Rc<AtomicUsize, A>,
@@ -333,6 +334,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
             static_blocks: hashmap_in(emitter.ctx().allocator()),
             entry_variables: BTreeMap::new_in(emitter.ctx().allocator()),
             promoted_locations: hashmap_in(emitter.ctx().allocator()),
+            bits_stack_widths: hashmap_in(emitter.ctx().allocator()),
             return_value: ReturnValue::new(emitter, function.return_type()),
             current_stack_offset,
             emitter,
@@ -677,7 +679,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                 }
                 let var = variables.get(&symbol.name()).unwrap().clone();
 
-                let mut value = statement_values
+                let value = statement_values
                     .get(*value)
                     .unwrap_or_else(|| {
                         panic!(
@@ -686,21 +688,6 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                         )
                     })
                     .clone();
-
-                // todo: handle this better
-                // if we have a `Bits` stack variable, we see corruption if we write a Bits that
-                // has been evaluated to be a u32 but later read a full `Bits`
-                if is_dynamic {
-                    if matches!(symbol.typ(), rudder::types::Type::Bits) {
-                        if matches!(value.typ(), Type::Unsigned(_)) {
-                            value = self.emitter.cast(
-                                value,
-                                Type::Unsigned(64),
-                                crate::dbt::x86::emitter::CastOperationKind::ZeroExtend,
-                            );
-                        }
-                    }
-                }
 
                 self.write_variable(var, value);
 
@@ -1213,7 +1200,18 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
         match variable {
             LocalVariable::Virtual { symbol } => self.emitter.read_virt_variable(symbol),
             LocalVariable::Stack { stack_offset, typ } => {
-                self.emitter.read_stack_variable(stack_offset, typ)
+                let read = self.emitter.read_stack_variable(stack_offset, typ);
+
+                if matches!(typ, Type::Bits) {
+                    let width = *self.bits_stack_widths.get(&stack_offset).unwrap();
+                    self.emitter.cast(
+                        read,
+                        Type::Unsigned(width),
+                        super::x86::emitter::CastOperationKind::Truncate,
+                    )
+                } else {
+                    read
+                }
             }
         }
     }
@@ -1221,10 +1219,17 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
     fn write_variable(&mut self, variable: LocalVariable<A>, value: X86NodeRef<A>) {
         match variable {
             LocalVariable::Virtual { symbol } => self.emitter.write_virt_variable(symbol, value),
-            LocalVariable::Stack {
-                typ: _,
-                stack_offset,
-            } => self.emitter.write_stack_variable(stack_offset, value),
+            LocalVariable::Stack { typ, stack_offset } => {
+                if matches!(typ, Type::Bits) {
+                    // no panic even if we tried to write two different sizes to the stack :(
+                    // this relies on the depth first block translation order
+                    // if we see any issues, we need to actually support writing different sizes to
+                    // stack, using an extra stack variable containing the size
+                    self.bits_stack_widths
+                        .insert(stack_offset, value.typ().width());
+                }
+                self.emitter.write_stack_variable(stack_offset, value)
+            }
         }
     }
 

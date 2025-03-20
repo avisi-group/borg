@@ -3685,3 +3685,47 @@ fn ldrh() {
         assert_eq!(*x3, 0x0000_DEAD);
     }
 }
+
+#[ktest]
+fn csneg() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  5a8307e3        csneg   w3, wzr, w3, eq // eq = none
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0x5a8307e3, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let x3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
+
+        *(register_file_ptr.add(model.reg_offset("PSTATE_Z") as usize) as *mut u8) = 0;
+
+        *x3 = 0x9;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*x3, 0xfffffff7);
+    }
+}

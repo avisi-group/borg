@@ -7,26 +7,16 @@ use {
     spin::Once,
 };
 
-const ENABLE_COLORS: bool = true;
-pub const REG_TRACE_ONLY: bool = false;
-
-/*struct QemuWriter;
-
-impl fmt::Write for QemuWriter {
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        for byte in s.as_bytes() {
-            unsafe { x86::io::outb(0xe9, *byte) };
-        }
-        Ok(())
-    }
-}*/
-
 /// Global console writer
 pub static mut WRITER: Once<UART16550Device> = Once::INIT;
 
-static LOGGER: &'static dyn Log = &Logger {
+pub const PRINT_REGISTERS: bool = true;
+
+static LOGGER: &Logger = &Logger {
+    enable_colors: true,
+    max_level: LevelFilter::Off,
     default_level: LevelFilter::Trace,
-    module_levels: [
+    module_levels: &[
         ("virtio_drivers", LevelFilter::Warn),
         ("tar_no_std", LevelFilter::Off), /* todo: find better way of silencing error
                                            * about empty file named "" at end of
@@ -50,7 +40,7 @@ pub fn init() {
     unsafe { WRITER.call_once(|| UART16550Device::new(SERIAL_IO_PORT)) };
 
     log::set_logger(&LOGGER).expect("Failed to set logger");
-    log::set_max_level(LevelFilter::Trace);
+    log::set_max_level(LOGGER.max_level);
 
     log::info!(
         r#"
@@ -68,14 +58,16 @@ pub fn init() {
     )
 }
 
-struct Logger<const N: usize> {
+struct Logger {
+    enable_colors: bool,
+    max_level: LevelFilter,
     default_level: LevelFilter,
-    module_levels: [(&'static str, LevelFilter); N],
+    module_levels: &'static [(&'static str, LevelFilter)],
 }
 
-impl<const N: usize> Log for Logger<N> {
+impl Log for Logger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        if REG_TRACE_ONLY {
+        if PRINT_REGISTERS {
             false
         } else {
             &metadata.level().to_level_filter()
@@ -102,11 +94,11 @@ impl<const N: usize> Log for Logger<N> {
             record.module_path().unwrap_or_default()
         };
 
-        if ENABLE_COLORS {
+        if self.enable_colors {
             crate::println!(
                 "\x1b[0;30m({}ms)\x1b[0m {} \x1b[0;30m[{}]\x1b[0m {}",
                 current_milliseconds(),
-                format_level(record.level()),
+                format_level(record.level(), true),
                 target,
                 record.args()
             );
@@ -114,7 +106,7 @@ impl<const N: usize> Log for Logger<N> {
             crate::println!(
                 "({}ms) {} [{}] {}",
                 current_milliseconds(),
-                format_level(record.level()),
+                format_level(record.level(), false),
                 target,
                 record.args()
             );
@@ -124,8 +116,8 @@ impl<const N: usize> Log for Logger<N> {
     fn flush(&self) {}
 }
 
-fn format_level(level: Level) -> &'static str {
-    if ENABLE_COLORS {
+fn format_level(level: Level, enable_colors: bool) -> &'static str {
+    if enable_colors {
         match level {
             Level::Trace => "\x1b[0;35mTRACE\x1b[0m",
             Level::Debug => "\x1b[0;34mDEBUG\x1b[0m",

@@ -676,7 +676,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 match left.width().cmp(&right.width()) {
                     Ordering::Less => {
-                        todo!("zero extend {l} to {r}")
+                        let tmp = Operand::vreg(right.width(), self.next_vreg());
+                        self.push_instruction(Instruction::movzx(left, tmp));
+                        (right, tmp)
                     }
                     Ordering::Equal => (left, right),
                     Ordering::Greater => {
