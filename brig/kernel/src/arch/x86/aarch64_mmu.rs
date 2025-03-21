@@ -48,7 +48,7 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
     translate_l1(device, table, guest_virtual_address)
 }
 
-fn translate_l0(
+fn _translate_l0(
     device: &ModelDevice,
     table: &[Descriptor; 512],
     guest_virtual_address: u64,
