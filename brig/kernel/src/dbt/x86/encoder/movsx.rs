@@ -23,6 +23,9 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             (Width::_32, Width::_64) => assembler
                 .movsxd::<AsmRegister64, AsmRegister32>(dst.into(), src.into())
                 .unwrap(),
+            (Width::_16, Width::_32) => assembler
+                .movsx::<AsmRegister32, AsmRegister16>(dst.into(), src.into())
+                .unwrap(),
             (Width::_16, Width::_64) => assembler
                 .movsx::<AsmRegister64, AsmRegister16>(dst.into(), src.into())
                 .unwrap(),

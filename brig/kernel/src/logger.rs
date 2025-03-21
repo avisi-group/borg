@@ -10,11 +10,11 @@ use {
 /// Global console writer
 pub static mut WRITER: Once<UART16550Device> = Once::INIT;
 
-pub const PRINT_REGISTERS: bool = true;
+pub const PRINT_REGISTERS: bool = false;
 
 static LOGGER: &Logger = &Logger {
     enable_colors: true,
-    max_level: LevelFilter::Off,
+    max_level: LevelFilter::Warn,
     default_level: LevelFilter::Trace,
     module_levels: &[
         ("virtio_drivers", LevelFilter::Warn),

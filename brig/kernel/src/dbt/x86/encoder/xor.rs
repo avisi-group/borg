@@ -69,6 +69,20 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .xor::<AsmRegister64, i32>(dst.into(), (*src).try_into().unwrap())
                 .unwrap();
         }
+        (
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .xor::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                .unwrap();
+        }
         _ => todo!("xor {src} {dst}"),
     }
 }
