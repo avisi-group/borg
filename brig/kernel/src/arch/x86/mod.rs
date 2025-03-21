@@ -15,6 +15,7 @@ use {
 
 pub mod aarch64_mmu;
 pub mod backtrace;
+mod dbg;
 mod gdt;
 pub mod irq;
 pub mod memory;
@@ -59,6 +60,7 @@ pub fn init(
     // initialize global descriptor table and interrupts
     gdt::init();
     irq::init();
+    dbg::init();
 
     // initialize device manager ready to register detected devices
     devices::manager::init();

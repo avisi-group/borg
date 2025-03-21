@@ -3,6 +3,7 @@ use {
         arch::x86::{
             MachineContext,
             aarch64_mmu::guest_translate,
+            dbg,
             memory::{
                 GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea,
             },
@@ -18,7 +19,7 @@ use {
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{
-        BREAKPOINT_VECTOR, DIVIDE_ERROR_VECTOR, DOUBLE_FAULT_VECTOR,
+        BREAKPOINT_VECTOR, DEBUG_VECTOR, DIVIDE_ERROR_VECTOR, DOUBLE_FAULT_VECTOR,
         GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR,
     },
     x86_64::{
@@ -95,6 +96,12 @@ impl IrqManager {
                 .breakpoint
                 .set_handler_addr(VirtAddr::from_ptr(breakpoint_exception as *const u8));
             self.used.set(BREAKPOINT_VECTOR);
+
+            // breakpoint
+            self.idt
+                .debug
+                .set_handler_addr(VirtAddr::from_ptr(debug_exception as *const u8));
+            self.used.set(DEBUG_VECTOR);
 
             // double fault
             self.idt
@@ -273,6 +280,11 @@ fn div0_exception() {
 #[irq_handler(with_code = false)]
 fn breakpoint_exception() {
     exit_with_message!("EXCEPTION: BREAKPOINT");
+}
+
+#[irq_handler(with_code = false)]
+fn debug_exception() {
+    dbg::handle_exception();
 }
 
 #[irq_handler(with_code = true)]
