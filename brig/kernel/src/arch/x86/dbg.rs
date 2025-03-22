@@ -1,14 +1,10 @@
-use core::arch::global_asm;
-
 use x86_64::{
     VirtAddr,
     registers::debug::{
         BreakpointCondition, BreakpointSize, DebugAddressRegister, DebugAddressRegisterNumber, Dr0,
-        Dr1, Dr2, Dr3, Dr6, Dr6Flags, Dr7, Dr7Flags,
+        Dr1, Dr2, Dr3, Dr6, Dr7, Dr7Flags,
     },
 };
-
-use crate::arch::x86::irq::exit_with_message;
 
 static mut WATCHPOINTS: [Watchpoint; 4] = [
     Watchpoint::new(DebugAddressRegisterNumber::Dr0),
@@ -18,11 +14,11 @@ static mut WATCHPOINTS: [Watchpoint; 4] = [
 ];
 
 pub fn init() {
-    // add_memory_watchpoint(
-    //     VirtAddr::new(0xc008210158),
-    //     BreakpointSize::Length8B,
-    //     BreakpointCondition::DataWrites,
-    // );
+    add_memory_watchpoint(
+        VirtAddr::new(0xc0082b3b18),
+        BreakpointSize::Length8B,
+        BreakpointCondition::DataReadsWrites,
+    );
 }
 
 pub fn handle_exception() {

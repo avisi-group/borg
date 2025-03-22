@@ -3729,3 +3729,47 @@ fn csneg() {
         assert_eq!(*x3, 0xfffffff7);
     }
 }
+
+#[ktest]
+fn ldp() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    //  a9405400        ldp     x0, x21, [x0]
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xa9405400, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let src = Box::<(u64, u64)>::new((0xBBBB_BBBB_BBBB_BBBB, 0xCCCC_CCCC_CCCC_CCCC));
+
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+        let x21 = register_file_ptr.add(model.reg_offset("R21") as usize) as *mut u64;
+
+        *see = -1;
+
+        *x0 = ((&*src) as *const (u64, u64)) as u64;
+        *x21 = 0xAAAA_AAAA_AAAA_AAAA;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!((*x0, *x21), *src);
+    }
+}

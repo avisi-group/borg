@@ -326,7 +326,7 @@ impl ModelDevice {
     }
 
     fn single_step_exec(&self) {
-        let mut instructions_retired = 0;
+        let mut instructions_retired = 0u64;
 
         let register_file_ptr = {
             let mut lock = self.register_file.lock();
