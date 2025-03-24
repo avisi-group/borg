@@ -8,7 +8,7 @@ use {
         arena::{Arena, Ref},
         hashmap::HashSet,
     },
-    core::{alloc::Allocator, fmt::Write},
+    core::fmt::Write,
     itertools::Itertools,
 };
 
@@ -39,7 +39,7 @@ pub fn render<A: Alloc>(arena: &Arena<X86Block<A>, A>, entry: Ref<X86Block<A>>) 
     for block in blocks {
         writeln!(
             &mut out,
-            "{}[label=\"{{{:x}|{}}}\"][shape=\"record\"];",
+            "{}[label=\"{{block {:#x}|{}}}\"][shape=\"record\"];",
             ref_label(block),
             block.index(),
             block

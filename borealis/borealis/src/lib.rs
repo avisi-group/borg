@@ -192,10 +192,17 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     {
         let func = rudder
             .functions()
-            .get(&InternedString::from_static("X_set"))
+            .get(&InternedString::from_static(
+                "execute_aarch64_instrs_memory_pair_general_post_idx",
+            ))
             .unwrap();
         rudder::dot::render(
-            &mut create_file_buffered(dump_ir.unwrap().join("X_set.dot")).unwrap(),
+            &mut create_file_buffered(
+                dump_ir
+                    .unwrap()
+                    .join("execute_aarch64_instrs_memory_pair_general_post_idx.dot"),
+            )
+            .unwrap(),
             func.arena(),
             func.entry_block(),
         )

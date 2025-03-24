@@ -623,7 +623,12 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     );
                 }
 
-                if is_dynamic {
+                if is_dynamic
+                // terrible hack to workaround ldp     x0, x21, [x0] bug, where x0 gets written to halfway through, thus corrupting the second read of x0 to write *(x0 + 8) to x21
+                    || (symbol.name().as_ref() == "address"
+                        && self.function.name().as_ref()
+                            == "execute_aarch64_instrs_memory_pair_general_post_idx")
+                {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
                     match variables.get(&symbol.name()).unwrap() {
