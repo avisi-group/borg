@@ -3773,3 +3773,47 @@ fn ldp() {
         assert_eq!((*x0, *x21), *src);
     }
 }
+
+#[ktest]
+fn mem_load_32_bit() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  ldr		w0, [x0]
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xb9400000, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let mut src = Box::<u32>::new(0xF1F0F1F0);
+
+        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
+
+        *r0 = ((&mut *src) as *mut u32) as u64;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*r0, 0xF1F0F1F0);
+    }
+}

@@ -8,6 +8,7 @@ use {
     plugins_api::guest::Device,
 };
 
+#[derive(Debug)]
 pub struct AddressSpace {
     regions: BTreeMap<u64, AddressSpaceRegion>,
 }

@@ -4,6 +4,16 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+    {
+        "type": "gdb",
+        "request": "attach",
+        "name": "Attach to gdbserver",
+        "executable": "/home/fm208/.cargo/target/x86_64-unknown-brig/release/kernel",
+        "target": ":1234",
+        "remote": true,
+        "cwd": "${workspaceRoot}",
+        "valuesFormatting": "parseText"
+    },
         {
             "type": "lldb",
             "request": "launch",

@@ -47,7 +47,7 @@
             "kind": "pl011",
             "attach": {
                 "address_space": "as0",
-                "base": "0x3a00_0000"
+                "base": "0x3c00_0000"
             }
         }
     }

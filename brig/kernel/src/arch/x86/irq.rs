@@ -12,10 +12,11 @@ use {
         guest::memory::AddressSpaceRegionKind,
         qemu_exit,
     },
-    alloc::alloc::alloc_zeroed,
+    alloc::{alloc::alloc_zeroed, vec::Vec},
     bitset_core::BitSet,
     common::intern::InternedString,
-    core::alloc::Layout,
+    core::{alloc::Layout, arch::asm},
+    iced_x86::{Code, Instruction, Register},
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{
@@ -160,8 +161,9 @@ pub fn local_disable() {
 fn page_fault_exception(machine_context: *mut MachineContext) {
     let faulting_address = Cr2::read().unwrap();
 
-    let error_code =
-        PageFaultErrorCode::from_bits(unsafe { (*machine_context).error_code }).unwrap();
+    let machine_context = unsafe { &mut *machine_context };
+
+    let error_code = PageFaultErrorCode::from_bits(machine_context.error_code).unwrap();
 
     if faulting_address <= LOW_HALF_CANONICAL_END {
         log::debug!("guest fault @ {faulting_address:#x}");
@@ -239,9 +241,128 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
                             backing_page
                         }
-                        _ => {
-                            // Physical address is not in RAM-backed region; could be a device...
-                            exit_with_message!("fault in non-ram memory @ {guest_physical:x?}")
+                        AddressSpaceRegionKind::IO(device) => {
+                            log::error!("guest device page fault at rip {:x}", machine_context.rip);
+
+                            let offset = guest_physical - rgn.base();
+
+                            let write = error_code.contains(PageFaultErrorCode::CAUSED_BY_WRITE);
+
+                            let data = unsafe { &*(machine_context.rip as *const [u8; 15]) };
+
+                            let mut decoder = iced_x86::Decoder::new(64, data, 0);
+                            let faulting_instruction = decoder.decode();
+
+                            if write {
+                                log::error!(
+                                    "device write @ {offset:x} with instr {faulting_instruction:?}"
+                                );
+
+                                let (src, size) = match faulting_instruction.code() {
+                                    Code::Mov_rm8_r8 => {
+                                        let src = faulting_instruction.op1_register();
+
+                                        let size = if src.is_gpr8() {
+                                            8
+                                        } else if src.is_gpr16() {
+                                            16
+                                        } else if src.is_gpr32() {
+                                            32
+                                        } else if src.is_gpr64() {
+                                            64
+                                        } else {
+                                            panic!()
+                                        };
+
+                                        (src, size)
+                                    }
+                                    code => {
+                                        exit_with_message!(
+                                            "code: {code:?}, instr: {faulting_instruction:?}"
+                                        )
+                                    }
+                                };
+
+                                let bytes = match src {
+                                    Register::CL => {
+                                        (machine_context.rcx as u8).to_le_bytes().to_vec()
+                                    }
+                                    register => {
+                                        exit_with_message!(
+                                            "register: {register:?}, instr: {faulting_instruction:?}"
+                                        )
+                                    }
+                                };
+
+                                log::error!(
+                                    "writing {bytes:x?} to device @ {offset:x?}, from register {src:?}"
+                                );
+
+                                device.write(offset, &bytes);
+                            } else {
+                                // read
+                                let (dest, size) = match faulting_instruction.code() {
+                                    Code::Mov_r32_rm32 => {
+                                        let dest = faulting_instruction.op0_register();
+
+                                        let size = if dest.is_gpr8() {
+                                            8
+                                        } else if dest.is_gpr16() {
+                                            16
+                                        } else if dest.is_gpr32() {
+                                            32
+                                        } else if dest.is_gpr64() {
+                                            64
+                                        } else {
+                                            panic!()
+                                        };
+
+                                        (dest, size)
+                                    }
+                                    code => {
+                                        exit_with_message!(
+                                            "code: {code:?}, instr: {faulting_instruction:?}"
+                                        )
+                                    }
+                                };
+
+                                let mut bytes = alloc::vec![0; size];
+
+                                device.read(offset, &mut bytes);
+
+                                log::error!("read {bytes:x?} from device, writing to {dest:?}");
+
+                                // write bytes to dest
+
+                                match dest {
+                                    Register::EAX => {
+                                        let data =
+                                            u32::from_le_bytes(bytes[0..4].try_into().unwrap());
+                                        // mask
+                                        machine_context.rax &= 0xFFFF_FFFF_0000_0000;
+                                        // or in data
+                                        machine_context.rax |= data as u64;
+                                    }
+                                    register => {
+                                        exit_with_message!(
+                                            "register: {register:?}, data: {bytes:?}, instr: {faulting_instruction:?}"
+                                        )
+                                    }
+                                }
+                            }
+
+                            // jump back to next instruction
+                            let current_ip = machine_context.rip;
+                            let len = faulting_instruction.len();
+
+                            machine_context.rip = current_ip + faulting_instruction.len() as u64;
+
+                            log::error!(
+                                "setting correct return point: current_ip: {current_ip:x}, len: {len:x}, new_rip: {:x}",
+                                machine_context.rip
+                            );
+
+                            return;
                         }
                     }
                 } else {

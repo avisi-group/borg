@@ -348,20 +348,22 @@ impl ModelDevice {
             allocator.clear();
             let alloc_ref = BumpAllocatorRef::new(&allocator);
 
-            log::info!("instrs: {instructions_retired}");
+            //
             let current_pc = unsafe {
                 *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
             } & 0x0000_00FF_FFFF_FFFF;
 
             if let Some(translation) = instr_cache.get(&current_pc) {
-                log::info!("executing cached translation @ {current_pc:x}");
+                //log::info!("executing cached translation @ {current_pc:x}");
                 translation.execute(register_file_ptr);
                 instructions_retired += 1;
                 self.print_regs();
                 continue;
             }
 
-            log::info!("---- ---- ---- ---- starting instr translation: {current_pc:x}");
+            log::info!(
+                "---- ---- ---- ---- starting instr translation: {current_pc:x}, retired: {instructions_retired}"
+            );
 
             unsafe {
                 // reset SEE

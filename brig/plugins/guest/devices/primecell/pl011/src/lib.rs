@@ -60,7 +60,7 @@ impl Device for Pl011 {
             (0x0000, [c]) => log::trace!("{}", *c as char),
 
             // todo: https://developer.arm.com/documentation/ddi0183/g/programmers-model/summary-of-registers
-            _ => (),
+            (offset, value) => log::trace!("PL011: wrote {value:x?} @ {offset:x}"),
         }
     }
 }
