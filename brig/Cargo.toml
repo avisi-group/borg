@@ -17,6 +17,6 @@ proc_macro_lib = { path = "./proc_macro_lib" }
 debug = true
 debug-assertions = false
 overflow-checks = false
-lto = "fat"
-incremental = false
+lto = "thin"
+incremental = true
 codegen-units = 1
