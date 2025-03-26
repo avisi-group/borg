@@ -360,18 +360,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
     fn translate(&mut self) -> Option<X86NodeRef<A>> {
         // create an empty block all control flow will end at
-        let exit_block = self
-            .emitter
-            .ctx_mut()
-            .arena_mut()
-            .insert(X86Block::new_in(self.allocator.clone()));
+        let exit_block = self.emitter.ctx_mut().create_block();
 
         // create an empty entry block for this function
-        let entry_x86 = self
-            .emitter
-            .ctx_mut()
-            .arena_mut()
-            .insert(X86Block::new_in(self.allocator.clone()));
+        let entry_x86 = self.emitter.ctx_mut().create_block();
 
         // jump from the *current* emitter block to this function's entry block
         self.emitter.push_instruction(Instruction::jmp(entry_x86));
@@ -940,11 +932,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
-                let x86 = self
-                    .emitter
-                    .ctx_mut()
-                    .arena_mut()
-                    .insert(X86Block::new_in(self.allocator.clone()));
+                let x86 = self.emitter.ctx_mut().create_block();
 
                 self.static_blocks
                     .entry(*target)
@@ -966,11 +954,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 return match condition.kind() {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
-                            let x86 = self
-                                .emitter
-                                .ctx_mut()
-                                .arena_mut()
-                                .insert(X86Block::new_in(self.allocator.clone()));
+                            let x86 = self.emitter.ctx_mut().create_block();
 
                             self.static_blocks
                                 .entry(*false_target)
@@ -984,11 +968,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                 variables.clone(),
                             ))
                         } else {
-                            let x86 = self
-                                .emitter
-                                .ctx_mut()
-                                .arena_mut()
-                                .insert(X86Block::new_in(self.allocator.clone()));
+                            let x86 = self.emitter.ctx_mut().create_block();
 
                             self.static_blocks
                                 .entry(*true_target)
@@ -1007,28 +987,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         let true_x86 = (*self
                             .dynamic_blocks
                             .entry((*true_target, variables.clone()))
-                            .or_insert_with(|| {
-                                (
-                                    self.emitter
-                                        .ctx_mut()
-                                        .arena_mut()
-                                        .insert(X86Block::new_in(self.allocator.clone())),
-                                    false,
-                                )
-                            }))
+                            .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
                         let false_x86 = (*self
                             .dynamic_blocks
                             .entry((*false_target, variables.clone()))
-                            .or_insert_with(|| {
-                                (
-                                    self.emitter
-                                        .ctx_mut()
-                                        .arena_mut()
-                                        .insert(X86Block::new_in(self.allocator.clone())),
-                                    false,
-                                )
-                            }))
+                            .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
                         self.emitter.branch(condition, true_x86, false_x86);
                         StatementResult::ControlFlow(ControlFlow::Branch(

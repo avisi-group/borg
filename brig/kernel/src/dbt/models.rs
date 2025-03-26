@@ -18,13 +18,11 @@ use {
         memory::bump::{BumpAllocator, BumpAllocatorRef},
     },
     alloc::{
-        alloc::Global,
         borrow::ToOwned,
         boxed::Box,
         collections::btree_map::BTreeMap,
         string::{String, ToString},
         sync::Arc,
-        vec::Vec,
     },
     common::{
         hashmap::HashMap,

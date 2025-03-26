@@ -11,13 +11,8 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::{
-        arena::{Arena, Ref},
-        hashmap::HashMap,
-        mask::mask,
-    },
+    common::{arena::Ref, hashmap::HashMap, mask::mask},
     core::{
-        alloc::Allocator,
         cell::RefCell,
         cmp::Ordering,
         fmt::Debug,

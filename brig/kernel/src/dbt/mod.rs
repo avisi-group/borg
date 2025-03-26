@@ -1,14 +1,9 @@
 use {
-    crate::{
-        arch::x86::memory::VirtualMemoryArea,
-        dbt::{interpret::interpret, register_file::RegisterFile},
-    },
+    crate::{arch::x86::memory::VirtualMemoryArea, dbt::register_file::RegisterFile},
     alloc::{string::String, vec::Vec},
-    byteorder::{ByteOrder, LittleEndian},
-    common::{hashmap::HashMap, intern::InternedString, mask::mask, rudder::Model},
+    common::mask::mask,
     core::{
         alloc::Allocator,
-        borrow::Borrow,
         fmt::{self, Debug},
     },
     iced_x86::{Formatter, Instruction},
