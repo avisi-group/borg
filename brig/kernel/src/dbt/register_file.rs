@@ -137,6 +137,25 @@ impl RegisterValue for u8 {
     }
 }
 
+impl RegisterValue for bool {
+    const SIZE: usize = 1;
+
+    fn write(&self, dest: &mut [u8]) {
+        dest[0] = match self {
+            true => 1,
+            false => 0,
+        };
+    }
+
+    fn read(src: &[u8]) -> Self {
+        match src[0] {
+            0 => false,
+            1 => true,
+            _ => unreachable!(),
+        }
+    }
+}
+
 fn configure_features(register_file: &mut RegisterFile) {
     let disabled = [
         "FEAT_LSE2_IMPLEMENTED",

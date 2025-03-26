@@ -32,7 +32,6 @@ fn static_dynamic_chaos_smoke() {
         let model = models::get("aarch64").unwrap();
 
         let mut register_file = RegisterFile::init(&*model);
-        let register_file_ptr = register_file.as_mut_ptr();
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -51,18 +50,17 @@ fn static_dynamic_chaos_smoke() {
         let num_regs = emitter.next_vreg();
         let translation = ctx.compile(num_regs);
 
-        unsafe {
-            let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-            let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-            let r2 = register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u64;
-            *r0 = r0_value;
-            *r1 = r1_value;
-            *r2 = r2_value;
+        register_file.write("R0", r0_value);
+        register_file.write("R1", r1_value);
+        register_file.write("R2", r2_value);
 
-            translation.execute(&mut register_file);
+        translation.execute(&mut register_file);
 
-            (*r0, *r1, *r2)
-        }
+        (
+            register_file.read("R0"),
+            register_file.read("R1"),
+            register_file.read("R2"),
+        )
     }
 
     assert_eq!(run(0, 0, 0), (0, 0, 10));
@@ -76,7 +74,7 @@ fn static_dynamic_chaos_smoke() {
 //     let model = &*models::get("aarch64").unwrap();
 
 //     let mut register_file = RegisterFile::init(&*model);
-//     let register_file_ptr = register_file.as_mut_ptr();
+//
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
 //     let mut emitter = X86Emitter::new(&mut ctx);
@@ -103,12 +101,12 @@ fn static_dynamic_chaos_smoke() {
 // *mut i32;         let r1 = register_file_ptr.add(model.reg_offset("R1") as
 // usize) as *mut i64;
 
-//         *r0 = 4;
+//         register_file.write::<u64,_>("R0",4);
 //         *r1 = 0;
 
 //         translation.execute(&mut register_file);
 
-//         assert_eq!(4, (*r0));
+//         assert_eq!(4, ( register_file.read::<u64,_>("R0")));
 //         assert_eq!(4, (*r1));
 //         //assert_eq!(0xe, (*see)); //// todo: re-implement depending on
 // result         // of SEE/cacheable registers work
@@ -120,7 +118,6 @@ fn num_of_feature_const_123() {
     let model = &*models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -153,7 +150,6 @@ fn statistical_profiling_disabled() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -175,12 +171,7 @@ fn statistical_profiling_disabled() {
     let translation = ctx.compile(num_regs);
     translation.execute(&mut register_file);
 
-    unsafe {
-        assert_eq!(
-            false,
-            *(register_file_ptr.add(model.reg_offset("R0") as usize) as *mut bool)
-        )
-    }
+    assert_eq!(0, register_file.read::<u8, _>("R0"))
 }
 
 // /// Disabling because we enabled all the features, but this should really be
@@ -189,7 +180,7 @@ fn statistical_profiling_disabled() {
 //     let model = models::get("aarch64").unwrap();
 
 //     let mut register_file = RegisterFile::init(&*model);
-//     let register_file_ptr = register_file.as_mut_ptr();
+//
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
 //     let mut emitter = X86Emitter::new(&mut ctx);
@@ -218,7 +209,6 @@ fn using_aarch32_disabled() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -240,12 +230,7 @@ fn using_aarch32_disabled() {
     let translation = ctx.compile(num_regs);
     translation.execute(&mut register_file);
 
-    unsafe {
-        assert_eq!(
-            false,
-            *(register_file_ptr.add(model.reg_offset("R0") as usize) as *mut bool)
-        )
-    }
+    assert_eq!(0, register_file.read::<u8, _>("R0"))
 }
 
 #[ktest]
@@ -253,7 +238,6 @@ fn branchto() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -274,27 +258,14 @@ fn branchto() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    unsafe {
-        assert_eq!(
-            0x0,
-            *(register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64)
-        );
+    assert_eq!(0x0, register_file.read::<u64, _>("_PC"));
 
-        *(register_file_ptr.add(model.reg_offset("__BranchTaken") as usize) as *mut bool) = false;
-    }
+    register_file.write("__BranchTaken", false);
 
     translation.execute(&mut register_file);
 
-    unsafe {
-        assert_eq!(
-            0xDEADFEED,
-            *(register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64)
-        );
-        assert_eq!(
-            true,
-            *(register_file_ptr.add(model.reg_offset("__BranchTaken") as usize) as *mut bool)
-        )
-    }
+    assert_eq!(0xDEADFEED, register_file.read::<u64, _>("_PC"));
+    assert_eq!(true, register_file.read::<bool, _>("__BranchTaken"))
 }
 
 #[ktest]
@@ -302,7 +273,6 @@ fn decodea64_addsub() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -323,23 +293,16 @@ fn decodea64_addsub() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u32;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u32;
-        let r2 = register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u32;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+    register_file.write("SEE", -1i64);
+    register_file.write::<u64, _>("R0", 2);
+    register_file.write::<u64, _>("R1", 5);
+    register_file.write::<u64, _>("R2", 10);
 
-        *see = -1;
-        *r0 = 2;
-        *r1 = 5;
-        *r2 = 10;
+    translation.execute(&mut register_file);
 
-        translation.execute(&mut register_file);
-
-        assert_eq!(15, (*r0));
-        //assert_eq!(0xe, (*see)); //// todo: re-implement depending on result
-        // of SEE/cacheable registers work
-    }
+    assert_eq!(15, register_file.read::<u64, _>("R0"));
+    //assert_eq!(0xe, (*see)); //// todo: re-implement depending on result
+    // of SEE/cacheable registers work
 }
 
 #[ktest]
@@ -348,17 +311,11 @@ fn decodea64_addsub_interpret() {
         let model = models::get("aarch64").unwrap();
 
         let mut register_file = RegisterFile::init(&*model);
-        let register_file_ptr = register_file.as_mut_ptr();
 
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u32;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u32;
-        let r2 = register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u32;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *see = -1;
-        *r0 = 2;
-        *r1 = 5;
-        *r2 = 10;
+        register_file.write("SEE", -1i64);
+        register_file.write::<u64, _>("R0", 2);
+        register_file.write::<u64, _>("R1", 5);
+        register_file.write::<u64, _>("R2", 10);
 
         let pc = crate::dbt::interpret::Value::UnsignedInteger {
             value: 0,
@@ -370,7 +327,7 @@ fn decodea64_addsub_interpret() {
         };
         interpret(&*model, "__DecodeA64", &[pc, opcode], &mut register_file);
 
-        assert_eq!(15, (*r0));
+        assert_eq!(15, register_file.read::<u64, _>("R0"));
         //   assert_eq!(0xe, (*see)); // todo: re-implement depending on result
         // of SEE/cacheable registers work
     }
@@ -381,7 +338,6 @@ fn decodea64_mov() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -403,18 +359,14 @@ fn decodea64_mov() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u32;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u32;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *see = -1;
-        *r0 = 2;
-        *r1 = 43;
+        register_file.write("SEE", -1i64);
+        register_file.write::<u64, _>("R0", 2);
+        register_file.write::<u64, _>("R1", 43);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(43, (*r0));
-        assert_eq!(43, (*r1));
+        assert_eq!(43, register_file.read::<u64, _>("R0"));
+        assert_eq!(43, register_file.read::<u64, _>("R1"));
         // assert_eq!(55, (*see));// todo: re-implement depending on result of
         // SEE/cacheable registers work
     }
@@ -425,7 +377,6 @@ fn decodea64_branch() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -449,15 +400,12 @@ fn decodea64_branch() {
     //  log::trace!("{translation:?}");
 
     unsafe {
-        let pc = register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *pc = 44;
-        *see = -1;
+        register_file.write("_PC", 44u64);
+        register_file.write("SEE", -1i64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(20, (*pc));
+        assert_eq!(20, register_file.read::<u64, _>("_PC"));
         //assert_eq!(67, (*see));// todo: re-implement depending on result of
         // SEE/cacheable registers work
     }
@@ -468,7 +416,6 @@ fn branch_if_eq() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -490,19 +437,15 @@ fn branch_if_eq() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        let pc = register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u32;
-        let branch_taken =
-            register_file_ptr.add(model.reg_offset("__BranchTaken") as usize) as *mut bool;
-
-        *see = -1;
+        register_file.write("SEE", -1i64);
 
         translation.execute(&mut register_file);
 
         //assert_eq!(0x45, (*see)); // todo: re-implement depending on result of
         // SEE/cacheable registers work
-        assert_eq!(0x0, (*pc));
-        assert_eq!(true, (*branch_taken));
+
+        assert_eq!(0x0, register_file.read::<u64, _>("_PC"));
+        assert_eq!(true, register_file.read::<bool, _>("__BranchTaken"));
     }
 }
 
@@ -611,7 +554,6 @@ fn cmp_csel() {
         let model = models::get("aarch64").unwrap();
 
         let mut register_file = RegisterFile::init(&*model);
-        let register_file_ptr = register_file.as_mut_ptr();
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -652,15 +594,12 @@ fn cmp_csel() {
         let translation = ctx.compile(num_regs);
 
         unsafe {
-            let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-            let r2 = register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u64;
-
-            *r0 = pre_r0;
-            *r2 = pre_r2;
+            register_file.write::<u64, _>("R0", pre_r0);
+            register_file.write::<u64, _>("R2", pre_r2);
 
             translation.execute(&mut register_file);
 
-            *r2
+            register_file.read::<u64, _>("R2")
         }
     }
 }
@@ -670,7 +609,6 @@ fn fibonacci_instr() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let program = [
         // <_start>
@@ -694,20 +632,15 @@ fn fibonacci_instr() {
     ];
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        let branch_taken =
-            { register_file_ptr.add(model.reg_offset("__BranchTaken") as usize) as *mut bool };
-        let pc = { register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64 };
-        let r0 = { register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64 };
-        let r3 = { register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64 };
-
         // bounded just in case
         for _ in 0..100 {
-            *see = -1;
-            *branch_taken = false;
+            register_file.write("SEE", -1i64);
+            register_file.write("__BranchTaken", false);
+
+            let pc = register_file.read::<u64, _>("_PC");
 
             // exit before the svc
-            if *pc == 0x38 {
+            if pc == 0x38 {
                 break;
             }
 
@@ -717,8 +650,8 @@ fn fibonacci_instr() {
             let mut emitter = X86Emitter::new(&mut ctx);
 
             {
-                let opcode = emitter.constant(program[*pc as usize / 4], Type::Unsigned(32));
-                let pc = emitter.constant(*pc, Type::Unsigned(64));
+                let opcode = emitter.constant(program[pc as usize / 4], Type::Unsigned(32));
+                let pc = emitter.constant(pc, Type::Unsigned(64));
                 translate(
                     Global,
                     &*model,
@@ -735,13 +668,13 @@ fn fibonacci_instr() {
             translation.execute(&mut register_file);
 
             // increment PC if no branch was taken
-            if !*branch_taken {
-                *pc += 4;
+            if !register_file.read::<bool, _>("__BranchTaken") {
+                register_file.write("_PC", pc + 4);
             }
         }
 
-        assert_eq!(89, *r0);
-        assert_eq!(10, *r3);
+        assert_eq!(89, register_file.read::<u64, _>("R0"));
+        assert_eq!(10, register_file.read::<u64, _>("R3"));
     }
 }
 
@@ -755,13 +688,12 @@ fn mem() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let see = unsafe { register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64 };
-    unsafe { *see = -1 };
+    register_file.write("SEE", -1i64);
+
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xf9000020, Type::Unsigned(32));
@@ -784,16 +716,13 @@ fn mem() {
     unsafe {
         let mem = alloc::boxed::Box::new(0xdead_c0de_0000_0000u64);
 
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-
-        *see = -1;
-        *r0 = 0xdeadcafe;
-        *r1 = &*mem as *const u64 as u64;
+        register_file.write("SEE", -1i64);
+        register_file.write::<u64, _>("R0", 0xdeadcafe);
+        register_file.write::<u64, _>("R1", &*mem as *const u64 as u64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*mem, *r0);
+        assert_eq!(*mem, register_file.read::<u64, _>("R0"));
     }
 }
 
@@ -802,7 +731,6 @@ fn mem_store() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -827,13 +755,9 @@ fn mem_store() {
         const VALUE: u64 = 0xdead_c0de_0000_0000; // will be overwritten
         let mem = alloc::boxed::Box::new(0xdeadcafeu64);
 
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-
-        *see = -1;
-        *r0 = VALUE;
-        *r1 = &*mem as *const u64 as u64;
+        register_file.write("SEE", -1i64);
+        register_file.write::<u64, _>("R0", VALUE);
+        register_file.write::<u64, _>("R1", &*mem as *const u64 as u64);
 
         translation.execute(&mut register_file);
 
@@ -846,7 +770,6 @@ fn mem_load() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -872,17 +795,13 @@ fn mem_load() {
         const VALUE: u64 = 0xdead_c0de_0000_0000;
         let mem = alloc::boxed::Box::new(VALUE);
 
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-
-        *see = -1;
-        *r0 = 0xdeadcafe; // will be overwritten
-        *r1 = &*mem as *const u64 as u64;
+        register_file.write("SEE", -1i64);
+        register_file.write::<u64, _>("R0", 0xdeadcafe); // will be overwritten
+        register_file.write::<u64, _>("R1", &*mem as *const u64 as u64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*r0, VALUE);
+        assert_eq!(register_file.read::<u64, _>("R0"), VALUE);
     }
 }
 
@@ -892,7 +811,6 @@ fn fibonacci_block() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let program = [
         // <_start>
@@ -920,7 +838,7 @@ fn fibonacci_block() {
     loop {
         unsafe {
             let pc_offset = model.reg_offset("_PC");
-            let mut current_pc = *(register_file_ptr.add(pc_offset as usize) as *mut u64);
+            let mut current_pc = register_file.read::<u64, _>("_PC");
             let start_pc = current_pc;
             if let Some(translation) = blocks.get(&start_pc) {
                 translation.execute(&mut register_file);
@@ -935,7 +853,7 @@ fn fibonacci_block() {
             let mut emitter = X86Emitter::new(&mut ctx);
 
             loop {
-                *(register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64) = -1;
+                register_file.write("SEE", -1i64);
 
                 let _false = emitter.constant(0 as u64, Type::Unsigned(1));
                 emitter.write_register(model.reg_offset("__BranchTaken"), _false);
@@ -993,8 +911,8 @@ fn fibonacci_block() {
 
             log::trace!(
                 "{} {}",
-                *(register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64),
-                *(register_file_ptr.add(model.reg_offset("__BranchTaken") as usize) as *mut u8)
+                register_file.read::<u64, _>("_PC"),
+                register_file.read::<bool, _>("__BranchTaken")
             );
         }
     }
@@ -1004,12 +922,9 @@ fn fibonacci_block() {
             1298777728820984005, /* technically this is fib 101, fib 100 = 3736710778780434371,
                                   * but this depends whether you treat x0 or x1 as the final
                                   * result */
-            *(register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64)
+            register_file.read::<u64, _>("R0")
         );
-        assert_eq!(
-            100,
-            *(register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64)
-        );
+        assert_eq!(100, register_file.read::<u64, _>("R3"));
     }
 }
 
@@ -1062,18 +977,14 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let r0 = unsafe { register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64 };
-    let r1 = unsafe { register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64 };
-    let r2 = unsafe { register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u8 };
-
     unsafe {
-        *r0 = x;
-        *r1 = y;
-        *r2 = carry_in as u8;
+        register_file.write::<u64, _>("R0", x);
+        register_file.write::<u64, _>("R1", y);
+        register_file.write::<u64, _>("R2", carry_in as u64);
     }
 
     let x = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(0x40));
@@ -1102,7 +1013,12 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 
     translation.execute(&mut register_file);
 
-    unsafe { (*r0, *(r1 as *mut u8)) }
+    unsafe {
+        (
+            register_file.read::<u64, _>("R0"),
+            register_file.read::<u8, _>("R1"),
+        )
+    }
 }
 
 #[ktest]
@@ -1178,14 +1094,15 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        *(register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64) = x;
-        *(register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64) = y;
-        *(register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64) = -1;
+        register_file.write::<u64, _>("R0", x);
+        register_file.write::<u64, _>("R1", y);
+
+        register_file.write("SEE", -1i64);
     }
 
     // cmp    x0, x1
@@ -1206,12 +1123,10 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     let translation = ctx.compile(num_regs);
     translation.execute(&mut register_file);
 
-    unsafe {
-        *(register_file_ptr.add(model.reg_offset("PSTATE_N") as usize) as *mut u8) << 3
-            | *(register_file_ptr.add(model.reg_offset("PSTATE_Z") as usize) as *mut u8) << 2
-            | *(register_file_ptr.add(model.reg_offset("PSTATE_C") as usize) as *mut u8) << 1
-            | *(register_file_ptr.add(model.reg_offset("PSTATE_V") as usize) as *mut u8)
-    }
+    register_file.read::<u8, _>("PSTATE_N") << 3
+        | register_file.read::<u8, _>("PSTATE_Z") << 2
+        | register_file.read::<u8, _>("PSTATE_C") << 1
+        | register_file.read::<u8, _>("PSTATE_V")
 }
 
 #[ktest]
@@ -1219,7 +1134,7 @@ fn shiftreg() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -1245,16 +1160,13 @@ fn shiftreg() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-
-        *r0 = 0;
-        *r1 = 0xdeadfeeddeadfeed;
+        register_file.write::<u64, _>("R0", 0);
+        register_file.write::<u64, _>("R1", 0xdeadfeeddeadfeed);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*r0, 0xdeadfeeddeadfeed);
-        assert_eq!(*r1, 0xdeadfeeddeadfeed);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0xdeadfeeddeadfeed);
+        assert_eq!(register_file.read::<u64, _>("R1"), 0xdeadfeeddeadfeed);
     }
 }
 
@@ -1263,7 +1175,6 @@ fn floorpow2_constant() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1343,7 +1254,6 @@ fn ceilpow2_constant() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1423,7 +1333,7 @@ fn _ispow2() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -1474,20 +1384,18 @@ fn _ispow2() {
     // log::debug!("{translation:?}");
 
     unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-        let r2 = register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u64;
-        let r3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
-
-        *r0 = 0;
-        *r1 = 0;
-        *r2 = 0;
-        *r3 = 2048;
+        register_file.write::<u64, _>("R0", 0);
+        register_file.write::<u64, _>("R1", 0);
+        register_file.write::<u64, _>("R2", 0);
+        register_file.write::<u64, _>("R3", 2048);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*r0, *r1);
-        assert_eq!(1, *r2)
+        assert_eq!(
+            register_file.read::<u64, _>("R0"),
+            register_file.read::<u64, _>("R1")
+        );
+        assert_eq!(1, register_file.read::<u64, _>("R2"))
     }
 }
 
@@ -1496,14 +1404,10 @@ fn rbitx0_interpret() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *r0 = 0x0123_4567_89ab_cdef;
-        *see = -1;
+        register_file.write::<u64, _>("R0", 0x0123_4567_89ab_cdef);
+        register_file.write("SEE", -1i64);
 
         // rbit x0
         let pc = Value::UnsignedInteger {
@@ -1517,7 +1421,7 @@ fn rbitx0_interpret() {
         interpret(&*model, "__DecodeA64", &[pc, opcode], &mut register_file);
 
         // assert bits are reversed
-        assert_eq!(*r0, 0xf7b3_d591_e6a2_c480);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0xf7b3_d591_e6a2_c480);
     }
 }
 
@@ -1526,7 +1430,7 @@ fn rbitx0() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -1548,16 +1452,13 @@ fn rbitx0() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *r0 = 0x0123_4567_89ab_cdef;
-        *see = -1;
+        register_file.write::<u64, _>("R0", 0x0123_4567_89ab_cdef);
+        register_file.write("SEE", -1i64);
 
         translation.execute(&mut register_file);
 
         // assert bits are reversed
-        assert_eq!(*r0, 0xf7b3_d591_e6a2_c480);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0xf7b3_d591_e6a2_c480);
     }
 }
 
@@ -1579,7 +1480,7 @@ fn bitinsert() {
         let model = models::get("aarch64").unwrap();
 
         let mut register_file = RegisterFile::init(&*model);
-        let register_file_ptr = register_file.as_mut_ptr();
+
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -1601,16 +1502,12 @@ fn bitinsert() {
         // log::trace!("{translation:?}");
 
         unsafe {
-            let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-            let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-            let r2 = register_file_ptr.add(model.reg_offset("R2") as usize) as *mut u64;
-
-            *r0 = target;
-            *r1 = source;
+            register_file.write::<u64, _>("R0", target);
+            register_file.write::<u64, _>("R1", source);
 
             translation.execute(&mut register_file);
 
-            *r2
+            register_file.read::<u64, _>("R2")
         }
     }
 }
@@ -1620,7 +1517,7 @@ fn ubfx() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -1642,15 +1539,12 @@ fn ubfx() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *r3 = 0x8444_c004;
-        *see = -1;
+        register_file.write("SEE", -1i64);
+        register_file.write("R3", 0x8444_c004u64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*r3, 0x4);
+        assert_eq!(register_file.read::<u64, _>("R3"), 0x4);
     }
 }
 
@@ -1659,7 +1553,6 @@ fn highest_set_bit() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1706,7 +1599,6 @@ fn ror() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1774,7 +1666,6 @@ fn extsv() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1853,7 +1744,6 @@ fn zext_ones() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1934,7 +1824,7 @@ fn decodebitmasks() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -2015,7 +1905,7 @@ fn replicate_bits() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -2086,7 +1976,7 @@ fn rev_d00dfeed() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -2107,14 +1997,11 @@ fn rev_d00dfeed() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *r3 = 0xedfe0dd0;
-        *see = -1;
+        register_file.write("SEE", -1i64);
+        register_file.write("R3", 0xedfe0dd0u64);
 
         translation.execute(&mut register_file);
-        assert_eq!(0xd00dfeed, *r3);
+        assert_eq!(0xd00dfeed, register_file.read::<u64, _>("R3"));
     }
 }
 
@@ -2123,7 +2010,6 @@ fn place_slice() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2157,7 +2043,6 @@ fn udiv() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2179,20 +2064,16 @@ fn udiv() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-        let r19 = register_file_ptr.add(model.reg_offset("R19") as usize) as *mut u64;
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
         let x = 0xffffff8008bfffffu64;
         let y = 0x200000u64;
 
-        *see = -1;
-        *r1 = y;
-        *r19 = x;
+        register_file.write("SEE", -1i64);
+        register_file.write("R1", y);
+        register_file.write("R19", x);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(0x7fffffc0045, (*r19));
+        assert_eq!(0x7fffffc0045, register_file.read::<u64, _>("R19"));
     }
 }
 
@@ -2201,7 +2082,7 @@ fn udiv() {
 //     let model = models::get("aarch64").unwrap();
 
 //     let mut register_file = RegisterFile::init(&*model);
-//     let register_file_ptr = register_file.as_mut_ptr();
+//
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
 //     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2219,7 +2100,7 @@ fn udiv() {
 //     let model = models::get("aarch64").unwrap();
 
 //     let mut register_file = RegisterFile::init(&*model);
-//     let register_file_ptr = register_file.as_mut_ptr();
+//
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
 //     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2242,7 +2123,6 @@ fn floor() {
         let model = models::get("aarch64").unwrap();
 
         let mut register_file = RegisterFile::init(&*model);
-        let register_file_ptr = register_file.as_mut_ptr();
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -2262,15 +2142,12 @@ fn floor() {
         let translation = ctx.compile(num_regs);
 
         unsafe {
-            let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut i64;
-            let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut i64;
-
-            *r0 = n;
-            *r1 = d;
+            register_file.write("R0", n);
+            register_file.write("R1", d);
 
             translation.execute(&mut register_file);
 
-            *r0
+            register_file.read::<i64, _>("R0")
         }
     }
 }
@@ -2285,7 +2162,6 @@ fn ceil() {
         let model = models::get("aarch64").unwrap();
 
         let mut register_file = RegisterFile::init(&*model);
-        let register_file_ptr = register_file.as_mut_ptr();
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -2305,15 +2181,12 @@ fn ceil() {
         let translation = ctx.compile(num_regs);
 
         unsafe {
-            let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut i64;
-            let r1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut i64;
-
-            *r0 = n;
-            *r1 = d;
+            register_file.write("R0", n);
+            register_file.write("R1", d);
 
             translation.execute(&mut register_file);
 
-            *r0
+            register_file.read::<i64, _>("R0")
         }
     }
 }
@@ -2323,13 +2196,12 @@ fn msr() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  d51be000        msr     cntfrq_el0, x0
@@ -2350,8 +2222,7 @@ fn msr() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
 
         translation.execute(&mut register_file);
         // todo: test more here
@@ -2363,7 +2234,7 @@ fn stp() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -2390,15 +2261,10 @@ fn stp() {
     unsafe {
         let dst = Box::<(u64, u64)>::new((0, 0));
 
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        let x29 = register_file_ptr.add(model.reg_offset("R29") as usize) as *mut u64;
-        let x30 = register_file_ptr.add(model.reg_offset("R30") as usize) as *mut u64;
-        let sp = register_file_ptr.add(model.reg_offset("SP_EL3") as usize) as *mut u64;
-
-        *see = -1;
-        *x29 = 0xFEED;
-        *x30 = 0xDEAD;
-        *sp = (((&*dst) as *const (u64, u64)) as u64) + 16;
+        register_file.write("SEE", -1i64);
+        register_file.write("R29", 0xFEEDu64);
+        register_file.write("R30", 0xDEADu64);
+        register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
         translation.execute(&mut register_file);
 
@@ -2411,13 +2277,12 @@ fn ldrsw() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  b9802fe0        ldrsw   x0, [sp, #44]
@@ -2463,15 +2328,13 @@ fn ldrsw() {
     unsafe {
         let src = Box::<u32>::new(0x8001_0000); // negative signed 32-bit int
 
-        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let sp = register_file_ptr.add(model.reg_offset("SP_EL3") as usize) as *mut u64;
+        register_file.write("R0", 0xDEADu64);
 
-        *x0 = 0xDEAD;
-        *sp = (((&*src) as *const u32) as u64) - 44;
+        register_file.write("SP_EL3", (((&*src) as *const u32) as u64) - 44);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*x0, 0xffff_ffff_8001_0000);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0xffff_ffff_8001_0000);
     }
 }
 
@@ -2480,13 +2343,12 @@ fn get_num_event_counters_accessible() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     let result = translate(
@@ -2506,11 +2368,9 @@ fn get_num_event_counters_accessible() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-
         translation.execute(&mut register_file);
 
-        assert_eq!(*x0, 31);
+        assert_eq!(register_file.read::<u64, _>("R0"), 31);
     }
 }
 
@@ -2519,13 +2379,12 @@ fn sub_pc() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  d10043ff    sub                sp, sp, #0x10
@@ -2546,13 +2405,11 @@ fn sub_pc() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let sp = register_file_ptr.add(model.reg_offset("SP_EL3") as usize) as *mut u64;
-
-        *sp = 0xdeadbe90;
+        register_file.write::<u64, _>("SP_EL3", 0xdeadbe90);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*sp, 0xdeadbe80);
+        assert_eq!(register_file.read::<u64, _>("SP_EL3"), 0xdeadbe80);
     }
 }
 
@@ -2561,13 +2418,12 @@ fn lsrv() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  lsrv              x0, x1, x0
@@ -2588,15 +2444,12 @@ fn lsrv() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-
-        *x0 = 0x3c;
-        *x1 = 0x3;
+        register_file.write("R0", 0x3cu64);
+        register_file.write("R1", 0x3u64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*x0, 0x0);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0x0);
     }
 }
 
@@ -2605,13 +2458,12 @@ fn mem_load_immediate() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  ldr                w0, 0xdc
@@ -2634,15 +2486,12 @@ fn mem_load_immediate() {
     unsafe {
         let mut src = Box::<u64>::new(0xBEE5BEE5);
 
-        let pc = register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64;
-        let w0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-
-        *pc = (&mut *src) as *mut u64 as u64 - 0xdc;
-        *w0 = 0x0;
+        register_file.write("_PC", (&mut *src) as *mut u64 as u64 - 0xdc);
+        register_file.write("R0", 0x0u64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*w0, 0xBEE5BEE5);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0xBEE5BEE5);
     }
 }
 
@@ -2651,13 +2500,12 @@ fn eret() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  eret
@@ -2679,25 +2527,18 @@ fn eret() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let pc = register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64;
-        let elr_el3 = register_file_ptr.add(model.reg_offset("ELR_EL3") as usize) as *mut u64;
-        let el = register_file_ptr.add(model.reg_offset("PSTATE_EL") as usize) as *mut u64;
-        let _sp = register_file_ptr.add(model.reg_offset("PSTATE_SP") as usize) as *mut u64;
-        let spsr_el3 =
-            register_file_ptr.add(model.reg_offset("SPSR_EL3_bits") as usize) as *mut u64;
+        register_file.write::<u64, _>("SPSR_EL3_bits", 6);
 
-        *spsr_el3 = 6;
+        assert_eq!(register_file.read::<u8, _>("PSTATE_EL"), 3);
 
-        assert_eq!(*el, 3);
-
-        *elr_el3 = 0x8000_0020;
+        register_file.write::<u64, _>("ELR_EL3", 0x8000_0020);
 
         // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
         // log::info!("{translation:?}");
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*pc, 0x8000_0020);
+        assert_eq!(register_file.read::<u64, _>("_PC"), 0x8000_0020);
     }
 }
 
@@ -2706,13 +2547,12 @@ fn clz() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //clz               x9, x9
@@ -2734,13 +2574,11 @@ fn clz() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x9 = register_file_ptr.add(model.reg_offset("R9") as usize) as *mut u64;
-
-        *x9 = 0x1;
+        register_file.write("R9", 0x1u64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*x9, 63);
+        assert_eq!(register_file.read::<u64, _>("R9"), 63);
     }
 }
 
@@ -2749,7 +2587,7 @@ fn highest_set_bit_const() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -2852,7 +2690,7 @@ fn count_leading_zero_bits_const() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -2955,7 +2793,7 @@ fn highest_set_bit_dynamic() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -2978,11 +2816,10 @@ fn highest_set_bit_dynamic() {
     //   log::info!("{translation:?}");
 
     unsafe {
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        *r0 = 0x1;
+        register_file.write::<u64, _>("R0", 0x1);
 
         translation.execute(&mut register_file);
-        assert_eq!(*r0, 0);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0);
     }
 }
 
@@ -2991,13 +2828,12 @@ fn msr_daifclr() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  d50348ff        msr               daifclr, #0x8
@@ -3018,8 +2854,7 @@ fn msr_daifclr() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
 
         translation.execute(&mut register_file);
         // todo: test more here
@@ -3031,7 +2866,7 @@ fn current_security_state_is_const() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -3058,13 +2893,12 @@ fn sys_movzx_investigation() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  sys               #3, c7, c4, #1, x8
@@ -3086,10 +2920,9 @@ fn sys_movzx_investigation() {
     let _translation = ctx.compile(num_regs);
 
     unsafe {
-        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
         let mut dst = Box::new(0xAAu8);
 
-        *x0 = (&mut *dst as *mut u8) as u64;
+        register_file.write::<u64, _>("R0", (&mut *dst as *mut u8) as u64);
 
         // memory not set up for tests
         //         panicked at kernel/src/guest/mod.rs:51:18:
@@ -3105,13 +2938,12 @@ fn ttbr1_el1_write() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     let val = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
@@ -3131,15 +2963,14 @@ fn ttbr1_el1_write() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-        let ttbr1_el1 =
-            register_file_ptr.add(model.reg_offset("_TTBR1_EL1_bits") as usize) as *mut u64;
-
-        *x0 = 0xF0F0_0000_F0F0_0000;
-        *ttbr1_el1 = 0x0;
+        register_file.write::<u64, _>("R0", 0xF0F0_0000_F0F0_0000);
+        register_file.write::<u64, _>("_TTBR1_EL1_bits", 0x0);
         translation.execute(&mut register_file);
 
-        assert_eq!(*ttbr1_el1, 0xF0F0_0000_F0F0_0000);
+        assert_eq!(
+            register_file.read::<u64, _>("_TTBR1_EL1_bits"),
+            0xF0F0_0000_F0F0_0000
+        );
     }
 }
 
@@ -3148,13 +2979,12 @@ fn aarch64_sysregwrite() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     // [X86NodeRef(X86Node { typ: Unsigned(2), kind: Constant { value: 3, width: 2 }
@@ -3189,16 +3019,12 @@ fn aarch64_sysregwrite() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-        let ttbr1_el1 =
-            register_file_ptr.add(model.reg_offset("_TTBR1_EL1_bits") as usize) as *mut u64;
-
-        *ttbr1_el1 = 0x0;
-        *x1 = 0x8224e000;
+        register_file.write::<u64, _>("R1", 0x8224e000);
+        register_file.write::<u64, _>("_TTBR1_EL1_bits", 0x0);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*ttbr1_el1, 0x8224e000);
+        assert_eq!(register_file.read::<u64, _>("_TTBR1_EL1_bits"), 0x8224e000);
     }
 }
 
@@ -3207,13 +3033,12 @@ fn msr_ttbr() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  msr               ttbr1_el1, x1
@@ -3234,16 +3059,12 @@ fn msr_ttbr() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-        let ttbr1_el1 =
-            register_file_ptr.add(model.reg_offset("_TTBR1_EL1_bits") as usize) as *mut u64;
-
-        *ttbr1_el1 = 0x0;
-        *x1 = 0x8224e000;
+        register_file.write::<u64, _>("R1", 0x8224e000);
+        register_file.write::<u64, _>("_TTBR1_EL1_bits", 0x0);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*ttbr1_el1, 0x8224e000);
+        assert_eq!(register_file.read::<u64, _>("_TTBR1_EL1_bits"), 0x8224e000);
     }
 }
 
@@ -3252,15 +3073,14 @@ fn branch_link_pc_flag() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     assert!(!ctx.get_pc_write_flag());
 
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  bl         0x1134
@@ -3285,18 +3105,13 @@ fn mrs_mpidr_el1() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let mpidr_el1 =
-            *(register_file_ptr.add(model.reg_offset("MPIDR_EL1_bits") as usize) as *mut u64);
-        assert_eq!(mpidr_el1, 0x80000000);
-
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *see = -1;
+        assert_eq!(register_file.read::<u64, _>("MPIDR_EL1_bits"), 0x80000000);
+        register_file.write("SEE", -1i64);
     }
 
     // mrs     x5, mpidr_el1
@@ -3317,11 +3132,9 @@ fn mrs_mpidr_el1() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x5 = register_file_ptr.add(model.reg_offset("R5") as usize) as *mut u64;
-
         translation.execute(&mut register_file);
 
-        assert_eq!(*x5, 0x80000000);
+        assert_eq!(register_file.read::<u64, _>("R5"), 0x80000000);
     }
 }
 
@@ -3330,14 +3143,12 @@ fn mov_300000() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  mov     x4, #0x300000
@@ -3358,11 +3169,9 @@ fn mov_300000() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x4 = register_file_ptr.add(model.reg_offset("R4") as usize) as *mut u64;
-
         translation.execute(&mut register_file);
 
-        assert_eq!(*x4, 0x300000);
+        assert_eq!(register_file.read::<u64, _>("R4"), 0x300000);
     }
 }
 
@@ -3371,13 +3180,12 @@ fn mrs_ctr_el0() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //          mrs     x3, ctr_el0
@@ -3398,11 +3206,9 @@ fn mrs_ctr_el0() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
-
         translation.execute(&mut register_file);
 
-        assert_eq!(*x3, 0x4_8444_8004);
+        assert_eq!(register_file.read::<u64, _>("R3"), 0x4_8444_8004);
     }
 }
 
@@ -3411,17 +3217,17 @@ fn mrs_id_aa64dfr0_el1() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let id_aa64dfr0_el1 =
-            *(register_file_ptr.add(model.reg_offset("ID_AA64DFR0_EL1_bits") as usize) as *mut u64);
-        assert_eq!(id_aa64dfr0_el1, 0x112101f5e1e1e91b);
+        assert_eq!(
+            register_file.read::<u64, _>("ID_AA64DFR0_EL1_bits"),
+            0x112101f5e1e1e91b
+        );
 
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     // mrs               x1, id_aa64dfr0_el1
@@ -3442,11 +3248,9 @@ fn mrs_id_aa64dfr0_el1() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-
         translation.execute(&mut register_file);
 
-        assert_eq!(*x1, 0x112101f5e1e1e91b);
+        assert_eq!(register_file.read::<u64, _>("R1"), 0x112101f5e1e1e91b);
     }
 }
 
@@ -3467,7 +3271,7 @@ fn mrs_id_aa64dfr0_el1() {
 //     let model = models::get("aarch64").unwrap();
 
 //     let mut register_file = RegisterFile::init(&*model);
-//     let register_file_ptr = register_file.as_mut_ptr();
+//
 //     let mut ctx = X86TranslationContext::new(&model, false);
 //     let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -3478,7 +3282,7 @@ fn mrs_id_aa64dfr0_el1() {
 // 0x1311211130111112);
 
 //         let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as
-// *mut i64;         *see = -1;
+// *mut i64;         register_file.write("SEE", -1i64);
 //     }
 
 //     // mrs               x1, id_aa64pfr0_el1
@@ -3511,13 +3315,12 @@ fn ldaxr() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     // ldaxr            x3, [x0]
@@ -3543,13 +3346,12 @@ fn slow_msr() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd5184000, Type::Unsigned(32));
@@ -3573,13 +3375,12 @@ fn slow_msr_2() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd5181000, Type::Unsigned(32));
@@ -3603,13 +3404,12 @@ fn csinc() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     // csinc		w3, wzr, wzr, ne
@@ -3630,12 +3430,11 @@ fn csinc() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
-        *(register_file_ptr.add(model.reg_offset("PSTATE_Z") as usize) as *mut u8) = 1;
+        register_file.write("PSTATE_Z", 0x1u8);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*x3, 0x1);
+        assert_eq!(register_file.read::<u64, _>("R3"), 0x1);
     }
 }
 
@@ -3644,13 +3443,12 @@ fn ldrh() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //   78635823        ldrh    w3, [x1, w3, uxtw #1]
@@ -3673,15 +3471,16 @@ fn ldrh() {
     unsafe {
         let src = Box::<u32>::new(0xAAAA_DEAD); // negative signed 32-bit int
 
-        let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as *mut u64;
-        let x3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
+        register_file.write("R3", 0xABu64);
 
-        *x3 = 0xAB;
-        *x1 = ((&*src) as *const u32) as u64 - (*x3 << 1);
+        register_file.write(
+            "R1",
+            ((&*src) as *const u32) as u64 - (register_file.read::<u64, _>("R3") << 1),
+        );
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*x3, 0x0000_DEAD);
+        assert_eq!(register_file.read::<u64, _>("R3"), 0x0000_DEAD);
     }
 }
 
@@ -3690,13 +3489,12 @@ fn csneg() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  5a8307e3        csneg   w3, wzr, w3, eq // eq = none
@@ -3717,15 +3515,12 @@ fn csneg() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let x3 = register_file_ptr.add(model.reg_offset("R3") as usize) as *mut u64;
-
-        *(register_file_ptr.add(model.reg_offset("PSTATE_Z") as usize) as *mut u8) = 0;
-
-        *x3 = 0x9;
+        register_file.write::<u64, _>("R3", 0x9);
+        register_file.write("PSTATE_Z", 0u8);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*x3, 0xfffffff7);
+        assert_eq!(register_file.read::<u64, _>("R3"), 0xfffffff7);
     }
 }
 
@@ -3791,13 +3586,12 @@ fn mem_load_32_bit() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  ldr		w0, [x0]
@@ -3820,13 +3614,11 @@ fn mem_load_32_bit() {
     unsafe {
         let mut src = Box::<u32>::new(0xF1F0F1F0);
 
-        let r0 = register_file_ptr.add(model.reg_offset("R0") as usize) as *mut u64;
-
-        *r0 = ((&mut *src) as *mut u32) as u64;
+        register_file.write::<u64, _>("R0", ((&mut *src) as *mut u32) as u64);
 
         translation.execute(&mut register_file);
 
-        assert_eq!(*r0, 0xF1F0F1F0);
+        assert_eq!(register_file.read::<u64, _>("R0"), 0xF1F0F1F0);
     }
 }
 
@@ -3835,13 +3627,12 @@ fn ccmp() {
     let model = models::get("aarch64").unwrap();
 
     let mut register_file = RegisterFile::init(&*model);
-    let register_file_ptr = register_file.as_mut_ptr();
+
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
     unsafe {
-        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
-        *see = -1;
+        register_file.write("SEE", -1i64);
     }
 
     //  ccmp x5, #0x0, #0x0, eq
@@ -3862,23 +3653,23 @@ fn ccmp() {
     let translation = ctx.compile(num_regs);
 
     unsafe {
-        let r5 = register_file_ptr.add(model.reg_offset("R5") as usize) as *mut u64;
-        let n = register_file_ptr.add(model.reg_offset("PSTATE_N") as usize) as *mut u8;
-        let z = register_file_ptr.add(model.reg_offset("PSTATE_Z") as usize) as *mut u8;
-        let c = register_file_ptr.add(model.reg_offset("PSTATE_C") as usize) as *mut u8;
-        let v = register_file_ptr.add(model.reg_offset("PSTATE_V") as usize) as *mut u8;
-
-        *n = 1;
-        *z = 0;
-        *c = 0;
-        *v = 0;
-        *r5 = 0x0;
+        register_file.write("R5", 0x0u64);
+        register_file.write::<u8, _>("PSTATE_N", 1);
+        register_file.write::<u8, _>("PSTATE_Z", 0);
+        register_file.write::<u8, _>("PSTATE_C", 0);
+        register_file.write::<u8, _>("PSTATE_V", 0);
 
         log::warn!("{translation:?}");
 
         translation.execute(&mut register_file);
 
-        panic!("{:b}{:b}{:b}{:b}", *n, *z, *c, *v);
+        panic!(
+            "{:b}{:b}{:b}{:b}",
+            register_file.read::<u8, _>("PSTATE_N"),
+            register_file.read::<u8, _>("PSTATE_Z"),
+            register_file.read::<u8, _>("PSTATE_C"),
+            register_file.read::<u8, _>("PSTATE_V"),
+        );
         // assert_eq!(*n, 0);
         // assert_eq!(*z, 0);
         // assert_eq!(*c, 0);
