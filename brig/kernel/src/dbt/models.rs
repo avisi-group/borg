@@ -197,6 +197,18 @@ impl ModelDevice {
         unsafe { &mut *(self.register_file.lock().as_mut_ptr().add(offset as usize) as *mut T) }
     }
 
+    fn get_nzcv(&self) -> u8 {
+        let register_file_ptr = self.register_file.lock().as_mut_ptr();
+        unsafe {
+            *(register_file_ptr.add(self.model.reg_offset("PSTATE_N") as usize) as *mut u8) << 3
+                | *(register_file_ptr.add(self.model.reg_offset("PSTATE_Z") as usize) as *mut u8)
+                    << 2
+                | *(register_file_ptr.add(self.model.reg_offset("PSTATE_C") as usize) as *mut u8)
+                    << 1
+                | *(register_file_ptr.add(self.model.reg_offset("PSTATE_V") as usize) as *mut u8)
+        }
+    }
+
     fn print_regs(&self) {
         if PRINT_REGISTERS {
             let register_file_ptr = self.register_file.lock().as_mut_ptr();
@@ -205,6 +217,9 @@ impl ModelDevice {
                     "PC = {:016x}\n",
                     *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
                 );
+
+                crate::print!("NZCV = {:04b}\n", self.get_nzcv());
+
                 for reg in 0..=30 {
                     crate::print!(
                         "R{reg:02} = {:016x}\n",
@@ -471,15 +486,13 @@ impl ModelDevice {
                 instructions_retired += 1;
 
                 log::trace!(
-                    "sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x4: {:x}, x12: {:x}, x14: {:x}, x23: {:x}",
+                    "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
+                    self.get_nzcv(),
                     *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R1") as usize) as *mut u64),
                     *(register_file_ptr.add(self.model.reg_offset("R2") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R4") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R12") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R14") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R23") as usize) as *mut u64),
+                    *(register_file_ptr.add(self.model.reg_offset("R5") as usize) as *mut u64),
                 );
 
                 self.print_regs()

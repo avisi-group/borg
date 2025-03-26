@@ -3817,3 +3817,57 @@ fn mem_load_32_bit() {
         assert_eq!(*r0, 0xF1F0F1F0);
     }
 }
+
+#[ktest]
+fn ccmp() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut register_file = init_register_file(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  ccmp x5, #0x0, #0x0, eq
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xfa4008a0, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        register_file_ptr,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let r5 = register_file_ptr.add(model.reg_offset("R5") as usize) as *mut u64;
+        let n = register_file_ptr.add(model.reg_offset("PSTATE_N") as usize) as *mut u8;
+        let z = register_file_ptr.add(model.reg_offset("PSTATE_Z") as usize) as *mut u8;
+        let c = register_file_ptr.add(model.reg_offset("PSTATE_C") as usize) as *mut u8;
+        let v = register_file_ptr.add(model.reg_offset("PSTATE_V") as usize) as *mut u8;
+
+        *n = 1;
+        *z = 0;
+        *c = 0;
+        *v = 0;
+        *r5 = 0x0;
+
+        translation.execute(register_file_ptr);
+
+        assert_eq!(*n, 0);
+        assert_eq!(*z, 0);
+        assert_eq!(*c, 0);
+        assert_eq!(*v, 0);
+        assert_eq!(*r5, 0);
+    }
+}
