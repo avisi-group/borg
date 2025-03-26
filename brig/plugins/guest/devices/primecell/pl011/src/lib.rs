@@ -4,9 +4,12 @@ extern crate alloc;
 
 use {
     alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
-    plugins_rt::api::{
-        PluginHeader, PluginHost,
-        guest::{Device, DeviceFactory, Environment},
+    plugins_rt::{
+        api::{
+            PluginHeader, PluginHost,
+            guest::{Device, DeviceFactory, Environment},
+        },
+        get_host,
     },
 };
 
@@ -57,7 +60,7 @@ impl Device for Pl011 {
     /// Write `value` bytes into the device starting at `offset`
     fn write(&self, offset: u64, value: &[u8]) {
         match (offset, value) {
-            (0x0000, [c]) => log::trace!("{}", *c as char),
+            (0x0000, [c]) => get_host().print_message(&alloc::format!("{}", *c as char), true),
 
             // todo: https://developer.arm.com/documentation/ddi0183/g/programmers-model/summary-of-registers
             (offset, value) => log::trace!("PL011: wrote {value:x?} @ {offset:x}"),
