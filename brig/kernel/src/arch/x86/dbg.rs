@@ -13,13 +13,7 @@ static mut WATCHPOINTS: [Watchpoint; 4] = [
     Watchpoint::new(DebugAddressRegisterNumber::Dr3),
 ];
 
-pub fn init() {
-    add_memory_watchpoint(
-        VirtAddr::new(0xc0082b3b18),
-        BreakpointSize::Length8B,
-        BreakpointCondition::DataReadsWrites,
-    );
-}
+pub fn init() {}
 
 pub fn handle_exception() {
     let watchpoint = get_watchpoint_from_dr6();
