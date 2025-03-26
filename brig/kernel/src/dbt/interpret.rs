@@ -1,11 +1,14 @@
 use {
-    crate::dbt::{bit_extract, bit_insert},
+    crate::dbt::{
+        bit_extract, bit_insert,
+        register_file::{RegisterFile, RegisterValue},
+    },
     alloc::vec::Vec,
     common::{
         arena::Ref,
+        hashmap::HashMap,
         intern::InternedString,
         mask::mask,
-        hashmap::HashMap,
         rudder::{
             Model,
             block::Block,
@@ -29,7 +32,7 @@ pub fn interpret(
     model: &Model,
     function_name: &str,
     arguments: &[Value],
-    register_file: *mut u8,
+    register_file: &mut RegisterFile,
 ) -> Option<Value> {
     log::debug!("interpreting {function_name}");
     let function_name = InternedString::from(function_name);
@@ -55,20 +58,24 @@ pub fn interpret(
     }
 }
 
-struct Interpreter<'f> {
+struct Interpreter<'f, 'r> {
     model: &'f Model,
     function_name: InternedString,
     // local variables
     locals: HashMap<InternedString, Value>,
     // value of previously evaluated statements
     statement_values: HashMap<Ref<Statement>, Value>,
-    register_file: *mut u8,
+    register_file: &'r mut RegisterFile,
     // nzcv
     flags: u8,
 }
 
-impl<'f> Interpreter<'f> {
-    fn new(model: &'f Model, function_name: InternedString, register_file: *mut u8) -> Self {
+impl<'f, 'r> Interpreter<'f, 'r> {
+    fn new(
+        model: &'f Model,
+        function_name: InternedString,
+        register_file: &'r mut RegisterFile,
+    ) -> Self {
         Self {
             model,
             function_name,
@@ -591,7 +598,7 @@ impl<'f> Interpreter<'f> {
                     let offset = self.resolve_u64(offset);
 
                     match width {
-                        1..=8 => self.write_reg(offset, u16::try_from(value).unwrap()),
+                        1..=8 => self.write_reg(offset, u8::try_from(value).unwrap()),
                         9..=16 => self.write_reg(offset, u16::try_from(value).unwrap()),
                         17..=32 => self.write_reg(offset, u32::try_from(value).unwrap()),
                         33..=64 => self.write_reg(offset, value),
@@ -668,17 +675,16 @@ impl<'f> Interpreter<'f> {
         unreachable!("block must end in a panic, jump, return, or branch")
     }
 
-    fn read_reg<T>(&self, offset: u64) -> T {
-        unsafe {
-            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T).read_unaligned()
-        }
+    fn read_reg<T: RegisterValue>(&self, offset: u64) -> T {
+        let name = self.register_file.lookup(usize::try_from(offset).unwrap());
+
+        self.register_file.read(name)
     }
 
-    fn write_reg<T>(&self, offset: u64, value: T) {
-        unsafe {
-            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T)
-                .write_unaligned(value)
-        }
+    fn write_reg<T: RegisterValue>(&mut self, offset: u64, value: T) {
+        let name = self.register_file.lookup(usize::try_from(offset).unwrap());
+
+        self.register_file.write(name, value);
     }
 }
 

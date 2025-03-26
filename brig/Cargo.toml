@@ -18,5 +18,5 @@ debug = true
 debug-assertions = false
 overflow-checks = false
 lto = "thin"
-incremental = true
+incremental = true # 20s -> 10s for `touch lib.rs && cargo b -r` when false
 codegen-units = 1

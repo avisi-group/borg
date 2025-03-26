@@ -4,7 +4,7 @@ use {
         dbt::{
             Translation,
             emitter::{Emitter, Type},
-            init_register_file,
+            register_file::RegisterFile,
             translate::translate,
             x86::{
                 X86TranslationContext,
@@ -114,7 +114,7 @@ impl DeviceFactory for ModelDeviceFactory {
 pub struct ModelDevice {
     name: String,
     model: Arc<Model>,
-    register_file: Mutex<Vec<u8>>,
+    pub register_file: Mutex<RegisterFile>,
 }
 
 impl Debug for ModelDevice {
@@ -149,7 +149,7 @@ impl Device for ModelDevice {
 
 impl ModelDevice {
     fn new(name: String, model: Arc<Model>, initial_pc: u64) -> Self {
-        let mut register_file = init_register_file(&*model);
+        let mut register_file = RegisterFile::init(&*model);
 
         // interpret(
         //     &model,
@@ -179,11 +179,7 @@ impl ModelDevice {
         // u__SetConfig(&mut state, &NoopTracer, "cpu.cpu0.RVBAR", 0x8000_0000);
         // u__SetConfig(&mut state, &NoopTracer, "cpu.has_tlb", 0x0);
 
-        unsafe {
-            *(register_file
-                .as_mut_ptr()
-                .add(model.reg_offset("_PC") as usize) as *mut u64) = initial_pc
-        }
+        register_file.write("_PC", initial_pc);
 
         Self {
             name,
@@ -192,57 +188,39 @@ impl ModelDevice {
         }
     }
 
-    pub fn get_register_mut<'a, T>(&self, register: &'a str) -> &mut T {
-        let offset = self.model.reg_offset(register);
-        unsafe { &mut *(self.register_file.lock().as_mut_ptr().add(offset as usize) as *mut T) }
-    }
-
     fn get_nzcv(&self) -> u8 {
-        let register_file_ptr = self.register_file.lock().as_mut_ptr();
-        unsafe {
-            *(register_file_ptr.add(self.model.reg_offset("PSTATE_N") as usize) as *mut u8) << 3
-                | *(register_file_ptr.add(self.model.reg_offset("PSTATE_Z") as usize) as *mut u8)
-                    << 2
-                | *(register_file_ptr.add(self.model.reg_offset("PSTATE_C") as usize) as *mut u8)
-                    << 1
-                | *(register_file_ptr.add(self.model.reg_offset("PSTATE_V") as usize) as *mut u8)
-        }
+        let file = self.register_file.lock();
+        let n = file.read::<u8, _>("PSTATE_N");
+        let z = file.read::<u8, _>("PSTATE_Z");
+        let c = file.read::<u8, _>("PSTATE_C");
+        let v = file.read::<u8, _>("PSTATE_V");
+
+        assert!(n <= 1);
+        assert!(z <= 1);
+        assert!(c <= 1);
+        assert!(v <= 1);
+
+        n << 3 | z << 2 | c << 1 | v
     }
 
     fn print_regs(&self) {
         if PRINT_REGISTERS {
-            let register_file_ptr = self.register_file.lock().as_mut_ptr();
-            unsafe {
+            let file = self.register_file.lock();
+
+            crate::print!("PC = {:016x}\n", file.read::<u64, _>("_PC"));
+
+            crate::print!("NZCV = {:04b}\n", self.get_nzcv());
+
+            for reg in 0..=30 {
                 crate::print!(
-                    "PC = {:016x}\n",
-                    *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
+                    "R{reg:02} = {:016x}\n",
+                    file.read::<u64, _>(alloc::format!("R{reg}"))
                 );
-
-                crate::print!("NZCV = {:04b}\n", self.get_nzcv());
-
-                for reg in 0..=30 {
-                    crate::print!(
-                        "R{reg:02} = {:016x}\n",
-                        *(register_file_ptr
-                            .add(self.model.reg_offset(alloc::format!("R{reg}")) as usize)
-                            as *mut u64)
-                    );
-                }
             }
         }
     }
 
     fn block_exec(&self) {
-        let register_file_ptr = {
-            let mut lock = self.register_file.lock();
-
-            let ptr = lock.as_mut_ptr();
-
-            drop(lock);
-
-            ptr
-        };
-
         let mut block_cache = HashMap::<u64, Translation>::default();
 
         let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
@@ -254,13 +232,12 @@ impl ModelDevice {
             let alloc_ref = BumpAllocatorRef::new(&allocator);
 
             unsafe {
-                let pc_offset = self.model.reg_offset("_PC");
-                let mut current_pc = (*(register_file_ptr.add(pc_offset as usize) as *mut u64))
-                    & 0x0000_00FF_FFFF_FFFF;
+                let mut current_pc =
+                    self.register_file.lock().read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
 
                 let start_pc = current_pc;
                 if let Some(translation) = block_cache.get(&start_pc) {
-                    translation.execute(register_file_ptr);
+                    translation.execute(&mut *self.register_file.lock());
                     continue;
                 }
 
@@ -270,8 +247,7 @@ impl ModelDevice {
 
                 loop {
                     // reset SEE
-                    *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) =
-                        -1;
+                    self.register_file.lock().write::<i64, _>("SEE", -1);
 
                     // reset BranchTaken
                     let _false = emitter.constant(0 as u64, Type::Unsigned(1));
@@ -291,13 +267,14 @@ impl ModelDevice {
                             "__DecodeA64",
                             &[pc, opcode],
                             &mut emitter,
-                            register_file_ptr,
+                            &mut *self.register_file.lock(),
                         );
                     }
 
                     if emitter.ctx().get_pc_write_flag() {
                         break;
                     } else {
+                        let pc_offset = self.model.reg_offset("_PC");
                         let pc = emitter.read_register(pc_offset as u64, Type::Unsigned(64));
                         let _4 = emitter.constant(4, Type::Unsigned(64));
                         let pc_inc = emitter.binary_operation(BinaryOperationKind::Add(pc, _4));
@@ -318,10 +295,10 @@ impl ModelDevice {
                     let _4 = emitter.constant(4, Type::Unsigned(64));
                     let addend = emitter.select(branch_taken, _0, _4);
 
-                    let pc =
-                        emitter.read_register(self.model.reg_offset("_PC"), Type::Unsigned(64));
+                    let pc_offset = self.model.reg_offset("_PC");
+                    let pc = emitter.read_register(pc_offset, Type::Unsigned(64));
                     let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
-                    emitter.write_register(self.model.reg_offset("_PC"), new_pc);
+                    emitter.write_register(pc_offset, new_pc);
                 }
 
                 log::trace!("compiling");
@@ -334,14 +311,11 @@ impl ModelDevice {
                 let translation = ctx.compile(num_regs);
 
                 log::trace!("executing");
-                translation.execute(register_file_ptr);
+                translation.execute(&mut *self.register_file.lock());
 
                 if contains_mmu_write | needs_invalidate {
-                    let mmu_enabled = *(register_file_ptr
-                        .add(self.model.reg_offset("SCTLR_EL1_bits") as usize)
-                        as *mut u64)
-                        & 1
-                        == 1;
+                    let mmu_enabled =
+                        self.register_file.lock().read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
 
                     if mmu_enabled | needs_invalidate {
                         block_cache.clear();
@@ -353,15 +327,13 @@ impl ModelDevice {
                 }
 
                 log::trace!(
-                    "sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x4: {:x}, x12: {:x}, x14: {:x}, x23: {:x}",
-                    *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R1") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R2") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R4") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R12") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R14") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R23") as usize) as *mut u64),
+                    "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
+                    self.get_nzcv(),
+                    self.register_file.lock().read::<u64, _>("SP_EL3"),
+                    self.register_file.lock().read::<u64, _>("R0"),
+                    self.register_file.lock().read::<u64, _>("R1"),
+                    self.register_file.lock().read::<u64, _>("R2"),
+                    self.register_file.lock().read::<u64, _>("R5"),
                 );
 
                 self.print_regs()
@@ -374,16 +346,6 @@ impl ModelDevice {
     fn single_step_exec(&self) {
         let mut instructions_retired = 0u64;
 
-        let register_file_ptr = {
-            let mut lock = self.register_file.lock();
-
-            let ptr = lock.as_mut_ptr();
-
-            drop(lock);
-
-            ptr
-        };
-
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
         let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
@@ -394,14 +356,12 @@ impl ModelDevice {
             allocator.clear();
             let alloc_ref = BumpAllocatorRef::new(&allocator);
 
-            //
-            let current_pc = unsafe {
-                *(register_file_ptr.add(self.model.reg_offset("_PC") as usize) as *mut u64)
-            } & 0x0000_00FF_FFFF_FFFF;
+            let current_pc =
+                self.register_file.lock().read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
 
             if let Some(translation) = instr_cache.get(&current_pc) {
                 //log::info!("executing cached translation @ {current_pc:x}");
-                translation.execute(register_file_ptr);
+                translation.execute(&mut *self.register_file.lock());
                 instructions_retired += 1;
                 self.print_regs();
                 continue;
@@ -413,7 +373,7 @@ impl ModelDevice {
 
             unsafe {
                 // reset SEE
-                *(register_file_ptr.add(self.model.reg_offset("SEE") as usize) as *mut i64) = -1;
+                self.register_file.lock().write::<i64, _>("SEE", -1);
 
                 let mut ctx =
                     X86TranslationContext::new_with_allocator(alloc_ref, &self.model, true);
@@ -436,7 +396,7 @@ impl ModelDevice {
                     "__DecodeA64",
                     &[pc, opcode],
                     &mut emitter,
-                    register_file_ptr,
+                    &mut *self.register_file.lock(),
                 );
 
                 // if we didn't jump anywhere, increment PC by 4 bytes
@@ -466,14 +426,11 @@ impl ModelDevice {
                 let translation = ctx.compile(num_regs);
 
                 log::trace!("executing");
-                translation.execute(register_file_ptr);
+                translation.execute(&mut *self.register_file.lock());
 
                 if contains_mmu_write | needs_invalidate {
-                    let mmu_enabled = *(register_file_ptr
-                        .add(self.model.reg_offset("SCTLR_EL1_bits") as usize)
-                        as *mut u64)
-                        & 1
-                        == 1;
+                    let mmu_enabled =
+                        self.register_file.lock().read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
 
                     if mmu_enabled | needs_invalidate {
                         instr_cache.clear();
@@ -488,11 +445,11 @@ impl ModelDevice {
                 log::trace!(
                     "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
                     self.get_nzcv(),
-                    *(register_file_ptr.add(self.model.reg_offset("SP_EL3") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R0") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R1") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R2") as usize) as *mut u64),
-                    *(register_file_ptr.add(self.model.reg_offset("R5") as usize) as *mut u64),
+                    self.register_file.lock().read::<u64, _>("SP_EL3"),
+                    self.register_file.lock().read::<u64, _>("R0"),
+                    self.register_file.lock().read::<u64, _>("R1"),
+                    self.register_file.lock().read::<u64, _>("R2"),
+                    self.register_file.lock().read::<u64, _>("R5"),
                 );
 
                 self.print_regs()
