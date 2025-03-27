@@ -63,7 +63,7 @@ impl RegisterFile {
         let (offset, size) = self.registers.get(&name).copied().unwrap();
 
         if V::SIZE > size {
-            panic!(
+            log::error!(
                 "wrong size write to {name:?}: expected {:#x} got {:#x} ({})",
                 size,
                 V::SIZE,
@@ -71,7 +71,11 @@ impl RegisterFile {
             );
         }
 
-        value.write(&mut self.inner[offset..offset + size]);
+        self.write_raw(offset, value)
+    }
+
+    pub fn write_raw<V: RegisterValue>(&mut self, offset: usize, value: V) {
+        value.write(&mut self.inner[offset..offset + V::SIZE]);
     }
 
     pub fn read<V: RegisterValue, S: Into<InternedString>>(&self, name: S) -> V {
@@ -79,7 +83,7 @@ impl RegisterFile {
         let (offset, size) = self.registers.get(&name).copied().unwrap();
 
         if V::SIZE > size {
-            panic!(
+            log::error!(
                 "wrong size read of {name:?}: expected {:#x} got {:#x} ({})",
                 size,
                 V::SIZE,
@@ -87,7 +91,11 @@ impl RegisterFile {
             );
         }
 
-        V::read(&self.inner[offset..offset + size])
+        self.read_raw(offset)
+    }
+
+    pub fn read_raw<V: RegisterValue>(&self, offset: usize) -> V {
+        V::read(&self.inner[offset..offset + V::SIZE])
     }
 }
 
@@ -163,7 +171,7 @@ fn configure_features(register_file: &mut RegisterFile) {
         "FEAT_BTI_IMPLEMENTED",
     ];
 
-    disabled.iter().for_each(|name| {
-        register_file.write(*name, 0u8);
+    disabled.into_iter().for_each(|name| {
+        register_file.write(name, 0u8);
     });
 }

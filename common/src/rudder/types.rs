@@ -95,7 +95,7 @@ impl Type {
     }
 
     pub fn width_bytes(&self) -> u16 {
-        self.width_bits().div_ceil(8).next_power_of_two()
+        self.width_bits().div_ceil(8)
     }
 
     type_def_helper!(u1, UnsignedInteger, 1);

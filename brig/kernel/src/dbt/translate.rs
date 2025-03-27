@@ -709,10 +709,16 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     | RegisterCacheType::Read
                     | RegisterCacheType::ReadWrite => {
                         let value = match typ.width() {
-                            1..=8 => u64::from(self.register_file.read::<u8, _>(name)),
-                            9..=16 => u64::from(self.register_file.read::<u16, _>(name)),
-                            17..=32 => u64::from(self.register_file.read::<u32, _>(name)),
-                            33..=64 => u64::from(self.register_file.read::<u64, _>(name)),
+                            1..=8 => u64::from(self.register_file.read_raw::<u8>(offset as usize)),
+                            9..=16 => {
+                                u64::from(self.register_file.read_raw::<u16>(offset as usize))
+                            }
+                            17..=32 => {
+                                u64::from(self.register_file.read_raw::<u32>(offset as usize))
+                            }
+                            33..=64 => {
+                                u64::from(self.register_file.read_raw::<u64>(offset as usize))
+                            }
                             w => todo!("width {w}"),
                         };
                         log::trace!("read from cacheable {name:?}: {value:x}");
@@ -733,6 +739,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     .model
                     .get_register_by_offset(offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
+
+                assert_eq!(offset, self.model.registers().get(&name).unwrap().offset);
 
                 let value = statement_values.get(*value).unwrap().clone();
 
