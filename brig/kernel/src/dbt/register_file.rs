@@ -1,16 +1,19 @@
 use {
     crate::dbt::interpret::interpret,
-    alloc::{collections::BTreeMap, vec::Vec},
+    alloc::vec::Vec,
     byteorder::ByteOrder,
     common::{hashmap::HashMap, intern::InternedString, rudder::Model},
     core::{any::type_name, borrow::Borrow},
+    itertools::Itertools,
     paste::paste,
 };
 
 pub struct RegisterFile {
     inner: Vec<u8>,
     registers: HashMap<InternedString, (usize, usize)>, // offset, size
-    registers_by_offset: BTreeMap<usize, InternedString>,
+
+    // sorted vec of all register start offsets, each pair forms a half-open range(?)
+    register_offsets: Vec<usize>,
 }
 
 impl RegisterFile {
@@ -32,10 +35,12 @@ impl RegisterFile {
                     )
                 })
                 .collect(),
-            registers_by_offset: model
+
+            register_offsets: model
                 .registers()
-                .iter()
-                .map(|(name, desc)| (usize::try_from(desc.offset).unwrap(), *name))
+                .values()
+                .map(|desc| usize::try_from(desc.offset).unwrap())
+                .sorted()
                 .collect(),
         };
 
@@ -48,14 +53,6 @@ impl RegisterFile {
 
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         self.inner.as_mut_ptr()
-    }
-
-    pub fn lookup(&self, offset: usize) -> InternedString {
-        self.registers_by_offset
-            .range(..=offset)
-            .map(|(_, name)| *name)
-            .next_back()
-            .unwrap()
     }
 
     pub fn write<V: RegisterValue, S: Into<InternedString>>(&mut self, name: S, value: V) {
@@ -75,6 +72,7 @@ impl RegisterFile {
     }
 
     pub fn write_raw<V: RegisterValue>(&mut self, offset: usize, value: V) {
+        self.validate_range::<V>(offset);
         value.write(&mut self.inner[offset..offset + V::SIZE]);
     }
 
@@ -95,7 +93,29 @@ impl RegisterFile {
     }
 
     pub fn read_raw<V: RegisterValue>(&self, offset: usize) -> V {
+        self.validate_range::<V>(offset);
         V::read(&self.inner[offset..offset + V::SIZE])
+    }
+
+    pub fn validate_range<V: RegisterValue>(&self, offset: usize) {
+        // given an offset into the register file, return the range in which it
+        // lies
+
+        let (Ok(start_index) | Err(start_index)) =
+            self.register_offsets.as_slice().binary_search(&offset);
+
+        let Some(end) = self.register_offsets.get(start_index + 1) else {
+            // writing to last register in the register file
+            return;
+        };
+
+        if offset + V::SIZE > *end {
+            panic!(
+                "writing a {} ({} bytes) at offset {offset:#x} goes past beginning of adjacent register at offset {end:#x}",
+                type_name::<V>(),
+                V::SIZE,
+            )
+        }
     }
 }
 

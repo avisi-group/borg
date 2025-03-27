@@ -3418,21 +3418,7 @@ fn ldp() {
     register_file.write("R0", ((&*src) as *const (u64, u64)) as u64);
     register_file.write("R21", 0xAAAA_AAAA_AAAA_AAAAu64);
 
-    log::debug!(
-        "{:x?}",
-        (
-            register_file.read::<u64, _>("R0"),
-            register_file.read::<u64, _>("R21")
-        )
-    );
     translation.execute(&mut register_file);
-    log::debug!(
-        "{:x?}",
-        (
-            register_file.read::<u64, _>("R0"),
-            register_file.read::<u64, _>("R21")
-        )
-    );
 
     assert_eq!(
         (
