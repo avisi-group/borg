@@ -353,7 +353,7 @@ impl ModelDevice {
             let current_pc = self.register_file.read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
 
             if let Some(translation) = instr_cache.get(&current_pc) {
-                //log::info!("executing cached translation @ {current_pc:x}");
+                log::info!("executing cached translation @ {current_pc:x}");
                 translation.execute(&self.register_file);
                 instructions_retired += 1;
                 self.print_regs();
@@ -418,7 +418,6 @@ impl ModelDevice {
             log::trace!("executing");
             translation.execute(&self.register_file);
 
-            log::trace!("checking for guest invalidate");
             if contains_mmu_write | needs_invalidate {
                 let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
                 log::trace!("mmu_enabled: {mmu_enabled}");
@@ -427,6 +426,7 @@ impl ModelDevice {
                     instr_cache.clear();
                     VirtualMemoryArea::current().invalidate_guest_mappings();
                 }
+                // no insertion here?
             } else {
                 log::trace!("inserting into cache");
                 instr_cache.insert(current_pc, translation);
@@ -435,15 +435,16 @@ impl ModelDevice {
             instructions_retired += 1;
 
             log::trace!(
-                "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
+                "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x4: {:x}, x5: {:x}",
                 self.get_nzcv(),
                 self.register_file.read::<u64, _>("SP_EL3"),
                 self.register_file.read::<u64, _>("R0"),
                 self.register_file.read::<u64, _>("R1"),
                 self.register_file.read::<u64, _>("R2"),
+                self.register_file.read::<u64, _>("R4"),
                 self.register_file.read::<u64, _>("R5"),
             );
-            log::trace!("print regs");
+
             self.print_regs();
 
             log::info!("finished\n\n")

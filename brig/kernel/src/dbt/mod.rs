@@ -31,6 +31,9 @@ pub struct Translation {
 
 impl Translation {
     pub fn new(code: Vec<u8>) -> Self {
+        log::error!("creating translation @ {:p}..{:p}", code.as_ptr(), unsafe {
+            code.as_ptr().add(code.len())
+        });
         let start = VirtAddr::from_ptr(code.as_ptr());
         VirtualMemoryArea::current().update_flags_range(
             start..start + code.len() as u64,
@@ -49,11 +52,16 @@ impl Translation {
 
 impl Drop for Translation {
     fn drop(&mut self) {
-        let start = VirtAddr::from_ptr(self.code.as_ptr());
-        VirtualMemoryArea::current().update_flags_range(
-            start..start + self.code.len() as u64,
-            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
-        );
+        // log::error!(
+        //     "dropping translation @ {:p}..{:p}",
+        //     self.code.as_ptr(),
+        //     unsafe { self.code.as_ptr().add(self.code.len()) }
+        // );
+        // let start = VirtAddr::from_ptr(self.code.as_ptr());
+        // VirtualMemoryArea::current().update_flags_range(
+        //     start..start + self.code.len() as u64,
+        //     PageTableFlags::PRESENT | PageTableFlags::WRITABLE |
+        // PageTableFlags::NO_EXECUTE, );
     }
 }
 
