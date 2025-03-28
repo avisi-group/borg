@@ -193,14 +193,14 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
         let func = rudder
             .functions()
             .get(&InternedString::from_static(
-                "execute_aarch64_instrs_memory_pair_general_post_idx",
+                "execute_aarch64_instrs_integer_conditional_compare_immediate",
             ))
             .unwrap();
         rudder::dot::render(
             &mut create_file_buffered(
                 dump_ir
                     .unwrap()
-                    .join("execute_aarch64_instrs_memory_pair_general_post_idx.dot"),
+                    .join("execute_aarch64_instrs_integer_conditional_compare_immediate.dot"),
             )
             .unwrap(),
             func.arena(),

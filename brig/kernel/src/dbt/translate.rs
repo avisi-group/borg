@@ -21,6 +21,7 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
+        cell::RefCell,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
@@ -79,7 +80,7 @@ pub fn translate<A: Alloc>(
     function: &str,
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
-    register_file: &mut RegisterFile,
+    register_file: &RegisterFile,
 ) -> Option<X86NodeRef<A>> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
@@ -188,7 +189,7 @@ struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
     emitter: &'emitter mut X86Emitter<'context, A>,
 
     /// Pointer to the register file used for cached register reads
-    register_file: &'registers mut RegisterFile,
+    register_file: &'registers RegisterFile,
 }
 
 impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
@@ -299,7 +300,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             .into_iter()
             .zip(self.return_value.variables.clone().into_iter())
             .for_each(|(value, variable)| {
-                self.write_variable(variable, value);
+                self.write_variable(&variable, value);
             });
 
         log::trace!(
@@ -315,7 +316,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         arguments: &[X86NodeRef<A>],
         emitter: &'e mut X86Emitter<'c, A>,
         current_stack_offset: Rc<AtomicUsize, A>,
-        register_file: &'r mut RegisterFile,
+        register_file: &'r RegisterFile,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
         assert!(!FN_DENYLIST.contains(&function));
@@ -352,7 +353,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     symbol: celf.emitter.ctx_mut().create_symbol(),
                 };
                 celf.entry_variables.insert(parameter.name(), var.clone());
-                celf.write_variable(var, argument.clone());
+                celf.write_variable(&var, argument.clone());
             });
 
         celf
@@ -447,12 +448,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block0,
                         x86: block0_x86,
-                        variables: lives.clone(),
+                        variables: variables_deep_clone_in(&lives, self.allocator),
                     });
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block1,
                         x86: block1_x86,
-                        variables: lives,
+                        variables: variables_deep_clone_in(&lives, self.allocator),
                     });
                 }
                 ControlFlow::Return => {
@@ -606,15 +607,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     self.function.name()
                 );
 
-                if variables.get(&symbol.name()).is_none() {
+                let variable = variables.entry(symbol.name()).or_insert_with(|| {
                     log::trace!("writing var {} for the first time", symbol.name());
-                    variables.insert(
-                        symbol.name(),
-                        LocalVariable::Virtual {
-                            symbol: self.emitter.ctx_mut().create_symbol(),
-                        },
-                    );
-                }
+                    LocalVariable::Virtual {
+                        symbol: self.emitter.ctx_mut().create_symbol(),
+                    }
+                });
 
                 if is_dynamic
                 // terrible hack to workaround ldp     x0, x21, [x0] bug, where x0 gets written to halfway through, thus corrupting the second read of x0 to write *(x0 + 8) to x21
@@ -624,7 +622,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
-                    match variables.get(&symbol.name()).unwrap() {
+                    match variable {
                         LocalVariable::Virtual { .. } => {
                             log::trace!(
                                 "promoting {:?} from virtual to stack in block {:#x} in {:?}",
@@ -652,17 +650,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                     offset
                                 };
 
-                            variables.insert(
-                                symbol.name(),
-                                LocalVariable::Stack {
-                                    typ: emit_rudder_type(&symbol.typ()),
-                                    stack_offset,
-                                },
-                            );
-
-                            let current_block = self.emitter.get_current_block();
-
-                            self.emitter.set_current_block(current_block);
+                            *variable = LocalVariable::Stack {
+                                typ: emit_rudder_type(&symbol.typ()),
+                                stack_offset,
+                            };
                         }
                         LocalVariable::Stack { stack_offset, .. } => {
                             log::debug!(
@@ -675,7 +666,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         }
                     }
                 }
-                let var = variables.get(&symbol.name()).unwrap().clone();
 
                 let value = statement_values
                     .get(*value)
@@ -687,7 +677,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     })
                     .clone();
 
-                self.write_variable(var, value);
+                self.write_variable(variable, value);
 
                 StatementResult::Data(None)
             }
@@ -1187,9 +1177,11 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         }
     }
 
-    fn write_variable(&mut self, variable: LocalVariable<A>, value: X86NodeRef<A>) {
+    fn write_variable(&mut self, variable: &LocalVariable<A>, value: X86NodeRef<A>) {
         match variable {
-            LocalVariable::Virtual { symbol } => self.emitter.write_virt_variable(symbol, value),
+            LocalVariable::Virtual { symbol } => {
+                self.emitter.write_virt_variable(symbol.clone(), value)
+            }
             LocalVariable::Stack { typ, stack_offset } => {
                 if matches!(typ, Type::Bits) {
                     // no panic even if we tried to write two different sizes to the stack :(
@@ -1197,9 +1189,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     // if we see any issues, we need to actually support writing different sizes to
                     // stack, using an extra stack variable containing the size
                     self.bits_stack_widths
-                        .insert(stack_offset, value.typ().width());
+                        .insert(*stack_offset, value.typ().width());
                 }
-                self.emitter.write_stack_variable(stack_offset, value)
+                self.emitter.write_stack_variable(*stack_offset, value)
             }
         }
     }
@@ -1299,4 +1291,30 @@ impl<A: Alloc> StatementValueStore<A> {
     pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef<A>> {
         self.map.get(&s).cloned()
     }
+}
+
+fn variables_deep_clone_in<A: Alloc>(
+    variables: &BTreeMap<InternedString, LocalVariable<A>, A>,
+    allocator: A,
+) -> BTreeMap<InternedString, LocalVariable<A>, A> {
+    let mut map = BTreeMap::new_in(allocator);
+    variables
+        .iter()
+        .map(|(name, local)| {
+            (
+                *name,
+                match local {
+                    LocalVariable::Virtual { symbol } => LocalVariable::Virtual {
+                        symbol: X86SymbolRef(Rc::new_in(
+                            RefCell::new(symbol.0.borrow().clone()),
+                            allocator,
+                        )),
+                    },
+                    LocalVariable::Stack { .. } => local.clone(),
+                },
+            )
+        })
+        .collect_into(&mut map);
+
+    map
 }

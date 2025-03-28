@@ -112,7 +112,7 @@ impl DeviceFactory for ModelDeviceFactory {
 pub struct ModelDevice {
     name: String,
     model: Arc<Model>,
-    pub register_file: Mutex<RegisterFile>,
+    pub register_file: RegisterFile,
 }
 
 impl Debug for ModelDevice {
@@ -182,16 +182,15 @@ impl ModelDevice {
         Self {
             name,
             model,
-            register_file: Mutex::new(register_file),
+            register_file: register_file,
         }
     }
 
     fn get_nzcv(&self) -> u8 {
-        let file = self.register_file.lock();
-        let n = file.read::<u8, _>("PSTATE_N");
-        let z = file.read::<u8, _>("PSTATE_Z");
-        let c = file.read::<u8, _>("PSTATE_C");
-        let v = file.read::<u8, _>("PSTATE_V");
+        let n = self.register_file.read::<u8, _>("PSTATE_N");
+        let z = self.register_file.read::<u8, _>("PSTATE_Z");
+        let c = self.register_file.read::<u8, _>("PSTATE_C");
+        let v = self.register_file.read::<u8, _>("PSTATE_V");
 
         assert!(n <= 1);
         assert!(z <= 1);
@@ -203,16 +202,14 @@ impl ModelDevice {
 
     fn print_regs(&self) {
         if PRINT_REGISTERS {
-            let file = self.register_file.lock();
-
-            crate::print!("PC = {:016x}\n", file.read::<u64, _>("_PC"));
+            crate::print!("PC = {:016x}\n", self.register_file.read::<u64, _>("_PC"));
 
             crate::print!("NZCV = {:04b}\n", self.get_nzcv());
 
             for reg in 0..=30 {
                 crate::print!(
                     "R{reg:02} = {:016x}\n",
-                    file.read::<u64, _>(alloc::format!("R{reg}"))
+                    self.register_file.read::<u64, _>(alloc::format!("R{reg}"))
                 );
             }
         }
@@ -231,11 +228,11 @@ impl ModelDevice {
 
             unsafe {
                 let mut current_pc =
-                    self.register_file.lock().read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
+                    self.register_file.read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
 
                 let start_pc = current_pc;
                 if let Some(translation) = block_cache.get(&start_pc) {
-                    translation.execute(&mut *self.register_file.lock());
+                    translation.execute(&self.register_file);
                     continue;
                 }
 
@@ -245,7 +242,7 @@ impl ModelDevice {
 
                 loop {
                     // reset SEE
-                    self.register_file.lock().write::<i64, _>("SEE", -1);
+                    self.register_file.write::<i64, _>("SEE", -1);
 
                     // reset BranchTaken
                     let _false = emitter.constant(0 as u64, Type::Unsigned(1));
@@ -265,7 +262,7 @@ impl ModelDevice {
                             "__DecodeA64",
                             &[pc, opcode],
                             &mut emitter,
-                            &mut *self.register_file.lock(),
+                            &self.register_file,
                         );
                     }
 
@@ -309,11 +306,10 @@ impl ModelDevice {
                 let translation = ctx.compile(num_regs);
 
                 log::trace!("executing");
-                translation.execute(&mut *self.register_file.lock());
+                translation.execute(&self.register_file);
 
                 if contains_mmu_write | needs_invalidate {
-                    let mmu_enabled =
-                        self.register_file.lock().read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
+                    let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
 
                     if mmu_enabled | needs_invalidate {
                         block_cache.clear();
@@ -327,11 +323,11 @@ impl ModelDevice {
                 log::trace!(
                     "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
                     self.get_nzcv(),
-                    self.register_file.lock().read::<u64, _>("SP_EL3"),
-                    self.register_file.lock().read::<u64, _>("R0"),
-                    self.register_file.lock().read::<u64, _>("R1"),
-                    self.register_file.lock().read::<u64, _>("R2"),
-                    self.register_file.lock().read::<u64, _>("R5"),
+                    self.register_file.read::<u64, _>("SP_EL3"),
+                    self.register_file.read::<u64, _>("R0"),
+                    self.register_file.read::<u64, _>("R1"),
+                    self.register_file.read::<u64, _>("R2"),
+                    self.register_file.read::<u64, _>("R5"),
                 );
 
                 self.print_regs()
@@ -354,12 +350,11 @@ impl ModelDevice {
             allocator.clear();
             let alloc_ref = BumpAllocatorRef::new(&allocator);
 
-            let current_pc =
-                self.register_file.lock().read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
+            let current_pc = self.register_file.read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
 
             if let Some(translation) = instr_cache.get(&current_pc) {
                 //log::info!("executing cached translation @ {current_pc:x}");
-                translation.execute(&mut *self.register_file.lock());
+                translation.execute(&self.register_file);
                 instructions_retired += 1;
                 self.print_regs();
                 continue;
@@ -369,89 +364,87 @@ impl ModelDevice {
                 "---- ---- ---- ---- starting instr translation: {current_pc:x}, retired: {instructions_retired}"
             );
 
-            unsafe {
-                // reset SEE
-                self.register_file.lock().write::<i64, _>("SEE", -1);
+            // reset SEE
+            self.register_file.write::<i64, _>("SEE", -1);
 
-                let mut ctx =
-                    X86TranslationContext::new_with_allocator(alloc_ref, &self.model, true);
-                let mut emitter = X86Emitter::new(&mut ctx);
+            let mut ctx = X86TranslationContext::new_with_allocator(alloc_ref, &self.model, true);
+            let mut emitter = X86Emitter::new(&mut ctx);
 
-                // reset BranchTaken
-                let _false = emitter.constant(0 as u64, Type::Unsigned(1));
-                emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
+            // reset BranchTaken
+            let _false = emitter.constant(0 as u64, Type::Unsigned(1));
+            emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
 
-                let opcode = *(current_pc as *const u32);
+            let opcode = unsafe { *(current_pc as *const u32) };
 
-                log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
-                log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
+            log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
+            log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
 
-                let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
-                let pc = emitter.constant(current_pc, Type::Unsigned(64));
-                let _return_value = translate(
-                    alloc_ref,
-                    &*self.model,
-                    "__DecodeA64",
-                    &[pc, opcode],
-                    &mut emitter,
-                    &mut *self.register_file.lock(),
+            let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
+            let pc = emitter.constant(current_pc, Type::Unsigned(64));
+            let _return_value = translate(
+                alloc_ref,
+                &*self.model,
+                "__DecodeA64",
+                &[pc, opcode],
+                &mut emitter,
+                &self.register_file,
+            );
+
+            // if we didn't jump anywhere, increment PC by 4 bytes
+            {
+                let branch_taken = emitter.read_register(
+                    self.model.reg_offset("__BranchTaken") as u64,
+                    Type::Unsigned(1),
                 );
 
-                // if we didn't jump anywhere, increment PC by 4 bytes
-                {
-                    let branch_taken = emitter.read_register(
-                        self.model.reg_offset("__BranchTaken") as u64,
-                        Type::Unsigned(1),
-                    );
+                let _0 = emitter.constant(0, Type::Unsigned(64));
+                let _4 = emitter.constant(4, Type::Unsigned(64));
+                let addend = emitter.select(branch_taken, _0, _4);
 
-                    let _0 = emitter.constant(0, Type::Unsigned(64));
-                    let _4 = emitter.constant(4, Type::Unsigned(64));
-                    let addend = emitter.select(branch_taken, _0, _4);
-
-                    let pc =
-                        emitter.read_register(self.model.reg_offset("_PC"), Type::Unsigned(64));
-                    let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
-                    emitter.write_register(self.model.reg_offset("_PC"), new_pc);
-                }
-                log::trace!("compiling");
-
-                emitter.leave();
-                let num_regs = emitter.next_vreg();
-
-                let contains_mmu_write = ctx.get_mmu_write_flag();
-                let needs_invalidate = ctx.get_mmu_needs_invalidate_flag();
-
-                let translation = ctx.compile(num_regs);
-
-                log::trace!("executing");
-                translation.execute(&mut *self.register_file.lock());
-
-                if contains_mmu_write | needs_invalidate {
-                    let mmu_enabled =
-                        self.register_file.lock().read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
-
-                    if mmu_enabled | needs_invalidate {
-                        instr_cache.clear();
-                        VirtualMemoryArea::current().invalidate_guest_mappings();
-                    }
-                } else {
-                    instr_cache.insert(current_pc, translation);
-                }
-
-                instructions_retired += 1;
-
-                log::trace!(
-                    "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
-                    self.get_nzcv(),
-                    self.register_file.lock().read::<u64, _>("SP_EL3"),
-                    self.register_file.lock().read::<u64, _>("R0"),
-                    self.register_file.lock().read::<u64, _>("R1"),
-                    self.register_file.lock().read::<u64, _>("R2"),
-                    self.register_file.lock().read::<u64, _>("R5"),
-                );
-
-                self.print_regs()
+                let pc = emitter.read_register(self.model.reg_offset("_PC"), Type::Unsigned(64));
+                let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
+                emitter.write_register(self.model.reg_offset("_PC"), new_pc);
             }
+            log::trace!("compiling");
+
+            emitter.leave();
+            let num_regs = emitter.next_vreg();
+
+            let contains_mmu_write = ctx.get_mmu_write_flag();
+            let needs_invalidate = ctx.get_mmu_needs_invalidate_flag();
+
+            let translation = ctx.compile(num_regs);
+
+            log::trace!("executing");
+            translation.execute(&self.register_file);
+
+            log::trace!("checking for guest invalidate");
+            if contains_mmu_write | needs_invalidate {
+                let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
+                log::trace!("mmu_enabled: {mmu_enabled}");
+                if mmu_enabled | needs_invalidate {
+                    log::trace!("clearing cache");
+                    instr_cache.clear();
+                    VirtualMemoryArea::current().invalidate_guest_mappings();
+                }
+            } else {
+                log::trace!("inserting into cache");
+                instr_cache.insert(current_pc, translation);
+            }
+
+            instructions_retired += 1;
+
+            log::trace!(
+                "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
+                self.get_nzcv(),
+                self.register_file.read::<u64, _>("SP_EL3"),
+                self.register_file.read::<u64, _>("R0"),
+                self.register_file.read::<u64, _>("R1"),
+                self.register_file.read::<u64, _>("R2"),
+                self.register_file.read::<u64, _>("R5"),
+            );
+            log::trace!("print regs");
+            self.print_regs();
 
             log::info!("finished\n\n")
         }

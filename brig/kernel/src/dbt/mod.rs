@@ -39,7 +39,7 @@ impl Translation {
         Self { code }
     }
 
-    pub fn execute(&self, register_file: &mut RegisterFile) {
+    pub fn execute(&self, register_file: &RegisterFile) {
         let code_ptr = self.code.as_ptr();
         let register_file_ptr = register_file.as_mut_ptr();
 

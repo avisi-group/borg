@@ -3500,20 +3500,11 @@ fn ccmp() {
     register_file.write::<u8, _>("PSTATE_C", 0);
     register_file.write::<u8, _>("PSTATE_V", 0);
 
-    log::warn!("{translation:?}");
-
     translation.execute(&mut register_file);
 
-    panic!(
-        "{:b}{:b}{:b}{:b}",
-        register_file.read::<u8, _>("PSTATE_N"),
-        register_file.read::<u8, _>("PSTATE_Z"),
-        register_file.read::<u8, _>("PSTATE_C"),
-        register_file.read::<u8, _>("PSTATE_V"),
-    );
-    // assert_eq!(*n, 0);
-    // assert_eq!(*z, 0);
-    // assert_eq!(*c, 0);
-    // assert_eq!(*v, 0);
-    // assert_eq!(*r5, 0);
+    assert_eq!(register_file.read::<u8, _>("PSTATE_N"), 0);
+    assert_eq!(register_file.read::<u8, _>("PSTATE_Z"), 0);
+    assert_eq!(register_file.read::<u8, _>("PSTATE_C"), 0);
+    assert_eq!(register_file.read::<u8, _>("PSTATE_V"), 0);
+    assert_eq!(register_file.read::<u64, _>("R5"), 0);
 }

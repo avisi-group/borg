@@ -3,13 +3,13 @@ use {
     alloc::vec::Vec,
     byteorder::ByteOrder,
     common::{hashmap::HashMap, intern::InternedString, rudder::Model},
-    core::{any::type_name, borrow::Borrow},
+    core::{any::type_name, borrow::Borrow, cell::UnsafeCell},
     itertools::Itertools,
     paste::paste,
 };
 
 pub struct RegisterFile {
-    inner: Vec<u8>,
+    inner: UnsafeCell<Vec<u8>>,
     registers: HashMap<InternedString, (usize, usize)>, // offset, size
 
     // sorted vec of all register start offsets, each pair forms a half-open range(?)
@@ -21,7 +21,7 @@ impl RegisterFile {
         let model = model.borrow();
 
         let mut register_file = Self {
-            inner: alloc::vec![0u8; model.register_file_size() as usize],
+            inner: UnsafeCell::new(alloc::vec![0u8; model.register_file_size() as usize]),
             registers: model
                 .registers()
                 .iter()
@@ -51,11 +51,11 @@ impl RegisterFile {
         register_file
     }
 
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.inner.as_mut_ptr()
+    pub fn as_mut_ptr(&self) -> *mut u8 {
+        unsafe { self.inner.as_mut_unchecked() }.as_mut_ptr()
     }
 
-    pub fn write<V: RegisterValue, S: Into<InternedString>>(&mut self, name: S, value: V) {
+    pub fn write<V: RegisterValue, S: Into<InternedString>>(&self, name: S, value: V) {
         let name = name.into();
         let (offset, size) = self.registers.get(&name).copied().unwrap();
 
@@ -71,9 +71,9 @@ impl RegisterFile {
         self.write_raw(offset, value)
     }
 
-    pub fn write_raw<V: RegisterValue>(&mut self, offset: usize, value: V) {
+    pub fn write_raw<V: RegisterValue>(&self, offset: usize, value: V) {
         self.validate_range::<V>(offset);
-        value.write(&mut self.inner[offset..offset + V::SIZE]);
+        value.write(&mut unsafe { self.inner.as_mut_unchecked() }[offset..offset + V::SIZE]);
     }
 
     pub fn read<V: RegisterValue, S: Into<InternedString>>(&self, name: S) -> V {
@@ -94,7 +94,7 @@ impl RegisterFile {
 
     pub fn read_raw<V: RegisterValue>(&self, offset: usize) -> V {
         self.validate_range::<V>(offset);
-        V::read(&self.inner[offset..offset + V::SIZE])
+        V::read(&unsafe { self.inner.as_ref_unchecked() }[offset..offset + V::SIZE])
     }
 
     pub fn validate_range<V: RegisterValue>(&self, offset: usize) {
