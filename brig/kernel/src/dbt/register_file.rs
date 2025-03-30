@@ -44,9 +44,9 @@ impl RegisterFile {
                 .collect(),
         };
 
-        interpret(model, "borealis_register_init", &[], &mut register_file);
-        configure_features(&mut register_file);
-        interpret(model, "__InitSystem", &[], &mut register_file);
+        interpret(model, "borealis_register_init", &[], &register_file);
+        configure_features(&register_file);
+        interpret(model, "__InitSystem", &[], &register_file);
 
         register_file
     }
@@ -184,7 +184,7 @@ impl RegisterValue for bool {
     }
 }
 
-fn configure_features(register_file: &mut RegisterFile) {
+fn configure_features(register_file: &RegisterFile) {
     let disabled = [
         "FEAT_LSE2_IMPLEMENTED",
         "FEAT_TME_IMPLEMENTED",

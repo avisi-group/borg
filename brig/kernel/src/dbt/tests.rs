@@ -42,7 +42,7 @@ fn static_dynamic_chaos_smoke() {
             "func_corrupted_var",
             &[],
             &mut emitter,
-            &mut register_file,
+            &register_file,
         )
         .unwrap();
 
@@ -54,7 +54,7 @@ fn static_dynamic_chaos_smoke() {
         register_file.write("R1", r1_value);
         register_file.write("R2", r2_value);
 
-        translation.execute(&mut register_file);
+        translation.execute(&register_file);
 
         (
             register_file.read("R0"),
@@ -87,7 +87,7 @@ fn static_dynamic_chaos_smoke() {
 //         "num_of_Feature",
 //         &[feature],
 //         &mut emitter,
-//         &mut register_file,
+//         &register_file,
 //     )
 //     .unwrap();
 //     emitter.write_register(model.reg_offset("R1"), out);
@@ -104,7 +104,7 @@ fn static_dynamic_chaos_smoke() {
 //         register_file.write::<u64,_>("R0",4);
 //         *r1 = 0;
 
-//         translation.execute(&mut register_file);
+//         translation.execute(&register_file);
 
 //         assert_eq!(4, ( register_file.read::<u64,_>("R0")));
 //         assert_eq!(4, (*r1));
@@ -130,7 +130,7 @@ fn num_of_feature_const_123() {
         "num_of_Feature",
         &[feature],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
 
@@ -160,7 +160,7 @@ fn statistical_profiling_disabled() {
         "StatisticalProfilingEnabled",
         &[],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
 
@@ -169,7 +169,7 @@ fn statistical_profiling_disabled() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(0, register_file.read::<u8, _>("R0"))
 }
@@ -194,7 +194,7 @@ fn statistical_profiling_disabled() {
 //     emitter.leave();
 //     let num_regs = emitter.next_vreg();
 //     let translation = ctx.compile(num_regs);
-//     translation.execute(&mut register_file);
+//     translation.execute(&register_file);
 
 //     unsafe {
 //         assert_eq!(
@@ -219,7 +219,7 @@ fn using_aarch32_disabled() {
         "UsingAArch32",
         &[],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
 
@@ -228,7 +228,7 @@ fn using_aarch32_disabled() {
     emitter.leave();
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(0, register_file.read::<u8, _>("R0"))
 }
@@ -251,7 +251,7 @@ fn branchto() {
         "BranchTo",
         &[target, branch_type, branch_conditional],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -262,7 +262,7 @@ fn branchto() {
 
     register_file.write("__BranchTaken", false);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(0xDEADFEED, register_file.read::<u64, _>("_PC"));
     assert_eq!(true, register_file.read::<bool, _>("__BranchTaken"))
@@ -285,7 +285,7 @@ fn decodea64_addsub() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -298,7 +298,7 @@ fn decodea64_addsub() {
     register_file.write::<u64, _>("R1", 5);
     register_file.write::<u64, _>("R2", 10);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(15, register_file.read::<u64, _>("R0"));
     //assert_eq!(0xe, (*see)); //// todo: re-implement depending on result
@@ -324,7 +324,7 @@ fn decodea64_addsub_interpret() {
         value: 0x8b020020,
         width: 32,
     };
-    interpret(&*model, "__DecodeA64", &[pc, opcode], &mut register_file);
+    interpret(&*model, "__DecodeA64", &[pc, opcode], &register_file);
 
     assert_eq!(15, register_file.read::<u64, _>("R0"));
     //   assert_eq!(0xe, (*see)); // todo: re-implement depending on result
@@ -348,7 +348,7 @@ fn decodea64_mov() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -360,7 +360,7 @@ fn decodea64_mov() {
     register_file.write::<u64, _>("R0", 2);
     register_file.write::<u64, _>("R1", 43);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(43, register_file.read::<u64, _>("R0"));
     assert_eq!(43, register_file.read::<u64, _>("R1"));
@@ -385,7 +385,7 @@ fn decodea64_branch() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -398,7 +398,7 @@ fn decodea64_branch() {
     register_file.write("_PC", 44u64);
     register_file.write("SEE", -1i64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(20, register_file.read::<u64, _>("_PC"));
     //assert_eq!(67, (*see));// todo: re-implement depending on result of
@@ -422,7 +422,7 @@ fn branch_if_eq() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -432,7 +432,7 @@ fn branch_if_eq() {
 
     register_file.write("SEE", -1i64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     //assert_eq!(0x45, (*see)); // todo: re-implement depending on result of
     // SEE/cacheable registers work
@@ -562,7 +562,7 @@ fn cmp_csel() {
             "__DecodeA64",
             &[pc, opcode],
             &mut emitter,
-            &mut register_file,
+            &register_file,
         );
 
         let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
@@ -577,7 +577,7 @@ fn cmp_csel() {
             "__DecodeA64",
             &[pc, opcode],
             &mut emitter,
-            &mut register_file,
+            &register_file,
         );
 
         emitter.leave();
@@ -588,7 +588,7 @@ fn cmp_csel() {
         register_file.write::<u64, _>("R0", pre_r0);
         register_file.write::<u64, _>("R2", pre_r2);
 
-        translation.execute(&mut register_file);
+        translation.execute(&register_file);
 
         register_file.read::<u64, _>("R2")
     }
@@ -647,14 +647,14 @@ fn fibonacci_instr() {
                 "__DecodeA64",
                 &[pc, opcode],
                 &mut emitter,
-                &mut register_file,
+                &register_file,
             );
         }
 
         emitter.leave();
         let num_regs = emitter.next_vreg();
         let translation = ctx.compile(num_regs);
-        translation.execute(&mut register_file);
+        translation.execute(&register_file);
 
         // increment PC if no branch was taken
         if !register_file.read::<bool, _>("__BranchTaken") {
@@ -691,7 +691,7 @@ fn mem() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -707,7 +707,7 @@ fn mem() {
     register_file.write::<u64, _>("R0", 0xdeadcafe);
     register_file.write::<u64, _>("R1", &*mem as *const u64 as u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(*mem, register_file.read::<u64, _>("R0"));
 }
@@ -729,7 +729,7 @@ fn mem_store() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -744,7 +744,7 @@ fn mem_store() {
     register_file.write::<u64, _>("R0", VALUE);
     register_file.write::<u64, _>("R1", &*mem as *const u64 as u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(*mem, VALUE);
 }
@@ -767,7 +767,7 @@ fn mem_load() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -782,7 +782,7 @@ fn mem_load() {
     register_file.write::<u64, _>("R0", 0xdeadcafe); // will be overwritten
     register_file.write::<u64, _>("R1", &*mem as *const u64 as u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), VALUE);
 }
@@ -822,7 +822,7 @@ fn fibonacci_block() {
         let mut current_pc = register_file.read::<u64, _>("_PC");
         let start_pc = current_pc;
         if let Some(translation) = blocks.get(&start_pc) {
-            translation.execute(&mut register_file);
+            translation.execute(&register_file);
             continue;
         }
 
@@ -848,7 +848,7 @@ fn fibonacci_block() {
                     "__DecodeA64",
                     &[pc, opcode],
                     &mut emitter,
-                    &mut register_file,
+                    &register_file,
                 );
             }
 
@@ -885,7 +885,7 @@ fn fibonacci_block() {
 
         // log::trace!("{translation:?}")
 
-        translation.execute(&mut register_file);
+        translation.execute(&register_file);
         blocks.insert(start_pc, translation);
 
         log::trace!(
@@ -971,7 +971,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
         "add_with_carry_test",
         &[x, y, carry_in],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
 
@@ -985,7 +985,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     (
         register_file.read::<u64, _>("R0"),
@@ -1086,14 +1086,14 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     register_file.read::<u8, _>("PSTATE_N") << 3
         | register_file.read::<u8, _>("PSTATE_Z") << 2
@@ -1120,7 +1120,7 @@ fn shiftreg() {
         "ShiftReg",
         &[_1, shift_type, amount, width],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
 
@@ -1134,7 +1134,7 @@ fn shiftreg() {
     register_file.write::<u64, _>("R0", 0);
     register_file.write::<u64, _>("R1", 0xdeadfeeddeadfeed);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0xdeadfeeddeadfeed);
     assert_eq!(register_file.read::<u64, _>("R1"), 0xdeadfeeddeadfeed);
@@ -1156,7 +1156,7 @@ fn floorpow2_constant() {
         "FloorPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1173,7 +1173,7 @@ fn floorpow2_constant() {
         "FloorPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1190,7 +1190,7 @@ fn floorpow2_constant() {
         "FloorPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1207,7 +1207,7 @@ fn floorpow2_constant() {
         "FloorPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1235,7 +1235,7 @@ fn ceilpow2_constant() {
         "CeilPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1252,7 +1252,7 @@ fn ceilpow2_constant() {
         "CeilPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1269,7 +1269,7 @@ fn ceilpow2_constant() {
         "CeilPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1286,7 +1286,7 @@ fn ceilpow2_constant() {
         "CeilPow2",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1316,7 +1316,7 @@ fn _ispow2() {
             "FloorPow2",
             &[x.clone()],
             &mut emitter,
-            &mut register_file,
+            &register_file,
         )
         .unwrap();
         emitter.write_register(model.reg_offset("R0"), value);
@@ -1329,7 +1329,7 @@ fn _ispow2() {
             "CeilPow2",
             &[x.clone()],
             &mut emitter,
-            &mut register_file,
+            &register_file,
         )
         .unwrap();
         emitter.write_register(model.reg_offset("R1"), value);
@@ -1342,7 +1342,7 @@ fn _ispow2() {
             "IsPow2",
             &[x],
             &mut emitter,
-            &mut register_file,
+            &register_file,
         )
         .unwrap();
         emitter.write_register(model.reg_offset("R2"), value);
@@ -1358,7 +1358,7 @@ fn _ispow2() {
     register_file.write::<u64, _>("R2", 0);
     register_file.write::<u64, _>("R3", 2048);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(
         register_file.read::<u64, _>("R0"),
@@ -1385,7 +1385,7 @@ fn rbitx0_interpret() {
         value: 0xdac00000,
         width: 32,
     };
-    interpret(&*model, "__DecodeA64", &[pc, opcode], &mut register_file);
+    interpret(&*model, "__DecodeA64", &[pc, opcode], &register_file);
 
     // assert bits are reversed
     assert_eq!(register_file.read::<u64, _>("R0"), 0xf7b3_d591_e6a2_c480);
@@ -1409,7 +1409,7 @@ fn rbitx0() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -1420,7 +1420,7 @@ fn rbitx0() {
     register_file.write::<u64, _>("R0", 0x0123_4567_89ab_cdef);
     register_file.write("SEE", -1i64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     // assert bits are reversed
     assert_eq!(register_file.read::<u64, _>("R0"), 0xf7b3_d591_e6a2_c480);
@@ -1468,7 +1468,7 @@ fn bitinsert() {
         register_file.write::<u64, _>("R0", target);
         register_file.write::<u64, _>("R1", source);
 
-        translation.execute(&mut register_file);
+        translation.execute(&register_file);
 
         register_file.read::<u64, _>("R2")
     }
@@ -1492,7 +1492,7 @@ fn ubfx() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -1503,7 +1503,7 @@ fn ubfx() {
     register_file.write("SEE", -1i64);
     register_file.write("R3", 0x8444_c004u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R3"), 0x4);
 }
@@ -1524,7 +1524,7 @@ fn highest_set_bit() {
         "HighestSetBit",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1542,7 +1542,7 @@ fn highest_set_bit() {
         "HighestSetBit",
         &[x],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1571,7 +1571,7 @@ fn ror() {
         "ROR",
         &[x, shift],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1590,7 +1590,7 @@ fn ror() {
         "ROR",
         &[x, shift],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1609,7 +1609,7 @@ fn ror() {
         "ROR",
         &[x, shift],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1638,7 +1638,7 @@ fn extsv() {
         "extsv",
         &[m, v],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1656,7 +1656,7 @@ fn extsv() {
         "extsv",
         &[m, v],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1674,7 +1674,7 @@ fn extsv() {
         "extsv",
         &[m, v],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1693,7 +1693,7 @@ fn extsv() {
         "extsv",
         &[m, v],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
@@ -1716,7 +1716,7 @@ fn zext_ones() {
         "zext_ones",
         &[n, m],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
@@ -1729,7 +1729,7 @@ fn zext_ones() {
         "zext_ones",
         &[n, m],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1748,7 +1748,7 @@ fn zext_ones() {
         "zext_ones",
         &[n, m],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1767,7 +1767,7 @@ fn zext_ones() {
         "zext_ones",
         &[n, m],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -1815,7 +1815,7 @@ fn decodebitmasks() {
     //                 length: 64,
     //             },
     //         ],
-    //         &mut register_file,
+    //         &register_file,
     //     ),
     //     Value::Tuple(alloc::vec![
     //         Value::UnsignedInteger {
@@ -1840,7 +1840,7 @@ fn decodebitmasks() {
         "DecodeBitMasks",
         &[immn, imms, immr, immediate, m],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
 
@@ -1883,7 +1883,7 @@ fn replicate_bits() {
                 "replicate_bits_borealis_internal",
                 &[value, count],
                 &mut emitter,
-                &mut register_file,
+                &register_file,
             )
             .unwrap()
             .kind()
@@ -1903,7 +1903,7 @@ fn replicate_bits() {
                 "replicate_bits_borealis_internal",
                 &[value, count],
                 &mut emitter,
-                &mut register_file,
+                &register_file,
             )
             .unwrap()
             .kind()
@@ -1923,7 +1923,7 @@ fn replicate_bits() {
                 "replicate_bits_borealis_internal",
                 &[value, count],
                 &mut emitter,
-                &mut register_file,
+                &register_file,
             )
             .unwrap()
             .kind()
@@ -1948,7 +1948,7 @@ fn rev_d00dfeed() {
         "execute_aarch64_instrs_integer_arithmetic_rev",
         &[_32.clone(), _3.clone(), _32, _3],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -1959,7 +1959,7 @@ fn rev_d00dfeed() {
     register_file.write("SEE", -1i64);
     register_file.write("R3", 0xedfe0dd0u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
     assert_eq!(0xd00dfeed, register_file.read::<u64, _>("R3"));
 }
 
@@ -1984,7 +1984,7 @@ fn place_slice() {
         "place_slice_signed",
         &[m, xs, i, l, shift],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2013,7 +2013,7 @@ fn udiv() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2028,7 +2028,7 @@ fn udiv() {
     register_file.write("R1", y);
     register_file.write("R19", x);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(0x7fffffc0045, register_file.read::<u64, _>("R19"));
 }
@@ -2100,7 +2100,7 @@ fn floor() {
         register_file.write("R0", n);
         register_file.write("R1", d);
 
-        translation.execute(&mut register_file);
+        translation.execute(&register_file);
 
         register_file.read::<i64, _>("R0")
     }
@@ -2137,7 +2137,7 @@ fn ceil() {
         register_file.write("R0", n);
         register_file.write("R1", d);
 
-        translation.execute(&mut register_file);
+        translation.execute(&register_file);
 
         register_file.read::<i64, _>("R0")
     }
@@ -2163,7 +2163,7 @@ fn msr() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2173,7 +2173,7 @@ fn msr() {
 
     register_file.write("SEE", -1i64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
     // todo: test more here
 }
 
@@ -2195,7 +2195,7 @@ fn stp() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
     //__DecodeA64_LoadStore
     // decode_stp_gen_aarch64_instrs_memory_pair_general_pre_idx
@@ -2213,7 +2213,7 @@ fn stp() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(*dst, (0xFEED, 0xDEAD));
 }
@@ -2238,7 +2238,7 @@ fn ldrsw() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     // DEBUG [kernel::dbt::translate] translating "__DecodeA64_LoadStore"
@@ -2275,7 +2275,7 @@ fn ldrsw() {
 
     register_file.write("SP_EL3", (((&*src) as *const u32) as u64) - 44);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0xffff_ffff_8001_0000);
 }
@@ -2297,7 +2297,7 @@ fn get_num_event_counters_accessible() {
         "AArch64_GetNumEventCountersAccessible",
         &[],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     emitter.write_register(model.reg_offset("R0"), result);
@@ -2307,7 +2307,7 @@ fn get_num_event_counters_accessible() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 31);
 }
@@ -2332,7 +2332,7 @@ fn sub_pc() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2342,7 +2342,7 @@ fn sub_pc() {
 
     register_file.write::<u64, _>("SP_EL3", 0xdeadbe90);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("SP_EL3"), 0xdeadbe80);
 }
@@ -2367,7 +2367,7 @@ fn lsrv() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2378,7 +2378,7 @@ fn lsrv() {
     register_file.write("R0", 0x3cu64);
     register_file.write("R1", 0x3u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0x0);
 }
@@ -2403,7 +2403,7 @@ fn mem_load_immediate() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2416,7 +2416,7 @@ fn mem_load_immediate() {
     register_file.write("_PC", (&mut *src) as *mut u64 as u64 - 0xdc);
     register_file.write("R0", 0x0u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0xBEE5BEE5);
 }
@@ -2441,7 +2441,7 @@ fn eret() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2459,7 +2459,7 @@ fn eret() {
     // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
     // log::info!("{translation:?}");
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("_PC"), 0x8000_0020);
 }
@@ -2484,7 +2484,7 @@ fn clz() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2495,7 +2495,7 @@ fn clz() {
 
     register_file.write("R9", 0x1u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R9"), 63);
 }
@@ -2516,7 +2516,7 @@ fn highest_set_bit_const() {
         "HighestSetBit",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2534,7 +2534,7 @@ fn highest_set_bit_const() {
         "HighestSetBit",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2552,7 +2552,7 @@ fn highest_set_bit_const() {
         "HighestSetBit",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2570,7 +2570,7 @@ fn highest_set_bit_const() {
         "HighestSetBit",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2591,7 +2591,7 @@ fn highest_set_bit_const() {
         "HighestSetBit",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2619,7 +2619,7 @@ fn count_leading_zero_bits_const() {
         "CountLeadingZeroBits",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2637,7 +2637,7 @@ fn count_leading_zero_bits_const() {
         "CountLeadingZeroBits",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2655,7 +2655,7 @@ fn count_leading_zero_bits_const() {
         "CountLeadingZeroBits",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2673,7 +2673,7 @@ fn count_leading_zero_bits_const() {
         "CountLeadingZeroBits",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2694,7 +2694,7 @@ fn count_leading_zero_bits_const() {
         "CountLeadingZeroBits",
         &[bv],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     assert_eq!(
@@ -2722,7 +2722,7 @@ fn highest_set_bit_dynamic() {
         "HighestSetBit",
         &[r0],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     )
     .unwrap();
     emitter.write_register(model.reg_offset("R0"), n);
@@ -2735,7 +2735,7 @@ fn highest_set_bit_dynamic() {
 
     register_file.write::<u64, _>("R0", 0x1);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
     assert_eq!(register_file.read::<u64, _>("R0"), 0);
 }
 
@@ -2759,7 +2759,7 @@ fn msr_daifclr() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2769,7 +2769,7 @@ fn msr_daifclr() {
 
     register_file.write("SEE", -1i64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
     // todo: test more here
 }
 
@@ -2788,7 +2788,7 @@ fn current_security_state_is_const() {
         "CurrentSecurityState",
         &[],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     assert_eq!(
@@ -2821,7 +2821,7 @@ fn sys_movzx_investigation() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2836,7 +2836,7 @@ fn sys_movzx_investigation() {
     // memory not set up for tests
     //         panicked at kernel/src/guest/mod.rs:51:18:
     // null pointer dereference occurred
-    //   translation.execute(&mut register_file);
+    //   translation.execute(&register_file);
 
     //   assert_eq!(*dst, 0x0);
 }
@@ -2860,7 +2860,7 @@ fn ttbr1_el1_write() {
         "TTBR1_EL1_write",
         &[val],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2870,7 +2870,7 @@ fn ttbr1_el1_write() {
 
     register_file.write::<u64, _>("R0", 0xF0F0_0000_F0F0_0000);
     register_file.write::<u64, _>("_TTBR1_EL1_bits", 0x0);
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(
         register_file.read::<u64, _>("_TTBR1_EL1_bits"),
@@ -2912,7 +2912,7 @@ fn aarch64_sysregwrite() {
         "TTBR1_EL1_SysRegWrite_949dc27ace2a7dbe",
         &[el, op0, op1, crn, op2, crm, t],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2923,7 +2923,7 @@ fn aarch64_sysregwrite() {
     register_file.write::<u64, _>("R1", 0x8224e000);
     register_file.write::<u64, _>("_TTBR1_EL1_bits", 0x0);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("_TTBR1_EL1_bits"), 0x8224e000);
 }
@@ -2948,7 +2948,7 @@ fn msr_ttbr() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -2959,7 +2959,7 @@ fn msr_ttbr() {
     register_file.write::<u64, _>("R1", 0x8224e000);
     register_file.write::<u64, _>("_TTBR1_EL1_bits", 0x0);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("_TTBR1_EL1_bits"), 0x8224e000);
 }
@@ -2986,7 +2986,7 @@ fn branch_link_pc_flag() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3015,7 +3015,7 @@ fn mrs_mpidr_el1() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3023,7 +3023,7 @@ fn mrs_mpidr_el1() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R5"), 0x80000000);
 }
@@ -3048,7 +3048,7 @@ fn mov_300000() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3056,7 +3056,7 @@ fn mov_300000() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R4"), 0x300000);
 }
@@ -3081,7 +3081,7 @@ fn mrs_ctr_el0() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3089,7 +3089,7 @@ fn mrs_ctr_el0() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R3"), 0x4_8444_8004);
 }
@@ -3119,7 +3119,7 @@ fn mrs_id_aa64dfr0_el1() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3127,7 +3127,7 @@ fn mrs_id_aa64dfr0_el1() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R1"), 0x112101f5e1e1e91b);
 }
@@ -3171,7 +3171,7 @@ fn mrs_id_aa64dfr0_el1() {
 //         "__DecodeA64",
 //         &[pc, opcode],
 //         &mut emitter,
-//         &mut register_file,
+//         &register_file,
 //     );
 
 //     emitter.leave();
@@ -3183,7 +3183,7 @@ fn mrs_id_aa64dfr0_el1() {
 //         let x1 = register_file_ptr.add(model.reg_offset("R1") as usize) as
 // *mut u64;
 
-//         translation.execute(&mut register_file);
+//         translation.execute(&register_file);
 
 //         assert_eq!(*x1, 0x1311211130111112);
 //     }
@@ -3208,7 +3208,7 @@ fn ldaxr() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3236,7 +3236,7 @@ fn slow_msr() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3264,7 +3264,7 @@ fn slow_msr_2() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3293,7 +3293,7 @@ fn csinc() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3303,7 +3303,7 @@ fn csinc() {
 
     register_file.write("PSTATE_Z", 0x1u8);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R3"), 0x1);
 }
@@ -3328,7 +3328,7 @@ fn ldrh() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3345,7 +3345,7 @@ fn ldrh() {
         ((&*src) as *const u32) as u64 - (register_file.read::<u64, _>("R3") << 1),
     );
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R3"), 0x0000_DEAD);
 }
@@ -3370,7 +3370,7 @@ fn csneg() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3381,7 +3381,7 @@ fn csneg() {
     register_file.write::<u64, _>("R3", 0x9);
     register_file.write("PSTATE_Z", 0u8);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R3"), 0xfffffff7);
 }
@@ -3404,7 +3404,7 @@ fn ldp() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3418,7 +3418,7 @@ fn ldp() {
     register_file.write("R0", ((&*src) as *const (u64, u64)) as u64);
     register_file.write("R21", 0xAAAA_AAAA_AAAA_AAAAu64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(
         (
@@ -3449,7 +3449,7 @@ fn mem_load_32_bit() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3461,7 +3461,7 @@ fn mem_load_32_bit() {
 
     register_file.write::<u64, _>("R0", ((&mut *src) as *mut u32) as u64);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0xF1F0F1F0);
 }
@@ -3486,7 +3486,7 @@ fn ccmp() {
         "__DecodeA64",
         &[pc, opcode],
         &mut emitter,
-        &mut register_file,
+        &register_file,
     );
 
     emitter.leave();
@@ -3500,7 +3500,7 @@ fn ccmp() {
     register_file.write::<u8, _>("PSTATE_C", 0);
     register_file.write::<u8, _>("PSTATE_V", 0);
 
-    translation.execute(&mut register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u8, _>("PSTATE_N"), 0);
     assert_eq!(register_file.read::<u8, _>("PSTATE_Z"), 0);

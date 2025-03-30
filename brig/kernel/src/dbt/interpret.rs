@@ -32,7 +32,7 @@ pub fn interpret(
     model: &Model,
     function_name: &str,
     arguments: &[Value],
-    register_file: &mut RegisterFile,
+    register_file: &RegisterFile,
 ) -> Option<Value> {
     log::debug!("interpreting {function_name}");
     let function_name = InternedString::from(function_name);
@@ -65,7 +65,7 @@ struct Interpreter<'f, 'r> {
     locals: HashMap<InternedString, Value>,
     // value of previously evaluated statements
     statement_values: HashMap<Ref<Statement>, Value>,
-    register_file: &'r mut RegisterFile,
+    register_file: &'r RegisterFile,
     // nzcv
     flags: u8,
 }
@@ -74,7 +74,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
     fn new(
         model: &'f Model,
         function_name: InternedString,
-        register_file: &'r mut RegisterFile,
+        register_file: &'r RegisterFile,
     ) -> Self {
         Self {
             model,
