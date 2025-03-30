@@ -3,6 +3,7 @@
 *.graph
 *.dot
 *.svg
+*.log
 /aarch64
 /ir
 /borealis/_sbuild

@@ -1,11 +1,14 @@
 use {
-    crate::dbt::{bit_extract, bit_insert},
+    crate::dbt::{
+        bit_extract, bit_insert,
+        register_file::{RegisterFile, RegisterValue},
+    },
     alloc::vec::Vec,
     common::{
         arena::Ref,
+        hashmap::HashMap,
         intern::InternedString,
         mask::mask,
-        hashmap::HashMap,
         rudder::{
             Model,
             block::Block,
@@ -21,7 +24,7 @@ use {
         borrow::Borrow,
         cmp::{Ordering, max},
         ops::{Add, BitAnd, BitOr, Div, Mul, Sub},
-        panic,
+        panic, usize,
     },
 };
 
@@ -29,7 +32,7 @@ pub fn interpret(
     model: &Model,
     function_name: &str,
     arguments: &[Value],
-    register_file: *mut u8,
+    register_file: &mut RegisterFile,
 ) -> Option<Value> {
     log::debug!("interpreting {function_name}");
     let function_name = InternedString::from(function_name);
@@ -55,20 +58,24 @@ pub fn interpret(
     }
 }
 
-struct Interpreter<'f> {
+struct Interpreter<'f, 'r> {
     model: &'f Model,
     function_name: InternedString,
     // local variables
     locals: HashMap<InternedString, Value>,
     // value of previously evaluated statements
     statement_values: HashMap<Ref<Statement>, Value>,
-    register_file: *mut u8,
+    register_file: &'r mut RegisterFile,
     // nzcv
     flags: u8,
 }
 
-impl<'f> Interpreter<'f> {
-    fn new(model: &'f Model, function_name: InternedString, register_file: *mut u8) -> Self {
+impl<'f, 'r> Interpreter<'f, 'r> {
+    fn new(
+        model: &'f Model,
+        function_name: InternedString,
+        register_file: &'r mut RegisterFile,
+    ) -> Self {
         Self {
             model,
             function_name,
@@ -129,13 +136,15 @@ impl<'f> Interpreter<'f> {
                         t => todo!("{t}"),
                     };
 
-                    let offset = self.resolve_u64(offset);
+                    let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
                     let value = match width {
-                        1..=8 => self.read_reg::<u8>(offset) as u64,
-                        9..=16 => self.read_reg::<u16>(offset) as u64,
-                        17..=32 => self.read_reg::<u32>(offset) as u64,
-                        33..=64 => self.read_reg::<u64>(offset),
-                        65..=128 => u64::try_from(self.read_reg::<u128>(offset)).unwrap(),
+                        1..=8 => self.register_file.read_raw::<u8>(offset) as u64,
+                        9..=16 => self.register_file.read_raw::<u16>(offset) as u64,
+                        17..=32 => self.register_file.read_raw::<u32>(offset) as u64,
+                        33..=64 => self.register_file.read_raw::<u64>(offset),
+                        65..=128 => {
+                            u64::try_from(self.register_file.read_raw::<u128>(offset)).unwrap()
+                        }
 
                         w => {
                             log::trace!(
@@ -588,16 +597,22 @@ impl<'f> Interpreter<'f> {
                         t => todo!("{t:?}"),
                     };
 
-                    let offset = self.resolve_u64(offset);
+                    let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
 
                     match width {
-                        1..=8 => self.write_reg(offset, u16::try_from(value).unwrap()),
-                        9..=16 => self.write_reg(offset, u16::try_from(value).unwrap()),
-                        17..=32 => self.write_reg(offset, u32::try_from(value).unwrap()),
-                        33..=64 => self.write_reg(offset, value),
+                        1..=8 => self
+                            .register_file
+                            .write_raw(offset, u8::try_from(value).unwrap()),
+                        9..=16 => self
+                            .register_file
+                            .write_raw(offset, u16::try_from(value).unwrap()),
+                        17..=32 => self
+                            .register_file
+                            .write_raw(offset, u32::try_from(value).unwrap()),
+                        33..=64 => self.register_file.write_raw(offset, value),
                         65..=128 => {
-                            self.write_reg(offset, value);
-                            self.write_reg(offset + 8, 0u64); // todo: hack
+                            self.register_file.write_raw(offset, value);
+                            self.register_file.write_raw(offset + 8, 0u64); // todo: hack
                         }
                         w => {
                             log::trace!(
@@ -610,8 +625,8 @@ impl<'f> Interpreter<'f> {
                 }
                 Statement::WriteMemory { .. } => todo!(),
                 Statement::WritePc { value } => {
-                    self.write_reg(
-                        self.model.reg_offset(InternedString::from_static("_PC")) as u64,
+                    self.register_file.write_raw(
+                        self.model.reg_offset(InternedString::from_static("_PC")) as usize,
                         self.resolve_u64(value),
                     );
                     None
@@ -666,19 +681,6 @@ impl<'f> Interpreter<'f> {
         }
 
         unreachable!("block must end in a panic, jump, return, or branch")
-    }
-
-    fn read_reg<T>(&self, offset: u64) -> T {
-        unsafe {
-            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T).read_unaligned()
-        }
-    }
-
-    fn write_reg<T>(&self, offset: u64, value: T) {
-        unsafe {
-            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T)
-                .write_unaligned(value)
-        }
     }
 }
 

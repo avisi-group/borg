@@ -365,6 +365,7 @@ dependencies = [
  "linkme",
  "log",
  "num-rational",
+ "paste",
  "phf",
  "plugins_api",
  "postcard",

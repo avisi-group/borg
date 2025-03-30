@@ -12,11 +12,11 @@ use {
         guest::memory::AddressSpaceRegionKind,
         qemu_exit,
     },
-    alloc::{alloc::alloc_zeroed, vec::Vec},
+    alloc::alloc::alloc_zeroed,
     bitset_core::BitSet,
     common::intern::InternedString,
-    core::{alloc::Layout, arch::asm},
-    iced_x86::{Code, Instruction, Register},
+    core::alloc::Layout,
+    iced_x86::{Code, Register},
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{
@@ -182,7 +182,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         .downcast_ref::<ModelDevice>()
         .unwrap();
 
-        let mmu_enabled = *device.get_register_mut::<u64>("SCTLR_EL1_bits") & 1 == 1;
+        let mmu_enabled = device.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
 
         // correct the address as it was masked off in emitter.rs:read/write-memory
         let unmasked_address =

@@ -60,3 +60,4 @@ postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
 disarm64 = "0.1.24"
 aarch64-paging = "0.8.1"
 derive-where = "1.2.7"
+paste = "1.0.15"

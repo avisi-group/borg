@@ -2,6 +2,7 @@ use {
     crate::dbt::{
         Alloc,
         emitter::{self, Emitter, Type},
+        register_file::RegisterFile,
         trampoline::MAX_STACK_SIZE,
         x86::{
             emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
@@ -20,6 +21,7 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
+        cell::RefCell,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
@@ -78,7 +80,7 @@ pub fn translate<A: Alloc>(
     function: &str,
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
-    register_file_ptr: *mut u8,
+    register_file: &RegisterFile,
 ) -> Option<X86NodeRef<A>> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
@@ -90,7 +92,7 @@ pub fn translate<A: Alloc>(
         arguments,
         emitter,
         current_stack_offset,
-        register_file_ptr,
+        register_file,
     )
     .translate()
 }
@@ -154,7 +156,7 @@ impl<A: Alloc> ReturnValue<A> {
     }
 }
 
-struct FunctionTranslator<'model, 'emitter, 'context, A: Alloc> {
+struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
     allocator: A,
 
     /// The model we are translating guest code for
@@ -187,10 +189,10 @@ struct FunctionTranslator<'model, 'emitter, 'context, A: Alloc> {
     emitter: &'emitter mut X86Emitter<'context, A>,
 
     /// Pointer to the register file used for cached register reads
-    register_file_ptr: *mut u8,
+    register_file: &'registers RegisterFile,
 }
 
-impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
+impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     fn read_return_value(&mut self) -> Option<X86NodeRef<A>> {
         match self.function.return_type() {
             Some(rudder::types::Type::Tuple(_)) => {
@@ -314,7 +316,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
         arguments: &[X86NodeRef<A>],
         emitter: &'e mut X86Emitter<'c, A>,
         current_stack_offset: Rc<AtomicUsize, A>,
-        register_file_ptr: *mut u8,
+        register_file: &'r RegisterFile,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
         assert!(!FN_DENYLIST.contains(&function));
@@ -338,7 +340,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
             return_value: ReturnValue::new(emitter, function.return_type()),
             current_stack_offset,
             emitter,
-            register_file_ptr,
+            register_file,
         };
 
         // set up symbols for parameters, and write arguments into them
@@ -715,16 +717,18 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     RegisterCacheType::Constant
                     | RegisterCacheType::Read
                     | RegisterCacheType::ReadWrite => {
-                        let value = unsafe {
-                            let ptr = self.register_file_ptr.add(usize::try_from(offset).unwrap());
-
-                            match typ.width() {
-                                1..=8 => u64::from((ptr as *const u8).read()),
-                                9..=16 => u64::from((ptr as *const u16).read()),
-                                17..=32 => u64::from((ptr as *const u32).read()),
-                                33..=64 => u64::from((ptr as *const u64).read()),
-                                w => todo!("width {w}"),
+                        let value = match typ.width() {
+                            1..=8 => u64::from(self.register_file.read_raw::<u8>(offset as usize)),
+                            9..=16 => {
+                                u64::from(self.register_file.read_raw::<u16>(offset as usize))
                             }
+                            17..=32 => {
+                                u64::from(self.register_file.read_raw::<u32>(offset as usize))
+                            }
+                            33..=64 => {
+                                u64::from(self.register_file.read_raw::<u64>(offset as usize))
+                            }
+                            w => todo!("width {w}"),
                         };
                         log::trace!("read from cacheable {name:?}: {value:x}");
                         StatementResult::Data(Some(self.emitter.constant(value, typ)))
@@ -745,6 +749,8 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     .get_register_by_offset(offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
 
+                assert_eq!(offset, self.model.registers().get(&name).unwrap().offset);
+
                 let value = statement_values.get(*value).unwrap().clone();
 
                 // if cacheable and writing a constant, update the register file during
@@ -756,18 +762,15 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     RegisterCacheType::ReadWrite => {
                         log::trace!("attempting write to cacheable {name:?}: {value:?}");
                         if let NodeKind::Constant { value, width } = value.kind() {
-                            unsafe {
-                                let ptr =
-                                    self.register_file_ptr.add(usize::try_from(offset).unwrap());
-
-                                match width {
-                                    1..=8 => (ptr as *mut u8).write(*value as u8),
-                                    9..=16 => (ptr as *mut u16).write(*value as u16),
-                                    17..=32 => (ptr as *mut u32).write(*value as u32),
-                                    33..=64 => (ptr as *mut u64).write(*value),
-                                    w => todo!("width {w}"),
+                            match width {
+                                1..=8 => self.register_file.write::<u8, _>(name, (*value) as u8),
+                                9..=16 => self.register_file.write::<u16, _>(name, (*value) as u16),
+                                17..=32 => {
+                                    self.register_file.write::<u32, _>(name, (*value) as u32)
                                 }
-                            };
+                                33..=64 => self.register_file.write::<u64, _>(name, *value),
+                                w => todo!("width {w}"),
+                            }
 
                             log::trace!("wrote to cacheable {name:?}: {value:x}");
 
@@ -939,7 +942,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                                                             * so
                                                             * called functions' stack variables
                                                             * don't corrupt this function's */
-                        self.register_file_ptr,
+                        self.register_file,
                     )
                     .translate(),
                 )

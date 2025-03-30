@@ -1,10 +1,9 @@
 use {
-    crate::{arch::x86::memory::VirtualMemoryArea, dbt::interpret::interpret},
+    crate::{arch::x86::memory::VirtualMemoryArea, dbt::register_file::RegisterFile},
     alloc::{string::String, vec::Vec},
-    common::{mask::mask, rudder::Model},
+    common::mask::mask,
     core::{
         alloc::Allocator,
-        borrow::Borrow,
         fmt::{self, Debug},
     },
     iced_x86::{Formatter, Instruction},
@@ -14,6 +13,7 @@ use {
 pub mod emitter;
 pub mod interpret;
 pub mod models;
+pub mod register_file;
 mod tests;
 mod trampoline;
 pub mod translate;
@@ -39,10 +39,11 @@ impl Translation {
         Self { code }
     }
 
-    pub fn execute(&self, register_file: *mut u8) {
+    pub fn execute(&self, register_file: &RegisterFile) {
         let code_ptr = self.code.as_ptr();
+        let register_file_ptr = register_file.as_mut_ptr();
 
-        unsafe { trampoline::trampoline(code_ptr, register_file) };
+        unsafe { trampoline::trampoline(code_ptr, register_file_ptr) };
     }
 }
 
@@ -109,29 +110,4 @@ fn bit_insert(target: u64, source: u64, start: u64, length: u64) -> u64 {
 
 fn bit_extract(value: u64, start: u64, length: u64) -> u64 {
     (value >> start) & mask(u32::try_from(length).unwrap())
-}
-
-fn init_register_file<M: Borrow<Model>>(model: M) -> Vec<u8> {
-    let model = model.borrow();
-    let mut register_file = alloc::vec![0u8; model.register_file_size() as usize];
-    let register_file_ptr = register_file.as_mut_ptr();
-
-    interpret(model, "borealis_register_init", &[], register_file_ptr);
-    configure_features(model, register_file_ptr);
-    interpret(model, "__InitSystem", &[], register_file_ptr);
-
-    register_file
-}
-
-fn configure_features(model: &Model, register_file: *mut u8) {
-    let disabled = [
-        "FEAT_LSE2_IMPLEMENTED",
-        "FEAT_TME_IMPLEMENTED",
-        "FEAT_BTI_IMPLEMENTED",
-    ];
-
-    disabled.iter().for_each(|name| {
-        let offset = model.reg_offset(*name);
-        unsafe { register_file.add(offset as usize).write(0u8) };
-    });
 }

@@ -7,6 +7,7 @@
 #![feature(new_zeroed_alloc)] // bump allocator
 #![feature(btreemap_alloc)]
 #![feature(iter_collect_into)]
+#![feature(unsafe_cell_access)]
 #![allow(static_mut_refs)] // todo: fix me
 
 extern crate alloc;
