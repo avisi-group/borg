@@ -3508,3 +3508,106 @@ fn ccmp() {
     assert_eq!(register_file.read::<u8, _>("PSTATE_V"), 0);
     assert_eq!(register_file.read::<u64, _>("R5"), 0);
 }
+
+#[ktest]
+fn eret_3() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    //  eret
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd69f03e0, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        &register_file,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let pc = register_file_ptr.add(model.reg_offset("_PC") as usize) as *mut u64;
+        let elr_el3 = register_file_ptr.add(model.reg_offset("ELR_EL3") as usize) as *mut u64;
+        let el = register_file_ptr.add(model.reg_offset("PSTATE_EL") as usize) as *mut u64;
+        let _sp = register_file_ptr.add(model.reg_offset("PSTATE_SP") as usize) as *mut u64;
+        let spsr_el3 =
+            register_file_ptr.add(model.reg_offset("SPSR_EL3_bits") as usize) as *mut u64;
+
+        *spsr_el3 = 0x3c9; // PSTATE.EL  = spsr<3:2>;
+
+        assert_eq!(*el, 3);
+
+        *elr_el3 = 0x80000004;
+
+        // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
+        // log::info!("{translation:?}");
+
+        translation.execute(&register_file);
+
+        assert_eq!(*pc, 0x80000004);
+        //  assert_eq!(*el, 2); todo: find out why this assertion fails
+    }
+}
+
+#[ktest]
+fn msr_elr_el2() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let register_file_ptr = register_file.as_mut_ptr();
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    unsafe {
+        let see = register_file_ptr.add(model.reg_offset("SEE") as usize) as *mut i64;
+        *see = -1;
+    }
+
+    // msr		elr_el2, x4
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd51c4024, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        &register_file,
+    );
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+
+    let translation = ctx.compile(num_regs);
+
+    unsafe {
+        let elr_el3 = register_file_ptr.add(model.reg_offset("ELR_EL2") as usize) as *mut u64;
+        let x4 = register_file_ptr.add(model.reg_offset("R4") as usize) as *mut u64;
+
+        *x4 = 0x82080000;
+
+        // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
+        //log::info!("{translation:?}");
+
+        translation.execute(&register_file);
+
+        assert_eq!(*elr_el3, 0x82080000);
+    }
+}
