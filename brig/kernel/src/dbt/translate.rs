@@ -614,15 +614,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     self.function.name()
                 );
 
-                if variables.get(&symbol.name()).is_none() {
+                let variable = variables.entry(symbol.name()).or_insert_with(|| {
                     log::trace!("writing var {} for the first time", symbol.name());
-                    variables.insert(
-                        symbol.name(),
-                        LocalVariable::Virtual {
-                            symbol: self.emitter.ctx_mut().create_symbol(),
-                        },
-                    );
-                }
+                    LocalVariable::Virtual {
+                        symbol: self.emitter.ctx_mut().create_symbol(),
+                    }
+                });
 
                 if is_dynamic
                 // terrible hack to workaround ldp     x0, x21, [x0] bug, where x0 gets written to halfway through, thus corrupting the second read of x0 to write *(x0 + 8) to x21
@@ -632,7 +629,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
-                    match variables.get(&symbol.name()).unwrap() {
+                    match variable {
                         LocalVariable::Virtual { .. } => {
                             log::trace!(
                                 "promoting {:?} from virtual to stack in block {:#x} in {:?}",
@@ -660,16 +657,13 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                     offset
                                 };
 
-                            variables.insert(
-                                symbol.name(),
-                                LocalVariable::Stack {
-                                    typ: emit_rudder_type(&symbol.typ()),
-                                    stack_offset,
-                                },
-                            );
+                            *variable = LocalVariable::Stack {
+                                typ: emit_rudder_type(&symbol.typ()),
+                                stack_offset,
+                            };
 
+                            // clears operands??? todo: understand this
                             let current_block = self.emitter.get_current_block();
-
                             self.emitter.set_current_block(current_block);
                         }
                         LocalVariable::Stack { stack_offset, .. } => {
@@ -683,7 +677,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         }
                     }
                 }
-                let var = variables.get(&symbol.name()).unwrap().clone();
 
                 let value = statement_values
                     .get(*value)
@@ -695,7 +688,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     })
                     .clone();
 
-                self.write_variable(var, value);
+                self.write_variable(variable.clone(), value);
 
                 StatementResult::Data(None)
             }
