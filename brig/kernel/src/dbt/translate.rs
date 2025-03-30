@@ -21,7 +21,6 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
-        cell::RefCell,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
@@ -949,11 +948,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
-                let x86 = self
-                    .emitter
-                    .ctx_mut()
-                    .arena_mut()
-                    .insert(X86Block::new_in(self.allocator.clone()));
+                let x86 = self.emitter.ctx_mut().create_block();
 
                 self.static_blocks
                     .entry(*target)
@@ -975,11 +970,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 return match condition.kind() {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
-                            let x86 = self
-                                .emitter
-                                .ctx_mut()
-                                .arena_mut()
-                                .insert(X86Block::new_in(self.allocator.clone()));
+                            let x86 = self.emitter.ctx_mut().create_block();
 
                             self.static_blocks
                                 .entry(*false_target)
@@ -993,11 +984,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                 variables.clone(),
                             ))
                         } else {
-                            let x86 = self
-                                .emitter
-                                .ctx_mut()
-                                .arena_mut()
-                                .insert(X86Block::new_in(self.allocator.clone()));
+                            let x86 = self.emitter.ctx_mut().create_block();
 
                             self.static_blocks
                                 .entry(*true_target)
@@ -1016,28 +1003,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         let true_x86 = (*self
                             .dynamic_blocks
                             .entry((*true_target, variables.clone()))
-                            .or_insert_with(|| {
-                                (
-                                    self.emitter
-                                        .ctx_mut()
-                                        .arena_mut()
-                                        .insert(X86Block::new_in(self.allocator.clone())),
-                                    false,
-                                )
-                            }))
+                            .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
                         let false_x86 = (*self
                             .dynamic_blocks
                             .entry((*false_target, variables.clone()))
-                            .or_insert_with(|| {
-                                (
-                                    self.emitter
-                                        .ctx_mut()
-                                        .arena_mut()
-                                        .insert(X86Block::new_in(self.allocator.clone())),
-                                    false,
-                                )
-                            }))
+                            .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
                         self.emitter.branch(condition, true_x86, false_x86);
                         StatementResult::ControlFlow(ControlFlow::Branch(
