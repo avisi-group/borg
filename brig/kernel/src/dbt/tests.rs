@@ -10,6 +10,7 @@ use {
             X86TranslationContext,
             emitter::{
                 BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind, X86Emitter,
+                X86Node,
             },
         },
     },
@@ -3653,6 +3654,8 @@ fn illegal_exception_return() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
+    log::warn!("{translation:?}");
+
     assert_eq!(register_file.read::<u64, _>("R0"), 0x0);
     register_file.write("SCR_EL3_bits", 0b1);
 
@@ -3693,4 +3696,86 @@ fn el_from_spsr() {
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0x1);
+}
+
+#[ktest]
+fn el_state_using_aarch32k() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let el = emitter.constant(1, Type::Unsigned(2));
+
+    let secure = emitter.node(X86Node {
+        typ: Type::Unsigned(1),
+        kind: NodeKind::BinaryOperation(BinaryOperationKind::CompareEqual(
+            emitter.node(X86Node {
+                typ: Type::Unsigned(1),
+                kind: NodeKind::Cast {
+                    value: emitter.node(X86Node {
+                        typ: Type::Unsigned(1),
+                        kind: NodeKind::BinaryOperation(BinaryOperationKind::And(
+                            emitter.node(X86Node {
+                                typ: Type::Unsigned(1),
+                                kind: NodeKind::Cast {
+                                    value: emitter.node(X86Node {
+                                        typ: Type::Unsigned(64),
+                                        kind: NodeKind::Shift {
+                                            value: emitter.node(X86Node {
+                                                typ: Type::Unsigned(64),
+                                                kind: NodeKind::GuestRegister { offset: 7696 },
+                                            }),
+                                            amount: emitter.node(X86Node {
+                                                typ: Type::Signed(64),
+                                                kind: NodeKind::Constant {
+                                                    value: 0,
+                                                    width: 64,
+                                                },
+                                            }),
+                                            kind: ShiftOperationKind::LogicalShiftRight,
+                                        },
+                                    }),
+                                    kind: CastOperationKind::Truncate,
+                                },
+                            }),
+                            emitter.node(X86Node {
+                                typ: Type::Unsigned(1),
+                                kind: NodeKind::Constant { value: 1, width: 1 },
+                            }),
+                        )),
+                    }),
+                    kind: CastOperationKind::Truncate,
+                },
+            }),
+            emitter.node(X86Node {
+                typ: Type::Unsigned(1),
+                kind: NodeKind::Constant { value: 0, width: 1 },
+            }),
+        )),
+    });
+    let known_aarch32_tuple = translate(
+        Global,
+        &*model,
+        "ELStateUsingAArch32K",
+        &[el, secure],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    let known = emitter.access_tuple(known_aarch32_tuple.clone(), 0);
+    let aarch32 = emitter.access_tuple(known_aarch32_tuple, 1);
+    emitter.write_register(model.reg_offset("R0"), known);
+    emitter.write_register(model.reg_offset("R1"), aarch32);
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64, _>("R0"), 1);
+    assert_eq!(register_file.read::<u64, _>("R1"), 0);
 }
