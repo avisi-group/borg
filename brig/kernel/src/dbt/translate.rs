@@ -506,28 +506,28 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 &mut variables,
             ) {
                 StatementResult::Data(Some(value)) => {
-                    // log::trace!(
-                    //     "{} {} = {:?}",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    //     value.kind(),
-                    // );
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        value.kind(),
+                    );
                     statement_value_store.insert(*s, value);
                 }
                 StatementResult::Data(None) => {
-                    // log::trace!(
-                    //     "{} {} = ()",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    // );
+                    log::trace!(
+                        "{} {} = ()",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                    );
                 }
                 StatementResult::ControlFlow(block_result) => {
-                    // log::trace!(
-                    //     "{} {} = {:?}",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    //     block_result
-                    // );
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        block_result
+                    );
                     return block_result;
                 }
             }
@@ -550,7 +550,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         arena: &Arena<Statement>,
         variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
     ) -> StatementResult<A> {
-        //        log::debug!("translate stmt: {statement:?}");
+        log::debug!("translate stmt: {statement:?}");
 
         match statement {
             Statement::Constant { typ, value } => {
@@ -608,7 +608,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::WriteVariable { symbol, value } => {
                 log::trace!(
-                    "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}",
+                    "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}, value: {value:#?}",
                     symbol.name(),
                     block.index(),
                     self.function.name()
