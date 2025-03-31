@@ -22,7 +22,7 @@ buddy_system_allocator = "0.11.0"
 #linked_list_allocator = "0.10.5" // only supports single backing chunk
 
 
-spin = "0.9.8"
+spin = "0.10.0"
 byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
 log = { version = "0.4.26", default-features = false, features = ["release_max_level_off", "max_level_off"] }
 elf = { version = "0.7.4", default-features = false }

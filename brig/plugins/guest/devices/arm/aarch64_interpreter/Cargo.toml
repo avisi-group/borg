@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 plugins_rt.workspace = true
 log = "0.4.22"
-spin = "0.9.8"
+spin = "0.10.0"
 
 common = { path = "../../../../../../aarch64/common" }
 u__SetConfig = { path = "../../../../../../aarch64/u__SetConfig"}
