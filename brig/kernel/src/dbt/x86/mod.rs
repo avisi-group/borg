@@ -166,7 +166,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
         log::trace!("encoding all blocks");
 
-        log::trace!("{}", dot::render(self.arena(), self.initial_block()));
+        log::debug!("{}", dot::render(self.arena(), self.initial_block()));
 
         for (i, block) in all_blocks.iter().enumerate() {
             assembler
