@@ -48,7 +48,7 @@ static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
 pub fn optimise(ctx: &mut Model, level: OptLevel) {
     let passes: Vec<FunctionPass> = match level {
         OptLevel::Level3 => vec![
-            BLOCK_INLINER,
+            // BLOCK_INLINER,
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
             //RETURN_PROPAGATION,

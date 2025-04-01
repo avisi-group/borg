@@ -1955,7 +1955,7 @@ fn signextend_64() {
 }
 
 #[derive_where(Debug)]
-pub struct X86NodeRef<A: Alloc>(Rc<X86Node<A>, A>);
+pub struct X86NodeRef<A: Alloc>(pub Rc<X86Node<A>, A>);
 
 impl<A: Alloc> Clone for X86NodeRef<A> {
     fn clone(&self) -> Self {

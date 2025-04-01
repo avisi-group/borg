@@ -3635,8 +3635,6 @@ fn illegal_exception_return() {
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write("SCR_EL3_bits", 0b1);
-
     let spsr = emitter.constant(0x3c9, Type::Unsigned(64));
     let illegal_psr_state = translate(
         Global,
@@ -3654,10 +3652,10 @@ fn illegal_exception_return() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    log::warn!("{translation:?}");
-
     assert_eq!(register_file.read::<u64, _>("R0"), 0x0);
-    register_file.write("SCR_EL3_bits", 0b1);
+    register_file.write("SCR_EL3_bits", 0x5b1);
+    register_file.write("SCTLR_EL2_bits", 0x30c50830);
+    register_file.write("CPTR_EL2_bits", 0x33ff);
 
     translation.execute(&register_file);
 
@@ -3672,7 +3670,7 @@ fn el_from_spsr() {
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let spsr = emitter.constant(0b001111001001, Type::Unsigned(64));
+    let spsr = emitter.constant(0b1111001001, Type::Unsigned(64));
     let valid_target_tuple = translate(
         Global,
         &*model,
@@ -3683,19 +3681,24 @@ fn el_from_spsr() {
     )
     .unwrap();
 
-    let valid = emitter.access_tuple(valid_target_tuple, 0);
+    let valid = emitter.access_tuple(valid_target_tuple.clone(), 0);
+    let target = emitter.access_tuple(valid_target_tuple, 1);
     emitter.write_register(model.reg_offset("R0"), valid);
+    emitter.write_register(model.reg_offset("R1"), target);
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0x0);
-    register_file.write("SCR_EL3_bits", 0b1);
+    register_file.write("SCR_EL3_bits", 0x5b1);
+    register_file.write("SCTLR_EL2_bits", 0x30c50830);
+    register_file.write("CPTR_EL2_bits", 0x33ff);
 
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64, _>("R0"), 0x1);
+    assert_eq!(register_file.read::<u64, _>("R1"), 0x2);
 }
 
 #[ktest]
@@ -3778,4 +3781,70 @@ fn el_state_using_aarch32k() {
 
     assert_eq!(register_file.read::<u64, _>("R0"), 1);
     assert_eq!(register_file.read::<u64, _>("R1"), 0);
+}
+
+#[ktest]
+fn el_state_using_aarch32k_dynamic() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let target = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(2));
+
+    let tuple = translate(
+        Global,
+        &*model,
+        "ELUsingAArch32K",
+        &[target],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    let known = emitter.access_tuple(tuple.clone(), 0);
+    emitter.write_register(model.reg_offset("R1"), known);
+
+    let aarch32 = emitter.access_tuple(tuple, 1);
+    emitter.write_register(model.reg_offset("R2"), aarch32);
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    // EL2 target?
+    register_file.write::<u64, _>("R0", 2);
+
+    translation.execute(&register_file);
+
+    // known
+    assert_eq!(register_file.read::<u64, _>("R1"), 1);
+    // target_el_is_aarch32
+    assert_eq!(register_file.read::<u64, _>("R2"), 0);
+}
+
+#[ktest]
+fn have_aarch64() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let have_aarch64 = translate(
+        Global,
+        &*model,
+        "HaveAArch64",
+        &[],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    assert_eq!(
+        *have_aarch64.kind(),
+        NodeKind::Constant { value: 1, width: 1 }
+    )
 }

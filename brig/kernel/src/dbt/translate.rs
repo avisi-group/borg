@@ -5,7 +5,7 @@ use {
         register_file::RegisterFile,
         trampoline::MAX_STACK_SIZE,
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
+            emitter::{NodeKind, X86Block, X86Emitter, X86Node, X86NodeRef, X86SymbolRef},
             encoder::Instruction,
         },
     },
@@ -21,6 +21,7 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
+        cell::RefCell,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
@@ -455,12 +456,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block0,
                         x86: block0_x86,
-                        variables: lives.clone(),
+                        variables: variables_deep_clone_in(&lives, self.allocator),
                     });
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block1,
                         x86: block1_x86,
-                        variables: lives,
+                        variables: variables_deep_clone_in(&lives, self.allocator),
                     });
                 }
                 ControlFlow::Return => {
@@ -1300,4 +1301,46 @@ impl<A: Alloc> StatementValueStore<A> {
     pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef<A>> {
         self.map.get(&s).cloned()
     }
+}
+
+fn variables_deep_clone_in<A: Alloc>(
+    variables: &BTreeMap<InternedString, LocalVariable<A>, A>,
+    allocator: A,
+) -> BTreeMap<InternedString, LocalVariable<A>, A> {
+    let mut map = BTreeMap::new_in(allocator);
+    variables
+        .iter()
+        .map(|(name, local)| {
+            (
+                *name,
+                match local {
+                    LocalVariable::Virtual { symbol } => {
+                        // doing Al syntax just to ensure we are really doing a
+                        // deep clone not really
+                        // necessary, but sanity checking
+
+                        let borrow: &Option<X86NodeRef<A>> = &*symbol.0.borrow();
+
+                        let inverted: Option<&X86NodeRef<A>> = borrow.as_ref();
+
+                        let cloned: Option<(NodeKind<A>, crate::dbt::emitter::Type)> = inverted
+                            .map(|node_ref_ref| {
+                                (node_ref_ref.kind().clone(), node_ref_ref.typ().clone())
+                            });
+
+                        let node: Option<X86NodeRef<A>> = cloned
+                            .map(|(kind, typ)| X86Node { typ, kind })
+                            .map(|node| X86NodeRef(Rc::new_in(node, allocator)));
+
+                        let symbol = X86SymbolRef(Rc::new_in(RefCell::new(node), allocator));
+
+                        LocalVariable::Virtual { symbol }
+                    }
+                    LocalVariable::Stack { .. } => local.clone(),
+                },
+            )
+        })
+        .collect_into(&mut map);
+
+    map
 }

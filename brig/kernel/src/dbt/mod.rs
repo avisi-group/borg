@@ -26,6 +26,7 @@ pub trait Alloc: Allocator + Clone + Copy + Debug {}
 impl<T: Allocator + Clone + Copy + Debug> Alloc for T {}
 
 pub struct Translation {
+    // should be AlignedAllocator<4096> or ExecutableAllocator
     pub code: Vec<u8>,
 }
 
@@ -47,15 +48,19 @@ impl Translation {
     }
 }
 
-impl Drop for Translation {
-    fn drop(&mut self) {
-        let start = VirtAddr::from_ptr(self.code.as_ptr());
-        VirtualMemoryArea::current().update_flags_range(
-            start..start + self.code.len() as u64,
-            PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_EXECUTE,
-        );
-    }
-}
+/// Disabled until we can validate that `code` is always page-aligned: after the
+/// variable deep clone fix we got isntruction fetch host page faults when
+/// executing cached translations, likely because another translation drop
+/// overlapped?
+// impl Drop for Translation {
+//     fn drop(&mut self) {
+//         let start = VirtAddr::from_ptr(self.code.as_ptr());
+//         VirtualMemoryArea::current().update_flags_range(
+//             start..start + self.code.len() as u64,
+//             PageTableFlags::PRESENT | PageTableFlags::WRITABLE |
+// PageTableFlags::NO_EXECUTE,         );
+//     }
+// }
 
 impl Debug for Translation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
