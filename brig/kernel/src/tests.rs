@@ -42,11 +42,10 @@ pub fn run(config: TestConfig) {
 
             tests
         }
-        TestConfig::All => {
-            log::info!("running all {} tests", TESTS.len());
-            TESTS.iter().collect()
-        }
+        TestConfig::All => TESTS.iter().collect(),
     };
+
+    log::info!("running {} tests", tests.len());
 
     for (name, test) in tests {
         log::trace!("running {name:?}");

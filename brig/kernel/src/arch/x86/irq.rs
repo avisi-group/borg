@@ -12,11 +12,11 @@ use {
         guest::memory::AddressSpaceRegionKind,
         qemu_exit,
     },
-    alloc::{alloc::alloc_zeroed, vec::Vec},
+    alloc::alloc::alloc_zeroed,
     bitset_core::BitSet,
     common::intern::InternedString,
-    core::{alloc::Layout, arch::asm},
-    iced_x86::{Code, Instruction, Register},
+    core::alloc::Layout,
+    iced_x86::{Code, Register},
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{
@@ -182,7 +182,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         .downcast_ref::<ModelDevice>()
         .unwrap();
 
-        let mmu_enabled = *device.get_register_mut::<u64>("SCTLR_EL1_bits") & 1 == 1;
+        let mmu_enabled = device.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
 
         // correct the address as it was masked off in emitter.rs:read/write-memory
         let unmasked_address =
@@ -242,7 +242,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                             backing_page
                         }
                         AddressSpaceRegionKind::IO(device) => {
-                            log::error!("guest device page fault at rip {:x}", machine_context.rip);
+                            log::debug!("guest device page fault at rip {:x}", machine_context.rip);
 
                             let offset = guest_physical - rgn.base();
 
@@ -254,7 +254,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                             let faulting_instruction = decoder.decode();
 
                             if write {
-                                log::error!(
+                                log::debug!(
                                     "device write @ {offset:x} with instr {faulting_instruction:?}"
                                 );
 
@@ -294,7 +294,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                     }
                                 };
 
-                                log::error!(
+                                log::debug!(
                                     "writing {bytes:x?} to device @ {offset:x?}, from register {src:?}"
                                 );
 
@@ -330,7 +330,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
                                 device.read(offset, &mut bytes);
 
-                                log::error!("read {bytes:x?} from device, writing to {dest:?}");
+                                log::debug!("read {bytes:x?} from device, writing to {dest:?}");
 
                                 // write bytes to dest
 
@@ -357,7 +357,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
                             machine_context.rip = current_ip + faulting_instruction.len() as u64;
 
-                            log::error!(
+                            log::debug!(
                                 "setting correct return point: current_ip: {current_ip:x}, len: {len:x}, new_rip: {:x}",
                                 machine_context.rip
                             );

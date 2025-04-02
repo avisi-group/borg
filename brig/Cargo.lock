@@ -10,7 +10,7 @@ checksum = "0a99e1041d545949fa732edf65cab7067ce8f05825c4f6fd4020b70dd76a88df"
 dependencies = [
  "bitflags 2.9.0",
  "thiserror",
- "zerocopy 0.8.23",
+ "zerocopy 0.8.24",
 ]
 
 [[package]]
@@ -110,7 +110,7 @@ version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1a0108968a3a2dab95b089c0fc3f1afa7759aa5ebe6f1d86d206d6f7ba726eb"
 dependencies = [
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -155,7 +155,7 @@ dependencies = [
  "postcard",
  "rkyv",
  "serde",
- "spin",
+ "spin 0.10.0",
  "twox-hash",
 ]
 
@@ -365,6 +365,7 @@ dependencies = [
  "linkme",
  "log",
  "num-rational",
+ "paste",
  "phf",
  "plugins_api",
  "postcard",
@@ -372,7 +373,7 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "serde_json",
- "spin",
+ "spin 0.10.0",
  "tar-no-std",
  "thiserror",
  "uart_16550",
@@ -401,7 +402,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
- "spin",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -436,9 +437,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.26"
+version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
+checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "memchr"
@@ -497,9 +498,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.21.1"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d75b0bedcc4fe52caa0e03d9f1151a323e4aa5e2d78ba3580400cd3c9e2bc4bc"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "paste"
@@ -695,9 +696,9 @@ dependencies = [
 
 [[package]]
 name = "rust_decimal"
-version = "1.36.0"
+version = "1.37.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b082d80e3e3cc52b2ed634388d436fe1f4de6af5786cc2de9ba9737527bdf555"
+checksum = "faa7de2ba56ac291bd90c6b9bece784a52ae1411f9506544b3eae36dd2356d50"
 dependencies = [
  "arrayvec",
  "num-traits",
@@ -775,6 +776,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5fe4ccb98d9c292d56fec89a5e07da7fc4cf0dc11e156b41793132775d3e591"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "strum"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -820,9 +830,9 @@ dependencies = [
 
 [[package]]
 name = "tar-no-std"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f3702156d45f3b61411186a2555956d57d94f63049bbfaa3fd4856729f7c14a"
+checksum = "3b86f35512dae48782f49a15538f9af3e7ef3ea8226ee073c88f081958583924"
 dependencies = [
  "bitflags 2.9.0",
  "log",
@@ -917,7 +927,7 @@ dependencies = [
  "enumn",
  "log",
  "thiserror",
- "zerocopy 0.8.23",
+ "zerocopy 0.8.24",
 ]
 
 [[package]]
@@ -988,11 +998,11 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.23"
+version = "0.8.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd97444d05a4328b90e75e503a34bad781f14e28a823ad3557f0750df1ebcbc6"
+checksum = "2586fea28e186957ef732a5f8b3be2da217d65c5969d4b1e17f973ebbe876879"
 dependencies = [
- "zerocopy-derive 0.8.23",
+ "zerocopy-derive 0.8.24",
 ]
 
 [[package]]
@@ -1008,9 +1018,9 @@ dependencies = [
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.23"
+version = "0.8.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6352c01d0edd5db859a63e2605f4ea3183ddbd15e2c4a9e7d32184df75e4f154"
+checksum = "a996a8f63c5c4448cd959ac1bab0aaa3306ccfd060472f85943ee0750f0169be"
 dependencies = [
  "proc-macro2",
  "quote",

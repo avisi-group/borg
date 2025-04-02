@@ -1,5 +1,5 @@
 use {
-    crate::intern::InternedString,
+    crate::{intern::InternedString, mask::mask, rudder::types::Type},
     alloc::vec::Vec,
     core::{
         cmp::Ordering,
@@ -19,6 +19,21 @@ pub enum ConstantValue {
 }
 
 impl ConstantValue {
+    pub fn truncate_to_type(self, typ: &Type) -> Self {
+        match self {
+            ConstantValue::UnsignedInteger(v) => {
+                ConstantValue::UnsignedInteger(v & mask(typ.width_bits()))
+            }
+            ConstantValue::SignedInteger(v) => {
+                todo!() // ConstantValue::SignedInteger(  v & mask(typ.width_bits()))
+            }
+            ConstantValue::FloatingPoint(_) => todo!(),
+            ConstantValue::String(interned_string) => todo!(),
+            ConstantValue::Tuple(constant_values) => todo!(),
+            ConstantValue::Vector(constant_values) => todo!(),
+        }
+    }
+
     pub fn is_zero(&self) -> bool {
         match self {
             ConstantValue::UnsignedInteger(v) => *v == 0,

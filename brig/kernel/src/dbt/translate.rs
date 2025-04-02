@@ -2,9 +2,10 @@ use {
     crate::dbt::{
         Alloc,
         emitter::{self, Emitter, Type},
+        register_file::RegisterFile,
         trampoline::MAX_STACK_SIZE,
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef, X86SymbolRef},
+            emitter::{NodeKind, X86Block, X86Emitter, X86Node, X86NodeRef, X86SymbolRef},
             encoder::Instruction,
         },
     },
@@ -20,6 +21,7 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
+        cell::RefCell,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
@@ -78,7 +80,7 @@ pub fn translate<A: Alloc>(
     function: &str,
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
-    register_file_ptr: *mut u8,
+    register_file: &RegisterFile,
 ) -> Option<X86NodeRef<A>> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
@@ -90,7 +92,7 @@ pub fn translate<A: Alloc>(
         arguments,
         emitter,
         current_stack_offset,
-        register_file_ptr,
+        register_file,
     )
     .translate()
 }
@@ -154,7 +156,7 @@ impl<A: Alloc> ReturnValue<A> {
     }
 }
 
-struct FunctionTranslator<'model, 'emitter, 'context, A: Alloc> {
+struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
     allocator: A,
 
     /// The model we are translating guest code for
@@ -187,10 +189,10 @@ struct FunctionTranslator<'model, 'emitter, 'context, A: Alloc> {
     emitter: &'emitter mut X86Emitter<'context, A>,
 
     /// Pointer to the register file used for cached register reads
-    register_file_ptr: *mut u8,
+    register_file: &'registers RegisterFile,
 }
 
-impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
+impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     fn read_return_value(&mut self) -> Option<X86NodeRef<A>> {
         match self.function.return_type() {
             Some(rudder::types::Type::Tuple(_)) => {
@@ -314,7 +316,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
         arguments: &[X86NodeRef<A>],
         emitter: &'e mut X86Emitter<'c, A>,
         current_stack_offset: Rc<AtomicUsize, A>,
-        register_file_ptr: *mut u8,
+        register_file: &'r RegisterFile,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
         assert!(!FN_DENYLIST.contains(&function));
@@ -338,7 +340,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
             return_value: ReturnValue::new(emitter, function.return_type()),
             current_stack_offset,
             emitter,
-            register_file_ptr,
+            register_file,
         };
 
         // set up symbols for parameters, and write arguments into them
@@ -454,12 +456,12 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block0,
                         x86: block0_x86,
-                        variables: lives.clone(),
+                        variables: variables_deep_clone_in(&lives, self.allocator),
                     });
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block1,
                         x86: block1_x86,
-                        variables: lives,
+                        variables: variables_deep_clone_in(&lives, self.allocator),
                     });
                 }
                 ControlFlow::Return => {
@@ -505,28 +507,28 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                 &mut variables,
             ) {
                 StatementResult::Data(Some(value)) => {
-                    // log::trace!(
-                    //     "{} {} = {:?}",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    //     value.kind(),
-                    // );
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        value.kind(),
+                    );
                     statement_value_store.insert(*s, value);
                 }
                 StatementResult::Data(None) => {
-                    // log::trace!(
-                    //     "{} {} = ()",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    // );
+                    log::trace!(
+                        "{} {} = ()",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                    );
                 }
                 StatementResult::ControlFlow(block_result) => {
-                    // log::trace!(
-                    //     "{} {} = {:?}",
-                    //     s,
-                    //     s.get(block.arena()).to_string(block.arena()),
-                    //     block_result
-                    // );
+                    log::trace!(
+                        "{} {} = {:?}",
+                        s,
+                        s.get(block.arena()).to_string(block.arena()),
+                        block_result
+                    );
                     return block_result;
                 }
             }
@@ -549,7 +551,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
         arena: &Arena<Statement>,
         variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
     ) -> StatementResult<A> {
-        //        log::debug!("translate stmt: {statement:?}");
+        log::debug!("translate stmt: {statement:?}");
 
         match statement {
             Statement::Constant { typ, value } => {
@@ -607,21 +609,18 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
             }
             Statement::WriteVariable { symbol, value } => {
                 log::trace!(
-                    "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}",
+                    "writing var {} in block (dynamic={is_dynamic}) {:#x} in {:?}, value: {value:#?}",
                     symbol.name(),
                     block.index(),
                     self.function.name()
                 );
 
-                if variables.get(&symbol.name()).is_none() {
+                let variable = variables.entry(symbol.name()).or_insert_with(|| {
                     log::trace!("writing var {} for the first time", symbol.name());
-                    variables.insert(
-                        symbol.name(),
-                        LocalVariable::Virtual {
-                            symbol: self.emitter.ctx_mut().create_symbol(),
-                        },
-                    );
-                }
+                    LocalVariable::Virtual {
+                        symbol: self.emitter.ctx_mut().create_symbol(),
+                    }
+                });
 
                 if is_dynamic
                 // terrible hack to workaround ldp     x0, x21, [x0] bug, where x0 gets written to halfway through, thus corrupting the second read of x0 to write *(x0 + 8) to x21
@@ -631,7 +630,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
-                    match variables.get(&symbol.name()).unwrap() {
+                    match variable {
                         LocalVariable::Virtual { .. } => {
                             log::trace!(
                                 "promoting {:?} from virtual to stack in block {:#x} in {:?}",
@@ -659,16 +658,13 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                                     offset
                                 };
 
-                            variables.insert(
-                                symbol.name(),
-                                LocalVariable::Stack {
-                                    typ: emit_rudder_type(&symbol.typ()),
-                                    stack_offset,
-                                },
-                            );
+                            *variable = LocalVariable::Stack {
+                                typ: emit_rudder_type(&symbol.typ()),
+                                stack_offset,
+                            };
 
+                            // clears operands??? todo: understand this
                             let current_block = self.emitter.get_current_block();
-
                             self.emitter.set_current_block(current_block);
                         }
                         LocalVariable::Stack { stack_offset, .. } => {
@@ -682,7 +678,6 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                         }
                     }
                 }
-                let var = variables.get(&symbol.name()).unwrap().clone();
 
                 let value = statement_values
                     .get(*value)
@@ -694,7 +689,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     })
                     .clone();
 
-                self.write_variable(var, value);
+                self.write_variable(variable.clone(), value);
 
                 StatementResult::Data(None)
             }
@@ -715,16 +710,18 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     RegisterCacheType::Constant
                     | RegisterCacheType::Read
                     | RegisterCacheType::ReadWrite => {
-                        let value = unsafe {
-                            let ptr = self.register_file_ptr.add(usize::try_from(offset).unwrap());
-
-                            match typ.width() {
-                                1..=8 => u64::from((ptr as *const u8).read()),
-                                9..=16 => u64::from((ptr as *const u16).read()),
-                                17..=32 => u64::from((ptr as *const u32).read()),
-                                33..=64 => u64::from((ptr as *const u64).read()),
-                                w => todo!("width {w}"),
+                        let value = match typ.width() {
+                            1..=8 => u64::from(self.register_file.read_raw::<u8>(offset as usize)),
+                            9..=16 => {
+                                u64::from(self.register_file.read_raw::<u16>(offset as usize))
                             }
+                            17..=32 => {
+                                u64::from(self.register_file.read_raw::<u32>(offset as usize))
+                            }
+                            33..=64 => {
+                                u64::from(self.register_file.read_raw::<u64>(offset as usize))
+                            }
+                            w => todo!("width {w}"),
                         };
                         log::trace!("read from cacheable {name:?}: {value:x}");
                         StatementResult::Data(Some(self.emitter.constant(value, typ)))
@@ -745,6 +742,8 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     .get_register_by_offset(offset)
                     .unwrap_or_else(|| panic!("no register found for offset {offset}"));
 
+                assert_eq!(offset, self.model.registers().get(&name).unwrap().offset);
+
                 let value = statement_values.get(*value).unwrap().clone();
 
                 // if cacheable and writing a constant, update the register file during
@@ -756,18 +755,15 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                     RegisterCacheType::ReadWrite => {
                         log::trace!("attempting write to cacheable {name:?}: {value:?}");
                         if let NodeKind::Constant { value, width } = value.kind() {
-                            unsafe {
-                                let ptr =
-                                    self.register_file_ptr.add(usize::try_from(offset).unwrap());
-
-                                match width {
-                                    1..=8 => (ptr as *mut u8).write(*value as u8),
-                                    9..=16 => (ptr as *mut u16).write(*value as u16),
-                                    17..=32 => (ptr as *mut u32).write(*value as u32),
-                                    33..=64 => (ptr as *mut u64).write(*value),
-                                    w => todo!("width {w}"),
+                            match width {
+                                1..=8 => self.register_file.write::<u8, _>(name, (*value) as u8),
+                                9..=16 => self.register_file.write::<u16, _>(name, (*value) as u16),
+                                17..=32 => {
+                                    self.register_file.write::<u32, _>(name, (*value) as u32)
                                 }
-                            };
+                                33..=64 => self.register_file.write::<u64, _>(name, *value),
+                                w => todo!("width {w}"),
+                            }
 
                             log::trace!("wrote to cacheable {name:?}: {value:x}");
 
@@ -939,18 +935,14 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                                                             * so
                                                             * called functions' stack variables
                                                             * don't corrupt this function's */
-                        self.register_file_ptr,
+                        self.register_file,
                     )
                     .translate(),
                 )
             }
             Statement::Jump { target } => {
                 // make new empty x86 block
-                let x86 = self
-                    .emitter
-                    .ctx_mut()
-                    .arena_mut()
-                    .insert(X86Block::new_in(self.allocator.clone()));
+                let x86 = self.emitter.ctx_mut().create_block();
 
                 self.static_blocks
                     .entry(*target)
@@ -972,11 +964,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                 return match condition.kind() {
                     NodeKind::Constant { value, .. } => {
                         if *value == 0 {
-                            let x86 = self
-                                .emitter
-                                .ctx_mut()
-                                .arena_mut()
-                                .insert(X86Block::new_in(self.allocator.clone()));
+                            let x86 = self.emitter.ctx_mut().create_block();
 
                             self.static_blocks
                                 .entry(*false_target)
@@ -990,11 +978,7 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                                 variables.clone(),
                             ))
                         } else {
-                            let x86 = self
-                                .emitter
-                                .ctx_mut()
-                                .arena_mut()
-                                .insert(X86Block::new_in(self.allocator.clone()));
+                            let x86 = self.emitter.ctx_mut().create_block();
 
                             self.static_blocks
                                 .entry(*true_target)
@@ -1013,28 +997,12 @@ impl<'m, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'e, 'c, A> {
                         let true_x86 = (*self
                             .dynamic_blocks
                             .entry((*true_target, variables.clone()))
-                            .or_insert_with(|| {
-                                (
-                                    self.emitter
-                                        .ctx_mut()
-                                        .arena_mut()
-                                        .insert(X86Block::new_in(self.allocator.clone())),
-                                    false,
-                                )
-                            }))
+                            .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
                         let false_x86 = (*self
                             .dynamic_blocks
                             .entry((*false_target, variables.clone()))
-                            .or_insert_with(|| {
-                                (
-                                    self.emitter
-                                        .ctx_mut()
-                                        .arena_mut()
-                                        .insert(X86Block::new_in(self.allocator.clone())),
-                                    false,
-                                )
-                            }))
+                            .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
                         self.emitter.branch(condition, true_x86, false_x86);
                         StatementResult::ControlFlow(ControlFlow::Branch(
@@ -1333,4 +1301,46 @@ impl<A: Alloc> StatementValueStore<A> {
     pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef<A>> {
         self.map.get(&s).cloned()
     }
+}
+
+fn variables_deep_clone_in<A: Alloc>(
+    variables: &BTreeMap<InternedString, LocalVariable<A>, A>,
+    allocator: A,
+) -> BTreeMap<InternedString, LocalVariable<A>, A> {
+    let mut map = BTreeMap::new_in(allocator);
+    variables
+        .iter()
+        .map(|(name, local)| {
+            (
+                *name,
+                match local {
+                    LocalVariable::Virtual { symbol } => {
+                        // doing Al syntax just to ensure we are really doing a
+                        // deep clone not really
+                        // necessary, but sanity checking
+
+                        let borrow: &Option<X86NodeRef<A>> = &*symbol.0.borrow();
+
+                        let inverted: Option<&X86NodeRef<A>> = borrow.as_ref();
+
+                        let cloned: Option<(NodeKind<A>, crate::dbt::emitter::Type)> = inverted
+                            .map(|node_ref_ref| {
+                                (node_ref_ref.kind().clone(), node_ref_ref.typ().clone())
+                            });
+
+                        let node: Option<X86NodeRef<A>> = cloned
+                            .map(|(kind, typ)| X86Node { typ, kind })
+                            .map(|node| X86NodeRef(Rc::new_in(node, allocator)));
+
+                        let symbol = X86SymbolRef(Rc::new_in(RefCell::new(node), allocator));
+
+                        LocalVariable::Virtual { symbol }
+                    }
+                    LocalVariable::Stack { .. } => local.clone(),
+                },
+            )
+        })
+        .collect_into(&mut map);
+
+    map
 }

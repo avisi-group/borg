@@ -1,11 +1,14 @@
 use {
-    crate::dbt::{bit_extract, bit_insert},
+    crate::dbt::{
+        bit_extract, bit_insert,
+        register_file::{RegisterFile, RegisterValue},
+    },
     alloc::vec::Vec,
     common::{
         arena::Ref,
+        hashmap::HashMap,
         intern::InternedString,
         mask::mask,
-        hashmap::HashMap,
         rudder::{
             Model,
             block::Block,
@@ -21,7 +24,7 @@ use {
         borrow::Borrow,
         cmp::{Ordering, max},
         ops::{Add, BitAnd, BitOr, Div, Mul, Sub},
-        panic,
+        panic, usize,
     },
 };
 
@@ -29,7 +32,7 @@ pub fn interpret(
     model: &Model,
     function_name: &str,
     arguments: &[Value],
-    register_file: *mut u8,
+    register_file: &RegisterFile,
 ) -> Option<Value> {
     log::debug!("interpreting {function_name}");
     let function_name = InternedString::from(function_name);
@@ -55,20 +58,24 @@ pub fn interpret(
     }
 }
 
-struct Interpreter<'f> {
+struct Interpreter<'f, 'r> {
     model: &'f Model,
     function_name: InternedString,
     // local variables
     locals: HashMap<InternedString, Value>,
     // value of previously evaluated statements
     statement_values: HashMap<Ref<Statement>, Value>,
-    register_file: *mut u8,
+    register_file: &'r RegisterFile,
     // nzcv
     flags: u8,
 }
 
-impl<'f> Interpreter<'f> {
-    fn new(model: &'f Model, function_name: InternedString, register_file: *mut u8) -> Self {
+impl<'f, 'r> Interpreter<'f, 'r> {
+    fn new(
+        model: &'f Model,
+        function_name: InternedString,
+        register_file: &'r RegisterFile,
+    ) -> Self {
         Self {
             model,
             function_name,
@@ -124,42 +131,9 @@ impl<'f> Interpreter<'f> {
                         .clone(),
                 ),
                 Statement::ReadRegister { typ, offset } => {
-                    let width = match typ {
-                        Type::Primitive(typ) => typ.width(),
-                        t => todo!("{t}"),
-                    };
+                    let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
 
-                    let offset = self.resolve_u64(offset);
-                    let value = match width {
-                        1..=8 => self.read_reg::<u8>(offset) as u64,
-                        9..=16 => self.read_reg::<u16>(offset) as u64,
-                        17..=32 => self.read_reg::<u32>(offset) as u64,
-                        33..=64 => self.read_reg::<u64>(offset),
-                        65..=128 => u64::try_from(self.read_reg::<u128>(offset)).unwrap(),
-
-                        w => {
-                            log::trace!(
-                                "tried to read a {w} bit register offset {offset}, returning 0"
-                            );
-                            0
-                        }
-                    };
-
-                    Some(match typ {
-                        Type::Primitive(PrimitiveType::UnsignedInteger(width)) => {
-                            Value::UnsignedInteger {
-                                value: value & mask(*width),
-                                width: *width,
-                            }
-                        }
-                        Type::Primitive(PrimitiveType::SignedInteger(width)) => {
-                            Value::SignedInteger {
-                                value: (value & mask(*width)) as i64,
-                                width: *width,
-                            }
-                        }
-                        t => todo!("{t}"),
-                    })
+                    Some(self.read_register(typ, offset))
                 }
                 Statement::ReadMemory { .. } => todo!(),
                 Statement::ReadPc => todo!(),
@@ -374,6 +348,14 @@ impl<'f> Interpreter<'f> {
                             width: *width,
                         }),
                         (
+                            CastOperationKind::Truncate,
+                            Type::Primitive(PrimitiveType::SignedInteger(width)),
+                            Value::SignedInteger { value, .. },
+                        ) => Some(Value::SignedInteger {
+                            value: ((*value as u64) & mask(*width)) as i64,
+                            width: *width,
+                        }),
+                        (
                             CastOperationKind::Reinterpret,
                             Type::Primitive(PrimitiveType::SignedInteger(width)),
                             Value::UnsignedInteger { value, .. },
@@ -539,7 +521,23 @@ impl<'f> Interpreter<'f> {
                     })
                 }
                 Statement::ReadElement { .. } => todo!(),
-                Statement::AssignElement { .. } => todo!(),
+                Statement::AssignElement {
+                    vector,
+                    value,
+                    index,
+                } => {
+                    let vector = self.resolve(vector);
+                    let value = self.resolve(value);
+                    let index = usize::try_from(self.resolve_u64(index)).unwrap();
+
+                    let Value::Vector(mut vec) = vector else {
+                        panic!()
+                    };
+
+                    vec[index] = value;
+
+                    Some(Value::Vector(vec))
+                }
                 Statement::CreateBits { value, width } => {
                     let value = self.resolve_u64(value);
                     let width = self.resolve_u64(width);
@@ -588,16 +586,22 @@ impl<'f> Interpreter<'f> {
                         t => todo!("{t:?}"),
                     };
 
-                    let offset = self.resolve_u64(offset);
+                    let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
 
                     match width {
-                        1..=8 => self.write_reg(offset, u16::try_from(value).unwrap()),
-                        9..=16 => self.write_reg(offset, u16::try_from(value).unwrap()),
-                        17..=32 => self.write_reg(offset, u32::try_from(value).unwrap()),
-                        33..=64 => self.write_reg(offset, value),
+                        1..=8 => self
+                            .register_file
+                            .write_raw(offset, u8::try_from(value).unwrap()),
+                        9..=16 => self
+                            .register_file
+                            .write_raw(offset, u16::try_from(value).unwrap()),
+                        17..=32 => self
+                            .register_file
+                            .write_raw(offset, u32::try_from(value).unwrap()),
+                        33..=64 => self.register_file.write_raw(offset, value),
                         65..=128 => {
-                            self.write_reg(offset, value);
-                            self.write_reg(offset + 8, 0u64); // todo: hack
+                            self.register_file.write_raw(offset, value);
+                            self.register_file.write_raw(offset + 8, 0u64); // todo: hack
                         }
                         w => {
                             log::trace!(
@@ -610,8 +614,8 @@ impl<'f> Interpreter<'f> {
                 }
                 Statement::WriteMemory { .. } => todo!(),
                 Statement::WritePc { value } => {
-                    self.write_reg(
-                        self.model.reg_offset(InternedString::from_static("_PC")) as u64,
+                    self.register_file.write_raw(
+                        self.model.reg_offset(InternedString::from_static("_PC")) as usize,
                         self.resolve_u64(value),
                     );
                     None
@@ -668,16 +672,51 @@ impl<'f> Interpreter<'f> {
         unreachable!("block must end in a panic, jump, return, or branch")
     }
 
-    fn read_reg<T>(&self, offset: u64) -> T {
-        unsafe {
-            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T).read_unaligned()
-        }
-    }
+    fn read_register(&self, typ: &Type, offset: usize) -> Value {
+        match typ {
+            Type::Primitive(ptyp) => {
+                let value = match ptyp.width() {
+                    1..=8 => self.register_file.read_raw::<u8>(offset) as u64,
+                    9..=16 => self.register_file.read_raw::<u16>(offset) as u64,
+                    17..=32 => self.register_file.read_raw::<u32>(offset) as u64,
+                    33..=64 => self.register_file.read_raw::<u64>(offset),
+                    65..=128 => u64::try_from(self.register_file.read_raw::<u128>(offset)).unwrap(),
 
-    fn write_reg<T>(&self, offset: u64, value: T) {
-        unsafe {
-            (self.register_file.add(usize::try_from(offset).unwrap()) as *mut T)
-                .write_unaligned(value)
+                    w => {
+                        log::trace!(
+                            "tried to read a {w} bit register offset {offset}, returning 0"
+                        );
+                        0
+                    }
+                };
+
+                match ptyp {
+                    PrimitiveType::UnsignedInteger(width) => Value::UnsignedInteger {
+                        value: value & mask(*width),
+                        width: *width,
+                    },
+                    PrimitiveType::SignedInteger(width) => Value::SignedInteger {
+                        value: (value & mask(*width)) as i64,
+                        width: *width,
+                    },
+                    _ => todo!("{typ}"),
+                }
+            }
+            Type::Vector {
+                element_count,
+                element_type,
+            } => {
+                let element_width = element_type.width_bytes();
+
+                Value::Vector(
+                    (0..*element_count)
+                        .into_iter()
+                        .map(|i| (offset + (i * usize::from(element_width))))
+                        .map(|element_offset| self.read_register(&element_type, element_offset))
+                        .collect(),
+                )
+            }
+            t => todo!("{t}"),
         }
     }
 }

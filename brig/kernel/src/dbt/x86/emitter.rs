@@ -66,7 +66,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         &mut self.ctx
     }
 
-    fn node(&self, node: X86Node<A>) -> X86NodeRef<A> {
+    pub fn node(&self, node: X86Node<A>) -> X86NodeRef<A> {
         X86NodeRef(Rc::new_in(node, self.ctx().allocator.clone()))
     }
 
@@ -1955,7 +1955,7 @@ fn signextend_64() {
 }
 
 #[derive_where(Debug)]
-pub struct X86NodeRef<A: Alloc>(Rc<X86Node<A>, A>);
+pub struct X86NodeRef<A: Alloc>(pub Rc<X86Node<A>, A>);
 
 impl<A: Alloc> Clone for X86NodeRef<A> {
     fn clone(&self) -> Self {
@@ -1993,6 +1993,7 @@ pub struct X86Node<A: Alloc> {
     pub kind: NodeKind<A>,
 }
 
+#[derive(Clone)]
 #[derive_where(Debug, PartialEq, Eq)]
 pub enum NodeKind<A: Alloc> {
     Constant {

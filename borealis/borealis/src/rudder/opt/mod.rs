@@ -2,6 +2,8 @@ use {
     common::rudder::{Model, function::Function},
     log::trace,
     rayon::iter::{IntoParallelRefMutIterator, ParallelIterator},
+    sailrs::create_file_buffered,
+    std::path::PathBuf,
 };
 
 pub mod block_inliner;
@@ -73,6 +75,8 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
 
             trace!("optimising function {name:?}");
 
+            let mut counter = 0;
+
             while changed {
                 changed = false;
                 for pass in &passes {
@@ -81,7 +85,34 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
                     while pass.1(function) {
                         changed = true;
                     }
+
+                    if function.name().as_ref() == "ELFromSPSR" {
+                        crate::rudder::dot::render(
+                            &mut create_file_buffered(
+                                PathBuf::from("/tmp/")
+                                    .join(format!("ELFromSPSR.rudder.{counter}.dot")),
+                            )
+                            .unwrap(),
+                            function.arena(),
+                            function.entry_block(),
+                        )
+                        .unwrap();
+                        counter += 1;
+                    }
                 }
+            }
+
+            if function.name().as_ref() == "ELFromSPSR" {
+                crate::rudder::dot::render(
+                    &mut create_file_buffered(
+                        PathBuf::from("/tmp/").join(format!("ELFromSPSR.rudder.{counter}.dot")),
+                    )
+                    .unwrap(),
+                    function.arena(),
+                    function.entry_block(),
+                )
+                .unwrap();
+                counter += 1;
             }
         });
 }
