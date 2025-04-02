@@ -341,7 +341,8 @@ impl ModelDevice {
 
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
-        let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
+        // 4GB
+        let mut allocator = BumpAllocator::new(4 * 1024 * 1024 * 1024);
 
         let _status = record_safepoint();
 

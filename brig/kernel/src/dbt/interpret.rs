@@ -131,44 +131,9 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         .clone(),
                 ),
                 Statement::ReadRegister { typ, offset } => {
-                    let width = match typ {
-                        Type::Primitive(typ) => typ.width(),
-                        t => todo!("{t}"),
-                    };
-
                     let offset = usize::try_from(self.resolve_u64(offset)).unwrap();
-                    let value = match width {
-                        1..=8 => self.register_file.read_raw::<u8>(offset) as u64,
-                        9..=16 => self.register_file.read_raw::<u16>(offset) as u64,
-                        17..=32 => self.register_file.read_raw::<u32>(offset) as u64,
-                        33..=64 => self.register_file.read_raw::<u64>(offset),
-                        65..=128 => {
-                            u64::try_from(self.register_file.read_raw::<u128>(offset)).unwrap()
-                        }
 
-                        w => {
-                            log::trace!(
-                                "tried to read a {w} bit register offset {offset}, returning 0"
-                            );
-                            0
-                        }
-                    };
-
-                    Some(match typ {
-                        Type::Primitive(PrimitiveType::UnsignedInteger(width)) => {
-                            Value::UnsignedInteger {
-                                value: value & mask(*width),
-                                width: *width,
-                            }
-                        }
-                        Type::Primitive(PrimitiveType::SignedInteger(width)) => {
-                            Value::SignedInteger {
-                                value: (value & mask(*width)) as i64,
-                                width: *width,
-                            }
-                        }
-                        t => todo!("{t}"),
-                    })
+                    Some(self.read_register(typ, offset))
                 }
                 Statement::ReadMemory { .. } => todo!(),
                 Statement::ReadPc => todo!(),
@@ -383,6 +348,14 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                             width: *width,
                         }),
                         (
+                            CastOperationKind::Truncate,
+                            Type::Primitive(PrimitiveType::SignedInteger(width)),
+                            Value::SignedInteger { value, .. },
+                        ) => Some(Value::SignedInteger {
+                            value: ((*value as u64) & mask(*width)) as i64,
+                            width: *width,
+                        }),
+                        (
                             CastOperationKind::Reinterpret,
                             Type::Primitive(PrimitiveType::SignedInteger(width)),
                             Value::UnsignedInteger { value, .. },
@@ -548,7 +521,23 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                     })
                 }
                 Statement::ReadElement { .. } => todo!(),
-                Statement::AssignElement { .. } => todo!(),
+                Statement::AssignElement {
+                    vector,
+                    value,
+                    index,
+                } => {
+                    let vector = self.resolve(vector);
+                    let value = self.resolve(value);
+                    let index = usize::try_from(self.resolve_u64(index)).unwrap();
+
+                    let Value::Vector(mut vec) = vector else {
+                        panic!()
+                    };
+
+                    vec[index] = value;
+
+                    Some(Value::Vector(vec))
+                }
                 Statement::CreateBits { value, width } => {
                     let value = self.resolve_u64(value);
                     let width = self.resolve_u64(width);
@@ -681,6 +670,54 @@ impl<'f, 'r> Interpreter<'f, 'r> {
         }
 
         unreachable!("block must end in a panic, jump, return, or branch")
+    }
+
+    fn read_register(&self, typ: &Type, offset: usize) -> Value {
+        match typ {
+            Type::Primitive(ptyp) => {
+                let value = match ptyp.width() {
+                    1..=8 => self.register_file.read_raw::<u8>(offset) as u64,
+                    9..=16 => self.register_file.read_raw::<u16>(offset) as u64,
+                    17..=32 => self.register_file.read_raw::<u32>(offset) as u64,
+                    33..=64 => self.register_file.read_raw::<u64>(offset),
+                    65..=128 => u64::try_from(self.register_file.read_raw::<u128>(offset)).unwrap(),
+
+                    w => {
+                        log::trace!(
+                            "tried to read a {w} bit register offset {offset}, returning 0"
+                        );
+                        0
+                    }
+                };
+
+                match ptyp {
+                    PrimitiveType::UnsignedInteger(width) => Value::UnsignedInteger {
+                        value: value & mask(*width),
+                        width: *width,
+                    },
+                    PrimitiveType::SignedInteger(width) => Value::SignedInteger {
+                        value: (value & mask(*width)) as i64,
+                        width: *width,
+                    },
+                    _ => todo!("{typ}"),
+                }
+            }
+            Type::Vector {
+                element_count,
+                element_type,
+            } => {
+                let element_width = element_type.width_bytes();
+
+                Value::Vector(
+                    (0..*element_count)
+                        .into_iter()
+                        .map(|i| (offset + (i * usize::from(element_width))))
+                        .map(|element_offset| self.read_register(&element_type, element_offset))
+                        .collect(),
+                )
+            }
+            t => todo!("{t}"),
+        }
     }
 }
 

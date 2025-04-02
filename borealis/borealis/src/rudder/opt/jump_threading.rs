@@ -15,7 +15,7 @@ pub fn run(f: &mut Function) -> bool {
 
 fn target_for_threadable(f: &Function, block_ref: Ref<Block>) -> Option<Ref<Block>> {
     let block = block_ref.get(f.arena());
-    if block.size() == 1 {
+    if block.len() == 1 {
         if let Statement::Jump { target } = block.terminator_statement().unwrap().get(block.arena())
         {
             Some(*target)

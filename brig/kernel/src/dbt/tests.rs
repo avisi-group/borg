@@ -3697,7 +3697,10 @@ fn el_from_spsr() {
 
     translation.execute(&register_file);
 
+    // valid = true
     assert_eq!(register_file.read::<u64, _>("R0"), 0x1);
+
+    // EL should be 2 afterwards
     assert_eq!(register_file.read::<u64, _>("R1"), 0x2);
 }
 

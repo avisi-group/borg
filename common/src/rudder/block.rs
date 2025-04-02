@@ -86,7 +86,7 @@ impl Block {
             .collect()
     }
 
-    pub fn size(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.statements().len()
     }
 

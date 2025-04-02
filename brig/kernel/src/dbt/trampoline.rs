@@ -1,6 +1,6 @@
 use core::arch::global_asm;
 
-pub const MAX_STACK_SIZE: usize = 0x10000;
+pub const MAX_STACK_SIZE: usize = 2 * 1024 * 1024;
 
 global_asm!(
     r#"
