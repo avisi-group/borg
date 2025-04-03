@@ -21,10 +21,9 @@ buddy_system_allocator = "0.11.0"
 #talc = { version = "4.4.2", features = ["counters"] } // weirdly slow
 #linked_list_allocator = "0.10.5" // only supports single backing chunk
 
-
 spin = "0.10.0"
 byte-unit = { version = "5.1.6", default-features = false, features = ["byte"] }
-log = { version = "0.4.26", default-features = false, features = ["release_max_level_error", "max_level_error"]} #
+log = { version = "0.4.26", default-features = false, features = ["release_max_level_error", "max_level_error"]}
 elf = { version = "0.7.4", default-features = false }
 rustc-demangle = { version = "0.1.24", default-features = false }
 serde = { version = "1.0.219", default-features = false, features = [

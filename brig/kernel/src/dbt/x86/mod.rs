@@ -254,12 +254,11 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         self.writes_to_sctlr
     }
 
-    /// Sets the "SCTLR register was written to" flag
+    /// Wrote to TTBR0/1
     pub fn set_mmu_needs_invalidate_flag(&mut self) {
         self.mmu_invalidate = true;
     }
 
-    /// Gets the "SCTLR register was written to" flag
     pub fn get_mmu_needs_invalidate_flag(&mut self) -> bool {
         self.mmu_invalidate
     }
