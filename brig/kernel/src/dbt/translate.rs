@@ -35,6 +35,13 @@ const BLOCK_QUEUE_LIMIT: usize = 1000;
 // if we attempt to translate any of these , something went wrong
 const FN_DENYLIST: &[&str] = &["AArch64_TranslateAddress"];
 
+/// DBT translation error
+#[derive(Debug, displaydoc::Display, thiserror::Error)]
+pub enum Error {
+    /// SEE exception during instruction decode
+    Decode,
+}
+
 /// Kind of jump to a target block
 #[derive(Debug)]
 enum JumpKind<A: Alloc> {
@@ -74,6 +81,47 @@ enum ControlFlow<A: Alloc> {
     Return,
 }
 
+/// Top-level translation of a given guest instruction opcode
+///
+/// Includes logic for retrying decoding if a SEE exception is thrown.
+pub fn translate_instruction<A: Alloc>(
+    allocator: A,
+    model: &Model,
+    function: &str,
+    emitter: &mut X86Emitter<A>,
+    register_file: &RegisterFile,
+    pc: u64,
+    opcode: u32,
+) -> Result<Option<X86NodeRef<A>>, Error> {
+    register_file.write("SEE", -1i64);
+
+    loop {
+        register_file.write("have_exception", 0u8);
+
+        let pc = emitter.constant(pc, Type::Unsigned(64));
+        let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(32));
+
+        let res = translate(
+            allocator,
+            model,
+            function,
+            &[pc, opcode],
+            emitter,
+            register_file,
+        );
+
+        match res {
+            Ok(_) => break res,
+            Err(Error::Decode) => {
+                // not resetting emitter on decode SEE retry, this is risky in
+                // case we emitted stuff during translation, except we should
+                // never have hit a write-mem or write-reg
+                // inside decode, it should always be const
+            }
+        }
+    }
+}
+
 pub fn translate<A: Alloc>(
     allocator: A,
     model: &Model,
@@ -81,7 +129,7 @@ pub fn translate<A: Alloc>(
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
-) -> Option<X86NodeRef<A>> {
+) -> Result<Option<X86NodeRef<A>>, Error> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
@@ -359,7 +407,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         celf
     }
 
-    fn translate(&mut self) -> Option<X86NodeRef<A>> {
+    fn translate(&mut self) -> Result<Option<X86NodeRef<A>>, Error> {
         // create an empty block all control flow will end at
         let exit_block = self
             .emitter
@@ -403,7 +451,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     log::trace!(
                         "translating static block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
                     );
-                    let res = self.translate_block(rudder_block, false, variables);
+                    let res = self.translate_block(rudder_block, false, variables)?;
                     log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
                     res
                 }
@@ -428,7 +476,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         "translating dynamic block rudder={rudder_block:?}, x86={x86_block:?}, variables: {variables:?}",
                     );
 
-                    let res = self.translate_block(rudder_block, true, variables);
+                    let res = self.translate_block(rudder_block, true, variables)?;
                     log::trace!("emitted: {:?}", x86_block.get(self.emitter.ctx().arena()));
                     res
                 }
@@ -483,7 +531,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
         log::debug!("finished translating {:?}", self.function.name());
 
-        self.read_return_value()
+        Ok(self.read_return_value())
     }
 
     fn translate_block(
@@ -492,7 +540,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         block_ref: Ref<Block>,
         is_dynamic: bool,
         mut variables: BTreeMap<InternedString, LocalVariable<A>, A>,
-    ) -> ControlFlow<A> {
+    ) -> Result<ControlFlow<A>, Error> {
         let block = block_ref.get(self.function.arena());
 
         let mut statement_value_store = StatementValueStore::new(self.allocator.clone());
@@ -505,7 +553,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 block_ref,
                 block.arena(),
                 &mut variables,
-            ) {
+            )? {
                 StatementResult::Data(Some(value)) => {
                     log::trace!(
                         "{} {} = {:?}",
@@ -529,7 +577,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         s.get(block.arena()).to_string(block.arena()),
                         block_result
                     );
-                    return block_result;
+                    return Ok(block_result);
                 }
             }
         }
@@ -550,10 +598,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
         arena: &Arena<Statement>,
         variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
-    ) -> StatementResult<A> {
+    ) -> Result<StatementResult<A>, Error> {
         log::debug!("translate stmt: {statement:?}");
 
-        match statement {
+        Ok(match statement {
             Statement::Constant { typ, value } => {
                 let typ = emit_rudder_constant_type(value, typ);
                 StatementResult::Data(Some(match value {
@@ -937,7 +985,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                                             * don't corrupt this function's */
                         self.register_file,
                     )
-                    .translate(),
+                    .translate()?,
                 )
             }
             Statement::Jump { target } => {
@@ -972,11 +1020,11 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                 .or_insert(alloc::vec![x86]);
 
                             self.emitter.jump(x86);
-                            StatementResult::ControlFlow(ControlFlow::Jump(
+                            Ok(StatementResult::ControlFlow(ControlFlow::Jump(
                                 *false_target,
                                 x86,
                                 variables.clone(),
-                            ))
+                            )))
                         } else {
                             let x86 = self.emitter.ctx_mut().create_block();
 
@@ -986,11 +1034,11 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                 .or_insert(alloc::vec![x86]);
 
                             self.emitter.jump(x86);
-                            StatementResult::ControlFlow(ControlFlow::Jump(
+                            Ok(StatementResult::ControlFlow(ControlFlow::Jump(
                                 *true_target,
                                 x86,
                                 variables.clone(),
-                            ))
+                            )))
                         }
                     }
                     _ => {
@@ -1005,11 +1053,11 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                             .or_insert_with(|| (self.emitter.ctx_mut().create_block(), false)))
                         .0;
                         self.emitter.branch(condition, true_x86, false_x86);
-                        StatementResult::ControlFlow(ControlFlow::Branch(
+                        Ok(StatementResult::ControlFlow(ControlFlow::Branch(
                             *true_target,
                             *false_target,
                             variables.clone(),
-                        ))
+                        )))
                     }
                 };
             }
@@ -1129,7 +1177,19 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     todo!();
                 };
 
+                // if have_exception is true
+                if self.register_file.read::<bool, _>("have_exception") {
+                    // current exception is a SEE exception
+                    if self.register_file.read::<u32, _>("current_exception_tag") == 5 {
+                        // retranslate a64 with current SEE value
+                        return Err(Error::Decode);
+                    }
+                }
+
                 self.emitter.panic(msg.as_ref());
+
+                // reset have exception for other translation paths
+                self.register_file.write("have_exception", false);
 
                 StatementResult::ControlFlow(ControlFlow::Panic)
             }
@@ -1166,7 +1226,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 let source = statement_values.get(*source).unwrap().clone();
                 StatementResult::Data(Some(self.emitter.access_tuple(source, *index)))
             }
-        }
+        })
     }
 
     fn read_variable(&mut self, variable: LocalVariable<A>) -> X86NodeRef<A> {

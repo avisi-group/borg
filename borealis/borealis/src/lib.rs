@@ -101,15 +101,6 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
             &mut create_file_buffered(path.join("ast.boom")).unwrap(),
             ast.clone(),
         );
-        boom::control_flow::dot::render(
-            &mut create_file_buffered(path.join("elfromspsr.boom")).unwrap(),
-            &ast.get()
-                .functions
-                .get(&InternedString::from_static("ELFromSPSR"))
-                .unwrap()
-                .entry_block,
-        )
-        .unwrap();
     }
 
     info!("Running passes on BOOM");
@@ -140,32 +131,10 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
             &mut create_file_buffered(path.join("ast.processed.boom")).unwrap(),
             ast.clone(),
         );
-        boom::control_flow::dot::render(
-            &mut create_file_buffered(path.join("elfromspsr.processed.boom")).unwrap(),
-            &ast.get()
-                .functions
-                .get(&InternedString::from_static("ELFromSPSR"))
-                .unwrap()
-                .entry_block,
-        )
-        .unwrap();
     }
 
     info!("Building rudder");
     let mut rudder = rudder::build::from_boom(&ast.get());
-
-    {
-        let func = rudder
-            .functions()
-            .get(&InternedString::from_static("ELFromSPSR"))
-            .unwrap();
-        rudder::dot::render(
-            &mut create_file_buffered(dump_ir.unwrap().join("ELFromSPSR.rudder.dot")).unwrap(),
-            func.arena(),
-            func.entry_block(),
-        )
-        .unwrap();
-    }
 
     if let Some(path) = &dump_ir {
         writeln!(
@@ -223,10 +192,17 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     {
         let func = rudder
             .functions()
-            .get(&InternedString::from_static("ELFromSPSR"))
+            .get(&InternedString::from_static(
+                "decode_hint_aarch64_instrs_system_hints",
+            ))
             .unwrap();
         rudder::dot::render(
-            &mut create_file_buffered(dump_ir.unwrap().join("ELFromSPSR.rudder.opt.dot")).unwrap(),
+            &mut create_file_buffered(
+                dump_ir
+                    .unwrap()
+                    .join("decode_hint_aarch64_instrs_system_hints.rudder.opt.dot"),
+            )
+            .unwrap(),
             func.arena(),
             func.entry_block(),
         )

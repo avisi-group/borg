@@ -5,9 +5,9 @@ use {
     },
     common::{
         arena::{Arena, Ref},
+        hashmap::HashMap,
         id::Id,
         intern::InternedString,
-        hashmap::HashMap,
         rudder::{
             Model, RegisterCacheType, RegisterDescriptor,
             block::Block,

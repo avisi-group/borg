@@ -8,7 +8,7 @@ use {
         },
         sail_ast::Identifier,
     },
-    common::{intern::InternedString, hashmap::HashSet},
+    common::{hashmap::HashSet, intern::InternedString},
     std::{
         io::Write,
         rc::Rc,
@@ -480,8 +480,8 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
     fn visit_name(&mut self, node: &Name) {
         match node {
             Name::Name(ident, _) => write!(self.writer, "{}", ident.as_interned()).unwrap(),
-            Name::HaveException(_) => write!(self.writer, "have-exception").unwrap(),
-            Name::CurrentException(_) => write!(self.writer, "have-exception").unwrap(),
+            Name::HaveException(_) => write!(self.writer, "have_exception").unwrap(),
+            Name::CurrentException(_) => write!(self.writer, "current_exception").unwrap(),
             Name::ThrowLocation(_) => write!(self.writer, "throw").unwrap(),
             Name::Return(_) => write!(self.writer, "return").unwrap(),
             Name::Channel(_, _) => write!(self.writer, "channel").unwrap(),

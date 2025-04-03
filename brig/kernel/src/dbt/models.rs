@@ -376,8 +376,8 @@ impl ModelDevice {
 
             let opcode = unsafe { *(current_pc as *const u32) };
 
-            log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
-            log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
+            log::info!("translating {opcode:#08x} @ {current_pc:#08x}");
+            log::info!("{}", disarm64::decoder::decode(opcode).unwrap());
 
             let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
             let pc = emitter.constant(current_pc, Type::Unsigned(64));
@@ -461,12 +461,12 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         || name.as_ref() == "EL3"
     {
         RegisterCacheType::Constant
-    } else if name.as_ref() == "SEE" {
-        RegisterCacheType::ReadWrite
-    } else if name.as_ref() == "PSTATE_EL"
-        || name.as_ref().starts_with("SPE")
+    } else if name.as_ref() == "SEE"
         || name.as_ref() == "have_exception"
+        || name.as_ref().starts_with("current_exception")
     {
+        RegisterCacheType::ReadWrite
+    } else if name.as_ref() == "PSTATE_EL" || name.as_ref().starts_with("SPE") {
         RegisterCacheType::Read
     } else {
         RegisterCacheType::None

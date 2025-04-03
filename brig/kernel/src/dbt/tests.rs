@@ -5,7 +5,7 @@ use {
         interpret::{Value, interpret},
         models::{self},
         register_file::RegisterFile,
-        translate::translate,
+        translate::{translate, translate_instruction},
         x86::{
             X86TranslationContext,
             emitter::{
@@ -32,7 +32,7 @@ fn static_dynamic_chaos_smoke() {
     fn run(r0_value: u64, r1_value: u64, r2_value: u64) -> (u64, u64, u64) {
         let model = models::get("aarch64").unwrap();
 
-        let mut register_file = RegisterFile::init(&*model);
+        let register_file = RegisterFile::init(&*model);
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -74,7 +74,7 @@ fn static_dynamic_chaos_smoke() {
 // fn num_of_feature_dynamic() {
 //     let model = &*models::get("aarch64").unwrap();
 
-//     let mut register_file = RegisterFile::init(&*model);
+//     let  register_file = RegisterFile::init(&*model);
 //
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
@@ -118,7 +118,7 @@ fn static_dynamic_chaos_smoke() {
 fn num_of_feature_const_123() {
     let model = &*models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -133,6 +133,7 @@ fn num_of_feature_const_123() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     emitter.leave();
@@ -150,7 +151,7 @@ fn num_of_feature_const_123() {
 fn statistical_profiling_disabled() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -163,6 +164,7 @@ fn statistical_profiling_disabled() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     emitter.write_register(model.reg_offset("R0"), is_enabled);
@@ -180,7 +182,7 @@ fn statistical_profiling_disabled() {
 // fn havebrbext_disabled() {
 //     let model = models::get("aarch64").unwrap();
 
-//     let mut register_file = RegisterFile::init(&*model);
+//     let  register_file = RegisterFile::init(&*model);
 //
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
@@ -209,7 +211,7 @@ fn statistical_profiling_disabled() {
 fn using_aarch32_disabled() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -222,6 +224,7 @@ fn using_aarch32_disabled() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     emitter.write_register(model.reg_offset("R0"), is_enabled);
@@ -238,7 +241,7 @@ fn using_aarch32_disabled() {
 fn branchto() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -253,7 +256,8 @@ fn branchto() {
         &[target, branch_type, branch_conditional],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
     let num_regs = emitter.next_vreg();
@@ -273,7 +277,7 @@ fn branchto() {
 fn decodea64_addsub() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -287,7 +291,8 @@ fn decodea64_addsub() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -310,7 +315,7 @@ fn decodea64_addsub() {
 fn decodea64_addsub_interpret() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     register_file.write("SEE", -1i64);
     register_file.write::<u64, _>("R0", 2);
@@ -336,7 +341,7 @@ fn decodea64_addsub_interpret() {
 fn decodea64_mov() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -350,7 +355,8 @@ fn decodea64_mov() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -373,7 +379,7 @@ fn decodea64_mov() {
 fn decodea64_branch() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -387,7 +393,8 @@ fn decodea64_branch() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -410,7 +417,7 @@ fn decodea64_branch() {
 fn branch_if_eq() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -424,7 +431,8 @@ fn branch_if_eq() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -546,7 +554,7 @@ fn cmp_csel() {
     fn cmp_csel_inner(pre_r0: u64, pre_r2: u64) -> u64 {
         let model = models::get("aarch64").unwrap();
 
-        let mut register_file = RegisterFile::init(&*model);
+        let register_file = RegisterFile::init(&*model);
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -564,7 +572,8 @@ fn cmp_csel() {
             &[pc, opcode],
             &mut emitter,
             &register_file,
-        );
+        )
+        .unwrap();
 
         let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
         emitter.write_register(model.reg_offset("SEE"), see_value);
@@ -579,7 +588,8 @@ fn cmp_csel() {
             &[pc, opcode],
             &mut emitter,
             &register_file,
-        );
+        )
+        .unwrap();
 
         emitter.leave();
 
@@ -599,7 +609,7 @@ fn cmp_csel() {
 fn fibonacci_instr() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let program = [
         // <_start>
@@ -649,7 +659,8 @@ fn fibonacci_instr() {
                 &[pc, opcode],
                 &mut emitter,
                 &register_file,
-            );
+            )
+            .unwrap();
         }
 
         emitter.leave();
@@ -676,7 +687,7 @@ fn fibonacci_instr() {
 fn mem() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -693,7 +704,8 @@ fn mem() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -717,7 +729,7 @@ fn mem() {
 fn mem_store() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -731,7 +743,8 @@ fn mem_store() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -754,7 +767,7 @@ fn mem_store() {
 fn mem_load() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -769,7 +782,8 @@ fn mem_load() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -793,7 +807,7 @@ fn mem_load() {
 fn fibonacci_block() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let program = [
         // <_start>
@@ -953,7 +967,7 @@ fn addwithcarry_linux_regression() {
 fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -974,6 +988,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     let sum = emitter.access_tuple(res.clone(), 0);
@@ -1066,17 +1081,15 @@ fn decodea64_cmp_something() {
 fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    unsafe {
-        register_file.write::<u64, _>("R0", x);
-        register_file.write::<u64, _>("R1", y);
+    register_file.write::<u64, _>("R0", x);
+    register_file.write::<u64, _>("R1", y);
 
-        register_file.write("SEE", -1i64);
-    }
+    register_file.write("SEE", -1i64);
 
     // cmp    x0, x1
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -1088,7 +1101,8 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -1106,7 +1120,7 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
 fn shiftreg() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1123,6 +1137,7 @@ fn shiftreg() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     emitter.write_register(model.reg_offset("R0"), value);
@@ -1145,7 +1160,7 @@ fn shiftreg() {
 fn floorpow2_constant() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1159,6 +1174,7 @@ fn floorpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1176,6 +1192,7 @@ fn floorpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1193,6 +1210,7 @@ fn floorpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1210,6 +1228,7 @@ fn floorpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1224,7 +1243,7 @@ fn floorpow2_constant() {
 fn ceilpow2_constant() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1238,6 +1257,7 @@ fn ceilpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1255,6 +1275,7 @@ fn ceilpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1272,6 +1293,7 @@ fn ceilpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1289,6 +1311,7 @@ fn ceilpow2_constant() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         value.kind(),
@@ -1303,7 +1326,7 @@ fn ceilpow2_constant() {
 fn _ispow2() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1319,6 +1342,7 @@ fn _ispow2() {
             &mut emitter,
             &register_file,
         )
+        .unwrap()
         .unwrap();
         emitter.write_register(model.reg_offset("R0"), value);
     }
@@ -1332,6 +1356,7 @@ fn _ispow2() {
             &mut emitter,
             &register_file,
         )
+        .unwrap()
         .unwrap();
         emitter.write_register(model.reg_offset("R1"), value);
     }
@@ -1345,6 +1370,7 @@ fn _ispow2() {
             &mut emitter,
             &register_file,
         )
+        .unwrap()
         .unwrap();
         emitter.write_register(model.reg_offset("R2"), value);
     }
@@ -1372,7 +1398,7 @@ fn _ispow2() {
 fn rbitx0_interpret() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     register_file.write::<u64, _>("R0", 0x0123_4567_89ab_cdef);
     register_file.write("SEE", -1i64);
@@ -1396,7 +1422,7 @@ fn rbitx0_interpret() {
 fn rbitx0() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1411,7 +1437,8 @@ fn rbitx0() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -1444,7 +1471,7 @@ fn bitinsert() {
     fn harness(target: u64, source: u64, start: u64, length: u64) -> u64 {
         let model = models::get("aarch64").unwrap();
 
-        let mut register_file = RegisterFile::init(&*model);
+        let register_file = RegisterFile::init(&*model);
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -1479,7 +1506,7 @@ fn bitinsert() {
 fn ubfx() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1494,7 +1521,8 @@ fn ubfx() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -1513,7 +1541,7 @@ fn ubfx() {
 fn highest_set_bit() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1527,6 +1555,7 @@ fn highest_set_bit() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1545,6 +1574,7 @@ fn highest_set_bit() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1559,7 +1589,7 @@ fn highest_set_bit() {
 fn ror() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1574,6 +1604,7 @@ fn ror() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1593,6 +1624,7 @@ fn ror() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1612,6 +1644,7 @@ fn ror() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1626,7 +1659,7 @@ fn ror() {
 fn extsv() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1641,6 +1674,7 @@ fn extsv() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1659,6 +1693,7 @@ fn extsv() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1677,6 +1712,7 @@ fn extsv() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1696,6 +1732,7 @@ fn extsv() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 }
@@ -1704,7 +1741,7 @@ fn extsv() {
 fn zext_ones() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1719,6 +1756,7 @@ fn zext_ones() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(res.kind(), &NodeKind::Constant { value: 1, width: 1 });
 
@@ -1732,6 +1770,7 @@ fn zext_ones() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1751,6 +1790,7 @@ fn zext_ones() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1770,6 +1810,7 @@ fn zext_ones() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -1784,7 +1825,7 @@ fn zext_ones() {
 fn decodebitmasks() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1843,6 +1884,7 @@ fn decodebitmasks() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     assert_eq!(
@@ -1865,7 +1907,7 @@ fn decodebitmasks() {
 fn replicate_bits() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1887,6 +1929,7 @@ fn replicate_bits() {
                 &register_file,
             )
             .unwrap()
+            .unwrap()
             .kind()
         );
     }
@@ -1906,6 +1949,7 @@ fn replicate_bits() {
                 &mut emitter,
                 &register_file,
             )
+            .unwrap()
             .unwrap()
             .kind()
         );
@@ -1927,6 +1971,7 @@ fn replicate_bits() {
                 &register_file,
             )
             .unwrap()
+            .unwrap()
             .kind()
         );
     }
@@ -1936,7 +1981,7 @@ fn replicate_bits() {
 fn rev_d00dfeed() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1950,7 +1995,8 @@ fn rev_d00dfeed() {
         &[_32.clone(), _3.clone(), _32, _3],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -1968,7 +2014,7 @@ fn rev_d00dfeed() {
 fn place_slice() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -1987,6 +2033,7 @@ fn place_slice() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         res.kind(),
@@ -2001,7 +2048,7 @@ fn place_slice() {
 fn udiv() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2015,7 +2062,8 @@ fn udiv() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2038,7 +2086,7 @@ fn udiv() {
 // fn to_real_const() {
 //     let model = models::get("aarch64").unwrap();
 
-//     let mut register_file = RegisterFile::init(&*model);
+//     let  register_file = RegisterFile::init(&*model);
 //
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
@@ -2056,7 +2104,7 @@ fn udiv() {
 // fn to_real_dyn() {
 //     let model = models::get("aarch64").unwrap();
 
-//     let mut register_file = RegisterFile::init(&*model);
+//     let  register_file = RegisterFile::init(&*model);
 //
 
 //     let mut ctx = X86TranslationContext::new(&model, false);
@@ -2079,7 +2127,7 @@ fn floor() {
     fn harness(n: i64, d: i64) -> i64 {
         let model = models::get("aarch64").unwrap();
 
-        let mut register_file = RegisterFile::init(&*model);
+        let register_file = RegisterFile::init(&*model);
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -2116,7 +2164,7 @@ fn ceil() {
     fn harness(n: i64, d: i64) -> i64 {
         let model = models::get("aarch64").unwrap();
 
-        let mut register_file = RegisterFile::init(&*model);
+        let register_file = RegisterFile::init(&*model);
 
         let mut ctx = X86TranslationContext::new(&model, false);
         let mut emitter = X86Emitter::new(&mut ctx);
@@ -2148,7 +2196,7 @@ fn ceil() {
 fn msr() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2165,7 +2213,8 @@ fn msr() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2182,7 +2231,7 @@ fn msr() {
 fn stp() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2197,7 +2246,8 @@ fn stp() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
     //__DecodeA64_LoadStore
     // decode_stp_gen_aarch64_instrs_memory_pair_general_pre_idx
     // execute_aarch64_instrs_memory_pair_general_post_idx
@@ -2223,7 +2273,7 @@ fn stp() {
 fn ldrsw() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2240,7 +2290,8 @@ fn ldrsw() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     // DEBUG [kernel::dbt::translate] translating "__DecodeA64_LoadStore"
     // DEBUG [kernel::dbt::translate] translating
@@ -2285,7 +2336,7 @@ fn ldrsw() {
 fn get_num_event_counters_accessible() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2300,6 +2351,7 @@ fn get_num_event_counters_accessible() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     emitter.write_register(model.reg_offset("R0"), result);
 
@@ -2317,7 +2369,7 @@ fn get_num_event_counters_accessible() {
 fn sub_pc() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2334,7 +2386,8 @@ fn sub_pc() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2352,7 +2405,7 @@ fn sub_pc() {
 fn lsrv() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2369,7 +2422,8 @@ fn lsrv() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2388,7 +2442,7 @@ fn lsrv() {
 fn mem_load_immediate() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2405,7 +2459,8 @@ fn mem_load_immediate() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2426,7 +2481,7 @@ fn mem_load_immediate() {
 fn eret() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2443,7 +2498,8 @@ fn eret() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2469,7 +2525,7 @@ fn eret() {
 fn clz() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2486,7 +2542,8 @@ fn clz() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2505,7 +2562,7 @@ fn clz() {
 fn highest_set_bit_const() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2519,6 +2576,7 @@ fn highest_set_bit_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2537,6 +2595,7 @@ fn highest_set_bit_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2555,6 +2614,7 @@ fn highest_set_bit_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2573,6 +2633,7 @@ fn highest_set_bit_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2594,6 +2655,7 @@ fn highest_set_bit_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2608,7 +2670,7 @@ fn highest_set_bit_const() {
 fn count_leading_zero_bits_const() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2622,6 +2684,7 @@ fn count_leading_zero_bits_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2640,6 +2703,7 @@ fn count_leading_zero_bits_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2658,6 +2722,7 @@ fn count_leading_zero_bits_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2676,6 +2741,7 @@ fn count_leading_zero_bits_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2697,6 +2763,7 @@ fn count_leading_zero_bits_const() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     assert_eq!(
         *n.kind(),
@@ -2711,7 +2778,7 @@ fn count_leading_zero_bits_const() {
 fn highest_set_bit_dynamic() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2725,6 +2792,7 @@ fn highest_set_bit_dynamic() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
     emitter.write_register(model.reg_offset("R0"), n);
 
@@ -2744,7 +2812,7 @@ fn highest_set_bit_dynamic() {
 fn msr_daifclr() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2761,7 +2829,8 @@ fn msr_daifclr() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2778,7 +2847,7 @@ fn msr_daifclr() {
 fn current_security_state_is_const() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2790,7 +2859,8 @@ fn current_security_state_is_const() {
         &[],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     assert_eq!(
         *state.unwrap().kind(),
@@ -2805,7 +2875,7 @@ fn current_security_state_is_const() {
 fn sys_movzx_investigation() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2823,7 +2893,8 @@ fn sys_movzx_investigation() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2846,7 +2917,7 @@ fn sys_movzx_investigation() {
 fn ttbr1_el1_write() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2862,7 +2933,8 @@ fn ttbr1_el1_write() {
         &[val],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2883,7 +2955,7 @@ fn ttbr1_el1_write() {
 fn aarch64_sysregwrite() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2914,7 +2986,8 @@ fn aarch64_sysregwrite() {
         &[el, op0, op1, crn, op2, crm, t],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2933,7 +3006,7 @@ fn aarch64_sysregwrite() {
 fn msr_ttbr() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -2950,7 +3023,8 @@ fn msr_ttbr() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2969,7 +3043,7 @@ fn msr_ttbr() {
 fn branch_link_pc_flag() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     assert!(!ctx.get_pc_write_flag());
@@ -2988,7 +3062,8 @@ fn branch_link_pc_flag() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -2999,7 +3074,7 @@ fn branch_link_pc_flag() {
 fn mrs_mpidr_el1() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3017,7 +3092,8 @@ fn mrs_mpidr_el1() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3033,7 +3109,7 @@ fn mrs_mpidr_el1() {
 fn mov_300000() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3050,7 +3126,8 @@ fn mov_300000() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3066,7 +3143,7 @@ fn mov_300000() {
 fn mrs_ctr_el0() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3083,7 +3160,8 @@ fn mrs_ctr_el0() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3099,7 +3177,7 @@ fn mrs_ctr_el0() {
 fn mrs_id_aa64dfr0_el1() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3121,7 +3199,8 @@ fn mrs_id_aa64dfr0_el1() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3149,7 +3228,7 @@ fn mrs_id_aa64dfr0_el1() {
 // fn mrs_id_aa64pfr0_el1() {
 //     let model = models::get("aarch64").unwrap();
 
-//     let mut register_file = RegisterFile::init(&*model);
+//     let  register_file = RegisterFile::init(&*model);
 //
 //     let mut ctx = X86TranslationContext::new(&model, false);
 //     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3193,7 +3272,7 @@ fn mrs_id_aa64dfr0_el1() {
 fn ldaxr() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3210,7 +3289,8 @@ fn ldaxr() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3222,7 +3302,7 @@ fn ldaxr() {
 fn slow_msr() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3238,7 +3318,8 @@ fn slow_msr() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3250,7 +3331,7 @@ fn slow_msr() {
 fn slow_msr_2() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3266,7 +3347,8 @@ fn slow_msr_2() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3278,7 +3360,7 @@ fn slow_msr_2() {
 fn csinc() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3295,7 +3377,8 @@ fn csinc() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3313,7 +3396,7 @@ fn csinc() {
 fn ldrh() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3330,7 +3413,8 @@ fn ldrh() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3355,7 +3439,7 @@ fn ldrh() {
 fn csneg() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3372,7 +3456,8 @@ fn csneg() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3391,7 +3476,7 @@ fn csneg() {
 fn ldp() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3406,7 +3491,8 @@ fn ldp() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3434,7 +3520,7 @@ fn ldp() {
 fn mem_load_32_bit() {
     let model = models::get("aarch64").unwrap();
 
-    let mut register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3451,7 +3537,8 @@ fn mem_load_32_bit() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3488,7 +3575,8 @@ fn ccmp() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3529,7 +3617,8 @@ fn msr_elr_el2() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3568,7 +3657,8 @@ fn eret_3() {
         &[pc, opcode],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3609,7 +3699,8 @@ fn exception_return() {
         &[new_pc, spsr],
         &mut emitter,
         &register_file,
-    );
+    )
+    .unwrap();
 
     emitter.leave();
 
@@ -3644,6 +3735,7 @@ fn illegal_exception_return() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     emitter.write_register(model.reg_offset("R0"), illegal_psr_state);
@@ -3679,6 +3771,7 @@ fn el_from_spsr() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     let valid = emitter.access_tuple(valid_target_tuple.clone(), 0);
@@ -3769,6 +3862,7 @@ fn el_state_using_aarch32k() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     let known = emitter.access_tuple(known_aarch32_tuple.clone(), 0);
@@ -3804,6 +3898,7 @@ fn el_state_using_aarch32k_dynamic() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     let known = emitter.access_tuple(tuple.clone(), 0);
@@ -3844,10 +3939,37 @@ fn have_aarch64() {
         &mut emitter,
         &register_file,
     )
+    .unwrap()
     .unwrap();
 
     assert_eq!(
         *have_aarch64.kind(),
         NodeKind::Constant { value: 1, width: 1 }
     )
+}
+
+#[ktest]
+fn xpaclri() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0,
+        0xd50320ff,
+    )
+    .unwrap();
+
+    emitter.leave();
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
 }
