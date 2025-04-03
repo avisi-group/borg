@@ -5,7 +5,7 @@ use {
             Translation,
             emitter::{Emitter, Type},
             register_file::RegisterFile,
-            translate::translate,
+            translate::{translate, translate_instruction},
             x86::{
                 X86TranslationContext,
                 emitter::{BinaryOperationKind, X86Emitter},
@@ -364,9 +364,6 @@ impl ModelDevice {
                 "---- ---- ---- ---- starting instr translation: {current_pc:x}, retired: {instructions_retired}"
             );
 
-            // reset SEE
-            self.register_file.write::<i64, _>("SEE", -1);
-
             let mut ctx = X86TranslationContext::new_with_allocator(alloc_ref, &self.model, true);
             let mut emitter = X86Emitter::new(&mut ctx);
 
@@ -379,15 +376,14 @@ impl ModelDevice {
             log::info!("translating {opcode:#08x} @ {current_pc:#08x}");
             log::info!("{}", disarm64::decoder::decode(opcode).unwrap());
 
-            let opcode = emitter.constant(u64::try_from(opcode).unwrap(), Type::Unsigned(32));
-            let pc = emitter.constant(current_pc, Type::Unsigned(64));
-            let _return_value = translate(
+            let _return_value = translate_instruction(
                 alloc_ref,
                 &*self.model,
                 "__DecodeA64",
-                &[pc, opcode],
                 &mut emitter,
                 &self.register_file,
+                current_pc,
+                opcode,
             );
 
             // if we didn't jump anywhere, increment PC by 4 bytes

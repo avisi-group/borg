@@ -3956,6 +3956,18 @@ fn xpaclri() {
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
+    // nop
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0,
+        0xd503201f,
+    )
+    .unwrap();
+
     translate_instruction(
         Global,
         &model,
@@ -3964,6 +3976,30 @@ fn xpaclri() {
         &register_file,
         0x0,
         0xd50320ff,
+    )
+    .unwrap();
+
+    // nop
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0,
+        0xd503201f,
+    )
+    .unwrap();
+
+    // nop
+    translate_instruction(
+        Global,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x0,
+        0xd503201f,
     )
     .unwrap();
 

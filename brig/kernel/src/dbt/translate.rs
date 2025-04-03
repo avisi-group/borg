@@ -95,7 +95,12 @@ pub fn translate_instruction<A: Alloc>(
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     register_file.write("SEE", -1i64);
 
-    loop {
+    let initial_block = emitter.get_current_block();
+
+    let (result, start_block) = loop {
+        let start_block = emitter.ctx_mut().create_block();
+        emitter.set_current_block(start_block);
+
         register_file.write("have_exception", 0u8);
 
         let pc = emitter.constant(pc, Type::Unsigned(64));
@@ -111,15 +116,26 @@ pub fn translate_instruction<A: Alloc>(
         );
 
         match res {
-            Ok(_) => break res,
+            Ok(_) => break (res, start_block),
             Err(Error::Decode) => {
                 // not resetting emitter on decode SEE retry, this is risky in
                 // case we emitted stuff during translation, except we should
                 // never have hit a write-mem or write-reg
                 // inside decode, it should always be const
+
+                // todo: timeout
             }
         }
-    }
+    };
+
+    let end_block = emitter.get_current_block();
+
+    emitter.set_current_block(initial_block);
+    emitter.jump(start_block);
+
+    emitter.set_current_block(end_block);
+
+    result
 }
 
 pub fn translate<A: Alloc>(
