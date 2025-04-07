@@ -81,6 +81,8 @@ enum ControlFlow<A: Alloc> {
     Return,
 }
 
+const NUM_TRANSLATE_ATTEMPTS: usize = 3;
+
 /// Top-level translation of a given guest instruction opcode
 ///
 /// Includes logic for retrying decoding if a SEE exception is thrown.
@@ -97,7 +99,13 @@ pub fn translate_instruction<A: Alloc>(
 
     let initial_block = emitter.get_current_block();
 
+    let mut attempts_remaining = NUM_TRANSLATE_ATTEMPTS;
+
     let (result, start_block) = loop {
+        if attempts_remaining == 0 {
+            panic!("Failed to translate in {NUM_TRANSLATE_ATTEMPTS} attempts")
+        }
+
         let start_block = emitter.ctx_mut().create_block();
         emitter.set_current_block(start_block);
 
@@ -123,6 +131,7 @@ pub fn translate_instruction<A: Alloc>(
                 // never have hit a write-mem or write-reg
                 // inside decode, it should always be const
 
+                attempts_remaining -= 1;
                 // todo: timeout
             }
         }
