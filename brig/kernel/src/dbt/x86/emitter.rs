@@ -845,7 +845,6 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     type NodeRef = X86NodeRef<A>;
     type BlockRef = Ref<X86Block<A>>;
-    type SymbolRef = X86SymbolRef<A>;
 
     fn set_current_block(&mut self, block: Self::BlockRef) {
         self.current_block = block;
@@ -1691,18 +1690,6 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction::ret());
     }
 
-    fn read_virt_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef {
-        symbol
-            .0
-            .borrow()
-            .as_ref()
-            .unwrap_or_else(|| panic!("tried to read from {symbol:?} but it was never written to"))
-            .clone()
-    }
-    fn write_virt_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef) {
-        *symbol.0.borrow_mut() = Some(value);
-    }
-
     fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
         let width = typ.width();
 
@@ -2186,10 +2173,6 @@ impl<A: Alloc> Debug for X86Block<A> {
         Ok(())
     }
 }
-
-#[derive(Clone)]
-#[derive_where(Debug)]
-pub struct X86SymbolRef<A: Alloc>(pub Rc<RefCell<Option<X86NodeRef<A>>>, A>);
 
 fn encode_compare<A: Alloc>(
     kind: &BinaryOperationKind<A>,

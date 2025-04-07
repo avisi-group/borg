@@ -3,7 +3,7 @@ use {
         Alloc, Translation,
         emitter::Emitter,
         x86::{
-            emitter::{X86Block, X86BlockMark, X86Emitter, X86SymbolRef},
+            emitter::{X86Block, X86BlockMark, X86Emitter},
             encoder::{Instruction, Opcode, OperandKind},
             register_allocator::naive::FreshAllocator,
         },
@@ -228,10 +228,6 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
     pub fn create_block(&mut self) -> Ref<X86Block<A>> {
         let b = X86Block::new_in(self.allocator());
         self.arena_mut().insert(b)
-    }
-
-    pub fn create_symbol(&mut self) -> X86SymbolRef<A> {
-        X86SymbolRef(Rc::new_in(RefCell::new(None), self.allocator()))
     }
 
     /// Sets the "PC was written to" flag

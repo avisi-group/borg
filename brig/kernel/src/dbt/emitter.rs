@@ -12,7 +12,6 @@ use {
 pub trait Emitter<A: Alloc> {
     type BlockRef;
     type NodeRef;
-    type SymbolRef;
 
     fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
@@ -70,8 +69,6 @@ pub trait Emitter<A: Alloc> {
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef);
 
-    fn read_virt_variable(&mut self, symbol: Self::SymbolRef) -> Self::NodeRef;
-    fn write_virt_variable(&mut self, symbol: Self::SymbolRef, value: Self::NodeRef);
     fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef;
     fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef);
 

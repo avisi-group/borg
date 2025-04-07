@@ -5,7 +5,7 @@ use {
         register_file::RegisterFile,
         trampoline::MAX_STACK_SIZE,
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86Node, X86NodeRef, X86SymbolRef},
+            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
             encoder::Instruction,
         },
     },
@@ -21,7 +21,6 @@ use {
         width_helpers::unsigned_smallest_width_of_value,
     },
     core::{
-        cell::RefCell,
         hash::{Hash, Hasher},
         panic,
         sync::atomic::{AtomicUsize, Ordering},
@@ -174,12 +173,18 @@ pub fn translate<A: Alloc>(
 #[derive_where(Debug)]
 enum LocalVariable<A: Alloc> {
     Virtual {
-        symbol: X86SymbolRef<A>,
+        value: Option<X86NodeRef<A>>,
     },
     Stack {
         typ: emitter::Type,
         stack_offset: usize,
     },
+}
+
+impl<A: Alloc> Default for LocalVariable<A> {
+    fn default() -> Self {
+        LocalVariable::Virtual { value: None }
+    }
 }
 
 // we only care if the variable is virtual or on the stack?
@@ -214,12 +219,10 @@ impl<A: Alloc> ReturnValue<A> {
             None => 0,
         };
 
-        let mut variables = Vec::new_in(emitter.ctx().allocator());
+        let mut variables = Vec::with_capacity_in(num_variables, emitter.ctx().allocator());
 
         for _ in 0..num_variables {
-            variables.push(LocalVariable::Virtual {
-                symbol: emitter.ctx_mut().create_symbol(),
-            });
+            variables.push(LocalVariable::default());
         }
 
         Self {
@@ -331,11 +334,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     .into_iter()
                     .zip(types.into_iter())
                     .map(|(local_variable, typ)| {
-                        let LocalVariable::Virtual { symbol } = local_variable else {
+                        let LocalVariable::Virtual { value } = local_variable else {
                             panic!()
                         };
 
-                        let prev_value = (symbol.0.borrow()).clone().unwrap();
+                        let prev_value =
+                            value.expect("no previous value written to local variable");
 
                         let stack_offset = self.allocate_stack_offset(&typ);
 
@@ -369,12 +373,16 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
         }
 
+        let mut new_variables = self.return_value.variables.clone();
+
         values
             .into_iter()
-            .zip(self.return_value.variables.clone().into_iter())
+            .zip(new_variables.iter_mut())
             .for_each(|(value, variable)| {
                 self.write_variable(variable, value);
             });
+
+        self.return_value.variables = new_variables;
 
         log::trace!(
             "wrote var borealis_fn_return_value: {:?}",
@@ -417,17 +425,20 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         };
 
         // set up symbols for parameters, and write arguments into them
+
         function
             .parameters()
             .iter()
             .zip(arguments)
-            .for_each(|(parameter, argument)| {
-                let var = LocalVariable::Virtual {
-                    symbol: celf.emitter.ctx_mut().create_symbol(),
-                };
-                celf.entry_variables.insert(parameter.name(), var.clone());
-                celf.write_variable(var, argument.clone());
-            });
+            .map(|(parameter, argument)| {
+                (
+                    parameter.name(),
+                    LocalVariable::Virtual {
+                        value: Some(argument.clone()),
+                    },
+                )
+            })
+            .collect_into(&mut celf.entry_variables);
 
         celf
     }
@@ -529,12 +540,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block0,
                         x86: block0_x86,
-                        variables: variables_deep_clone_in(&lives, self.allocator),
+                        variables: lives.clone(),
                     });
                     block_queue.push_back(JumpKind::Dynamic {
                         rudder: block1,
                         x86: block1_x86,
-                        variables: variables_deep_clone_in(&lives, self.allocator),
+                        variables: lives,
                     });
                 }
                 ControlFlow::Return => {
@@ -690,9 +701,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 let variable = variables.entry(symbol.name()).or_insert_with(|| {
                     log::trace!("writing var {} for the first time", symbol.name());
-                    LocalVariable::Virtual {
-                        symbol: self.emitter.ctx_mut().create_symbol(),
-                    }
+                    LocalVariable::default()
                 });
 
                 if is_dynamic
@@ -762,7 +771,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     })
                     .clone();
 
-                self.write_variable(variable.clone(), value);
+                self.write_variable(variable, value);
 
                 StatementResult::Data(None)
             }
@@ -1256,7 +1265,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
     fn read_variable(&mut self, variable: LocalVariable<A>) -> X86NodeRef<A> {
         match variable {
-            LocalVariable::Virtual { symbol } => self.emitter.read_virt_variable(symbol),
+            LocalVariable::Virtual { value } => {
+                value.expect("local virtual variable never written to")
+            }
             LocalVariable::Stack { stack_offset, typ } => {
                 let read = self.emitter.read_stack_variable(stack_offset, typ);
 
@@ -1274,9 +1285,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         }
     }
 
-    fn write_variable(&mut self, variable: LocalVariable<A>, value: X86NodeRef<A>) {
+    fn write_variable(&mut self, variable: &mut LocalVariable<A>, new_value: X86NodeRef<A>) {
         match variable {
-            LocalVariable::Virtual { symbol } => self.emitter.write_virt_variable(symbol, value),
+            LocalVariable::Virtual { value } => *value = Some(new_value),
             LocalVariable::Stack { typ, stack_offset } => {
                 if matches!(typ, Type::Bits) {
                     // no panic even if we tried to write two different sizes to the stack :(
@@ -1284,9 +1295,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     // if we see any issues, we need to actually support writing different sizes to
                     // stack, using an extra stack variable containing the size
                     self.bits_stack_widths
-                        .insert(stack_offset, value.typ().width());
+                        .insert(*stack_offset, new_value.typ().width());
                 }
-                self.emitter.write_stack_variable(stack_offset, value)
+                self.emitter.write_stack_variable(*stack_offset, new_value)
             }
         }
     }
@@ -1386,46 +1397,4 @@ impl<A: Alloc> StatementValueStore<A> {
     pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef<A>> {
         self.map.get(&s).cloned()
     }
-}
-
-fn variables_deep_clone_in<A: Alloc>(
-    variables: &BTreeMap<InternedString, LocalVariable<A>, A>,
-    allocator: A,
-) -> BTreeMap<InternedString, LocalVariable<A>, A> {
-    let mut map = BTreeMap::new_in(allocator);
-    variables
-        .iter()
-        .map(|(name, local)| {
-            (
-                *name,
-                match local {
-                    LocalVariable::Virtual { symbol } => {
-                        // doing Al syntax just to ensure we are really doing a
-                        // deep clone not really
-                        // necessary, but sanity checking
-
-                        let borrow: &Option<X86NodeRef<A>> = &*symbol.0.borrow();
-
-                        let inverted: Option<&X86NodeRef<A>> = borrow.as_ref();
-
-                        let cloned: Option<(NodeKind<A>, crate::dbt::emitter::Type)> = inverted
-                            .map(|node_ref_ref| {
-                                (node_ref_ref.kind().clone(), node_ref_ref.typ().clone())
-                            });
-
-                        let node: Option<X86NodeRef<A>> = cloned
-                            .map(|(kind, typ)| X86Node { typ, kind })
-                            .map(|node| X86NodeRef(Rc::new_in(node, allocator)));
-
-                        let symbol = X86SymbolRef(Rc::new_in(RefCell::new(node), allocator));
-
-                        LocalVariable::Virtual { symbol }
-                    }
-                    LocalVariable::Stack { .. } => local.clone(),
-                },
-            )
-        })
-        .collect_into(&mut map);
-
-    map
 }
