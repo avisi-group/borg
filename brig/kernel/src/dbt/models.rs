@@ -2,10 +2,10 @@ use {
     crate::{
         arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
         dbt::{
-            Translation,
+            Alloc, Translation,
             emitter::{Emitter, Type},
             register_file::RegisterFile,
-            translate::{translate, translate_instruction},
+            translate::translate_instruction,
             x86::{
                 X86TranslationContext,
                 emitter::{BinaryOperationKind, X86Emitter},
@@ -204,21 +204,9 @@ impl ModelDevice {
         n << 3 | z << 2 | c << 1 | v
     }
 
-    fn print_regs(&self) {
-        if PRINT_REGISTERS {
-            crate::print!("PC = {:016x}\n", self.register_file.read::<u64, _>("_PC"));
-            crate::print!("NZCV = {:04b}\n", self.get_nzcv());
-            for reg in 0..=30 {
-                crate::print!(
-                    "R{reg:02} = {:016x}\n",
-                    self.register_file.read::<u64, _>(alloc::format!("R{reg}"))
-                );
-            }
-        }
-    }
-
     fn block_exec(&self, single_step_mode: bool) {
-        let mut block_cache = HashMap::<u64, (Translation, usize)>::default();
+        // guest PC to translated block cache
+        let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
 
         let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
@@ -228,105 +216,18 @@ impl ModelDevice {
         loop {
             let block_start_pc = self.register_file.read::<u64, _>("_PC");
 
-            if let Some((translation, num_instructions)) = block_cache.get(&block_start_pc) {
-                log::debug!("executing cached @ {block_start_pc:#08x}");
-                translation.execute(&self.register_file);
-                self.print_regs();
-                if PRINT_REGISTERS {
-                    crate::println!("skip {}", num_instructions);
-                }
-                continue;
-            }
-
-            allocator.clear();
-            let alloc_ref = BumpAllocatorRef::new(&allocator);
-
-            let mut ctx = X86TranslationContext::new_with_allocator(alloc_ref, &self.model, true);
-            let mut emitter = X86Emitter::new(&mut ctx);
-
-            let mut current_pc = block_start_pc;
-
-            let mut num_instructions = 0usize;
-
-            // instruction translation loop
-            let was_end_of_block = loop {
-                // reset BranchTaken
-                let _false = emitter.constant(0 as u64, Type::Unsigned(1));
-                emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
-
-                // read opcode
-                let opcode = unsafe { *((current_pc & 0xFF_FFFF_FFFF) as *const u32) };
-
-                log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
-
-                let _return_value = translate_instruction(
-                    alloc_ref,
-                    &*self.model,
-                    "__DecodeA64",
-                    &mut emitter,
-                    &self.register_file,
-                    current_pc,
-                    opcode,
+            let translated_block = block_cache.entry(block_start_pc).or_insert_with(|| {
+                log::debug!("translating {block_start_pc:#08x}");
+                allocator.clear();
+                self.translate_block(
+                    BumpAllocatorRef::new(&allocator),
+                    block_start_pc,
+                    single_step_mode,
                 )
-                .unwrap();
+            });
 
-                num_instructions += 1;
-
-                // hit a maybe-PC modifying instruction
-                if emitter.ctx().get_pc_write_flag() {
-                    // end of block
-                    break true;
-                } else {
-                    // emit code to increment PC register by 4
-                    let pc_offset = self.model.reg_offset("_PC");
-                    let pc = emitter.read_register(pc_offset as u64, Type::Unsigned(64));
-                    let _4 = emitter.constant(4, Type::Unsigned(64));
-                    let pc_inc = emitter.binary_operation(BinaryOperationKind::Add(pc, _4));
-                    emitter.write_register(pc_offset as u64, pc_inc);
-
-                    // increase our local pc by 4
-                    current_pc += 4;
-
-                    // did we cross a page boundary?
-                    if current_pc & !0xFFF != block_start_pc & !0xFFF {
-                        break false;
-                    }
-                }
-
-                if single_step_mode {
-                    break false;
-                }
-            };
-
-            // if we didn't jump anywhere at the end of the block (IE. branch was not
-            // taken), increment PC by 4 bytes
-            if was_end_of_block {
-                let branch_taken = emitter.read_register(
-                    self.model.reg_offset("__BranchTaken") as u64,
-                    Type::Unsigned(1),
-                );
-
-                let _0 = emitter.constant(0, Type::Unsigned(64));
-                let _4 = emitter.constant(4, Type::Unsigned(64));
-                let addend = emitter.select(branch_taken, _0, _4);
-
-                let pc_offset = self.model.reg_offset("_PC");
-                let pc = emitter.read_register(pc_offset, Type::Unsigned(64));
-                let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
-                emitter.write_register(pc_offset, new_pc);
-            }
-
-            log::trace!("compiling");
-            emitter.leave();
-            let num_regs = emitter.next_vreg();
-
-            let contains_mmu_write = ctx.get_mmu_write_flag();
-            let needs_invalidate = ctx.get_mmu_needs_invalidate_flag();
-
-            let translation = ctx.compile(num_regs);
-
-            log::trace!("executing");
-            translation.execute(&self.register_file);
+            log::debug!("executing {block_start_pc:#08x}");
+            translated_block.translation.execute(&self.register_file);
 
             log::trace!(
                 "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
@@ -338,26 +239,139 @@ impl ModelDevice {
                 self.register_file.read::<u64, _>("R5"),
             );
 
-            self.print_regs();
             if PRINT_REGISTERS {
-                crate::println!("skip {}", num_instructions);
+                crate::print!("PC = {:016x}\n", self.register_file.read::<u64, _>("_PC"));
+                crate::print!("NZCV = {:04b}\n", self.get_nzcv());
+                for reg in 0..=30 {
+                    crate::print!(
+                        "R{reg:02} = {:016x}\n",
+                        self.register_file.read::<u64, _>(alloc::format!("R{reg}"))
+                    );
+                }
+                if !single_step_mode {
+                    crate::print!("skip {}\n", translated_block.num_instructions);
+                }
             }
 
-            if contains_mmu_write | needs_invalidate {
+            if translated_block.contained_sctlr_write | translated_block.contained_ttbr_write {
                 let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
 
-                if mmu_enabled | needs_invalidate {
+                if mmu_enabled | translated_block.contained_ttbr_write {
                     block_cache.clear();
-                    VirtualMemoryArea::current().invalidate_guest_mappings();
                     // clear guest page tables
+                    VirtualMemoryArea::current().invalidate_guest_mappings();
                 }
-            } else {
-                block_cache.insert(block_start_pc, (translation, num_instructions));
             }
-
-            log::info!("finished\n\n")
         }
     }
+
+    fn translate_block<A: Alloc>(
+        &self,
+        allocator: A,
+        block_start_pc: u64,
+        single_step_mode: bool,
+    ) -> TranslatedBlock {
+        let mut ctx = X86TranslationContext::new_with_allocator(allocator, &self.model, true);
+        let mut emitter = X86Emitter::new(&mut ctx);
+
+        let mut current_pc = block_start_pc;
+
+        let mut num_instructions = 0usize;
+
+        // instruction translation loop
+        let was_end_of_block = loop {
+            // reset BranchTaken
+            let _false = emitter.constant(0 as u64, Type::Unsigned(1));
+            emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
+
+            // read opcode
+            let opcode = unsafe { *((current_pc & 0xFF_FFFF_FFFF) as *const u32) };
+
+            log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
+
+            let _return_value = translate_instruction(
+                allocator,
+                &*self.model,
+                "__DecodeA64",
+                &mut emitter,
+                &self.register_file,
+                current_pc,
+                opcode,
+            )
+            .unwrap();
+
+            num_instructions += 1;
+
+            // hit a maybe-PC modifying instruction
+            if emitter.ctx().get_pc_write_flag() {
+                // end of block
+                break true;
+            } else {
+                // emit code to increment PC register by 4
+                let pc_offset = self.model.reg_offset("_PC");
+                let pc = emitter.read_register(pc_offset as u64, Type::Unsigned(64));
+                let _4 = emitter.constant(4, Type::Unsigned(64));
+                let pc_inc = emitter.binary_operation(BinaryOperationKind::Add(pc, _4));
+                emitter.write_register(pc_offset as u64, pc_inc);
+
+                // increase our local pc by 4
+                current_pc += 4;
+
+                // did we cross a page boundary?
+                if current_pc & !0xFFF != block_start_pc & !0xFFF {
+                    break false;
+                }
+            }
+
+            if single_step_mode {
+                break false;
+            }
+        };
+
+        // if we didn't jump anywhere at the end of the block (IE. branch was not
+        // taken), increment PC by 4 bytes
+        if was_end_of_block {
+            let branch_taken = emitter.read_register(
+                self.model.reg_offset("__BranchTaken") as u64,
+                Type::Unsigned(1),
+            );
+
+            let _0 = emitter.constant(0, Type::Unsigned(64));
+            let _4 = emitter.constant(4, Type::Unsigned(64));
+            let addend = emitter.select(branch_taken, _0, _4);
+
+            let pc_offset = self.model.reg_offset("_PC");
+            let pc = emitter.read_register(pc_offset, Type::Unsigned(64));
+            let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
+            emitter.write_register(pc_offset, new_pc);
+        }
+
+        log::trace!("compiling");
+        emitter.leave();
+        let num_regs = emitter.next_vreg();
+
+        let contained_sctlr_write = ctx.get_mmu_write_flag();
+        let contained_ttbr_write = ctx.get_mmu_needs_invalidate_flag();
+
+        let translation = ctx.compile(num_regs);
+
+        log::trace!("finished");
+
+        TranslatedBlock {
+            translation,
+            num_instructions,
+            contained_sctlr_write,
+            contained_ttbr_write,
+        }
+    }
+}
+
+struct TranslatedBlock {
+    translation: Translation,
+    num_instructions: usize,
+    // translation contains a write, not guaranteed it will be executed
+    contained_sctlr_write: bool,
+    contained_ttbr_write: bool,
 }
 
 fn register_cache_type(name: InternedString) -> RegisterCacheType {

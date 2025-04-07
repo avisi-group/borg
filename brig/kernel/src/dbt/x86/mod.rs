@@ -259,6 +259,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         self.mmu_invalidate = true;
     }
 
+    /// Wrote to TTBR0/1
     pub fn get_mmu_needs_invalidate_flag(&mut self) -> bool {
         self.mmu_invalidate
     }
