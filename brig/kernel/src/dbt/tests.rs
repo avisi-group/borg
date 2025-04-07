@@ -4009,3 +4009,36 @@ fn xpaclri() {
 
     translation.execute(&register_file);
 }
+
+// todo: enable me
+// #[ktest]
+fn _brk() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    // brk              #0x800
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd4210000, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+}
