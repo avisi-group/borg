@@ -12,7 +12,7 @@ use {
         rudder::{
             Model,
             block::Block,
-            constant_value::ConstantValue,
+            constant::Constant,
             statement::{
                 BinaryOperationKind, CastOperationKind, ShiftOperationKind, Statement,
                 TernaryOperationKind, UnaryOperationKind,
@@ -123,7 +123,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
         for statement_ref in block.statements() {
             let statement = statement_ref.get(block.arena());
             let value = match statement {
-                Statement::Constant { typ, value } => Some(Value::from_constant(value, typ)),
+                Statement::Constant { typ, value } => Some(Value::from_constant(value)),
                 Statement::ReadVariable { symbol } => Some(
                     self.locals
                         .get(&symbol.name())
@@ -732,40 +732,21 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn from_constant(value: &ConstantValue, typ: &Type) -> Self {
+    pub fn from_constant(value: &Constant) -> Self {
         match value {
-            ConstantValue::UnsignedInteger(u) => Value::UnsignedInteger {
-                value: *u,
-                width: typ.width_bits(),
+            Constant::UnsignedInteger { value, width } => Value::UnsignedInteger {
+                value: *value,
+                width: *width,
             },
-            ConstantValue::SignedInteger(i) => Value::SignedInteger {
-                value: *i,
-                width: typ.width_bits(),
+            Constant::SignedInteger { value, width } => Value::SignedInteger {
+                value: *value,
+                width: *width,
             },
-            ConstantValue::FloatingPoint(f) => Value::FloatingPoint(*f),
-            ConstantValue::String(interned_string) => Value::String(*interned_string),
+            Constant::FloatingPoint { value, .. } => Value::FloatingPoint(*value),
+            Constant::String(interned_string) => Value::String(*interned_string),
 
-            ConstantValue::Tuple(vec) => {
-                let Type::Tuple(types) = typ else {
-                    unreachable!()
-                };
-                Value::Tuple(
-                    vec.iter()
-                        .zip(types)
-                        .map(|(v, t)| Value::from_constant(v, t))
-                        .collect(),
-                )
-            }
-            ConstantValue::Vector(vec) => {
-                let Type::Vector { element_type, .. } = typ else {
-                    panic!()
-                };
-                Value::Vector(
-                    vec.iter()
-                        .map(|cv| Value::from_constant(cv, element_type))
-                        .collect(),
-                )
-            }
+            Constant::Tuple(vec) => Value::Tuple(vec.iter().map(Value::from_constant).collect()),
+            Constant::Vector(vec) => Value::Vector(vec.iter().map(Value::from_constant).collect()),
         }
     }
 }

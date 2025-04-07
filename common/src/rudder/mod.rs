@@ -13,7 +13,7 @@ use {
 };
 
 pub mod block;
-pub mod constant_value;
+pub mod constant;
 pub mod function;
 pub mod statement;
 pub mod types;

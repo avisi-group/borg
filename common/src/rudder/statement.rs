@@ -1,11 +1,11 @@
 use {
     crate::{
         arena::{Arena, Ref},
-        intern::InternedString,
         hashmap::HashMap,
+        intern::InternedString,
         rudder::{
             block::Block,
-            constant_value::ConstantValue,
+            constant::Constant,
             function::Symbol,
             types::{PrimitiveType, Type, maybe_type_to_string},
         },
@@ -81,7 +81,7 @@ pub enum ShiftOperationKind {
 pub enum Statement {
     Constant {
         typ: Type,
-        value: ConstantValue,
+        value: Constant,
     },
 
     ReadVariable {
@@ -350,10 +350,10 @@ impl Statement {
             } => {
                 if let Self::Constant { value: length, .. } = length.get(arena) {
                     Some(match length {
-                        ConstantValue::UnsignedInteger(l) => Type::new_primitive(
+                        Constant::UnsignedInteger { value: l, .. } => Type::new_primitive(
                             PrimitiveType::UnsignedInteger(u16::try_from(*l).unwrap()),
                         ),
-                        ConstantValue::SignedInteger(l) => Type::new_primitive(
+                        Constant::SignedInteger { value: l, .. } => Type::new_primitive(
                             PrimitiveType::UnsignedInteger(u16::try_from(*l).unwrap()),
                         ),
                         _ => panic!("non unsigned integer length: {length:#?}"),
@@ -1315,7 +1315,7 @@ pub fn cast_at(
                     panic!()
                 };
 
-                let ConstantValue::String(s) = value else {
+                let Constant::String(s) = value else {
                     panic!()
                 };
 
@@ -1334,7 +1334,7 @@ pub fn cast_at(
                     arena,
                     Statement::Constant {
                         typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
-                        value: ConstantValue::SignedInteger(num),
+                        value: Constant::new_signed(num, 64),
                     },
                     location,
                 );
@@ -1344,7 +1344,7 @@ pub fn cast_at(
                     arena,
                     Statement::Constant {
                         typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
-                        value: ConstantValue::SignedInteger(den),
+                        value: Constant::new_signed(den, 64),
                     },
                     location,
                 );

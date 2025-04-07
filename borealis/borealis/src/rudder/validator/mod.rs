@@ -5,7 +5,7 @@ use {
         rudder::{
             Model,
             block::Block,
-            constant_value::ConstantValue,
+            constant::Constant,
             function::Function,
             statement::Statement,
             types::{PrimitiveType, Type},
@@ -136,15 +136,18 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 fn validate_constant_type(
     ((stmt, block, f), (typ, value)): (
         (Ref<Statement>, Ref<Block>, &Function),
-        (Type, ConstantValue),
+        (Type, Constant),
     ),
 ) -> Option<ValidationMessage> {
     match (&value, &typ) {
-        (ConstantValue::UnsignedInteger(_), Type::Primitive(PrimitiveType::UnsignedInteger(_)))
-        | (ConstantValue::SignedInteger(_), Type::Primitive(PrimitiveType::SignedInteger(_)))
-        | (ConstantValue::FloatingPoint(_), Type::Primitive(PrimitiveType::FloatingPoint(_)))
-        | (ConstantValue::String(_), Type::String)
-        | (ConstantValue::Tuple(_), Type::Tuple(_)) => None,
+        (
+            Constant::UnsignedInteger { .. },
+            Type::Primitive(PrimitiveType::UnsignedInteger(_)),
+        )
+        | (Constant::SignedInteger { .. }, Type::Primitive(PrimitiveType::SignedInteger(_)))
+        | (Constant::FloatingPoint { .. }, Type::Primitive(PrimitiveType::FloatingPoint(_)))
+        | (Constant::String(_), Type::String)
+        | (Constant::Tuple(_), Type::Tuple(_)) => None,
 
         _ => Some(ValidationMessage::stmt_warn(
             f.name(),

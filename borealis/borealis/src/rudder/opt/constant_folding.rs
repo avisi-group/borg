@@ -2,7 +2,7 @@ use common::{
     arena::{Arena, Ref},
     rudder::{
         block::Block,
-        constant_value::ConstantValue,
+        constant::Constant,
         function::Function,
         statement::{BinaryOperationKind, CastOperationKind, Statement, UnaryOperationKind},
         types::{PrimitiveType, Type},
@@ -53,8 +53,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 UnaryOperationKind::Not => {
                     let constant = Statement::Constant {
                         typ: stmt.get(arena).typ(arena).unwrap(),
-                        value: (!constant_value)
-                            .truncate_to_type(&stmt.get(arena).typ(arena).unwrap()),
+                        value: !constant_value,
                     };
 
                     stmt.get_mut(arena).replace_kind(constant);
@@ -82,22 +81,22 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         BinaryOperationKind::Xor => lhs ^ rhs,
                         BinaryOperationKind::PowI => lhs.powi(rhs),
                         BinaryOperationKind::CompareEqual => {
-                            ConstantValue::UnsignedInteger((lhs == rhs) as u64)
+                            Constant::new_unsigned((lhs == rhs) as u64, 1)
                         }
                         BinaryOperationKind::CompareNotEqual => {
-                            ConstantValue::UnsignedInteger((lhs != rhs) as u64)
+                            Constant::new_unsigned((lhs != rhs) as u64, 1)
                         }
                         BinaryOperationKind::CompareLessThan => {
-                            ConstantValue::UnsignedInteger((lhs < rhs) as u64)
+                            Constant::new_unsigned((lhs < rhs) as u64, 1)
                         }
                         BinaryOperationKind::CompareLessThanOrEqual => {
-                            ConstantValue::UnsignedInteger((lhs <= rhs) as u64)
+                            Constant::new_unsigned((lhs <= rhs) as u64, 1)
                         }
                         BinaryOperationKind::CompareGreaterThan => {
-                            ConstantValue::UnsignedInteger((lhs > rhs) as u64)
+                            Constant::new_unsigned((lhs > rhs) as u64, 1)
                         }
                         BinaryOperationKind::CompareGreaterThanOrEqual => {
-                            ConstantValue::UnsignedInteger((lhs >= rhs) as u64)
+                            Constant::new_unsigned((lhs >= rhs) as u64, 1)
                         }
                     };
 
@@ -111,7 +110,9 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                 }
                 (_lhs, Statement::Constant { value: rhs, .. }) => match kind {
                     BinaryOperationKind::Multiply => match rhs {
-                        ConstantValue::UnsignedInteger(rhs_value) => {
+                        Constant::UnsignedInteger {
+                            value: rhs_value, ..
+                        } => {
                             if rhs_value == 8 {
                                 //stmt.get_mut(arena).replace_kind(Statement::ShiftOperation {
                                 // kind: (), value: (), amount: () });
@@ -120,11 +121,11 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                                 false
                             }
                         }
-                        ConstantValue::SignedInteger(_) => false,
-                        ConstantValue::FloatingPoint(_) => false,
-                        ConstantValue::String(_interned_string) => false,
-                        ConstantValue::Tuple(_vec) => false,
-                        ConstantValue::Vector(_vec) => false,
+                        Constant::SignedInteger { .. } => false,
+                        Constant::FloatingPoint { .. } => false,
+                        Constant::String(_interned_string) => false,
+                        Constant::Tuple(_vec) => false,
+                        Constant::Vector(_vec) => false,
                     },
                     _ => false,
                 },
@@ -158,10 +159,14 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
         } => {
             if let Statement::Constant { value, .. } = value.get(arena).clone() {
                 if typ.is_u1() {
-                    if let ConstantValue::SignedInteger(signed_value) = value {
+                    if let Constant::SignedInteger {
+                        value: signed_value,
+                        ..
+                    } = value
+                    {
                         stmt.get_mut(arena).replace_kind(Statement::Constant {
                             typ,
-                            value: ConstantValue::UnsignedInteger(signed_value.try_into().unwrap()),
+                            value: Constant::new_unsigned(signed_value.try_into().unwrap(), 1),
                         });
                     } else {
                         stmt.get_mut(arena)
@@ -200,23 +205,24 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
     }
 }
 
-fn cast_integer(value: ConstantValue, typ: Type) -> ConstantValue {
+fn cast_integer(value: Constant, typ: Type) -> Constant {
     match &typ {
-        Type::Primitive(primitive) => match (primitive, value) {
-            (PrimitiveType::SignedInteger(_), ConstantValue::UnsignedInteger(i)) => {
-                ConstantValue::SignedInteger(i64::try_from(i).unwrap())
+        Type::Primitive(primitive) => match (value, primitive) {
+            (Constant::UnsignedInteger { value, .. }, PrimitiveType::SignedInteger(width)) => {
+                Constant::new_signed(i64::try_from(value).unwrap(), *width)
             }
-            (PrimitiveType::SignedInteger(_), ConstantValue::SignedInteger(i)) => {
-                ConstantValue::SignedInteger(i)
+            (Constant::SignedInteger { value, .. }, PrimitiveType::SignedInteger(width)) => {
+                Constant::new_signed(value, *width)
             }
-            (PrimitiveType::UnsignedInteger(_), ConstantValue::SignedInteger(i)) => {
-                ConstantValue::UnsignedInteger(u64::try_from(i).unwrap())
+            (Constant::SignedInteger { value, .. }, PrimitiveType::UnsignedInteger(width)) => {
+                Constant::new_unsigned(u64::try_from(value).unwrap(), *width)
             }
-            (PrimitiveType::UnsignedInteger(_), ConstantValue::UnsignedInteger(i)) => {
-                ConstantValue::UnsignedInteger(i)
-            }
-            (PrimitiveType::FloatingPoint(_), ConstantValue::SignedInteger(s)) => {
-                ConstantValue::FloatingPoint(f64::from(i16::try_from(s).unwrap()))
+            (
+                Constant::UnsignedInteger { value, .. },
+                PrimitiveType::UnsignedInteger(width),
+            ) => Constant::new_unsigned(value, *width),
+            (Constant::SignedInteger { value, .. }, PrimitiveType::FloatingPoint(width)) => {
+                Constant::new_float(f64::from(i32::try_from(value).unwrap()), *width)
             }
             (typ, cv) => {
                 panic!("incompatible type {typ:?} and constant value {cv:?}")

@@ -15,8 +15,8 @@ use {
         hashmap::{HashMapA, hashmap_in},
         intern::InternedString,
         rudder::{
-            self, Model, RegisterCacheType, block::Block, constant_value::ConstantValue,
-            function::Function, statement::Statement, types::PrimitiveType,
+            self, Model, RegisterCacheType, block::Block, constant::Constant, function::Function,
+            statement::Statement, types::PrimitiveType,
         },
         width_helpers::unsigned_smallest_width_of_value,
     },
@@ -641,15 +641,21 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             Statement::Constant { typ, value } => {
                 let typ = emit_rudder_constant_type(value, typ);
                 StatementResult::Data(Some(match value {
-                    ConstantValue::UnsignedInteger(v) => self.emitter.constant(*v, typ),
-                    ConstantValue::SignedInteger(v) => self.emitter.constant(*v as u64, typ),
-                    ConstantValue::FloatingPoint(v) => self.emitter.constant(*v as u64, typ),
+                    Constant::UnsignedInteger { value, width } => {
+                        self.emitter.constant(*value, typ)
+                    }
+                    Constant::SignedInteger { value, width } => {
+                        self.emitter.constant(*value as u64, typ)
+                    }
+                    Constant::FloatingPoint { value, width } => {
+                        self.emitter.constant(*value as u64, typ)
+                    }
 
-                    ConstantValue::String(_) => self
+                    Constant::String(_) => self
                         .emitter
                         .constant(0xDEAD5555, emitter::Type::Unsigned(32)),
 
-                    ConstantValue::Tuple(_) => {
+                    Constant::Tuple(_) => {
                         // let Type::Tuple(types) = &typ else { panic!() };
                         // let values = values
                         //     .iter()
@@ -659,7 +665,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         // ((#(#values),*))
                         todo!("tuple")
                     }
-                    ConstantValue::Vector(_) => {
+                    Constant::Vector(_) => {
                         // let Type::Tuple(types) = &typ else { panic!() };
                         // let values = values
                         //     .iter()
@@ -1204,7 +1210,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::Panic(value) => {
                 let Statement::Constant {
-                    value: ConstantValue::String(msg),
+                    value: Constant::String(msg),
                     ..
                 } = value.get(arena)
                 else {
@@ -1345,10 +1351,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 }
 
 /// Converts a rudder type to a `Type` value
-fn emit_rudder_constant_type(value: &ConstantValue, typ: &rudder::types::Type) -> emitter::Type {
+fn emit_rudder_constant_type(value: &Constant, typ: &rudder::types::Type) -> emitter::Type {
     match typ {
         rudder::types::Type::Bits => {
-            let ConstantValue::UnsignedInteger(cv) = value else {
+            let Constant::UnsignedInteger { value: cv, .. } = value else {
                 panic!();
             };
 

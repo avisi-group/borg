@@ -22,7 +22,7 @@ use {
         intern::InternedString,
         rudder::{
             block::Block,
-            constant_value::ConstantValue,
+            constant::Constant,
             function::{Function, Symbol},
             statement::Statement,
             types::Type,
@@ -273,21 +273,21 @@ fn example_functions() -> HashMap<InternedString, Function> {
         let s_arena = entry_block.arena_mut();
         let _0 = s_arena.insert(Statement::Constant {
             typ: Type::u64(),
-            value: ConstantValue::UnsignedInteger(0),
+            value: Constant::new_unsigned(0, 64),
         });
 
         let _8 = s_arena.insert(Statement::Constant {
             typ: Type::u64(),
-            value: ConstantValue::UnsignedInteger(8),
+            value: Constant::new_unsigned(8, 64),
         });
 
         let _16 = s_arena.insert(Statement::Constant {
             typ: Type::u64(),
-            value: ConstantValue::UnsignedInteger(16),
+            value: Constant::new_unsigned(16, 64),
         });
         let _24 = s_arena.insert(Statement::Constant {
             typ: Type::u64(),
-            value: ConstantValue::UnsignedInteger(24),
+            value: Constant::new_unsigned(24, 64),
         });
         let r0 = s_arena.insert(Statement::ReadRegister {
             typ: Type::u64(),
@@ -378,7 +378,7 @@ fn variable_corrupted_example(
             let s_arena = a.arena_mut();
             let r0_offset = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(r0_offset),
+                value: Constant::new_unsigned(r0_offset, 64),
             });
             let read = s_arena.insert(Statement::ReadRegister {
                 typ: Type::u64(),
@@ -397,7 +397,7 @@ fn variable_corrupted_example(
             let s_arena = b.arena_mut();
             let _5 = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(5),
+                value: Constant::new_unsigned(5, 64),
             });
             let w = s_arena.insert(Statement::WriteVariable {
                 symbol: ret_val.clone(),
@@ -412,7 +412,7 @@ fn variable_corrupted_example(
             let s_arena = c.arena_mut();
             let _10 = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(10),
+                value: Constant::new_unsigned(10, 64),
             });
             let w = s_arena.insert(Statement::WriteVariable {
                 symbol: ret_val.clone(),
@@ -427,7 +427,7 @@ fn variable_corrupted_example(
             let s_arena = d.arena_mut();
             let r1_offset = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(r1_offset),
+                value: Constant::new_unsigned(r1_offset, 64),
             });
             let read = s_arena.insert(Statement::ReadRegister {
                 typ: Type::u64(),
@@ -463,7 +463,7 @@ fn variable_corrupted_example(
             });
             let r2_offset = s_arena.insert(Statement::Constant {
                 typ: Type::u64(),
-                value: ConstantValue::UnsignedInteger(r2_offset),
+                value: Constant::new_unsigned(r2_offset, 64),
             });
             let w = s_arena.insert(Statement::WriteRegister {
                 offset: r2_offset,

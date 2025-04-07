@@ -1,10 +1,10 @@
 use {
     crate::boom::{self, control_flow::ControlFlowBlock},
     common::{
-        intern::InternedString,
         hashmap::HashMap,
+        intern::InternedString,
         rudder::{
-            constant_value::ConstantValue,
+            constant::Constant,
             function::{Function, Symbol},
             statement::{BinaryOperationKind, ShiftOperationKind, Statement, build, cast},
             types::Type,
@@ -90,7 +90,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             function.arena_mut(),
             Statement::Constant {
                 typ: Type::s64(),
-                value: ConstantValue::SignedInteger(0),
+                value: Constant::new_signed(0, 64),
             },
         );
 
@@ -138,7 +138,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             function.arena_mut(),
             Statement::Constant {
                 typ: Type::s64(),
-                value: ConstantValue::SignedInteger(1),
+                value: Constant::new_signed(1, 64),
             },
         );
 
@@ -267,7 +267,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
             function.arena_mut(),
             Statement::Constant {
                 typ: (Type::u64()),
-                value: ConstantValue::UnsignedInteger(0),
+                value: Constant::new_unsigned(0, 64),
             },
         );
 

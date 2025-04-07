@@ -2,7 +2,7 @@ use common::{
     arena::{Arena, Ref},
     rudder::{
         block::Block,
-        constant_value::ConstantValue,
+        constant::Constant,
         function::Function,
         statement::{BinaryOperationKind, Location, Statement, build_at, cast_at},
         types::Type,
@@ -59,7 +59,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                         arena,
                         Statement::Constant {
                             typ: (Type::u16()),
-                            value: ConstantValue::UnsignedInteger(
+                            value: Constant::new_unsigned(
                                 assign_value
                                     .get(block.get(arena).arena())
                                     .typ(block.get(arena).arena())
@@ -67,6 +67,7 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                                     .width_bytes()
                                     .try_into()
                                     .unwrap(),
+                                16,
                             ),
                         },
                         Location::Before(stmt),
@@ -131,8 +132,9 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     arena,
                     Statement::Constant {
                         typ: (Type::s64()),
-                        value: ConstantValue::SignedInteger(
+                        value: Constant::new_signed(
                             i64::try_from(element_type.width_bytes()).unwrap(),
+                            64,
                         ),
                     },
                     Location::Before(stmt),
