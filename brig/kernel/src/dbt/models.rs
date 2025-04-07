@@ -37,6 +37,11 @@ use {
     spin::Mutex,
 };
 
+/// Size in bytes for the per-translation bump allocator
+const TRANSLATION_ALLOCATOR_SIZE: usize = 2 * 1024 * 1024 * 1024;
+
+const SINGLE_STEP: bool = false;
+
 static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
 pub fn register_model(name: &str, model: Model) {
@@ -123,8 +128,7 @@ impl Debug for ModelDevice {
 
 impl Device for ModelDevice {
     fn start(&self) {
-        self.block_exec();
-        //self.single_step_exec();
+        self.block_exec(SINGLE_STEP);
         unreachable!("execution should never terminate here")
     }
 
@@ -213,10 +217,10 @@ impl ModelDevice {
         }
     }
 
-    fn block_exec(&self) {
+    fn block_exec(&self, single_step_mode: bool) {
         let mut block_cache = HashMap::<u64, (Translation, usize)>::default();
 
-        let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
+        let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
         let _status = record_safepoint();
 
@@ -288,6 +292,10 @@ impl ModelDevice {
                         break false;
                     }
                 }
+
+                if single_step_mode {
+                    break false;
+                }
             };
 
             // if we didn't jump anywhere at the end of the block (IE. branch was not
@@ -346,117 +354,6 @@ impl ModelDevice {
             } else {
                 block_cache.insert(block_start_pc, (translation, num_instructions));
             }
-
-            log::info!("finished\n\n")
-        }
-    }
-
-    fn single_step_exec(&self) {
-        let mut instructions_retired = 0u64;
-
-        let mut instr_cache = HashMap::<u64, Translation>::default();
-
-        // 4GB
-        let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
-
-        let _status = record_safepoint();
-
-        loop {
-            let current_pc = self.register_file.read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
-
-            if let Some(translation) = instr_cache.get(&current_pc) {
-                log::info!("executing cached translation @ {current_pc:x}");
-                translation.execute(&self.register_file);
-                instructions_retired += 1;
-                self.print_regs();
-                continue;
-            }
-
-            log::info!(
-                "---- ---- ---- ---- starting instr translation: {current_pc:x}, retired: {instructions_retired}"
-            );
-
-            allocator.clear();
-            let alloc_ref = BumpAllocatorRef::new(&allocator);
-
-            let mut ctx = X86TranslationContext::new_with_allocator(alloc_ref, &self.model, true);
-            let mut emitter = X86Emitter::new(&mut ctx);
-
-            // reset BranchTaken
-            let _false = emitter.constant(0 as u64, Type::Unsigned(1));
-            emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
-
-            let opcode = unsafe { *(current_pc as *const u32) };
-
-            log::info!("translating {opcode:#08x} @ {current_pc:#08x}");
-            log::info!("{}", disarm64::decoder::decode(opcode).unwrap());
-
-            let _return_value = translate_instruction(
-                alloc_ref,
-                &*self.model,
-                "__DecodeA64",
-                &mut emitter,
-                &self.register_file,
-                current_pc,
-                opcode,
-            );
-
-            // if we didn't jump anywhere, increment PC by 4 bytes
-            {
-                let branch_taken = emitter.read_register(
-                    self.model.reg_offset("__BranchTaken") as u64,
-                    Type::Unsigned(1),
-                );
-
-                let _0 = emitter.constant(0, Type::Unsigned(64));
-                let _4 = emitter.constant(4, Type::Unsigned(64));
-                let addend = emitter.select(branch_taken, _0, _4);
-
-                let pc = emitter.read_register(self.model.reg_offset("_PC"), Type::Unsigned(64));
-                let new_pc = emitter.binary_operation(BinaryOperationKind::Add(pc, addend));
-                emitter.write_register(self.model.reg_offset("_PC"), new_pc);
-            }
-            log::trace!("compiling");
-
-            emitter.leave();
-            let num_regs = emitter.next_vreg();
-
-            let contains_mmu_write = ctx.get_mmu_write_flag();
-            let needs_invalidate = ctx.get_mmu_needs_invalidate_flag();
-
-            let translation = ctx.compile(num_regs);
-
-            log::trace!("executing");
-            translation.execute(&self.register_file);
-
-            if contains_mmu_write | needs_invalidate {
-                let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
-                log::trace!("mmu_enabled: {mmu_enabled}");
-                if mmu_enabled | needs_invalidate {
-                    log::trace!("clearing cache");
-                    instr_cache.clear();
-                    VirtualMemoryArea::current().invalidate_guest_mappings();
-                }
-                // no insertion here?
-            } else {
-                log::trace!("inserting into cache");
-                instr_cache.insert(current_pc, translation);
-            }
-
-            instructions_retired += 1;
-
-            log::trace!(
-                "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x4: {:x}, x5: {:x}",
-                self.get_nzcv(),
-                self.register_file.read::<u64, _>("SP_EL3"),
-                self.register_file.read::<u64, _>("R0"),
-                self.register_file.read::<u64, _>("R1"),
-                self.register_file.read::<u64, _>("R2"),
-                self.register_file.read::<u64, _>("R4"),
-                self.register_file.read::<u64, _>("R5"),
-            );
-
-            self.print_regs();
 
             log::info!("finished\n\n")
         }
