@@ -203,9 +203,7 @@ impl ModelDevice {
     fn print_regs(&self) {
         if PRINT_REGISTERS {
             crate::print!("PC = {:016x}\n", self.register_file.read::<u64, _>("_PC"));
-
             crate::print!("NZCV = {:04b}\n", self.get_nzcv());
-
             for reg in 0..=30 {
                 crate::print!(
                     "R{reg:02} = {:016x}\n",
@@ -216,7 +214,7 @@ impl ModelDevice {
     }
 
     fn block_exec(&self) {
-        let mut block_cache = HashMap::<u64, Translation>::default();
+        let mut block_cache = HashMap::<u64, (Translation, usize)>::default();
 
         let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
 
@@ -226,10 +224,13 @@ impl ModelDevice {
         loop {
             let block_start_pc = self.register_file.read::<u64, _>("_PC");
 
-            if let Some(translation) = block_cache.get(&block_start_pc) {
+            if let Some((translation, num_instructions)) = block_cache.get(&block_start_pc) {
                 log::debug!("executing cached @ {block_start_pc:#08x}");
                 translation.execute(&self.register_file);
                 self.print_regs();
+                if PRINT_REGISTERS {
+                    crate::println!("skip {}", num_instructions);
+                }
                 continue;
             }
 
@@ -240,6 +241,8 @@ impl ModelDevice {
             let mut emitter = X86Emitter::new(&mut ctx);
 
             let mut current_pc = block_start_pc;
+
+            let mut num_instructions = 0usize;
 
             // instruction translation loop
             let was_end_of_block = loop {
@@ -260,7 +263,10 @@ impl ModelDevice {
                     &self.register_file,
                     current_pc,
                     opcode,
-                );
+                )
+                .unwrap();
+
+                num_instructions += 1;
 
                 // hit a maybe-PC modifying instruction
                 if emitter.ctx().get_pc_write_flag() {
@@ -314,18 +320,6 @@ impl ModelDevice {
             log::trace!("executing");
             translation.execute(&self.register_file);
 
-            if contains_mmu_write | needs_invalidate {
-                let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
-
-                if mmu_enabled | needs_invalidate {
-                    block_cache.clear();
-                    VirtualMemoryArea::current().invalidate_guest_mappings();
-                    // clear guest page tables
-                }
-            } else {
-                block_cache.insert(block_start_pc, translation);
-            }
-
             log::trace!(
                 "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
                 self.get_nzcv(),
@@ -337,6 +331,21 @@ impl ModelDevice {
             );
 
             self.print_regs();
+            if PRINT_REGISTERS {
+                crate::println!("skip {}", num_instructions);
+            }
+
+            if contains_mmu_write | needs_invalidate {
+                let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
+
+                if mmu_enabled | needs_invalidate {
+                    block_cache.clear();
+                    VirtualMemoryArea::current().invalidate_guest_mappings();
+                    // clear guest page tables
+                }
+            } else {
+                block_cache.insert(block_start_pc, (translation, num_instructions));
+            }
 
             log::info!("finished\n\n")
         }
@@ -348,14 +357,11 @@ impl ModelDevice {
         let mut instr_cache = HashMap::<u64, Translation>::default();
 
         // 4GB
-        let mut allocator = BumpAllocator::new(4 * 1024 * 1024 * 1024);
+        let mut allocator = BumpAllocator::new(2 * 1024 * 1024 * 1024);
 
         let _status = record_safepoint();
 
         loop {
-            allocator.clear();
-            let alloc_ref = BumpAllocatorRef::new(&allocator);
-
             let current_pc = self.register_file.read::<u64, _>("_PC") & 0x0000_00FF_FFFF_FFFF;
 
             if let Some(translation) = instr_cache.get(&current_pc) {
@@ -369,6 +375,9 @@ impl ModelDevice {
             log::info!(
                 "---- ---- ---- ---- starting instr translation: {current_pc:x}, retired: {instructions_retired}"
             );
+
+            allocator.clear();
+            let alloc_ref = BumpAllocatorRef::new(&allocator);
 
             let mut ctx = X86TranslationContext::new_with_allocator(alloc_ref, &self.model, true);
             let mut emitter = X86Emitter::new(&mut ctx);
