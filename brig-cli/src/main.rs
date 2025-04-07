@@ -69,12 +69,6 @@ fn main() -> color_eyre::Result<()> {
         );
     }
 
-    let artifacts = build_cargo("../brig", cli.release, cli.verbose);
-
-    if let Some(Command::GdbCli) = cli.command {
-        gdb_cli(&artifacts);
-    }
-
     let test_config = match (cli.include_tests, cli.exclude_tests, cli.all_tests) {
         (None, None, false) => TestConfig::None,
         (Some(include), None, false) => TestConfig::Include(include),
@@ -82,6 +76,17 @@ fn main() -> color_eyre::Result<()> {
         (None, None, true) => TestConfig::All,
         _ => panic!("include, exclude and all test CLI flags are mutually exclusive"),
     };
+
+    let artifacts = build_cargo(
+        "../brig",
+        cli.release,
+        cli.verbose,
+        test_config != TestConfig::None,
+    );
+
+    if let Some(Command::GdbCli) = cli.command {
+        gdb_cli(&artifacts);
+    }
 
     // create TAR file containing guest kernel, plugins, and configuration
     let guest_tar = build_guest_tar("./guest_data", &artifacts, test_config);
@@ -114,7 +119,12 @@ fn main() -> color_eyre::Result<()> {
 
 /// Builds the cargo project at the supplied path, returning the artifacts
 /// produced
-fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Artifact> {
+fn build_cargo<P: AsRef<Path>>(
+    path: P,
+    release: bool,
+    verbose: bool,
+    tests_enabled: bool,
+) -> Vec<Artifact> {
     println!(
         "building cargo project {:?}",
         path.as_ref().to_str().unwrap()
@@ -126,6 +136,10 @@ fn build_cargo<P: AsRef<Path>>(path: P, release: bool, verbose: bool) -> Vec<Art
 
         if release {
             cmd.arg("--release");
+        }
+
+        if !tests_enabled {
+            cmd.arg("-F no_logging");
         }
 
         cmd.arg("--message-format=json")

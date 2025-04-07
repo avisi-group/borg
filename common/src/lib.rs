@@ -17,7 +17,7 @@ pub mod mask;
 pub mod rudder;
 pub mod width_helpers;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum TestConfig {
     // Do not run tests
     None,
