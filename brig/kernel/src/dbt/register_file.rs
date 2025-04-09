@@ -20,7 +20,7 @@ impl RegisterFile {
     pub fn init<M: Borrow<Model>>(model: M) -> Self {
         let model = model.borrow();
 
-        let mut register_file = Self {
+        let register_file = Self {
             inner: UnsafeCell::new(alloc::vec![0u8; model.register_file_size() as usize]),
             registers: model
                 .registers()
@@ -55,7 +55,7 @@ impl RegisterFile {
         unsafe { self.inner.as_mut_unchecked() }.as_mut_ptr()
     }
 
-    pub fn write<V: RegisterValue, S: Into<InternedString>>(&self, name: S, value: V) {
+    pub fn write<V: RegisterValue>(&self, name: impl Into<InternedString>, value: V) {
         let name = name.into();
         let (offset, size) = self.registers.get(&name).copied().unwrap();
 
@@ -76,7 +76,7 @@ impl RegisterFile {
         value.write(&mut unsafe { self.inner.as_mut_unchecked() }[offset..offset + V::SIZE]);
     }
 
-    pub fn read<V: RegisterValue, S: Into<InternedString>>(&self, name: S) -> V {
+    pub fn read<V: RegisterValue>(&self, name: impl Into<InternedString>) -> V {
         let name = name.into();
         let (offset, size) = self.registers.get(&name).copied().unwrap();
 

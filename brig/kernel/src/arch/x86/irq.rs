@@ -182,7 +182,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         .downcast_ref::<ModelDevice>()
         .unwrap();
 
-        let mmu_enabled = device.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
+        let mmu_enabled = device.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
 
         // correct the address as it was masked off in emitter.rs:read/write-memory
         let unmasked_address =

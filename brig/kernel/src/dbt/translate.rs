@@ -842,12 +842,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         log::trace!("attempting write to cacheable {name:?}: {value:?}");
                         if let NodeKind::Constant { value, width } = value.kind() {
                             match width {
-                                1..=8 => self.register_file.write::<u8, _>(name, (*value) as u8),
-                                9..=16 => self.register_file.write::<u16, _>(name, (*value) as u16),
-                                17..=32 => {
-                                    self.register_file.write::<u32, _>(name, (*value) as u32)
-                                }
-                                33..=64 => self.register_file.write::<u64, _>(name, *value),
+                                1..=8 => self.register_file.write::<u8>(name, (*value) as u8),
+                                9..=16 => self.register_file.write::<u16>(name, (*value) as u16),
+                                17..=32 => self.register_file.write::<u32>(name, (*value) as u32),
+                                33..=64 => self.register_file.write::<u64>(name, *value),
                                 w => todo!("width {w}"),
                             }
 
@@ -1212,9 +1210,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 };
 
                 // if have_exception is true
-                if self.register_file.read::<bool, _>("have_exception") {
+                if self.register_file.read::<bool>("have_exception") {
                     // current exception is a SEE exception
-                    if self.register_file.read::<u32, _>("current_exception_tag") == 5 {
+                    if self.register_file.read::<u32>("current_exception_tag") == 5 {
                         // retranslate a64 with current SEE value
                         return Err(Error::Decode);
                     }

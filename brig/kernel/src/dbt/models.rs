@@ -191,10 +191,10 @@ impl ModelDevice {
     }
 
     fn get_nzcv(&self) -> u8 {
-        let n = self.register_file.read::<u8, _>("PSTATE_N");
-        let z = self.register_file.read::<u8, _>("PSTATE_Z");
-        let c = self.register_file.read::<u8, _>("PSTATE_C");
-        let v = self.register_file.read::<u8, _>("PSTATE_V");
+        let n = self.register_file.read::<u8>("PSTATE_N");
+        let z = self.register_file.read::<u8>("PSTATE_Z");
+        let c = self.register_file.read::<u8>("PSTATE_C");
+        let v = self.register_file.read::<u8>("PSTATE_V");
 
         assert!(n <= 1);
         assert!(z <= 1);
@@ -214,7 +214,7 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
-            let block_start_pc = self.register_file.read::<u64, _>("_PC");
+            let block_start_pc = self.register_file.read::<u64>("_PC");
 
             let translated_block = block_cache.entry(block_start_pc).or_insert_with(|| {
                 log::debug!("translating {block_start_pc:#08x}");
@@ -232,20 +232,20 @@ impl ModelDevice {
             log::trace!(
                 "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
                 self.get_nzcv(),
-                self.register_file.read::<u64, _>("SP_EL3"),
-                self.register_file.read::<u64, _>("R0"),
-                self.register_file.read::<u64, _>("R1"),
-                self.register_file.read::<u64, _>("R2"),
-                self.register_file.read::<u64, _>("R5"),
+                self.register_file.read::<u64>("SP_EL3"),
+                self.register_file.read::<u64>("R0"),
+                self.register_file.read::<u64>("R1"),
+                self.register_file.read::<u64>("R2"),
+                self.register_file.read::<u64>("R5"),
             );
 
             if PRINT_REGISTERS {
-                crate::print!("PC = {:016x}\n", self.register_file.read::<u64, _>("_PC"));
+                crate::print!("PC = {:016x}\n", self.register_file.read::<u64>("_PC"));
                 crate::print!("NZCV = {:04b}\n", self.get_nzcv());
                 for reg in 0..=30 {
                     crate::print!(
                         "R{reg:02} = {:016x}\n",
-                        self.register_file.read::<u64, _>(alloc::format!("R{reg}"))
+                        self.register_file.read::<u64>(alloc::format!("R{reg}"))
                     );
                 }
                 if !single_step_mode {
@@ -254,7 +254,7 @@ impl ModelDevice {
             }
 
             if translated_block.contained_sctlr_write | translated_block.contained_ttbr_write {
-                let mmu_enabled = self.register_file.read::<u64, _>("SCTLR_EL1_bits") & 1 == 1;
+                let mmu_enabled = self.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
 
                 if mmu_enabled | translated_block.contained_ttbr_write {
                     block_cache.clear();

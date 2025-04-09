@@ -12,15 +12,15 @@ use {
 
 // returns guest physical address
 pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Option<u64> {
-    let tcr_el1 = device.register_file.read::<u64, _>("TCR_EL1_bits");
+    let tcr_el1 = device.register_file.read::<u64>("TCR_EL1_bits");
     log::trace!("tcr_el1: {tcr_el1:x}");
     // let ttbcr = device.register_file.read::<u32>("TTBCR_S_bits");
     // log::trace!("{ttbcr:032b}");
     // let ttbcr_n = ttbcr & 0b111;
     // exit_with_message!("{ttbcr_n:03b}");
 
-    let ttbr0_el1 = device.register_file.read::<u64, _>("_TTBR0_EL1_bits");
-    let ttbr1_el1 = device.register_file.read::<u64, _>("_TTBR1_EL1_bits");
+    let ttbr0_el1 = device.register_file.read::<u64>("_TTBR0_EL1_bits");
+    let ttbr1_el1 = device.register_file.read::<u64>("_TTBR1_EL1_bits");
     log::trace!("ttbr0_el1: {ttbr0_el1:x}");
     log::trace!("ttbr1_el1: {ttbr1_el1:x}");
 
@@ -138,7 +138,7 @@ fn entry_to_table(entry: &Descriptor) -> &[Descriptor; 512] {
 fn guest_page_fault(device: &ModelDevice, guest_virtual_address: u64) {
     log::warn!("guest page fault @ {guest_virtual_address}");
 
-    let retaddr = device.register_file.read::<u64, _>("_PC");
+    let retaddr = device.register_file.read::<u64>("_PC");
 
     take_arm_exception(device, 1, 1, 0, guest_virtual_address, retaddr, 0);
 
@@ -157,49 +157,49 @@ fn take_arm_exception(
     let spsr = get_psr_from_pstate(device);
     log::trace!("spsr: {spsr:032b}");
 
-    let current_el = device.register_file.read::<u8, _>("PSTATE_EL");
+    let current_el = device.register_file.read::<u8>("PSTATE_EL");
     log::trace!("current_el: {current_el}");
 
     if target_el > current_el {
         voff += 0x400;
-    } else if device.register_file.read::<u8, _>("PSTATE_SP") == 1 {
+    } else if device.register_file.read::<u8>("PSTATE_SP") == 1 {
         voff += 0x200;
     }
 
     log::trace!("voff: {voff:x}");
 
     // Update the execution level
-    device.register_file.write::<u8, _>("PSTATE_EL", target_el);
+    device.register_file.write::<u8>("PSTATE_EL", target_el);
 
     // Update spsel
-    device.register_file.write::<u8, _>("PSTATE_SP", 1);
+    device.register_file.write::<u8>("PSTATE_SP", 1);
 
     if target_el == 1 {
-        device.register_file.write::<u32, _>("SPSR_EL1_bits", spsr);
-        device.register_file.write::<u64, _>("ELR_EL1", retaddr);
+        device.register_file.write::<u32>("SPSR_EL1_bits", spsr);
+        device.register_file.write::<u64>("ELR_EL1", retaddr);
 
         // If it's NOT an IRQ...
         if typ != 255 {
             let ec = get_exception_class(current_el, target_el, typ);
-            device.register_file.write::<u32, _>(
+            device.register_file.write::<u32>(
                 "ESR_EL1_bits",
                 (ec << 26) | (1 << 25) | (syndrome & 0x1ffffff),
             );
 
             if typ == 1 || typ == 4 {
-                device.register_file.write::<u64, _>("FAR_EL1", vaddr);
+                device.register_file.write::<u64>("FAR_EL1", vaddr);
             }
         }
     } else {
         exit_with_message!("trap");
     }
 
-    device.register_file.write::<u8, _>("PSTATE_D", 1);
-    device.register_file.write::<u8, _>("PSTATE_A", 1);
-    device.register_file.write::<u8, _>("PSTATE_I", 1);
-    device.register_file.write::<u8, _>("PSTATE_F", 1);
+    device.register_file.write::<u8>("PSTATE_D", 1);
+    device.register_file.write::<u8>("PSTATE_A", 1);
+    device.register_file.write::<u8>("PSTATE_I", 1);
+    device.register_file.write::<u8>("PSTATE_F", 1);
 
-    let vbar = device.register_file.read::<u64, _>(match current_el {
+    let vbar = device.register_file.read::<u64>(match current_el {
         1 => "VBAR_EL1",
         2 => "VBAR_EL2",
         3 => "VBAR_EL3",
@@ -208,20 +208,20 @@ fn take_arm_exception(
     log::trace!("vbar: {:x}", vbar);
 
     log::trace!("pc: {:x}", vbar + voff);
-    device.register_file.write::<u64, _>("_PC", vbar + voff);
+    device.register_file.write::<u64>("_PC", vbar + voff);
 }
 
 fn get_psr_from_pstate(device: &ModelDevice) -> u32 {
-    let n = device.register_file.read::<u8, _>("PSTATE_N") as u32;
-    let z = device.register_file.read::<u8, _>("PSTATE_Z") as u32;
-    let c = device.register_file.read::<u8, _>("PSTATE_C") as u32;
-    let v = device.register_file.read::<u8, _>("PSTATE_V") as u32;
-    let d = device.register_file.read::<u8, _>("PSTATE_D") as u32;
-    let a = device.register_file.read::<u8, _>("PSTATE_A") as u32;
-    let i = device.register_file.read::<u8, _>("PSTATE_I") as u32;
-    let f = device.register_file.read::<u8, _>("PSTATE_F") as u32;
-    let el = device.register_file.read::<u8, _>("PSTATE_EL") as u32;
-    let sp = device.register_file.read::<u8, _>("PSTATE_SP") as u32;
+    let n = device.register_file.read::<u8>("PSTATE_N") as u32;
+    let z = device.register_file.read::<u8>("PSTATE_Z") as u32;
+    let c = device.register_file.read::<u8>("PSTATE_C") as u32;
+    let v = device.register_file.read::<u8>("PSTATE_V") as u32;
+    let d = device.register_file.read::<u8>("PSTATE_D") as u32;
+    let a = device.register_file.read::<u8>("PSTATE_A") as u32;
+    let i = device.register_file.read::<u8>("PSTATE_I") as u32;
+    let f = device.register_file.read::<u8>("PSTATE_F") as u32;
+    let el = device.register_file.read::<u8>("PSTATE_EL") as u32;
+    let sp = device.register_file.read::<u8>("PSTATE_SP") as u32;
 
     n << 31 | z << 30 | c << 29 | v << 28 | d << 9 | a << 8 | i << 7 | f << 6 | el << 2 | sp
 }
