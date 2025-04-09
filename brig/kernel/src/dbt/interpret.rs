@@ -123,7 +123,7 @@ impl<'f, 'r> Interpreter<'f, 'r> {
         for statement_ref in block.statements() {
             let statement = statement_ref.get(block.arena());
             let value = match statement {
-                Statement::Constant { typ, value } => Some(Value::from_constant(value)),
+                Statement::Constant(value) => Some(Value::from_constant(value)),
                 Statement::ReadVariable { symbol } => Some(
                     self.locals
                         .get(&symbol.name())

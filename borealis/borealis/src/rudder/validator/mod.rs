@@ -96,8 +96,8 @@ fn check_constant_value_types(ctx: &Model) -> Vec<ValidationMessage> {
         })
         .flatten()
         .filter_map(|((b, f), s)| {
-            if let Statement::Constant { typ, value } = s.get(b.get(f.arena()).arena()) {
-                Some(((s, b, f), (typ.clone(), value.clone())))
+            if let Statement::Constant(value) = s.get(b.get(f.arena()).arena()) {
+                Some(((s, b, f), (value.typ(), value.clone())))
             } else {
                 None
             }
@@ -134,16 +134,10 @@ fn check_operand_types(ctx: &Model) -> Vec<ValidationMessage> {
 }
 
 fn validate_constant_type(
-    ((stmt, block, f), (typ, value)): (
-        (Ref<Statement>, Ref<Block>, &Function),
-        (Type, Constant),
-    ),
+    ((stmt, block, f), (typ, value)): ((Ref<Statement>, Ref<Block>, &Function), (Type, Constant)),
 ) -> Option<ValidationMessage> {
     match (&value, &typ) {
-        (
-            Constant::UnsignedInteger { .. },
-            Type::Primitive(PrimitiveType::UnsignedInteger(_)),
-        )
+        (Constant::UnsignedInteger { .. }, Type::Primitive(PrimitiveType::UnsignedInteger(_)))
         | (Constant::SignedInteger { .. }, Type::Primitive(PrimitiveType::SignedInteger(_)))
         | (Constant::FloatingPoint { .. }, Type::Primitive(PrimitiveType::FloatingPoint(_)))
         | (Constant::String(_), Type::String)

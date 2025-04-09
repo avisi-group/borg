@@ -105,8 +105,8 @@ impl Display for Constant {
         let typ = self.typ();
         match self {
             Constant::UnsignedInteger { value, .. } => write!(f, "{value:#x}{typ}"),
-            Constant::SignedInteger { value, .. } => write!(f, "{value}s"),
-            Constant::FloatingPoint { value, .. } => write!(f, "{value}f"),
+            Constant::SignedInteger { value, .. } => write!(f, "{value}{typ}"),
+            Constant::FloatingPoint { value, .. } => write!(f, "{value}{typ}"),
             Constant::String(str) => write!(f, "{str:?}"),
             Constant::Tuple(vs) => {
                 write!(f, "(").unwrap();

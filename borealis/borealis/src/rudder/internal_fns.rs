@@ -88,10 +88,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         let _0 = build(
             check_block_ref,
             function.arena_mut(),
-            Statement::Constant {
-                typ: Type::s64(),
-                value: Constant::new_signed(0, 64),
-            },
+            Statement::Constant(Constant::new_signed(0, 64)),
         );
 
         let read_count = build(
@@ -136,10 +133,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         let _1 = build(
             shift_block_ref,
             function.arena_mut(),
-            Statement::Constant {
-                typ: Type::s64(),
-                value: Constant::new_signed(1, 64),
-            },
+            Statement::Constant(Constant::new_signed(1, 64)),
         );
 
         let decrement = build(
@@ -265,10 +259,7 @@ pub static REPLICATE_BITS_BOREALIS_INTERNAL: Lazy<Function> = Lazy::new(|| {
         let zero = build(
             entry_block_ref,
             function.arena_mut(),
-            Statement::Constant {
-                typ: (Type::u64()),
-                value: Constant::new_unsigned(0, 64),
-            },
+            Statement::Constant(Constant::new_unsigned(0, 64)),
         );
 
         let bits = build(

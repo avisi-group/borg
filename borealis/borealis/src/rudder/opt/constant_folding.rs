@@ -46,15 +46,9 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             kind: unary_op_kind,
             value,
         } => match value.get(arena).clone() {
-            Statement::Constant {
-                value: constant_value,
-                ..
-            } => match unary_op_kind {
+            Statement::Constant(constant) => match unary_op_kind {
                 UnaryOperationKind::Not => {
-                    let constant = Statement::Constant {
-                        typ: stmt.get(arena).typ(arena).unwrap(),
-                        value: !constant_value,
-                    };
+                    let constant = Statement::Constant(!constant);
 
                     stmt.get_mut(arena).replace_kind(constant);
 
@@ -66,10 +60,7 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
         },
         Statement::BinaryOperation { kind, lhs, rhs } => {
             match (lhs.get(arena).clone(), rhs.get(arena).clone()) {
-                (
-                    Statement::Constant { value: lhs, .. },
-                    Statement::Constant { value: rhs, .. },
-                ) => {
+                (Statement::Constant(lhs), Statement::Constant(rhs)) => {
                     let cv = match kind {
                         BinaryOperationKind::Add => lhs + rhs,
                         BinaryOperationKind::Sub => lhs - rhs,
@@ -100,15 +91,11 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         }
                     };
 
-                    let constant = Statement::Constant {
-                        typ: stmt.get(arena).typ(arena).unwrap(),
-                        value: cv,
-                    };
-                    stmt.get_mut(arena).replace_kind(constant);
+                    stmt.get_mut(arena).replace_kind(Statement::Constant(cv));
 
                     true
                 }
-                (_lhs, Statement::Constant { value: rhs, .. }) => match kind {
+                (_lhs, Statement::Constant(rhs)) => match kind {
                     BinaryOperationKind::Multiply => match rhs {
                         Constant::UnsignedInteger {
                             value: rhs_value, ..
@@ -140,10 +127,9 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             // watch out! if you cast a constant primitive to an arbitrary bits you lose
             // length information
             if let Type::Primitive(_) = &typ {
-                if let Statement::Constant { value, .. } = value.get(arena).clone() {
+                if let Statement::Constant(value) = value.get(arena).clone() {
                     let value = cast_integer(value, typ.clone());
-                    stmt.get_mut(arena)
-                        .replace_kind(Statement::Constant { typ, value });
+                    stmt.get_mut(arena).replace_kind(Statement::Constant(value));
                     true
                 } else {
                     false
@@ -157,25 +143,33 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             typ,
             value,
         } => {
-            if let Statement::Constant { value, .. } = value.get(arena).clone() {
-                if typ.is_u1() {
-                    if let Constant::SignedInteger {
-                        value: signed_value,
-                        ..
-                    } = value
-                    {
-                        stmt.get_mut(arena).replace_kind(Statement::Constant {
-                            typ,
-                            value: Constant::new_unsigned(signed_value.try_into().unwrap(), 1),
-                        });
-                    } else {
-                        stmt.get_mut(arena)
-                            .replace_kind(Statement::Constant { typ, value });
+            if let Statement::Constant(value) = value.get(arena).clone() {
+                // creating new constant will truncate old value
+                // todo: assert old width > target width
+                let truncated = match typ {
+                    Type::Primitive(PrimitiveType::UnsignedInteger(width)) => {
+                        let value = match value {
+                            Constant::UnsignedInteger { value, .. } => value,
+                            Constant::SignedInteger { value, .. } => u64::try_from(value).unwrap(),
+                            _ => todo!("{value}"),
+                        };
+                        Constant::new_unsigned(value, width)
                     }
-                } else {
-                    stmt.get_mut(arena)
-                        .replace_kind(Statement::Constant { typ, value });
-                }
+                    Type::Primitive(PrimitiveType::SignedInteger(width)) => {
+                        let value = match value {
+                            Constant::SignedInteger { value, .. } => value,
+                            Constant::UnsignedInteger { value, .. } => {
+                                i64::try_from(value).unwrap()
+                            }
+                            _ => todo!("{value}"),
+                        };
+                        Constant::new_signed(value, width)
+                    }
+                    _ => todo!("{typ}"),
+                };
+
+                stmt.get_mut(arena)
+                    .replace_kind(Statement::Constant(truncated));
 
                 true
             } else {
@@ -187,11 +181,10 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
             typ,
             value,
         } => {
-            if let Statement::Constant { value, .. } = value.get(arena) {
+            if let Statement::Constant(value) = value.get(arena) {
                 let value = cast_integer(value.clone(), typ.clone());
 
-                stmt.get_mut(arena)
-                    .replace_kind(Statement::Constant { typ, value });
+                stmt.get_mut(arena).replace_kind(Statement::Constant(value));
                 true
             } else {
                 false
@@ -217,10 +210,9 @@ fn cast_integer(value: Constant, typ: Type) -> Constant {
             (Constant::SignedInteger { value, .. }, PrimitiveType::UnsignedInteger(width)) => {
                 Constant::new_unsigned(u64::try_from(value).unwrap(), *width)
             }
-            (
-                Constant::UnsignedInteger { value, .. },
-                PrimitiveType::UnsignedInteger(width),
-            ) => Constant::new_unsigned(value, *width),
+            (Constant::UnsignedInteger { value, .. }, PrimitiveType::UnsignedInteger(width)) => {
+                Constant::new_unsigned(value, *width)
+            }
             (Constant::SignedInteger { value, .. }, PrimitiveType::FloatingPoint(width)) => {
                 Constant::new_float(f64::from(i32::try_from(value).unwrap()), *width)
             }

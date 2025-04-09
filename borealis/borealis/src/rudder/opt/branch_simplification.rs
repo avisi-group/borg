@@ -25,7 +25,7 @@ pub fn run(f: &mut Function) -> bool {
         {
             let condition = condition.get(block.arena()).clone();
 
-            if let Statement::Constant { value, .. } = condition {
+            if let Statement::Constant(value) = condition {
                 trace!("found constant branch statement {}", value);
 
                 if value.is_zero() == Some(true) {

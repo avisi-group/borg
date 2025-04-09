@@ -504,10 +504,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let one = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::s64()),
-                        value: Constant::new_signed(1, 64),
-                    },
+                    Statement::Constant(Constant::new_signed(1, 64)),
                 );
 
                 let typ = {
@@ -769,10 +766,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let const_1 = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::s64(),
-                        value: Constant::new_signed(1, 64),
-                    },
+                    Statement::Constant(Constant::new_signed(1, 64)),
                 );
                 Some(build(
                     self.block,
@@ -940,10 +934,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let length = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u64()),
-                        value: Constant::new_unsigned(1, 64),
-                    },
+                    Statement::Constant(Constant::new_unsigned(1, 64)),
                 );
                 let bitex = build(
                     self.block,
@@ -963,10 +954,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let zero = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::u64(),
-                        value: Constant::new_unsigned(0, 64),
-                    },
+                    Statement::Constant(Constant::new_unsigned(0, 64)),
                 );
 
                 Some(build(
@@ -1014,10 +1002,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let one = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u64()),
-                        value: Constant::new_unsigned(1, 64),
-                    },
+                    Statement::Constant(Constant::new_unsigned(1, 64)),
                 );
 
                 // (bit & 1)
@@ -1144,7 +1129,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             // val sail_zero_extend : (%bv, %i) -> %bv
             "ZeroExtend0" | "sail_zero_extend" => {
                 let width = args[1].get(self.statement_arena());
-                if let Statement::Constant { value: width, .. } = width {
+                if let Statement::Constant(width) = width {
                     let width = match width {
                         Constant::UnsignedInteger { value, .. } => u16::try_from(*value).unwrap(),
                         Constant::SignedInteger { value, .. } => u16::try_from(*value).unwrap(),
@@ -1185,10 +1170,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             ) {
                 (
                     Type::Primitive(PrimitiveType::UnsignedInteger(_)),
-                    Statement::Constant {
-                        value: Constant::SignedInteger { value: width, .. },
-                        ..
-                    },
+                    Statement::Constant(Constant::SignedInteger { value: width, .. }),
                 ) => Some(build(
                     self.block,
                     self.block_arena_mut(),
@@ -1288,10 +1270,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let const_0 = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::u64(),
-                        value: Constant::new_unsigned(0, 64),
-                    },
+                    Statement::Constant(Constant::new_unsigned(0, 64)),
                 );
 
                 Some(build(
@@ -1329,10 +1308,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let const_1 = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u64()),
-                        value: Constant::new_unsigned(1, 64),
-                    },
+                    Statement::Constant(Constant::new_unsigned(1, 64)),
                 );
 
                 Some(build(
@@ -1440,10 +1416,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let const_1 = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::s64(),
-                        value: Constant::new_signed(1, 64),
-                    },
+                    Statement::Constant(Constant::new_signed(1, 64)),
                 );
 
                 let source_length = build(
@@ -1522,10 +1495,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let value = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::Primitive(PrimitiveType::UnsignedInteger(8)),
-                        value: Constant::new_unsigned(0, 8),
-                    },
+                    Statement::Constant(Constant::new_unsigned(0, 8)),
                 );
 
                 Some(build(
@@ -1576,19 +1546,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "read_tag#" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Constant {
-                    typ: (Type::u1()),
-                    value: Constant::new_unsigned(1, 1),
-                },
+                Statement::Constant(Constant::new_unsigned(1, 1)),
             )),
+
             "write_tag#" => {
                 let msg = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::String),
-                        value: Constant::String("write_tag panic".into()),
-                    },
+                    Statement::Constant(Constant::String("write_tag panic".into())),
                 );
                 Some(build(
                     self.block,
@@ -1600,48 +1565,35 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "DecStr" | "bits_str" | "HexStr" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Constant {
-                    typ: (Type::String),
-                    value: Constant::String("fix me in build_specialized_function".into()),
-                },
+                Statement::Constant(Constant::String(
+                    "fix me in build_specialized_function".into(),
+                )),
             )),
 
             // todo: remove me!
             "HaveBRBExt" | "HaveStatisticalProfiling" | "HaveGCS" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Constant {
-                    typ: (Type::u1()),
-                    value: Constant::new_unsigned(0, 1),
-                },
+                Statement::Constant(Constant::new_unsigned(0, 1)),
             )),
 
             "__GetVerbosity" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Constant {
-                    typ: (Type::u64()),
-                    value: Constant::new_unsigned(0, 64),
-                },
+                Statement::Constant(Constant::new_unsigned(0, 64)),
             )),
 
             "get_cycle_count" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Constant {
-                    typ: Type::s64(),
-                    value: Constant::new_signed(0, 64),
-                },
+                Statement::Constant(Constant::new_signed(0, 64)),
             )),
 
             // requires u256 internally :(
             "SHA256hash" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Constant {
-                    typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(256))),
-                    value: Constant::new_unsigned(0, 256),
-                },
+                Statement::Constant(Constant::new_unsigned(0, 256)),
             )),
 
             // val putchar : (%i) -> %unit
@@ -1674,10 +1626,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 Some(build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(1))),
-                        value: Constant::new_unsigned(0, 1),
-                    },
+                    Statement::Constant(Constant::new_unsigned(0, 1)),
                 ))
             }
 
@@ -1685,10 +1634,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "AArch64_ExclusiveMonitorsPass" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Constant {
-                    typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(1))),
-                    value: Constant::new_unsigned(1, 1),
-                },
+                Statement::Constant(Constant::new_unsigned(1, 1)),
             )),
             _ => None,
         }
@@ -1761,13 +1707,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u32()),
-                            value: Constant::new_unsigned(
-                                u64::try_from(register_offset).unwrap(),
-                                32,
-                            ),
-                        },
+                        Statement::Constant(Constant::new_unsigned(
+                            u64::try_from(register_offset).unwrap(),
+                            32,
+                        )),
                     );
 
                     build(
@@ -1815,13 +1758,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     let offset = build(
                         self.block,
                         self.block_arena_mut(),
-                        Statement::Constant {
-                            typ: (Type::u32()),
-                            value: Constant::new_unsigned(
-                                u64::try_from(register_offset).unwrap(),
-                                32,
-                            ),
-                        },
+                        Statement::Constant(Constant::new_unsigned(
+                            u64::try_from(register_offset).unwrap(),
+                            32,
+                        )),
                     );
 
                     return build(
@@ -1868,12 +1808,9 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let c = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::String,
-                        value: Constant::String(
-                            format!("boom attempted to build a struct {name:?} here").into(),
-                        ),
-                    },
+                    Statement::Constant(Constant::String(
+                        format!("boom attempted to build a struct {name:?} here").into(),
+                    )),
                 );
                 return build(self.block, self.block_arena_mut(), Statement::Panic(c));
                 // todo: do whatever to enable this panic
@@ -1896,10 +1833,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let target_tag = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::Primitive(PrimitiveType::SignedInteger(32)),
-                        value: Constant::new_signed(i64::from(target_tag), 32),
-                    },
+                    Statement::Constant(Constant::new_signed(i64::from(target_tag), 64)),
                 );
 
                 let read_tag = {
@@ -1987,49 +1921,19 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
         let value = build_constant_value(literal);
 
         let kind = match literal {
-            boom::Literal::Int(_) => Statement::Constant {
-                typ: (Type::new_primitive(PrimitiveType::SignedInteger(64))),
-                value,
-            },
-            boom::Literal::Bits(bits) => Statement::Constant {
-                typ: (Type::new_primitive(PrimitiveType::UnsignedInteger(
-                    u16::try_from(bits.len()).unwrap(),
-                ))),
-                value,
-            },
-            boom::Literal::Bit(_) => Statement::Constant {
-                typ: (Type::u1()),
-                value,
-            },
-            boom::Literal::Bool(_) => Statement::Constant {
-                typ: (Type::u1()),
-                value,
-            },
-            boom::Literal::String(_) => Statement::Constant {
-                typ: (Type::String),
-                value,
-            },
+            boom::Literal::Int(_)
+            | boom::Literal::Bits(_)
+            | boom::Literal::Bit(_)
+            | boom::Literal::Bool(_)
+            | boom::Literal::String(_) => Statement::Constant(value),
             boom::Literal::Unit => unreachable!("units removed in boom pass"),
             boom::Literal::Reference(_) => todo!(),
             boom::Literal::Undefined => todo!(),
-            boom::Literal::Vector(vec) => Statement::Constant {
-                typ: Type::Vector {
-                    element_count: vec.len(),
-                    element_type: Box::new(match &*vec[0].get() {
-                        boom::Literal::Bits(vec) => Type::Primitive(
-                            PrimitiveType::UnsignedInteger(u16::try_from(vec.len()).unwrap()),
-                        ),
-                        boom::Literal::Bit(_) => Type::Primitive(PrimitiveType::UnsignedInteger(1)),
-                        boom::Literal::Int(_) => Type::Primitive(PrimitiveType::SignedInteger(64)),
-                        l => todo!("{l:?}"),
-                    }),
-                },
-                value: Constant::Vector(
-                    vec.iter()
-                        .map(|l| build_constant_value(&*l.get()))
-                        .collect(),
-                ),
-            },
+            boom::Literal::Vector(vec) => Statement::Constant(Constant::Vector(
+                vec.iter()
+                    .map(|l| build_constant_value(&*l.get()))
+                    .collect(),
+            )),
         };
 
         build(self.block, self.block_arena_mut(), kind)
@@ -2312,10 +2216,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let right_width_constant = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: (Type::u16()),
-                        value: Constant::new_unsigned(u64::try_from(right_width).unwrap(), 16),
-                    },
+                    Statement::Constant(Constant::new_unsigned(
+                        u64::try_from(right_width).unwrap(),
+                        16,
+                    )),
                 );
 
                 let left_shift = build(
@@ -2348,10 +2252,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let left_width = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::u16(),
-                        value: Constant::new_unsigned(u64::try_from(left_width).unwrap(), 16),
-                    },
+                    Statement::Constant(Constant::new_unsigned(
+                        u64::try_from(left_width).unwrap(),
+                        16,
+                    )),
                 );
 
                 let length = build(
@@ -2396,10 +2300,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let right_width = build(
                     self.block,
                     self.block_arena_mut(),
-                    Statement::Constant {
-                        typ: Type::u16(),
-                        value: Constant::new_unsigned(u64::try_from(right_width).unwrap(), 16),
-                    },
+                    Statement::Constant(Constant::new_unsigned(
+                        u64::try_from(right_width).unwrap(),
+                        16,
+                    )),
                 );
 
                 let left_shift = build(

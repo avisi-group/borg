@@ -79,10 +79,7 @@ pub enum ShiftOperationKind {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Statement {
-    Constant {
-        typ: Type,
-        value: Constant,
-    },
+    Constant(Constant),
 
     ReadVariable {
         symbol: Symbol,
@@ -286,7 +283,7 @@ impl Statement {
 
     pub fn typ(&self, arena: &Arena<Statement>) -> Option<Type> {
         match self {
-            Self::Constant { typ, .. } => Some(typ.clone()),
+            Self::Constant(c) => Some(c.typ()),
             Self::ReadVariable { symbol } => Some(symbol.typ()),
             Self::WriteVariable { .. } => None,
             Self::ReadRegister { typ, .. } => Some(typ.clone()),
@@ -348,7 +345,7 @@ impl Statement {
                 width: length,
                 ..
             } => {
-                if let Self::Constant { value: length, .. } = length.get(arena) {
+                if let Self::Constant(length) = length.get(arena) {
                     Some(match length {
                         Constant::UnsignedInteger { value: l, .. } => Type::new_primitive(
                             PrimitiveType::UnsignedInteger(u16::try_from(*l).unwrap()),
@@ -882,7 +879,7 @@ impl Statement {
 
     pub fn to_string(&self, arena: &Arena<Statement>) -> String {
         match &self {
-            Self::Constant { typ, value } => format!("const #{} : {}", value, typ),
+            Self::Constant(c) => format!("const #{c}"),
             Self::ReadVariable { symbol } => {
                 format!("read-var {}:{}", symbol.name(), symbol.typ())
             }
@@ -1311,13 +1308,11 @@ pub fn cast_at(
                     Type::Primitive(PrimitiveType::SignedInteger(64)),
                 ]
             {
-                let Statement::Constant { value, .. } = source.get(s_arena) else {
+                let Statement::Constant(value) = source.get(s_arena) else {
                     panic!()
                 };
 
-                let Constant::String(s) = value else {
-                    panic!()
-                };
+                let Constant::String(s) = value else { panic!() };
 
                 // todo: fix this silliness
                 let (num, den) = match s.as_ref() {
@@ -1332,20 +1327,14 @@ pub fn cast_at(
                 let num = build_at(
                     block,
                     arena,
-                    Statement::Constant {
-                        typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
-                        value: Constant::new_signed(num, 64),
-                    },
+                    Statement::Constant(Constant::new_signed(num, 64)),
                     location,
                 );
 
                 let den = build_at(
                     block,
                     arena,
-                    Statement::Constant {
-                        typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
-                        value: Constant::new_signed(den, 64),
-                    },
+                    Statement::Constant(Constant::new_signed(den, 64)),
                     location,
                 );
 
@@ -1392,7 +1381,7 @@ pub fn import_statement(
             b: mapping.get(&b).unwrap().clone(),
             c: mapping.get(&c).unwrap().clone(),
         },
-        Statement::Constant { typ, value } => Statement::Constant { typ, value },
+        Statement::Constant(c) => Statement::Constant(c),
         Statement::ReadVariable { symbol } => Statement::ReadVariable { symbol },
         Statement::WriteVariable { symbol, value } => Statement::WriteVariable {
             symbol,

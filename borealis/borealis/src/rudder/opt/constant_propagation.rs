@@ -37,7 +37,7 @@ pub fn run(f: &mut Function) -> bool {
                 panic!("not a write")
             };
 
-            if let Statement::Constant { typ, value } =
+            if let Statement::Constant(value) =
                 value_written.get(block.get(f.arena()).arena()).clone()
             {
                 trace!("identified candidate symbol: {}", symbol);
@@ -53,10 +53,7 @@ pub fn run(f: &mut Function) -> bool {
                         };
 
                         read.get_mut(block.get_mut(f.arena_mut()).arena_mut())
-                            .replace_kind(Statement::Constant {
-                                typ: typ.clone(),
-                                value: value.clone(),
-                            });
+                            .replace_kind(Statement::Constant(value.clone()));
 
                         changed = true;
                     }

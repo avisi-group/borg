@@ -658,7 +658,7 @@ fn destruct_variable(
             [(
                 union_tag_ident(root_name),
                 Shared::new(Type::Integer {
-                    size: Size::Static(32),
+                    size: Size::Static(64),
                 }),
             )]
             .into_iter()

@@ -57,19 +57,16 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                     let vector_width = build_at(
                         block,
                         arena,
-                        Statement::Constant {
-                            typ: (Type::u16()),
-                            value: Constant::new_unsigned(
-                                assign_value
-                                    .get(block.get(arena).arena())
-                                    .typ(block.get(arena).arena())
-                                    .unwrap()
-                                    .width_bytes()
-                                    .try_into()
-                                    .unwrap(),
-                                16,
-                            ),
-                        },
+                        Statement::Constant(Constant::new_unsigned(
+                            assign_value
+                                .get(block.get(arena).arena())
+                                .typ(block.get(arena).arena())
+                                .unwrap()
+                                .width_bytes()
+                                .try_into()
+                                .unwrap(),
+                            16,
+                        )),
                         Location::Before(stmt),
                     );
                     let vector_offset = build_at(
@@ -130,13 +127,10 @@ fn run_on_block(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
                 let typ_width = build_at(
                     block,
                     arena,
-                    Statement::Constant {
-                        typ: (Type::s64()),
-                        value: Constant::new_signed(
-                            i64::try_from(element_type.width_bytes()).unwrap(),
-                            64,
-                        ),
-                    },
+                    Statement::Constant(Constant::new_signed(
+                        i64::try_from(element_type.width_bytes()).unwrap(),
+                        64,
+                    )),
                     Location::Before(stmt),
                 );
 

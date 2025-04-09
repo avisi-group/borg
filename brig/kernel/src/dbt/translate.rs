@@ -638,16 +638,14 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         log::debug!("translate stmt: {statement:?}");
 
         Ok(match statement {
-            Statement::Constant { typ, value } => {
-                let typ = emit_rudder_constant_type(value, typ);
+            Statement::Constant(value) => {
+                let typ = emit_rudder_constant_type(value, &value.typ());
                 StatementResult::Data(Some(match value {
-                    Constant::UnsignedInteger { value, width } => {
-                        self.emitter.constant(*value, typ)
-                    }
-                    Constant::SignedInteger { value, width } => {
+                    Constant::UnsignedInteger { value, .. } => self.emitter.constant(*value, typ),
+                    Constant::SignedInteger { value, .. } => {
                         self.emitter.constant(*value as u64, typ)
                     }
-                    Constant::FloatingPoint { value, width } => {
+                    Constant::FloatingPoint { value, .. } => {
                         self.emitter.constant(*value as u64, typ)
                     }
 
@@ -1209,11 +1207,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 StatementResult::Data(Some(self.emitter.mutate_element(vector, index, value)))
             }
             Statement::Panic(value) => {
-                let Statement::Constant {
-                    value: Constant::String(msg),
-                    ..
-                } = value.get(arena)
-                else {
+                let Statement::Constant(Constant::String(msg)) = value.get(arena) else {
                     todo!();
                 };
 
