@@ -627,7 +627,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     // todo: fix these parameters this is silly
     fn translate_statement(
         &mut self,
-        statement_values: &StatementValueStore<A>,
+        value_store: &StatementValueStore<A>,
         is_dynamic: bool,
         statement: &Statement,
         block: Ref<Block>,
@@ -765,22 +765,14 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     }
                 }
 
-                let value = statement_values
-                    .get(*value)
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "no value for {value} when writing to {symbol:?} in {} {block:?}",
-                            self.function.name()
-                        )
-                    })
-                    .clone();
+                let value = value_store.get(*value);
 
                 self.write_variable(variable, value);
 
                 StatementResult::Data(None)
             }
             Statement::ReadRegister { typ, offset } => {
-                let offset = match statement_values.get(*offset).unwrap().kind() {
+                let offset = match value_store.get(*offset).kind() {
                     NodeKind::Constant { value, .. } => *value,
                     k => panic!("can't read non constant offset: {k:#?}"),
                 };
@@ -796,17 +788,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     RegisterCacheType::Constant
                     | RegisterCacheType::Read
                     | RegisterCacheType::ReadWrite => {
+                        let offset = usize::try_from(offset).unwrap();
                         let value = match typ.width() {
-                            1..=8 => u64::from(self.register_file.read_raw::<u8>(offset as usize)),
-                            9..=16 => {
-                                u64::from(self.register_file.read_raw::<u16>(offset as usize))
-                            }
-                            17..=32 => {
-                                u64::from(self.register_file.read_raw::<u32>(offset as usize))
-                            }
-                            33..=64 => {
-                                u64::from(self.register_file.read_raw::<u64>(offset as usize))
-                            }
+                            1..=8 => u64::from(self.register_file.read_raw::<u8>(offset)),
+                            9..=16 => u64::from(self.register_file.read_raw::<u16>(offset)),
+                            17..=32 => u64::from(self.register_file.read_raw::<u32>(offset)),
+                            33..=64 => u64::from(self.register_file.read_raw::<u64>(offset)),
                             w => todo!("width {w}"),
                         };
                         log::trace!("read from cacheable {name:?}: {value:x}");
@@ -818,7 +805,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 }
             }
             Statement::WriteRegister { offset, value } => {
-                let offset = match statement_values.get(*offset).unwrap().kind() {
+                let offset = match value_store.get(*offset).kind() {
                     NodeKind::Constant { value, .. } => *value,
                     k => panic!("can't write non constant offset: {k:#?}"),
                 };
@@ -830,7 +817,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 assert_eq!(offset, self.model.registers().get(&name).unwrap().offset);
 
-                let value = statement_values.get(*value).unwrap().clone();
+                let value = value_store.get(*value);
 
                 // if cacheable and writing a constant, update the register file during
                 // translation
@@ -867,8 +854,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 }
             }
             Statement::ReadMemory { address, size } => {
-                let address = statement_values.get(*address).unwrap().clone();
-                let size = statement_values.get(*size).unwrap().clone();
+                let address = value_store.get(*address);
+                let size = value_store.get(*size);
 
                 let NodeKind::Constant { value, .. } = size.kind() else {
                     panic!("expected constant got {:#?}", size.kind());
@@ -886,8 +873,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 StatementResult::Data(Some(self.emitter.read_memory(address, typ)))
             }
             Statement::WriteMemory { address, value } => {
-                let address = statement_values.get(*address).unwrap().clone();
-                let value = statement_values.get(*value).unwrap().clone();
+                let address = value_store.get(*address);
+                let value = value_store.get(*value);
                 self.emitter.write_memory(address, value);
                 StatementResult::Data(None)
             }
@@ -896,13 +883,13 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 self.emitter.ctx_mut().set_pc_write_flag();
 
                 let offset = self.emitter.ctx().pc_offset() as u64;
-                let value = statement_values.get(*value).unwrap().clone();
+                let value = value_store.get(*value);
 
                 self.emitter.write_register(offset, value);
                 StatementResult::Data(None)
             }
             Statement::GetFlags { operation } => {
-                let operation = statement_values.get(*operation).unwrap().clone();
+                let operation = value_store.get(*operation);
                 StatementResult::Data(Some(self.emitter.get_flags(operation)))
             }
             Statement::UnaryOperation { kind, value } => {
@@ -911,7 +898,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     rudder::statement::UnaryOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(*value).unwrap().clone();
+                let value = value_store.get(*value);
 
                 let op = match kind {
                     RudderOp::Not => EmitterOp::Not(value),
@@ -932,8 +919,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     rudder::statement::BinaryOperationKind as RudderOp,
                 };
 
-                let lhs = statement_values.get(*lhs).unwrap().clone();
-                let rhs = statement_values.get(*rhs).unwrap().clone();
+                let lhs = value_store.get(*lhs);
+                let rhs = value_store.get(*rhs);
 
                 let op = match kind {
                     RudderOp::Add => EmitterOp::Add(lhs, rhs),
@@ -968,9 +955,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     rudder::statement::TernaryOperationKind as RudderOp,
                 };
 
-                let a = statement_values.get(*a).unwrap().clone();
-                let b = statement_values.get(*b).unwrap().clone();
-                let c = statement_values.get(*c).unwrap().clone();
+                let a = value_store.get(*a);
+                let b = value_store.get(*b);
+                let c = value_store.get(*c);
 
                 let op = match kind {
                     RudderOp::AddWithCarry => EmitterOp::AddWithCarry(a, b, c),
@@ -988,8 +975,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     rudder::statement::ShiftOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(*value).unwrap().clone();
-                let amount = statement_values.get(*amount).unwrap().clone();
+                let value = value_store.get(*value);
+                let amount = value_store.get(*amount);
 
                 let op = match kind {
                     RudderOp::LogicalShiftLeft => EmitterOp::LogicalShiftLeft,
@@ -1003,10 +990,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
 
             Statement::Call { target, args, .. } => {
-                let args = args
-                    .iter()
-                    .map(|a| statement_values.get(*a).unwrap())
-                    .collect::<Vec<_>>();
+                let args = args.iter().map(|a| value_store.get(*a)).collect::<Vec<_>>();
 
                 StatementResult::Data(
                     FunctionTranslator::new(
@@ -1041,7 +1025,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 true_target,
                 false_target,
             } => {
-                let condition = statement_values.get(*condition).unwrap().clone();
+                let condition = value_store.get(*condition);
 
                 // todo: obviously refactor this to re-use jump logic
 
@@ -1099,7 +1083,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             }
             Statement::Return { value } => {
                 if let Some(value) = value {
-                    let value = statement_values.get(*value).unwrap();
+                    let value = value_store.get(*value);
                     self.write_return_value(value);
                 }
 
@@ -1112,7 +1096,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     rudder::statement::CastOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(*value).unwrap();
+                let value = value_store.get(*value);
                 let typ = emit_rudder_type(typ);
 
                 let kind = match kind {
@@ -1137,8 +1121,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     rudder::statement::CastOperationKind as RudderOp,
                 };
 
-                let value = statement_values.get(*value).unwrap().clone();
-                let width = statement_values.get(*width).unwrap().clone();
+                let value = value_store.get(*value);
+                let width = value_store.get(*width);
                 let typ = emit_rudder_type(typ);
 
                 let kind = match kind {
@@ -1160,9 +1144,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 true_value,
                 false_value,
             } => {
-                let condition = statement_values.get(*condition).unwrap().clone();
-                let true_value = statement_values.get(*true_value).unwrap().clone();
-                let false_value = statement_values.get(*false_value).unwrap().clone();
+                let condition = value_store.get(*condition);
+                let true_value = value_store.get(*true_value);
+                let false_value = value_store.get(*false_value);
                 StatementResult::Data(Some(self.emitter.select(
                     condition,
                     true_value,
@@ -1174,9 +1158,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 start,
                 width,
             } => {
-                let value = statement_values.get(*value).unwrap().clone();
-                let start = statement_values.get(*start).unwrap().clone();
-                let width = statement_values.get(*width).unwrap().clone();
+                let value = value_store.get(*value);
+                let start = value_store.get(*start);
+                let width = value_store.get(*width);
                 StatementResult::Data(Some(self.emitter.bit_extract(value, start, width)))
             }
             Statement::BitInsert {
@@ -1185,10 +1169,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 start,
                 width,
             } => {
-                let target = statement_values.get(*target).unwrap().clone();
-                let source = statement_values.get(*source).unwrap().clone();
-                let start = statement_values.get(*start).unwrap().clone();
-                let width = statement_values.get(*width).unwrap().clone();
+                let target = value_store.get(*target);
+                let source = value_store.get(*source);
+                let start = value_store.get(*start);
+                let width = value_store.get(*width);
                 StatementResult::Data(Some(self.emitter.bit_insert(target, source, start, width)))
             }
             Statement::ReadElement { .. } => {
@@ -1199,9 +1183,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 value,
                 index,
             } => {
-                let vector = statement_values.get(*vector).unwrap().clone();
-                let value = statement_values.get(*value).unwrap().clone();
-                let index = statement_values.get(*index).unwrap().clone();
+                let vector = value_store.get(*vector);
+                let value = value_store.get(*value);
+                let index = value_store.get(*index);
                 StatementResult::Data(Some(self.emitter.mutate_element(vector, index, value)))
             }
             Statement::Panic(value) => {
@@ -1231,17 +1215,17 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 meta |= (block.index() as u64 & 0xFFFF) << 16;
                 meta |= (condition.index() as u64) & 0xFFFF;
 
-                let condition = statement_values.get(*condition).unwrap().clone();
+                let condition = value_store.get(*condition);
                 self.emitter.assert(condition, meta);
                 StatementResult::Data(None)
             }
             Statement::CreateBits { value, width } => {
-                let value = statement_values.get(*value).unwrap().clone();
-                let width = statement_values.get(*width).unwrap().clone();
+                let value = value_store.get(*value);
+                let width = value_store.get(*width);
                 StatementResult::Data(Some(self.emitter.create_bits(value, width)))
             }
             Statement::SizeOf { value } => {
-                let value = statement_values.get(*value).unwrap().clone();
+                let value = value_store.get(*value);
                 StatementResult::Data(Some(self.emitter.size_of(value)))
             }
             Statement::MatchesUnion { .. } => todo!(),
@@ -1250,12 +1234,12 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 let mut tuple = Vec::new_in(self.allocator);
                 values
                     .iter()
-                    .map(|v| statement_values.get(*v).unwrap())
+                    .map(|v| value_store.get(*v))
                     .collect_into(&mut tuple);
                 StatementResult::Data(Some(self.emitter.create_tuple(tuple)))
             }
             Statement::TupleAccess { index, source } => {
-                let source = statement_values.get(*source).unwrap().clone();
+                let source = value_store.get(*source);
                 StatementResult::Data(Some(self.emitter.access_tuple(source, *index)))
             }
         })
@@ -1315,31 +1299,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
         offset
     }
-
-    // fn get_x86(
-    //     &mut self,
-    //     rudder: Ref<Block>,
-    //     live_ins: BTreeMap<InternedString, bool>,
-    // ) -> Ref<X86Block> {
-    //     (*self.translated_blocks.get(&(rudder, live_ins)).unwrap()).0
-    // }
-
-    // fn get_or_insert_x86(
-    //     &mut self,
-    //     rudder: Ref<Block>,
-    //     live_ins: BTreeMap<InternedString, bool>,
-    // ) -> Ref<X86Block> {
-    //     (*self
-    //         .translated_blocks
-    //         .entry((rudder, live_ins))
-    //         .or_insert_with(|| {
-    //             (
-    //                 self.emitter.ctx_mut().arena_mut().insert(X86Block::new()),
-    //                 false,
-    //             )
-    //         }))
-    //     .0
-    // }
 }
 
 /// Converts a rudder type to a `Type` value
@@ -1392,7 +1351,7 @@ impl<A: Alloc> StatementValueStore<A> {
         self.map.insert(s, v);
     }
 
-    pub fn get(&self, s: Ref<Statement>) -> Option<X86NodeRef<A>> {
-        self.map.get(&s).cloned()
+    pub fn get(&self, s: Ref<Statement>) -> X86NodeRef<A> {
+        self.map.get(&s).unwrap().clone()
     }
 }
