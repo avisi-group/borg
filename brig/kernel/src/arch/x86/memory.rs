@@ -1,4 +1,5 @@
 use {
+    crate::memory::bytes,
     alloc::alloc::{Global, alloc_zeroed},
     bootloader_api::info::{MemoryRegionKind, MemoryRegions},
     buddy_system_allocator::LockedHeap,
@@ -57,8 +58,7 @@ pub fn heap_init(memory_regions: &MemoryRegions) {
     log::info!(
         "heap allocator initialized @ {:p}, {:.2} available",
         &HEAP_ALLOCATOR as *const _,
-        Byte::from(HEAP_ALLOCATOR.lock().stats_total_bytes())
-            .get_appropriate_unit(UnitType::Binary)
+        bytes(HEAP_ALLOCATOR.lock().stats_total_bytes())
     );
 }
 

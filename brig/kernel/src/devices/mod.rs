@@ -8,6 +8,7 @@ use {
 };
 
 pub mod acpi;
+pub mod ivshmem;
 pub mod lapic;
 pub mod manager;
 pub mod pcie;
@@ -44,6 +45,7 @@ pub enum Device {
     Net(Box<dyn NetDevice>),
     #[allow(unused)]
     Timer(Box<dyn Timer>),
+    Mem(Box<dyn MemDevice>),
 }
 
 impl Device {
@@ -72,6 +74,12 @@ impl From<Box<dyn NetDevice>> for Device {
 impl From<Box<dyn Timer>> for Device {
     fn from(value: Box<dyn Timer>) -> Self {
         Self::Timer(value)
+    }
+}
+
+impl From<Box<dyn MemDevice>> for Device {
+    fn from(value: Box<dyn MemDevice>) -> Self {
+        Self::Mem(value)
     }
 }
 
@@ -144,3 +152,5 @@ impl BlockDevice for Box<dyn BlockDevice> {
 pub trait NetDevice: Debug + Send + Sync {}
 
 pub trait Timer: Debug + Send + Sync {}
+
+pub trait MemDevice: Debug + Send + Sync {}

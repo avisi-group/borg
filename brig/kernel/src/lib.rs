@@ -25,9 +25,9 @@ use {
         devices::manager::SharedDeviceManager,
         fs::{File, Filesystem, tar::TarFilesystem},
         logger::WRITER,
+        memory::bytes,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
-    byte_unit::{Byte, UnitType::Binary},
     core::panic::PanicInfo,
     x86::io::outw,
 };
@@ -145,11 +145,7 @@ fn panic(info: &PanicInfo) -> ! {
     let (used, total) = arch::x86::memory::stats();
 
     log::error!("{info}");
-    log::error!(
-        "heap {:.2}/{:.2} used",
-        Byte::from(used).get_appropriate_unit(Binary),
-        Byte::from(total).get_appropriate_unit(Binary),
-    );
+    log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));
 
     backtrace();
     qemu_exit();

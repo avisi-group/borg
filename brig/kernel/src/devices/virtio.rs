@@ -2,15 +2,16 @@ use {
     crate::{
         arch::x86::memory::{PhysAddrExt, VirtAddrExt, VirtualMemoryArea},
         devices::{
-            BlockDevice, Device, SharedDevice, manager::SharedDeviceManager, pcie::allocate_bars,
+            BlockDevice, Device, SharedDevice, manager::SharedDeviceManager,
+            pcie::bar::allocate_bars,
         },
+        memory::bytes,
     },
     alloc::{
         alloc::{alloc_zeroed, dealloc},
         boxed::Box,
         format,
     },
-    byte_unit::Byte,
     core::{alloc::Layout, fmt::Debug, ptr::NonNull},
     log::trace,
     spin::Mutex,
@@ -136,10 +137,10 @@ impl Debug for VirtioBlockDevice {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "virtio block device @ {}, capacity: {:.2}, block size: {:.2}",
+            "VirtioBlockDevice @ {}, capacity: {:.2}, block size: {:.2}",
             self.device_function,
-            Byte::from(self.size()).get_appropriate_unit(byte_unit::UnitType::Binary),
-            Byte::from(self.block_size()).get_appropriate_unit(byte_unit::UnitType::Binary),
+            bytes(self.size()),
+            bytes(self.block_size())
         )
     }
 }

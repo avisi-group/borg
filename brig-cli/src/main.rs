@@ -324,56 +324,71 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
 
     println!("starting QEMU");
     let mut cmd = std::process::Command::new("qemu-system-x86_64");
-    cmd.arg("-drive").arg(format!(
-        "if=pflash,unit=0,format=raw,readonly=on,file={}",
-        prebuilt
-            .get_file(Arch::X64, FileType::Code)
-            .to_str()
-            .unwrap()
-    ));
-    cmd.arg("-drive").arg(format!(
-        "if=pflash,unit=1,format=raw,readonly=on,file={}",
-        prebuilt
-            .get_file(Arch::X64, FileType::Vars)
-            .to_str()
-            .unwrap()
-    ));
-    cmd.arg("-drive")
-        .arg(format!("format=raw,file={}", kernel_path.to_str().unwrap()));
+    cmd.args([
+        "-drive",
+        &format!(
+            "if=pflash,unit=0,format=raw,readonly=on,file={}",
+            prebuilt
+                .get_file(Arch::X64, FileType::Code)
+                .to_str()
+                .unwrap()
+        ),
+    ]);
+    cmd.args([
+        "-drive",
+        &format!(
+            "if=pflash,unit=1,format=raw,readonly=on,file={}",
+            prebuilt
+                .get_file(Arch::X64, FileType::Vars)
+                .to_str()
+                .unwrap()
+        ),
+    ]);
+    cmd.args([
+        "-drive",
+        &format!("format=raw,file={}", kernel_path.to_str().unwrap()),
+    ]);
+
     cmd.arg("-nographic");
 
     #[cfg(target_arch = "x86_64")]
-    cmd.arg("-enable-kvm");
+    {
+        cmd.args(["-enable-kvm", "-cpu", "host"]);
+    }
 
     cmd.arg("-no-reboot");
 
     if gdb {
-        cmd.arg("-gdb");
-        cmd.arg("tcp::1234");
-        cmd.arg("-S"); //  freeze CPU at startup
+        cmd.args(["-gdb", "tcp::1234", "-S"]); //  freeze CPU at startup
     }
 
-    cmd.arg("-m");
-    cmd.arg("16g");
-    cmd.arg("-device");
-    cmd.arg("virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4");
-    cmd.arg("-drive");
-    cmd.arg(format!(
-        "file={},if=none,format=raw,id=drive0",
-        guest_tar_path.display()
-    ));
+    cmd.args(["-m", "16g"]);
+
+    cmd.args([
+        "-device",
+        "virtio-blk-pci,drive=drive0,id=virtblk0,num-queues=4",
+    ]);
+    cmd.args([
+        "-drive",
+        &format!(
+            "file={},if=none,format=raw,id=drive0",
+            guest_tar_path.display()
+        ),
+    ]);
+
     // cmd.arg("-device");
     // cmd.arg("virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4");
     // cmd.arg("-drive");
     // cmd.arg("file=../../brig-programs/rootfs.ext2,if=none,format=raw,id=drive1");
-    cmd.arg("-M");
-    cmd.arg("q35");
+    cmd.args(["-M", "q35"]);
 
-    cmd.arg("-qmp");
-    cmd.arg("unix:/tmp/qmp.sock,server,nowait");
+    cmd.args(["-qmp", "unix:/tmp/qmp.sock,server,nowait"]);
 
-    #[cfg(target_arch = "x86_64")]
-    cmd.args(["-cpu", "host"]);
+    cmd.args(["-device", "ivshmem-plain,memdev=ivshmem"]);
+    cmd.args([
+        "-object",
+        "memory-backend-file,id=ivshmem,share=on,mem-path=/dev/shm/brig-shared-mem,size=64M",
+    ]);
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
