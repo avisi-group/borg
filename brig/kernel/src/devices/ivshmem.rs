@@ -2,7 +2,8 @@ use {
     crate::{
         arch::x86::memory::PhysAddrExt,
         devices::{
-            Device, MemDevice, SharedDevice, manager::SharedDeviceManager, pcie::bar::allocate_bars,
+            Device, MemDevice, SharedDevice, TransportDevice, manager::SharedDeviceManager,
+            pcie::bar::allocate_bars,
         },
         memory::bytes,
     },
@@ -50,28 +51,12 @@ pub fn probe_ivshmem(root: &mut PciRoot<MmioCam>, device_function: DeviceFunctio
         core::slice::from_raw_parts_mut::<u8>(virt.as_mut_ptr(), usize::try_from(size).unwrap())
     };
 
-    let mut rb = RingBuffer::<Producer>::open(mem);
-
-    loop {
-        let msg = "Hello, world!\n".as_bytes();
-        let sent = rb.write(msg);
-
-        if sent != msg.len() {
-            log::error!("only wrote {sent} bytes!!");
-            let retried = rb.write(&msg[sent..]);
-            if retried + sent != msg.len() {
-                panic!("retried and only wrote {retried} bytes");
-            }
-        }
-    }
+    let rb = RingBuffer::<Producer>::open(mem);
 
     let dev_mgr = SharedDeviceManager::get();
 
-    let id = dev_mgr.register_device(SharedDevice::from_device(Device::Mem(Box::new(
-        InterVMSharedMemory(mem),
-    ))));
-
-    dev_mgr.add_alias(id, format!("mem{}", device_function));
+    let id = dev_mgr.register_device(SharedDevice::from_device(Device::Transport(Box::new(rb))));
+    dev_mgr.add_alias(id, format!("transport{}", device_function));
 }
 
 pub struct InterVMSharedMemory(pub &'static mut [u8]);
@@ -88,3 +73,13 @@ impl Debug for InterVMSharedMemory {
 }
 
 impl MemDevice for InterVMSharedMemory {}
+
+impl<'a> TransportDevice for RingBuffer<'a, Producer> {
+    fn read(&mut self, _buf: &mut [u8]) -> usize {
+        0
+    }
+
+    fn write(&mut self, buf: &[u8]) -> usize {
+        self.write(buf)
+    }
+}

@@ -184,10 +184,9 @@ impl Not for Constant {
 
     fn not(self) -> Self::Output {
         match self {
-            Constant::UnsignedInteger { value, width } => {
-                Constant::new_unsigned(!value, width)
-            }
-            Constant::SignedInteger { value, width } => todo!("neg??"), /* ConstantValue::SignedInteger(!v), */
+            Constant::UnsignedInteger { value, width } => Constant::new_unsigned(!value, width),
+            Constant::SignedInteger { .. } => todo!("neg??"), /* ConstantValue::SignedInteger(!
+                                                                * v), */
             Constant::FloatingPoint { .. }
             | Constant::String(_)
             | Constant::Tuple(_)

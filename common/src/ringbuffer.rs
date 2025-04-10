@@ -1,5 +1,7 @@
 use core::{
+    any::type_name,
     cmp::{Ordering, min},
+    fmt::Debug,
     marker::PhantomData,
     mem::offset_of,
 };
@@ -18,6 +20,19 @@ pub struct RingBuffer<'a, T: Role> {
     buffer: &'a mut [u8],
 
     _kind: PhantomData<T>,
+}
+
+impl<'a, T: Role> Debug for RingBuffer<'a, T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "RingBuffer<{}> {{ capacity: {:#x}, head: {:#x}, tail: {:#x} }}",
+            type_name::<T>(),
+            self.capacity(),
+            self.head(),
+            self.tail()
+        )
+    }
 }
 
 impl<'a, T: Role> RingBuffer<'a, T> {

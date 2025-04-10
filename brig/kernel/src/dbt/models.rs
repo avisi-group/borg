@@ -11,7 +11,7 @@ use {
                 emitter::{BinaryOperationKind, X86Emitter},
             },
         },
-        devices::SharedDevice,
+        devices::{SharedDevice, manager::SharedDeviceManager},
         fs::{File, Filesystem, tar::TarFilesystem},
         guest::register_device_factory,
         logger::PRINT_REGISTERS,
@@ -29,7 +29,7 @@ use {
         intern::InternedString,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
     },
-    core::fmt::{self, Debug},
+    core::fmt::{self, Debug, Write},
     plugins_api::{
         guest::{Device, DeviceFactory},
         util::parse_hex_prefix,
@@ -40,7 +40,7 @@ use {
 /// Size in bytes for the per-translation bump allocator
 const TRANSLATION_ALLOCATOR_SIZE: usize = 2 * 1024 * 1024 * 1024;
 
-const SINGLE_STEP: bool = false;
+const SINGLE_STEP: bool = true;
 
 static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
@@ -205,6 +205,13 @@ impl ModelDevice {
     }
 
     fn block_exec(&self, single_step_mode: bool) {
+        let shared = SharedDeviceManager::get()
+            .get_device_by_alias("transport00:04.0")
+            .unwrap();
+        let crate::devices::Device::Transport(transport) = &mut *shared.lock() else {
+            panic!();
+        };
+
         // guest PC to translated block cache
         let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
 
@@ -240,16 +247,23 @@ impl ModelDevice {
             );
 
             if PRINT_REGISTERS {
-                crate::print!("PC = {:016x}\n", self.register_file.read::<u64>("_PC"));
-                crate::print!("NZCV = {:04b}\n", self.get_nzcv());
+                write!(
+                    transport,
+                    "PC = {:016x}\n",
+                    self.register_file.read::<u64>("_PC")
+                )
+                .unwrap();
+                write!(transport, "NZCV = {:04b}\n", self.get_nzcv()).unwrap();
                 for reg in 0..=30 {
-                    crate::print!(
+                    write!(
+                        transport,
                         "R{reg:02} = {:016x}\n",
                         self.register_file.read::<u64>(alloc::format!("R{reg}"))
-                    );
+                    )
+                    .unwrap();
                 }
                 if !single_step_mode {
-                    crate::print!("skip {}\n", translated_block.num_instructions);
+                    write!(transport, "skip {}\n", translated_block.num_instructions).unwrap();
                 }
             }
 

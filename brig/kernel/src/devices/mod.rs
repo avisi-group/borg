@@ -1,7 +1,7 @@
 use {
     alloc::{boxed::Box, sync::Arc},
     core::{
-        fmt::Debug,
+        fmt::{self, Debug, Formatter, Write},
         ops::{Deref, DerefMut},
     },
     spin::{Mutex, MutexGuard},
@@ -20,9 +20,15 @@ pub trait Bus<P> {
     fn probe(&self, probe_data: P);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SharedDevice {
     inner: Arc<Mutex<Device>>,
+}
+
+impl Debug for SharedDevice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", &*self.inner.lock())
+    }
 }
 
 impl SharedDevice {
@@ -44,8 +50,9 @@ pub enum Device {
     #[allow(unused)]
     Net(Box<dyn NetDevice>),
     #[allow(unused)]
-    Timer(Box<dyn Timer>),
+    Timer(Box<dyn TimerDevice>),
     Mem(Box<dyn MemDevice>),
+    Transport(Box<dyn TransportDevice>),
 }
 
 impl Device {
@@ -71,8 +78,8 @@ impl From<Box<dyn NetDevice>> for Device {
     }
 }
 
-impl From<Box<dyn Timer>> for Device {
-    fn from(value: Box<dyn Timer>) -> Self {
+impl From<Box<dyn TimerDevice>> for Device {
+    fn from(value: Box<dyn TimerDevice>) -> Self {
         Self::Timer(value)
     }
 }
@@ -80,6 +87,12 @@ impl From<Box<dyn Timer>> for Device {
 impl From<Box<dyn MemDevice>> for Device {
     fn from(value: Box<dyn MemDevice>) -> Self {
         Self::Mem(value)
+    }
+}
+
+impl From<Box<dyn TransportDevice>> for Device {
+    fn from(value: Box<dyn TransportDevice>) -> Self {
+        Self::Transport(value)
     }
 }
 
@@ -151,6 +164,25 @@ impl BlockDevice for Box<dyn BlockDevice> {
 
 pub trait NetDevice: Debug + Send + Sync {}
 
-pub trait Timer: Debug + Send + Sync {}
+pub trait TimerDevice: Debug + Send + Sync {}
 
 pub trait MemDevice: Debug + Send + Sync {}
+
+pub trait TransportDevice: Debug + Send + Sync {
+    fn read(&mut self, buf: &mut [u8]) -> usize;
+    fn write(&mut self, buf: &[u8]) -> usize;
+}
+
+impl fmt::Write for Box<dyn TransportDevice> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        let bytes = s.as_bytes();
+
+        let mut written = 0;
+
+        while written != bytes.len() {
+            written += self.write(&bytes[written..]);
+        }
+
+        Ok(())
+    }
+}
