@@ -1,13 +1,16 @@
 use {
     cargo_metadata::{Artifact, Message, TargetKind, diagnostic::DiagnosticLevel},
     clap::{Parser, Subcommand},
-    common::TestConfig,
+    common::{
+        TestConfig,
+        ringbuffer::{Consumer, MaybeSplitBuffer, RingBuffer},
+    },
     elf::{ElfBytes, endian::AnyEndian, section::SectionHeader},
     itertools::Itertools,
     ovmf_prebuilt::{Arch, FileType, Source},
     std::{
         fs::{self, File},
-        io::{BufReader, Write},
+        io::{BufReader, BufWriter, Write},
         path::{Path, PathBuf},
         process::{self, Stdio},
     },
@@ -384,11 +387,14 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
 
     cmd.args(["-qmp", "unix:/tmp/qmp.sock,server,nowait"]);
 
+    let mem_path = "/dev/shm/brig-shared-mem";
+
     cmd.args(["-device", "ivshmem-plain,memdev=ivshmem"]);
     cmd.args([
         "-object",
-        "memory-backend-file,id=ivshmem,share=on,mem-path=/dev/shm/brig-shared-mem,size=64M",
+        &format!("memory-backend-file,id=ivshmem,share=on,mem-path={mem_path},size=64M"),
     ]);
+    let _handle = std::thread::spawn(move || hyperport_reader(mem_path, "/tmp/hyperport.trace"));
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
@@ -447,4 +453,43 @@ fn gdb_cli(artifacts: &[Artifact]) {
 
     gdb.wait().expect("Child process wasn't running properly");
     std::process::exit(0);
+}
+
+fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(shared_mem_path: P1, destination_path: P2) {
+    println!(
+        "starting hyperport reader @ {:?}, writing to {:?}",
+        shared_mem_path.as_ref(),
+        destination_path.as_ref()
+    );
+
+    let mut dest = BufWriter::new(
+        File::options()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(destination_path)
+            .unwrap(),
+    );
+
+    let shared_file = File::options()
+        .write(true)
+        .read(true)
+        .open(shared_mem_path)
+        .unwrap();
+    let mut mem = unsafe { memmap2::MmapMut::map_mut(&shared_file) }.unwrap();
+
+    let mut rb = RingBuffer::<Consumer>::init(&mut mem);
+
+    loop {
+        rb.read(|buffer| {
+            match buffer {
+                MaybeSplitBuffer::Single(buf) => dest.write_all(buf).unwrap(),
+                MaybeSplitBuffer::Split(a, b) => {
+                    dest.write_all(a).unwrap();
+                    dest.write_all(b).unwrap();
+                }
+            };
+            buffer.len()
+        });
+    }
 }

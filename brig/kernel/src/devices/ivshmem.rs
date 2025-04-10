@@ -7,6 +7,7 @@ use {
         memory::bytes,
     },
     alloc::{boxed::Box, format},
+    common::ringbuffer::{Producer, RingBuffer},
     core::fmt::{self, Debug},
     log::trace,
     virtio_drivers::transport::pci::bus::{
@@ -16,7 +17,7 @@ use {
 };
 
 pub fn probe_ivshmem(root: &mut PciRoot<MmioCam>, device_function: DeviceFunction) {
-    trace!("probing ishmem (todo)");
+    trace!("probing ishmem");
 
     root.set_command(
         device_function,
@@ -48,6 +49,21 @@ pub fn probe_ivshmem(root: &mut PciRoot<MmioCam>, device_function: DeviceFunctio
     let mem = unsafe {
         core::slice::from_raw_parts_mut::<u8>(virt.as_mut_ptr(), usize::try_from(size).unwrap())
     };
+
+    let mut rb = RingBuffer::<Producer>::open(mem);
+
+    loop {
+        let msg = "Hello, world!\n".as_bytes();
+        let sent = rb.write(msg);
+
+        if sent != msg.len() {
+            log::error!("only wrote {sent} bytes!!");
+            let retried = rb.write(&msg[sent..]);
+            if retried + sent != msg.len() {
+                panic!("retried and only wrote {retried} bytes");
+            }
+        }
+    }
 
     let dev_mgr = SharedDeviceManager::get();
 

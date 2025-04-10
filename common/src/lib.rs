@@ -14,6 +14,7 @@ pub mod hashmap;
 pub mod id;
 pub mod intern;
 pub mod mask;
+pub mod ringbuffer;
 pub mod rudder;
 pub mod width_helpers;
 
