@@ -106,26 +106,45 @@ impl FreshAllocator {
 
         instructions
             .iter_mut()
-            .filter(|i| !matches!(i, Instruction(Opcode::PUSH(_) | Opcode::POP(_))))
             .enumerate()
             .for_each(|(instruction_index, instruction)| {
                 let instr_clone = instruction.clone();
-                instruction.get_use_defs().for_each(|ud| {
-                    let is_usedef = ud.is_usedef();
-                    if let UseDef::Def(reg) | UseDef::UseDef(reg) = ud {
-                        if is_usedef {
-                            if let Opcode::XOR(l, r) = instr_clone.0 {
-                                if l == r {
-                                    //
+
+                if matches!(instruction.0, Opcode::RET) {
+                    let live_ranges = self
+                        .live_ranges
+                        .get_mut(&Register::PhysicalRegister(PhysicalRegister::RAX))
+                        .unwrap_or_else(|| {
+                            panic!("use of undef'd register RAX @ {instruction_index}")
+                        });
+
+                    // update end
+                    let last_use = &mut live_ranges
+                        .as_mut_slice()
+                        .last_mut()
+                        .expect("should have at least one live range")
+                        .1;
+
+                    if last_use.unwrap_or_default() < instruction_index {
+                        *last_use = Some(instruction_index);
+                    }
+                } else {
+                    instruction.get_use_defs().for_each(|ud| {
+                        let is_usedef = ud.is_usedef();
+                        if let UseDef::Def(reg) | UseDef::UseDef(reg) = ud {
+                            if is_usedef {
+                                if let Opcode::XOR(l, r) = instr_clone.0 {
+                                    if l == r {
+                                        //
+                                    } else {
+                                        return;
+                                    }
                                 } else {
                                     return;
                                 }
-                            } else {
-                                return;
                             }
-                        }
 
-                        self.live_ranges
+                            self.live_ranges
                             .entry(*reg)
                             .and_modify(|live_ranges| {
                                 // assert last live range had some end
@@ -157,27 +176,28 @@ impl FreshAllocator {
                                 }
                             })
                             .or_insert(alloc::vec![(instruction_index, None)]);
-                    }
-                });
-                instruction.get_use_defs().for_each(|ud| {
-                    if let UseDef::Use(reg) | UseDef::UseDef(reg) = ud {
-                        // assert exists
-                        let live_ranges = self.live_ranges.get_mut(reg).unwrap_or_else(|| {
-                            panic!("use of undef'd register {reg} @ {instruction_index}")
-                        });
-
-                        // update end
-                        let last_use = &mut live_ranges
-                            .as_mut_slice()
-                            .last_mut()
-                            .expect("should have at least one live range")
-                            .1;
-
-                        if last_use.unwrap_or_default() < instruction_index {
-                            *last_use = Some(instruction_index);
                         }
-                    }
-                });
+                    });
+                    instruction.get_use_defs().for_each(|ud| {
+                        if let UseDef::Use(reg) | UseDef::UseDef(reg) = ud {
+                            // assert exists
+                            let live_ranges = self.live_ranges.get_mut(reg).unwrap_or_else(|| {
+                                panic!("use of undef'd register {reg} @ {instruction_index}")
+                            });
+
+                            // update end
+                            let last_use = &mut live_ranges
+                                .as_mut_slice()
+                                .last_mut()
+                                .expect("should have at least one live range")
+                                .1;
+
+                            if last_use.unwrap_or_default() < instruction_index {
+                                *last_use = Some(instruction_index);
+                            }
+                        }
+                    });
+                }
             });
     }
 
