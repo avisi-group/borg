@@ -54,7 +54,6 @@ pub fn trampoline(code_ptr: *const u8, register_file: *mut u8) -> ExecutionResul
                 mov %rsp, %r14
                 sub ${max_stack_size}, %rsp
                 call *{code_ptr}
-                mov %rax, {status}
                 add ${max_stack_size}, %rsp
 
                 pop %r15
@@ -76,7 +75,7 @@ pub fn trampoline(code_ptr: *const u8, register_file: *mut u8) -> ExecutionResul
             max_stack_size = const MAX_STACK_SIZE,
             register_file = in(reg) register_file,
             code_ptr = in(reg) code_ptr,
-            status = out(reg) status,
+            out("rax") status,
         )
     };
 
