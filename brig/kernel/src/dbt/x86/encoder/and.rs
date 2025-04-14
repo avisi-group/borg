@@ -22,7 +22,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_8,
             },
         ) => {
-            if *left > u32::MAX as u64 {
+            if *left > i32::MAX as u64 {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
@@ -36,7 +36,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_16,
             },
         ) => {
-            if *left > u32::MAX as u64 {
+            if *left > i32::MAX as u64 {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
@@ -50,7 +50,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_32,
             },
         ) => {
-            if *left > u32::MAX as u64 {
+            if *left > i32::MAX as u64 {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
@@ -64,7 +64,7 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_64,
             },
         ) => {
-            if *left > u32::MAX as u64 {
+            if *left > i32::MAX as u64 {
                 panic!("AND immediate too large: {left:x}");
             }
             assembler
