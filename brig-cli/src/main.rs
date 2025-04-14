@@ -13,6 +13,11 @@ use {
         io::{BufReader, BufWriter, Write},
         path::{Path, PathBuf},
         process::{self, Stdio},
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        thread,
     },
     tar::Header,
     walkdir::WalkDir,
@@ -394,7 +399,12 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
         "-object",
         &format!("memory-backend-file,id=ivshmem,share=on,mem-path={mem_path},size=64M"),
     ]);
-    let _handle = std::thread::spawn(move || hyperport_reader(mem_path, "/tmp/hyperport.trace"));
+
+    let ready = Arc::new(AtomicBool::new(false));
+    let cloned = ready.clone();
+    let _handle = thread::spawn(move || hyperport_reader(mem_path, "/tmp/hyperport.trace", cloned));
+
+    while !ready.load(Ordering::Relaxed) {}
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
@@ -440,7 +450,7 @@ fn gdb_cli(artifacts: &[Artifact]) {
 
                     target remote :1234
 
-                    hbreak trampoline
+                    hbreak kernel::dbt::trampoline::trampoline
                 "#,
                 kernel_path.to_string_lossy(),
                 offset,
@@ -455,7 +465,11 @@ fn gdb_cli(artifacts: &[Artifact]) {
     std::process::exit(0);
 }
 
-fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(shared_mem_path: P1, destination_path: P2) {
+fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
+    shared_mem_path: P1,
+    destination_path: P2,
+    ready: Arc<AtomicBool>,
+) {
     println!(
         "starting hyperport reader @ {:?}, writing to {:?}",
         shared_mem_path.as_ref(),
@@ -479,6 +493,8 @@ fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(shared_mem_path: P1, desti
     let mut mem = unsafe { memmap2::MmapMut::map_mut(&shared_file) }.unwrap();
 
     let mut rb = RingBuffer::<Consumer>::init(&mut mem);
+
+    ready.store(true, Ordering::Relaxed);
 
     loop {
         rb.read(|buffer| {

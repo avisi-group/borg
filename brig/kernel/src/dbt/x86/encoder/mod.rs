@@ -42,6 +42,8 @@ pub enum Opcode<A: Alloc> {
     CMOVE(Operand<A>, Operand<A>),
     /// cmovne {0}, {1}
     CMOVNE(Operand<A>, Operand<A>),
+    /// call {0}
+    CALL(Operand<A>),
     /// lea {0}, {1}
     LEA(Operand<A>, Operand<A>),
     /// shl {0}, {1}
@@ -821,6 +823,10 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::CMOVNE(src, dest))
     }
 
+    pub fn call(f: Operand<A>) -> Self {
+        Self(Opcode::CALL(f))
+    }
+
     alu_op!(add, ADD);
     alu_op!(sub, SUB);
     alu_op!(or, OR);
@@ -1108,6 +1114,12 @@ impl<A: Alloc> Instruction<A> {
                 assert_eq!(*lo, PhysicalRegister::RAX);
                 assembler.idiv::<AsmRegister64>(div.into()).unwrap();
             }
+            CALL(Operand {
+                kind: R(PHYS(tgt)),
+                width_in_bits: Width::_64,
+            }) => {
+                assembler.call::<AsmRegister64>(tgt.into()).unwrap();
+            }
 
             _ => panic!("cannot encode this instruction {}", self),
         }
@@ -1148,7 +1160,9 @@ impl<A: Alloc> Instruction<A> {
                 Some((OperandDirection::In, divisor)),
             ]
             .into_iter(),
-            Opcode::JMP(tgt) => [Some((OperandDirection::None, tgt)), None, None].into_iter(),
+            Opcode::JMP(tgt) | Opcode::JNE(tgt) | Opcode::CALL(tgt) => {
+                [Some((OperandDirection::In, tgt)), None, None].into_iter()
+            }
             Opcode::RET | Opcode::NOP => [None, None, None].into_iter(),
             Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => [
                 Some((OperandDirection::In, op0)),
@@ -1156,7 +1170,7 @@ impl<A: Alloc> Instruction<A> {
                 None,
             ]
             .into_iter(),
-            Opcode::JNE(tgt) => [Some((OperandDirection::None, tgt)), None, None].into_iter(),
+
             Opcode::SETE(r)
             | Opcode::SETNE(r)
             | Opcode::SETNZ(r)

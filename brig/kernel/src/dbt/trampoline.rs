@@ -1,55 +1,84 @@
-use core::arch::global_asm;
+use core::arch::asm;
 
 pub const MAX_STACK_SIZE: usize = 2 * 1024 * 1024;
 
-global_asm!(
-    r#"
-        .global trampoline
-    trampoline:
-        push %rax
-        push %rcx
-        push %rdx
-        push %rbx
-        push %rbp
-        push %rsi
-        push %rdi
-        push %r8
-        push %r9
-        push %r10
-        push %r11
-        push %r12
-        push %r13
-        push %r14
-        push %r15
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u64)]
+pub enum ExecutionResult {
+    Ok,
+    NeedTLBInvalidate,
+}
 
-        mov %rsi, %rbp
-        mov %rsp, %r14
-        sub ${max_stack_size}, %rsp
-        call *%rdi
-        add ${max_stack_size}, %rsp
+impl From<u64> for ExecutionResult {
+    fn from(value: u64) -> Self {
+        match value {
+            0 => Self::Ok,
+            1 => Self::NeedTLBInvalidate,
+            _ => panic!("unknown execution result value: {value:x}"),
+        }
+    }
+}
 
-        pop %r15
-        pop %r14
-        pop %r13
-        pop %r12
-        pop %r11
-        pop %r10
-        pop %r9
-        pop %r8
-        pop %rdi
-        pop %rsi
-        pop %rbp
-        pop %rbx
-        pop %rdx
-        pop %rcx
-        pop %rax
+impl ExecutionResult {
+    pub fn as_u64(&self) -> u64 {
+        match self {
+            Self::Ok => 0,
+            Self::NeedTLBInvalidate => 1,
+        }
+    }
+}
 
-        ret
-    "#,
-    max_stack_size = const MAX_STACK_SIZE,
-    options(att_syntax)
-);
+#[inline(never)] // only disabled to make debugging easier
+pub fn trampoline(code_ptr: *const u8, register_file: *mut u8) -> ExecutionResult {
+    let mut status: u64;
 
-unsafe extern "C" {
-    pub fn trampoline(code_ptr: *const u8, register_file: *mut u8);
+    unsafe {
+        asm!(
+            "
+                push %rcx
+                push %rdx
+                push %rbx
+                push %rbp
+                push %rsi
+                push %rdi
+                push %r8
+                push %r9
+                push %r10
+                push %r11
+                push %r12
+                push %r13
+                push %r14
+                push %r15
+
+                mov {register_file}, %rbp
+                mov %rsp, %r14
+                sub ${max_stack_size}, %rsp
+                call *{code_ptr}
+                mov %rax, {status}
+                add ${max_stack_size}, %rsp
+
+                pop %r15
+                pop %r14
+                pop %r13
+                pop %r12
+                pop %r11
+                pop %r10
+                pop %r9
+                pop %r8
+                pop %rdi
+                pop %rsi
+                pop %rbp
+                pop %rbx
+                pop %rdx
+                pop %rcx
+            ",
+            options(att_syntax),
+            max_stack_size = const MAX_STACK_SIZE,
+            register_file = in(reg) register_file,
+            code_ptr = in(reg) code_ptr,
+            status = out(reg) status,
+        )
+    };
+
+    ExecutionResult::from(status)
 }

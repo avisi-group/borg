@@ -106,6 +106,7 @@ impl FreshAllocator {
 
         instructions
             .iter_mut()
+            .filter(|i| !matches!(i, Instruction(Opcode::PUSH(_) | Opcode::POP(_))))
             .enumerate()
             .for_each(|(instruction_index, instruction)| {
                 let instr_clone = instruction.clone();

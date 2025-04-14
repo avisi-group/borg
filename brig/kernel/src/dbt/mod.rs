@@ -1,5 +1,8 @@
 use {
-    crate::{arch::x86::memory::VirtualMemoryArea, dbt::register_file::RegisterFile},
+    crate::{
+        arch::x86::memory::VirtualMemoryArea,
+        dbt::{register_file::RegisterFile, trampoline::ExecutionResult},
+    },
     alloc::{string::String, vec::Vec},
     common::mask::mask,
     core::{
@@ -40,11 +43,11 @@ impl Translation {
         Self { code }
     }
 
-    pub fn execute(&self, register_file: &RegisterFile) {
+    pub fn execute(&self, register_file: &RegisterFile) -> ExecutionResult {
         let code_ptr = self.code.as_ptr();
         let register_file_ptr = register_file.as_mut_ptr();
 
-        unsafe { trampoline::trampoline(code_ptr, register_file_ptr) };
+        trampoline::trampoline(code_ptr, register_file_ptr)
     }
 }
 

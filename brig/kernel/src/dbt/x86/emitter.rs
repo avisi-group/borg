@@ -2,10 +2,13 @@ use {
     crate::dbt::{
         Alloc, bit_extract, bit_insert,
         emitter::Type,
+        trampoline::{self, ExecutionResult},
         x86::{
             Emitter, X86TranslationContext,
             encoder::{
-                Instruction, Opcode, Operand, OperandKind, PhysicalRegister, Register, width::Width,
+                Instruction, Opcode, Operand, OperandKind, PhysicalRegister,
+                Register::{self},
+                width::Width,
             },
             register_allocator::RegisterAllocator,
         },
@@ -44,6 +47,7 @@ pub struct X86Emitter<'ctx, A: Alloc> {
     current_block_operands: HashMap<X86NodeRef<A>, Operand<A>>,
     panic_block: Ref<X86Block<A>>,
     next_vreg: usize,
+    execution_result: ExecutionResult,
     ctx: &'ctx mut X86TranslationContext<A>,
 }
 
@@ -54,8 +58,13 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             current_block_operands: HashMap::default(),
             panic_block: ctx.panic_block(),
             next_vreg: 0,
+            execution_result: ExecutionResult::Ok,
             ctx,
         }
+    }
+
+    pub fn execution_result(&self) -> ExecutionResult {
+        self.execution_result
     }
 
     pub fn ctx(&self) -> &X86TranslationContext<A> {
@@ -840,6 +849,48 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             op => todo!("{op:#?}"),
         }
     }
+
+    fn _emit_helper_call(&mut self, fn_ptr: usize, operands: &[Operand<A>]) {
+        const ARG_REGS: &[PhysicalRegister] = &[PhysicalRegister::RDI, PhysicalRegister::RSI];
+
+        const CALLER_SAVED: &[PhysicalRegister] = &[
+            PhysicalRegister::RAX,
+            PhysicalRegister::RCX,
+            PhysicalRegister::RDX,
+            PhysicalRegister::RSI,
+            PhysicalRegister::RDI,
+            PhysicalRegister::R8,
+            PhysicalRegister::R9,
+            PhysicalRegister::R10,
+            PhysicalRegister::R11,
+        ];
+
+        // todo add more arg regs
+        assert!(operands.len() <= ARG_REGS.len());
+
+        operands
+            .iter()
+            .zip(ARG_REGS.into_iter())
+            .for_each(|(operand, preg)| {
+                self.push_instruction(
+                    Instruction::mov(*operand, Operand::preg(operand.width(), *preg)).unwrap(),
+                );
+            });
+
+        let target_reg = Operand::vreg(Width::_64, self.next_vreg());
+        let target_imm = Operand::imm(Width::_64, fn_ptr as u64);
+        self.push_instruction(Instruction::mov(target_imm, target_reg).unwrap());
+
+        for reg in CALLER_SAVED {
+            self.push_instruction(Instruction::push(Operand::preg(Width::_64, *reg)));
+        }
+
+        self.push_instruction(Instruction::call(target_reg));
+
+        for reg in CALLER_SAVED.iter().rev() {
+            self.push_instruction(Instruction::pop(Operand::preg(Width::_64, *reg)));
+        }
+    }
 }
 
 impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
@@ -1581,12 +1632,6 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
         let width = value.width();
 
-        if offset == self.ctx().sctlr_el1_offset {
-            self.ctx_mut().set_mmu_config_flag(); // block contains an instr that modifies sctlr
-        } else if offset == self.ctx().ttbr0_el1_offset || offset == self.ctx().ttbr1_el1_offset {
-            self.ctx_mut().set_mmu_needs_invalidate_flag();
-        }
-
         self.push_instruction(
             Instruction::mov(
                 value,
@@ -1598,6 +1643,14 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             )
             .unwrap(),
         );
+
+        if offset == self.ctx().sctlr_el1_offset
+            || offset == self.ctx().ttbr0_el1_offset
+            || offset == self.ctx().ttbr1_el1_offset
+        {
+            // return with invalidate code
+            self.execution_result = ExecutionResult::NeedTLBInvalidate;
+        }
     }
 
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef {
@@ -1687,6 +1740,13 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     }
 
     fn leave(&mut self) {
+        self.push_instruction(
+            Instruction::mov(
+                Operand::imm(Width::_64, self.execution_result.as_u64()),
+                Operand::preg(Width::_64, PhysicalRegister::RAX),
+            )
+            .unwrap(),
+        );
         self.push_instruction(Instruction::ret());
     }
 

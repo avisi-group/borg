@@ -5,6 +5,7 @@ use {
             Alloc, Translation,
             emitter::{Emitter, Type},
             register_file::RegisterFile,
+            trampoline::ExecutionResult,
             translate::translate_instruction,
             x86::{
                 X86TranslationContext,
@@ -23,6 +24,7 @@ use {
         collections::btree_map::BTreeMap,
         string::{String, ToString},
         sync::Arc,
+        vec::Vec,
     },
     common::{
         hashmap::HashMap,
@@ -212,6 +214,8 @@ impl ModelDevice {
             panic!();
         };
 
+        let mut instructions_executed = 0usize;
+
         // guest PC to translated block cache
         let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
 
@@ -221,10 +225,13 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
+            // if instructions_executed == 335000 {
+            //     log::set_max_level(log::LevelFilter::Trace);
+            // }
+
             let block_start_pc = self.register_file.read::<u64>("_PC");
 
             let translated_block = block_cache.entry(block_start_pc).or_insert_with(|| {
-                log::debug!("translating {block_start_pc:#08x}");
                 allocator.clear();
                 self.translate_block(
                     BumpAllocatorRef::new(&allocator),
@@ -233,17 +240,24 @@ impl ModelDevice {
                 )
             });
 
-            log::debug!("executing {block_start_pc:#08x}");
-            translated_block.translation.execute(&self.register_file);
+            instructions_executed += translated_block.opcodes.len();
+
+            log::debug!(
+                "executing {block_start_pc:#08x}: {:08x?} (instr {instructions_executed})",
+                translated_block.opcodes,
+            );
+
+            let exec_result = translated_block.translation.execute(&self.register_file);
 
             log::trace!(
-                "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x5: {:x}",
+                "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x3: {:x}, x18: {:x}",
                 self.get_nzcv(),
                 self.register_file.read::<u64>("SP_EL3"),
                 self.register_file.read::<u64>("R0"),
                 self.register_file.read::<u64>("R1"),
                 self.register_file.read::<u64>("R2"),
-                self.register_file.read::<u64>("R5"),
+                self.register_file.read::<u64>("R3"),
+                self.register_file.read::<u64>("R18"),
             );
 
             if PRINT_REGISTERS {
@@ -263,16 +277,14 @@ impl ModelDevice {
                     .unwrap();
                 }
                 if !single_step_mode {
-                    write!(transport, "skip {}\n", translated_block.num_instructions).unwrap();
+                    write!(transport, "skip {}\n", translated_block.opcodes.len()).unwrap();
                 }
             }
 
-            if translated_block.contained_sctlr_write | translated_block.contained_ttbr_write {
-                let mmu_enabled = self.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
-
-                if mmu_enabled | translated_block.contained_ttbr_write {
+            match exec_result {
+                ExecutionResult::Ok => (),
+                ExecutionResult::NeedTLBInvalidate => {
                     block_cache.clear();
-                    // clear guest page tables
                     VirtualMemoryArea::current().invalidate_guest_mappings();
                 }
             }
@@ -290,7 +302,7 @@ impl ModelDevice {
 
         let mut current_pc = block_start_pc;
 
-        let mut num_instructions = 0usize;
+        let mut opcodes = Vec::new();
 
         // instruction translation loop
         let was_end_of_block = loop {
@@ -302,6 +314,9 @@ impl ModelDevice {
             let opcode = unsafe { *((current_pc & 0xFF_FFFF_FFFF) as *const u32) };
 
             log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
+            log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
+
+            opcodes.push(opcode);
 
             let _return_value = translate_instruction(
                 allocator,
@@ -313,8 +328,6 @@ impl ModelDevice {
                 opcode,
             )
             .unwrap();
-
-            num_instructions += 1;
 
             // hit a maybe-PC modifying instruction
             if emitter.ctx().get_pc_write_flag() {
@@ -337,6 +350,13 @@ impl ModelDevice {
                 }
             }
 
+            // if we have a TLB invalidation or other non-zero status in that instruction,
+            // do not translate the rest of the block
+            if emitter.execution_result() != ExecutionResult::Ok {
+                break false;
+            }
+
+            // only translate single instruction in single_step_mode
             if single_step_mode {
                 break false;
             }
@@ -364,28 +384,20 @@ impl ModelDevice {
         emitter.leave();
         let num_regs = emitter.next_vreg();
 
-        let contained_sctlr_write = ctx.get_mmu_write_flag();
-        let contained_ttbr_write = ctx.get_mmu_needs_invalidate_flag();
-
         let translation = ctx.compile(num_regs);
 
         log::trace!("finished");
 
         TranslatedBlock {
             translation,
-            num_instructions,
-            contained_sctlr_write,
-            contained_ttbr_write,
+            opcodes,
         }
     }
 }
 
-struct TranslatedBlock {
+pub struct TranslatedBlock {
     translation: Translation,
-    num_instructions: usize,
-    // translation contains a write, not guaranteed it will be executed
-    contained_sctlr_write: bool,
-    contained_ttbr_write: bool,
+    opcodes: Vec<u32>,
 }
 
 fn register_cache_type(name: InternedString) -> RegisterCacheType {
