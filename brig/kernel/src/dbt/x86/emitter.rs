@@ -118,7 +118,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         let op = self.to_operand(node);
 
         if let OperandKind::Immediate(value) = op.kind() {
-            if *value > (u32::MAX as u64) {
+            if *value > (i32::MAX as u64) {
                 let tmp = Operand::vreg(op.width(), self.next_vreg());
                 self.push_instruction(Instruction::mov(op, tmp).unwrap());
                 return tmp;
@@ -760,22 +760,6 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             BinaryOperationKind::Or(_, _) => {
                 self.push_instruction(Instruction::mov(left, dst).unwrap());
 
-                let right = if width >= Width::_32 {
-                    if let OperandKind::Immediate(i) = *right.kind() {
-                        if i > i32::MAX as u64 {
-                            let tmp = Operand::vreg(width, self.next_vreg());
-                            self.push_instruction(Instruction::mov(right, tmp).unwrap());
-                            tmp
-                        } else {
-                            right
-                        }
-                    } else {
-                        right
-                    }
-                } else {
-                    right
-                };
-
                 self.push_instruction(Instruction::or(right, dst));
                 dst
             }
@@ -791,13 +775,6 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 dst
             }
             BinaryOperationKind::And(_, _) => {
-                if let OperandKind::Immediate(i) = right.kind() {
-                    if *i > u32::MAX as u64 {
-                        let new = Operand::vreg(width, self.next_vreg());
-                        self.push_instruction(Instruction::mov(right, new).unwrap());
-                        right = new;
-                    }
-                }
                 self.push_instruction(Instruction::mov(left, dst).unwrap());
                 self.push_instruction(Instruction::and(right, dst));
 
