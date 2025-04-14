@@ -47,7 +47,7 @@ pub struct X86Emitter<'ctx, A: Alloc> {
     current_block_operands: HashMap<X86NodeRef<A>, Operand<A>>,
     panic_block: Ref<X86Block<A>>,
     next_vreg: usize,
-    execution_result: ExecutionResult,
+    pub execution_result: ExecutionResult,
     ctx: &'ctx mut X86TranslationContext<A>,
 }
 
@@ -61,10 +61,6 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             execution_result: ExecutionResult::Ok,
             ctx,
         }
-    }
-
-    pub fn execution_result(&self) -> ExecutionResult {
-        self.execution_result
     }
 
     pub fn ctx(&self) -> &X86TranslationContext<A> {

@@ -85,7 +85,7 @@ fn translate_l1(
     if entry.is_table_or_page() {
         translate_l2(device, entry_to_table(&entry), guest_virtual_address)
     } else {
-        todo!("block")
+        Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 30) - 1)))
     }
 }
 

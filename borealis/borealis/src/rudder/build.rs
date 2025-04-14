@@ -1609,7 +1609,6 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "execute_aarch64_instrs_system_barriers_isb"
             | "sail_return_exception"
             | "sail_branch_announce"
-            | "sail_tlbi"
             | "prerr_bits"
             | "prerr_int"
             | "sail_cache_op"

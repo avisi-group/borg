@@ -3,7 +3,7 @@ use {
         Alloc,
         emitter::{self, Emitter, Type},
         register_file::RegisterFile,
-        trampoline::MAX_STACK_SIZE,
+        trampoline::{ExecutionResult, MAX_STACK_SIZE},
         x86::{
             emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
             encoder::Instruction,
@@ -991,6 +991,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
             Statement::Call { target, args, .. } => {
                 let args = args.iter().map(|a| value_store.get(*a)).collect::<Vec<_>>();
+
+                if target.as_ref() == "sail_tlbi" {
+                    self.emitter.execution_result = ExecutionResult::NeedTLBInvalidate;
+                }
 
                 StatementResult::Data(
                     FunctionTranslator::new(

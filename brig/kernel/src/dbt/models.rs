@@ -352,7 +352,7 @@ impl ModelDevice {
 
             // if we have a TLB invalidation or other non-zero status in that instruction,
             // do not translate the rest of the block
-            if emitter.execution_result() != ExecutionResult::Ok {
+            if emitter.execution_result != ExecutionResult::Ok {
                 break false;
             }
 
