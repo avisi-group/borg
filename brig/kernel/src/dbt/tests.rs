@@ -4042,3 +4042,40 @@ fn _brk() {
 
     translation.execute(&register_file);
 }
+
+#[ktest]
+fn lsr() {
+    //d360fd08        lsr     x8, x8, #32
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    //   d360fd08        lsr     x8, x8, #32
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd360fd08, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("R8", 0x1);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R8"), 0x1 >> 32);
+}
