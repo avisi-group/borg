@@ -17,7 +17,7 @@ use {
             Arc,
             atomic::{AtomicBool, Ordering},
         },
-        thread,
+        thread::{self},
     },
     tar::Header,
     walkdir::WalkDir,
@@ -401,13 +401,27 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
     ]);
 
     let ready = Arc::new(AtomicBool::new(false));
-    let cloned = ready.clone();
-    let _handle = thread::spawn(move || hyperport_reader(mem_path, "/tmp/hyperport.trace", cloned));
+    let terminate = Arc::new(AtomicBool::new(false));
 
-    while !ready.load(Ordering::Relaxed) {}
+    let ready_clone = ready.clone();
+    let terminate_clone = terminate.clone();
+
+    let handle = thread::spawn(move || {
+        hyperport_reader(
+            mem_path,
+            "/tmp/hyperport.trace",
+            ready_clone,
+            terminate_clone,
+        )
+    });
+
+    while ready.load(Ordering::Relaxed) {}
 
     let mut child = cmd.spawn().unwrap();
     child.wait().unwrap();
+
+    terminate.store(true, Ordering::Relaxed);
+    handle.join().unwrap();
 }
 
 fn get_kernel_from_artifacts(artifacts: &[Artifact]) -> PathBuf {
@@ -469,6 +483,7 @@ fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
     shared_mem_path: P1,
     destination_path: P2,
     ready: Arc<AtomicBool>,
+    terminate: Arc<AtomicBool>,
 ) {
     println!(
         "starting hyperport reader @ {:?}, writing to {:?}",
@@ -496,7 +511,7 @@ fn hyperport_reader<P1: AsRef<Path>, P2: AsRef<Path>>(
 
     ready.store(true, Ordering::Relaxed);
 
-    loop {
+    while !terminate.load(Ordering::Relaxed) {
         rb.read(|buffer| {
             match buffer {
                 MaybeSplitBuffer::Single(buf) => dest.write_all(buf).unwrap(),
