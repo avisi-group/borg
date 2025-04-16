@@ -261,13 +261,28 @@ impl ModelDevice {
             );
 
             if PRINT_REGISTERS {
-                write!(
-                    transport,
-                    "PC = {:016x}\n",
-                    self.register_file.read::<u64>("_PC")
-                )
-                .unwrap();
-                write!(transport, "NZCV = {:04b}\n", self.get_nzcv()).unwrap();
+                write!(transport, "PSTATE:\n").unwrap();
+                for field in [
+                    "A", "ALLINT", "BTYPE", "C", "D", "DIT", "E", "EL", "EXLOCK", "F", "GE", "I",
+                    "IL", "IT", "J", "M", "N", "PAN", "PM", "PPEND", "Q", "SM", "SP", "SS", "SSBS",
+                    "T", "TCO", "UAO", "V", "Z", "ZA", "nRW",
+                ] {
+                    write!(
+                        transport,
+                        "\t{field} = {}\n",
+                        self.register_file
+                            .read::<u8>(alloc::format!("PSTATE_{field}"))
+                    )
+                    .unwrap();
+                }
+                for el in 0..=3 {
+                    write!(
+                        transport,
+                        "SP_EL{el} = {:016x}\n",
+                        self.register_file.read::<u64>(alloc::format!("SP_EL{el}"))
+                    )
+                    .unwrap();
+                }
                 for reg in 0..=30 {
                     write!(
                         transport,
@@ -276,6 +291,13 @@ impl ModelDevice {
                     )
                     .unwrap();
                 }
+                write!(transport, "\n\n").unwrap();
+                write!(
+                    transport,
+                    "PC = {:016x}\n",
+                    self.register_file.read::<u64>("_PC")
+                )
+                .unwrap();
                 if !single_step_mode {
                     write!(transport, "skip {}\n", translated_block.opcodes.len()).unwrap();
                 }
