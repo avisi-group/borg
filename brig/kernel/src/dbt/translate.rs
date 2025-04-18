@@ -122,6 +122,36 @@ pub fn translate_instruction<A: Alloc>(
             register_file,
         );
 
+        // from __InstructionExecute
+        // if not_bool(AArch64_ExecutingERETInstr()) then {
+        //     PSTATE.BTYPE = BTypeNext
+        // };
+        {
+            let update_btype_block = emitter.ctx_mut().create_block();
+
+            let end_block = emitter.ctx_mut().create_block();
+
+            let executing_eret = translate(
+                allocator,
+                model,
+                "AArch64_ExecutingERETInstr",
+                &[],
+                emitter,
+                register_file,
+            )
+            .unwrap()
+            .unwrap();
+
+            emitter.branch(executing_eret, end_block, update_btype_block);
+
+            emitter.set_current_block(update_btype_block);
+            let btypenext = emitter.read_register(model.reg_offset("BTypeNext"), Type::Unsigned(2));
+            emitter.write_register(model.reg_offset("PSTATE_BTYPE"), btypenext);
+            emitter.jump(end_block);
+
+            emitter.set_current_block(end_block);
+        }
+
         match res {
             Ok(_) => break (res, start_block),
             Err(Error::Decode) => {

@@ -221,12 +221,18 @@ impl ModelDevice {
 
         let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
+        //log::set_max_level(log::LevelFilter::Error);
+
         let _status = record_safepoint();
 
         // block translation/execution loop
         loop {
-            // if instructions_executed == 335000 {
+            // if instructions_executed == 52580 {
             //     log::set_max_level(log::LevelFilter::Trace);
+            // }
+
+            // if instructions_executed == 52590 {
+            //     panic!();
             // }
 
             let block_start_pc = self.register_file.read::<u64>("_PC");

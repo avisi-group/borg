@@ -4079,3 +4079,39 @@ fn lsr() {
 
     assert_eq!(register_file.read::<u64>("R8"), 0x1 >> 32);
 }
+
+#[ktest]
+fn br_btype() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    //   0xd61f0100  br                x8
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0,
+        0xd61f0100,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R8", 0xffffffc008250254);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("_PC"), 0xffffffc008250254);
+    assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"), 0x1);
+}
