@@ -147,7 +147,7 @@ pub fn irq_handler(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // new outer function created with original function name
     let outer_fn = quote!(
-        #[naked]
+        #[unsafe(naked)]
         unsafe extern "C" fn #outer_fn_ident() {
             // original user-supplied function definition
             #inner_fn

@@ -267,6 +267,12 @@ impl ModelDevice {
             );
 
             if PRINT_REGISTERS {
+                write!(
+                    transport,
+                    "PC = {:016x}\n",
+                    self.register_file.read::<u64>("_PC")
+                )
+                .unwrap();
                 write!(transport, "PSTATE:\n").unwrap();
                 for field in [
                     "A", "ALLINT", "BTYPE", "C", "D", "DIT", "E", "EL", "EXLOCK", "F", "GE", "I",
@@ -281,6 +287,12 @@ impl ModelDevice {
                     )
                     .unwrap();
                 }
+                write!(
+                    transport,
+                    "BTypeNext = {}\n",
+                    self.register_file.read::<u8>("BTypeNext")
+                )
+                .unwrap();
                 for el in 0..=3 {
                     write!(
                         transport,
@@ -298,12 +310,6 @@ impl ModelDevice {
                     .unwrap();
                 }
                 write!(transport, "\n\n").unwrap();
-                write!(
-                    transport,
-                    "PC = {:016x}\n",
-                    self.register_file.read::<u64>("_PC")
-                )
-                .unwrap();
                 if !single_step_mode {
                     write!(transport, "skip {}\n", translated_block.opcodes.len()).unwrap();
                 }
