@@ -1,7 +1,7 @@
 use {
     crate::boom::{
-        Ast, Expression, Literal, NamedType, Operation, Parameter, Size, Statement, Type, Value,
-        Visitor,
+        Ast, Expression, Literal, NamedType, NamedValue, Operation, Parameter, Size, Statement,
+        Type, Value, Visitor,
         control_flow::{ControlFlowBlock, Terminator},
         passes::Pass,
         visitor::Walkable,
@@ -10,7 +10,7 @@ use {
     itertools::Itertools,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
     sailrs::shared::Shared,
-    std::{fmt, fmt::Display},
+    std::fmt::{self, Display},
 };
 
 #[derive(Debug, Default)]
@@ -343,7 +343,21 @@ fn destruct_locals(
                                     .map(Shared::new)
                                     .collect();
                                 }
+                                Value::Struct { name, .. } => {
+                                    let typ = composites.get(name).unwrap();
+
+                                    return flatten_struct_value(value.get().clone())
+                                        .into_iter()
+                                        .zip(destruct_variable(destination.to_ident(), typ.clone()))
+                                        .map(|(value, (dest_part, _))| Statement::Copy {
+                                            expression: Expression::Identifier(dest_part),
+                                            value,
+                                        })
+                                        .map(Shared::new)
+                                        .collect();
+                                }
                                 _ => {
+                                    log::warn!("bailing out of {}", destination.to_ident());
                                     return vec![Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(destination.to_ident()),
                                         value: value.clone(),
@@ -458,7 +472,12 @@ fn destruct_locals(
                                     let root_typ = destructed_local_variables
                                         .get(&destination.root())
                                         .or_else(|| destructed_registers.get(&destination.root()))
-                                        .unwrap();
+                                        .unwrap_or_else(|| {
+                                            panic!(
+                                                "failed to find root type for {:?}",
+                                                destination.root()
+                                            )
+                                        });
                                     let (dst_outer_ident, outer_typ) =
                                         traverse_typ_from_location(root_typ.clone(), &destination);
 
@@ -634,6 +653,18 @@ fn create_union_construction_copies(
             )
             .collect(),
         v => todo!("{v:?}"),
+    }
+}
+
+fn flatten_struct_value(value: Value) -> Vec<Shared<Value>> {
+    match value {
+        Value::Struct { fields, .. } => fields
+            .iter()
+            .map(|NamedValue { value, .. }| value.get().clone())
+            .map(flatten_struct_value)
+            .flatten()
+            .collect(),
+        _ => vec![Shared::new(value)],
     }
 }
 

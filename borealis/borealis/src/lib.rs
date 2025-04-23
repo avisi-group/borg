@@ -9,7 +9,7 @@ use {
                 cycle_finder::CycleFinder, destruct_composites::DestructComposites,
                 fold_unconditionals::FoldUnconditionals, lower_reals::LowerReals,
                 remove_const_branch::RemoveConstBranch, remove_constant_type::RemoveConstantType,
-                remove_units::RemoveUnits,
+                remove_units::RemoveUnits, replace_undefined::ReplaceUndefined,
             },
         },
         example_fns::{example_functions, variable_corrupted_example},
@@ -99,6 +99,7 @@ pub fn sail_to_brig(jib_ast: ListVec<jib_ast::Definition>, path: PathBuf, mode: 
     [
         LowerReals::new_boxed(),
         HandleBuiltinFunctions::new_boxed(),
+        ReplaceUndefined::new_boxed(),
         RemoveConstantType::new_boxed(),
         DestructComposites::new_boxed(),
         RemoveUnits::new_boxed(),

@@ -60,7 +60,9 @@ impl BoomEmitter {
                     value: Shared::new(boom::Value::Literal(Shared::new(boom::Literal::Unit))),
                 }));
             self.register_init_statements
-                .push(Shared::new(boom::Statement::End("ret".into())));
+                .push(Shared::new(boom::Statement::Return(Shared::new(
+                    boom::Value::Identifier("ret".into()),
+                ))));
 
             self.ast.functions.insert(
                 "borealis_register_init".into(),
@@ -309,9 +311,15 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
             value: convert_value(value),
         }],
         jib_ast::InstructionAux::Clear(_, _) => vec![],
-        jib_ast::InstructionAux::Undefined(_) => vec![boom::Statement::Undefined],
-        jib_ast::InstructionAux::Exit(s) => vec![boom::Statement::Exit(*s)],
-        jib_ast::InstructionAux::End(name) => vec![boom::Statement::End(convert_name(name))],
+        jib_ast::InstructionAux::Undefined(_) => vec![boom::Statement::Return(Shared::new(
+            boom::Value::Literal(Shared::new(boom::Literal::Undefined)),
+        ))],
+        jib_ast::InstructionAux::Exit(s) => vec![boom::Statement::Panic(Shared::new(
+            boom::Value::Literal(Shared::new(boom::Literal::String(*s))),
+        ))],
+        jib_ast::InstructionAux::End(name) => vec![boom::Statement::Return(Shared::new(
+            boom::Value::Identifier(convert_name(name)),
+        ))],
         jib_ast::InstructionAux::If(condition, if_body, else_body, _) => {
             vec![boom::Statement::If {
                 condition: convert_value(condition),
@@ -323,7 +331,7 @@ fn convert_statement(statement: &jib_ast::InstructionAux) -> Vec<Shared<boom::St
         jib_ast::InstructionAux::Throw(value) => {
             vec![boom::Statement::Panic(convert_value(value))]
         }
-        jib_ast::InstructionAux::Comment(s) => vec![boom::Statement::Comment(*s)],
+        jib_ast::InstructionAux::Comment(_) => vec![],
         jib_ast::InstructionAux::TryBlock(_) | jib_ast::InstructionAux::Block(_) => unreachable!(),
         jib_ast::InstructionAux::Raw(_) => todo!(),
         jib_ast::InstructionAux::Return(_) => todo!(),

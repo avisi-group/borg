@@ -227,11 +227,11 @@ impl ModelDevice {
 
         // block translation/execution loop
         loop {
-            // if instructions_executed == 52580 {
+            // if instructions_executed == 389280 {
             //     log::set_max_level(log::LevelFilter::Trace);
             // }
 
-            // if instructions_executed == 52590 {
+            // if instructions_executed == 277455 {
             //     panic!();
             // }
 

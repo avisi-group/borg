@@ -417,17 +417,15 @@ pub enum Statement {
         condition: Shared<Value>,
         target: InternedString,
     },
-    End(InternedString),
-    Undefined,
     If {
         condition: Shared<Value>,
         if_body: Vec<Shared<Statement>>,
         else_body: Vec<Shared<Statement>>,
     },
-    Exit(InternedString),
-    Comment(InternedString),
     /// Fatal error, printing the supplied values
     Panic(Shared<Value>),
+    /// Function return
+    Return(Shared<Value>),
 }
 
 impl From<Statement> for Shared<Statement> {
@@ -460,8 +458,6 @@ impl Walkable for Statement {
             Self::Label(_) => (),
             Self::Goto(_) => (),
             Self::Jump { condition, .. } => visitor.visit_value(condition.clone()),
-            Self::End(_) => (),
-            Self::Undefined => (),
             Self::If {
                 condition,
                 if_body,
@@ -475,9 +471,8 @@ impl Walkable for Statement {
                     .iter()
                     .for_each(|statement| visitor.visit_statement(statement.clone()));
             }
-            Self::Exit(_) => (),
-            Self::Comment(_) => (),
-            Self::Panic(value) => visitor.visit_value(value.clone()),
+
+            Self::Panic(value) | Self::Return(value) => visitor.visit_value(value.clone()),
         }
     }
 }

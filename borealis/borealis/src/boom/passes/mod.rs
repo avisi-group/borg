@@ -27,6 +27,8 @@ pub mod monomorphize_vectors;
 pub mod remove_const_branch;
 pub mod remove_constant_type;
 pub mod remove_units;
+pub mod replace_undefined;
+
 /// Pass that performs an operation on an AST
 pub trait Pass {
     /// Gets the name of the pass

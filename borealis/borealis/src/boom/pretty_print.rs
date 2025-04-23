@@ -297,14 +297,12 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 self.visit_type(typ.clone());
                 write!(self.writer, " {name};").unwrap();
             }
-
             Statement::Copy { expression, value } => {
                 self.visit_expression(expression);
                 write!(self.writer, " = ").unwrap();
                 self.visit_value(value.clone());
                 write!(self.writer, ";").unwrap();
             }
-
             Statement::FunctionCall {
                 expression,
                 name,
@@ -328,24 +326,21 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
                 write!(self.writer, ");").unwrap();
             }
-
-            Statement::Comment(str) => write!(self.writer, "// {str}").unwrap(),
             Statement::Label(str) => write!(self.writer, "// label({str})").unwrap(),
-            Statement::Exit(str) => write!(self.writer, "// exit({str})").unwrap(),
-
             Statement::If { .. } | Statement::Jump { .. } | Statement::Goto(_) => {
                 panic!(
                     "control flow statements should have been removed by this point: {:?}",
                     node
                 )
             }
-
-            Statement::End(_) => todo!(),
-            Statement::Undefined => todo!(),
             Statement::Panic(value) => {
                 write!(self.writer, "panic(").unwrap();
                 self.visit_value(value.clone());
                 write!(self.writer, ")").unwrap();
+            }
+            Statement::Return(value) => {
+                write!(self.writer, "return ").unwrap();
+                self.visit_value(value.clone());
             }
         }
     }

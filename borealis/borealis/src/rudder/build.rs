@@ -375,18 +375,11 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             boom::Statement::Label(_)
             | boom::Statement::Goto(_)
             | boom::Statement::Jump { .. }
-            | boom::Statement::End(_)
-            | boom::Statement::Undefined
-            | boom::Statement::If { .. } => {
+            | boom::Statement::If { .. }
+            | boom::Statement::Return { .. } => {
                 panic!("no control flow should exist at this point in compilation!\n{statement:?}")
             }
-            boom::Statement::Comment(_) => (),
-            boom::Statement::Exit(msg) => {
-                let value = self.build_value(Shared::new(boom::Value::Literal(Shared::new(
-                    boom::Literal::String(*msg),
-                ))));
-                build(self.block, self.block_arena_mut(), Statement::Panic(value));
-            }
+
             boom::Statement::Panic(value) => {
                 let value = self.build_value(value.clone());
                 build(self.block, self.block_arena_mut(), Statement::Panic(value));

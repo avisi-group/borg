@@ -1,9 +1,9 @@
 use {
     crate::boom::{
-        Literal, Statement, Value,
+        Statement, Value,
         control_flow::{ControlFlowBlock, Terminator},
     },
-    common::{intern::InternedString, hashmap::HashMap},
+    common::{hashmap::HashMap, intern::InternedString},
     sailrs::shared::{Shared, SharedKey},
 };
 
@@ -123,24 +123,16 @@ impl ControlFlowGraphBuilder {
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
                 }
-                Statement::End(ident) => {
+                Statement::Return(value) => {
                     // end current block
                     self.current_block
                         .get_mut()
-                        .set_terminator(MaybeUnresolvedTerminator::Return(*ident));
+                        .set_terminator(MaybeUnresolvedTerminator::Return(value.get().clone()));
 
                     // start new, "detached" block
                     self.current_block = MaybeUnresolvedControlFlowBlock::new();
                 }
-                Statement::Undefined => {
-                    // end current block
-                    self.current_block
-                        .get_mut()
-                        .set_terminator(MaybeUnresolvedTerminator::Undefined);
 
-                    // start new, "detached" block
-                    self.current_block = MaybeUnresolvedControlFlowBlock::new();
-                }
                 Statement::Panic(value) => {
                     // end current block
                     self.current_block
@@ -204,12 +196,8 @@ impl ControlFlowGraphBuilder {
 
         // resolve each kind of terminator
         let terminator = match &unresolved.get().terminator {
-            MaybeUnresolvedTerminator::Return(ident) => {
-                Terminator::Return(Some(Value::Identifier(*ident)))
-            }
-            MaybeUnresolvedTerminator::Undefined => Terminator::Panic(Value::Literal(Shared::new(
-                Literal::String("undefined terminator".into()),
-            ))),
+            MaybeUnresolvedTerminator::Return(value) => Terminator::Return(Some(value.clone())),
+
             MaybeUnresolvedTerminator::Panic(value) => Terminator::Panic(value.clone()),
             MaybeUnresolvedTerminator::Conditional {
                 condition,
@@ -285,14 +273,13 @@ impl MaybeUnresolvedControlFlowBlock {
 /// Possibly-unresolved block terminator statement
 #[derive(Debug, Clone)]
 enum MaybeUnresolvedTerminator {
-    Return(InternedString),
+    Return(Value),
     Conditional {
         condition: Value,
         target: MaybeUnresolvedJumpTarget,
         fallthrough: MaybeUnresolvedJumpTarget,
     },
     Unconditional(MaybeUnresolvedJumpTarget),
-    Undefined,
     Unknown,
     Panic(Value),
 }

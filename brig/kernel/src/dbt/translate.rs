@@ -665,7 +665,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         arena: &Arena<Statement>,
         variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
     ) -> Result<StatementResult<A>, Error> {
-        log::debug!("translate stmt: {statement:?}");
+        log::trace!("translate stmt: {statement:?}");
 
         Ok(match statement {
             Statement::Constant(value) => {
