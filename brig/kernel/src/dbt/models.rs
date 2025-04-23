@@ -301,6 +301,23 @@ impl ModelDevice {
                     )
                     .unwrap();
                 }
+                for el in 1..=3 {
+                    write!(
+                        transport,
+                        "SPSR_EL{el} = {:016x}\n",
+                        self.register_file
+                            .read::<u64>(alloc::format!("SPSR_EL{el}_bits"))
+                    )
+                    .unwrap();
+                }
+                for el in 1..=3 {
+                    write!(
+                        transport,
+                        "ELR_EL{el} = {:016x}\n",
+                        self.register_file.read::<u64>(alloc::format!("ELR_EL{el}"))
+                    )
+                    .unwrap();
+                }
                 for reg in 0..=30 {
                     write!(
                         transport,

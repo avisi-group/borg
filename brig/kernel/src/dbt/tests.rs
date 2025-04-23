@@ -4193,3 +4193,144 @@ fn mrs_btype() {
 
     // assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"), 0x0);// todo
 }
+
+#[ktest]
+fn udf() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    //   00000000        udf
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0,
+        0x0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+}
+
+#[ktest]
+fn eret_post_exception() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    //   0xd69f03e0        eret
+    translate_instruction(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0x82205034,
+        0xd69f03e0,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("ELR_EL1", 0x8225_0008);
+    register_file.write::<u8>("PSTATE_EL", 0x1);
+    register_file.write::<u64>("SPSR_EL1_bits", 0x3c5);
+    register_file.write::<u64>("SPSR_EL2_bits", 0x3c5);
+    register_file.write::<u64>("SPSR_EL3_bits", 0x3c9);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("_PC"), 0x8225_0008);
+}
+
+#[ktest]
+fn check_eret_trap() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    let pac = emitter.constant(0, Type::Unsigned(1));
+    let use_key_a = emitter.constant(1, Type::Unsigned(1));
+    let res = translate(
+        Global,
+        &*model,
+        "AArch64_CheckForERetTrap",
+        &[pac, use_key_a],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    assert!(res.is_none())
+}
+
+#[ktest]
+fn exceptionreturn_post_exception() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+    register_file.write::<u8>("have_exception", 0);
+
+    let new_pc = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
+    let spsr = emitter.read_register(model.reg_offset("R1"), Type::Unsigned(64));
+
+    //
+    translate(
+        Global,
+        &*model,
+        "AArch64_ExceptionReturn",
+        &[new_pc, spsr],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write::<u64>("R0", 0x8225_0008);
+    register_file.write::<u64>("R1", 0x3c5);
+
+    register_file.write::<u64>("ELR_EL1", 0x8225_0008);
+    register_file.write::<u8>("PSTATE_EL", 0x1);
+    register_file.write::<u64>("SPSR_EL1_bits", 0x3c5);
+    register_file.write::<u64>("SPSR_EL2_bits", 0x3c5);
+    register_file.write::<u64>("SPSR_EL3_bits", 0x3c9);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("_PC"), 0x8225_0008);
+}

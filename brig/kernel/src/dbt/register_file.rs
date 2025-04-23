@@ -57,7 +57,11 @@ impl RegisterFile {
 
     pub fn write<V: RegisterValue>(&self, name: impl Into<InternedString>, value: V) {
         let name = name.into();
-        let (offset, size) = self.registers.get(&name).copied().unwrap();
+        let (offset, size) = self
+            .registers
+            .get(&name)
+            .copied()
+            .unwrap_or_else(|| panic!("failed to find register with name {name:?}"));
 
         if V::SIZE > size {
             log::error!(
