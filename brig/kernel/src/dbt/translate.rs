@@ -849,6 +849,15 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 let value = value_store.get(*value);
 
+                if name.as_ref() == "current_exception_tag" {
+                    if let NodeKind::Constant { value, .. } = value.kind() {
+                        // SEE exception
+                        if *value == 5 {
+                            return Err(Error::Decode);
+                        }
+                    }
+                }
+
                 // if cacheable and writing a constant, update the register file during
                 // translation
                 match self.model.registers().get(&name).unwrap().cache {
@@ -1226,15 +1235,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 let Statement::Constant(Constant::String(msg)) = value.get(arena) else {
                     todo!();
                 };
-
-                // if have_exception is true
-                if self.register_file.read::<bool>("have_exception") {
-                    // current exception is a SEE exception
-                    if self.register_file.read::<u32>("current_exception_tag") == 5 {
-                        // retranslate a64 with current SEE value
-                        return Err(Error::Decode);
-                    }
-                }
 
                 self.emitter.panic(msg.as_ref());
 
