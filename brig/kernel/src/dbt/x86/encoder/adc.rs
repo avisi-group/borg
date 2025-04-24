@@ -140,6 +140,26 @@ pub fn encode<A: Alloc>(
                 .add::<AsmRegister64, i32>(dst.into(), src.try_into().unwrap())
                 .unwrap();
         }
+        (
+            Operand {
+                kind: I(src),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: I(carry_in),
+                width_in_bits: Width::_8,
+            },
+        ) => {
+            let src = src.wrapping_add(*carry_in);
+
+            assembler
+                .add::<AsmRegister32, i32>(dst.into(), src.try_into().unwrap())
+                .unwrap();
+        }
         _ => todo!("adc {src} {dst} {carry}"),
     }
 }

@@ -8,6 +8,7 @@ use {
         qemu_exit,
     },
     aarch64_paging::paging::Descriptor,
+    proc_macro_lib::ktest,
 };
 
 // returns guest physical address
@@ -82,10 +83,11 @@ fn translate_l1(
         exit_with_message!("invalid")
     }
 
-    if entry.is_table_or_page() {
+    if (entry.0 & 3) == 3 {
         translate_l2(device, entry_to_table(&entry), guest_virtual_address)
     } else {
-        Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 30) - 1)))
+        let mask = (1 << 30) - 1;
+        Some((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
     }
 }
 
@@ -103,10 +105,11 @@ fn translate_l2(
         exit_with_message!("invalid")
     }
 
-    if entry.is_table_or_page() {
+    if (entry.0 & 3) == 3 {
         translate_l3(device, entry_to_table(&entry), guest_virtual_address)
     } else {
-        Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 21) - 1)))
+        let mask = (1 << 21) - 1;
+        Some((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
     }
 }
 
@@ -120,7 +123,7 @@ fn translate_l3(
     let entry = table[entry_idx];
     log::trace!("l3 entry: {entry:x?}");
 
-    if entry.is_valid() && entry.is_table_or_page() {
+    if (entry.0 & 3) == 3 {
         Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 12) - 1)))
     } else {
         log::warn!("invalid");
@@ -264,4 +267,13 @@ fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u32 {
             exit_with_message!("trap")
         }
     }
+}
+
+#[ktest]
+fn l1_entry_suspicious() {
+    let raw: u64 = 0x1000000088fff003;
+    let desc: Descriptor = unsafe { core::mem::transmute(raw) };
+
+    log::error!("{desc:?}: {:?}", desc.flags());
+    panic!();
 }

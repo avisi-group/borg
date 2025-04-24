@@ -15,7 +15,7 @@ pub const PRINT_REGISTERS: bool = true;
 static LOGGER: &Logger = &Logger {
     enable_colors: true,
     max_level: LevelFilter::Trace,
-    default_level: LevelFilter::Trace,
+    default_level: LevelFilter::Error,
     module_levels: &[
         ("virtio_drivers", LevelFilter::Warn),
         ("tar_no_std", LevelFilter::Off), /* todo: find better way of silencing error
@@ -27,6 +27,8 @@ static LOGGER: &Logger = &Logger {
         ("kernel::dbt::x86", LevelFilter::Info),
         ("kernel::dbt::translate", LevelFilter::Info),
         ("kernel::dbt::interpret", LevelFilter::Info),
+        ("kernel::arch::x86::irq", LevelFilter::Trace),
+        ("kernel::arch::x86::aarch64_mmu", LevelFilter::Trace),
     ],
 };
 

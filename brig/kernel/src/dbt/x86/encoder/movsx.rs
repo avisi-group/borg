@@ -5,7 +5,9 @@ use {
             Operand, OperandKind::Register as R, Register::PhysicalRegister as PHYS, Width,
         },
     },
-    iced_x86::code_asm::{AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+    },
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
@@ -28,6 +30,9 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .unwrap(),
             (Width::_16, Width::_64) => assembler
                 .movsx::<AsmRegister64, AsmRegister16>(dst.into(), src.into())
+                .unwrap(),
+            (Width::_8, Width::_64) => assembler
+                .movsx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                 .unwrap(),
             (src, dst) => todo!("{src} -> {dst} sign extend mov not implemented"),
         },

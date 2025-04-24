@@ -42,7 +42,7 @@ use {
 /// Size in bytes for the per-translation bump allocator
 const TRANSLATION_ALLOCATOR_SIZE: usize = 2 * 1024 * 1024 * 1024;
 
-const SINGLE_STEP: bool = true;
+const SINGLE_STEP: bool = false;
 
 static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
@@ -221,13 +221,13 @@ impl ModelDevice {
 
         let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
-        //log::set_max_level(log::LevelFilter::Error);
+        //  log::set_max_level(log::LevelFilter::Error);
 
         let _status = record_safepoint();
 
         // block translation/execution loop
         loop {
-            // if instructions_executed == 52580 {
+            // if instructions_executed == 389280 {
             //     log::set_max_level(log::LevelFilter::Trace);
             // }
 
@@ -249,7 +249,8 @@ impl ModelDevice {
             instructions_executed += translated_block.opcodes.len();
 
             log::debug!(
-                "executing {block_start_pc:#08x}: {:08x?} (instr {instructions_executed})",
+                "executing {block_start_pc:#08x}: {:08x?} (instr
+            {instructions_executed})",
                 translated_block.opcodes,
             );
 
@@ -267,6 +268,7 @@ impl ModelDevice {
             );
 
             if PRINT_REGISTERS {
+                write!(transport, "instr = {:08x}\n", translated_block.opcodes[0]).unwrap();
                 write!(
                     transport,
                     "PC = {:016x}\n",

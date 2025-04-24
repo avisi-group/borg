@@ -182,6 +182,9 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         .downcast_ref::<ModelDevice>()
         .unwrap();
 
+        let pc = device.register_file.read::<u64>("_PC");
+        log::debug!("PC = {pc:016x}");
+
         let mmu_enabled = device.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
 
         // correct the address as it was masked off in emitter.rs:read/write-memory
@@ -203,9 +206,17 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             unmasked_address.as_u64()
         };
 
+        log::debug!("guest physical: {guest_physical:x?}");
+
+        // gp = guest_physical
+        let host_virtual_in_gp_mapping =
+            (GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64);
+
+        log::debug!("host virtual: {host_virtual_in_gp_mapping:x?}");
+
         let guest_backing_frame = VirtualMemoryArea::current()
             .opt
-            .translate_addr((GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64));
+            .translate_addr(host_virtual_in_gp_mapping);
 
         log::debug!("guest backing frame: {guest_backing_frame:x?}");
 
