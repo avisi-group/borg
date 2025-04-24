@@ -179,11 +179,19 @@ pub fn translate_instruction<A: Alloc>(
 pub fn translate<A: Alloc>(
     allocator: A,
     model: &Model,
-    function: &str,
+    mut function: &str,
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
+    if function == "decode_udf_perm_undef_aarch64_instrs_udf" {
+        function = "AArch64_UndefinedFault";
+    }
+
+    if function == "EndOfInstruction" {
+        return Ok(None);
+    }
+
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
