@@ -515,6 +515,10 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 ) => {
                     if *lhs_value == 0 {
                         self.constant(0, *rhs.typ())
+                    } else if *lhs_value == mask(rhs.typ().width())
+                        && matches!(rhs.typ().width(), 8 | 16 | 32 | 64)
+                    {
+                        rhs.clone()
                     } else {
                         self.node(X86Node {
                             typ: lhs.typ().clone(),
@@ -530,6 +534,10 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 ) => {
                     if *rhs_value == 0 {
                         self.constant(0, *lhs.typ())
+                    } else if *rhs_value == mask(lhs.typ().width())
+                        && matches!(rhs.typ().width(), 8 | 16 | 32 | 64)
+                    {
+                        lhs.clone()
                     } else {
                         self.node(X86Node {
                             typ: rhs.typ().clone(),
