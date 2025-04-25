@@ -3,13 +3,14 @@ use {
         Alloc,
         x86::{emitter::X86Block, encoder::width::Width},
     },
+    alloc::vec,
     common::{arena::Ref, hashmap::HashMapA},
     core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
     displaydoc::Display,
     iced_x86::code_asm::{
         AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
-        CodeLabel,
+        CodeLabel, qword_ptr,
     },
 };
 
@@ -530,7 +531,7 @@ impl<A: Alloc> Operand<A> {
     }
 
     pub fn mem_base_idx_scale(
-        width_in_bits: u16,
+        width_in_bits: Width,
         base: Register,
         idx: Register,
         scale: MemoryScale,
@@ -539,7 +540,7 @@ impl<A: Alloc> Operand<A> {
     }
 
     pub fn mem_base_idx_scale_displ(
-        width_in_bits: u16,
+        width_in_bits: Width,
         base: Register,
         idx: Register,
         scale: MemoryScale,
@@ -553,7 +554,7 @@ impl<A: Alloc> Operand<A> {
                 displacement,
                 segment_override: None,
             },
-            width_in_bits: Width::from_uncanonicalized(width_in_bits).unwrap(),
+            width_in_bits,
         }
     }
 
@@ -578,6 +579,13 @@ impl<A: Alloc> Operand<A> {
         Self {
             kind: OperandKind::Target(target),
             width_in_bits: Width::_64, // todo: not really true, fix this
+        }
+    }
+
+    pub fn as_register(&self) -> Option<Register> {
+        match self.kind {
+            OperandKind::Register(r) => Some(r),
+            _ => None,
         }
     }
 }
@@ -839,7 +847,7 @@ impl<A: Alloc> Instruction<A> {
     ) {
         use {
             Opcode::*,
-            OperandKind::{Immediate as I, Register as R, Target as T},
+            OperandKind::{Immediate as I, Memory as M, Register as R, Target as T},
             Register::PhysicalRegister as PHYS,
         };
 
@@ -881,6 +889,26 @@ impl<A: Alloc> Instruction<A> {
                     .unwrap_or_else(|| panic!("no label for {target:?} found"))
                     .clone();
                 assembler.jmp(label.clone()).unwrap();
+            }
+            JMP(Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                ..
+            }) => {
+                assembler
+                    .jmp(qword_ptr(memory_operand_to_iced(
+                        *base,
+                        *index,
+                        *scale,
+                        *displacement,
+                    )))
+                    .unwrap();
             }
             RET => {
                 assembler.ret().unwrap();
@@ -962,6 +990,20 @@ impl<A: Alloc> Instruction<A> {
             }
             SAR(
                 Operand {
+                    kind: R(PHYS(amount)),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(value)),
+                    width_in_bits: Width::_32,
+                },
+            ) => {
+                assembler
+                    .sar::<AsmRegister32, AsmRegister8>(value.into(), amount.into())
+                    .unwrap();
+            }
+            SAR(
+                Operand {
                     kind: I(amount),
                     width_in_bits: Width::_64,
                 },
@@ -972,6 +1014,20 @@ impl<A: Alloc> Instruction<A> {
             ) => {
                 assembler
                     .sar::<AsmRegister64, i32>(value.into(), i32::try_from(*amount).unwrap())
+                    .unwrap();
+            }
+            SAR(
+                Operand {
+                    kind: I(amount),
+                    width_in_bits: Width::_64,
+                },
+                Operand {
+                    kind: R(PHYS(value)),
+                    width_in_bits: Width::_32,
+                },
+            ) => {
+                assembler
+                    .sar::<AsmRegister32, i32>(value.into(), i32::try_from(*amount).unwrap())
                     .unwrap();
             }
             BEXTR(
@@ -1213,13 +1269,21 @@ impl<A: Alloc> Instruction<A> {
             .flatten()
             .filter_map(|operand| match &mut operand.1.kind {
                 OperandKind::Memory {
-                    base: Some(base), ..
-                } => Some(UseDef::Use(base)), // TODO: index
-                OperandKind::Register(register) => {
-                    Some(UseDef::from_operand_direction(operand.0, register).unwrap())
-                }
+                    base: Some(base),
+                    index: None,
+                    ..
+                } => Some(vec![UseDef::Use(base)]),
+                OperandKind::Memory {
+                    base: Some(base),
+                    index: Some(index),
+                    ..
+                } => Some(vec![UseDef::Use(base), UseDef::Use(index)]),
+                OperandKind::Register(register) => Some(vec![
+                    UseDef::from_operand_direction(operand.0, register).unwrap(),
+                ]),
                 _ => None,
             })
+            .flatten()
 
         // self.operands
         //     .iter_mut()

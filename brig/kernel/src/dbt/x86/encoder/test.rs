@@ -5,7 +5,7 @@ use {
             Operand, OperandKind::Register as R, Register::PhysicalRegister as PHYS, Width,
         },
     },
-    iced_x86::code_asm::{AsmRegister8, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
@@ -39,6 +39,20 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         ) => {
             assembler
                 .test::<AsmRegister8, AsmRegister8>(left.into(), right.into())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(left)),
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .test::<AsmRegister32, AsmRegister32>(left.into(), right.into())
                 .unwrap();
         }
         _ => todo!("test {src} {dst}"),

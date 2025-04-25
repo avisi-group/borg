@@ -4,6 +4,7 @@ use {
         dbt::{
             Alloc, Translation,
             emitter::{Emitter, Type},
+            mask,
             register_file::RegisterFile,
             trampoline::ExecutionResult,
             translate::translate_instruction,
@@ -19,6 +20,7 @@ use {
         memory::bump::{BumpAllocator, BumpAllocatorRef},
     },
     alloc::{
+        alloc::alloc_zeroed,
         borrow::ToOwned,
         boxed::Box,
         collections::btree_map::BTreeMap,
@@ -31,16 +33,21 @@ use {
         intern::InternedString,
         rudder::{Model, RegisterCacheType, RegisterDescriptor},
     },
-    core::fmt::{self, Debug, Write},
+    core::{
+        alloc::Layout,
+        fmt::{self, Debug, Write},
+    },
+    iced_x86::code_asm::ch,
     plugins_api::{
         guest::{Device, DeviceFactory},
         util::parse_hex_prefix,
     },
     spin::Mutex,
+    x86_64::structures::paging::{Page, PageSize, Size4KiB},
 };
 
 /// Size in bytes for the per-translation bump allocator
-const TRANSLATION_ALLOCATOR_SIZE: usize = 2 * 1024 * 1024 * 1024;
+const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 
 const SINGLE_STEP: bool = false;
 
@@ -217,7 +224,11 @@ impl ModelDevice {
         let mut instructions_executed = 0usize;
 
         // guest PC to translated block cache
+        // todo: should be guest physical address not virtual so we dont need to
+        // invalidate
         let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
+        // guest virtual address
+        let mut chain_cache = ChainCache::<256>::new();
 
         let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
@@ -241,10 +252,13 @@ impl ModelDevice {
                 allocator.clear();
                 self.translate_block(
                     BumpAllocatorRef::new(&allocator),
+                    chain_cache.table.as_ptr() as u64,
                     block_start_pc,
                     single_step_mode,
                 )
             });
+
+            chain_cache.insert(block_start_pc, translated_block.translation.as_ptr());
 
             instructions_executed += translated_block.opcodes.len();
 
@@ -338,6 +352,7 @@ impl ModelDevice {
                 ExecutionResult::Ok => (),
                 ExecutionResult::NeedTLBInvalidate => {
                     block_cache.clear();
+                    chain_cache.clear();
                     VirtualMemoryArea::current().invalidate_guest_mappings();
                 }
             }
@@ -347,6 +362,7 @@ impl ModelDevice {
     fn translate_block<A: Alloc>(
         &self,
         allocator: A,
+        chain_cache: u64,
         block_start_pc: u64,
         single_step_mode: bool,
     ) -> TranslatedBlock {
@@ -434,7 +450,7 @@ impl ModelDevice {
         }
 
         log::trace!("compiling");
-        emitter.leave();
+        emitter.leave_with_cache(chain_cache);
         let num_regs = emitter.next_vreg();
 
         let translation = ctx.compile(num_regs);
@@ -471,5 +487,47 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         RegisterCacheType::Read
     } else {
         RegisterCacheType::None
+    }
+}
+
+#[repr(C)]
+struct ChainCacheEntry {
+    pc: u64,
+    block_ptr: *const u8,
+}
+
+#[repr(C)]
+struct ChainCache<const N: usize> {
+    table: &'static mut [ChainCacheEntry; N],
+}
+
+impl<const N: usize> ChainCache<N> {
+    pub fn new() -> Self {
+        let ptr = unsafe {
+            alloc_zeroed(
+                Layout::from_size_align(
+                    N * size_of::<ChainCacheEntry>(),
+                    Size4KiB::SIZE.try_into().unwrap(),
+                )
+                .unwrap(),
+            )
+        };
+
+        let mut celf = Self {
+            table: unsafe { &mut *(ptr as *mut [ChainCacheEntry; N]) },
+        };
+
+        celf.clear();
+
+        celf
+    }
+
+    pub fn insert(&mut self, pc: u64, block_ptr: *const u8) {
+        let index = (pc as usize >> 2) & (N - 1);
+        self.table[index] = ChainCacheEntry { pc, block_ptr };
+    }
+
+    pub fn clear(&mut self) {
+        self.table.iter_mut().for_each(|e| e.pc = 1);
     }
 }

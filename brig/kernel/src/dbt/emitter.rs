@@ -93,6 +93,7 @@ pub trait Emitter<A: Alloc> {
 
     // cleanup and return
     fn leave(&mut self);
+    fn leave_with_cache(&mut self, chain_cache: u64);
 
     fn set_current_block(&mut self, block: Self::BlockRef);
     fn get_current_block(&self) -> Self::BlockRef;

@@ -43,8 +43,12 @@ impl Translation {
         Self { code }
     }
 
+    pub fn as_ptr(&self) -> *const u8 {
+        self.code.as_ptr()
+    }
+
     pub fn execute(&self, register_file: &RegisterFile) -> ExecutionResult {
-        let code_ptr = self.code.as_ptr();
+        let code_ptr = self.as_ptr();
         let register_file_ptr = register_file.as_mut_ptr();
 
         trampoline::trampoline(code_ptr, register_file_ptr)

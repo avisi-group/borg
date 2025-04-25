@@ -996,6 +996,89 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction::ret());
     }
 
+    fn leave_with_cache(&mut self, chain_cache: u64) {
+        let return_block = self.ctx_mut().create_block();
+
+        self.push_instruction(
+            Instruction::mov(
+                Operand::imm(Width::_64, self.execution_result.as_u64()),
+                Operand::preg(Width::_64, PhysicalRegister::RAX),
+            )
+            .unwrap(),
+        );
+        self.push_instruction(Instruction::test(
+            Operand::preg(Width::_32, PhysicalRegister::RAX),
+            Operand::preg(Width::_32, PhysicalRegister::RAX),
+        ));
+        self.push_instruction(Instruction::jne(return_block));
+        self.push_target(return_block);
+
+        let pc_vreg = Operand::vreg(Width::_64, self.next_vreg());
+        self.push_instruction(
+            Instruction::mov(
+                Operand::mem_base_displ(
+                    Width::_64,
+                    Register::PhysicalRegister(PhysicalRegister::RBP),
+                    self.ctx().pc_offset() as i32,
+                ),
+                pc_vreg,
+            )
+            .unwrap(),
+        );
+
+        let shifted_pc_reg = Operand::vreg(Width::_64, self.next_vreg());
+        self.push_instruction(Instruction::mov(pc_vreg, shifted_pc_reg).unwrap());
+        self.push_instruction(Instruction::shr(Operand::imm(Width::_8, 2), shifted_pc_reg));
+        self.push_instruction(Instruction::and(
+            Operand::imm(Width::_64, 256 - 1),
+            shifted_pc_reg,
+        ));
+        self.push_instruction(Instruction::shl(
+            Operand::imm(Width::_64, 4),
+            shifted_pc_reg,
+        ));
+
+        let tag = Operand::vreg(Width::_64, self.next_vreg());
+        let chain_cache_reg = Operand::vreg(Width::_64, self.next_vreg());
+        self.push_instruction(
+            Instruction::mov(Operand::imm(Width::_64, chain_cache), chain_cache_reg).unwrap(),
+        );
+
+        self.push_instruction(
+            Instruction::mov(
+                Operand::mem_base_idx_scale(
+                    Width::_64,
+                    chain_cache_reg.as_register().unwrap(),
+                    shifted_pc_reg.as_register().unwrap(),
+                    super::encoder::MemoryScale::S1,
+                ),
+                tag,
+            )
+            .unwrap(),
+        );
+
+        self.push_instruction(Instruction::cmp(tag, pc_vreg));
+        self.push_instruction(Instruction::jne(return_block));
+
+        self.push_instruction(Instruction(Opcode::JMP(Operand::mem_base_idx_scale_displ(
+            Width::_64,
+            chain_cache_reg.as_register().unwrap(),
+            shifted_pc_reg.as_register().unwrap(),
+            super::encoder::MemoryScale::S1,
+            8,
+        ))));
+
+        self.set_current_block(return_block);
+        self.push_instruction(
+            Instruction::mov(
+                Operand::imm(Width::_64, self.execution_result.as_u64()),
+                Operand::preg(Width::_64, PhysicalRegister::RAX),
+            )
+            .unwrap(),
+        );
+        self.push_instruction(Instruction::ret());
+    }
+
     fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
         let width = typ.width();
 

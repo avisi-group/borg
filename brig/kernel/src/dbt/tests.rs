@@ -4335,3 +4335,21 @@ fn exceptionreturn_post_exception() {
 
     assert_eq!(register_file.read::<u64>("_PC"), 0x8225_0008);
 }
+
+#[ktest]
+fn leave_with_cache() {
+    let model = models::get("aarch64").unwrap();
+
+    let _register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let aaaa = emitter.constant(0xAAAA, Type::Unsigned(64));
+    emitter.write_register(model.reg_offset("_PC"), aaaa);
+
+    emitter.leave_with_cache(0x1234);
+
+    let num_regs = emitter.next_vreg();
+    let _translation = ctx.compile(num_regs);
+}
