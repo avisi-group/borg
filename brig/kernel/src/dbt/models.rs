@@ -1,6 +1,6 @@
 use {
     crate::{
-        arch::x86::{memory::VirtualMemoryArea, safepoint::record_safepoint},
+        arch::x86::{aarch64_mmu, memory::VirtualMemoryArea, safepoint::record_safepoint},
         dbt::{
             Alloc, Translation,
             emitter::{Emitter, Type},
@@ -232,7 +232,10 @@ impl ModelDevice {
         // invalidate
         let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
         // guest virtual address
-        let mut chain_cache = ChainCache::<CHAIN_CACHE_ENTRY_COUNT>::new();
+        let mut chain_cache = DirectMappedCache::<CHAIN_CACHE_ENTRY_COUNT, *const u8>::new(1);
+
+        // virtual to physical PCs
+        let mut translation_cache = DirectMappedCache::<1024, u64>::new(1);
 
         let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
@@ -250,25 +253,39 @@ impl ModelDevice {
             //     panic!();
             // }
 
-            let block_start_pc = self.register_file.read::<u64>("_PC");
+            let block_start_virtual_pc = self.register_file.read::<u64>("_PC");
 
-            let translated_block = block_cache.entry(block_start_pc).or_insert_with(|| {
-                allocator.clear();
-                self.translate_block(
-                    BumpAllocatorRef::new(&allocator),
-                    chain_cache.table.as_ptr() as u64,
-                    block_start_pc,
-                    single_step_mode,
-                )
-            });
+            let block_start_physical_pc =
+                if let Some(pc) = translation_cache.get(block_start_virtual_pc as usize) {
+                    pc
+                } else {
+                    let pc = aarch64_mmu::guest_translate(self, block_start_virtual_pc).unwrap();
+                    translation_cache.insert(block_start_virtual_pc as usize, pc);
+                    pc
+                };
 
-            chain_cache.insert(block_start_pc, translated_block.translation.as_ptr());
+            let translated_block =
+                block_cache
+                    .entry(block_start_physical_pc)
+                    .or_insert_with(|| {
+                        allocator.clear();
+                        self.translate_block(
+                            BumpAllocatorRef::new(&allocator),
+                            chain_cache.table as u64,
+                            block_start_virtual_pc,
+                            single_step_mode,
+                        )
+                    });
+
+            chain_cache.insert(
+                block_start_virtual_pc as usize,
+                translated_block.translation.as_ptr(),
+            );
 
             instructions_executed += translated_block.opcodes.len();
 
             log::debug!(
-                "executing {block_start_pc:#08x}: {:08x?} (instr
-            {instructions_executed})",
+                "executing {block_start_virtual_pc:#08x} ({block_start_physical_pc:#08x}): {:08x?} (instr {instructions_executed})",
                 translated_block.opcodes,
             );
 
@@ -355,8 +372,8 @@ impl ModelDevice {
             match exec_result {
                 ExecutionResult::Ok => (),
                 ExecutionResult::NeedTLBInvalidate => {
-                    block_cache.clear();
-                    chain_cache.clear();
+                    chain_cache.fill_keys(1);
+                    translation_cache.fill_keys(1);
                     VirtualMemoryArea::current().invalidate_guest_mappings();
                 }
             }
@@ -495,22 +512,22 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
 }
 
 #[repr(C)]
-struct ChainCacheEntry {
-    pc: u64,
-    block_ptr: *const u8,
+struct ChainCacheEntry<V> {
+    key: usize,
+    value: V,
 }
 
 #[repr(C)]
-struct ChainCache<const N: usize> {
-    table: &'static mut [ChainCacheEntry; N],
+struct DirectMappedCache<const N: usize, V> {
+    table: *mut ChainCacheEntry<V>,
 }
 
-impl<const N: usize> ChainCache<N> {
-    pub fn new() -> Self {
+impl<const N: usize, V: Copy> DirectMappedCache<N, V> {
+    pub fn new(initial_keys: usize) -> Self {
         let ptr = unsafe {
             alloc_zeroed(
                 Layout::from_size_align(
-                    N * size_of::<ChainCacheEntry>(),
+                    N * size_of::<ChainCacheEntry<V>>(),
                     Size4KiB::SIZE.try_into().unwrap(),
                 )
                 .unwrap(),
@@ -518,20 +535,37 @@ impl<const N: usize> ChainCache<N> {
         };
 
         let mut celf = Self {
-            table: unsafe { &mut *(ptr as *mut [ChainCacheEntry; N]) },
+            table: ptr as *mut ChainCacheEntry<V>,
         };
 
-        celf.clear();
+        celf.fill_keys(initial_keys);
 
         celf
     }
 
-    pub fn insert(&mut self, pc: u64, block_ptr: *const u8) {
-        let index = (pc as usize >> 2) & (N - 1);
-        self.table[index] = ChainCacheEntry { pc, block_ptr };
+    pub fn insert(&mut self, key: usize, value: V) {
+        self.table()[Self::index(key)] = ChainCacheEntry { key, value };
     }
 
-    pub fn clear(&mut self) {
-        self.table.iter_mut().for_each(|e| e.pc = 1);
+    pub fn get(&mut self, key: usize) -> Option<V> {
+        let entry = &self.table()[Self::index(key)];
+
+        if entry.key == key {
+            Some(entry.value)
+        } else {
+            None
+        }
+    }
+
+    fn index(key: usize) -> usize {
+        (key >> 2) & (N - 1)
+    }
+
+    fn table(&mut self) -> &mut [ChainCacheEntry<V>] {
+        unsafe { core::slice::from_raw_parts_mut(self.table, N) }
+    }
+
+    pub fn fill_keys(&mut self, key: usize) {
+        self.table().iter_mut().for_each(|e| e.key = key);
     }
 }

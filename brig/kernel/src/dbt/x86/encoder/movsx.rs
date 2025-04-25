@@ -34,6 +34,9 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             (Width::_8, Width::_64) => assembler
                 .movsx::<AsmRegister64, AsmRegister8>(dst.into(), src.into())
                 .unwrap(),
+            (Width::_8, Width::_32) => assembler
+                .movsx::<AsmRegister32, AsmRegister8>(dst.into(), src.into())
+                .unwrap(),
             (src, dst) => todo!("{src} -> {dst} sign extend mov not implemented"),
         },
         _ => todo!("movsx {src} {dst}"),

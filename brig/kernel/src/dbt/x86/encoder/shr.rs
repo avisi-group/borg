@@ -85,6 +85,23 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
                 .shr::<AsmRegister64, AsmRegister8>(value_reg.into(), PhysicalRegister::RCX.into())
                 .unwrap();
         }
+        (
+            Operand {
+                kind: R(PHYS(PhysicalRegister::RCX)),
+                width_in_bits: Width::_8,
+            },
+            Operand {
+                kind: R(PHYS(value_reg)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            if *value_reg == PhysicalRegister::RCX {
+                panic!("can't shr %rcx %rcx");
+            }
+            assembler
+                .shr::<AsmRegister32, AsmRegister8>(value_reg.into(), PhysicalRegister::RCX.into())
+                .unwrap();
+        }
         _ => todo!("shr {amount} {value}"),
     }
 }

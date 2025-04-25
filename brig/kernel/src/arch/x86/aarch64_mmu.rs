@@ -13,8 +13,10 @@ use {
 
 // returns guest physical address
 pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Option<u64> {
-    let tcr_el1 = device.register_file.read::<u64>("TCR_EL1_bits");
-    log::trace!("tcr_el1: {tcr_el1:x}");
+    let mmu_enabled = device.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
+    if !mmu_enabled {
+        return Some(guest_virtual_address);
+    }
     // let ttbcr = device.register_file.read::<u32>("TTBCR_S_bits");
     // log::trace!("{ttbcr:032b}");
     // let ttbcr_n = ttbcr & 0b111;
