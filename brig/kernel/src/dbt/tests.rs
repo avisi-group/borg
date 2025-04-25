@@ -346,6 +346,7 @@ fn decodea64_mov() {
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
+    //   aa0103e0        mov     x0, x1
     let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xaa0103e0, Type::Unsigned(32));
     translate(
@@ -368,6 +369,8 @@ fn decodea64_mov() {
     register_file.write::<u64>("R1", 43);
 
     translation.execute(&register_file);
+
+    //log::info!("{translation:?}");
 
     assert_eq!(43, register_file.read::<u64>("R0"));
     assert_eq!(43, register_file.read::<u64>("R1"));

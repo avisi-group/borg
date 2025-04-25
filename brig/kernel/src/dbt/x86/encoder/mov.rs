@@ -413,9 +413,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_8,
             },
         ) => {
-            assembler
-                .mov::<AsmRegister8, i32>(dst.into(), (*src).try_into().unwrap())
-                .unwrap();
+            if *src == 0 {
+                assembler
+                    .xor::<AsmRegister8, AsmRegister8>(dst.into(), dst.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .mov::<AsmRegister8, i32>(dst.into(), (*src).try_into().unwrap())
+                    .unwrap();
+            }
         }
         // MOV I -> R
         (
@@ -443,9 +449,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_32,
             },
         ) => {
-            assembler
-                .mov::<AsmRegister32, u32>(dst.into(), u32::try_from(*src).unwrap())
-                .unwrap();
+            if *src == 0 {
+                assembler
+                    .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .mov::<AsmRegister32, u32>(dst.into(), u32::try_from(*src).unwrap())
+                    .unwrap();
+            }
         }
 
         (
@@ -460,9 +472,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             },
         ) => {
             // todo: maybe zero extend src here?
-            assembler
-                .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
-                .unwrap();
+            if *src == 0 {
+                assembler
+                    .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .mov::<AsmRegister32, i32>(dst.into(), (*src).try_into().unwrap())
+                    .unwrap();
+            }
         }
         (
             Operand {
