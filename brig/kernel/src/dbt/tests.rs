@@ -3671,7 +3671,6 @@ fn eret_3() {
     assert_eq!(register_file.read::<u8>("PSTATE_EL"), 3);
     register_file.write::<u64>("ELR_EL3", 0x80000004);
 
-    // uncommenting causes DBT runtime assert, commenting causes panic on line 2443
     // log::info!("{translation:?}");
 
     translation.execute(&register_file);

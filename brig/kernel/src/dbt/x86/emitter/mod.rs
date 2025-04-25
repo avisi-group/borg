@@ -2,6 +2,7 @@ use {
     crate::dbt::{
         Alloc, bit_extract, bit_insert,
         emitter::Type,
+        models::CHAIN_CACHE_ENTRY_COUNT,
         trampoline::{self, ExecutionResult},
         x86::{
             Emitter, X86TranslationContext,
@@ -736,6 +737,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             (NodeKind::Constant { .. }, NodeKind::Constant { .. }, k) => {
                 todo!("{k:?}")
             }
+            (_, NodeKind::Constant { value: 0, .. }, _) => value,
             (_, _, _) => self.node(X86Node {
                 typ,
                 kind: NodeKind::Shift {
@@ -974,23 +976,43 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             NodeKind::Constant { .. } => {
                 todo!("this was handled in models.rs")
             }
+            NodeKind::BinaryOperation(BinaryOperationKind::CompareEqual(left, right)) => {
+                let left = self.to_operand(left);
+                let right = self.to_operand(right);
+
+                match (left.kind(), right.kind()) {
+                    (_, OperandKind::Immediate(0)) => {
+                        self.push_instruction(Instruction::test(left, left))
+                    }
+                    (_, OperandKind::Immediate(_)) => {
+                        self.push_instruction(Instruction::cmp(right, left))
+                    }
+                    _ => self.push_instruction(Instruction::cmp(left, right)),
+                }
+
+                self.push_instruction(Instruction::jne(false_target));
+                self.push_target(false_target);
+
+                self.push_instruction(Instruction::jmp(true_target));
+                self.push_target(true_target);
+            }
             _ => {
                 let condition = self.to_operand(&condition);
 
                 self.push_instruction(Instruction::test(condition, condition));
 
-                self.push_instruction(Instruction::jne(true_target.clone()));
-                self.push_target(true_target.clone());
+                self.push_instruction(Instruction::jne(true_target));
+                self.push_target(true_target);
 
-                self.push_instruction(Instruction::jmp(false_target.clone()));
-                self.push_target(false_target.clone());
+                self.push_instruction(Instruction::jmp(false_target));
+                self.push_target(false_target);
             }
         }
     }
 
     fn jump(&mut self, target: Self::BlockRef) {
-        self.push_instruction(Instruction::jmp(target.clone()));
-        self.push_target(target.clone());
+        self.push_instruction(Instruction::jmp(target));
+        self.push_target(target);
     }
 
     fn leave(&mut self) {
@@ -1034,17 +1056,19 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             .unwrap(),
         );
 
-        let shifted_pc_reg = Operand::vreg(Width::_64, self.next_vreg());
-        self.push_instruction(Instruction::mov(pc_vreg, shifted_pc_reg).unwrap());
-        self.push_instruction(Instruction::shr(Operand::imm(Width::_8, 2), shifted_pc_reg));
-        self.push_instruction(Instruction::and(
-            Operand::imm(Width::_64, 256 - 1),
-            shifted_pc_reg,
+        let shifted_pc_vreg = self.next_vreg();
+        let shifted_pc_op = Operand::vreg(Width::_64, shifted_pc_vreg);
+        self.push_instruction(Instruction::mov(pc_vreg, shifted_pc_op).unwrap());
+        self.push_instruction(Instruction::shr(Operand::imm(Width::_8, 2), shifted_pc_op)); // pc must be 4 byte aligned
+
+        assert_eq!(CHAIN_CACHE_ENTRY_COUNT, (1 << 16));
+        let masked_vreg = Operand::vreg(Width::_32, self.next_vreg());
+        self.push_instruction(Instruction::movzx(
+            Operand::vreg(Width::_16, shifted_pc_vreg), // bottom 16 bits = 65536 entries, check
+            masked_vreg,
         ));
-        self.push_instruction(Instruction::shl(
-            Operand::imm(Width::_64, 4),
-            shifted_pc_reg,
-        ));
+
+        self.push_instruction(Instruction::shl(Operand::imm(Width::_64, 4), masked_vreg));
 
         let tag = Operand::vreg(Width::_64, self.next_vreg());
         let chain_cache_reg = Operand::vreg(Width::_64, self.next_vreg());
@@ -1057,7 +1081,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 Operand::mem_base_idx_scale(
                     Width::_64,
                     chain_cache_reg.as_register().unwrap(),
-                    shifted_pc_reg.as_register().unwrap(),
+                    masked_vreg.as_register().unwrap(),
                     super::encoder::MemoryScale::S1,
                 ),
                 tag,
@@ -1071,7 +1095,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction(Opcode::JMP(Operand::mem_base_idx_scale_displ(
             Width::_64,
             chain_cache_reg.as_register().unwrap(),
-            shifted_pc_reg.as_register().unwrap(),
+            masked_vreg.as_register().unwrap(),
             super::encoder::MemoryScale::S1,
             8,
         ))));

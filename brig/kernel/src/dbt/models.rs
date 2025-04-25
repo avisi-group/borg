@@ -49,6 +49,10 @@ use {
 /// Size in bytes for the per-translation bump allocator
 const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 
+pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
+// todo: static assert this is pow2
+const ASSERT_TEST: bool = CHAIN_CACHE_ENTRY_COUNT.is_power_of_two();
+
 const SINGLE_STEP: bool = false;
 
 static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
@@ -228,7 +232,7 @@ impl ModelDevice {
         // invalidate
         let mut block_cache = HashMap::<u64, TranslatedBlock>::default();
         // guest virtual address
-        let mut chain_cache = ChainCache::<256>::new();
+        let mut chain_cache = ChainCache::<CHAIN_CACHE_ENTRY_COUNT>::new();
 
         let mut allocator = BumpAllocator::new(TRANSLATION_ALLOCATOR_SIZE);
 
