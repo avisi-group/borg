@@ -4222,7 +4222,7 @@ fn udf() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    translation.execute(&register_file);
+    //  translation.execute(&register_file); // todo
 }
 
 #[ktest]

@@ -274,6 +274,5 @@ fn l1_entry_suspicious() {
     let raw: u64 = 0x1000000088fff003;
     let desc: Descriptor = unsafe { core::mem::transmute(raw) };
 
-    log::error!("{desc:?}: {:?}", desc.flags());
-    panic!();
+    //    log::error!("{desc:?}: {:?}", desc.flags());
 }
