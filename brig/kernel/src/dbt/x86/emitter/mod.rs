@@ -1092,6 +1092,19 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction::cmp(tag, pc_vreg));
         self.push_instruction(Instruction::jne(return_block));
 
+        // print an A for every chain
+        // self.push_instruction(
+        //     Instruction::mov(
+        //         Operand::imm(Width::_8, 0x41),
+        //         Operand::preg(Width::_8, PhysicalRegister::RAX),
+        //     )
+        //     .unwrap(),
+        // );
+        // self.push_instruction(Instruction::out(
+        //     Operand::imm(Width::_8, 0xE9),
+        //     Operand::preg(Width::_8, PhysicalRegister::RAX),
+        // ));
+
         self.push_instruction(Instruction(Opcode::JMP(Operand::mem_base_idx_scale_displ(
             Width::_64,
             chain_cache_reg.as_register().unwrap(),

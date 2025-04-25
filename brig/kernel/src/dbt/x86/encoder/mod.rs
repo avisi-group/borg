@@ -124,7 +124,10 @@ pub enum Opcode<A: Alloc> {
     /// int {0}
     INT(Operand<A>),
 
-    /// special marker for dead instructions
+    /// out {0} {1}
+    OUT(Operand<A>, Operand<A>),
+
+    /// dead instruction
     DEAD,
 }
 
@@ -811,6 +814,10 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::JNE(Operand::target(block)))
     }
 
+    pub fn out(port: Operand<A>, value: Operand<A>) -> Self {
+        Self(Opcode::OUT(port, value))
+    }
+
     pub fn not(r: Operand<A>) -> Self {
         Self(Opcode::NOT(r))
     }
@@ -1177,6 +1184,18 @@ impl<A: Alloc> Instruction<A> {
                 assembler.call::<AsmRegister64>(tgt.into()).unwrap();
             }
 
+            OUT(
+                Operand {
+                    kind: I(port),
+                    width_in_bits: Width::_8,
+                },
+                Operand {
+                    kind: R(PHYS(value)),
+                    width_in_bits: Width::_8,
+                },
+            ) => assembler
+                .out::<i32, AsmRegister8>((*port).try_into().unwrap(), value.into())
+                .unwrap(),
             _ => panic!("cannot encode this instruction {}", self),
         }
     }
@@ -1226,7 +1245,6 @@ impl<A: Alloc> Instruction<A> {
                 None,
             ]
             .into_iter(),
-
             Opcode::SETE(r)
             | Opcode::SETNE(r)
             | Opcode::SETNZ(r)
@@ -1244,7 +1262,6 @@ impl<A: Alloc> Instruction<A> {
             Opcode::NOT(r) | Opcode::NEG(r) => {
                 [Some((OperandDirection::InOut, r)), None, None].into_iter()
             }
-
             Opcode::BEXTR(ctrl, src, dst) => [
                 Some((OperandDirection::In, ctrl)),
                 Some((OperandDirection::In, src)),
@@ -1261,6 +1278,12 @@ impl<A: Alloc> Instruction<A> {
             Opcode::PUSH(src) => [Some((OperandDirection::In, src)), None, None].into_iter(),
             Opcode::POP(dest) => [Some((OperandDirection::Out, dest)), None, None].into_iter(),
             Opcode::DEAD => panic!(),
+            Opcode::OUT(port, value) => [
+                Some((OperandDirection::In, port)),
+                Some((OperandDirection::In, value)),
+                None,
+            ]
+            .into_iter(),
         }
     }
 

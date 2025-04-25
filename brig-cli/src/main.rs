@@ -384,6 +384,8 @@ fn run_brig(kernel_path: &Path, guest_tar_path: &Path, gdb: bool) {
         ),
     ]);
 
+    cmd.args(["-debugcon", "file:/tmp/debugcon"]);
+
     // cmd.arg("-device");
     // cmd.arg("virtio-blk-pci,drive=drive1,id=virtblk1,num-queues=4");
     // cmd.arg("-drive");
