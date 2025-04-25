@@ -434,9 +434,15 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 width_in_bits: Width::_64,
             },
         ) => {
-            assembler
-                .mov::<AsmRegister64, u64>(dst.into(), *src)
-                .unwrap();
+            if *src == 0 {
+                assembler
+                    .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
+                    .unwrap();
+            } else {
+                assembler
+                    .mov::<AsmRegister64, u64>(dst.into(), *src)
+                    .unwrap();
+            }
         }
         // MOV I -> R
         (

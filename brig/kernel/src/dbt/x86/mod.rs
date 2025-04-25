@@ -154,6 +154,13 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             }
         }
 
+        // log::trace!("optimising blocks");
+        // all_blocks.iter().for_each(|block| {
+        //     block
+        //         .get_mut(self.arena_mut())
+        //         .optimise();
+        // });
+
         log::trace!("allocating registers");
 
         all_blocks.iter().for_each(|block| {

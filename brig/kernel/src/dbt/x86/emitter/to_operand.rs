@@ -525,8 +525,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 let false_value = self.to_operand(false_value);
 
                 // if this sequence is modified, the register allocator must be fixed
-                self.push_instruction(Instruction::test(condition, condition));
                 self.push_instruction(Instruction::mov(false_value, dest).unwrap());
+                self.push_instruction(Instruction::test(condition, condition));
                 self.push_instruction(Instruction::cmovne(true_value, dest)); // this write to dest does not result in deallocation
 
                 dest
