@@ -3,16 +3,6 @@
 version = 4
 
 [[package]]
-name = "aarch64-paging"
-version = "0.8.1"
-source = "git+https://github.com/fmckeogh/aarch64-paging#f867a6c85f560872436ca73a8f4c3db48322514c"
-dependencies = [
- "bitflags 2.9.0",
- "thiserror",
- "zerocopy 0.8.24",
-]
-
-[[package]]
 name = "acpi"
 version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -343,7 +333,6 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 name = "kernel"
 version = "0.1.0"
 dependencies = [
- "aarch64-paging",
  "acpi",
  "bitset-core",
  "bootloader_api",

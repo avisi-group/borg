@@ -7,8 +7,7 @@ use {
         dbt::models::ModelDevice,
         qemu_exit,
     },
-    aarch64_paging::paging::Descriptor,
-    proc_macro_lib::ktest,
+    core::marker::PhantomData,
 };
 
 // returns guest physical address
@@ -43,7 +42,7 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
 
     let translation_table_base = guest_physical_to_host_virt(ttbgp_masked);
     log::trace!("translation_table_base: {translation_table_base:x?}");
-    let table = unsafe { &*(translation_table_base.as_ptr::<[Descriptor; 512]>()) };
+    let table = unsafe { &*(translation_table_base.as_ptr::<[Descriptor<L1>; 512]>()) };
 
     //log::trace!("table: {table:x?}");
 
@@ -51,32 +50,14 @@ pub fn guest_translate(device: &ModelDevice, guest_virtual_address: u64) -> Opti
     translate_l1(device, table, guest_virtual_address)
 }
 
-fn _translate_l0(
-    device: &ModelDevice,
-    table: &[Descriptor; 512],
-    guest_virtual_address: u64,
-) -> Option<u64> {
-    let entry_idx = ((guest_virtual_address >> 39) & 0x1ff) as usize;
-
-    log::trace!("entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
-    log::trace!("entry: {entry:x?}");
-
-    if entry.is_table_or_page() {
-        translate_l1(device, entry_to_table(&entry), guest_virtual_address)
-    } else {
-        exit_with_message!("entry was not table or page")
-    }
-}
-
 fn translate_l1(
     device: &ModelDevice,
-    table: &[Descriptor; 512],
+    table: &[Descriptor<L1>; 512],
     guest_virtual_address: u64,
 ) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 30) & 0x1ff) as usize;
     log::trace!("l1 entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
+    let entry = &table[entry_idx];
     log::trace!("l1 entry: {entry:x?}");
 
     if !entry.is_valid() {
@@ -85,59 +66,64 @@ fn translate_l1(
         exit_with_message!("invalid")
     }
 
-    if (entry.0 & 3) == 3 {
-        translate_l2(device, entry_to_table(&entry), guest_virtual_address)
-    } else {
-        let mask = (1 << 30) - 1;
-        Some((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
+    match entry.kind() {
+        SubL3DescriptorType::Block => {
+            let mask = (1 << 30) - 1;
+            Some((entry.raw() & !mask) | (guest_virtual_address & mask))
+        }
+        SubL3DescriptorType::Table => {
+            translate_l2(device, entry_to_table(&entry), guest_virtual_address)
+        }
     }
 }
 
 fn translate_l2(
     device: &ModelDevice,
-    table: &[Descriptor; 512],
+    table: &[Descriptor<L2>; 512],
     guest_virtual_address: u64,
 ) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 21) & 0x1ff) as usize;
     log::trace!("l2 entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
+    let entry = &table[entry_idx];
     log::trace!("l2 entry: {entry:x?}");
 
     if !entry.is_valid() {
         exit_with_message!("invalid")
     }
 
-    if (entry.0 & 3) == 3 {
-        translate_l3(device, entry_to_table(&entry), guest_virtual_address)
-    } else {
-        let mask = (1 << 21) - 1;
-        Some((entry.output_address().0 as u64 & !mask) | (guest_virtual_address & mask))
+    match entry.kind() {
+        SubL3DescriptorType::Table => {
+            translate_l3(device, entry_to_table(&entry), guest_virtual_address)
+        }
+        SubL3DescriptorType::Block => {
+            let mask = (1 << 21) - 1;
+            Some((entry.raw & !mask) | (guest_virtual_address & mask))
+        }
     }
 }
 
 fn translate_l3(
     device: &ModelDevice,
-    table: &[Descriptor; 512],
+    table: &[Descriptor<L3>; 512],
     guest_virtual_address: u64,
 ) -> Option<u64> {
     let entry_idx = ((guest_virtual_address >> 12) & 0x1ff) as usize;
     log::trace!("l3 entry_idx: {entry_idx:x?}");
-    let entry = table[entry_idx];
+    let entry = &table[entry_idx];
     log::trace!("l3 entry: {entry:x?}");
 
-    if (entry.0 & 3) == 3 {
-        Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 12) - 1)))
-    } else {
-        log::warn!("invalid");
-        guest_page_fault(device, guest_virtual_address);
-        None
+    match entry.kind() {
+        L3DescriptorType::Page => Some((entry.raw) | (guest_virtual_address & ((1 << 12) - 1))),
+        L3DescriptorType::Invalid => {
+            log::warn!("invalid");
+            guest_page_fault(device, guest_virtual_address);
+            None
+        }
     }
 }
 
-fn entry_to_table(entry: &Descriptor) -> &[Descriptor; 512] {
-    unsafe {
-        &*guest_physical_to_host_virt(entry.output_address().0 as u64).as_ptr::<[Descriptor; 512]>()
-    }
+fn entry_to_table<LA, LB>(entry: &Descriptor<LA>) -> &[Descriptor<LB>; 512] {
+    unsafe { &*guest_physical_to_host_virt(entry.raw).as_ptr() }
 }
 
 fn guest_page_fault(device: &ModelDevice, guest_virtual_address: u64) {
@@ -271,10 +257,69 @@ fn get_exception_class(current_el: u8, target_el: u8, typ: u8) -> u32 {
     }
 }
 
-#[ktest]
-fn l1_entry_suspicious() {
-    let raw: u64 = 0x1000000088fff003;
-    let desc: Descriptor = unsafe { core::mem::transmute(raw) };
+trait DescriptorTranslationLevel: core::fmt::Debug {}
 
-    //    log::error!("{desc:?}: {:?}", desc.flags());
+trait SubL3DescriptorLevel: DescriptorTranslationLevel {}
+
+#[derive(Debug)]
+struct L1;
+impl DescriptorTranslationLevel for L1 {}
+impl SubL3DescriptorLevel for L1 {}
+
+#[derive(Debug)]
+struct L2;
+impl DescriptorTranslationLevel for L2 {}
+impl SubL3DescriptorLevel for L2 {}
+
+#[derive(Debug)]
+struct L3;
+impl DescriptorTranslationLevel for L3 {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum L3DescriptorType {
+    Page,
+    Invalid,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SubL3DescriptorType {
+    Table,
+    Block,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+struct Descriptor<L> {
+    raw: u64,
+    _level: PhantomData<L>,
+}
+
+impl<L: DescriptorTranslationLevel> Descriptor<L> {
+    pub fn is_valid(&self) -> bool {
+        (self.raw & 0b1) == 0b1
+    }
+
+    pub fn raw(&self) -> u64 {
+        self.raw
+    }
+}
+
+impl<L: SubL3DescriptorLevel> Descriptor<L> {
+    pub fn kind(&self) -> SubL3DescriptorType {
+        if self.raw & 0b10 == 0b10 {
+            SubL3DescriptorType::Table
+        } else {
+            SubL3DescriptorType::Block
+        }
+    }
+}
+
+impl Descriptor<L3> {
+    pub fn kind(&self) -> L3DescriptorType {
+        if self.raw & 0b11 == 0b11 {
+            L3DescriptorType::Page
+        } else {
+            L3DescriptorType::Invalid
+        }
+    }
 }
