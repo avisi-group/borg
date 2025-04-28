@@ -1,7 +1,7 @@
 use {
     alloc::{boxed::Box, sync::Arc},
     core::{
-        fmt::{self, Debug, Formatter, Write},
+        fmt::{self, Debug, Formatter},
         ops::{Deref, DerefMut},
     },
     spin::{Mutex, MutexGuard},

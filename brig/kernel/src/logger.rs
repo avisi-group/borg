@@ -10,7 +10,7 @@ use {
 /// Global console writer
 pub static mut WRITER: Once<UART16550Device> = Once::INIT;
 
-pub const PRINT_REGISTERS: bool = false;
+pub const PRINT_REGISTERS: bool = true;
 
 static LOGGER: &Logger = &Logger {
     enable_colors: true,

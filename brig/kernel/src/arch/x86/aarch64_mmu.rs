@@ -85,7 +85,7 @@ fn translate_l1(
         exit_with_message!("invalid")
     }
 
-    if (entry.0 & 3) == 3 {
+    if entry.is_table_or_page() {
         translate_l2(device, entry_to_table(&entry), guest_virtual_address)
     } else {
         let mask = (1 << 30) - 1;
@@ -107,7 +107,7 @@ fn translate_l2(
         exit_with_message!("invalid")
     }
 
-    if (entry.0 & 3) == 3 {
+    if entry.is_table_or_page() {
         translate_l3(device, entry_to_table(&entry), guest_virtual_address)
     } else {
         let mask = (1 << 21) - 1;
@@ -125,7 +125,7 @@ fn translate_l3(
     let entry = table[entry_idx];
     log::trace!("l3 entry: {entry:x?}");
 
-    if (entry.0 & 3) == 3 {
+    if entry.is_table_or_page() {
         Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 12) - 1)))
     } else {
         log::warn!("invalid");

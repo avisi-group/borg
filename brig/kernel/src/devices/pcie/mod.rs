@@ -1,21 +1,17 @@
 use {
     super::Bus,
     crate::{
-        arch::x86::memory::{PhysAddrExt, VirtualMemoryArea},
+        arch::x86::memory::PhysAddrExt,
         devices::{ivshmem::probe_ivshmem, virtio::probe_virtio_block},
     },
     acpi::{PciConfigRegions, mcfg::PciConfigEntry},
     common::hashmap::HashMap,
     core::fmt::{self, Display},
     log::trace,
-    phf::phf_map,
     virtio_drivers::transport::pci::bus::{
-        BarInfo, Cam, DeviceFunction, DeviceFunctionInfo, MemoryBarType, MmioCam, PciRoot,
+        Cam, DeviceFunction, DeviceFunctionInfo, MmioCam, PciRoot,
     },
-    x86_64::{
-        PhysAddr,
-        structures::paging::{Page, PageSize, PageTableFlags, PhysFrame, Size4KiB},
-    },
+    x86_64::{self, PhysAddr},
 };
 
 pub mod bar;
@@ -100,6 +96,6 @@ impl From<DeviceFunctionInfo> for PciId {
 
 impl Display for PciId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:04x}:{:04x}", self.vendor_id, self.device_id)
+        write!(f, "{:04x}:{:04x}", self.vendor_id(), self.device_id())
     }
 }
