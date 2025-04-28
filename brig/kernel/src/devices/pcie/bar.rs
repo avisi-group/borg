@@ -10,14 +10,14 @@ use {
 };
 
 /// Iterator over BARs in a device
-pub struct BarIter<'root> {
-    root: &'root mut PciRoot<MmioCam>,
+pub struct BarIter<'root, 'mmio> {
+    root: &'root mut PciRoot<MmioCam<'mmio>>,
     dev_fn: DeviceFunction,
     current_index: u8,
 }
 
-impl<'root> BarIter<'root> {
-    pub fn new(root: &'root mut PciRoot<MmioCam>, dev_fn: DeviceFunction) -> Self {
+impl<'root, 'mmio> BarIter<'root, 'mmio> {
+    pub fn new(root: &'root mut PciRoot<MmioCam<'mmio>>, dev_fn: DeviceFunction) -> Self {
         Self {
             root,
             dev_fn,
@@ -26,7 +26,7 @@ impl<'root> BarIter<'root> {
     }
 }
 
-impl<'root> Iterator for BarIter<'root> {
+impl<'root, 'mmio> Iterator for BarIter<'root, 'mmio> {
     type Item = BarInfo;
 
     fn next(&mut self) -> Option<Self::Item> {
