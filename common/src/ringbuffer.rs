@@ -52,11 +52,15 @@ impl<'a, T: Role> RingBuffer<'a, T> {
     pub fn open(mem: &'a mut [u8]) -> Self {
         let (header, buffer) = mem.split_at_mut(size_of::<Header>());
 
-        Self {
+        let celf = Self {
             header,
             buffer,
             _kind: PhantomData::default(),
-        }
+        };
+
+        assert!(celf.capacity() > 0);
+
+        celf
     }
 
     fn read_header_field(&self, offset: usize) -> usize {
