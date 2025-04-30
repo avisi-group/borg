@@ -2,6 +2,7 @@
 name = "brig-cli"
 version = "0.1.0"
 edition = "2024"
+default-run = "brig-cli"
 
 [dependencies]
 common = { path = "../common" }
@@ -17,3 +18,4 @@ walkdir = "2.5.0"
 elf = "0.7.4"
 postcard = { version = "1.1.1", features = ["alloc"] }
 memmap2 = "0.9.5"
+clap-num = "1.2.0"
