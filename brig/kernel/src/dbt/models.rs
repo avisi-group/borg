@@ -4,7 +4,6 @@ use {
         dbt::{
             Alloc, Translation,
             emitter::{Emitter, Type},
-            mask,
             register_file::RegisterFile,
             trampoline::ExecutionResult,
             translate::translate_instruction,
@@ -37,23 +36,24 @@ use {
         alloc::Layout,
         fmt::{self, Debug, Write},
     },
-    iced_x86::code_asm::ch,
     plugins_api::{
         guest::{Device, DeviceFactory},
         util::parse_hex_prefix,
     },
     spin::Mutex,
-    x86_64::structures::paging::{Page, PageSize, Size4KiB},
+    x86_64::structures::paging::{PageSize, Size4KiB},
 };
 
 /// Size in bytes for the per-translation bump allocator
 const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 
-pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
-// todo: static assert this is pow2
-const ASSERT_TEST: bool = CHAIN_CACHE_ENTRY_COUNT.is_power_of_two();
+/// Limit blocks to contain only 1 instruction
+const SINGLE_STEP: bool = true;
 
-const SINGLE_STEP: bool = false;
+/// Enable the jump table chain cache
+const CHAIN_CACHE_ENABLED: bool = false;
+pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
+const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
 static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
@@ -277,10 +277,12 @@ impl ModelDevice {
                         )
                     });
 
-            chain_cache.insert(
-                block_start_virtual_pc as usize,
-                translated_block.translation.as_ptr(),
-            );
+            if CHAIN_CACHE_ENABLED {
+                chain_cache.insert(
+                    block_start_virtual_pc as usize,
+                    translated_block.translation.as_ptr(),
+                );
+            }
 
             instructions_executed += translated_block.opcodes.len();
 
