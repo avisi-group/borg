@@ -1571,10 +1571,16 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             )),
 
             // todo: remove me!
-            "HaveBRBExt" | "HaveStatisticalProfiling" | "HaveGCS" => Some(build(
+            "HaveBRBExt" | "HaveStatisticalProfiling" => Some(build(
                 self.block,
                 self.block_arena_mut(),
                 Statement::Constant(Constant::new_unsigned(0, 1)),
+            )),
+
+            "HaveGCS" => Some(build(
+                self.block,
+                self.block_arena_mut(),
+                Statement::Constant(Constant::new_unsigned(1, 1)),
             )),
 
             "__GetVerbosity" => Some(build(
