@@ -23,24 +23,6 @@ use {
 pub mod pretty_print;
 pub mod visitor;
 
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    FromValue,
-    ToValue,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    DeepSizeOf,
-)]
-pub enum Channel {
-    Stdout,
-    Stderr,
-}
-
 /// C type
 #[derive(
     Debug,
@@ -85,26 +67,16 @@ pub enum Type {
     List(#[rkyv(omit_bounds)] Box<Self>),
     Ref(#[rkyv(omit_bounds)] Box<Self>),
     Poly(KindIdentifier),
+    MemoryWrites,
+    Json,
+    JsonKey,
 }
 
 impl Walkable for Type {
     fn walk<V: Visitor>(&self, visitor: &mut V) {
         match self {
-            Self::Lint => (),
-            Self::Fint(_) => (),
-            Self::Constant(_) => (),
-            Self::Lbits => (),
-            Self::Sbits(_) => (),
-            Self::Fbits(_) => (),
-            Self::Unit => (),
-            Self::Bool => (),
-            Self::Bit => (),
-            Self::String => (),
-            Self::Real => (),
-            Self::Float(_) => (),
-            Self::RoundingMode => (),
             Self::Tup(types) => types.iter().for_each(|t| visitor.visit_type(t)),
-            Self::Enum(_, _) => (),
+
             Self::Struct(_, fields) | Self::Variant(_, fields) => {
                 fields.iter().for_each(|(_, typ)| {
                     visitor.visit_type(typ);
@@ -113,12 +85,29 @@ impl Walkable for Type {
             Self::Fvector(_, typ) | Self::Vector(typ) | Self::List(typ) | Self::Ref(typ) => {
                 visitor.visit_type(typ)
             }
-            Self::Poly(_) => (),
+
+            Self::Enum(_, _)
+            | Self::Lint
+            | Self::Fint(_)
+            | Self::Constant(_)
+            | Self::Lbits
+            | Self::Sbits(_)
+            | Self::Fbits(_)
+            | Self::Unit
+            | Self::Bool
+            | Self::Bit
+            | Self::String
+            | Self::Real
+            | Self::Float(_)
+            | Self::RoundingMode
+            | Self::Poly(_)
+            | Self::MemoryWrites
+            | Self::Json
+            | Self::JsonKey => (),
         }
     }
 }
 
-/// Name
 #[derive(
     Debug,
     Clone,
@@ -132,23 +121,12 @@ impl Walkable for Type {
     rkyv::Deserialize,
     DeepSizeOf,
 )]
-pub enum Name {
-    Name(Identifier, Int),
-    HaveException(Int),
-    CurrentException(Int),
-    ThrowLocation(Int),
-    Channel(Channel, Int),
-    Return(Int),
-}
-
-impl Walkable for Name {
-    fn walk<V: Visitor>(&self, _: &mut V) {
-        // leaf node
-    }
+pub enum Channel {
+    Stdout,
+    Stderr,
 }
 
 /// Operation
-
 #[derive(
     Debug,
     Clone,
@@ -172,6 +150,8 @@ pub enum Op {
     Eq,
     Neq,
     Ite,
+    GetAbstract,
+    StringEq,
     Ilt,
     Ilteq,
     Igt,
@@ -202,8 +182,7 @@ impl Walkable for Op {
     }
 }
 
-/// clexp
-
+/// Name
 #[derive(
     Debug,
     Clone,
@@ -217,41 +196,19 @@ impl Walkable for Op {
     rkyv::Deserialize,
     DeepSizeOf,
 )]
-#[rkyv(deserialize_bounds(<__D as rkyv::rancor::Fallible>::Error: rkyv::rancor::Source))]
-#[rkyv(serialize_bounds(__S: Writer))]
-#[rkyv(bytecheck(
-    bounds(
-        __C: rkyv::validation::ArchiveContext,
-    )
-))]
-pub enum Expression {
-    Id(Name, Type),
-    Rmw(Name, Name, Type),
-    Field(#[rkyv(omit_bounds)] Box<Self>, Identifier),
-    Addr(#[rkyv(omit_bounds)] Box<Self>),
-    Tuple(#[rkyv(omit_bounds)] Box<Self>, Int),
-    Void,
+pub enum Name {
+    Name(Identifier, Int),
+    HaveException(Int),
+    CurrentException(Int),
+    ThrowLocation(Int),
+    Channel(Channel, Int),
+    MemoryWrites(Int),
+    Return(Int),
 }
 
-impl Walkable for Expression {
-    fn walk<V: Visitor>(&self, visitor: &mut V) {
-        match self {
-            Self::Id(name, typ) => {
-                visitor.visit_name(name);
-                visitor.visit_type(typ);
-            }
-            Self::Rmw(name0, name1, typ) => {
-                visitor.visit_name(name0);
-                visitor.visit_name(name1);
-                visitor.visit_type(typ);
-            }
-            Self::Field(expression, _) => {
-                visitor.visit_expression(expression);
-            }
-            Self::Addr(expression) => visitor.visit_expression(expression),
-            Self::Tuple(expression, _) => visitor.visit_expression(expression),
-            Self::Void => (),
-        }
+impl Walkable for Name {
+    fn walk<V: Visitor>(&self, _: &mut V) {
+        // leaf node
     }
 }
 
@@ -343,6 +300,89 @@ impl Walkable for Value {
     }
 }
 
+/// clexp
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+#[rkyv(deserialize_bounds(<__D as rkyv::rancor::Fallible>::Error: rkyv::rancor::Source))]
+#[rkyv(serialize_bounds(__S: Writer))]
+#[rkyv(bytecheck(
+    bounds(
+        __C: rkyv::validation::ArchiveContext,
+    )
+))]
+pub enum Expression {
+    Id(Name, Type),
+    Rmw(Name, Name, Type),
+    Field(#[rkyv(omit_bounds)] Box<Self>, Identifier),
+    Addr(#[rkyv(omit_bounds)] Box<Self>),
+    Tuple(#[rkyv(omit_bounds)] Box<Self>, Int),
+    Void(Type),
+}
+
+impl Walkable for Expression {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match self {
+            Self::Id(name, typ) => {
+                visitor.visit_name(name);
+                visitor.visit_type(typ);
+            }
+            Self::Rmw(name0, name1, typ) => {
+                visitor.visit_name(name0);
+                visitor.visit_name(name1);
+                visitor.visit_type(typ);
+            }
+            Self::Field(expression, _) => {
+                visitor.visit_expression(expression);
+            }
+            Self::Addr(expression) => visitor.visit_expression(expression),
+            Self::Tuple(expression, _) => visitor.visit_expression(expression),
+            Self::Void(typ) => visitor.visit_type(typ),
+        }
+    }
+}
+
+/// Init
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum Init {
+    Cval(Value),
+    Static(Vl),
+    JsonKey(ListVec<String>),
+}
+
+impl Walkable for Init {
+    fn walk<V: Visitor>(&self, visitor: &mut V) {
+        match self {
+            Init::Cval(value) => visitor.visit_value(value),
+            Init::Static(vl) => visitor.visit_vl(vl),
+            Init::JsonKey(_) => (),
+        }
+    }
+}
+
 #[derive(
     Debug,
     Clone,
@@ -359,27 +399,6 @@ impl Walkable for Value {
 pub enum CReturn {
     One(Expression),
     Multi(ListVec<Expression>),
-}
-
-/// C type definition
-
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    FromValue,
-    ToValue,
-    serde::Serialize,
-    serde::Deserialize,
-    rkyv::Archive,
-    rkyv::Serialize,
-    rkyv::Deserialize,
-    DeepSizeOf,
-)]
-pub enum TypeDefinition {
-    Enum(Identifier, ListVec<Identifier>),
-    Struct(Identifier, ListVec<(Identifier, Type)>),
-    Variant(Identifier, ListVec<(Identifier, Type)>),
 }
 
 #[derive(
@@ -404,7 +423,7 @@ pub enum TypeDefinition {
 ))]
 pub enum InstructionAux {
     Decl(Type, Name),
-    Init(Type, Name, Value),
+    Init(Type, Name, Init),
     Jump(Value, InternedString),
     Goto(InternedString),
     Label(InternedString),
@@ -418,7 +437,6 @@ pub enum InstructionAux {
         Value,
         #[rkyv(omit_bounds)] ListVec<Instruction>,
         #[rkyv(omit_bounds)] ListVec<Instruction>,
-        Type,
     ),
     Block(#[rkyv(omit_bounds)] ListVec<Instruction>),
     TryBlock(#[rkyv(omit_bounds)] ListVec<Instruction>),
@@ -455,10 +473,10 @@ impl Walkable for Instruction {
                 visitor.visit_type(typ);
                 visitor.visit_name(name);
             }
-            InstructionAux::Init(typ, name, value) => {
+            InstructionAux::Init(typ, name, init) => {
                 visitor.visit_type(typ);
                 visitor.visit_name(name);
-                visitor.visit_value(value);
+                visitor.visit_init(init);
             }
             InstructionAux::Jump(value, _) => visitor.visit_value(value),
             InstructionAux::Goto(_) => {}
@@ -493,11 +511,10 @@ impl Walkable for Instruction {
             InstructionAux::Undefined(typ) => visitor.visit_type(typ),
             InstructionAux::Exit(_) => {}
             InstructionAux::End(name) => visitor.visit_name(name),
-            InstructionAux::If(value, if_body, else_body, typ) => {
+            InstructionAux::If(value, if_body, else_body) => {
                 visitor.visit_value(value);
                 if_body.iter().for_each(|i| visitor.visit_instruction(i));
                 else_body.iter().for_each(|i| visitor.visit_instruction(i));
-                visitor.visit_type(typ);
             }
             InstructionAux::Block(instructions) => instructions
                 .iter()
@@ -520,6 +537,48 @@ impl Walkable for Instruction {
             }
         }
     }
+}
+
+/// ctype_def_init
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum TypeDefinitionInit {
+    Instrs(ListVec<Instruction>),
+    None,
+}
+
+/// C type definition
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    FromValue,
+    ToValue,
+    serde::Serialize,
+    serde::Deserialize,
+    rkyv::Archive,
+    rkyv::Serialize,
+    rkyv::Deserialize,
+    DeepSizeOf,
+)]
+pub enum TypeDefinition {
+    Enum(Identifier, ListVec<Identifier>),
+    Struct(Identifier, ListVec<(Identifier, Type)>),
+    Variant(Identifier, ListVec<(Identifier, Type)>),
+    Abbrev(Identifier, Type),
+    Abstract(Identifier, Type, TypeDefinitionInit),
 }
 
 /// Cdef_aux
@@ -668,6 +727,15 @@ impl Walkable for TypeDefinition {
                 fields.iter().for_each(|(_, typ)| {
                     visitor.visit_type(typ);
                 });
+            }
+            Self::Abbrev(_, typ) => visitor.visit_type(typ),
+            Self::Abstract(_, typ, typ_def_init) => {
+                visitor.visit_type(typ);
+                if let TypeDefinitionInit::Instrs(instrs) = typ_def_init {
+                    instrs
+                        .iter()
+                        .for_each(|instr| visitor.visit_instruction(instr));
+                }
             }
         }
     }

@@ -3,8 +3,8 @@
 use {
     crate::{
         jib_ast::{
-            CReturn, Definition, DefinitionAux, Expression, Instruction, InstructionAux, Name,
-            Type, TypeDefinition, Value, visitor::Visitor,
+            CReturn, Definition, DefinitionAux, Expression, Init, Instruction, InstructionAux,
+            Name, Type, TypeDefinition, Value, visitor::Visitor,
         },
         sail_ast::Identifier,
     },
@@ -140,6 +140,12 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
                 }
 
                 self.prindentln("}");
+            }
+            DefinitionAux::Type(TypeDefinition::Abbrev(id, fields)) => {
+                todo!()
+            }
+            DefinitionAux::Type(TypeDefinition::Abstract(..)) => {
+                todo!()
             }
             DefinitionAux::Let(_, bindings, instructions) => {
                 self.prindent("let (");
@@ -286,7 +292,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
             InstructionAux::Label(label) => {
                 self.prindentln(format!("label \"{label}\""));
             }
-            InstructionAux::If(condition, if_body, else_body, _) => {
+            InstructionAux::If(condition, if_body, else_body) => {
                 self.prindent("if (");
                 self.visit_value(condition);
                 writeln!(self.writer, ") {{").unwrap();
@@ -305,13 +311,13 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
 
                 self.prindentln("}");
             }
-            InstructionAux::Init(typ, name, value) => {
+            InstructionAux::Init(typ, name, init) => {
                 self.prindent("init ");
                 self.visit_type(typ);
                 write!(self.writer, " ").unwrap();
                 self.visit_name(name);
                 write!(self.writer, " ").unwrap();
-                self.visit_value(value);
+                self.visit_init(init);
                 writeln!(self.writer,).unwrap();
             }
             InstructionAux::Jump(value, s) => {
@@ -414,7 +420,7 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
                 self.visit_expression(inner);
             }
             Expression::Tuple(_, _) => todo!(),
-            Expression::Void => todo!(),
+            Expression::Void(_) => todo!(),
         }
     }
 
@@ -445,7 +451,6 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
                 }
                 write!(self.writer, ")").unwrap();
             }
-
             Type::Enum(ident, _) => write!(self.writer, "enum {}", ident.as_interned()).unwrap(),
             Type::Struct(ident, _) => {
                 write!(self.writer, "struct {}", ident.as_interned()).unwrap()
@@ -453,7 +458,6 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
             Type::Variant(ident, _) => {
                 write!(self.writer, "union {}", ident.as_interned()).unwrap()
             }
-
             Type::Vector(typ) => {
                 write!(self.writer, "%vec<").unwrap();
                 self.visit_type(typ);
@@ -474,6 +478,9 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
                 self.visit_type(inner);
             }
             Type::Poly(kid) => write!(self.writer, "{:?}", kid.inner).unwrap(),
+            Type::MemoryWrites => write!(self.writer, "MemoryWrites").unwrap(),
+            Type::Json => write!(self.writer, "Json").unwrap(),
+            Type::JsonKey => write!(self.writer, "JsonKey").unwrap(),
         }
     }
 
@@ -483,8 +490,25 @@ impl<W: Write> Visitor for JibPrettyPrinter<W> {
             Name::HaveException(_) => write!(self.writer, "have_exception").unwrap(),
             Name::CurrentException(_) => write!(self.writer, "current_exception").unwrap(),
             Name::ThrowLocation(_) => write!(self.writer, "throw").unwrap(),
-            Name::Return(_) => write!(self.writer, "return").unwrap(),
-            Name::Channel(_, _) => write!(self.writer, "channel").unwrap(),
+            Name::Return(i) => write!(self.writer, "return({i:?})").unwrap(),
+            Name::Channel(chan, i) => write!(self.writer, "channel({chan:?}, {i:?})").unwrap(),
+            Name::MemoryWrites(i) => write!(self.writer, "memory_writes({i:?})").unwrap(),
         }
+    }
+
+    fn visit_init(&mut self, node: &Init) {
+        write!(self.writer, "init(").unwrap();
+        match node {
+            Init::Cval(value) => self.visit_value(value),
+            Init::Static(vl) => self.visit_vl(vl),
+            Init::JsonKey(list_vec) => {
+                write!(self.writer, "jsonkey(").unwrap();
+                for s in list_vec.iter() {
+                    write!(self.writer, "{s:?},").unwrap();
+                }
+                write!(self.writer, ")").unwrap();
+            }
+        }
+        write!(self.writer, ")").unwrap();
     }
 }

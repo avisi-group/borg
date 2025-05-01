@@ -42,28 +42,7 @@
 (*  Technology) under DARPA/AFRL contracts FA8650-18-C-7809 ("CIFV")        *)
 (*  and FA8750-10-C-0237 ("CTSRD").                                         *)
 (*                                                                          *)
-(*  Redistribution and use in source and binary forms, with or without      *)
-(*  modification, are permitted provided that the following conditions      *)
-(*  are met:                                                                *)
-(*  1. Redistributions of source code must retain the above copyright       *)
-(*     notice, this list of conditions and the following disclaimer.        *)
-(*  2. Redistributions in binary form must reproduce the above copyright    *)
-(*     notice, this list of conditions and the following disclaimer in      *)
-(*     the documentation and/or other materials provided with the           *)
-(*     distribution.                                                        *)
-(*                                                                          *)
-(*  THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS''      *)
-(*  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED       *)
-(*  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A         *)
-(*  PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR     *)
-(*  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,            *)
-(*  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT        *)
-(*  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF        *)
-(*  USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND     *)
-(*  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,      *)
-(*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT      *)
-(*  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF      *)
-(*  SUCH DAMAGE.                                                            *)
+(*  SPDX-License-Identifier: BSD-2-Clause                                   *)
 (****************************************************************************)
 
 (** This file defines an intermediate representation that is roughly
@@ -98,6 +77,7 @@ val mk_port : Jib.name -> Jib.ctyp -> sv_module_port
 
 type sv_module = {
   name : sv_name;
+  recursive : bool;
   input_ports : sv_module_port list;
   output_ports : sv_module_port list;
   defs : sv_def list;
@@ -110,7 +90,10 @@ and sv_function = {
   body : sv_statement;
 }
 
-and sv_def =
+and sv_def = SVD_aux of sv_def_aux * Ast.l
+
+and sv_def_aux =
+  | SVD_null
   | SVD_type of Jib.ctype_def
   | SVD_module of sv_module
   | SVD_var of Jib.name * Jib.ctyp
@@ -122,13 +105,20 @@ and sv_def =
       output_connections : sv_place list;
     }
   | SVD_always_comb of sv_statement
+  | SVD_initial of sv_statement
+  | SVD_always_ff of sv_statement
+  | SVD_dpi_function of { function_name : sv_name; return_type : Jib.ctyp option; param_types : Jib.ctyp list }
 
 and sv_place =
   | SVP_id of Jib.name
   | SVP_index of sv_place * smt_exp
   | SVP_field of sv_place * Ast.id
   | SVP_multi of sv_place list
-  | SVP_void
+  | SVP_void of Jib.ctyp
+
+and sv_for_modifier = SVF_increment of Jib.name | SVF_decrement of Jib.name
+
+and sv_for = { for_var : Jib.name * Jib.ctyp * smt_exp; for_cond : smt_exp; for_modifier : sv_for_modifier }
 
 and sv_statement = SVS_aux of sv_statement_aux * Ast.l
 
@@ -139,23 +129,33 @@ and sv_statement_aux =
   | SVS_var of Jib.name * Jib.ctyp * smt_exp option
   | SVS_return of smt_exp
   | SVS_assign of sv_place * smt_exp
+  | SVS_continuous_assign of sv_place * smt_exp
   | SVS_call of sv_place * sv_name * smt_exp list
-  | SVS_case of { head_exp : smt_exp; cases : (Ast.id list * sv_statement) list; fallthrough : sv_statement option }
+  | SVS_case of { head_exp : smt_exp; cases : (smt_exp * sv_statement) list; fallthrough : sv_statement option }
   | SVS_if of smt_exp * sv_statement option * sv_statement option
   | SVS_block of sv_statement list
   | SVS_assert of smt_exp * smt_exp
   | SVS_foreach of sv_name * smt_exp * sv_statement
+  | SVS_for of sv_for * sv_statement
   | SVS_raw of string * Jib.name list * Jib.name list
 
 val svs_raw : ?inputs:Jib.name list -> ?outputs:Jib.name list -> string -> sv_statement_aux
 
 val is_split_comb : sv_statement -> bool
 
+val is_null_def : sv_def -> bool
+
+val is_skip : sv_statement -> bool
+
 val filter_skips : sv_statement list -> sv_statement list
 
 val svs_block : sv_statement list -> sv_statement_aux
 
+val mk_def : ?loc:Parse_ast.l -> sv_def_aux -> sv_def
+
 val mk_statement : ?loc:Parse_ast.l -> sv_statement_aux -> sv_statement
+
+val is_typedef : sv_def -> bool
 
 class type svir_visitor = object
   (** Note that despite inheriting from common_visitor, we don't use
@@ -178,3 +178,5 @@ val visit_sv_place : svir_visitor -> sv_place -> sv_place
 val visit_sv_statement : svir_visitor -> sv_statement -> sv_statement
 
 val visit_sv_def : svir_visitor -> sv_def -> sv_def
+
+val visit_sv_defs : svir_visitor -> sv_def list -> sv_def list

@@ -30,8 +30,11 @@
                     "kind": "bin"
                 },
             },
-            "args": [ "${workspaceFolder}/borealis/data/arm-v9.4-a.json","${workspaceFolder}/arm94_sail18.rkyv"],
+            "args": [ "${workspaceFolder}/borealis/data/arm-v9.4-a.json","${workspaceFolder}/arm94_sail19.rkyv"],
             "cwd": "${workspaceFolder}/borealis",
+            "env": {
+                "SAIL_DIR": "/home/fm208/.opam/default/share/sail"
+            }
         },
         {
             "type": "lldb",

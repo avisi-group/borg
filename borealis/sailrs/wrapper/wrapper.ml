@@ -50,7 +50,7 @@ let file_to_string filename =
     Buffer.contents buf
 
 
-let run_sail filepaths =
+let run_sail filepaths  =
   (* register isla target *)
   let tgt =
     Target.register ~name:"systemverilog" ~flag:"sv" ~options:verilog_options
@@ -65,7 +65,7 @@ let run_sail filepaths =
   let opt_just_parse_project = ref false in
   let opt_splice = ref [] in
 
-  Sail_plugin_sv.opt_nostrings := true;
+  Sail_plugin_sv.opt_no_strings := true;
 
   Rewrites.opt_mono_rewrites := true;
   (* Rewrites.opt_auto_mono := true; *)
@@ -87,7 +87,7 @@ let run_sail filepaths =
                    load_plugin options path)
                (Array.to_list (Sys.readdir dir))
          | [] -> ())); *)
-  Constraint.load_digests ();
+  Constraint.load_digests "./digests";
 
   (* rest is copied from sail.ml:run_sail *)
   Target.run_pre_parse_hook tgt ();
@@ -196,7 +196,7 @@ let run_sail filepaths =
   let cdefs, ctx = jib_of_ast SV.make_call_precise env ast effect_info in
   let cdefs, ctx = Jib_optimize.remove_tuples cdefs ctx in
 
-  Constraint.save_digests ();
+  Constraint.save_digests "./digests";
 
   cdefs
 
@@ -206,9 +206,6 @@ let () =
       exception_to_result (fun () -> run_sail filepaths));
 
   (* Utility *)
-  Callback.register "util_dedup" (fun a ->
-      exception_to_result (fun () -> Util.remove_duplicates a));
-
   Callback.register "bindings_to_list" (fun a ->
       exception_to_result (fun () -> bindings_to_list a));
   Callback.register "list_to_bindings" (fun a ->

@@ -42,28 +42,7 @@
 (*  Technology) under DARPA/AFRL contracts FA8650-18-C-7809 ("CIFV")        *)
 (*  and FA8750-10-C-0237 ("CTSRD").                                         *)
 (*                                                                          *)
-(*  Redistribution and use in source and binary forms, with or without      *)
-(*  modification, are permitted provided that the following conditions      *)
-(*  are met:                                                                *)
-(*  1. Redistributions of source code must retain the above copyright       *)
-(*     notice, this list of conditions and the following disclaimer.        *)
-(*  2. Redistributions in binary form must reproduce the above copyright    *)
-(*     notice, this list of conditions and the following disclaimer in      *)
-(*     the documentation and/or other materials provided with the           *)
-(*     distribution.                                                        *)
-(*                                                                          *)
-(*  THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS''      *)
-(*  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED       *)
-(*  TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A         *)
-(*  PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR     *)
-(*  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,            *)
-(*  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT        *)
-(*  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF        *)
-(*  USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND     *)
-(*  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,      *)
-(*  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT      *)
-(*  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF      *)
-(*  SUCH DAMAGE.                                                            *)
+(*  SPDX-License-Identifier: BSD-2-Clause                                   *)
 (****************************************************************************)
 
 open Libsail
@@ -79,17 +58,27 @@ open Printf
 open Smt_exp
 open Interactive.State
 
-open Generate_primop
+open Sv_optimize
 
+module StringSet = Util.StringSet
 module R = Jib_sv
 
 let opt_output_dir = ref None
 
 let opt_includes = ref []
 
+let opt_toplevel = ref "main"
+
 type verilate_mode = Verilator_none | Verilator_compile | Verilator_run
 
 let opt_verilate = ref Verilator_none
+let opt_verilate_args = ref None
+let opt_verilate_cflags = ref None
+let opt_verilate_ldflags = ref None
+let opt_verilate_link_sail_runtime = ref false
+let opt_verilate_jobs = ref 0
+
+let append_flag opt flag = match !opt with None -> opt := Some flag | Some flags -> opt := Some (flags ^ " " ^ flag)
 
 let opt_line_directives = ref false
 
@@ -101,8 +90,9 @@ let opt_outregs = ref false
 let opt_max_unknown_integer_width = ref 128
 let opt_max_unknown_bitvector_width = ref 128
 
-let opt_nostrings = ref false
-let opt_nopacked = ref false
+let opt_no_strings = ref false
+let opt_no_packed = ref false
+let opt_no_assertions = ref false
 let opt_never_pack_unions = ref false
 let opt_padding = ref false
 let opt_nomem = ref false
@@ -110,19 +100,31 @@ let opt_nomem = ref false
 let opt_unreachable = ref []
 let opt_fun2wires = ref []
 
+let opt_dpi_sets = ref StringSet.empty
+
 let opt_int_specialize = ref None
+
+let opt_disable_optimizations = ref false
 
 let verilog_options =
   [
-    ( "-sv_output_dir",
+    ( Flag.create ~prefix:["sv"] ~arg:"path" "output_dir",
       Arg.String (fun s -> opt_output_dir := Some s),
-      "<path> set the output directory for generated SystemVerilog files"
+      "set the output directory for generated SystemVerilog files"
     );
-    ( "-sv_include",
+    ( Flag.create ~prefix:["sv"] ~arg:"file" "include",
       Arg.String (fun s -> opt_includes := s :: !opt_includes),
-      "<file> add include directive to generated SystemVerilog file"
+      "add include directive to generated SystemVerilog file"
     );
-    ( "-sv_verilate",
+    ( Flag.create ~prefix:["sv"] ~arg:"id" "toplevel",
+      Arg.String
+        (fun s ->
+          Specialize.add_initial_calls (IdSet.singleton (mk_id s));
+          opt_toplevel := s
+        ),
+      "Sail function to use as toplevel module"
+    );
+    ( Flag.create ~prefix:["sv"; "verilate"] ~arg:"compile|run" ~override:"sv_verilate" "mode",
       Arg.String
         (fun opt ->
           if opt = "run" then opt_verilate := Verilator_run
@@ -133,43 +135,72 @@ let verilog_options =
                  "Invalid argument for -sv_verilate option. Valid options are either 'run' or 'compile'."
               )
         ),
-      "<compile|run> Invoke verilator on generated output"
+      "Invoke verilator on generated output"
     );
-    ("-sv_lines", Arg.Set opt_line_directives, " output `line directives");
-    ("-sv_comb", Arg.Set opt_comb, " output an always_comb block instead of initial block");
-    ("-sv_inregs", Arg.Set opt_inregs, " take register values from inputs");
-    ("-sv_outregs", Arg.Set opt_outregs, " output register values");
-    ( "-sv_int_size",
+    ( Flag.create ~prefix:["sv"; "verilate"] ~arg:"string" "args",
+      Arg.String (fun s -> append_flag opt_verilate_args s),
+      "Extra arguments to pass to verilator"
+    );
+    ( Flag.create ~prefix:["sv"; "verilate"] ~arg:"string" "cflags",
+      Arg.String (fun s -> append_flag opt_verilate_cflags s),
+      "Verilator CFLAGS argument"
+    );
+    ( Flag.create ~prefix:["sv"; "verilate"] ~arg:"string" "ldflags",
+      Arg.String (fun s -> append_flag opt_verilate_ldflags s),
+      "Verilator LDFLAGS argument"
+    );
+    ( Flag.create ~prefix:["sv"; "verilate"] "link_sail_runtime",
+      Arg.Set opt_verilate_link_sail_runtime,
+      "Link the Sail C runtime with the generated verilator C++"
+    );
+    ( Flag.create ~prefix:["sv"; "verilate"] ~arg:"n" "jobs",
+      Arg.Int (fun i -> opt_verilate_jobs := i),
+      "Provide the -j option to verilator"
+    );
+    (Flag.create ~prefix:["sv"] "lines", Arg.Set opt_line_directives, "output `line directives");
+    (Flag.create ~prefix:["sv"] "comb", Arg.Set opt_comb, "output an always_comb block instead of initial block");
+    (Flag.create ~prefix:["sv"] "inregs", Arg.Set opt_inregs, "take register values from inputs");
+    (Flag.create ~prefix:["sv"] "outregs", Arg.Set opt_outregs, "output register values");
+    ( Flag.create ~prefix:["sv"] ~arg:"n" "int_size",
       Arg.Int (fun i -> opt_max_unknown_integer_width := i),
-      "<n> set the maximum width for unknown integers"
+      "set the maximum width for unknown integers"
     );
-    ( "-sv_bits_size",
+    ( Flag.create ~prefix:["sv"] ~arg:"n" "bits_size",
       Arg.Int (fun i -> opt_max_unknown_bitvector_width := i),
-      "<n> set the maximum width for bitvectors with unknown width"
+      "set the maximum width for bitvectors with unknown width"
     );
-    ("-sv_nostrings", Arg.Set opt_nostrings, " don't emit any strings, instead emit units");
-    ("-sv_nopacked", Arg.Set opt_nopacked, " don't emit packed datastructures");
-    ("-sv_never_pack_unions", Arg.Set opt_never_pack_unions, " never emit a packed union");
-    ("-sv_padding", Arg.Set opt_padding, " add padding on packed unions");
-    ( "-sv_unreachable",
+    (Flag.create ~prefix:["sv"] "no_strings", Arg.Set opt_no_strings, "don't emit any strings, instead emit units");
+    (Flag.create ~prefix:["sv"] "no_packed", Arg.Set opt_no_packed, "don't emit packed datastructures");
+    (Flag.create ~prefix:["sv"] "no_assertions", Arg.Set opt_no_assertions, "ignore all Sail asserts");
+    (Flag.create ~prefix:["sv"] "never_pack_unions", Arg.Set opt_never_pack_unions, "never emit a packed union");
+    (Flag.create ~prefix:["sv"] "padding", Arg.Set opt_padding, "add padding on packed unions");
+    ( Flag.create ~prefix:["sv"] ~arg:"functionname" "unreachable",
       Arg.String (fun fn -> opt_unreachable := fn :: !opt_unreachable),
-      "<functionname> Mark function as unreachable."
+      "Mark function as unreachable."
     );
-    ("-sv_nomem", Arg.Set opt_nomem, " don't emit a dynamic memory implementation");
-    ( "-sv_fun2wires",
+    (Flag.create ~prefix:["sv"] "nomem", Arg.Set opt_nomem, "don't emit a dynamic memory implementation");
+    ( Flag.create ~prefix:["sv"] ~arg:"functionname" "fun2wires",
       Arg.String (fun fn -> opt_fun2wires := fn :: !opt_fun2wires),
-      "<functionname> Use input/output ports instead of emitting a function call"
+      "Use input/output ports instead of emitting a function call"
     );
-    ( "-sv_specialize",
+    ( Flag.create ~prefix:["sv"] ~arg:"n" "specialize",
       Arg.Int (fun i -> opt_int_specialize := Some i),
-      "<n> Run n specialization passes on Sail Int-kinded type variables"
+      "Run n specialization passes on Sail Int-kinded type variables"
+    );
+    ( Flag.create ~prefix:["sv"] "disable_optimizations",
+      Arg.Set opt_disable_optimizations,
+      "disable SystemVerilog specific optimizations"
+    );
+    ( Flag.create ~prefix:["sv"] ~arg:"set" "dpi",
+      Arg.String (fun s -> opt_dpi_sets := StringSet.add s !opt_dpi_sets),
+      "Use SystemVerilog DPI-C for a set of primitives (e.g. memory)"
     );
   ]
 
 let verilog_rewrites =
   let open Rewrites in
   [
-    ("instantiate_outcomes", [String_arg "c"]);
+    ("instantiate_outcomes", [String_arg "systemverilog"]);
     ("realize_mappings", []);
     ("remove_vector_subrange_pats", []);
     ("toplevel_string_append", []);
@@ -179,8 +210,8 @@ let verilog_rewrites =
     ("mono_rewrites", [If_flag opt_mono_rewrites]);
     ("recheck_defs", [If_flag opt_mono_rewrites]);
     ("toplevel_nexps", [If_mono_arg]);
-    ("monomorphise", [String_arg "c"; If_mono_arg]);
-    ("atoms_to_singletons", [String_arg "c"; If_mono_arg]);
+    ("monomorphise", [String_arg "systemverilog"; If_mono_arg]);
+    ("atoms_to_singletons", [String_arg "systemverilog"; If_mono_arg]);
     ("recheck_defs", [If_mono_arg]);
     ("undefined", [Bool_arg false]);
     ("vector_string_pats_to_bit_list", []);
@@ -195,7 +226,8 @@ let verilog_rewrites =
     ("exp_lift_assign", []);
     ("merge_function_clauses", []);
     ("recheck_defs", []);
-    ("constant_fold", [String_arg "c"]);
+    ("constant_fold", [String_arg "systemverilog"]);
+    ("unroll_constant_loops", [If_flag opt_unroll_loops]);
   ]
 
 module type JIB_CONFIG = sig
@@ -281,7 +313,7 @@ module Verilog_config (C : JIB_CONFIG) : Jib_compile.CONFIG = struct
         let fix_ctyp ctyp = if is_polymorphic ctyp then ctyp_suprema (subst_poly quants ctyp) else ctyp in
         CT_struct (id, Bindings.map fix_ctyp fields |> Bindings.bindings)
     | Typ_id id when Bindings.mem id ctx.variants ->
-        CT_variant (id, Bindings.find id ctx.variants |> snd |> Bindings.bindings)
+        CT_variant (id, Bindings.find id ctx.variants |> snd |> Bindings.bindings) |> transparent_newtype ctx
     | Typ_app (id, typ_args) when Bindings.mem id ctx.variants ->
         let typ_params, ctors = Bindings.find id ctx.variants in
         let quants =
@@ -294,7 +326,7 @@ module Verilog_config (C : JIB_CONFIG) : Jib_compile.CONFIG = struct
             ctx.quants typ_params (List.filter is_typ_arg_typ typ_args)
         in
         let fix_ctyp ctyp = if is_polymorphic ctyp then ctyp_suprema (subst_poly quants ctyp) else ctyp in
-        CT_variant (id, Bindings.map fix_ctyp ctors |> Bindings.bindings)
+        CT_variant (id, Bindings.map fix_ctyp ctors |> Bindings.bindings) |> transparent_newtype ctx
     | Typ_id id when Bindings.mem id ctx.enums -> CT_enum (id, Bindings.find id ctx.enums |> IdSet.elements)
     | Typ_tuple typs -> CT_tup (List.map (convert_typ ctx) typs)
     | Typ_exist _ -> begin
@@ -313,9 +345,9 @@ module Verilog_config (C : JIB_CONFIG) : Jib_compile.CONFIG = struct
 
   let optimize_anf _ aexp = aexp
 
-  let unroll_loops = None
+  let unroll_loops = Some 64
   let specialize_calls = false
-  let make_call_precise = C.make_call_precise
+  let make_call_precise ctx id _ _ = C.make_call_precise ctx id
   let ignore_64 = true
   let struct_value = false
   let tuple_value = false
@@ -323,6 +355,8 @@ module Verilog_config (C : JIB_CONFIG) : Jib_compile.CONFIG = struct
   let branch_coverage = None
   let use_real = false
   let use_void = false
+  let eager_control_flow = true
+  let preserve_types = IdSet.empty
 end
 
 let register_types cdefs =
@@ -335,7 +369,6 @@ let jib_of_ast make_call_precise env ast effect_info =
   let module Jibc = Make (Verilog_config (struct
     let make_call_precise = make_call_precise
   end)) in
-  let env, effect_info = add_special_functions env effect_info in
   let ctx = initial_ctx env effect_info in
   Jibc.compile_ast ctx ast
 
@@ -347,23 +380,43 @@ let wrap_module pre mod_name ins_outs doc =
   ^^ hardline ^^ string "endmodule" ^^ hardline
 
 let verilator_cpp_wrapper name =
-  [
-    sprintf "#include \"V%s.h\"" name;
-    "#include \"verilated.h\"";
-    "int main(int argc, char** argv) {";
-    "    VerilatedContext* contextp = new VerilatedContext;";
-    "    contextp->commandArgs(argc, argv);";
-    sprintf "    V%s* top = new V%s{contextp};" name name;
-    "    while (!contextp->gotFinish()) { top -> eval(); }";
-    "    delete top;";
-    "    delete contextp;";
-    "    return 0;";
-    "}";
-  ]
+  if not !opt_verilate_link_sail_runtime then
+    [
+      sprintf "#include \"V%s.h\"" name;
+      "#include \"verilated.h\"";
+      "int main(int argc, char** argv) {";
+      "    VerilatedContext* contextp = new VerilatedContext;";
+      "    contextp->commandArgs(argc, argv);";
+      sprintf "    V%s* top = new V%s{contextp};" name name;
+      "    while (!contextp->gotFinish()) { top -> eval(); }";
+      "    delete top;";
+      "    delete contextp;";
+      "    return 0;";
+      "}";
+    ]
+  else
+    [
+      sprintf "#include \"V%s.h\"" name;
+      "#include \"verilated.h\"";
+      "#include \"rts.h\"";
+      "int main(int argc, char** argv) {";
+      "    VerilatedContext* contextp = new VerilatedContext;";
+      (* "    contextp->commandArgs(argc, argv);"; *)
+      "    setup_rts();";
+      "    process_arguments(argc, argv);";
+      sprintf "    V%s* top = new V%s{contextp};" name name;
+      "    while (!contextp->gotFinish()) { top -> eval(); }";
+      "    cleanup_rts();";
+      "    delete top;";
+      "    delete contextp;";
+      "    return 0;";
+      "}";
+    ]
 
+(*
 let make_genlib_file filename =
   let common_primops =
-    if !opt_nostrings then
+    if !opt_no_strings then
       Generate_primop.common_primops_stubs !opt_max_unknown_bitvector_width !opt_max_unknown_integer_width
     else Generate_primop.common_primops !opt_max_unknown_bitvector_width !opt_max_unknown_integer_width
   in
@@ -385,19 +438,22 @@ let make_genlib_file filename =
     defs;
   output_string out_chan "`endif\n";
   Util.close_output_with_check file_info
+   *)
 
 let verilog_target out_opt { ast; effect_info; env; default_sail_dir; _ } =
   let module SV = Jib_sv.Make (struct
     let max_unknown_integer_width = !opt_max_unknown_integer_width
     let max_unknown_bitvector_width = !opt_max_unknown_bitvector_width
     let line_directives = !opt_line_directives
-    let nostrings = !opt_nostrings
-    let nopacked = !opt_nopacked
+    let no_strings = !opt_no_strings
+    let no_packed = !opt_no_packed
+    let no_assertions = !opt_no_assertions
     let never_pack_unions = !opt_never_pack_unions
     let union_padding = !opt_padding
     let unreachable = !opt_unreachable
     let comb = !opt_comb
     let ignore = !opt_fun2wires
+    let dpi_sets = !opt_dpi_sets
   end) in
   let open SV in
   let sail_dir = Reporting.get_sail_dir default_sail_dir in
@@ -412,11 +468,16 @@ let verilog_target out_opt { ast; effect_info; env; default_sail_dir; _ } =
   in
 
   let cdefs, ctx = jib_of_ast SV.make_call_precise env ast effect_info in
+
   let cdefs, ctx = Jib_optimize.remove_tuples cdefs ctx in
+  let cdefs = Jib_optimize.remove_mutrec cdefs in
   let registers = register_types cdefs in
 
   let include_doc =
-    (if !opt_nostrings then string "`define SAIL_NOSTRINGS" ^^ hardline else empty)
+    (if !opt_no_strings then string "`define SAIL_NOSTRINGS" ^^ hardline else empty)
+    ^^ List.fold_left
+         (fun doc set -> ksprintf string "SAIL_DPI_%s" (String.uppercase_ascii set) ^^ hardline)
+         empty (StringSet.elements !opt_dpi_sets)
     ^^ string "`include \"sail.sv\"" ^^ hardline
     ^^ ksprintf string "`include \"sail_genlib_%s.sv\"" out
     ^^ (if !opt_nomem then empty else hardline ^^ string "`include \"sail_memory.sv\"")
@@ -427,30 +488,46 @@ let verilog_target out_opt { ast; effect_info; env; default_sail_dir; _ } =
 
   let exception_vars =
     string "bit sail_reached_unreachable;" ^^ hardline ^^ string "bit sail_have_exception;" ^^ hardline
-    ^^ (if !opt_nostrings then string "sail_unit" else string "string")
+    ^^ (if !opt_no_strings then string "sail_unit" else string "string")
     ^^ space ^^ string "sail_throw_location;" ^^ twice hardline
   in
 
   let spec_info = Jib_sv.collect_spec_info ctx cdefs in
 
-  let doc, fn_ctyps =
+  let svir, fn_ctyps =
     List.fold_left
-      (fun (doc, fn_ctyps) cdef ->
-        let svir_defs, fn_ctyps = svir_cdef spec_info ctx fn_ctyps cdef in
-        match svir_defs with
-        | [] -> (doc, fn_ctyps)
-        | _ -> (doc ^^ separate_map (twice hardline) pp_def svir_defs ^^ twice hardline, fn_ctyps)
+      (fun (defs, fn_ctyps) cdef ->
+        let defs', fn_ctyps = svir_cdef spec_info ctx fn_ctyps cdef in
+        (List.rev defs' @ defs, fn_ctyps)
       )
-      (empty, Bindings.empty) cdefs
+      ([], Bindings.empty) cdefs
   in
+  let svir = List.rev svir in
+  let svir_types, svir = List.partition Sv_ir.is_typedef svir in
+  let library_svir = SV.Primops.get_generated_library_defs () in
+  let toplevel_svir = [Sv_ir.mk_def (Sv_ir.SVD_module (SV.toplevel_module (mk_id !opt_toplevel) spec_info fn_ctyps))] in
+
+  let svir = library_svir @ svir @ toplevel_svir in
+
+  let svir =
+    if not !opt_disable_optimizations then
+      svir |> remove_unit_ports |> remove_unused_variables |> simplify_smt |> remove_unused_variables |> simplify_smt
+      |> remove_unused_variables |> remove_nulls |> simplify_smt |> insert_case_expressions
+    else svir
+  in
+
   let doc =
     let base = Generate_primop2.basic_defs !opt_max_unknown_bitvector_width !opt_max_unknown_integer_width in
     let reg_ref_enums, reg_ref_functions = sv_register_references spec_info in
-    let library_defs = SV.Primops.get_generated_library_defs () in
-    let top_doc = Option.fold ~none:empty ~some:(fun m -> pp_def (SVD_module m)) (SV.toplevel_module spec_info) in
-    string "`include \"sail_modules.sv\"" ^^ twice hardline ^^ string base ^^ reg_ref_enums ^^ reg_ref_functions
-    ^^ separate_map (twice hardline) pp_def library_defs
-    ^^ twice hardline ^^ doc ^^ top_doc
+    Util.fold_left_last
+      (fun last doc set ->
+        ksprintf string "`define SAIL_DPI_%s" (String.uppercase_ascii set) ^^ if last then twice hardline else hardline
+      )
+      empty (StringSet.elements !opt_dpi_sets)
+    ^^ string base ^^ string "`include \"sail_modules.sv\"" ^^ twice hardline
+    ^^ separate_map (twice hardline) (pp_def None) svir_types
+    ^^ twice hardline ^^ reg_ref_enums ^^ reg_ref_functions
+    ^^ separate_map (twice hardline) (pp_def None) svir
   in
 
   (*
@@ -587,36 +664,39 @@ let verilog_target out_opt { ast; effect_info; env; default_sail_dir; _ } =
   in
      *)
   let sv_output = Pretty_print_sail.Document.to_string doc in
-  make_genlib_file (sprintf "sail_genlib_%s.sv" out);
 
-  let ((out_chan, _, _, _) as file_info) = Util.open_output_with_check_unformatted !opt_output_dir (out ^ ".sv") in
-  output_string out_chan sv_output;
+  (* make_genlib_file (Filename.concat (Filename.dirname out) (sprintf "sail_genlib_%s.sv" (Filename.basename out))); *)
+  let file_info = Util.open_output_with_check ?directory:!opt_output_dir (out ^ ".sv") in
+  output_string file_info.channel sv_output;
   Util.close_output_with_check file_info;
 
   begin
     match !opt_verilate with
     | Verilator_compile | Verilator_run ->
-        let ((out_chan, _, _, _) as file_info) =
-          Util.open_output_with_check_unformatted !opt_output_dir ("sim_" ^ out ^ ".cpp")
-        in
+        let file_info = Util.open_output_with_check ?directory:!opt_output_dir ("sim_" ^ out ^ ".cpp") in
         List.iter
           (fun line ->
-            output_string out_chan line;
-            output_char out_chan '\n'
+            output_string file_info.channel line;
+            output_char file_info.channel '\n'
           )
           (verilator_cpp_wrapper "sail_toplevel");
         Util.close_output_with_check file_info;
 
+        let extra = match !opt_verilate_args with None -> "" | Some args -> " " ^ args in
+        let cflags = match !opt_verilate_cflags with None -> "" | Some args -> sprintf " -CFLAGS \"%s\"" args in
+        let ldflags = match !opt_verilate_ldflags with None -> "" | Some args -> sprintf " -LDFLAGS \"%s\"" args in
+
         (* Verilator sometimes just spuriously returns non-zero exit
            codes even when it suceeds, so we don't use system_checked
            here, and just hope for the best. *)
-        let _ =
-          Unix.system
-            (sprintf
-               "verilator --cc --exe --build -j 0 --top-module sail_toplevel -I%s --Mdir %s_obj_dir sim_%s.cpp %s.sv"
-               sail_sv_libdir out out out
-            )
+        let verilator_command =
+          sprintf
+            "verilator --cc --exe --build -j %d --top-module sail_toplevel -I%s --Mdir %s_obj_dir sim_%s.cpp \
+             %s.sv%s%s%s"
+            !opt_verilate_jobs (Filename.quote sail_sv_libdir) out out out extra cflags ldflags
         in
+        print_endline ("Verilator command: " ^ verilator_command);
+        let _ = Unix.system verilator_command in
         begin
           match !opt_verilate with
           | Verilator_run -> Reporting.system_checked (sprintf "%s_obj_dir/V%s" out "sail_toplevel")

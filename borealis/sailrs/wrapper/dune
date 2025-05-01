@@ -6,6 +6,11 @@
   (flags
    (:standard -w -33 -w -27 -w -32 -w -26 -w -37))))
 
+(menhir
+ (modules sv_type_parser))
+
+(ocamllex sv_type_lexer)
+
 (rule
  (target manifest.ml)
  (mode fallback)

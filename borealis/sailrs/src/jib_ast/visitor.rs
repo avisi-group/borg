@@ -3,7 +3,7 @@
 //! Visitor trait has overridable methods
 
 use crate::jib_ast::{
-    Definition, Expression, Instruction, Name, Op, Type, TypeDefinition, Value, Vl,
+    Definition, Expression, Init, Instruction, Name, Op, Type, TypeDefinition, Value, Vl,
 };
 
 /// Visitor trait for interacting with Sail AST
@@ -45,6 +45,11 @@ pub trait Visitor: Sized {
 
     #[allow(missing_docs)]
     fn visit_name(&mut self, node: &Name) {
+        node.walk(self);
+    }
+
+    #[allow(missing_docs)]
+    fn visit_init(&mut self, node: &Init) {
         node.walk(self);
     }
 
