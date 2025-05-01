@@ -1,23 +1,28 @@
 use {
-    crate::dbt::{
-        Translation, bit_insert,
-        emitter::{Emitter, Type},
-        interpret::{Value, interpret},
-        models::{self},
-        register_file::RegisterFile,
-        translate::{translate, translate_instruction},
-        x86::{
-            X86TranslationContext,
-            emitter::{
-                BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind, X86Emitter,
-                X86Node,
+    crate::{
+        dbt::{
+            Translation, bit_insert,
+            emitter::{Emitter, Type},
+            interpret::{Value, interpret},
+            models::{self},
+            register_file::RegisterFile,
+            translate::{translate, translate_instruction},
+            x86::{
+                X86TranslationContext,
+                emitter::{
+                    BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
+                    X86Emitter, X86Node,
+                },
             },
         },
+        memory::bump::{BumpAllocator, BumpAllocatorRef},
+        timer::current_milliseconds,
     },
     alloc::{alloc::Global, boxed::Box},
     common::{hashmap::HashMap, mask::mask},
     core::panic,
     proc_macro_lib::ktest,
+    x86::time::{rdtsc, rdtscp},
 };
 
 #[ktest]
@@ -4354,4 +4359,59 @@ fn leave_with_cache() {
 
     let num_regs = emitter.next_vreg();
     let _translation = ctx.compile(num_regs);
+}
+
+#[ktest]
+fn decodea64_profiling() {
+    let model = models::get("aarch64").unwrap();
+
+    let allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
+    let allocator_ref = BumpAllocatorRef::new(&allocator);
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new_with_allocator(allocator_ref, &model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let t_start = unsafe { rdtscp().0 };
+
+    translate_instruction(
+        allocator_ref,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0,
+        0xd51be000,
+    )
+    .unwrap();
+
+    let t_end = unsafe { rdtscp().0 };
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+
+    crate::println!("translation took {}ms", t_end - t_start);
+
+    let c_start = unsafe { rdtscp().0 };
+    let translation = ctx.compile(num_regs);
+    let c_end = unsafe { rdtscp().0 };
+
+    crate::println!("compilation took {}ms", c_end - c_start);
+
+    register_file.write("SEE", -1i64);
+    register_file.write::<u64>("R0", 2);
+    register_file.write::<u64>("R1", 43);
+
+    let e_start = unsafe { rdtscp().0 };
+    translation.execute(&register_file);
+    let e_end = unsafe { rdtscp().0 };
+
+    crate::println!("execution took {}ms", e_end - e_start);
+
+    //log::info!("{translation:?}");
+
+    // assert_eq!(55, (*see));// todo: re-implement depending on result of
+    // SEE/cacheable registers work
 }

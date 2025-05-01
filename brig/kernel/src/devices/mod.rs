@@ -15,6 +15,7 @@ pub mod pcie;
 pub mod pit;
 pub mod serial;
 pub mod virtio;
+pub mod tsc;
 
 pub trait Bus<P> {
     fn probe(&self, probe_data: P);
