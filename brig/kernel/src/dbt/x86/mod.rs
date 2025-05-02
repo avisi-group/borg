@@ -129,16 +129,9 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
     }
 
     pub fn compile(mut self, num_virtual_registers: usize) -> Translation {
-        let mut measure = Measurement::start();
-        measure.trigger("initial");
-
         let mut assembler = CodeAssembler::new(64).unwrap();
 
-        measure.trigger("codeassembler");
-
         let mut label_map = hashmap_in(self.allocator());
-
-        measure.trigger("hashmap");
 
         log::trace!("{}", dot::render(self.arena(), self.initial_block()));
 
@@ -149,7 +142,6 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         work_queue.push(self.panic_block());
         work_queue.push(self.initial_block());
 
-        measure.trigger("queues");
         while let Some(block) = work_queue.pop() {
             if !block.get(self.arena()).is_linked() {
                 block.get_mut(self.arena_mut()).set_linked();
@@ -166,14 +158,6 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             }
         }
 
-        measure.trigger("build work queue");
-        // log::trace!("optimising blocks");
-        // all_blocks.iter().for_each(|block| {
-        //     block
-        //         .get_mut(self.arena_mut())
-        //         .optimise();
-        // });
-
         log::trace!("allocating registers");
 
         all_blocks.iter().for_each(|block| {
@@ -181,14 +165,12 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                 .get_mut(self.arena_mut())
                 .allocate_registers(&mut FreshAllocator::new(num_virtual_registers));
         });
-        measure.trigger("allocation");
+
         log::trace!("encoding all blocks");
 
         log::debug!("{}", dot::render(self.arena(), self.initial_block()));
 
         for (i, block) in all_blocks.iter().enumerate() {
-            //   let mut measure = Measurement::start();
-            // measure.trigger("start of loop");
             assembler
                 .set_label(label_map.get_mut(block).unwrap())
                 .unwrap_or_else(|e| {
@@ -197,25 +179,24 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                         label_map.get_mut(block).unwrap()
                     )
                 });
-            // measure.trigger("set label");
+
             assembler
                 .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + block.index()))
                 .unwrap();
-            //  measure.trigger("nop");
+
             let instrs = block.get(self.arena()).instructions();
-            //  measure.trigger("instrs");
+
             let (last, rest) = instrs.split_last().unwrap_or_else(|| {
                 panic!(
                     "block {:?} {block:?} was empty",
                     label_map.get_mut(block).unwrap()
                 )
             });
-            //  measure.trigger("split");
+
             // all but last
             for instr in rest {
                 instr.encode(&mut assembler, &label_map);
             }
-            //  measure.trigger("encode");
 
             assert!(matches!(
                 last,
@@ -233,18 +214,15 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             }
 
             last.encode(&mut assembler, &label_map);
-            //  measure.trigger("last encode");
         }
-        measure.trigger("encoding");
+
         log::trace!("assembling");
         let code = assembler.assemble(0).unwrap();
 
-        measure.trigger("assembling");
         log::trace!("making executable");
 
         let res = Translation::new(code);
 
-        measure.trigger("newing");
         log::trace!("done");
 
         res

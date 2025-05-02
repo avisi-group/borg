@@ -5,6 +5,8 @@ use {
     x86::time::rdtscp,
 };
 
+const ENABLE_MEASUREMENTS: bool = true;
+
 static JIFFIES: AtomicU64 = AtomicU64::new(0);
 
 pub fn init() {
@@ -38,7 +40,11 @@ pub struct Measurement {
 
 impl Measurement {
     pub fn start() -> Self {
-        let now = unsafe { rdtscp().0 };
+        let now = if ENABLE_MEASUREMENTS {
+            unsafe { rdtscp().0 }
+        } else {
+            0
+        };
 
         Self {
             start: now,
@@ -47,19 +53,17 @@ impl Measurement {
     }
 
     pub fn trigger(&mut self, msg: &str) {
-        let now = unsafe { rdtscp().0 };
-        let delta_start = now - self.start;
-        let delta_prev = now - self.prev;
+        if ENABLE_MEASUREMENTS {
+            let now = unsafe { rdtscp().0 };
+            let delta_start = now - self.start;
+            let delta_prev = now - self.prev;
 
-        println!(
-            "MEASUREMENT: msg={} ds={}ms, dp={}ms",
-            msg, delta_start, delta_prev
-        );
+            println!(
+                "MEASUREMENT: msg={} ds={}ms, dp={}ms",
+                msg, delta_start, delta_prev
+            );
 
-        self.prev = unsafe { rdtscp().0 };
+            self.prev = unsafe { rdtscp().0 };
+        }
     }
-}
-
-impl Drop for Measurement {
-    fn drop(&mut self) {}
 }

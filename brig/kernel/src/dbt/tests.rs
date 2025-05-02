@@ -16,13 +16,12 @@ use {
             },
         },
         memory::bump::{BumpAllocator, BumpAllocatorRef},
-        timer::current_milliseconds,
+        timer::Measurement,
     },
     alloc::{alloc::Global, boxed::Box},
     common::{hashmap::HashMap, mask::mask},
     core::panic,
     proc_macro_lib::ktest,
-    x86::time::{rdtsc, rdtscp},
 };
 
 #[ktest]
@@ -4365,6 +4364,8 @@ fn leave_with_cache() {
 fn decodea64_profiling() {
     let model = models::get("aarch64").unwrap();
 
+    let mut measure = Measurement::start();
+
     let allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
     let allocator_ref = BumpAllocatorRef::new(&allocator);
 
@@ -4373,7 +4374,7 @@ fn decodea64_profiling() {
     let mut ctx = X86TranslationContext::new_with_allocator(allocator_ref, &model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let t_start = unsafe { rdtscp().0 };
+    measure.trigger("init");
 
     translate_instruction(
         allocator_ref,
@@ -4386,29 +4387,23 @@ fn decodea64_profiling() {
     )
     .unwrap();
 
-    let t_end = unsafe { rdtscp().0 };
-
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
 
-    crate::println!("translation took {}ms", t_end - t_start);
+    measure.trigger("translation");
 
-    let c_start = unsafe { rdtscp().0 };
     let translation = ctx.compile(num_regs);
-    let c_end = unsafe { rdtscp().0 };
 
-    crate::println!("compilation took {}ms", c_end - c_start);
+    measure.trigger("compilation");
 
     register_file.write("SEE", -1i64);
     register_file.write::<u64>("R0", 2);
     register_file.write::<u64>("R1", 43);
 
-    let e_start = unsafe { rdtscp().0 };
     translation.execute(&register_file);
-    let e_end = unsafe { rdtscp().0 };
 
-    crate::println!("execution took {}ms", e_end - e_start);
+    measure.trigger("execution");
 
     //log::info!("{translation:?}");
 
