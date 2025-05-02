@@ -179,19 +179,11 @@ pub fn translate_instruction<A: Alloc>(
 pub fn translate<A: Alloc>(
     allocator: A,
     model: &Model,
-    mut function: &str,
+    function: &str,
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
-    if function == "decode_udf_perm_undef_aarch64_instrs_udf" {
-        function = "AArch64_UndefinedFault";
-    }
-
-    if function == "EndOfInstruction" {
-        return Ok(None);
-    }
-
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
@@ -1377,23 +1369,29 @@ fn emit_rudder_type(typ: &rudder::types::Type) -> emitter::Type {
 /// Stores the intermediate value of translated statements for use by future
 /// statements
 ///
-/// Tried linear search vec but same perf
+/// Reverse linear search 2x faster than hashmap
 struct StatementValueStore<A: Alloc> {
-    map: HashMapA<Ref<Statement>, X86NodeRef<A>, A>,
+    vec: Vec<(Ref<Statement>, X86NodeRef<A>), A>,
 }
 
 impl<A: Alloc> StatementValueStore<A> {
     pub fn new(allocator: A) -> Self {
         Self {
-            map: hashmap_in(allocator),
+            vec: alloc::vec::Vec::new_in(allocator),
         }
     }
 
     pub fn insert(&mut self, s: Ref<Statement>, v: X86NodeRef<A>) {
-        self.map.insert(s, v);
+        self.vec.push((s, v));
     }
 
     pub fn get(&self, s: Ref<Statement>) -> X86NodeRef<A> {
-        self.map.get(&s).unwrap().clone()
+        self.vec
+            .iter()
+            .rev()
+            .find(|(candidate, _)| *candidate == s)
+            .map(|(_, node)| node)
+            .unwrap()
+            .clone()
     }
 }
