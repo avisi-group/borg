@@ -176,13 +176,15 @@ let run_sail filepaths  =
     let max_unknown_integer_width = !opt_max_unknown_integer_width
     let max_unknown_bitvector_width = !opt_max_unknown_bitvector_width
     let line_directives = !opt_line_directives
-    let nostrings = !opt_nostrings
-    let nopacked = !opt_nopacked
+    let no_strings = !opt_no_strings
+    let no_packed = !opt_no_packed
+    let no_assertions = false
     let never_pack_unions = !opt_never_pack_unions
     let union_padding = !opt_padding
     let unreachable = !opt_unreachable
     let comb = !opt_comb
     let ignore = !opt_fun2wires
+    let dpi_sets = Util.StringSet.empty
   end) in
   let open SV in
   let ast, env, effect_info =
