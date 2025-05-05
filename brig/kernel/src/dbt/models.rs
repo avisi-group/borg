@@ -314,9 +314,10 @@ impl ModelDevice {
                 .unwrap();
                 write!(transport, "PSTATE:\n").unwrap();
                 for field in [
-                    "A", "ALLINT", "BTYPE", "C", "D", "DIT", "E", "EL", "EXLOCK", "F", "GE", "I",
-                    "IL", "IT", "J", "M", "N", "PAN", "PM", "PPEND", "Q", "SM", "SP", "SS", "SSBS",
-                    "T", "TCO", "UAO", "V", "Z", "ZA", "nRW",
+                    "A", "ALLINT", //"BTYPE",
+                    "C", "D", "DIT", "E", "EL", "EXLOCK", "F", "GE", "I", "IL", "IT", "J", "M",
+                    "N", "PAN", "PM", "PPEND", "Q", "SM", "SP", "SS", "SSBS", "T", "TCO", "UAO",
+                    "V", "Z", "ZA", "nRW",
                 ] {
                     write!(
                         transport,
@@ -326,12 +327,12 @@ impl ModelDevice {
                     )
                     .unwrap();
                 }
-                write!(
-                    transport,
-                    "BTypeNext = {}\n",
-                    self.register_file.read::<u8>("BTypeNext")
-                )
-                .unwrap();
+                // write!(
+                //     transport,
+                //     "BTypeNext = {}\n",
+                //     self.register_file.read::<u8>("BTypeNext")
+                // )
+                // .unwrap();
                 for el in 0..=3 {
                     write!(
                         transport,
