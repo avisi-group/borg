@@ -4361,6 +4361,31 @@ fn leave_with_cache() {
 }
 
 #[ktest]
+fn end_cycle() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    translate(
+        Global,
+        &*model,
+        "__EndCycle",
+        &[],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let _translation = ctx.compile(num_regs);
+}
+
+#[ktest]
 fn decodea64_profiling() {
     let model = models::get("aarch64").unwrap();
 

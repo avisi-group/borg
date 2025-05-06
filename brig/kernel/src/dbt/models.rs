@@ -47,12 +47,13 @@ use {
 const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 
 /// Limit blocks to contain only 1 instruction
-const SINGLE_STEP: bool = true;
+const SINGLE_STEP: bool = false;
 
-const PRINT_REGISTERS: bool = true;
+/// Write register trace to file
+const PRINT_REGISTERS: bool = false;
 
 /// Enable the jump table chain cache
-const CHAIN_CACHE_ENABLED: bool = false;
+const CHAIN_CACHE_ENABLED: bool = true;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 

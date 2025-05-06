@@ -10,7 +10,6 @@ use {
 /// Global console writer
 pub static mut WRITER: Once<UART16550Device> = Once::INIT;
 
-
 static LOGGER: &Logger = &Logger {
     enable_colors: true,
     max_level: LevelFilter::Trace,

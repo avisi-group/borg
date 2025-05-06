@@ -122,6 +122,8 @@ pub fn translate_instruction<A: Alloc>(
             register_file,
         );
 
+        translate(allocator, model, "__EndCycle", &[], emitter, register_file).unwrap();
+
         // from __InstructionExecute
         // if not_bool(AArch64_ExecutingERETInstr()) then {
         //     PSTATE.BTYPE = BTypeNext
@@ -665,7 +667,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         arena: &Arena<Statement>,
         variables: &mut BTreeMap<InternedString, LocalVariable<A>, A>,
     ) -> Result<StatementResult<A>, Error> {
-        log::debug!("translate stmt: {statement:?}");
+        log::trace!("translate stmt: {statement:?}");
 
         Ok(match statement {
             Statement::Constant(value) => {

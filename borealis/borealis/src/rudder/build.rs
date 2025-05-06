@@ -1641,6 +1641,40 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 self.block_arena_mut(),
                 Statement::Constant(Constant::new_unsigned(1, 1)),
             )),
+
+            "PhysicalCountInt" => {
+                let offset = self
+                    .ctx()
+                    .registers
+                    .get(&InternedString::from_static("__cycle_count"))
+                    .unwrap()
+                    .offset;
+
+                let offset_const = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Constant(Constant::new_unsigned(offset, 32)),
+                );
+
+                let read_reg = build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::ReadRegister {
+                        typ: Type::Primitive(PrimitiveType::SignedInteger(64)),
+                        offset: offset_const,
+                    },
+                );
+
+                Some(build(
+                    self.block,
+                    self.block_arena_mut(),
+                    Statement::Cast {
+                        kind: CastOperationKind::Reinterpret,
+                        typ: Type::u64(),
+                        value: read_reg,
+                    },
+                ))
+            }
             _ => None,
         }
     }
