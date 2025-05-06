@@ -5,7 +5,7 @@ use {
         register_file::RegisterFile,
         trampoline::{ExecutionResult, MAX_STACK_SIZE},
         x86::{
-            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
+            emitter::{BinaryOperationKind, NodeKind, X86Block, X86Emitter, X86NodeRef},
             encoder::Instruction,
         },
     },
@@ -122,7 +122,40 @@ pub fn translate_instruction<A: Alloc>(
             register_file,
         );
 
-        translate(allocator, model, "__EndCycle", &[], emitter, register_file).unwrap();
+        // if CNTCR[EN] == 1 {
+        //     __cycle_count += 1;
+        // }
+        {
+            let inc_cycle_count_block = emitter.ctx_mut().create_block();
+            let end_block = emitter.ctx_mut().create_block();
+
+            let cntcr = emitter.read_register(model.reg_offset("CNTCR_bits"), Type::Unsigned(32));
+            let en = translate(
+                allocator,
+                model,
+                "_get_CNTCR_Type_EN",
+                &[cntcr],
+                emitter,
+                register_file,
+            )
+            .unwrap()
+            .unwrap();
+
+            let _1 = emitter.constant(1, Type::Unsigned(1));
+            let is_enabled = emitter.binary_operation(BinaryOperationKind::CompareEqual(en, _1));
+
+            emitter.branch(is_enabled, inc_cycle_count_block, end_block);
+
+            emitter.set_current_block(inc_cycle_count_block);
+            let cycle_end =
+                emitter.read_register(model.reg_offset("__cycle_count"), Type::Signed(64));
+            let _1 = emitter.constant(1, Type::Signed(64));
+            let incremented = emitter.binary_operation(BinaryOperationKind::Add(cycle_end, _1));
+            emitter.write_register(model.reg_offset("__cycle_count"), incremented);
+            emitter.jump(end_block);
+
+            emitter.set_current_block(end_block);
+        }
 
         // from __InstructionExecute
         // if not_bool(AArch64_ExecutingERETInstr()) then {
