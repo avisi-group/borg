@@ -13,10 +13,6 @@
                 "start": "0x1300_0000",
                 "end": "0x1310_0000"
             },
-            "ram3": {
-                "start": "0x2c00_0000",
-                "end": "0x2c01_0000"
-            },
             "ram4": {
                 "start": "0x10ffff8180",
                 "end": "0x10ffff9000"
@@ -48,6 +44,13 @@
             "attach": {
                 "address_space": "as0",
                 "base": "0x3c00_0000"
+            }
+        },
+        "gic": {
+            "kind": "a9gic",
+            "attach": {
+                "address_space": "as0",
+                "base": "0x2c00_0000"
             }
         }
     }

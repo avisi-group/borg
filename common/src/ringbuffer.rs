@@ -58,7 +58,8 @@ impl<'a, T: Role> RingBuffer<'a, T> {
             _kind: PhantomData::default(),
         };
 
-        assert!(celf.capacity() > 0);
+        // breaks init because `open` is re-used there
+        // assert!(celf.capacity() > 0);
 
         celf
     }

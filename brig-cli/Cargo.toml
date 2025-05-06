@@ -12,7 +12,7 @@ bootloader = { version = "0.11.10", default-features = false, features = ["uefi"
 cargo_metadata = "0.19.2"
 itertools = "0.14.0"
 clap = { version = "4.5.37", features = ["derive"] }
-color-eyre = "0.6.3"
+color-eyre = "0.6.4"
 tar = "0.4.44"
 walkdir = "2.5.0"
 elf = "0.7.4"

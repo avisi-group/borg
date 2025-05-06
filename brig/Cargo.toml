@@ -5,6 +5,7 @@ members = [
     "proc_macro_lib",
     "plugins_rt",
     "plugins/guest/devices/primecell/pl011",
+    "plugins/guest/devices/arm/a9gic",
 ]
 
 [workspace.dependencies]

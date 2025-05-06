@@ -63,7 +63,7 @@ pub fn start() {
 
     let config = config::load_from_device(&device).unwrap();
 
-    log::debug!("got config: {:#?}", config);
+    log::debug!("got config: {:#x?}", config);
 
     unsafe { GUEST.call_once(Guest::new) };
     let guest = unsafe { GUEST.get_mut() }.unwrap();

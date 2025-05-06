@@ -61,18 +61,15 @@ pub fn load_all(device: &SharedDevice) {
     //   register_device_factory("demoarch".to_owned(), Box::new(DemoArchFactory));
 
     log::info!("loading plugins");
+
     // todo: don't hardcode this, load everything in plugins directory
-    [
-        // "plugins/libtest.so",
-        // "plugins/libaarch64_interpreter.so",
-        "plugins/libpl011.so",
-    ]
-    .into_iter()
-    .map(|path| fs.open(path).unwrap().read_to_vec().unwrap())
-    .map(|data| Plugin::load(&data))
-    .for_each(|plugin| {
-        // run entrypoint and register plugin
-        (plugin.header.entrypoint)(&Host);
-        PLUGIN_REGISTRY.register(plugin);
-    });
+    ["plugins/libpl011.so", "plugins/liba9gic.so"]
+        .into_iter()
+        .map(|path| fs.open(path).unwrap().read_to_vec().unwrap())
+        .map(|data| Plugin::load(&data))
+        .for_each(|plugin| {
+            // run entrypoint and register plugin
+            (plugin.header.entrypoint)(&Host);
+            PLUGIN_REGISTRY.register(plugin);
+        });
 }

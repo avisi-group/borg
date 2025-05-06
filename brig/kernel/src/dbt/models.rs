@@ -15,7 +15,6 @@ use {
         devices::{SharedDevice, manager::SharedDeviceManager},
         fs::{File, Filesystem, tar::TarFilesystem},
         guest::register_device_factory,
-        logger::PRINT_REGISTERS,
         memory::bump::{BumpAllocator, BumpAllocatorRef},
     },
     alloc::{
@@ -49,6 +48,8 @@ const TRANSLATION_ALLOCATOR_SIZE: usize = 4 * 1024 * 1024 * 1024;
 
 /// Limit blocks to contain only 1 instruction
 const SINGLE_STEP: bool = true;
+
+const PRINT_REGISTERS: bool = true;
 
 /// Enable the jump table chain cache
 const CHAIN_CACHE_ENABLED: bool = false;

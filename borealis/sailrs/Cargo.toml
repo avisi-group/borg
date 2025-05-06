@@ -32,8 +32,8 @@ strum = { version = "0.27.1", features = ["derive"] }
 byte-unit = "5.1.6"
 
 [build-dependencies]
-cc = "1.2.20"
-color-eyre = "0.6.3"
+cc = "1.2.21"
+color-eyre = "0.6.4"
 
 [dev-dependencies]
 proptest = "1.6.0"

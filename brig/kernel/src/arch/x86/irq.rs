@@ -16,7 +16,7 @@ use {
     bitset_core::BitSet,
     common::intern::InternedString,
     core::alloc::Layout,
-    iced_x86::{Code, Register},
+    iced_x86::{Code, OpKind, Register},
     proc_macro_lib::irq_handler,
     spin::Once,
     x86::irq::{
@@ -269,47 +269,75 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                     "device write @ {offset:x} with instr {faulting_instruction:?}"
                                 );
 
-                                let (src, size) = match faulting_instruction.code() {
-                                    Code::Mov_rm8_r8 => {
-                                        let src = faulting_instruction.op1_register();
+                                let (value, size) = match faulting_instruction.op1_kind() {
+                                    OpKind::Register => match faulting_instruction.op1_register() {
+                                        Register::CL => (machine_context.rcx, 1),
+                                        Register::ECX => (machine_context.rcx, 4),
+                                        reg => {
+                                            exit_with_message!("todo write src reg {reg:?}")
+                                        }
+                                    },
 
-                                        let size = if src.is_gpr8() {
-                                            8
-                                        } else if src.is_gpr16() {
-                                            16
-                                        } else if src.is_gpr32() {
-                                            32
-                                        } else if src.is_gpr64() {
-                                            64
-                                        } else {
-                                            panic!()
-                                        };
-
-                                        (src, size)
+                                    OpKind::Immediate8 => {
+                                        (faulting_instruction.immediate8() as u64, 1)
                                     }
-                                    code => {
+                                    OpKind::Immediate8_2nd => {
+                                        (faulting_instruction.immediate8_2nd() as u64, 1)
+                                    }
+                                    OpKind::Immediate16 => {
+                                        (faulting_instruction.immediate16() as u64, 2)
+                                    }
+                                    OpKind::Immediate32 => {
+                                        (faulting_instruction.immediate32() as u64, 4)
+                                    }
+                                    OpKind::Immediate64 => (faulting_instruction.immediate64(), 8),
+                                    OpKind::Immediate8to16 => {
+                                        (faulting_instruction.immediate8to16() as u64, 2)
+                                    }
+                                    OpKind::Immediate8to32 => {
+                                        (faulting_instruction.immediate8to32() as u64, 4)
+                                    }
+                                    OpKind::Immediate8to64 => {
+                                        (faulting_instruction.immediate8to64() as u64, 8)
+                                    }
+                                    OpKind::Immediate32to64 => {
+                                        (faulting_instruction.immediate32to64() as u64, 8)
+                                    }
+
+                                    kind => {
                                         exit_with_message!(
-                                            "code: {code:?}, instr: {faulting_instruction:?}"
+                                            "device write todo op1 kind {kind:?}  {faulting_instruction:?}"
                                         )
                                     }
                                 };
 
-                                let bytes = match src {
-                                    Register::CL => {
-                                        (machine_context.rcx as u8).to_le_bytes().to_vec()
-                                    }
-                                    register => {
-                                        exit_with_message!(
-                                            "register: {register:?}, instr: {faulting_instruction:?}"
-                                        )
-                                    }
-                                };
+                                // let (value, size) = match faulting_instruction.code() {
+                                //     Code::Mov_rm8_r8 => match src {
+                                //         Register::CL => (machine_context.rcx, 1),
+                                //         reg => {
+                                //             exit_with_message!("todo write src reg {reg:?}")
+                                //         }
+                                //     },
+                                //    => {
 
-                                log::debug!(
-                                    "writing {bytes:x?} to device @ {offset:x?}, from register {src:?}"
-                                );
+                                //     }
+                                //     Code::Mov_rm32_imm32 => {
+                                //         (faulting_instruction.immediate32() as u64, 4)
+                                //     }
 
-                                device.write(offset, &bytes);
+                                //     code => {
+                                //         exit_with_message!(
+                                //             "write code: {code:?}, instr:
+                                // {faulting_instruction:?}"
+                                //         )
+                                //     }
+                                // };
+
+                                let bytes = &value.to_le_bytes()[..size];
+
+                                log::debug!("writing {bytes:x?} to device @ {offset:x?}");
+
+                                device.write(offset, bytes);
                             } else {
                                 // read
                                 let (dest, size) = match faulting_instruction.code() {
@@ -332,7 +360,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                     }
                                     code => {
                                         exit_with_message!(
-                                            "code: {code:?}, instr: {faulting_instruction:?}"
+                                            "read code: {code:?}, instr: {faulting_instruction:?}"
                                         )
                                     }
                                 };

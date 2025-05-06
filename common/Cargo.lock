@@ -34,9 +34,9 @@ checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
 name = "cc"
-version = "1.2.20"
+version = "1.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04da6a0d40b948dfc4fa8f5bbf402b0fc1a64a28dbf7d12ffd683550f2c1b63a"
+checksum = "8691782945451c1c383942c4874dbe63814f61cb57ef773cda2972682b7bb3c0"
 dependencies = [
  "shlex",
 ]
@@ -58,7 +58,7 @@ name = "common"
 version = "0.0.0"
 dependencies = [
  "deepsize",
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
  "itertools",
  "lasso",
  "log",
@@ -168,11 +168,10 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.15.2"
+version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+checksum = "84b26c544d002229e640969970a2e74021aadf6e2f96372b9c58eff97de08eb3"
 dependencies = [
- "allocator-api2",
  "rayon",
  "serde",
 ]
@@ -411,9 +410,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.5.11"
+version = "0.5.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2f103c6d277498fbceb16e84d317e2a400f160f46904d5f5410848c829511a3"
+checksum = "928fca9cf2aa042393a8325b9ead81d2f0df4cb12e1e24cef072922ccd99c5af"
 dependencies = [
  "bitflags",
 ]
@@ -430,7 +429,7 @@ version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e147371c75553e1e2fcdb483944a8540b8438c31426279553b9a8182a9b7b65"
 dependencies = [
- "hashbrown 0.15.2",
+ "hashbrown 0.15.3",
  "munge",
  "ptr_meta",
  "rancor",
