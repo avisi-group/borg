@@ -1625,7 +1625,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "check_cycle_count"
             | "sail_take_exception"
             | "CheckSPAlignment"
-            | "AArch64_SetExclusiveMonitors" =>
+            | "AArch64_SetExclusiveMonitors"
+            | "UsingAArch32" =>
             // todo: don't replace with constant, delete
             {
                 Some(build(
@@ -1636,7 +1637,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
 
             // replace with "true"
-            "AArch64_ExclusiveMonitorsPass" => Some(build(
+            "AArch64_ExclusiveMonitorsPass" | "HaveAArch64" => Some(build(
                 self.block,
                 self.block_arena_mut(),
                 Statement::Constant(Constant::new_unsigned(1, 1)),
