@@ -17,6 +17,7 @@ pub mod phi_analysis;
 //pub mod tail_calls;
 pub mod variable_elimination;
 pub mod vector_folding;
+pub mod local_tuple_removal;
 
 pub enum OptLevel {
     Level3,
@@ -41,6 +42,7 @@ static BRANCH_SIMPLIFICATION: FunctionPass = ("branch-simplification", branch_si
 static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 // static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
+static LOCAL_TUPLE_REMOVAL: FunctionPass = ("local-tuple-removal", local_tuple_removal::run);
 // static DESTROY_BITVECTORS: FunctionPass = ("destroy-bitvectors",
 // destroy_bitvectors::run); static MATERIALISE_APINTS: FunctionPass =
 // ("materialise-apints", materialise_apints::run);
@@ -59,6 +61,7 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
+            LOCAL_TUPLE_REMOVAL,
             // DESTROY_BITVECTORS,
             // MATERIALISE_APINTS,
             VECTOR_FOLDING,

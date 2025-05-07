@@ -260,7 +260,7 @@ impl Display for Ref<Statement> {
 
 impl Ref<Statement> {
     pub fn to_string(&self, arena: &Arena<Statement>) -> String {
-        format!("{self}: {}", self.get(arena).to_string(arena))
+        format!("{self}{}", self.get(arena).to_string(arena))
     }
 }
 
@@ -878,7 +878,7 @@ impl Statement {
     }
 
     pub fn to_string(&self, arena: &Arena<Statement>) -> String {
-        match &self {
+        let operation = match &self {
             Self::Constant(c) => format!("const #{c}"),
             Self::ReadVariable { symbol } => {
                 format!("read-var {}:{}", symbol.name(), symbol.typ())
@@ -1104,6 +1104,12 @@ impl Statement {
                     values.iter().map(|v| v.index()).collect::<Vec<_>>()
                 )
             }
+        };
+
+        if let Some(typ) = self.typ(arena) {
+            format!(":{} = {operation}", typ)
+        } else {
+            format!(" = {operation}")
         }
     }
 }
