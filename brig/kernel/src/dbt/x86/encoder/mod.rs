@@ -941,20 +941,80 @@ impl<A: Alloc> Instruction<A> {
             }) => {
                 assembler.sete::<AsmRegister8>(dst.into()).unwrap();
             }
+            SETE(Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_8,
+            }) => {
+                assembler
+                    .sete(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .unwrap();
+            }
             SETO(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
                 assembler.seto::<AsmRegister8>(dst.into()).unwrap();
+            }
+            SETO(Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_8,
+            }) => {
+                assembler
+                    .seto(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .unwrap();
             }
             SETC(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
                 assembler.setc::<AsmRegister8>(dst.into()).unwrap();
             }
+            SETC(Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_8,
+            }) => {
+                assembler
+                    .setc(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .unwrap();
+            }
             SETS(Operand {
                 kind: R(PHYS(dst)), ..
             }) => {
                 assembler.sets::<AsmRegister8>(dst.into()).unwrap();
+            }
+            SETS(Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_8,
+            }) => {
+                assembler
+                    .sets(memory_operand_to_iced(*base, *index, *scale, *displacement))
+                    .unwrap();
             }
             SETGE(Operand {
                 kind: R(PHYS(dst)), ..

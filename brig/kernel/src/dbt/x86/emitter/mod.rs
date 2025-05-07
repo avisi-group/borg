@@ -884,6 +884,40 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn write_register(&mut self, offset: u64, value: Self::NodeRef) {
         // todo: validate offset + width is within register file
 
+        // if offset == flags register
+        if offset == self.ctx().n_offset
+            || offset == self.ctx().z_offset
+            || offset == self.ctx().c_offset
+            || offset == self.ctx().v_offset
+        {
+            // look back to see if we're extracting a bit out of get_flags
+            if let Some(op) = contains_get_flags(&value) {
+                // emit the setCC to the memory location directly
+
+                let _value = self.to_operand(&op);
+
+                let dest = Operand::mem_base_displ(
+                    Width::_8,
+                    Register::PhysicalRegister(PhysicalRegister::RBP),
+                    offset.try_into().unwrap(),
+                );
+
+                self.push_instruction(if offset == self.ctx().n_offset {
+                    Instruction::sets(dest)
+                } else if offset == self.ctx().z_offset {
+                    Instruction::sete(dest)
+                } else if offset == self.ctx().c_offset {
+                    Instruction::setc(dest)
+                } else if offset == self.ctx().v_offset {
+                    Instruction::seto(dest)
+                } else {
+                    unreachable!()
+                });
+
+                return;
+            }
+        }
+
         let value = self.to_operand(&value);
 
         let width = value.width();
@@ -1775,5 +1809,67 @@ fn emit_compare<A: Alloc>(
                 kind: NodeKind::BinaryOperation(op),
             })
         }
+    }
+}
+
+fn contains_get_flags<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> {
+    match value.kind() {
+        NodeKind::GetFlags { operation } => Some(operation.clone()),
+
+        NodeKind::Constant { .. }
+        | NodeKind::GuestRegister { .. }
+        | NodeKind::ReadMemory { .. }
+        | NodeKind::ReadStackVariable { .. } => None,
+
+        NodeKind::UnaryOperation(
+            UnaryOperationKind::Absolute(value)
+            | UnaryOperationKind::Ceil(value)
+            | UnaryOperationKind::Complement(value)
+            | UnaryOperationKind::Floor(value)
+            | UnaryOperationKind::Negate(value)
+            | UnaryOperationKind::Not(value)
+            | UnaryOperationKind::Power2(value)
+            | UnaryOperationKind::SquareRoot(value),
+        )
+        | NodeKind::Cast { value, .. }
+        | NodeKind::Select {
+            condition: value, ..
+        } => contains_get_flags(value),
+
+        NodeKind::BinaryOperation(
+            BinaryOperationKind::Add(a, b)
+            | BinaryOperationKind::And(a, b)
+            | BinaryOperationKind::CompareEqual(a, b)
+            | BinaryOperationKind::CompareGreaterThan(a, b)
+            | BinaryOperationKind::CompareGreaterThanOrEqual(a, b)
+            | BinaryOperationKind::CompareLessThan(a, b)
+            | BinaryOperationKind::CompareLessThanOrEqual(a, b)
+            | BinaryOperationKind::CompareNotEqual(a, b)
+            | BinaryOperationKind::Divide(a, b)
+            | BinaryOperationKind::Modulo(a, b)
+            | BinaryOperationKind::Multiply(a, b)
+            | BinaryOperationKind::Or(a, b)
+            | BinaryOperationKind::PowI(a, b)
+            | BinaryOperationKind::Sub(a, b)
+            | BinaryOperationKind::Xor(a, b),
+        )
+        | NodeKind::Shift {
+            value: a,
+            amount: b,
+            ..
+        } => contains_get_flags(a).or_else(|| contains_get_flags(b)),
+
+        NodeKind::BitExtract {
+            value: a,
+            start: b,
+            length: c,
+        } => contains_get_flags(a),
+        // .or_else(|| contains_get_flags(b))
+        // .or_else(|| contains_get_flags(c)),
+        NodeKind::Tuple(x86_node_refs) => {
+            x86_node_refs.iter().filter_map(contains_get_flags).next()
+        }
+
+        _ => panic!(),
     }
 }

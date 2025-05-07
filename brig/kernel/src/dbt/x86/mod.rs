@@ -37,6 +37,10 @@ pub struct X86TranslationContext<A: Alloc> {
     sctlr_el1_offset: u64,
     ttbr0_el1_offset: u64,
     ttbr1_el1_offset: u64,
+    n_offset: u64,
+    z_offset: u64,
+    c_offset: u64,
+    v_offset: u64,
     memory_mask: bool,
 }
 
@@ -95,6 +99,10 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             sctlr_el1_offset: model.reg_offset("SCTLR_EL1_bits"),
             ttbr0_el1_offset: model.reg_offset("_TTBR0_EL1_bits"),
             ttbr1_el1_offset: model.reg_offset("_TTBR1_EL1_bits"),
+            n_offset: model.reg_offset("PSTATE_N"),
+            z_offset: model.reg_offset("PSTATE_Z"),
+            c_offset: model.reg_offset("PSTATE_C"),
+            v_offset: model.reg_offset("PSTATE_V"),
             memory_mask,
         };
 
