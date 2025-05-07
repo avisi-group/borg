@@ -123,7 +123,7 @@ pub fn translate_instruction<A: Alloc>(
         );
 
         // if CNTCR[EN] == 1 {
-        //     __cycle_count += 1;
+        //     PhysicalCount += 1;
         // }
         {
             let inc_cycle_count_block = emitter.ctx_mut().create_block();
@@ -148,10 +148,10 @@ pub fn translate_instruction<A: Alloc>(
 
             emitter.set_current_block(inc_cycle_count_block);
             let cycle_end =
-                emitter.read_register(model.reg_offset("__cycle_count"), Type::Signed(64));
+                emitter.read_register(model.reg_offset("PhysicalCount"), Type::Signed(64));
             let _1 = emitter.constant(1, Type::Signed(64));
             let incremented = emitter.binary_operation(BinaryOperationKind::Add(cycle_end, _1));
-            emitter.write_register(model.reg_offset("__cycle_count"), incremented);
+            emitter.write_register(model.reg_offset("PhysicalCount"), incremented);
             emitter.jump(end_block);
 
             emitter.set_current_block(end_block);

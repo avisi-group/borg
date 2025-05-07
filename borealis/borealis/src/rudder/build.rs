@@ -1646,7 +1646,7 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 let offset = self
                     .ctx()
                     .registers
-                    .get(&InternedString::from_static("__cycle_count"))
+                    .get(&InternedString::from_static("PhysicalCount"))
                     .unwrap()
                     .offset;
 
