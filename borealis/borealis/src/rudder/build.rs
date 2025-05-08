@@ -1626,7 +1626,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             | "sail_take_exception"
             | "CheckSPAlignment"
             | "AArch64_SetExclusiveMonitors"
-            | "UsingAArch32" =>
+            | "UsingAArch32"
+            | "ELUsingAArch32"
+            | "EffectiveTBI"
+            | "GCSPCREnabled" =>
             // todo: don't replace with constant, delete
             {
                 Some(build(
