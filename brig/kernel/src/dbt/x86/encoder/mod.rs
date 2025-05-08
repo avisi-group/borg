@@ -1,9 +1,12 @@
 use {
     crate::dbt::{
         Alloc,
-        x86::{emitter::X86Block, encoder::width::Width},
+        x86::{
+            emitter::{ARG_REGS, X86Block},
+            encoder::width::Width,
+        },
     },
-    alloc::vec,
+    alloc::vec::{self, Vec},
     common::{arena::Ref, hashmap::HashMapA},
     core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
@@ -43,8 +46,7 @@ pub enum Opcode<A: Alloc> {
     CMOVE(Operand<A>, Operand<A>),
     /// cmovne {0}, {1}
     CMOVNE(Operand<A>, Operand<A>),
-    /// call {0}
-    CALL(Operand<A>),
+
     /// lea {0}, {1}
     LEA(Operand<A>, Operand<A>),
     /// shl {0}, {1}
@@ -129,6 +131,13 @@ pub enum Opcode<A: Alloc> {
 
     /// dead instruction
     DEAD,
+
+    /// call {function}
+    CALL {
+        function: Operand<A>,
+        nr_input_args: usize,
+        nr_output_args: usize,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Display, Hash)]
@@ -617,7 +626,41 @@ pub enum OperandDirection {
 
 /// UseDef
 #[derive(Debug, displaydoc::Display)]
-pub enum UseDef<'a> {
+pub enum UseDef {
+    /// use {0}
+    Use(Register),
+    /// def {0}
+    Def(Register),
+    /// usedef {0}
+    UseDef(Register),
+}
+
+impl UseDef {
+    pub fn from_operand_direction(direction: OperandDirection, register: Register) -> Option<Self> {
+        match direction {
+            OperandDirection::None => None,
+            OperandDirection::In => Some(Self::Use(register)),
+            OperandDirection::Out => Some(Self::Def(register)),
+            OperandDirection::InOut => Some(Self::UseDef(register)),
+        }
+    }
+
+    pub fn has_use(&self) -> bool {
+        matches!(self, Self::Use(_) | Self::UseDef(_))
+    }
+
+    pub fn has_def(&self) -> bool {
+        matches!(self, Self::Def(_) | Self::UseDef(_))
+    }
+
+    pub fn is_usedef(&self) -> bool {
+        matches!(self, Self::UseDef(_))
+    }
+}
+
+/// UseDef
+#[derive(Debug, displaydoc::Display)]
+pub enum UseDefMut<'a> {
     /// use {0}
     Use(&'a mut Register),
     /// def {0}
@@ -626,16 +669,16 @@ pub enum UseDef<'a> {
     UseDef(&'a mut Register),
 }
 
-impl<'a> UseDef<'a> {
+impl<'a> UseDefMut<'a> {
     pub fn from_operand_direction(
         direction: OperandDirection,
         register: &'a mut Register,
     ) -> Option<Self> {
         match direction {
             OperandDirection::None => None,
-            OperandDirection::In => Some(UseDef::Use(register)),
-            OperandDirection::Out => Some(UseDef::Def(register)),
-            OperandDirection::InOut => Some(UseDef::UseDef(register)),
+            OperandDirection::In => Some(Self::Use(register)),
+            OperandDirection::Out => Some(Self::Def(register)),
+            OperandDirection::InOut => Some(Self::UseDef(register)),
         }
     }
 
@@ -838,8 +881,12 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::CMOVNE(src, dest))
     }
 
-    pub fn call(f: Operand<A>) -> Self {
-        Self(Opcode::CALL(f))
+    pub fn call(function: Operand<A>, nr_input_args: usize, nr_output_args: usize) -> Self {
+        Self(Opcode::CALL {
+            function,
+            nr_input_args,
+            nr_output_args,
+        })
     }
 
     alu_op!(add, ADD);
@@ -1237,10 +1284,14 @@ impl<A: Alloc> Instruction<A> {
                 assert_eq!(*lo, PhysicalRegister::RAX);
                 assembler.idiv::<AsmRegister64>(div.into()).unwrap();
             }
-            CALL(Operand {
-                kind: R(PHYS(tgt)),
-                width_in_bits: Width::_64,
-            }) => {
+            CALL {
+                function:
+                    Operand {
+                        kind: R(PHYS(tgt)),
+                        width_in_bits: Width::_64,
+                    },
+                ..
+            } => {
                 assembler.call::<AsmRegister64>(tgt.into()).unwrap();
             }
 
@@ -1260,7 +1311,7 @@ impl<A: Alloc> Instruction<A> {
         }
     }
 
-    pub fn get_operands(
+    pub fn get_operands_mut(
         &mut self,
     ) -> impl Iterator<Item = Option<(OperandDirection, &mut Operand<A>)>> + '_ {
         match &mut self.0 {
@@ -1298,7 +1349,10 @@ impl<A: Alloc> Instruction<A> {
             Opcode::JMP(tgt) | Opcode::JNE(tgt) => {
                 [Some((OperandDirection::In, tgt)), None, None].into_iter()
             }
-            Opcode::CALL(tgt) => [Some((OperandDirection::In, tgt)), None, None].into_iter(), /* arguments are fudged and don't need to be marked as IN here becuase  we push the callee saved registers */
+            // if call has been handled properly we should need to modify its registers
+            Opcode::CALL { function, .. } => {
+                [Some((OperandDirection::In, function)), None, None].into_iter()
+            }
             Opcode::RET | Opcode::NOP => [None, None, None].into_iter(),
             Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => [
                 Some((OperandDirection::In, op0)),
@@ -1348,21 +1402,127 @@ impl<A: Alloc> Instruction<A> {
         }
     }
 
-    pub fn get_use_defs(&mut self) -> impl Iterator<Item = UseDef> + '_ {
-        self.get_operands()
-            .flatten()
-            .filter_map(|operand| match &mut operand.1.kind {
+    pub fn get_operands_copy(&self) -> Vec<(OperandDirection, Operand<A>)> {
+        match self.0 {
+            Opcode::MOV(src, dst)
+            | Opcode::MOVZX(src, dst)
+            | Opcode::MOVSX(src, dst)
+            | Opcode::LEA(src, dst)
+            | Opcode::CMOVE(src, dst)
+            | Opcode::CMOVNE(src, dst) => {
+                [(OperandDirection::In, src), (OperandDirection::Out, dst)]
+                    .into_iter()
+                    .collect()
+            }
+            Opcode::SHL(src, dst)
+            | Opcode::SHR(src, dst)
+            | Opcode::SAR(src, dst)
+            | Opcode::OR(src, dst)
+            | Opcode::XOR(src, dst)
+            | Opcode::ADD(src, dst)
+            | Opcode::SUB(src, dst)
+            | Opcode::AND(src, dst)
+            | Opcode::IMUL(src, dst) => {
+                [(OperandDirection::In, src), (OperandDirection::InOut, dst)]
+                    .into_iter()
+                    .collect()
+            }
+            Opcode::IDIV(dividend_hi, dividend_lo, divisor) => [
+                (OperandDirection::InOut, dividend_hi),
+                (OperandDirection::InOut, dividend_lo),
+                (OperandDirection::In, divisor),
+            ]
+            .into_iter()
+            .collect(),
+            Opcode::JMP(tgt) | Opcode::JNE(tgt) => {
+                [((OperandDirection::In, tgt))].into_iter().collect()
+            }
+
+            Opcode::RET | Opcode::NOP => alloc::vec![],
+            Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => {
+                [((OperandDirection::In, op0)), ((OperandDirection::In, op1))]
+                    .into_iter()
+                    .collect()
+            }
+            Opcode::SETE(r)
+            | Opcode::SETNE(r)
+            | Opcode::SETNZ(r)
+            | Opcode::SETB(r)
+            | Opcode::SETBE(r)
+            | Opcode::SETA(r)
+            | Opcode::SETG(r)
+            | Opcode::SETAE(r)
+            | Opcode::SETS(r)
+            | Opcode::SETO(r)
+            | Opcode::SETC(r)
+            | Opcode::SETGE(r)
+            | Opcode::SETL(r)
+            | Opcode::SETLE(r) => [((OperandDirection::Out, r))].into_iter().collect(),
+            Opcode::NOT(r) | Opcode::NEG(r) => {
+                [((OperandDirection::InOut, r))].into_iter().collect()
+            }
+            Opcode::BEXTR(ctrl, src, dst) => [
+                ((OperandDirection::In, ctrl)),
+                ((OperandDirection::In, src)),
+                ((OperandDirection::Out, dst)),
+            ]
+            .into_iter()
+            .collect(),
+            Opcode::INT(n) => [((OperandDirection::In, n))].into_iter().collect(),
+            Opcode::ADC(a, b, c) => [
+                ((OperandDirection::In, a)),
+                ((OperandDirection::In, b)),
+                ((OperandDirection::InOut, c)),
+            ]
+            .into_iter()
+            .collect(),
+            Opcode::PUSH(src) => [((OperandDirection::In, src))].into_iter().collect(),
+            Opcode::POP(dest) => [((OperandDirection::Out, dest))].into_iter().collect(),
+            Opcode::DEAD => panic!(),
+            Opcode::OUT(port, value) => [
+                ((OperandDirection::In, port)),
+                ((OperandDirection::In, value)),
+            ]
+            .into_iter()
+            .collect(),
+
+            Opcode::CALL {
+                function,
+                nr_input_args,
+                nr_output_args,
+            } => [((OperandDirection::In, function))]
+                .into_iter()
+                .chain(
+                    ARG_REGS
+                        .iter()
+                        .take(nr_input_args)
+                        .map(|reg| (OperandDirection::In, Operand::preg(Width::_64, *reg))),
+                )
+                .chain(
+                    [PhysicalRegister::RAX, PhysicalRegister::RDX]
+                        .into_iter()
+                        .take(nr_output_args)
+                        .map(|reg| (OperandDirection::Out, Operand::preg(Width::_64, reg))),
+                )
+                .collect(),
+        }
+    }
+
+    pub fn get_use_defs(&self) -> impl Iterator<Item = UseDef> + '_ {
+        self.get_operands_copy()
+            .into_iter()
+            .filter_map(|operand| match operand.1.kind {
                 OperandKind::Memory {
                     base: Some(base),
                     index: None,
                     ..
-                } => Some(vec![UseDef::Use(base)]),
+                } => Some(alloc::vec![UseDef::Use(base)]),
                 OperandKind::Memory {
                     base: Some(base),
                     index: Some(index),
                     ..
-                } => Some(vec![UseDef::Use(base), UseDef::Use(index)]),
-                OperandKind::Register(register) => Some(vec![
+                } => Some(alloc::vec![UseDef::Use(base), UseDef::Use(index)]),
+                OperandKind::Register(register) => Some(alloc::vec![
                     UseDef::from_operand_direction(operand.0, register).unwrap(),
                 ]),
                 _ => None,
@@ -1386,5 +1546,27 @@ impl<A: Alloc> Instruction<A> {
         //         OperandKind::Target(_) => None,
         //     })
         //     .flatten()
+    }
+
+    pub fn get_use_defs_mut(&mut self) -> impl Iterator<Item = UseDefMut> + '_ {
+        self.get_operands_mut()
+            .flatten()
+            .filter_map(|operand| match &mut operand.1.kind {
+                OperandKind::Memory {
+                    base: Some(base),
+                    index: None,
+                    ..
+                } => Some(alloc::vec![UseDefMut::Use(base)]),
+                OperandKind::Memory {
+                    base: Some(base),
+                    index: Some(index),
+                    ..
+                } => Some(alloc::vec![UseDefMut::Use(base), UseDefMut::Use(index)]),
+                OperandKind::Register(register) => Some(alloc::vec![
+                    UseDefMut::from_operand_direction(operand.0, register).unwrap(),
+                ]),
+                _ => None,
+            })
+            .flatten()
     }
 }

@@ -1,10 +1,8 @@
-//! Based on SSRA by Matt Keeter https://www.mattkeeter.com/blog/2022-10-04-ssra/
-
 use {
     crate::dbt::{
         Alloc as MemAlloc,
         x86::{
-            encoder::{Instruction, Opcode, PhysicalRegister, Register, UseDef},
+            encoder::{Instruction, Opcode, PhysicalRegister, Register, UseDef, UseDefMut},
             register_allocator::RegisterAllocator,
         },
     },
@@ -22,7 +20,7 @@ pub struct FreshAllocator {
 }
 
 impl RegisterAllocator for FreshAllocator {
-    fn allocate<M: MemAlloc>(&mut self, instructions: &mut [Instruction<M>]) {
+    fn allocate<M: MemAlloc>(&mut self, instructions: &mut Vec<Instruction<M>, M>) {
         log::debug!("----------------------");
 
         self.build_live_ranges(instructions);
@@ -43,8 +41,8 @@ impl RegisterAllocator for FreshAllocator {
 
         // apply allocation plan
         instructions.iter_mut().for_each(|instruction| {
-            instruction.get_use_defs().for_each(|ud| {
-                let (UseDef::Def(reg) | UseDef::Use(reg) | UseDef::UseDef(reg)) = ud;
+            instruction.get_use_defs_mut().for_each(|ud| {
+                let (UseDefMut::Def(reg) | UseDefMut::Use(reg) | UseDefMut::UseDef(reg)) = ud;
                 if let Register::VirtualRegister(vreg) = &*reg {
                     *reg = Register::PhysicalRegister(PhysicalRegister::from_index(
                         *self.allocation_plan.get(vreg).unwrap(),
@@ -128,8 +126,6 @@ impl FreshAllocator {
                     if last_use.unwrap_or_default() < instruction_index {
                         *last_use = Some(instruction_index);
                     }
-                } else if matches!(instruction.0, Opcode::CALL(_)) {
-                    panic!("allocating call");
                 } else {
                     instruction.get_use_defs().for_each(|ud| {
                         let is_usedef = ud.is_usedef();
@@ -147,7 +143,7 @@ impl FreshAllocator {
                             }
 
                             self.live_ranges
-                            .entry(*reg)
+                            .entry(reg)
                             .and_modify(|live_ranges| {
                                 // assert last live range had some end
                                 let last_range = live_ranges.as_mut_slice().last_mut().unwrap();
@@ -163,7 +159,7 @@ impl FreshAllocator {
 
                                 // start new live range if past the current end
                                 if instruction_index >= last_range.1.unwrap_or_default() {
-                                    if let Register::VirtualRegister(_) = *reg {
+                                    if let Register::VirtualRegister(_) = reg {
                                         if let Opcode::CMOVNE(_, _) = instr_clone.0 {
                                             // do nothing for CMOVNE
                                         } else {
@@ -183,7 +179,7 @@ impl FreshAllocator {
                     instruction.get_use_defs().for_each(|ud| {
                         if let UseDef::Use(reg) | UseDef::UseDef(reg) = ud {
                             // assert exists
-                            let live_ranges = self.live_ranges.get_mut(reg).unwrap_or_else(|| {
+                            let live_ranges = self.live_ranges.get_mut(&reg).unwrap_or_else(|| {
                                 panic!("use of undef'd register {reg} @ {instruction_index}")
                             });
 
@@ -295,6 +291,54 @@ impl FreshAllocator {
             })
         });
     }
+
+    fn handle_calls<M: MemAlloc>(&self, instructions: &mut Vec<Instruction<M>, M>) {
+        const CALLER_SAVED: &[PhysicalRegister] = &[
+            PhysicalRegister::RAX,
+            PhysicalRegister::RCX,
+            PhysicalRegister::RDX,
+            PhysicalRegister::RSI,
+            PhysicalRegister::RDI,
+            PhysicalRegister::R8,
+            PhysicalRegister::R9,
+            PhysicalRegister::R10,
+            PhysicalRegister::R11,
+        ];
+
+        //         // todo add more arg regs
+        //         assert!(arguments.len() <= ARG_REGS.len());
+
+        //         arguments
+        //             .iter()
+        //             .zip(ARG_REGS.into_iter())
+        //             .for_each(|(argument, preg)| {
+        //                 self.push_instruction(
+        //                     Instruction::mov(*argument,
+        // Operand::preg(argument.width(), *preg)).unwrap(),                 );
+        //             });
+
+        //         let target_reg = Operand::vreg(Width::_64, self.next_vreg());
+        //         let target_imm = Operand::imm(Width::_64, fn_ptr as u64);
+        //         self.push_instruction(Instruction::mov(target_imm,
+        // target_reg).unwrap());
+
+        //         for reg in CALLER_SAVED {
+        //             self.push_instruction(Instruction::push(Operand::preg(Width::_64,
+        // *reg)));         }
+
+        //  // call here!
+
+        //         for reg in CALLER_SAVED.iter().rev() {
+        //             self.push_instruction(Instruction::pop(Operand::preg(Width::_64,
+        // *reg)));         }
+
+        //         Operand::preg(Width::_64, PhysicalRegister::RAX)
+
+        // these will change as we insert new instructions!
+        let initial_locations = find_call_instructions(instructions);
+
+        // for each call, find
+    }
 }
 
 fn query_intersections(
@@ -307,5 +351,19 @@ fn query_intersections(
         .flatten()
         .filter(|(_, (y_start, y_end))| x_start <= y_end.unwrap() && *y_start <= x_end.unwrap())
         .map(|(reg, _)| reg)
+        .collect()
+}
+
+fn find_call_instructions<M: MemAlloc>(instructions: &[Instruction<M>]) -> Vec<usize> {
+    instructions
+        .iter()
+        .enumerate()
+        .filter_map(|(index, instruction)| {
+            if matches!(instruction, Instruction(Opcode::CALL { .. })) {
+                Some(index)
+            } else {
+                None
+            }
+        })
         .collect()
 }

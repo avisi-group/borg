@@ -14,6 +14,7 @@ pub trait Emitter<A: Alloc> {
     type NodeRef;
 
     fn constant(&mut self, val: u64, typ: Type) -> Self::NodeRef;
+    fn function_ptr(&mut self, val: u64) -> Self::NodeRef;
     fn create_bits(&mut self, value: Self::NodeRef, length: Self::NodeRef) -> Self::NodeRef;
     fn size_of(&mut self, value: Self::NodeRef) -> Self::NodeRef;
     fn create_tuple(&mut self, values: Vec<Self::NodeRef, A>) -> Self::NodeRef;
@@ -90,6 +91,14 @@ pub trait Emitter<A: Alloc> {
     );
 
     fn jump(&mut self, target: Self::BlockRef);
+
+    fn call(&mut self, function: Self::NodeRef, arguments: Vec<Self::NodeRef, A>);
+
+    fn call_with_return(
+        &mut self,
+        function: Self::NodeRef,
+        arguments: Vec<Self::NodeRef, A>,
+    ) -> Self::NodeRef;
 
     // cleanup and return
     fn leave(&mut self);

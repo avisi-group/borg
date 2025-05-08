@@ -489,25 +489,21 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
             let sysreg_id = (op0, op1, crn, crm, op2);
 
-            if let Some((read_helper, write_helper)) = sysreg_helpers::HELPER_MAP.get(&sysreg_id) {
+            if let Some((read_helper, _write_helper)) = sysreg_helpers::HELPER_MAP.get(&sysreg_id) {
                 // find whether we are reading or writing
                 if function == "AArch64_SysRegRead" {
-                    let value = emitter.emit_helper_call(
-                        read_helper as *const fn(_) -> _ as usize,
-                        &[Operand::imm(Width::_64, 0)],
-                    );
+                    let function = emitter.function_ptr((*read_helper) as fn(_) -> _ as u64);
+
+                    let arg0 = emitter.constant(0x1234, Type::Unsigned(64));
+
+                    let mut arguments = Vec::new_in(allocator);
+                    arguments.push(arg0);
+
+                    let return_value = emitter.call_with_return(function, arguments);
+
                     let offset = model.reg_offset(alloc::format!("R{t}"));
-                    emitter.push_instruction(
-                        Instruction::mov(
-                            value,
-                            Operand::mem_base_displ(
-                                Width::_64,
-                                Register::PhysicalRegister(PhysicalRegister::RBP),
-                                offset.try_into().unwrap(),
-                            ),
-                        )
-                        .unwrap(),
-                    );
+
+                    emitter.write_register(offset, return_value);
                 } else {
                     todo!()
                 }

@@ -8,7 +8,7 @@ use {
             register_allocator::naive::FreshAllocator, //solid_state::SolidStateRegisterAllocator,
         },
     },
-    alloc::alloc::Global,
+    alloc::{alloc::Global, vec::Vec},
     proc_macro_lib::ktest,
 };
 
@@ -19,12 +19,12 @@ pub mod naive;
 pub trait RegisterAllocator {
     // A is for the generic memory allocator, NOT anything to do with the register
     // allocator
-    fn allocate<A: MemAlloc>(&mut self, instructions: &mut [Instruction<A>]);
+    fn allocate<A: MemAlloc>(&mut self, instructions: &mut Vec<Instruction<A>, A>);
 }
 
 #[ktest]
 fn conflicted_physical_allocation() {
-    let mut instrs = [
+    let mut instrs = alloc::vec![
         Instruction(Opcode::MOV(
             Operand::<Global>::imm(Width::_64, 0xaaaa),
             Operand::vreg(Width::_64, 0),
@@ -57,7 +57,7 @@ fn shr_full() {
         Opcode::*,
     };
 
-    let mut instructions = [
+    let mut instructions = alloc::vec![
         Instruction(MOV(
             Operand::<Global> {
                 kind: Memory {

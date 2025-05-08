@@ -4514,6 +4514,8 @@ fn mrs_timer() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
+    crate::println!("{translation:?}");
+
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("R0"), 0x1234);

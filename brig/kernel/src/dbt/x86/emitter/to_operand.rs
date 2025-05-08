@@ -20,8 +20,8 @@ use crate::dbt::{
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
     /// Same as `to_operand` but if the value is a constant, move it to a
     /// register
-    fn to_operand_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
-        if let NodeKind::Constant { .. } = node.kind() {
+    pub fn to_operand_reg_promote(&mut self, node: &X86NodeRef<A>) -> Operand<A> {
+        if let NodeKind::Constant { .. } | NodeKind::FunctionPointer(_) = node.kind() {
             let width = Width::from_uncanonicalized(node.typ().width()).unwrap();
             let value_reg = Operand::vreg(width, self.next_vreg());
             let value_imm = self.to_operand(node);
@@ -59,6 +59,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                     .unwrap_or_else(|e| panic!("failed to canonicalize width of {node:?}: {e}")),
                 *value,
             ),
+            NodeKind::FunctionPointer(target) => Operand::imm(Width::_64, *target),
+            NodeKind::CallReturnValue => Operand::preg(Width::_64, PhysicalRegister::RAX),
             NodeKind::GuestRegister { offset } => {
                 let width = Width::from_uncanonicalized(node.typ().width()).unwrap_or_else(|e| {
                     panic!("invalid width register at offset {offset:?}: {e:?}")

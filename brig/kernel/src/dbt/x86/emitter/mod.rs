@@ -3,7 +3,7 @@ use {
         Alloc, bit_extract, bit_insert,
         emitter::Type,
         models::CHAIN_CACHE_ENTRY_COUNT,
-        trampoline::{self, ExecutionResult},
+        trampoline::ExecutionResult,
         x86::{
             Emitter, X86TranslationContext,
             encoder::{
@@ -15,15 +15,8 @@ use {
         },
     },
     alloc::{rc::Rc, vec::Vec},
-    common::{
-        arena::{Arena, Ref},
-        hashmap::HashMap,
-        mask::mask,
-    },
+    common::{arena::Ref, hashmap::HashMap, mask::mask},
     core::{
-        alloc::Allocator,
-        cell::RefCell,
-        cmp::Ordering,
         fmt::Debug,
         hash::{Hash, Hasher},
         panic,
@@ -35,6 +28,8 @@ use {
 mod to_operand;
 
 const INVALID_OFFSET: i32 = 0xDEAD00F;
+
+pub const ARG_REGS: &[PhysicalRegister] = &[PhysicalRegister::RDI, PhysicalRegister::RSI];
 
 /// X86 emitter error
 #[derive(Debug, thiserror::Error, displaydoc::Display)]
@@ -97,48 +92,33 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             .push_next(target);
     }
 
-    pub fn emit_helper_call(&mut self, fn_ptr: usize, arguments: &[Operand<A>]) -> Operand<A> {
-        const ARG_REGS: &[PhysicalRegister] = &[PhysicalRegister::RDI, PhysicalRegister::RSI];
+    fn emit_call(
+        &mut self,
+        function: X86NodeRef<A>,
+        arguments: Vec<X86NodeRef<A>, A>,
+        has_return_value: bool,
+    ) {
+        let function = self.to_operand_reg_promote(&function);
 
-        const CALLER_SAVED: &[PhysicalRegister] = &[
-            PhysicalRegister::RAX,
-            PhysicalRegister::RCX,
-            PhysicalRegister::RDX,
-            PhysicalRegister::RSI,
-            PhysicalRegister::RDI,
-            PhysicalRegister::R8,
-            PhysicalRegister::R9,
-            PhysicalRegister::R10,
-            PhysicalRegister::R11,
-        ];
-
-        // todo add more arg regs
-        assert!(arguments.len() <= ARG_REGS.len());
+        let arg_count = arguments.len();
 
         arguments
-            .iter()
-            .zip(ARG_REGS.into_iter())
-            .for_each(|(argument, preg)| {
+            .into_iter()
+            .map(|arg| self.to_operand(&arg))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .zip(ARG_REGS.iter())
+            .for_each(|(src, dst)| {
                 self.push_instruction(
-                    Instruction::mov(*argument, Operand::preg(argument.width(), *preg)).unwrap(),
-                );
+                    Instruction::mov(src, Operand::preg(Width::_64, *dst)).unwrap(),
+                )
             });
 
-        let target_reg = Operand::vreg(Width::_64, self.next_vreg());
-        let target_imm = Operand::imm(Width::_64, fn_ptr as u64);
-        self.push_instruction(Instruction::mov(target_imm, target_reg).unwrap());
-
-        for reg in CALLER_SAVED {
-            self.push_instruction(Instruction::push(Operand::preg(Width::_64, *reg)));
-        }
-
-        self.push_instruction(Instruction::call(target_reg));
-
-        for reg in CALLER_SAVED.iter().rev() {
-            self.push_instruction(Instruction::pop(Operand::preg(Width::_64, *reg)));
-        }
-
-        Operand::preg(Width::_64, PhysicalRegister::RAX)
+        self.push_instruction(Instruction::call(
+            function,
+            arg_count,
+            if has_return_value { 1 } else { 0 },
+        ));
     }
 }
 
@@ -166,6 +146,13 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.node(X86Node {
             typ,
             kind: NodeKind::Constant { value, width },
+        })
+    }
+
+    fn function_ptr(&mut self, val: u64) -> Self::NodeRef {
+        self.node(X86Node {
+            typ: Type::Unsigned(64),
+            kind: NodeKind::FunctionPointer(val),
         })
     }
 
@@ -1382,6 +1369,23 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             }
         }
     }
+
+    fn call(&mut self, function: Self::NodeRef, arguments: Vec<Self::NodeRef, A>) {
+        self.emit_call(function, arguments, false);
+    }
+
+    fn call_with_return(
+        &mut self,
+        function: Self::NodeRef,
+        arguments: Vec<Self::NodeRef, A>,
+    ) -> Self::NodeRef {
+        self.emit_call(function, arguments, true);
+
+        self.node(X86Node {
+            typ: Type::Unsigned(64),
+            kind: NodeKind::CallReturnValue,
+        })
+    }
 }
 
 fn sign_extend(value: u64, original_width: u16, target_width: u16) -> u64 {
@@ -1457,6 +1461,7 @@ pub enum NodeKind<A: Alloc> {
         value: u64,
         width: u16,
     },
+    FunctionPointer(u64),
     GuestRegister {
         offset: u64,
     },
@@ -1500,6 +1505,7 @@ pub enum NodeKind<A: Alloc> {
         true_value: X86NodeRef<A>,
         false_value: X86NodeRef<A>,
     },
+    CallReturnValue,
 }
 
 #[derive(Clone)]

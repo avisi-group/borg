@@ -14,7 +14,7 @@ pub static HELPER_MAP: Lazy<HashMap<SysRegId, (ReadHandler, WriteHandler)>> = La
 });
 
 fn generic_timer_read(_reg: SysRegId) -> u64 {
-    0x1234
+    0x6789
 }
 
 fn generic_timer_write(_reg: SysRegId, _value: u64) {
