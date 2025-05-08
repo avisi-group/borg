@@ -128,6 +128,8 @@ impl FreshAllocator {
                     if last_use.unwrap_or_default() < instruction_index {
                         *last_use = Some(instruction_index);
                     }
+                } else if matches!(instruction.0, Opcode::CALL(_)) {
+                    panic!("allocating call");
                 } else {
                     instruction.get_use_defs().for_each(|ud| {
                         let is_usedef = ud.is_usedef();

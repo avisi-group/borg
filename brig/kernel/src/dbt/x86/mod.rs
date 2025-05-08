@@ -4,7 +4,7 @@ use {
             Alloc, Translation,
             emitter::Emitter,
             x86::{
-                emitter::{X86Block, X86BlockMark, X86Emitter},
+                emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
                 encoder::{Instruction, Opcode, OperandKind},
                 register_allocator::naive::FreshAllocator,
             },
@@ -14,7 +14,8 @@ use {
     alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
     common::{
         arena::{Arena, Ref},
-        hashmap::{hashmap_in, hashset_in},
+        hashmap::{HashMapA, hashmap_in, hashset_in},
+        intern::InternedString,
         rudder::Model,
     },
     core::{cell::RefCell, fmt::Debug},
@@ -26,12 +27,19 @@ pub mod emitter;
 pub mod encoder;
 pub mod register_allocator;
 
+struct CachedFunction<A: Alloc> {
+    entry_block: Ref<X86Block<A>>,
+    result: Option<X86NodeRef<A>>,
+}
+
 pub struct X86TranslationContext<A: Alloc> {
     allocator: A,
     blocks: Arena<X86Block<A>, A>,
     initial_block: Ref<X86Block<A>>,
     panic_block: Ref<X86Block<A>>,
     writes_to_pc: bool,
+
+    function_cache: HashMapA<InternedString, CachedFunction<A>, A>,
 
     pc_offset: u64,
     sctlr_el1_offset: u64,
@@ -94,6 +102,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             initial_block,
             panic_block,
             writes_to_pc: false,
+            function_cache: hashmap_in(allocator),
 
             pc_offset: model.reg_offset("_PC"),
             sctlr_el1_offset: model.reg_offset("SCTLR_EL1_bits"),

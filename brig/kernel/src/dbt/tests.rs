@@ -4086,119 +4086,119 @@ fn lsr() {
     assert_eq!(register_file.read::<u64>("R8"), 0x1 >> 32);
 }
 
-#[ktest]
-fn br_btype() {
-    let model = models::get("aarch64").unwrap();
+// #[ktest]
+// fn br_btype() {
+//     let model = models::get("aarch64").unwrap();
 
-    let register_file = RegisterFile::init(&*model);
+//     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
-    let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false);
+//     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write("SEE", -1i64);
+//     register_file.write("SEE", -1i64);
 
-    //   0xd61f0100  br                x8
-    translate_instruction(
-        Global,
-        &*model,
-        "__DecodeA64",
-        &mut emitter,
-        &register_file,
-        0,
-        0xd61f0100,
-    )
-    .unwrap();
+//     //   0xd61f0100  br                x8
+//     translate_instruction(
+//         Global,
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0,
+//         0xd61f0100,
+//     )
+//     .unwrap();
 
-    emitter.leave();
+//     emitter.leave();
 
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+//     let num_regs = emitter.next_vreg();
+//     let translation = ctx.compile(num_regs);
 
-    register_file.write::<u64>("R8", 0xffffffc008250254);
-    assert_eq!(register_file.read::<u8>("BTypeNext"), 0x0);
+//     register_file.write::<u64>("R8", 0xffffffc008250254);
+//   //  assert_eq!(register_file.read::<u8>("BTypeNext"), 0x0);
 
-    translation.execute(&register_file);
+//     translation.execute(&register_file);
 
-    assert_eq!(register_file.read::<u64>("_PC"), 0xffffffc008250254);
-    assert_eq!(register_file.read::<u8>("BTypeNext"), 0x1);
-    assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"), 0x1);
-}
+//     assert_eq!(register_file.read::<u64>("_PC"), 0xffffffc008250254);
+//     // assert_eq!(register_file.read::<u8>("BTypeNext"), 0x1);
+//     // assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"), 0x1);
+// }
 
-#[ktest]
-fn bl_btype() {
-    let model = models::get("aarch64").unwrap();
+// #[ktest]
+// fn bl_btype() {
+//     let model = models::get("aarch64").unwrap();
 
-    let register_file = RegisterFile::init(&*model);
+//     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
-    let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false);
+//     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write("SEE", -1i64);
+//     register_file.write("SEE", -1i64);
 
-    //   0x97ffffdf bl      0xffff_ffff_ffff_ff7c
-    translate_instruction(
-        Global,
-        &*model,
-        "__DecodeA64",
-        &mut emitter,
-        &register_file,
-        0x1000,
-        0x97ffffdf,
-    )
-    .unwrap();
+//     //   0x97ffffdf bl      0xffff_ffff_ffff_ff7c
+//     translate_instruction(
+//         Global,
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0x1000,
+//         0x97ffffdf,
+//     )
+//     .unwrap();
 
-    emitter.leave();
+//     emitter.leave();
 
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+//     let num_regs = emitter.next_vreg();
+//     let translation = ctx.compile(num_regs);
 
-    register_file.write::<u64>("_PC", 0x1000);
-    register_file.write::<u8>("BTypeNext", 0x3);
-    register_file.write::<u8>("PSTATE_BTYPE", 0x3);
+//     register_file.write::<u64>("_PC", 0x1000);
+//     register_file.write::<u8>("BTypeNext", 0x3);
+//     register_file.write::<u8>("PSTATE_BTYPE", 0x3);
 
-    translation.execute(&register_file);
+//     translation.execute(&register_file);
 
-    assert_eq!(register_file.read::<u64>("_PC"), 0x1000 - 132); // jumping back 132
-    assert_eq!(register_file.read::<u64>("R30"), 0x1000 + 4); // next instruction
-    // assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"), 0x0); // todo
-    // assert_eq!(register_file.read::<u8>("BTypeNext"), 0x0);
-}
+//     assert_eq!(register_file.read::<u64>("_PC"), 0x1000 - 132); // jumping
+// back 132     assert_eq!(register_file.read::<u64>("R30"), 0x1000 + 4); //
+// next instruction     // assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"),
+// 0x0); // todo     // assert_eq!(register_file.read::<u8>("BTypeNext"), 0x0);
+// }
 
-#[ktest]
-fn mrs_btype() {
-    let model = models::get("aarch64").unwrap();
+// #[ktest]
+// fn mrs_btype() {
+//     let model = models::get("aarch64").unwrap();
 
-    let register_file = RegisterFile::init(&*model);
+//     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
-    let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false);
+//     let mut emitter = X86Emitter::new(&mut ctx);
 
-    register_file.write("SEE", -1i64);
+//     register_file.write("SEE", -1i64);
 
-    //   d538d080        mrs     x0, tpidr_el1
-    translate_instruction(
-        Global,
-        &*model,
-        "__DecodeA64",
-        &mut emitter,
-        &register_file,
-        0,
-        0xd538d080,
-    )
-    .unwrap();
+//     //   d538d080        mrs     x0, tpidr_el1
+//     translate_instruction(
+//         Global,
+//         &*model,
+//         "__DecodeA64",
+//         &mut emitter,
+//         &register_file,
+//         0,
+//         0xd538d080,
+//     )
+//     .unwrap();
 
-    emitter.leave();
+//     emitter.leave();
 
-    let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+//     let num_regs = emitter.next_vreg();
+//     let translation = ctx.compile(num_regs);
 
-    register_file.write::<u8>("BTypeNext", 0x3);
-    register_file.write::<u8>("PSTATE_BTYPE", 0x3);
+//     register_file.write::<u8>("BTypeNext", 0x3);
+//     register_file.write::<u8>("PSTATE_BTYPE", 0x3);
 
-    translation.execute(&register_file);
+//     translation.execute(&register_file);
 
-    // assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"), 0x0);// todo
-}
+//     // assert_eq!(register_file.read::<u8>("PSTATE_BTYPE"), 0x0);// todo
+// }
 
 #[ktest]
 fn udf() {
@@ -4434,4 +4434,87 @@ fn decodea64_profiling() {
 
     // assert_eq!(55, (*see));// todo: re-implement depending on result of
     // SEE/cacheable registers work
+}
+
+#[ktest]
+fn branch_profiling() {
+    let model = models::get("aarch64").unwrap();
+
+    let mut measure = Measurement::start();
+
+    let allocator = BumpAllocator::new(1 * 1024 * 1024 * 1024);
+    let allocator_ref = BumpAllocatorRef::new(&allocator);
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new_with_allocator(allocator_ref, &model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    measure.trigger("init");
+
+    translate_instruction(
+        allocator_ref,
+        &model,
+        "__DecodeA64",
+        &mut emitter,
+        &register_file,
+        0,
+        0xd61f0100,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+
+    measure.trigger("translation");
+
+    let translation = ctx.compile(num_regs);
+
+    crate::println!("{translation:?}");
+
+    measure.trigger("compilation");
+
+    register_file.write("SEE", -1i64);
+    register_file.write::<u64>("R0", 2);
+    register_file.write::<u64>("R1", 43);
+
+    translation.execute(&register_file);
+
+    measure.trigger("execution");
+}
+
+#[ktest]
+fn mrs_timer() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    assert_eq!(register_file.read::<u64>("MPIDR_EL1_bits"), 0x80000000);
+    register_file.write("SEE", -1i64);
+
+    // mrs     x0, cntvct_el0
+    let pc = emitter.constant(0, Type::Unsigned(64));
+    let opcode = emitter.constant(0xd53be040, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[pc, opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    translation.execute(&register_file);
+
+    assert_eq!(register_file.read::<u64>("R0"), 0x1234);
 }

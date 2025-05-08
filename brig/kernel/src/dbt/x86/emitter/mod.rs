@@ -97,7 +97,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             .push_next(target);
     }
 
-    fn _emit_helper_call(&mut self, fn_ptr: usize, operands: &[Operand<A>]) {
+    pub fn emit_helper_call(&mut self, fn_ptr: usize, arguments: &[Operand<A>]) -> Operand<A> {
         const ARG_REGS: &[PhysicalRegister] = &[PhysicalRegister::RDI, PhysicalRegister::RSI];
 
         const CALLER_SAVED: &[PhysicalRegister] = &[
@@ -113,14 +113,14 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         ];
 
         // todo add more arg regs
-        assert!(operands.len() <= ARG_REGS.len());
+        assert!(arguments.len() <= ARG_REGS.len());
 
-        operands
+        arguments
             .iter()
             .zip(ARG_REGS.into_iter())
-            .for_each(|(operand, preg)| {
+            .for_each(|(argument, preg)| {
                 self.push_instruction(
-                    Instruction::mov(*operand, Operand::preg(operand.width(), *preg)).unwrap(),
+                    Instruction::mov(*argument, Operand::preg(argument.width(), *preg)).unwrap(),
                 );
             });
 
@@ -137,6 +137,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         for reg in CALLER_SAVED.iter().rev() {
             self.push_instruction(Instruction::pop(Operand::preg(Width::_64, *reg)));
         }
+
+        Operand::preg(Width::_64, PhysicalRegister::RAX)
     }
 }
 

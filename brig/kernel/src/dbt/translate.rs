@@ -3,10 +3,11 @@ use {
         Alloc,
         emitter::{self, Emitter, Type},
         register_file::RegisterFile,
+        sysreg_helpers,
         trampoline::{ExecutionResult, MAX_STACK_SIZE},
         x86::{
             emitter::{BinaryOperationKind, NodeKind, X86Block, X86Emitter, X86NodeRef},
-            encoder::Instruction,
+            encoder::{Instruction, Operand, PhysicalRegister, Register, width::Width},
         },
     },
     alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
@@ -122,70 +123,72 @@ pub fn translate_instruction<A: Alloc>(
             register_file,
         );
 
-        // if CNTCR[EN] == 1 {
-        //     PhysicalCount += 1;
+        // // if CNTCR[EN] == 1 {
+        // //     PhysicalCount += 1;
+        // // }
+        // {
+        //     let inc_cycle_count_block = emitter.ctx_mut().create_block();
+        //     let end_block = emitter.ctx_mut().create_block();
+
+        //     let cntcr = emitter.read_register(model.reg_offset("CNTCR_bits"),
+        // Type::Unsigned(32));     let en = translate(
+        //         allocator,
+        //         model,
+        //         "_get_CNTCR_Type_EN",
+        //         &[cntcr],
+        //         emitter,
+        //         register_file,
+        //     )
+        //     .unwrap()
+        //     .unwrap();
+
+        //     let _1 = emitter.constant(1, Type::Unsigned(1));
+        //     let is_enabled =
+        // emitter.binary_operation(BinaryOperationKind::CompareEqual(en, _1));
+
+        //     emitter.branch(is_enabled, inc_cycle_count_block, end_block);
+
+        //     emitter.set_current_block(inc_cycle_count_block);
+        //     let cycle_end =
+        //         emitter.read_register(model.reg_offset("PhysicalCount"),
+        // Type::Signed(64));     let _1 = emitter.constant(1,
+        // Type::Signed(64));     let incremented =
+        // emitter.binary_operation(BinaryOperationKind::Add(cycle_end, _1));
+        //     emitter.write_register(model.reg_offset("PhysicalCount"), incremented);
+        //     emitter.jump(end_block);
+
+        //     emitter.set_current_block(end_block);
         // }
-        {
-            let inc_cycle_count_block = emitter.ctx_mut().create_block();
-            let end_block = emitter.ctx_mut().create_block();
 
-            let cntcr = emitter.read_register(model.reg_offset("CNTCR_bits"), Type::Unsigned(32));
-            let en = translate(
-                allocator,
-                model,
-                "_get_CNTCR_Type_EN",
-                &[cntcr],
-                emitter,
-                register_file,
-            )
-            .unwrap()
-            .unwrap();
+        // // from __InstructionExecute
+        // // if not_bool(AArch64_ExecutingERETInstr()) then {
+        // //     PSTATE.BTYPE = BTypeNext
+        // // };
+        // {
+        //     let update_btype_block = emitter.ctx_mut().create_block();
 
-            let _1 = emitter.constant(1, Type::Unsigned(1));
-            let is_enabled = emitter.binary_operation(BinaryOperationKind::CompareEqual(en, _1));
+        //     let end_block = emitter.ctx_mut().create_block();
 
-            emitter.branch(is_enabled, inc_cycle_count_block, end_block);
+        //     let executing_eret = translate(
+        //         allocator,
+        //         model,
+        //         "AArch64_ExecutingERETInstr",
+        //         &[],
+        //         emitter,
+        //         register_file,
+        //     )
+        //     .unwrap()
+        //     .unwrap();
 
-            emitter.set_current_block(inc_cycle_count_block);
-            let cycle_end =
-                emitter.read_register(model.reg_offset("PhysicalCount"), Type::Signed(64));
-            let _1 = emitter.constant(1, Type::Signed(64));
-            let incremented = emitter.binary_operation(BinaryOperationKind::Add(cycle_end, _1));
-            emitter.write_register(model.reg_offset("PhysicalCount"), incremented);
-            emitter.jump(end_block);
+        //     emitter.branch(executing_eret, end_block, update_btype_block);
 
-            emitter.set_current_block(end_block);
-        }
+        //     emitter.set_current_block(update_btype_block);
+        //     let btypenext = emitter.read_register(model.reg_offset("BTypeNext"),
+        // Type::Unsigned(2));     emitter.write_register(model.reg_offset("
+        // PSTATE_BTYPE"), btypenext);     emitter.jump(end_block);
 
-        // from __InstructionExecute
-        // if not_bool(AArch64_ExecutingERETInstr()) then {
-        //     PSTATE.BTYPE = BTypeNext
-        // };
-        {
-            let update_btype_block = emitter.ctx_mut().create_block();
-
-            let end_block = emitter.ctx_mut().create_block();
-
-            let executing_eret = translate(
-                allocator,
-                model,
-                "AArch64_ExecutingERETInstr",
-                &[],
-                emitter,
-                register_file,
-            )
-            .unwrap()
-            .unwrap();
-
-            emitter.branch(executing_eret, end_block, update_btype_block);
-
-            emitter.set_current_block(update_btype_block);
-            let btypenext = emitter.read_register(model.reg_offset("BTypeNext"), Type::Unsigned(2));
-            emitter.write_register(model.reg_offset("PSTATE_BTYPE"), btypenext);
-            emitter.jump(end_block);
-
-            emitter.set_current_block(end_block);
-        }
+        //     emitter.set_current_block(end_block);
+        // }
 
         match res {
             Ok(_) => break (res, start_block),
@@ -222,7 +225,7 @@ pub fn translate<A: Alloc>(
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
     let current_stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
-    FunctionTranslator::new(
+    FunctionTranslator::beep(
         allocator,
         model,
         function,
@@ -231,7 +234,6 @@ pub fn translate<A: Alloc>(
         current_stack_offset,
         register_file,
     )
-    .translate()
 }
 
 #[derive(Clone)]
@@ -455,7 +457,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         );
     }
 
-    fn new(
+    fn beep(
         allocator: A,
         model: &'m Model,
         function: &str,
@@ -463,8 +465,60 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         emitter: &'e mut X86Emitter<'c, A>,
         current_stack_offset: Rc<AtomicUsize, A>,
         register_file: &'r RegisterFile,
-    ) -> Self {
+    ) -> Result<Option<X86NodeRef<A>>, Error> {
         log::debug!("translating {function:?}: {:?}", arguments);
+
+        if function == "AArch64_SysRegRead" || function == "AArch64_SysRegWrite" {
+            let mut iter = arguments
+                .iter()
+                .map(|node| {
+                    let NodeKind::Constant { value, .. } = node.kind() else {
+                        panic!()
+                    };
+                    value
+                })
+                .copied();
+
+            let op0 = iter.next().unwrap();
+            let op1 = iter.next().unwrap();
+            let crn = iter.next().unwrap();
+            let crm = iter.next().unwrap();
+            let op2 = iter.next().unwrap();
+
+            let t = iter.next().unwrap();
+
+            let sysreg_id = (op0, op1, crn, crm, op2);
+
+            if let Some((read_helper, write_helper)) = sysreg_helpers::HELPER_MAP.get(&sysreg_id) {
+                // find whether we are reading or writing
+                if function == "AArch64_SysRegRead" {
+                    let value = emitter.emit_helper_call(
+                        read_helper as *const fn(_) -> _ as usize,
+                        &[Operand::imm(Width::_64, 0)],
+                    );
+                    let offset = model.reg_offset(alloc::format!("R{t}"));
+                    emitter.push_instruction(
+                        Instruction::mov(
+                            value,
+                            Operand::mem_base_displ(
+                                Width::_64,
+                                Register::PhysicalRegister(PhysicalRegister::RBP),
+                                offset.try_into().unwrap(),
+                            ),
+                        )
+                        .unwrap(),
+                    );
+                } else {
+                    todo!()
+                }
+
+                // call corresponding helper
+                // t is index of general purpose register
+                // call x_set or x_get with the value of the helper
+                return Ok(None);
+            }
+        }
+
         assert!(!FN_DENYLIST.contains(&function));
 
         let function_name = InternedString::from(function);
@@ -505,7 +559,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             })
             .collect_into(&mut celf.entry_variables);
 
-        celf
+        celf.translate()
     }
 
     fn translate(&mut self) -> Result<Option<X86NodeRef<A>>, Error> {
@@ -1070,21 +1124,18 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     self.emitter.execution_result = ExecutionResult::NeedTLBInvalidate;
                 }
 
-                StatementResult::Data(
-                    FunctionTranslator::new(
-                        self.allocator.clone(),
-                        self.model,
-                        target.as_ref(),
-                        &args,
-                        self.emitter,
-                        self.current_stack_offset.clone(), /* pass in the current stack offset
-                                                            * so
-                                                            * called functions' stack variables
-                                                            * don't corrupt this function's */
-                        self.register_file,
-                    )
-                    .translate()?,
-                )
+                StatementResult::Data(FunctionTranslator::beep(
+                    self.allocator.clone(),
+                    self.model,
+                    target.as_ref(),
+                    &args,
+                    self.emitter,
+                    self.current_stack_offset.clone(), /* pass in the current stack offset
+                                                        * so
+                                                        * called functions' stack variables
+                                                        * don't corrupt this function's */
+                    self.register_file,
+                )?)
             }
             Statement::Jump { target } => {
                 // make new empty x86 block

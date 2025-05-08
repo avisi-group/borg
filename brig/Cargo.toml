@@ -6,6 +6,7 @@ members = [
     "plugins_rt",
     "plugins/guest/devices/primecell/pl011",
     "plugins/guest/devices/arm/a9gic",
+    "plugins/guest/devices/arm/generic_timer",
 ]
 
 [workspace.dependencies]

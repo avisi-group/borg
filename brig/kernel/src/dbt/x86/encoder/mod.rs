@@ -1295,9 +1295,10 @@ impl<A: Alloc> Instruction<A> {
                 Some((OperandDirection::In, divisor)),
             ]
             .into_iter(),
-            Opcode::JMP(tgt) | Opcode::JNE(tgt) | Opcode::CALL(tgt) => {
+            Opcode::JMP(tgt) | Opcode::JNE(tgt) => {
                 [Some((OperandDirection::In, tgt)), None, None].into_iter()
             }
+            Opcode::CALL(tgt) => [Some((OperandDirection::In, tgt)), None, None].into_iter(), /* arguments are fudged and don't need to be marked as IN here becuase  we push the callee saved registers */
             Opcode::RET | Opcode::NOP => [None, None, None].into_iter(),
             Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => [
                 Some((OperandDirection::In, op0)),
