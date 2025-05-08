@@ -34,7 +34,7 @@ mod test;
 pub mod width;
 mod xor;
 
-#[derive(Debug, Clone, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
 pub enum Opcode<A: Alloc> {
     /// mov {0}, {1}
     MOV(Operand<A>, Operand<A>),
@@ -602,7 +602,7 @@ impl<A: Alloc> Operand<A> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Instruction<A: Alloc>(pub Opcode<A>);
 
 macro_rules! alu_op {

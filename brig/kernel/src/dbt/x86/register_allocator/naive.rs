@@ -2,7 +2,11 @@ use {
     crate::dbt::{
         Alloc as MemAlloc,
         x86::{
-            encoder::{Instruction, Opcode, PhysicalRegister, Register, UseDef, UseDefMut},
+            emitter::ARG_REGS,
+            encoder::{
+                Instruction, Opcode, Operand, PhysicalRegister, Register, UseDef, UseDefMut,
+                width::Width,
+            },
             register_allocator::RegisterAllocator,
         },
     },
@@ -58,6 +62,8 @@ impl RegisterAllocator for FreshAllocator {
                 }
             }
         });
+
+        self.insert_register_saves(instructions);
 
         log::debug!("post alloc----------------------------");
         for i in instructions {
@@ -292,7 +298,7 @@ impl FreshAllocator {
         });
     }
 
-    fn handle_calls<M: MemAlloc>(&self, instructions: &mut Vec<Instruction<M>, M>) {
+    fn insert_register_saves<M: MemAlloc>(&self, instructions: &mut Vec<Instruction<M>, M>) {
         const CALLER_SAVED: &[PhysicalRegister] = &[
             PhysicalRegister::RAX,
             PhysicalRegister::RCX,
@@ -305,39 +311,54 @@ impl FreshAllocator {
             PhysicalRegister::R11,
         ];
 
-        //         // todo add more arg regs
-        //         assert!(arguments.len() <= ARG_REGS.len());
+        let mut new_instructions = alloc::vec![];
 
-        //         arguments
-        //             .iter()
-        //             .zip(ARG_REGS.into_iter())
-        //             .for_each(|(argument, preg)| {
-        //                 self.push_instruction(
-        //                     Instruction::mov(*argument,
-        // Operand::preg(argument.width(), *preg)).unwrap(),                 );
-        //             });
+        for (index, instr) in instructions.iter().enumerate() {
+            if let Instruction(Opcode::CALL {
+                nr_input_args,
+                nr_output_args,
+                ..
+            }) = instr
+            {
+                let live_registers = self
+                    .live_ranges // only caller_saved live ranges
+                    .iter()
+                    .filter(|(_, ranges)| {
+                        ranges
+                            .iter()
+                            .copied()
+                            .filter_map(|(start, end)| end.map(|end| (start, end)))
+                            .any(|(start, end)| start < index && end > index)
+                    })
+                    .map(|(reg, _)| match reg {
+                        Register::PhysicalRegister(preg) => *preg,
+                        Register::VirtualRegister(virt) => {
+                            PhysicalRegister::from_index(*self.allocation_plan.get(virt).unwrap())
+                        }
+                    })
+                    .collect::<Vec<_>>();
 
-        //         let target_reg = Operand::vreg(Width::_64, self.next_vreg());
-        //         let target_imm = Operand::imm(Width::_64, fn_ptr as u64);
-        //         self.push_instruction(Instruction::mov(target_imm,
-        // target_reg).unwrap());
+                let to_save = CALLER_SAVED
+                    .iter()
+                    .filter(|r| live_registers.contains(r))
+                    .collect::<Vec<_>>();
 
-        //         for reg in CALLER_SAVED {
-        //             self.push_instruction(Instruction::push(Operand::preg(Width::_64,
-        // *reg)));         }
+                for reg in to_save.iter() {
+                    new_instructions.push(Instruction::push(Operand::preg(Width::_64, **reg)))
+                }
 
-        //  // call here!
+                new_instructions.push(*instr);
 
-        //         for reg in CALLER_SAVED.iter().rev() {
-        //             self.push_instruction(Instruction::pop(Operand::preg(Width::_64,
-        // *reg)));         }
+                for reg in to_save.iter().rev() {
+                    new_instructions.push(Instruction::pop(Operand::preg(Width::_64, **reg)))
+                }
+            } else {
+                new_instructions.push(*instr);
+            }
+        }
 
-        //         Operand::preg(Width::_64, PhysicalRegister::RAX)
-
-        // these will change as we insert new instructions!
-        let initial_locations = find_call_instructions(instructions);
-
-        // for each call, find
+        instructions.clear();
+        instructions.extend_from_slice(&new_instructions);
     }
 }
 
@@ -351,19 +372,5 @@ fn query_intersections(
         .flatten()
         .filter(|(_, (y_start, y_end))| x_start <= y_end.unwrap() && *y_start <= x_end.unwrap())
         .map(|(reg, _)| reg)
-        .collect()
-}
-
-fn find_call_instructions<M: MemAlloc>(instructions: &[Instruction<M>]) -> Vec<usize> {
-    instructions
-        .iter()
-        .enumerate()
-        .filter_map(|(index, instruction)| {
-            if matches!(instruction, Instruction(Opcode::CALL { .. })) {
-                Some(index)
-            } else {
-                None
-            }
-        })
         .collect()
 }
