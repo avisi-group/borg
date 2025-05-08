@@ -15,9 +15,10 @@ pub mod jump_threading;
 pub mod phi_analysis;
 //pub mod return_propagation;
 //pub mod tail_calls;
+pub mod local_tuple_removal;
+pub mod useless_cast_elimination;
 pub mod variable_elimination;
 pub mod vector_folding;
-pub mod local_tuple_removal;
 
 pub enum OptLevel {
     Level3,
@@ -43,6 +44,8 @@ static PHI_ANALYSIS: FunctionPass = ("phi-analysis", phi_analysis::run);
 // static TAIL_CALL: FunctionPass = ("tail-call", tail_calls::run);
 static VECTOR_FOLDING: FunctionPass = ("vector-folding", vector_folding::run);
 static LOCAL_TUPLE_REMOVAL: FunctionPass = ("local-tuple-removal", local_tuple_removal::run);
+static USELESS_CAST_ELIMINATION: FunctionPass =
+    ("useless-cast-elimination", useless_cast_elimination::run);
 // static DESTROY_BITVECTORS: FunctionPass = ("destroy-bitvectors",
 // destroy_bitvectors::run); static MATERIALISE_APINTS: FunctionPass =
 // ("materialise-apints", materialise_apints::run);
@@ -58,6 +61,7 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
             DEAD_STMT_ELIMINATION,
+            USELESS_CAST_ELIMINATION,
             VARIABLE_ELIMINATION,
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
