@@ -3,7 +3,7 @@ use {
         Alloc,
         emitter::{self, Emitter, Type},
         register_file::RegisterFile,
-        sysreg_helpers,
+        sysreg_helpers::{self, sys_reg_read, sys_reg_write},
         trampoline::{ExecutionResult, MAX_STACK_SIZE},
         x86::{
             emitter::{BinaryOperationKind, NodeKind, X86Block, X86Emitter, X86NodeRef},
@@ -28,6 +28,7 @@ use {
     },
     derive_where::derive_where,
     itertools::Itertools,
+    plugins_api::util::encode_sysreg_id,
 };
 
 const BLOCK_QUEUE_LIMIT: usize = 1000;
@@ -487,14 +488,14 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
             let t = iter.next().unwrap();
 
-            let sysreg_id = (op0, op1, crn, crm, op2);
+            let sysreg_id = encode_sysreg_id(op0, op1, crn, crm, op2);
 
-            if let Some((read_helper, _write_helper)) = sysreg_helpers::HELPER_MAP.get(&sysreg_id) {
+            if sysreg_helpers::handler_exists(sysreg_id) {
                 // find whether we are reading or writing
                 if function == "AArch64_SysRegRead" {
-                    let function = emitter.function_ptr((*read_helper) as fn(_) -> _ as u64);
+                    let function = emitter.function_ptr(sys_reg_read as u64);
 
-                    let arg0 = emitter.constant(0x1234, Type::Unsigned(64));
+                    let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
 
                     let mut arguments = Vec::new_in(allocator);
                     arguments.push(arg0);
@@ -505,7 +506,19 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                     emitter.write_register(offset, return_value);
                 } else {
-                    todo!()
+                    let function = emitter.function_ptr(sys_reg_write as u64);
+
+                    let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
+                    let offset = model.reg_offset(alloc::format!("R{t}"));
+                    let arg1 = emitter.read_register(offset, Type::Unsigned(64));
+                    let arg2 = emitter.constant(8, Type::Unsigned(64));
+
+                    let mut arguments = Vec::new_in(allocator);
+                    arguments.push(arg0); // Register Id
+                    arguments.push(arg1); // Value
+                    arguments.push(arg2); // Length
+
+                    emitter.call(function, arguments);
                 }
 
                 // call corresponding helper

@@ -61,5 +61,5 @@ num-rational = { version = "0.4.2", default-features = false }
 postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
 disarm64 = "0.1.25"
 derive-where = "1.4.0"
-paste = "1.0.15"
 aarch64-paging = { git = "https://github.com/google/aarch64-paging" }
+paste = "1.0.15"

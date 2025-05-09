@@ -1,12 +1,9 @@
 use {
     crate::{
         arch::x86::{
-            MachineContext,
-            aarch64_mmu::guest_translate,
-            dbg,
-            memory::{
-                GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END, VirtAddrExt, VirtualMemoryArea,
-            },
+            aarch64_mmu::guest_translate, dbg, memory::{
+                VirtAddrExt, VirtualMemoryArea, GUEST_PHYSICAL_START, LOW_HALF_CANONICAL_END
+            }, MachineContext
         },
         dbt::models::ModelDevice,
         guest::memory::AddressSpaceRegionKind,
@@ -15,7 +12,7 @@ use {
     alloc::alloc::alloc_zeroed,
     bitset_core::BitSet,
     common::intern::InternedString,
-    core::alloc::Layout,
+    core::{alloc::Layout, any::Any},
     iced_x86::{Code, OpKind, Register},
     proc_macro_lib::irq_handler,
     spin::Once,
@@ -24,12 +21,10 @@ use {
         GENERAL_PROTECTION_FAULT_VECTOR, PAGE_FAULT_VECTOR,
     },
     x86_64::{
-        VirtAddr,
-        registers::control::Cr2,
-        structures::{
+        registers::control::Cr2, structures::{
             idt::{InterruptDescriptorTable, PageFaultErrorCode},
             paging::{Page, PageTableFlags, PhysFrame, Size4KiB, Translate},
-        },
+        }, VirtAddr
     },
 };
 
@@ -170,17 +165,16 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
         let exec_ctx = crate::guest::GuestExecutionContext::current();
         let addrspace = unsafe { &*exec_ctx.current_address_space };
 
-        let device = unsafe {
+        let device = ((&**unsafe {
             crate::guest::GUEST
                 .get()
                 .unwrap()
                 .devices
                 .get("core0")
                 .unwrap()
-        }
-        .as_any()
-        .downcast_ref::<ModelDevice>()
-        .unwrap();
+        }) as &dyn Any)
+            .downcast_ref::<ModelDevice>()
+            .unwrap();
 
         let pc = device.register_file.read::<u64>("_PC");
         log::debug!("PC = {pc:016x}");

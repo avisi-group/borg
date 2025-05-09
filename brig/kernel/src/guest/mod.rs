@@ -1,33 +1,43 @@
 use {
     crate::{
+        dbt::sysreg_helpers::{self},
         devices::manager::SharedDeviceManager,
         fs::{File, Filesystem, tar::TarFilesystem},
-        guest::memory::{AddressSpace, AddressSpaceRegion, AddressSpaceRegionKind},
+        guest::{
+            config::DeviceAttachment,
+            memory::{AddressSpace, AddressSpaceRegion},
+        },
+        object_store,
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     core::ptr,
-    plugins_api::guest,
+    plugins_api::{
+        object::{
+            ObjectStore,
+            device::{Device, DeviceFactory},
+        },
+        util::encode_sysreg_id,
+    },
     spin::{Mutex, Once},
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
 
 pub mod config;
-pub mod devices;
 pub mod memory;
 
 pub static mut GUEST: Once<Guest> = Once::INIT;
 
-static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn guest::DeviceFactory>>> =
+pub static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn DeviceFactory>>> =
     Mutex::new(BTreeMap::new());
 
-pub fn register_device_factory(name: String, factory: Box<dyn guest::DeviceFactory>) {
+pub fn register_device_factory(name: String, factory: Box<dyn DeviceFactory>) {
     unsafe { GUEST_DEVICE_FACTORIES.lock() }.insert(name, factory);
 }
 
 #[derive(Default)]
 pub struct Guest {
     pub address_spaces: BTreeMap<String, Box<AddressSpace>>,
-    pub devices: BTreeMap<String, Arc<dyn guest::Device>>,
+    pub devices: BTreeMap<String, Arc<dyn Device>>,
 }
 
 impl Guest {
@@ -92,35 +102,54 @@ pub fn start() {
             panic!("unsupported guest device type {}", device_config.kind);
         };
 
-        let guest_environment = Box::new(BrigGuestEnvironment {
-            address_space: &(**guest.address_spaces.get("as0").unwrap()) as *const _,
-        });
-
         let device = factory.create(
             [("tracer", "noop")]
                 .into_iter()
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
                 .chain(device_config.extra.into_iter())
                 .collect(),
-            guest_environment,
         );
         guest.devices.insert(name.clone(), device.clone());
 
         // locate address space for attachment, if any
-        if let Some(attachment) = device_config.attach {
-            if let Some(addrspace) = guest.address_spaces.get_mut(&attachment.address_space) {
-                addrspace.add_region(AddressSpaceRegion::new(
-                    name,
-                    attachment.base,
-                    device.address_space_size(),
-                    memory::AddressSpaceRegionKind::IO(device.clone()),
-                ));
-            } else {
-                panic!(
-                    "address space {} not configured for attaching device {}",
-                    attachment.address_space, name
-                );
+        match device_config.attach {
+            Some(DeviceAttachment::Memory {
+                address_space,
+                base,
+            }) => {
+                let mem_map_device = object_store::get()
+                    .get_memory_mapped_device(device.id())
+                    .unwrap();
+
+                if let Some(addrspace) = guest.address_spaces.get_mut(&address_space) {
+                    addrspace.add_region(AddressSpaceRegion::new(
+                        name,
+                        base,
+                        mem_map_device.address_space_size(),
+                        memory::AddressSpaceRegionKind::IO(mem_map_device.clone()),
+                    ));
+                } else {
+                    panic!(
+                        "address space {} not configured for attaching device {}",
+                        address_space, name
+                    );
+                }
             }
+            Some(DeviceAttachment::SysReg(sysregs)) => {
+                let reg_map_device = object_store::get()
+                    .get_register_mapped_device(device.id())
+                    .unwrap();
+
+                sysregs
+                    .iter()
+                    .map(|(_, [op0, op1, crn, crm, op2])| {
+                        encode_sysreg_id(*op0, *op1, *crn, *crm, *op2)
+                    })
+                    .for_each(|id| {
+                        sysreg_helpers::register_device(id, reg_map_device.clone());
+                    });
+            }
+            None => (),
         }
     }
 
@@ -153,42 +182,5 @@ pub fn start() {
 
     for device in guest.devices.values_mut() {
         device.start();
-    }
-}
-
-struct BrigGuestEnvironment {
-    address_space: *const AddressSpace,
-}
-
-impl guest::Environment for BrigGuestEnvironment {
-    fn read_memory(&self, address: u64, data: &mut [u8]) {
-        let region = unsafe { &*self.address_space }
-            .find_region(address)
-            .unwrap();
-
-        match region.kind() {
-            // just read bytes
-            AddressSpaceRegionKind::Ram => unsafe {
-                ptr::copy(address as *const u8, data.as_mut_ptr(), data.len())
-            },
-            // or forward the request on to the IO handler
-            AddressSpaceRegionKind::IO(device) => device.read(address - region.base(), data),
-        }
-    }
-
-    fn write_memory(&self, address: u64, data: &[u8]) {
-        // lookup address in address space
-        let region = unsafe { &*self.address_space }
-            .find_region(address)
-            .unwrap();
-
-        match region.kind() {
-            // just write bytes
-            AddressSpaceRegionKind::Ram => unsafe {
-                ptr::copy(data.as_ptr(), address as *mut u8, data.len())
-            },
-            // or forward the request on to the IO handler
-            AddressSpaceRegionKind::IO(device) => device.write(address - region.base(), data),
-        }
     }
 }

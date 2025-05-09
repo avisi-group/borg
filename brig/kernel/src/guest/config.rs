@@ -72,10 +72,15 @@ pub struct Device {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct DeviceAttachment {
-    pub address_space: String,
-    #[serde(deserialize_with = "hex_address")]
-    pub base: u64,
+#[serde(rename_all = "lowercase")]
+pub enum DeviceAttachment {
+    Memory {
+        address_space: String,
+        #[serde(deserialize_with = "hex_address")]
+        base: u64,
+    },
+
+    SysReg(BTreeMap<String, [u64; 5]>),
 }
 
 /// Function to be passed in `deserialize_with` serde attribute for parsing JSON

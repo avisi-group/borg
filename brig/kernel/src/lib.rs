@@ -38,6 +38,7 @@ mod fs;
 pub mod guest;
 mod logger;
 pub mod memory;
+mod object_store;
 pub mod plugins;
 mod rand;
 mod scheduler;

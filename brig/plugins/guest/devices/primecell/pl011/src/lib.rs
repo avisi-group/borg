@@ -7,7 +7,11 @@ use {
     plugins_rt::{
         api::{
             PluginHeader, PluginHost,
-            guest::{Device, DeviceFactory, Environment},
+            object::{
+                Object, ObjectId, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
+                ToTickable,
+                device::{Device, DeviceFactory, MemoryMappedDevice},
+            },
         },
         get_host,
     },
@@ -23,30 +27,59 @@ pub static PLUGIN_HEADER: PluginHeader = PluginHeader {
 fn entrypoint(host: &'static dyn PluginHost) {
     plugins_rt::init(host);
 
-    host.register_device("pl011", Box::new(Pl011Factory));
+    host.register_device_factory(
+        "pl011",
+        Box::new(Pl011Factory {
+            id: ObjectId::new(),
+        }),
+    );
 
     log::info!("registered pl011 factory");
 }
 
-struct Pl011Factory;
+struct Pl011Factory {
+    id: ObjectId,
+}
+
+impl Object for Pl011Factory {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
+impl ToDevice for Pl011Factory {}
+impl ToTickable for Pl011Factory {}
+impl ToRegisterMappedDevice for Pl011Factory {}
+impl ToMemoryMappedDevice for Pl011Factory {}
 
 impl DeviceFactory for Pl011Factory {
-    fn create(
-        &self,
-        _config: BTreeMap<String, String>,
-        _guest_environment: Box<dyn Environment>,
-    ) -> Arc<dyn Device> {
-        Arc::new(Pl011)
+    fn create(&self, _config: BTreeMap<String, String>) -> Arc<dyn Device> {
+        Arc::new(Pl011 {
+            id: ObjectId::new(),
+        })
     }
 }
 
 #[derive(Debug)]
-struct Pl011;
+struct Pl011 {
+    id: ObjectId,
+}
+
+impl Object for Pl011 {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
+impl ToTickable for Pl011 {}
+impl ToRegisterMappedDevice for Pl011 {}
 
 impl Device for Pl011 {
     fn start(&self) {}
     fn stop(&self) {}
+}
 
+impl MemoryMappedDevice for Pl011 {
     fn address_space_size(&self) -> u64 {
         0x1000
     }

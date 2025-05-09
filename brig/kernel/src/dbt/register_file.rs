@@ -16,6 +16,10 @@ pub struct RegisterFile {
     register_offsets: Vec<usize>,
 }
 
+// todo: bad bad bad
+unsafe impl Send for RegisterFile {}
+unsafe impl Sync for RegisterFile {}
+
 impl RegisterFile {
     pub fn init<M: Borrow<Model>>(model: M) -> Self {
         let model = model.borrow();

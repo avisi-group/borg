@@ -6,6 +6,7 @@ use {
             interpret::{Value, interpret},
             models::{self},
             register_file::RegisterFile,
+            sysreg_helpers,
             translate::{translate, translate_instruction},
             x86::{
                 X86TranslationContext,
@@ -15,12 +16,15 @@ use {
                 },
             },
         },
+        guest::GUEST_DEVICE_FACTORIES,
         memory::bump::{BumpAllocator, BumpAllocatorRef},
+        object_store,
         timer::Measurement,
     },
-    alloc::{alloc::Global, boxed::Box},
+    alloc::{alloc::Global, boxed::Box, collections::BTreeMap},
     common::{hashmap::HashMap, mask::mask},
     core::panic,
+    plugins_api::object::ObjectStore,
     proc_macro_lib::ktest,
 };
 
@@ -4492,6 +4496,18 @@ fn mrs_timer() {
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);
+
+    let factories = unsafe { GUEST_DEVICE_FACTORIES.lock() };
+
+    let Some(factory) = factories.get("generic_timer") else {
+        panic!();
+    };
+
+    let timer = factory.create(BTreeMap::new());
+    let reg_map_dev = object_store::get()
+        .get_register_mapped_device(timer.id())
+        .unwrap();
+    sysreg_helpers::register_device(0x1be040, reg_map_dev);
 
     assert_eq!(register_file.read::<u64>("MPIDR_EL1_bits"), 0x80000000);
     register_file.write("SEE", -1i64);

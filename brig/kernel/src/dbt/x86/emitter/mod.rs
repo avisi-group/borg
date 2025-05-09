@@ -29,7 +29,11 @@ mod to_operand;
 
 const INVALID_OFFSET: i32 = 0xDEAD00F;
 
-pub const ARG_REGS: &[PhysicalRegister] = &[PhysicalRegister::RDI, PhysicalRegister::RSI];
+pub const ARG_REGS: &[PhysicalRegister] = &[
+    PhysicalRegister::RDI,
+    PhysicalRegister::RSI,
+    PhysicalRegister::RDX,
+];
 
 /// X86 emitter error
 #[derive(Debug, thiserror::Error, displaydoc::Display)]

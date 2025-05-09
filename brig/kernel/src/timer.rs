@@ -21,6 +21,8 @@ pub fn current_milliseconds() -> u64 {
 fn timer_interrupt() {
     JIFFIES.fetch_add(1, Ordering::Relaxed);
 
+    // What registered timers exist and need ticking -- then tick them
+
     scheduler::schedule();
 
     unsafe {

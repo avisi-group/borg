@@ -36,7 +36,10 @@ use {
         fmt::{self, Debug, Write},
     },
     plugins_api::{
-        guest::{Device, DeviceFactory},
+        object::{
+            Object, ObjectId, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice, ToTickable,
+            device::{Device, DeviceFactory},
+        },
         util::parse_hex_prefix,
     },
     spin::Mutex,
@@ -99,22 +102,34 @@ pub fn load_all(device: &SharedDevice) {
 
 /// Factory for creating execution instances for a supplied model
 struct ModelDeviceFactory {
+    id: ObjectId,
     name: String,
     model: Arc<Model>,
 }
 
 impl ModelDeviceFactory {
     fn new(name: String, model: Arc<Model>) -> Self {
-        Self { name, model }
+        Self {
+            id: ObjectId::new(),
+            name,
+            model,
+        }
     }
 }
 
+impl Object for ModelDeviceFactory {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
+impl ToDevice for ModelDeviceFactory {}
+impl ToTickable for ModelDeviceFactory {}
+impl ToRegisterMappedDevice for ModelDeviceFactory {}
+impl ToMemoryMappedDevice for ModelDeviceFactory {}
+
 impl DeviceFactory for ModelDeviceFactory {
-    fn create(
-        &self,
-        config: BTreeMap<String, String>,
-        _environment: Box<dyn plugins_api::guest::Environment>,
-    ) -> Arc<dyn plugins_api::guest::Device> {
+    fn create(&self, config: BTreeMap<String, String>) -> Arc<dyn Device> {
         let initial_pc = config
             .get("initial_pc")
             .map(parse_hex_prefix)
@@ -130,6 +145,7 @@ impl DeviceFactory for ModelDeviceFactory {
 }
 
 pub struct ModelDevice {
+    id: ObjectId,
     name: String,
     model: Arc<Model>,
     pub register_file: RegisterFile,
@@ -141,6 +157,16 @@ impl Debug for ModelDevice {
     }
 }
 
+impl Object for ModelDevice {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
+impl ToTickable for ModelDevice {}
+impl ToRegisterMappedDevice for ModelDevice {}
+impl ToMemoryMappedDevice for ModelDevice {}
+
 impl Device for ModelDevice {
     fn start(&self) {
         self.block_exec(SINGLE_STEP);
@@ -148,18 +174,6 @@ impl Device for ModelDevice {
     }
 
     fn stop(&self) {
-        todo!()
-    }
-
-    fn address_space_size(&self) -> u64 {
-        u64::MAX
-    }
-
-    fn read(&self, _offset: u64, _value: &mut [u8]) {
-        todo!()
-    }
-
-    fn write(&self, _offset: u64, _value: &[u8]) {
         todo!()
     }
 }
@@ -199,6 +213,7 @@ impl ModelDevice {
         register_file.write("_PC", initial_pc);
 
         Self {
+            id: ObjectId::new(),
             name,
             model,
             register_file,

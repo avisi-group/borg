@@ -7,7 +7,10 @@ use {
     log::error,
     plugins_rt::api::{
         PluginHeader, PluginHost,
-        guest::{Device, DeviceFactory, Environment},
+        object::{
+            Object, ObjectId, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice, ToTickable,
+            device::{Device, DeviceFactory, MemoryMappedDevice},
+        },
     },
     spin::Mutex,
 };
@@ -22,19 +25,33 @@ pub static PLUGIN_HEADER: PluginHeader = PluginHeader {
 fn entrypoint(host: &'static dyn PluginHost) {
     plugins_rt::init(host);
 
-    host.register_device("a9gic", Box::new(GlobalInterruptControllerFactory));
+    host.register_device_factory(
+        "a9gic",
+        Box::new(GlobalInterruptControllerFactory {
+            id: ObjectId::new(),
+        }),
+    );
 
     log::info!("registered a9gic factory");
 }
 
-struct GlobalInterruptControllerFactory;
+struct GlobalInterruptControllerFactory {
+    id: ObjectId,
+}
+
+impl Object for GlobalInterruptControllerFactory {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
+impl ToDevice for GlobalInterruptControllerFactory {}
+impl ToTickable for GlobalInterruptControllerFactory {}
+impl ToRegisterMappedDevice for GlobalInterruptControllerFactory {}
+impl ToMemoryMappedDevice for GlobalInterruptControllerFactory {}
 
 impl DeviceFactory for GlobalInterruptControllerFactory {
-    fn create(
-        &self,
-        _config: BTreeMap<String, String>,
-        _guest_environment: Box<dyn Environment>,
-    ) -> Arc<dyn Device> {
+    fn create(&self, _config: BTreeMap<String, String>) -> Arc<dyn Device> {
         Arc::new(GlobalInterruptController::new())
     }
 }
@@ -89,12 +106,14 @@ struct State {
 
 #[derive(Debug)]
 struct GlobalInterruptController {
+    id: ObjectId,
     state: Mutex<State>,
 }
 
 impl GlobalInterruptController {
     fn new() -> Self {
         Self {
+            id: ObjectId::new(),
             state: Mutex::new(State {
                 gicc_ctlr: 0,
                 pending: None,
@@ -125,10 +144,21 @@ impl GlobalInterruptController {
     }
 }
 
+impl Object for GlobalInterruptController {
+    fn id(&self) -> ObjectId {
+        self.id
+    }
+}
+
 impl Device for GlobalInterruptController {
     fn start(&self) {}
     fn stop(&self) {}
+}
 
+impl ToTickable for GlobalInterruptController {}
+impl ToRegisterMappedDevice for GlobalInterruptController {}
+
+impl MemoryMappedDevice for GlobalInterruptController {
     fn address_space_size(&self) -> u64 {
         0x3000
     }
@@ -167,7 +197,7 @@ impl Device for GlobalInterruptController {
             }
         };
 
-        value[..4].copy_from_slice(&response.to_ne_bytes());
+        value[..4].copy_from_slice(&response.to_le_bytes());
     }
 
     /// Write `value` bytes into the device starting at `offset`

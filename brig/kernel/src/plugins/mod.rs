@@ -57,19 +57,20 @@ pub fn load_all(device: &SharedDevice) {
     let mut device = device.lock();
     let mut fs = TarFilesystem::mount(device.as_block());
 
-    // loading statically linked arch
-    //   register_device_factory("demoarch".to_owned(), Box::new(DemoArchFactory));
-
     log::info!("loading plugins");
 
     // todo: don't hardcode this, load everything in plugins directory
-    ["plugins/libpl011.so", "plugins/liba9gic.so"]
-        .into_iter()
-        .map(|path| fs.open(path).unwrap().read_to_vec().unwrap())
-        .map(|data| Plugin::load(&data))
-        .for_each(|plugin| {
-            // run entrypoint and register plugin
-            (plugin.header.entrypoint)(&Host);
-            PLUGIN_REGISTRY.register(plugin);
-        });
+    [
+        "plugins/libpl011.so",
+        "plugins/liba9gic.so",
+        "plugins/libgeneric_timer.so",
+    ]
+    .into_iter()
+    .map(|path| fs.open(path).unwrap().read_to_vec().unwrap())
+    .map(|data| Plugin::load(&data))
+    .for_each(|plugin| {
+        // run entrypoint and register plugin
+        (plugin.header.entrypoint)(&Host);
+        PLUGIN_REGISTRY.register(plugin);
+    });
 }

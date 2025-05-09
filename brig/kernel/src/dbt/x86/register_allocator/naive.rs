@@ -2,7 +2,6 @@ use {
     crate::dbt::{
         Alloc as MemAlloc,
         x86::{
-            emitter::ARG_REGS,
             encoder::{
                 Instruction, Opcode, Operand, PhysicalRegister, Register, UseDef, UseDefMut,
                 width::Width,
@@ -314,12 +313,7 @@ impl FreshAllocator {
         let mut new_instructions = alloc::vec![];
 
         for (index, instr) in instructions.iter().enumerate() {
-            if let Instruction(Opcode::CALL {
-                nr_input_args,
-                nr_output_args,
-                ..
-            }) = instr
-            {
+            if let Instruction(Opcode::CALL { .. }) = instr {
                 let live_registers = self
                     .live_ranges // only caller_saved live ranges
                     .iter()
