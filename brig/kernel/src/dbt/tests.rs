@@ -4503,7 +4503,7 @@ fn mrs_timer() {
         panic!();
     };
 
-    let timer = factory.create(BTreeMap::new());
+    let timer = factory.create(object_store::get(), BTreeMap::new());
     let reg_map_dev = object_store::get()
         .get_register_mapped_device(timer.id())
         .unwrap();

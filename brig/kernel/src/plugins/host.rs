@@ -1,10 +1,13 @@
 use {
-    crate::{arch::x86::memory::HEAP_ALLOCATOR, guest::register_device_factory, print},
+    crate::{
+        arch::x86::memory::HEAP_ALLOCATOR, guest::register_device_factory, object_store, print,
+        timer::register_tickable,
+    },
     alloc::{borrow::ToOwned, boxed::Box},
     core::{alloc::GlobalAlloc, panic::PanicInfo},
     plugins_api::{
         PluginHost,
-        object::{ObjectId, device::DeviceFactory, tickable::Tickable},
+        object::{ObjectId, ObjectStore, device::DeviceFactory, tickable::Tickable},
     },
 };
 
@@ -32,7 +35,8 @@ impl PluginHost for Host {
         panic!("plugin panic");
     }
 
-    fn register_periodic_tick(&self, frequency: u64, callback: &dyn Tickable) {
-        todo!()
+    fn register_periodic_tick(&self, frequency: u64, tickable: &dyn Tickable) {
+        let tickable = object_store::get().get_tickable(tickable.id()).unwrap();
+        register_tickable(frequency, tickable);
     }
 }

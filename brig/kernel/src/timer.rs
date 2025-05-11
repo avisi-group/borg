@@ -1,11 +1,17 @@
 use {
     crate::{arch::x86::irq::assign_irq, println, scheduler},
+    alloc::{collections::BTreeMap, sync::Arc, vec::Vec},
     core::sync::atomic::{AtomicU64, Ordering},
+    plugins_api::object::tickable::Tickable,
     proc_macro_lib::irq_handler,
+    spin::{Lazy, Mutex},
     x86::time::rdtscp,
 };
 
 const ENABLE_MEASUREMENTS: bool = true;
+const JIFFIES_PER_SECOND: u64 = 1000;
+
+static TICKABLES: Lazy<Mutex<Vec<TickableState>>> = Lazy::new(|| Mutex::new(alloc::vec![]));
 
 static JIFFIES: AtomicU64 = AtomicU64::new(0);
 
@@ -19,9 +25,9 @@ pub fn current_milliseconds() -> u64 {
 
 #[irq_handler(with_code = false)]
 fn timer_interrupt() {
-    JIFFIES.fetch_add(1, Ordering::Relaxed);
+    let jiffies = JIFFIES.fetch_add(1, Ordering::Relaxed);
 
-    // What registered timers exist and need ticking -- then tick them
+    handle_tickables(jiffies);
 
     scheduler::schedule();
 
@@ -68,4 +74,29 @@ impl Measurement {
             self.prev = unsafe { rdtscp().0 };
         }
     }
+}
+
+fn handle_tickables(current_jiffies: u64) {
+    TICKABLES
+        .lock()
+        .iter_mut()
+        .filter(|s| current_jiffies >= s.last_tick_jiffy + s.jiffy_interval)
+        .for_each(|s| {
+            s.tickable.tick();
+            s.last_tick_jiffy = current_jiffies;
+        });
+}
+
+pub fn register_tickable(frequency: u64, tickable: Arc<dyn Tickable>) {
+    TICKABLES.lock().push(TickableState {
+        tickable,
+        jiffy_interval: JIFFIES_PER_SECOND / frequency,
+        last_tick_jiffy: 0,
+    });
+}
+
+struct TickableState {
+    tickable: Arc<dyn Tickable>,
+    jiffy_interval: u64,
+    last_tick_jiffy: u64,
 }

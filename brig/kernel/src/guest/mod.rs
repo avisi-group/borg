@@ -103,6 +103,7 @@ pub fn start() {
         };
 
         let device = factory.create(
+            object_store::get(),
             [("tracer", "noop")]
                 .into_iter()
                 .map(|(k, v)| (k.to_owned(), v.to_owned()))
@@ -180,7 +181,8 @@ pub fn start() {
     // go go go (start all devices)
     log::warn!("starting guest");
 
-    for device in guest.devices.values_mut() {
+    for (_, device) in guest.devices.iter().filter(|(name, _)| *name != "core0") {
         device.start();
     }
+    guest.devices.get("core0").unwrap().start();
 }

@@ -8,8 +8,8 @@ use {
         api::{
             PluginHeader, PluginHost,
             object::{
-                Object, ObjectId, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
-                ToTickable,
+                Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice,
+                ToRegisterMappedDevice, ToTickable,
                 device::{Device, DeviceFactory, MemoryMappedDevice},
             },
         },
@@ -53,10 +53,16 @@ impl ToRegisterMappedDevice for Pl011Factory {}
 impl ToMemoryMappedDevice for Pl011Factory {}
 
 impl DeviceFactory for Pl011Factory {
-    fn create(&self, _config: BTreeMap<String, String>) -> Arc<dyn Device> {
-        Arc::new(Pl011 {
+    fn create(
+        &self,
+        store: &dyn ObjectStore,
+        _config: BTreeMap<String, String>,
+    ) -> Arc<dyn Device> {
+        let dev = Arc::new(Pl011 {
             id: ObjectId::new(),
-        })
+        });
+        store.insert(dev.clone());
+        dev
     }
 }
 

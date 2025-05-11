@@ -40,7 +40,7 @@ pub trait PluginHost: Send + Sync {
         guest_device_factory: Box<dyn DeviceFactory>,
     );
 
-    fn register_periodic_tick(&self, frequency: u64, callback: &dyn Tickable);
+    fn register_periodic_tick(&self, frequency: u64, tickable: &dyn Tickable);
 
     /// Panic from plugin
     fn panic(&self, info: &PanicInfo);

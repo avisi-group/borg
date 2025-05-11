@@ -37,7 +37,8 @@ use {
     },
     plugins_api::{
         object::{
-            Object, ObjectId, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice, ToTickable,
+            Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
+            ToTickable,
             device::{Device, DeviceFactory},
         },
         util::parse_hex_prefix,
@@ -129,18 +130,22 @@ impl ToRegisterMappedDevice for ModelDeviceFactory {}
 impl ToMemoryMappedDevice for ModelDeviceFactory {}
 
 impl DeviceFactory for ModelDeviceFactory {
-    fn create(&self, config: BTreeMap<String, String>) -> Arc<dyn Device> {
+    fn create(&self, store: &dyn ObjectStore, config: BTreeMap<String, String>) -> Arc<dyn Device> {
         let initial_pc = config
             .get("initial_pc")
             .map(parse_hex_prefix)
             .unwrap()
             .unwrap();
 
-        Arc::new(ModelDevice::new(
+        let dev = Arc::new(ModelDevice::new(
             self.name.clone(),
             self.model.clone(),
             initial_pc,
-        ))
+        ));
+
+        store.insert(dev.clone());
+
+        dev
     }
 }
 

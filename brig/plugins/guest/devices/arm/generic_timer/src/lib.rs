@@ -9,8 +9,8 @@ use {
         api::{
             PluginHeader, PluginHost,
             object::{
-                Object, ObjectId, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
-                ToTickable,
+                Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice,
+                ToRegisterMappedDevice, ToTickable,
                 device::{Device, DeviceFactory, RegisterMappedDevice},
                 tickable::Tickable,
             },
@@ -56,11 +56,17 @@ impl ToRegisterMappedDevice for GenericTimerFactory {}
 impl ToMemoryMappedDevice for GenericTimerFactory {}
 
 impl DeviceFactory for GenericTimerFactory {
-    fn create(&self, _config: BTreeMap<String, String>) -> Arc<dyn Device> {
-        Arc::new(GenericTimer {
+    fn create(
+        &self,
+        store: &dyn ObjectStore,
+        _config: BTreeMap<String, String>,
+    ) -> Arc<dyn Device> {
+        let dev = Arc::new(GenericTimer {
             id: ObjectId::new(),
             counter: AtomicU64::new(0),
-        })
+        });
+        store.insert(dev.clone());
+        dev
     }
 }
 
@@ -132,20 +138,20 @@ impl RegisterMappedDevice for GenericTimer {
 
     fn write(&self, sys_reg_id: u64, value: &[u8]) {
         match sys_reg_id {
-            CNTKCTL_EL1 => todo!(),
-            CNTFRQ_EL0 => todo!(),
-            CNTPCT_EL0 => todo!(),
-            CNTVCT_EL0 => todo!(),
-            CNTP_TVAL_EL0 => todo!(),
-            CNTP_CTL_EL0 => todo!(),
-            CNTP_CVAL_EL0 => todo!(),
-            CNTVOFF_EL2 => todo!(),
-            CNTPS_TVAL_EL1 => todo!(),
-            CNTPS_CTL_EL1 => todo!(),
-            CNTPS_CVAL_EL1 => todo!(),
-            CNTV_TVAL_EL0 => todo!(),
-            CNTV_CTL_EL0 => todo!(),
-            CNTV_CVAL_EL0 => todo!(),
+            CNTKCTL_EL1 => log::error!("todo CNTKCTL_EL1"),
+            CNTFRQ_EL0 => log::error!("todo CNTFRQ_EL0"),
+            CNTPCT_EL0 => log::error!("todo CNTPCT_EL0"),
+            CNTVCT_EL0 => log::error!("todo CNTVCT_EL0"),
+            CNTP_TVAL_EL0 => log::error!("todo CNTP_TVAL_EL0"),
+            CNTP_CTL_EL0 => log::error!("todo CNTP_CTL_EL0"),
+            CNTP_CVAL_EL0 => log::error!("todo CNTP_CVAL_EL0"),
+            CNTVOFF_EL2 => log::error!("todo CNTVOFF_EL2"),
+            CNTPS_TVAL_EL1 => log::error!("todo CNTPS_TVAL_EL1"),
+            CNTPS_CTL_EL1 => log::error!("todo CNTPS_CTL_EL1"),
+            CNTPS_CVAL_EL1 => log::error!("todo CNTPS_CVAL_EL1"),
+            CNTV_TVAL_EL0 => log::error!("todo CNTV_TVAL_EL0"),
+            CNTV_CTL_EL0 => log::error!("todo CNTV_CTL_EL0"),
+            CNTV_CVAL_EL0 => log::error!("todo CNTV_CVAL_EL0"),
             _ => panic!("write unknown sys_reg_id {sys_reg_id:x}"),
         }
     }

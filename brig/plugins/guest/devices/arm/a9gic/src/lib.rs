@@ -8,7 +8,8 @@ use {
     plugins_rt::api::{
         PluginHeader, PluginHost,
         object::{
-            Object, ObjectId, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice, ToTickable,
+            Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
+            ToTickable,
             device::{Device, DeviceFactory, MemoryMappedDevice},
         },
     },
@@ -51,8 +52,14 @@ impl ToRegisterMappedDevice for GlobalInterruptControllerFactory {}
 impl ToMemoryMappedDevice for GlobalInterruptControllerFactory {}
 
 impl DeviceFactory for GlobalInterruptControllerFactory {
-    fn create(&self, _config: BTreeMap<String, String>) -> Arc<dyn Device> {
-        Arc::new(GlobalInterruptController::new())
+    fn create(
+        &self,
+        store: &dyn ObjectStore,
+        _config: BTreeMap<String, String>,
+    ) -> Arc<dyn Device> {
+        let dev = Arc::new(GlobalInterruptController::new());
+        store.insert(dev.clone());
+        dev
     }
 }
 

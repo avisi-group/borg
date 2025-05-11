@@ -503,7 +503,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     let return_value = emitter.call_with_return(function, arguments);
 
                     let offset = model.reg_offset(alloc::format!("R{t}"));
-
                     emitter.write_register(offset, return_value);
                 } else {
                     let function = emitter.function_ptr(sys_reg_write as u64);
