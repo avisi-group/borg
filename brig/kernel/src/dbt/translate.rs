@@ -6,8 +6,8 @@ use {
         sysreg_helpers::{self, sys_reg_read, sys_reg_write},
         trampoline::{ExecutionResult, MAX_STACK_SIZE},
         x86::{
-            emitter::{BinaryOperationKind, NodeKind, X86Block, X86Emitter, X86NodeRef},
-            encoder::{Instruction, Operand, PhysicalRegister, Register, width::Width},
+            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
+            encoder::Instruction,
         },
     },
     alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
@@ -225,16 +225,102 @@ pub fn translate<A: Alloc>(
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     // x86_64 has full descending stack so current stack offset needs to start at 8
     // for first stack variable offset to point to the next empty slot
-    let current_stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
-    FunctionTranslator::beep(
+    let stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
+    translate_with_stack_offset(
         allocator,
         model,
         function,
         arguments,
         emitter,
-        current_stack_offset,
+        register_file,
+        stack_offset,
+    )
+}
+
+fn translate_with_stack_offset<A: Alloc>(
+    allocator: A,
+    model: &Model,
+    function: &str,
+    arguments: &[X86NodeRef<A>],
+    emitter: &mut X86Emitter<A>,
+    register_file: &RegisterFile,
+    stack_offset: Rc<AtomicUsize, A>,
+) -> Result<Option<X86NodeRef<A>>, Error> {
+    if function == "AArch64_SysRegRead" || function == "AArch64_SysRegWrite" {
+        let mut iter = arguments
+            .iter()
+            .map(|node| {
+                let NodeKind::Constant { value, .. } = node.kind() else {
+                    panic!()
+                };
+                value
+            })
+            .copied();
+
+        let op0 = iter.next().unwrap();
+        let op1 = iter.next().unwrap();
+        let crn = iter.next().unwrap();
+        let crm = iter.next().unwrap();
+        let op2 = iter.next().unwrap();
+
+        let t = iter.next().unwrap();
+
+        let sysreg_id = encode_sysreg_id(op0, op1, crn, crm, op2);
+
+        if sysreg_helpers::handler_exists(sysreg_id) {
+            // find whether we are reading or writing
+            if function == "AArch64_SysRegRead" {
+                let function = emitter.function_ptr(sys_reg_read as u64);
+
+                let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
+
+                let mut arguments = Vec::new_in(allocator);
+                arguments.push(arg0);
+
+                let return_value = emitter.call_with_return(function, arguments);
+
+                let offset = model.reg_offset(alloc::format!("R{t}"));
+                emitter.write_register(offset, return_value);
+            } else {
+                let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
+
+                // no R31 so handle zero register
+                let arg1 = if t == 31 {
+                    emitter.constant(0, Type::Unsigned(64))
+                } else {
+                    let offset = model.reg_offset(alloc::format!("R{t}"));
+                    emitter.read_register(offset, Type::Unsigned(64))
+                };
+
+                let arg2 = emitter.constant(8, Type::Unsigned(64));
+
+                let mut arguments = Vec::new_in(allocator);
+                arguments.push(arg0); // Register Id
+                arguments.push(arg1); // Value
+                arguments.push(arg2); // Length
+
+                let function = emitter.function_ptr(sys_reg_write as u64);
+
+                emitter.call(function, arguments);
+            }
+
+            // call corresponding helper
+            // t is index of general purpose register
+            // call x_set or x_get with the value of the helper
+            return Ok(None);
+        }
+    }
+
+    FunctionTranslator::new(
+        allocator,
+        model,
+        function,
+        arguments,
+        emitter,
+        stack_offset,
         register_file,
     )
+    .translate()
 }
 
 #[derive(Clone)]
@@ -458,7 +544,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         );
     }
 
-    fn beep(
+    fn new(
         allocator: A,
         model: &'m Model,
         function: &str,
@@ -466,73 +552,8 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         emitter: &'e mut X86Emitter<'c, A>,
         current_stack_offset: Rc<AtomicUsize, A>,
         register_file: &'r RegisterFile,
-    ) -> Result<Option<X86NodeRef<A>>, Error> {
+    ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
-
-        if function == "AArch64_SysRegRead" || function == "AArch64_SysRegWrite" {
-            let mut iter = arguments
-                .iter()
-                .map(|node| {
-                    let NodeKind::Constant { value, .. } = node.kind() else {
-                        panic!()
-                    };
-                    value
-                })
-                .copied();
-
-            let op0 = iter.next().unwrap();
-            let op1 = iter.next().unwrap();
-            let crn = iter.next().unwrap();
-            let crm = iter.next().unwrap();
-            let op2 = iter.next().unwrap();
-
-            let t = iter.next().unwrap();
-
-            let sysreg_id = encode_sysreg_id(op0, op1, crn, crm, op2);
-
-            if sysreg_helpers::handler_exists(sysreg_id) {
-                // find whether we are reading or writing
-                if function == "AArch64_SysRegRead" {
-                    let function = emitter.function_ptr(sys_reg_read as u64);
-
-                    let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
-
-                    let mut arguments = Vec::new_in(allocator);
-                    arguments.push(arg0);
-
-                    let return_value = emitter.call_with_return(function, arguments);
-
-                    let offset = model.reg_offset(alloc::format!("R{t}"));
-                    emitter.write_register(offset, return_value);
-                } else {
-                    let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
-
-                    // no R31 so handle zero register
-                    let arg1 = if t == 31 {
-                        emitter.constant(0, Type::Unsigned(64))
-                    } else {
-                        let offset = model.reg_offset(alloc::format!("R{t}"));
-                        emitter.read_register(offset, Type::Unsigned(64))
-                    };
-
-                    let arg2 = emitter.constant(8, Type::Unsigned(64));
-
-                    let mut arguments = Vec::new_in(allocator);
-                    arguments.push(arg0); // Register Id
-                    arguments.push(arg1); // Value
-                    arguments.push(arg2); // Length
-
-                    let function = emitter.function_ptr(sys_reg_write as u64);
-
-                    emitter.call(function, arguments);
-                }
-
-                // call corresponding helper
-                // t is index of general purpose register
-                // call x_set or x_get with the value of the helper
-                return Ok(None);
-            }
-        }
 
         assert!(!FN_DENYLIST.contains(&function));
 
@@ -574,7 +595,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             })
             .collect_into(&mut celf.entry_variables);
 
-        celf.translate()
+        celf
     }
 
     fn translate(&mut self) -> Result<Option<X86NodeRef<A>>, Error> {
@@ -1139,17 +1160,17 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     self.emitter.execution_result = ExecutionResult::NeedTLBInvalidate;
                 }
 
-                StatementResult::Data(FunctionTranslator::beep(
+                StatementResult::Data(translate_with_stack_offset(
                     self.allocator.clone(),
                     self.model,
                     target.as_ref(),
                     &args,
                     self.emitter,
+                    self.register_file,
                     self.current_stack_offset.clone(), /* pass in the current stack offset
                                                         * so
                                                         * called functions' stack variables
                                                         * don't corrupt this function's */
-                    self.register_file,
                 )?)
             }
             Statement::Jump { target } => {
