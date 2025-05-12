@@ -505,17 +505,24 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     let offset = model.reg_offset(alloc::format!("R{t}"));
                     emitter.write_register(offset, return_value);
                 } else {
-                    let function = emitter.function_ptr(sys_reg_write as u64);
-
                     let arg0 = emitter.constant(sysreg_id, Type::Unsigned(64));
-                    let offset = model.reg_offset(alloc::format!("R{t}"));
-                    let arg1 = emitter.read_register(offset, Type::Unsigned(64));
+
+                    // no R31 so handle zero register
+                    let arg1 = if t == 31 {
+                        emitter.constant(0, Type::Unsigned(64))
+                    } else {
+                        let offset = model.reg_offset(alloc::format!("R{t}"));
+                        emitter.read_register(offset, Type::Unsigned(64))
+                    };
+
                     let arg2 = emitter.constant(8, Type::Unsigned(64));
 
                     let mut arguments = Vec::new_in(allocator);
                     arguments.push(arg0); // Register Id
                     arguments.push(arg1); // Value
                     arguments.push(arg2); // Length
+
+                    let function = emitter.function_ptr(sys_reg_write as u64);
 
                     emitter.call(function, arguments);
                 }

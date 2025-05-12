@@ -11,3 +11,4 @@ plugins_rt.workspace = true
 
 spin = "0.10.0"
 log = "0.4.27"
+bitfields = "0.13.2"
