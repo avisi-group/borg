@@ -1,6 +1,10 @@
-[workspace]
-members = ["sailrs", "borealis"]
-resolver = "2"
+[package]
+name = "borealis"
+version = "0.3.0"
+edition = "2024"
+authors = ["AVISI Research Group"]
+description = "Sail frontend for GenSim"
+
 
 # deserializing/converting the AST takes forever and overflows the stack without optimisations
 [profile.dev]
@@ -10,7 +14,7 @@ opt-level = 1
 lto = "thin" # fat made it around 5% faster
 debug = true
 
-[workspace.dependencies]
+[dependencies]
 rkyv = { version = "0.8.10", features = ["alloc", "hashbrown-0_15", "pointer_width_64"] }
 thiserror = "2.0.12"
 displaydoc = "0.2.5"
@@ -27,3 +31,13 @@ parking_lot = "0.12.3"
 color-eyre = { version = "0.6.4", default-features = false }
 regex = "1.11.1"
 pretty_env_logger = "0.5.0"
+
+common = { path = "../common", default-features = false, features = ["std" ] }#"arena-debug"
+
+pretty_assertions = "1.4.1"
+dot = "0.1.4"
+itertools = "0.14.0"
+kinded = "0.3.0"
+memmap2 = "0.9.5"
+postcard = { version = "1.1.1", features = ["alloc"], default-features = false }
+isla-lib = { git = "https://github.com/rems-project/isla.git", version = "0.2.0" }

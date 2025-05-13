@@ -4,20 +4,11 @@
 
 [![CI](https://github.com/avisi-group/borealis/actions/workflows/ci.yml/badge.svg)](https://github.com/avisi-group/borealis/actions/workflows/ci.yml)
 
-## Build Requirements
 
-* [Docker](https://www.docker.com)
-* [Earthly](https://earthly.dev)
+## Usage
 
-**OR**
+$ cargo r --bin borealis -- --dump-ir ./target ../arm-v9.4-a_d43f3f4c.rkyv ../aarch64
 
-* [Rust toolchain](https://rustup.rs)
-* [OCaml toolchain](https://ocaml.org)
-* [Z3](https://github.com/Z3Prover/z3)
-* [GMP](https://gmplib.org)
-* [opam](https://opam.ocaml.org)
-* [Dune](https://dune.build)
-* [`sail` opam package](https://opam.ocaml.org/packages/sail/)
 
 ## Testing
 
