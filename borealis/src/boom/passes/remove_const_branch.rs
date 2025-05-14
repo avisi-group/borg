@@ -1,14 +1,16 @@
 //! Branches with a constant condition can be removed
 
 use {
-    crate::boom::{
-        Ast,
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::{Pass, any::AnyExt},
+    crate::{
+        boom::{
+            Ast,
+            control_flow::{ControlFlowBlock, Terminator},
+            passes::{Pass, any::AnyExt},
+        },
+        shared::Shared,
     },
     common::hashmap::HashSet,
     log::{debug, trace},
-    crate::shared::Shared,
 };
 
 /// Branches with a constant condition can be removed

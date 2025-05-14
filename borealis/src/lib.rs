@@ -13,6 +13,7 @@ use {
             },
         },
         example_fns::{example_functions, variable_corrupted_example},
+        name_resolution::resolve_names,
         rudder::{
             opt::{self, OptLevel},
             validator,
@@ -23,10 +24,9 @@ use {
     errctx::PathCtx,
     isla_lib::{
         bitvector::b64::B64,
-        ir::{Def, Instr, Name, Symtab},
+        ir::{Def, Instr, Symtab},
         ir_lexer::new_ir_lexer,
         ir_parser::IrParser,
-        smt::Sym,
     },
     log::{debug, info},
     once_cell::sync::Lazy,
@@ -39,6 +39,7 @@ use {
 
 pub mod boom;
 mod example_fns;
+pub mod name_resolution;
 pub mod rudder;
 pub mod shared;
 
@@ -53,7 +54,7 @@ pub fn parse_ir<'ir>(ir: &'ir str) -> Vec<Def<InternedString, B64>> {
         .parse(&mut symtab, new_ir_lexer(ir))
         .unwrap();
 
-    convert_names(defs, &symtab)
+    resolve_names(defs, &symtab)
 }
 
 #[derive(Debug, Clone)]
@@ -254,8 +255,4 @@ pub fn create_file_buffered<P: AsRef<Path>>(path: P) -> color_eyre::Result<BufWr
         .map(BufWriter::new)
         .map_err(PathCtx::f(path))
         .wrap_err("Failed to write to file")
-}
-
-fn convert_names(defs: Vec<Def<Name, B64>>, symtab: &Symtab) -> Vec<Def<InternedString, B64>> {
-    todo!()
 }

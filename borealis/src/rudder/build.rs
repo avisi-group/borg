@@ -163,7 +163,6 @@ impl BuildContext {
         match &*typ.get() {
             boom::Type::Unit => panic!("found unit"),
             boom::Type::String => Type::String,
-            // value
             boom::Type::Bool | boom::Type::Bit => Type::u1(),
             boom::Type::Float => Type::f64(),
             boom::Type::Real | boom::Type::Union { .. } | boom::Type::Struct { .. } => {
@@ -171,7 +170,6 @@ impl BuildContext {
                 log::warn!("should be removed by pass: {:?}", &*typ.get());
                 Type::new_primitive(PrimitiveType::UnsignedInteger(9999))
             }
-
             boom::Type::Vector { element_type } => {
                 let element_type = (self.resolve_type(element_type.clone())).clone();
                 // todo: Brian Campbell said the Sail C backend had functionality to staticize
@@ -212,6 +210,7 @@ impl BuildContext {
             boom::Type::Tuple(ts) => {
                 Type::Tuple(ts.iter().cloned().map(|t| self.resolve_type(t)).collect())
             }
+            boom::Type::RoundingMode => todo!(),
         }
     }
 }

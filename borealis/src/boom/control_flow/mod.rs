@@ -25,7 +25,7 @@ use {
     },
 };
 
-pub mod builder;
+//pub mod builder;
 pub mod dot;
 pub mod util;
 

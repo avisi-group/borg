@@ -366,7 +366,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
             Type::Bit => write!(self.writer, "bit"),
             Type::Real => write!(self.writer, "real"),
             Type::Float => write!(self.writer, "float"),
-
             Type::Integer { size } => {
                 write!(self.writer, "i").unwrap();
 
@@ -378,7 +377,6 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
 
                 Ok(())
             }
-
             Type::Bits { size } => {
                 write!(self.writer, "bv").unwrap();
                 match size {
@@ -423,6 +421,7 @@ impl<'writer, W: Write> Visitor for PrettyPrinter<'writer, W> {
                 });
                 write!(self.writer, ")")
             }
+            Type::RoundingMode => todo!(),
         }
         .unwrap()
     }

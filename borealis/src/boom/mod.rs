@@ -1,13 +1,12 @@
 //! Borealis Object Of Machine, Internal intermediate representation used to
 //! convert JIB AST to GenC AST
 
-#![allow(missing_docs)]
-
 use {
     crate::{
         boom::{
             self,
             control_flow::ControlFlowBlock,
+            convert::BoomEmitter,
             visitor::{Visitor, Walkable},
         },
         shared::Shared,
@@ -20,7 +19,7 @@ use {
 };
 
 pub mod control_flow;
-//pub mod convert;
+pub mod convert;
 pub mod passes;
 pub mod pretty_print;
 pub mod visitor;
@@ -43,10 +42,10 @@ pub struct Ast {
 impl Ast {
     /// Converts JIB AST into BOOM AST
     pub fn from_jib<I: IntoIterator<Item = Def<InternedString, B64>>>(iter: I) -> Shared<Self> {
-        // let mut emitter = BoomEmitter::new();
-        // emitter.process(iter);
+        let mut emitter = BoomEmitter::new();
+        emitter.process(iter);
 
-        let mut ast: boom::Ast = todo!(); // emitter.finish();
+        let mut ast: boom::Ast = emitter.finish();
 
         {
             ast.registers
@@ -55,11 +54,6 @@ impl Ast {
                 "current_exception".into(),
                 Shared::new(Type::Union {
                     name: InternedString::from_static("exception"),
-                    fields: ast
-                        .unions
-                        .get(&InternedString::from_static("exception"))
-                        .unwrap()
-                        .clone(),
                 }),
             );
             ast.registers
@@ -69,11 +63,6 @@ impl Ast {
         {
             let return_type = Shared::new(Type::Struct {
                 name: "tuple#%bv_%bv4".into(),
-                fields: ast
-                    .structs
-                    .get(&InternedString::from("tuple#%bv_%bv4"))
-                    .unwrap()
-                    .clone(),
             });
             let entry_block = ControlFlowBlock::new();
             entry_block.set_statements(vec![
@@ -294,16 +283,16 @@ pub enum Type {
         size: Size,
     },
 
+    RoundingMode,
+
     Constant(i64),
 
     Union {
         name: InternedString,
-        fields: Vec<NamedType>,
     },
 
     Struct {
         name: InternedString,
-        fields: Vec<NamedType>,
     },
 
     Tuple(Vec<Shared<Self>>),
@@ -313,7 +302,7 @@ pub enum Type {
     },
 
     FixedVector {
-        length: isize,
+        length: usize,
         element_type: Shared<Self>,
     },
 
@@ -353,11 +342,10 @@ impl Walkable for Shared<Type> {
             | Integer { .. }
             | Bits { .. }
             | Bit
-            | Union { .. } => {}
+            | RoundingMode
+            | Union { .. } => (),
 
-            Struct { fields, .. } => fields
-                .iter()
-                .for_each(|field| visitor.visit_named_type(field)),
+            Struct { .. } => (),
 
             Vector { element_type }
             | FixedVector { element_type, .. }

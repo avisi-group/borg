@@ -1,12 +1,14 @@
 use {
-    crate::boom::{
-        Ast, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
-        control_flow::{ControlFlowBlock, Terminator},
-        passes::Pass,
+    crate::{
+        boom::{
+            Ast, FunctionDefinition, NamedType, Parameter, Size, Statement, Type, Value,
+            control_flow::{ControlFlowBlock, Terminator},
+            passes::Pass,
+        },
+        shared::Shared,
     },
     common::intern::InternedString,
     rayon::iter::ParallelIterator,
-    crate::shared::Shared,
 };
 
 #[derive(Debug, Default)]
@@ -44,11 +46,14 @@ impl Pass for LowerReals {
         };
 
         // replace all real types with (i64, i64)
-        ast.get_mut().registers.values().for_each(try_replace_type);
+        ast.get_mut()
+            .registers
+            .values()
+            .for_each(|v| try_replace_type(&ast, v));
         ast.get_mut().structs.iter().for_each(|(_, fields)| {
             fields
                 .iter()
-                .for_each(|NamedType { typ, .. }| try_replace_type(typ));
+                .for_each(|NamedType { typ, .. }| try_replace_type(&ast, typ));
         });
         ast.get_mut().functions.par_values().for_each(
             |FunctionDefinition {
@@ -56,21 +61,21 @@ impl Pass for LowerReals {
                  entry_block,
              }| {
                 if let Some(ret) = &signature.return_type {
-                    try_replace_type(&ret);
+                    try_replace_type(&ast, &ret);
                 }
 
                 signature
                     .parameters
                     .get()
                     .iter()
-                    .for_each(|Parameter { typ, .. }| try_replace_type(&typ));
+                    .for_each(|Parameter { typ, .. }| try_replace_type(&ast, &typ));
 
                 entry_block
                     .iter()
                     .flat_map(|block| block.statements())
                     .for_each(|s| {
                         if let Statement::VariableDeclaration { typ, .. } = &*s.get() {
-                            try_replace_type(&typ);
+                            try_replace_type(&ast, &typ);
                         }
                     });
             },
@@ -80,7 +85,7 @@ impl Pass for LowerReals {
     }
 }
 
-fn try_replace_type(typ: &Shared<Type>) {
+fn try_replace_type(ast: &Shared<Ast>, typ: &Shared<Type>) {
     let mut typ = typ.get_mut();
     match &*typ {
         Type::Real => {
@@ -94,13 +99,17 @@ fn try_replace_type(typ: &Shared<Type>) {
             ])
         }
 
-        Type::Struct { fields, .. } => fields
+        Type::Struct { name } => ast
+            .get()
+            .structs
+            .get(name)
+            .unwrap()
             .iter()
-            .for_each(|NamedType { typ, .. }| try_replace_type(typ)),
-        Type::Tuple(vec) => vec.iter().for_each(try_replace_type),
+            .for_each(|NamedType { typ, .. }| try_replace_type(ast, typ)),
+        Type::Tuple(vec) => vec.iter().for_each(|t| try_replace_type(ast, t)),
 
         Type::Vector { element_type } | Type::FixedVector { element_type, .. } => {
-            try_replace_type(element_type)
+            try_replace_type(ast, element_type)
         }
 
         _ => (),
