@@ -3,18 +3,19 @@
 use {
     crate::{
         boom::{
-            self, Bit, FunctionDefinition, FunctionSignature, NamedType, Parameter, Size, Type,
-            control_flow::ControlFlowBlock,
+            self, Bit, FunctionDefinition, FunctionSignature, Literal, NamedType, Parameter, Size,
+            Type, control_flow::ControlFlowBlock,
         },
         shared::Shared,
     },
     common::{hashmap::HashMap, intern::InternedString},
     isla_lib::{
-        bitvector::b64::B64,
+        bitvector::{BV, b64::B64},
         ir::{Def, Exp, Instr, Loc, Ty},
     },
     itertools::Itertools,
-    std::{borrow::Borrow, collections::BTreeMap},
+    num_bigint::BigInt,
+    std::{borrow::Borrow, collections::BTreeMap, hash::Hash},
 };
 
 type Parameters = Vec<Shared<boom::Type>>;
@@ -68,6 +69,8 @@ impl BoomEmitter {
             );
         }
 
+        // external functions
+        // todo: handle this better from IR
         self.ast.functions.extend(self.function_types.iter().map(
             |(name, (parameters, return_type))| {
                 (
@@ -99,34 +102,40 @@ impl BoomEmitter {
     fn process_definition(&mut self, definition: &Def<InternedString, B64>) {
         match definition {
             Def::Register(ident, typ, body) => {
-                self.ast.registers.insert(*ident, convert_type(typ));
-                self.register_init_statements
-                    .extend(body.iter().flat_map(convert_instruction));
+                self.ast.registers.insert(*ident, self.convert_type(typ));
+                let mut statements = body
+                    .iter()
+                    .flat_map(|i| self.convert_instruction(i))
+                    .collect::<Vec<_>>();
+                self.register_init_statements.append(&mut statements);
             }
             Def::Enum(name, variants) => {
                 self.ast.enums.insert(*name, variants.clone());
             }
             Def::Struct(name, fields) => {
-                self.ast
-                    .structs
-                    .insert(*name, convert_fields(fields.iter()));
+                let fields = self.convert_fields(fields.iter());
+                self.ast.structs.insert(*name, fields);
             }
             Def::Union(name, fields) => {
-                self.ast.unions.insert(*name, convert_fields(fields.iter()));
+                let fields = self.convert_fields(fields.iter());
+                self.ast.unions.insert(*name, fields);
             }
             Def::Let(bindings, body) => {
                 bindings.iter().for_each(|(ident, typ)| {
-                    self.ast.registers.insert(*ident, convert_type(typ));
+                    self.ast.registers.insert(*ident, self.convert_type(typ));
                 });
-                self.register_init_statements
-                    .extend(body.iter().flat_map(convert_instruction));
+                let mut statements = body
+                    .iter()
+                    .flat_map(|i| self.convert_instruction(i))
+                    .collect::<Vec<_>>();
+                self.register_init_statements.append(&mut statements);
             }
-            Def::Val(id, parameters, out) => {
+            Def::Extern(id, _, _, parameters, out) | Def::Val(id, parameters, out) => {
                 self.function_types.insert(
                     *id,
                     (
-                        parameters.iter().map(convert_type).collect(),
-                        convert_type(out),
+                        parameters.iter().map(|t| self.convert_type(t)).collect(),
+                        self.convert_type(out),
                     ),
                 );
             }
@@ -142,16 +151,18 @@ impl BoomEmitter {
                         .collect::<Vec<_>>(),
                 );
 
-                let mut entry_block = convert_body(body.as_ref());
+                let entry_block = self.convert_body(body.as_ref());
 
                 // // make implicit return variable explicit
-                // body.insert(
-                //     0,
-                //     Shared::new(boom::Statement::VariableDeclaration {
-                //         name: "return".into(),
-                //         typ: return_type.clone(),
-                //     }),
-                // );
+                let mut statements = entry_block.statements();
+                statements.insert(
+                    0,
+                    Shared::new(boom::Statement::VariableDeclaration {
+                        name: "return".into(),
+                        typ: return_type.clone(),
+                    }),
+                );
+                entry_block.set_statements(statements);
 
                 self.ast.functions.insert(
                     *name,
@@ -171,224 +182,266 @@ impl BoomEmitter {
                     InternedString::from(value.as_str()),
                 );
             }
-            Def::Extern(_, _, _, items, ty) => todo!(),
-            Def::Files(items) => todo!(),
+
+            Def::Files(items) => log::warn!("files: {items:?}"),
         };
     }
-}
 
-fn convert_type<T: Borrow<Ty<InternedString>>>(typ: T) -> Shared<boom::Type> {
-    Shared::new(match typ.borrow() {
-        Ty::I64 => boom::Type::Integer {
-            size: Size::Static(64),
-        },
-        Ty::I128 => boom::Type::Integer {
-            size: Size::Static(128),
-        },
-        Ty::AnyBits => boom::Type::Bits {
-            size: Size::Unknown,
-        },
-        Ty::Bits(width) => boom::Type::Bits {
-            size: Size::Static(usize::try_from(*width).unwrap()),
-        },
-        Ty::Float(fpty) => boom::Type::Float, // todo: properly handle floating point type
+    /// Converts fields of a struct or union from JIB to BOOM
+    ///
+    /// Generics are required to be able to convert from
+    /// `LinkedList<((Identifier, LinkedList<Type>), Box<Type>)>` *and*
+    /// `LinkedList<((Identifier, LinkedList<Type>), Type)>`.
+    fn convert_fields<
+        'a,
+        TYPE: Borrow<Ty<InternedString>> + 'a,
+        ITER: IntoIterator<Item = &'a (InternedString, TYPE)>,
+    >(
+        &self,
+        fields: ITER,
+    ) -> Vec<NamedType> {
+        fields
+            .into_iter()
+            .map(|(name, typ)| NamedType {
+                name: *name,
+                typ: self.convert_type(typ.borrow()),
+            })
+            .collect()
+    }
 
-        Ty::Unit => boom::Type::Unit,
-        Ty::Bool => boom::Type::Bool,
-        Ty::Bit => boom::Type::Bit,
-        Ty::String => boom::Type::String,
-        Ty::Real => boom::Type::Real,
-        Ty::RoundingMode => boom::Type::RoundingMode,
+    fn convert_type<T: Borrow<Ty<InternedString>>>(&self, typ: T) -> Shared<boom::Type> {
+        Shared::new(match typ.borrow() {
+            Ty::I64 => boom::Type::Integer {
+                size: Size::Static(64),
+            },
+            Ty::I128 => boom::Type::Integer {
+                size: Size::Static(128),
+            },
+            Ty::AnyBits => boom::Type::Bits {
+                size: Size::Unknown,
+            },
+            Ty::Bits(width) => boom::Type::Bits {
+                size: Size::Static(usize::try_from(*width).unwrap()),
+            },
+            Ty::Float(fpty) => boom::Type::Float, // todo: properly handle floating point type
 
-        Ty::FixedVector(length, ty) => boom::Type::FixedVector {
-            length: usize::try_from(*length).unwrap(),
-            element_type: convert_type(&**ty),
-        },
-        Ty::Vector(ty) | Ty::List(ty) => boom::Type::Vector {
-            element_type: (convert_type(&**ty)),
-        },
-        Ty::Ref(ty) => boom::Type::Reference(convert_type(&**ty)),
+            Ty::Unit => boom::Type::Unit,
+            Ty::Bool => boom::Type::Bool,
+            Ty::Bit => boom::Type::Bit,
+            Ty::String => boom::Type::String,
+            Ty::Real => boom::Type::Real,
+            Ty::RoundingMode => boom::Type::RoundingMode,
 
-        // enums are constants
-        Ty::Enum(_) => boom::Type::Integer {
-            size: Size::Static(32),
-        },
-        Ty::Struct(name) => boom::Type::Struct { name: *name },
-        Ty::Union(name) => boom::Type::Union { name: *name },
-    })
-}
+            Ty::FixedVector(length, ty) => boom::Type::FixedVector {
+                length: usize::try_from(*length).unwrap(),
+                element_type: self.convert_type(&**ty),
+            },
+            Ty::Vector(ty) | Ty::List(ty) => boom::Type::Vector {
+                element_type: (self.convert_type(&**ty)),
+            },
+            Ty::Ref(ty) => self.convert_type(&**ty).get().clone(),
 
-fn convert_body(instructions: &[Instr<InternedString, B64>]) -> ControlFlowBlock {
-    let entry = ControlFlowBlock::new();
+            // enums are constants
+            Ty::Enum(_) => boom::Type::Integer {
+                size: Size::Static(32),
+            },
+            Ty::Struct(name) => boom::Type::Struct {
+                name: *name,
+                fields: self.ast.structs.get(name).unwrap().clone(),
+            },
+            Ty::Union(name) => boom::Type::Union {
+                name: *name,
+                fields: self.ast.unions.get(name).unwrap().clone(),
+            },
+        })
+    }
+    fn convert_body(&self, instructions: &[Instr<InternedString, B64>]) -> ControlFlowBlock {
+        let entry = ControlFlowBlock::new();
 
-    let mut current_block = entry.clone();
-    let mut iter = instructions.iter().enumerate();
-    let mut block_locations = BTreeMap::<usize, ControlFlowBlock>::new();
+        let mut current_block = entry.clone();
+        let mut iter = instructions.iter().enumerate();
+        let mut block_locations = BTreeMap::<usize, ControlFlowBlock>::new();
 
-    let mut current_statements = vec![];
+        let mut current_statements = vec![];
 
-    // for every instruction in the body
-    while let Some((idx, instr)) = iter.next() {
-        // if the current index was the target of a jump, start a new block
-        if let Some(next_block) = block_locations.get(&idx) {
-            current_block.set_statements(current_statements.clone());
-            current_statements.clear();
-
-            current_block.set_terminator(boom::control_flow::Terminator::Unconditional {
-                target: next_block.clone(),
-            });
-            next_block.add_parent(&current_block);
-
-            current_block = ControlFlowBlock::new();
-        }
-
-        match instr {
-            // unconditional jump
-            Instr::Goto(target) => {
-                let target_block = block_locations
-                    .entry(*target)
-                    .or_insert_with(ControlFlowBlock::new);
-
+        // for every instruction in the body
+        while let Some((idx, instr)) = iter.next() {
+            // if the current index was the target of a jump, start a new block
+            if let Some(next_block) = block_locations.get(&idx) {
                 current_block.set_statements(current_statements.clone());
                 current_statements.clear();
 
                 current_block.set_terminator(boom::control_flow::Terminator::Unconditional {
-                    target: target_block.clone(),
+                    target: next_block.clone(),
                 });
-                target_block.add_parent(&current_block);
+                next_block.add_parent(&current_block);
 
                 current_block = ControlFlowBlock::new();
             }
 
-            // conditional jump
-            Instr::Jump(condition, target, _) => {
-                let fallthrough_block = ControlFlowBlock::new();
+            match instr {
+                // unconditional jump
+                Instr::Goto(target) => {
+                    let target_block = block_locations
+                        .entry(*target)
+                        .or_insert_with(ControlFlowBlock::new);
 
-                let target_block = block_locations
-                    .entry(*target)
-                    .or_insert_with(ControlFlowBlock::new);
+                    current_block.set_statements(current_statements.clone());
+                    current_statements.clear();
 
-                current_block.set_statements(current_statements.clone());
-                current_statements.clear();
+                    current_block.set_terminator(boom::control_flow::Terminator::Unconditional {
+                        target: target_block.clone(),
+                    });
+                    target_block.add_parent(&current_block);
 
-                current_block.set_terminator(boom::control_flow::Terminator::Conditional {
-                    condition: convert_expression(condition).get().clone(),
-                    target: target_block.clone(),
-                    fallthrough: fallthrough_block.clone(),
-                });
-                target_block.add_parent(&current_block);
+                    current_block = ControlFlowBlock::new();
+                }
 
-                current_block = fallthrough_block;
+                // conditional jump
+                Instr::Jump(condition, target, _) => {
+                    let fallthrough_block = ControlFlowBlock::new();
+
+                    let target_block = block_locations
+                        .entry(*target)
+                        .or_insert_with(ControlFlowBlock::new);
+
+                    current_block.set_statements(current_statements.clone());
+                    current_statements.clear();
+
+                    current_block.set_terminator(boom::control_flow::Terminator::Conditional {
+                        condition: convert_expression(condition).get().clone(),
+                        target: target_block.clone(),
+                        fallthrough: fallthrough_block.clone(),
+                    });
+                    target_block.add_parent(&current_block);
+
+                    current_block = fallthrough_block;
+                }
+                // return
+                Instr::End => {
+                    current_block.set_statements(current_statements.clone());
+                    current_statements.clear();
+
+                    current_block.set_terminator(boom::control_flow::Terminator::Return(Some(
+                        boom::Value::Identifier("return".into()),
+                    )));
+
+                    current_block = ControlFlowBlock::new();
+                }
+                // panic
+                Instr::Exit(cause, _) => {
+                    current_block.set_statements(current_statements.clone());
+                    current_statements.clear();
+
+                    current_block.set_terminator(boom::control_flow::Terminator::Panic(
+                        boom::Value::Literal(Shared::new(boom::Literal::String(
+                            format!("{cause:?}").into(),
+                        ))),
+                    ));
+
+                    current_block = ControlFlowBlock::new();
+                }
+                _ => current_statements.extend_from_slice(&self.convert_instruction(instr)),
             }
-            // return
-            Instr::End => {
-                current_block.set_statements(current_statements.clone());
-                current_statements.clear();
-
-                current_block.set_terminator(boom::control_flow::Terminator::Return(Some(
-                    boom::Value::Identifier("return".into()),
-                )));
-
-                current_block = ControlFlowBlock::new();
-            }
-            // panic
-            Instr::Exit(cause, _) => {
-                current_block.set_statements(current_statements.clone());
-                current_statements.clear();
-
-                current_block.set_terminator(boom::control_flow::Terminator::Panic(
-                    boom::Value::Literal(Shared::new(boom::Literal::String(
-                        format!("{cause:?}").into(),
-                    ))),
-                ));
-
-                current_block = ControlFlowBlock::new();
-            }
-            _ => current_statements.extend_from_slice(&convert_instruction(instr)),
         }
+
+        entry
     }
 
-    entry
-}
+    fn convert_instruction(
+        &self,
+        instr: &Instr<InternedString, B64>,
+    ) -> Vec<Shared<boom::Statement>> {
+        // jib_ast::InstructionAux::Decl(typ, name) =>
 
-fn convert_instruction(instr: &Instr<InternedString, B64>) -> Vec<Shared<boom::Statement>> {
-    // jib_ast::InstructionAux::Decl(typ, name) =>
+        // jib_ast::InstructionAux::Init(typ, name, value) =>
 
-    // jib_ast::InstructionAux::Init(typ, name, value) =>
+        // jib_ast::InstructionAux::Jump(condition, target) =>
+        // vec![boom::Statement::Jump {     condition: convert_value(condition),
+        //     target: *target,
+        // }],
+        // jib_ast::InstructionAux::Goto(s) => vec![boom::Statement::Goto(*s)],
+        // jib_ast::InstructionAux::Label(s) => vec![boom::Statement::Label(*s)],
+        // jib_ast::InstructionAux::Funcall(ret, _, (name, _), args) => {
+        //     let CReturn::One(expression) = ret else {
+        //         todo!()
+        //     };
+        //     vec![boom::Statement::FunctionCall {
+        //         expression: convert_expression(expression),
+        //         name: name.as_interned(),
+        //         arguments: args.iter().map(convert_value).collect(),
+        //     }]
+        // }
+        // jib_ast::InstructionAux::Copy(expression, value) =>
+        // vec![boom::Statement::Copy {     expression:
+        // convert_expression(expression).unwrap(),     value: convert_value(value),
+        // }],
+        // jib_ast::InstructionAux::Clear(_, _) => vec![],
+        // jib_ast::InstructionAux::Undefined(_) => vec![boom::Statement::Undefined],
+        // jib_ast::InstructionAux::Exit(s) => vec![boom::Statement::Exit(*s)],
+        // jib_ast::InstructionAux::End(name) =>
+        // vec![boom::Statement::End(convert_name(name))],
+        // jib_ast::InstructionAux::If(condition, if_body, else_body, _) => {
+        //     vec![boom::Statement::If {
+        //         condition: convert_value(condition),
+        //         if_body: convert_body(if_body.as_ref()),
+        //         else_body: convert_body(else_body.as_ref()),
+        //     }]
+        // }
 
-    // jib_ast::InstructionAux::Jump(condition, target) =>
-    // vec![boom::Statement::Jump {     condition: convert_value(condition),
-    //     target: *target,
-    // }],
-    // jib_ast::InstructionAux::Goto(s) => vec![boom::Statement::Goto(*s)],
-    // jib_ast::InstructionAux::Label(s) => vec![boom::Statement::Label(*s)],
-    // jib_ast::InstructionAux::Funcall(ret, _, (name, _), args) => {
-    //     let CReturn::One(expression) = ret else {
-    //         todo!()
-    //     };
-    //     vec![boom::Statement::FunctionCall {
-    //         expression: convert_expression(expression),
-    //         name: name.as_interned(),
-    //         arguments: args.iter().map(convert_value).collect(),
-    //     }]
-    // }
-    // jib_ast::InstructionAux::Copy(expression, value) =>
-    // vec![boom::Statement::Copy {     expression:
-    // convert_expression(expression).unwrap(),     value: convert_value(value),
-    // }],
-    // jib_ast::InstructionAux::Clear(_, _) => vec![],
-    // jib_ast::InstructionAux::Undefined(_) => vec![boom::Statement::Undefined],
-    // jib_ast::InstructionAux::Exit(s) => vec![boom::Statement::Exit(*s)],
-    // jib_ast::InstructionAux::End(name) =>
-    // vec![boom::Statement::End(convert_name(name))],
-    // jib_ast::InstructionAux::If(condition, if_body, else_body, _) => {
-    //     vec![boom::Statement::If {
-    //         condition: convert_value(condition),
-    //         if_body: convert_body(if_body.as_ref()),
-    //         else_body: convert_body(else_body.as_ref()),
-    //     }]
-    // }
+        // jib_ast::InstructionAux::Throw(value) => {
+        //     vec![boom::Statement::Panic(convert_value(value))]
+        // }
+        // jib_ast::InstructionAux::Comment(s) => vec![boom::Statement::Comment(*s)],
 
-    // jib_ast::InstructionAux::Throw(value) => {
-    //     vec![boom::Statement::Panic(convert_value(value))]
-    // }
-    // jib_ast::InstructionAux::Comment(s) => vec![boom::Statement::Comment(*s)],
+        let statements = match instr {
+            Instr::Decl(name, ty, _) => vec![boom::Statement::VariableDeclaration {
+                name: *name,
+                typ: self.convert_type(ty),
+            }],
+            Instr::Init(name, ty, exp, _) => {
+                vec![
+                    boom::Statement::VariableDeclaration {
+                        name: *name,
+                        typ: self.convert_type(ty),
+                    },
+                    boom::Statement::Copy {
+                        expression: boom::Expression::Identifier(*name),
+                        value: convert_expression(exp),
+                    },
+                ]
+            }
 
-    let statements = match instr {
-        Instr::Decl(name, ty, _) => vec![boom::Statement::VariableDeclaration {
-            name: *name,
-            typ: convert_type(ty),
-        }],
-        Instr::Init(name, ty, exp, source_loc) => {
-            vec![
-                boom::Statement::VariableDeclaration {
-                    name: *name,
-                    typ: convert_type(ty),
-                },
-                boom::Statement::Copy {
-                    expression: boom::Expression::Identifier(*name),
+            Instr::Copy(loc, exp, _) => {
+                vec![boom::Statement::Copy {
+                    expression: convert_location(loc),
                     value: convert_expression(exp),
-                },
-            ]
-        }
+                }]
+            }
+            Instr::Monomorphize(_, source_loc) => todo!(),
+            Instr::Call(loc, _, name, args, source_loc) => {
+                let expression = convert_location(loc);
+                vec![boom::Statement::FunctionCall {
+                    expression: Some(expression),
+                    name: *name,
+                    arguments: args.iter().map(convert_expression).collect(),
+                }]
+            }
+            Instr::PrimopUnary(loc, _, exp, source_loc) => todo!(),
+            Instr::PrimopBinary(loc, _, exp, exp1, source_loc) => todo!(),
+            Instr::PrimopVariadic(loc, _, exps, source_loc) => todo!(),
+            Instr::PrimopReset(loc, _, source_loc) => todo!(),
 
-        Instr::Copy(loc, exp, source_loc) => todo!(),
-        Instr::Monomorphize(_, source_loc) => todo!(),
-        Instr::Call(loc, _, _, exps, source_loc) => todo!(),
-        Instr::PrimopUnary(loc, _, exp, source_loc) => todo!(),
-        Instr::PrimopBinary(loc, _, exp, exp1, source_loc) => todo!(),
-        Instr::PrimopVariadic(loc, _, exps, source_loc) => todo!(),
-        Instr::PrimopReset(loc, _, source_loc) => todo!(),
+            Instr::Arbitrary => vec![boom::Statement::Undefined],
 
-        Instr::Arbitrary => todo!(),
+            Instr::Jump(..) => unreachable!("jump"),
+            Instr::Goto(_) => unreachable!("goto"),
+            Instr::Exit(..) => unreachable!("exit"),
+            Instr::End => unreachable!("end"),
+        };
 
-        Instr::Jump(..) => unreachable!("jump"),
-        Instr::Goto(_) => unreachable!("goto"),
-        Instr::Exit(..) => unreachable!("exit"),
-        Instr::End => unreachable!("end"),
-    };
-
-    statements.into_iter().map(Shared::new).collect()
+        statements.into_iter().map(Shared::new).collect()
+    }
 }
 
 // fn convert_name(name: &jib_ast::Name) -> InternedString {
@@ -430,22 +483,87 @@ fn convert_location(location: &Loc<InternedString>) -> boom::Expression {
 fn convert_expression(expression: &Exp<InternedString>) -> Shared<boom::Value> {
     Shared::new(match expression {
         Exp::Id(id) => boom::Value::Identifier(*id),
-        Exp::Ref(_) => todo!(),
-        Exp::Bool(_) => todo!(),
-        Exp::Bits(b64) => todo!(),
-        Exp::String(_) => todo!(),
-        Exp::Unit => todo!(),
-        Exp::I64(_) => todo!(),
-        Exp::I128(_) => todo!(),
-        Exp::Undefined(ty) => todo!(),
-        Exp::Struct(_, items) => todo!(),
-        Exp::Kind(_, exp) => todo!(),
-        Exp::Unwrap(_, exp) => todo!(),
+        Exp::Ref(id) => boom::Value::Identifier(*id), /* todo: fix this */
+        Exp::Bool(b) => boom::Value::Literal(Shared::new(boom::Literal::Bool(*b))),
+        Exp::Bits(bits) => boom::Value::Literal(Shared::new(boom::Literal::Bits(
+            // todo: use bits type in rest of codebase
+            bits.to_vec()
+                .into_iter()
+                .map(|b| if b { boom::Bit::One } else { boom::Bit::Zero })
+                .collect(),
+        ))),
+        Exp::String(s) => {
+            boom::Value::Literal(Shared::new(boom::Literal::String(s.as_str().into())))
+        }
+        Exp::Unit => boom::Value::Literal(Shared::new(boom::Literal::Unit)),
+        Exp::I64(i) => boom::Value::Literal(Shared::new(boom::Literal::Int(BigInt::from(*i)))),
+        Exp::I128(i) => boom::Value::Literal(Shared::new(boom::Literal::Int(BigInt::from(*i)))),
+        Exp::Undefined(ty) => boom::Value::Literal(Shared::new(boom::Literal::Undefined)), /* todo: use type somehow? */
+        Exp::Struct(name, fields) => boom::Value::Struct {
+            name: *name,
+            fields: fields
+                .iter()
+                .map(|(ident, value)| boom::NamedValue {
+                    name: *ident,
+                    value: convert_expression(value),
+                })
+                .collect(),
+        },
+        Exp::Kind(name, exp) => boom::Value::CtorKind {
+            value: (convert_expression(exp)),
+            identifier: *name,
+        },
+        Exp::Unwrap(name, exp) => boom::Value::CtorUnwrap {
+            value: (convert_expression(exp)),
+            identifier: *name,
+        },
         Exp::Field(exp, field) => boom::Value::Field {
-            value: convert_expression(expression),
+            value: convert_expression(exp),
             field_name: *field,
         },
-        Exp::Call(op, exps) => todo!(),
+        Exp::Call(op, values) => {
+            let values = values.iter().map(convert_expression).collect::<Vec<_>>();
+
+            let op = match op {
+                isla_lib::ir::Op::Not => boom::Operation::Not(values[0].clone()),
+                isla_lib::ir::Op::Or => todo!(),
+                isla_lib::ir::Op::And => todo!(),
+                isla_lib::ir::Op::Eq => todo!(),
+                isla_lib::ir::Op::Neq => boom::Operation::Not(Shared::new(boom::Value::Operation(
+                    boom::Operation::Equal(values[0].clone(), values[1].clone()),
+                ))),
+                isla_lib::ir::Op::Lteq => todo!(),
+                isla_lib::ir::Op::Lt => {
+                    boom::Operation::LessThan(values[0].clone(), values[1].clone())
+                }
+                isla_lib::ir::Op::Gteq => todo!(),
+                isla_lib::ir::Op::Gt => {
+                    boom::Operation::GreaterThan(values[0].clone(), values[1].clone())
+                }
+                isla_lib::ir::Op::Add => boom::Operation::Add(values[0].clone(), values[1].clone()),
+                isla_lib::ir::Op::Sub => {
+                    boom::Operation::Subtract(values[0].clone(), values[1].clone())
+                }
+                isla_lib::ir::Op::Slice(_) => todo!(),
+                isla_lib::ir::Op::SetSlice => todo!(),
+                isla_lib::ir::Op::Signed(_) => todo!(),
+                isla_lib::ir::Op::Unsigned(_) => todo!(),
+                isla_lib::ir::Op::ZeroExtend(_) => todo!(),
+                isla_lib::ir::Op::Bvnot => todo!(),
+                isla_lib::ir::Op::Bvor => todo!(),
+                isla_lib::ir::Op::Bvxor => todo!(),
+                isla_lib::ir::Op::Bvand => todo!(),
+                isla_lib::ir::Op::Bvadd => todo!(),
+                isla_lib::ir::Op::Bvsub => todo!(),
+                isla_lib::ir::Op::Bvaccess => todo!(),
+                isla_lib::ir::Op::Concat => todo!(),
+                isla_lib::ir::Op::Head => todo!(),
+                isla_lib::ir::Op::Tail => todo!(),
+                isla_lib::ir::Op::IsEmpty => todo!(),
+            };
+
+            boom::Value::Operation(op)
+        }
     })
 }
 
@@ -478,51 +596,7 @@ fn convert_expression(expression: &Exp<InternedString>) -> Shared<boom::Value> {
 //         },
 //         jib_ast::Value::TupleMember(_, _, _) => todo!(),
 //         jib_ast::Value::Call(op, values) => {
-//             let values =
-// values.iter().map(convert_value).collect::<Vec<_>>();
 
-//             let op = match op {
-//                 jib_ast::Op::Bnot => boom::Operation::Not(values[0].clone()),
-//                 jib_ast::Op::Bor => todo!(),
-//                 jib_ast::Op::Band => todo!(),
-//                 jib_ast::Op::ListHead => todo!(),
-//                 jib_ast::Op::ListTail => todo!(),
-//                 jib_ast::Op::Eq => todo!(),
-//                 jib_ast::Op::Neq =>
-// boom::Operation::Not(Shared::new(boom::Value::Operation(
-// boom::Operation::Equal(values[0].clone(), values[1].clone()),
-// ))),                 jib_ast::Op::Ite => todo!(),
-//                 jib_ast::Op::Ilt =>
-// boom::Operation::LessThan(values[0].clone(), values[1].clone()),
-
-//                 jib_ast::Op::Ilteq => todo!(),
-//                 jib_ast::Op::Igt => {
-//                     boom::Operation::GreaterThan(values[0].clone(),
-// values[1].clone())                 }
-//                 jib_ast::Op::Igteq => todo!(),
-//                 jib_ast::Op::Iadd => boom::Operation::Add(values[0].clone(),
-// values[1].clone()),                 jib_ast::Op::Isub => {
-//                     boom::Operation::Subtract(values[0].clone(),
-// values[1].clone())                 }
-//                 jib_ast::Op::Unsigned(_) => todo!(),
-//                 jib_ast::Op::Signed(_) => todo!(),
-//                 jib_ast::Op::Bvnot => todo!(),
-//                 jib_ast::Op::Bvor => todo!(),
-//                 jib_ast::Op::Bvand => todo!(),
-//                 jib_ast::Op::Bvxor => todo!(),
-//                 jib_ast::Op::Bvadd => todo!(),
-//                 jib_ast::Op::Bvsub => todo!(),
-//                 jib_ast::Op::Bvaccess => todo!(),
-//                 jib_ast::Op::Concat => todo!(),
-//                 jib_ast::Op::ZeroExtend(_) => todo!(),
-//                 jib_ast::Op::SignExtend(_) => todo!(),
-//                 jib_ast::Op::Slice(_) => todo!(),
-//                 jib_ast::Op::Sslice(_) => todo!(),
-//                 jib_ast::Op::SetSlice => todo!(),
-//                 jib_ast::Op::Replicate(_) => todo!(),
-//                 jib_ast::Op::ListIsEmpty => todo!(),
-//             };
-//             boom::Value::Operation(op)
 //         }
 //         jib_ast::Value::Field(value, ident) => boom::Value::Field {
 //             value: (convert_value(value)),
@@ -574,24 +648,3 @@ fn convert_expression(expression: &Exp<InternedString>) -> Shared<boom::Value> {
 //         jib_ast::BitU::BU => Bit::Unknown,
 //     }
 // }
-
-/// Converts fields of a struct or union from JIB to BOOM
-///
-/// Generics are required to be able to convert from `LinkedList<((Identifier,
-/// LinkedList<Type>), Box<Type>)>` *and* `LinkedList<((Identifier,
-/// LinkedList<Type>), Type)>`.
-fn convert_fields<
-    'a,
-    TYPE: Borrow<Ty<InternedString>> + 'a,
-    ITER: IntoIterator<Item = &'a (InternedString, TYPE)>,
->(
-    fields: ITER,
-) -> Vec<NamedType> {
-    fields
-        .into_iter()
-        .map(|(name, typ)| NamedType {
-            name: *name,
-            typ: convert_type(typ.borrow()),
-        })
-        .collect()
-}

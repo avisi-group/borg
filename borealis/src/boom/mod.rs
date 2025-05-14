@@ -54,15 +54,27 @@ impl Ast {
                 "current_exception".into(),
                 Shared::new(Type::Union {
                     name: InternedString::from_static("exception"),
+                    fields: ast
+                        .unions
+                        .get(&InternedString::from_static("exception"))
+                        .unwrap()
+                        .clone(),
                 }),
             );
             ast.registers
                 .insert("throw".into(), Shared::new(Type::String));
+            ast.registers
+                .insert("throw_location".into(), Shared::new(Type::String));
         }
 
         {
             let return_type = Shared::new(Type::Struct {
-                name: "tuple#%bv_%bv4".into(),
+                name: "tuplez3z5bv_z5bv4".into(),
+                fields: ast
+                    .structs
+                    .get(&InternedString::from("tuplez3z5bv_z5bv4"))
+                    .unwrap()
+                    .clone(),
             });
             let entry_block = ControlFlowBlock::new();
             entry_block.set_statements(vec![
@@ -289,10 +301,12 @@ pub enum Type {
 
     Union {
         name: InternedString,
+        fields: Vec<NamedType>,
     },
 
     Struct {
         name: InternedString,
+        fields: Vec<NamedType>,
     },
 
     Tuple(Vec<Shared<Self>>),
@@ -513,12 +527,12 @@ pub enum Value {
     CtorKind {
         value: Shared<Self>,
         identifier: InternedString,
-        types: Vec<Shared<Type>>,
+        // types: Vec<Shared<Type>>,
     },
     CtorUnwrap {
         value: Shared<Self>,
         identifier: InternedString,
-        types: Vec<Shared<Type>>,
+        //  types: Vec<Shared<Type>>,
     },
     Tuple(Vec<Shared<Self>>),
     VectorAccess {
@@ -596,9 +610,8 @@ impl Walkable for Value {
                 .iter()
                 .for_each(|field| visitor.visit_named_value(field)),
             Value::Field { value, .. } => visitor.visit_value(value.clone()),
-            Value::CtorKind { value, types, .. } | Value::CtorUnwrap { value, types, .. } => {
+            Value::CtorKind { value, .. } | Value::CtorUnwrap { value, .. } => {
                 visitor.visit_value(value.clone());
-                types.iter().for_each(|typ| visitor.visit_type(typ.clone()));
             }
             Value::Tuple(values) => values.iter().for_each(|v| visitor.visit_value(v.clone())),
             Value::VectorAccess { value, index } => {

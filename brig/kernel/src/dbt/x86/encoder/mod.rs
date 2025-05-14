@@ -365,6 +365,7 @@ pub enum SegmentRegister {
 pub enum Register {
     PhysicalRegister(PhysicalRegister),
     VirtualRegister(usize),
+    GlobalRegister(usize)
 }
 
 impl Display for Register {
@@ -372,6 +373,7 @@ impl Display for Register {
         match self {
             Register::PhysicalRegister(pr) => write!(f, "%{pr}"),
             Register::VirtualRegister(vr) => write!(f, "v{vr}"),
+            Register::GlobalRegister(gr) => write!(f, "g{gr}"),
         }
     }
 }
@@ -521,6 +523,13 @@ impl<A: Alloc> Operand<A> {
     pub fn vreg(width_in_bits: Width, reg: usize) -> Operand<A> {
         Operand {
             kind: OperandKind::Register(Register::VirtualRegister(reg)),
+            width_in_bits: (width_in_bits),
+        }
+    }
+
+    pub fn greg(width_in_bits: Width, reg: usize) -> Operand<A> {
+        Operand {
+            kind: OperandKind::Register(Register::GlobalRegister(reg)),
             width_in_bits: (width_in_bits),
         }
     }

@@ -41,6 +41,8 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
         .iter()
         .for_each(|(name, definition)| build_ctx.add_function(*name, definition));
 
+    build_ctx.enums = ast.enums.clone();
+
     build_ctx.unions = ast
         .unions
         .values()
@@ -80,9 +82,9 @@ pub fn from_boom(ast: &boom::Ast) -> Model {
 
 #[derive(Default)]
 struct BuildContext {
-    /// Name of enum maps to the rudder type and a map of enum variants to the
-    /// integer discriminant of that variant
-    enums: HashMap<InternedString, (Type, HashMap<InternedString, u32>)>,
+    /// Name of enum maps to the rudder type and the index of each enum variants
+    /// is the integer discriminant
+    enums: HashMap<InternedString, Vec<InternedString>>,
 
     /// Union variant to type and tag map
     unions: HashMap<InternedString, (Option<Type>, u32)>,
@@ -1817,14 +1819,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                 }
 
                 // enum
-                if let Some(_) = self
-                    .ctx()
-                    .enums
-                    .iter()
-                    .find_map(|(_, (_, variants))| variants.get(ident))
-                    .cloned()
-                {
-                    panic!("these should be members now?");
+                if let Some((idx, _)) = self.ctx().enums.iter().find_map(|(_, variants)| {
+                    variants.iter().enumerate().find(|(_, c)| **c == *ident)
+                }) {
+                    return build(
+                        self.block,
+                        self.block_arena_mut(),
+                        Statement::Constant(Constant::new_signed(i64::try_from(idx).unwrap(), 32)),
+                    );
                 }
 
                 panic!(

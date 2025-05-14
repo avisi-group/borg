@@ -10,9 +10,9 @@ use {
         shared::Shared,
     },
     common::{hashmap::HashMap, intern::InternedString},
-    itertools::{Itertools, structs},
+    itertools::Itertools,
     rayon::iter::{IntoParallelRefIterator, ParallelIterator},
-    std::fmt::{self, Display},
+    std::{fmt, fmt::Display},
 };
 
 #[derive(Debug, Default)]
@@ -33,8 +33,28 @@ impl Pass for DestructComposites {
     fn reset(&mut self) {}
 
     fn run(&mut self, ast: Shared<Ast>) -> bool {
-        let unions = ast.get().unions.clone();
-        let structs = ast.get().structs.clone();
+        let composites = {
+            let mut map = HashMap::default();
+            map.extend(ast.get().unions.iter().map(|(name, fields)| {
+                (
+                    *name,
+                    Shared::new(Type::Union {
+                        name: *name,
+                        fields: fields.clone(),
+                    }),
+                )
+            }));
+            map.extend(ast.get().structs.iter().map(|(name, fields)| {
+                (
+                    *name,
+                    Shared::new(Type::Struct {
+                        name: *name,
+                        fields: fields.clone(),
+                    }),
+                )
+            }));
+            map
+        };
 
         let destructed_registers = destruct_registers(ast.clone());
 
@@ -46,8 +66,7 @@ impl Pass for DestructComposites {
         ast.get().functions.par_iter().for_each(|(name, def)| {
             destruct_locals(
                 *name,
-                &unions,
-                &structs,
+                &composites,
                 &destructed_registers,
                 &destructed_return_type_by_function,
                 &destructed_parameters_by_function,
@@ -97,7 +116,7 @@ impl DataLocation {
     }
 
     pub fn try_from(value: Shared<Value>) -> Option<Self> {
-        fn build_fields(value: Shared<Value>) -> (InternedString, Vec<InternedString>) {
+        fn build_fields(value: Shared<Value>) -> Option<(InternedString, Vec<InternedString>)> {
             let mut fields = vec![];
 
             let mut current_value = value.get().clone();
@@ -105,27 +124,40 @@ impl DataLocation {
                 match current_value {
                     Value::Identifier(root) => {
                         fields.reverse();
-                        return (root, fields);
+                        return Some((root, fields));
                     }
                     Value::Field { value, field_name } => {
                         fields.push(field_name);
                         current_value = value.get().clone();
                     }
+                    Value::Struct { fields: f, .. } => {
+                        let Some(last) = fields.last() else {
+                            // encountered struct with no field accesses, bailing
+                            return None;
+                        };
 
-                    v => panic!("{v:?}"),
+                        let nv = f
+                            .iter()
+                            .find(|nv| nv.name == *last)
+                            .expect("tried to access field on struct that does not exist");
+
+                        // go back up one layer to cancel out
+                        fields.pop();
+                        current_value = nv.value.get().clone();
+                    }
+
+                    _ => return None,
                 }
             }
         }
 
-        match &*value.get() {
-            Value::Identifier(ident) => Some(Self::Identifier(*ident)),
-            Value::Field { .. } => {
-                let (root, fields) = build_fields(value.clone());
-                Some(Self::Fields { root, fields })
+        build_fields(value.clone()).map(|(root, fields)| {
+            if fields.is_empty() {
+                Self::Identifier(root)
+            } else {
+                Self::Fields { root, fields }
             }
-
-            _ => None,
-        }
+        })
     }
 }
 
@@ -165,8 +197,7 @@ impl From<&Expression> for DataLocation {
 /// the largest value?
 fn destruct_locals(
     function_name: InternedString,
-    unions: &HashMap<InternedString, Vec<NamedType>>,
-    structs: &HashMap<InternedString, Vec<NamedType>>,
+    composites: &HashMap<InternedString, Shared<Type>>,
     destructed_registers: &HashMap<InternedString, Shared<Type>>,
     destructed_return_types_by_function: &HashMap<InternedString, Shared<Type>>,
     destructed_parameters_by_function: &HashMap<
@@ -327,6 +358,43 @@ fn destruct_locals(
                                     .map(Shared::new)
                                     .collect();
                                 }
+                                Value::Struct { name, fields } => {
+                                    if let Some(dst_root_typ) = destructed_local_variables
+                                        .get(&destination.root())
+                                        .or_else(|| destructed_registers.get(&destination.root()))
+                                    {
+                                        let (dst_outer_ident, dst_outer_type) =
+                                            traverse_typ_from_location(
+                                                dst_root_typ.clone(),
+                                                &destination,
+                                            );
+
+                                        let source_typ = composites.get(name).unwrap();
+
+                                        return destruct_variable(dst_outer_ident, dst_outer_type)
+                                            .into_iter()
+                                            .zip(destruct_struct_value(
+                                                value,
+                                                source_typ.clone(),
+                                                composites,
+                                            ))
+                                            .map(|((dst, _), src)| {
+                                                Shared::new(Statement::Copy {
+                                                    expression: Expression::Identifier(dst),
+                                                    value: src.clone(),
+                                                })
+                                            })
+                                            .collect();
+                                    } else {
+                                        return vec![Shared::new(Statement::Copy {
+                                            expression: Expression::Identifier(
+                                                destination.to_ident(),
+                                            ),
+                                            value: value.clone(),
+                                        })];
+                                    }
+                                }
+
                                 _ => {
                                     return vec![Shared::new(Statement::Copy {
                                         expression: Expression::Identifier(destination.to_ident()),
@@ -402,7 +470,7 @@ fn destruct_locals(
                                     traverse_typ_from_location(dst_root_typ.clone(), &destination);
 
                                 let DataLocation::Identifier(src) = source else {
-                                    panic!();
+                                    panic!("non ident source: {source:?}");
                                 };
 
                                 let mut value = Shared::new(Value::Identifier(src));
@@ -429,10 +497,8 @@ fn destruct_locals(
                         arguments,
                     } => {
                         // function name is a union tag constructor
-                        if let Some((union_typ, tag)) = is_union_constructor(*name, unions) {
-                            create_union_construction_copies(
-                                expression, arguments, union_typ, unions, tag,
-                            )
+                        if let Some((union_typ, tag)) = is_union_constructor(*name, composites) {
+                            create_union_construction_copies(expression, arguments, union_typ, tag)
                         } else {
                             // if we have an expression...
                             let expression = expression.clone().map(|expr| {
@@ -444,7 +510,11 @@ fn destruct_locals(
                                     let root_typ = destructed_local_variables
                                         .get(&destination.root())
                                         .or_else(|| destructed_registers.get(&destination.root()))
-                                        .unwrap();
+                                        .unwrap_or_else(|| {
+                                            panic!(
+                                                "failed to find type for root of {destination:?}"
+                                            )
+                                        });
                                     let (dst_outer_ident, outer_typ) =
                                         traverse_typ_from_location(root_typ.clone(), &destination);
 
@@ -527,7 +597,6 @@ fn create_union_construction_copies(
     expression: &Option<Expression>,
     arguments: &Vec<Shared<Value>>,
     union_typ: Shared<Type>,
-    unions: &HashMap<InternedString, Vec<NamedType>>,
     tag: usize,
 ) -> Vec<Shared<Statement>> {
     let Some(Expression::Identifier(dst)) = expression else {
@@ -536,10 +605,9 @@ fn create_union_construction_copies(
 
     assert_eq!(1, arguments.len());
 
-    let Type::Union { name: union_name } = &*union_typ.get() else {
-        unreachable!()
+    let Type::Union { fields, .. } = &*union_typ.get() else {
+        panic!();
     };
-    let fields = unions.get(union_name).unwrap();
 
     let iter = [Shared::new(Statement::Copy {
         expression: Expression::Identifier(union_tag_ident(*dst)),
@@ -621,6 +689,47 @@ fn create_union_construction_copies(
                     .map(Shared::new),
             )
             .collect(),
+        Value::Struct {
+            fields: struct_fields,
+            ..
+        } => iter
+            .chain(
+                fields
+                    .iter()
+                    .enumerate()
+                    .map(|(i, nt)| {
+                        let src = if i == tag {
+                            Some(arguments[0].clone())
+                        } else {
+                            None
+                        };
+                        let dst = union_value_ident(*dst, nt.name);
+                        let typ = nt.typ.clone();
+
+                        (src, dst, typ)
+                    })
+                    .flat_map(|(src, dst, typ)| {
+                        if let Some(_) = src {
+                            destruct_variable(dst, typ)
+                                .into_iter()
+                                .map(|(dst, _)| dst)
+                                .zip(struct_fields.iter())
+                                .map(|(dst, nv)| (nv.value.clone(), dst)) // todo: split nv.value if it's a composite
+                                .collect::<Vec<_>>()
+                        } else {
+                            destruct_variable(dst, typ)
+                                .into_iter()
+                                .map(|(dst, typ)| (default_value(typ), dst))
+                                .collect()
+                        }
+                    })
+                    .map(|(value, dst)| Statement::Copy {
+                        expression: Expression::Identifier(dst),
+                        value,
+                    })
+                    .map(Shared::new),
+            )
+            .collect(),
         v => todo!("{v:?}"),
     }
 }
@@ -630,13 +739,9 @@ fn create_union_construction_copies(
 fn destruct_variable(
     root_name: InternedString,
     typ: Shared<Type>,
-    unions: &HashMap<InternedString, Vec<NamedType>>,
-    structs: &HashMap<InternedString, Vec<NamedType>>,
 ) -> Vec<(InternedString, Shared<Type>)> {
     match &*typ.get() {
-        Type::Struct { name } => structs
-            .get(name)
-            .unwrap()
+        Type::Struct { fields, .. } => fields
             .iter()
             .map(
                 |NamedType {
@@ -645,7 +750,7 @@ fn destruct_variable(
                  }| (struct_field_ident(root_name, *field_name), typ.clone()),
             )
             .collect::<Vec<_>>(),
-        Type::Union { name } => {
+        Type::Union { fields, .. } => {
             // create a tag variable
             [(
                 union_tag_ident(root_name),
@@ -656,11 +761,12 @@ fn destruct_variable(
             .into_iter()
             .chain(
                 // and value variables for each variant
-                unions.get(name).unwrap().iter().enumerate().map(
-                    |(_tag, NamedType { name, typ })| {
+                fields
+                    .iter()
+                    .enumerate()
+                    .map(|(_tag, NamedType { name, typ })| {
                         (union_value_ident(root_name, *name), typ.clone())
-                    },
-                ),
+                    }),
             )
             .collect()
         }
@@ -669,7 +775,7 @@ fn destruct_variable(
             element_type,
         } => {
             if is_type_composite(element_type.clone()) {
-                destruct_variable(root_name, element_type.clone(), unions, structs)
+                destruct_variable(root_name, element_type.clone())
                     .into_iter()
                     .map(|(name, typ)| {
                         (
@@ -690,7 +796,7 @@ fn destruct_variable(
     .into_iter()
     .map(|(name, typ)| {
         if is_type_composite(typ.clone()) {
-            destruct_variable(name, typ.clone(), unions, structs)
+            destruct_variable(name, typ.clone())
         } else {
             vec![(name, typ)]
         }
@@ -741,19 +847,30 @@ fn default_value(typ: Shared<Type>) -> Shared<Value> {
 /// fields of that union and the tag of that variant
 fn is_union_constructor(
     ident: InternedString,
-    unions: &HashMap<InternedString, Vec<NamedType>>,
+    composites: &HashMap<InternedString, Shared<Type>>,
 ) -> Option<(Shared<Type>, usize)> {
-    unions
-        .iter()
-        .flat_map(|(name, fields)| {
+    composites
+        .values()
+        .filter_map(|c| {
+            if let Type::Union { .. } = &*c.get() {
+                Some(c.clone())
+            } else {
+                None
+            }
+        })
+        .flat_map(|typ| {
+            let cloned = typ.clone();
+            let Type::Union { fields, .. } = &*cloned.get() else {
+                unreachable!()
+            };
             fields
                 .clone()
                 .into_iter()
                 .enumerate()
-                .map(move |(i, nt)| (*name, i, nt))
+                .map(move |(i, nt)| (typ.clone(), i, nt))
         })
         .find(|(_, _, nt)| nt.name == ident)
-        .map(|(name, tag, _)| (Shared::new(Type::Union { name }), tag))
+        .map(|(typ, tag, _)| (typ, tag))
 }
 
 fn is_type_composite(typ: Shared<Type>) -> bool {
@@ -830,7 +947,7 @@ fn destruct_function_return_types(ast: Shared<Ast>) -> HashMap<InternedString, S
             let typ = def.signature.return_type.clone().unwrap();
 
             def.signature.return_type = Some(Shared::new(Type::Tuple(
-                destruct_variable("return".into(), typ.clone(), &ast.unions, &ast.structs)
+                destruct_variable("return".into(), typ.clone())
                     .into_iter()
                     .map(|(_, typ)| typ)
                     .collect(),
@@ -853,12 +970,9 @@ fn destruct_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>>
     for (register_name, typ) in &union_regs {
         ast.get_mut().registers.remove(register_name);
 
-        let destructed = {
-            let ast = ast.get();
-            destruct_variable(*register_name, typ.clone(), &ast.unions, &ast.structs)
-        };
-
-        ast.get_mut().registers.extend(destructed);
+        ast.get_mut()
+            .registers
+            .extend(destruct_variable(*register_name, typ.clone()));
     }
 
     union_regs
@@ -870,8 +984,6 @@ fn destruct_registers(ast: Shared<Ast>) -> HashMap<InternedString, Shared<Type>>
 fn traverse_typ_from_location(
     typ: Shared<Type>,
     location: &DataLocation,
-    unions: &HashMap<InternedString, Vec<NamedType>>,
-    structs: &HashMap<InternedString, Vec<NamedType>>,
 ) -> (InternedString, Shared<Type>) {
     match location {
         // data location is of type Kind
@@ -883,15 +995,17 @@ fn traverse_typ_from_location(
 
             for field in fields {
                 match current_type.clone() {
-                    Type::Union { .. } => {
+                    Type::Union { fields: _, .. } => {
                         // let next = fields.iter().find(|nt| nt.name == *field).unwrap();
                         // current_type = next.typ.get().clone();
                         // current_identifier = union_value_ident(current_identifier, *field);
                         todo!();
                     }
 
-                    Type::Struct { name: struct_name } => {
-                        let fields = structs.get(&struct_name).unwrap();
+                    Type::Struct {
+                        fields,
+                        name: struct_name,
+                    } => {
                         let next = fields.iter().find(|nt| nt.name == *field).unwrap_or_else(|| panic!("failed to find {field:?} as a field name of {struct_name:?} in {typ:?}"));
                         current_type = next.typ.get().clone();
                         current_identifier = struct_field_ident(current_identifier, *field);
@@ -938,27 +1052,17 @@ fn traverse_typ_from_location(
 //     }
 // }
 
-struct DestructorVisitor<'a> {
+struct DestructorVisitor {
     destructed: HashMap<InternedString, Shared<Type>>,
-    unions: &'a HashMap<InternedString, Vec<NamedType>>,
-    structs: &'a HashMap<InternedString, Vec<NamedType>>,
 }
 
-impl<'a> DestructorVisitor<'a> {
-    fn new(
-        destructed: HashMap<InternedString, Shared<Type>>,
-        unions: &'a HashMap<InternedString, Vec<NamedType>>,
-        structs: &'a HashMap<InternedString, Vec<NamedType>>,
-    ) -> Self {
-        Self {
-            destructed,
-            unions,
-            structs,
-        }
+impl DestructorVisitor {
+    fn new(destructed: HashMap<InternedString, Shared<Type>>) -> Self {
+        Self { destructed }
     }
 }
 
-impl<'a> Visitor for DestructorVisitor<'a> {
+impl Visitor for DestructorVisitor {
     fn visit_value(&mut self, node: Shared<Value>) {
         let node = &mut *node.get_mut();
 
@@ -971,18 +1075,8 @@ impl<'a> Visitor for DestructorVisitor<'a> {
                         if let (Some(left_type), Some(right_type)) =
                             (self.destructed.get(&*left), self.destructed.get(&*right))
                         {
-                            let left_components = destruct_variable(
-                                *left,
-                                left_type.clone(),
-                                self.unions,
-                                self.structs,
-                            );
-                            let right_components = destruct_variable(
-                                *right,
-                                right_type.clone(),
-                                self.unions,
-                                self.structs,
-                            );
+                            let left_components = destruct_variable(*left, left_type.clone());
+                            let right_components = destruct_variable(*right, right_type.clone());
 
                             let equals = left_components
                                 .into_iter()
@@ -1029,5 +1123,37 @@ impl<'a> Visitor for DestructorVisitor<'a> {
         }
 
         node.walk(self);
+    }
+}
+
+fn destruct_struct_value(
+    value: &Shared<Value>,
+    typ: Shared<Type>,
+    composites: &HashMap<InternedString, Shared<Type>>,
+) -> Vec<Shared<Value>> {
+    match &*value.get() {
+        Value::Identifier(ident) => destruct_variable(*ident, typ)
+            .into_iter()
+            .map(|(ident, _)| Shared::new(Value::Identifier(ident)))
+            .collect(),
+        Value::Struct {
+            fields: value_fields,
+            name,
+        } => {
+            let Type::Struct {
+                name,
+                fields: type_fields,
+            } = &*composites.get(name).unwrap().get()
+            else {
+                unreachable!()
+            };
+
+            value_fields
+                .iter()
+                .zip(type_fields.iter())
+                .flat_map(|(nv, nt)| destruct_struct_value(&nv.value, nt.typ.clone(), composites))
+                .collect()
+        }
+        _ => vec![value.clone()],
     }
 }

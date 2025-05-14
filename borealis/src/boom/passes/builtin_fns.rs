@@ -20,14 +20,13 @@ use {
     regex::Regex,
 };
 
-const EQ_ANY_GENERIC: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^eq_any<([0-9a-zA-Z_%<>]+)>$").unwrap());
+const EQ_ANY_GENERIC: Lazy<Regex> = Lazy::new(|| Regex::new(r"^eq_any([0-9a-zA-Z_]+)$").unwrap());
 
 const VECTOR_ACCESS: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^plain_vector_access<([0-9a-zA-Z_%<>]+)>$").unwrap());
+    Lazy::new(|| Regex::new(r"^plain_vector_access([0-9a-zA-Z_]+)$").unwrap());
 
 const VECTOR_UPDATE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^plain_vector_update<([0-9a-zA-Z_%<>]+)>|internal_vector_update$").unwrap()
+    Regex::new(r"^plain_vector_update([0-9a-zA-Z_]+)|internal_vector_update$").unwrap()
 });
 
 #[derive(Debug, Default)]

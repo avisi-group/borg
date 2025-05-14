@@ -77,7 +77,8 @@ fn resolve_def(def: Def<Name, B64>, symtab: &Symtab) -> Def<InternedString, B64>
 }
 
 fn resolve_name(name: Name, symtab: &Symtab) -> InternedString {
-    InternedString::from(symtab.to_str_demangled(name))
+    let demangled = symtab.to_str_demangled(name);
+    InternedString::from(demangled.strip_prefix("z").unwrap_or(demangled))
 }
 
 fn resolve_type(ty: Ty<Name>, symtab: &Symtab) -> Ty<InternedString> {
