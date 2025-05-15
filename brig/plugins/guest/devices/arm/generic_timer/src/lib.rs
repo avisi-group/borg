@@ -70,7 +70,7 @@ impl DeviceFactory for GenericTimerFactory {
         // Lookup GIC
         // Request IRQ line
         let irq = IrqLine;
-        let dev = Arc::new(GenericTimer::new(irq, Nanoseconds::new(1_000_000)));
+        let dev = Arc::new(GenericTimer::new(irq, Nanoseconds::new(1_000)));
         store.insert(dev.clone());
         dev
     }
@@ -121,7 +121,7 @@ impl GenericTimer {
             irq,
             tick_interval,
             counter: AtomicU64::new(0),
-            frequency: AtomicU64::new(0x240000000), //
+            frequency: AtomicU64::new(10_000_000), //
             virtual_offset: AtomicU64::new(0),
             timer_condition_met: AtomicBool::new(false),
             timer_interrupt_masked: AtomicBool::new(false),
@@ -144,9 +144,8 @@ impl ToMemoryMappedDevice for GenericTimer {}
 
 impl Tickable for GenericTimer {
     fn tick(&self, time_since_last_tick: Nanoseconds<u64>) {
-        let frequency = Hertz::new(self.frequency.load(Ordering::Relaxed));
-        let time_per_count: Nanoseconds<u64> = frequency.to_duration().unwrap();
-        let counts = 1; // (time_since_last_tick.0 / time_per_count.0);
+        let counts =
+            (time_since_last_tick.0 * self.frequency.load(Ordering::Relaxed)) / 1_000_000_000;
 
         self.counter.fetch_add(counts, Ordering::Relaxed);
 
@@ -165,7 +164,6 @@ impl Tickable for GenericTimer {
             self.irq.raise();
             panic!()
         }
-        //get_host().irqs()[0].assert()
     }
 }
 
@@ -177,7 +175,7 @@ impl Object for GenericTimer {
 
 impl Device for GenericTimer {
     fn start(&self) {
-        get_host().register_periodic_tick(Nanoseconds::new(1000), self);
+        get_host().register_periodic_tick(self.tick_interval, self);
     }
 
     fn stop(&self) {}

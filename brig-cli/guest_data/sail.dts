@@ -46,7 +46,7 @@
 			     <1 14 0xf08>,
 			     <1 11 0xf08>,
 			     <1 10 0xf08>;
-		clock-frequency = <20000000>;
+		clock-frequency = <10000000>;
 	};
 
 	gic: interrupt-controller@2c001000 {
