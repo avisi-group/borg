@@ -5,7 +5,7 @@ use {
             Operand,
             OperandKind::{Immediate as I, Memory as M, Register as R},
             Register::PhysicalRegister as PHYS,
-            Width, memory_operand_to_iced,
+            Width, memory_operand_to_iced, segment_memory_operand_to_iced,
         },
     },
     iced_x86::code_asm::{
@@ -180,6 +180,31 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 .mov::<AsmRegister32, AsmMemoryOperand>(
                     dst.into(),
                     memory_operand_to_iced(*base, *index, *scale, *displacement),
+                )
+                .unwrap();
+        }
+        // MOV M -> R
+        (
+            Operand {
+                kind:
+                    M {
+                        base: None,
+                        index,
+                        scale,
+                        displacement,
+                        segment_override: Some(seg_reg),
+                    },
+                width_in_bits: Width::_64,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            assembler
+                .mov::<AsmRegister64, AsmMemoryOperand>(
+                    dst.into(),
+                    segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement),
                 )
                 .unwrap();
         }

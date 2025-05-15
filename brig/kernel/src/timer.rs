@@ -1,7 +1,16 @@
 use {
-    crate::{arch::x86::irq::assign_irq, println, scheduler},
+    crate::{
+        arch::x86::irq::assign_irq,
+        println,
+        scheduler::{self, TIMER_FREQUENCY},
+    },
     alloc::{collections::BTreeMap, sync::Arc, vec::Vec},
     core::sync::atomic::{AtomicU64, Ordering},
+    embedded_time::{
+        Clock, Instant, clock,
+        duration::Nanoseconds,
+        rate::{Fraction, Hertz, Rate},
+    },
     plugins_api::object::tickable::Tickable,
     proc_macro_lib::irq_handler,
     spin::{Lazy, Mutex},
@@ -9,25 +18,41 @@ use {
 };
 
 const ENABLE_MEASUREMENTS: bool = true;
-const JIFFIES_PER_SECOND: u64 = 1000;
 
 static TICKABLES: Lazy<Mutex<Vec<TickableState>>> = Lazy::new(|| Mutex::new(alloc::vec![]));
-
-static JIFFIES: AtomicU64 = AtomicU64::new(0);
 
 pub fn init() {
     assign_irq(0x20, timer_interrupt).unwrap();
 }
 
-pub fn current_milliseconds() -> u64 {
-    JIFFIES.load(Ordering::Relaxed)
+pub static GLOBAL_CLOCK: GlobalClock = GlobalClock {
+    nanoseconds_since_boot: AtomicU64::new(0),
+};
+
+pub struct GlobalClock {
+    nanoseconds_since_boot: AtomicU64,
+}
+
+impl GlobalClock {
+    pub fn increment(&self, amount: Nanoseconds<u64>) {
+        self.nanoseconds_since_boot
+            .fetch_add(amount.0 as u64, Ordering::Relaxed);
+    }
+
+    pub fn now(&self) -> Nanoseconds<u64> {
+        Nanoseconds::<u64>::new(self.nanoseconds_since_boot.load(Ordering::Relaxed))
+    }
 }
 
 #[irq_handler(with_code = false)]
 fn timer_interrupt() {
-    let jiffies = JIFFIES.fetch_add(1, Ordering::Relaxed);
+    // Our hacked in timer frequency is 1000 Hz, a period of 1ms -> so, that's
+    // 1,000,000 nanoseconds in a 1ms period
+    GLOBAL_CLOCK.increment(Hertz::new(TIMER_FREQUENCY).to_duration().unwrap());
 
-    handle_tickables(jiffies);
+    let current_time = GLOBAL_CLOCK.now(); // TODO: compute this period from timer interrupt frequency
+
+    handle_tickables(current_time);
 
     scheduler::schedule();
 
@@ -76,27 +101,27 @@ impl Measurement {
     }
 }
 
-fn handle_tickables(current_jiffies: u64) {
+fn handle_tickables(current_time: Nanoseconds<u64>) {
     TICKABLES
         .lock()
         .iter_mut()
-        .filter(|s| current_jiffies >= s.last_tick_jiffy + s.jiffy_interval)
+        .filter(|s| current_time >= s.time_at_last_tick + s.interval)
         .for_each(|s| {
-            s.tickable.tick();
-            s.last_tick_jiffy = current_jiffies;
+            s.tickable.tick(current_time - s.time_at_last_tick);
+            s.time_at_last_tick = current_time;
         });
 }
 
-pub fn register_tickable(frequency: u64, tickable: Arc<dyn Tickable>) {
+pub fn register_tickable(interval: Nanoseconds<u64>, tickable: Arc<dyn Tickable>) {
     TICKABLES.lock().push(TickableState {
         tickable,
-        jiffy_interval: JIFFIES_PER_SECOND / frequency,
-        last_tick_jiffy: 0,
+        interval,
+        time_at_last_tick: Nanoseconds::new(0),
     });
 }
 
 struct TickableState {
     tickable: Arc<dyn Tickable>,
-    jiffy_interval: u64,
-    last_tick_jiffy: u64,
+    interval: Nanoseconds<u64>,
+    time_at_last_tick: Nanoseconds<u64>,
 }

@@ -1,5 +1,5 @@
-use crate::object::Object;
+use {crate::object::Object, embedded_time::duration::Nanoseconds};
 
 pub trait Tickable: Object {
-    fn tick(&self);
+    fn tick(&self, time_since_last_tick: Nanoseconds<u64>);
 }

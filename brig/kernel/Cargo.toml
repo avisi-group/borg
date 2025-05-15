@@ -63,3 +63,4 @@ disarm64 = "0.1.25"
 derive-where = "1.4.0"
 aarch64-paging = { git = "https://github.com/google/aarch64-paging" }
 paste = "1.0.15"
+embedded-time = "0.12.1"

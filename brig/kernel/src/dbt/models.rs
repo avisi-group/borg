@@ -401,6 +401,7 @@ impl ModelDevice {
                     translation_cache.fill_keys(1);
                     VirtualMemoryArea::current().invalidate_guest_mappings();
                 }
+                ExecutionResult::InterruptPending => todo!(),
             }
         }
     }
@@ -418,6 +419,9 @@ impl ModelDevice {
         let mut current_pc = block_start_pc;
 
         let mut opcodes = Vec::new();
+
+        // block prologue
+        emitter.prologue();
 
         // instruction translation loop
         let was_end_of_block = loop {

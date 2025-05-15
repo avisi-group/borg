@@ -1,6 +1,7 @@
 use {
     crate::object::{
         device::{Device, MemoryMappedDevice, RegisterMappedDevice},
+        irq::IrqController,
         tickable::Tickable,
     },
     alloc::{fmt, sync::Arc},
@@ -12,6 +13,7 @@ use {
 };
 
 pub mod device;
+pub mod irq;
 pub mod tickable;
 
 static OBJECT_ID_GENERATOR: AtomicU64 = AtomicU64::new(0);
@@ -117,3 +119,45 @@ impl<T: Tickable> ToTickable for T {
         Some(self)
     }
 }
+
+pub trait ToIrqController {
+    fn to_irq_controller<'a>(self: Arc<Self>) -> Option<Arc<dyn IrqController + 'a>>
+    where
+        Self: 'a,
+    {
+        None
+    }
+}
+
+impl<T: IrqController> ToIrqController for T {
+    fn to_irq_controller<'a>(self: Arc<Self>) -> Option<Arc<dyn IrqController + 'a>>
+    where
+        Self: 'a,
+    {
+        Some(self)
+    }
+}
+
+// macro_rules! object_type {
+//     ($type_name:ident, $to_name:ident) => {
+//         pub trait concat_idents!(To, $type_name) {
+//             fn to_$to_name<'a>(self: Arc<Self>) -> Option<Arc<dyn $type_name
+// + 'a>>             where
+//                 Self: 'a,
+//             {
+//                 None
+//             }
+//         }
+
+//         impl<T: $type_name> To$type_name for T {
+//             fn to_$to_name<'a>(self: Arc<Self>) -> Option<Arc<dyn $type_name
+// + 'a>>             where
+//                 Self: 'a,
+//             {
+//                 Some(self)
+//             }
+//         }
+//     };
+// }
+
+// object_type!(IrqController, irq_controller);

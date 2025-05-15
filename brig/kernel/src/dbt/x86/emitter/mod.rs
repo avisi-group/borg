@@ -1,24 +1,28 @@
 use {
-    crate::dbt::{
-        Alloc, bit_extract, bit_insert,
-        emitter::Type,
-        models::CHAIN_CACHE_ENTRY_COUNT,
-        trampoline::ExecutionResult,
-        x86::{
-            Emitter, X86TranslationContext,
-            encoder::{
-                Instruction, Opcode, Operand, OperandKind, PhysicalRegister,
-                Register::{self},
-                width::Width,
+    crate::{
+        dbt::{
+            Alloc, bit_extract, bit_insert,
+            emitter::Type,
+            models::CHAIN_CACHE_ENTRY_COUNT,
+            trampoline::ExecutionResult,
+            x86::{
+                Emitter, X86TranslationContext,
+                encoder::{
+                    Instruction, Opcode, Operand, OperandKind, PhysicalRegister,
+                    Register::{self},
+                    width::Width,
+                },
+                register_allocator::RegisterAllocator,
             },
-            register_allocator::RegisterAllocator,
         },
+        guest::GuestExecutionContext,
     },
     alloc::{rc::Rc, vec::Vec},
     common::{arena::Ref, hashmap::HashMap, mask::mask},
     core::{
         fmt::Debug,
         hash::{Hash, Hasher},
+        mem::offset_of,
         panic,
     },
     derive_where::derive_where,
@@ -1040,6 +1044,40 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn jump(&mut self, target: Self::BlockRef) {
         self.push_instruction(Instruction::jmp(target));
         self.push_target(target);
+    }
+
+    fn prologue(&mut self) {
+        let interrupt_pending = Operand::vreg(Width::_64, self.next_vreg());
+
+        self.push_instruction(
+            Instruction::mov(
+                Operand::mem_seg_displ(
+                    64,
+                    super::encoder::SegmentRegister::FS,
+                    i32::try_from(offset_of!(GuestExecutionContext, interrupt_pending)).unwrap(),
+                ),
+                interrupt_pending,
+            )
+            .unwrap(),
+        );
+
+        self.push_instruction(Instruction::test(interrupt_pending, interrupt_pending));
+
+        let block_start = self.ctx_mut().create_block();
+
+        self.push_instruction(Instruction::je(block_start));
+        self.push_target(block_start);
+
+        self.push_instruction(
+            Instruction::mov(
+                Operand::imm(Width::_32, ExecutionResult::InterruptPending.as_u64()),
+                Operand::preg(Width::_32, PhysicalRegister::RAX),
+            )
+            .unwrap(),
+        );
+        self.push_instruction(Instruction::ret());
+
+        self.current_block = block_start;
     }
 
     fn leave(&mut self) {

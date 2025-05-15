@@ -3,9 +3,13 @@
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
+    alloc::{boxed::Box, collections::BTreeMap, format, string::String, sync::Arc},
     bitfields::bitfield,
     core::sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    embedded_time::{
+        duration::{Milliseconds, Nanoseconds},
+        rate::{Hertz, Rate},
+    },
     plugins_rt::{
         api::{
             PluginHeader, PluginHost,
@@ -13,6 +17,7 @@ use {
                 Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice,
                 ToRegisterMappedDevice, ToTickable,
                 device::{Device, DeviceFactory, RegisterMappedDevice},
+                irq::IrqLine,
                 tickable::Tickable,
             },
             util::encode_sysreg_id,
@@ -62,7 +67,10 @@ impl DeviceFactory for GenericTimerFactory {
         store: &dyn ObjectStore,
         _config: BTreeMap<String, String>,
     ) -> Arc<dyn Device> {
-        let dev = Arc::new(GenericTimer::new());
+        // Lookup GIC
+        // Request IRQ line
+        let irq = IrqLine;
+        let dev = Arc::new(GenericTimer::new(irq, Nanoseconds::new(1_000_000)));
         store.insert(dev.clone());
         dev
     }
@@ -90,6 +98,8 @@ const CNTV_CVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 2);
 #[derive(Debug)]
 struct GenericTimer {
     id: ObjectId,
+    tick_interval: Nanoseconds<u64>,
+    irq: IrqLine,
     counter: AtomicU64,
     /// Used when registering for a periodic tick from the kernel
     frequency: AtomicU64,
@@ -105,11 +115,13 @@ struct GenericTimer {
 }
 
 impl GenericTimer {
-    fn new() -> Self {
+    fn new(irq: IrqLine, tick_interval: Nanoseconds<u64>) -> Self {
         Self {
             id: ObjectId::new(),
+            irq,
+            tick_interval,
             counter: AtomicU64::new(0),
-            frequency: AtomicU64::new(1000),
+            frequency: AtomicU64::new(0x240000000), //
             virtual_offset: AtomicU64::new(0),
             timer_condition_met: AtomicBool::new(false),
             timer_interrupt_masked: AtomicBool::new(false),
@@ -131,8 +143,29 @@ impl GenericTimer {
 impl ToMemoryMappedDevice for GenericTimer {}
 
 impl Tickable for GenericTimer {
-    fn tick(&self) {
-        self.counter.fetch_add(1, Ordering::Relaxed);
+    fn tick(&self, time_since_last_tick: Nanoseconds<u64>) {
+        let frequency = Hertz::new(self.frequency.load(Ordering::Relaxed));
+        let time_per_count: Nanoseconds<u64> = frequency.to_duration().unwrap();
+        let counts = 1; // (time_since_last_tick.0 / time_per_count.0);
+
+        self.counter.fetch_add(counts, Ordering::Relaxed);
+
+        let interrupt_status = if self.timer_enabled.load(Ordering::Relaxed) {
+            self.virtual_count() as i64 - self.compare_value.load(Ordering::Relaxed) as i64 >= 0
+        } else {
+            false
+        };
+
+        self.timer_condition_met
+            .store(interrupt_status, Ordering::Relaxed);
+
+        if self.timer_condition_met.load(Ordering::Relaxed)
+            && !self.timer_interrupt_masked.load(Ordering::Relaxed)
+        {
+            self.irq.raise();
+            panic!()
+        }
+        //get_host().irqs()[0].assert()
     }
 }
 
@@ -144,7 +177,7 @@ impl Object for GenericTimer {
 
 impl Device for GenericTimer {
     fn start(&self) {
-        get_host().register_periodic_tick(self.frequency.load(Ordering::Relaxed), self);
+        get_host().register_periodic_tick(Nanoseconds::new(1000), self);
     }
 
     fn stop(&self) {}
@@ -174,15 +207,19 @@ impl RegisterMappedDevice for GenericTimer {
             _ => panic!("read unknown sys_reg_id {sys_reg_id:x}"),
         };
 
+        get_host().print_message(&format!("read {sys_reg_id:x} = {value}\n"), true);
+
         dest.copy_from_slice(&value.to_le_bytes());
     }
 
     fn write(&self, sys_reg_id: u64, value: &[u8]) {
         let value = u64::from_le_bytes(value.try_into().unwrap());
 
+        get_host().print_message(&format!("write! {sys_reg_id:x} = {value}\n"), true);
+
         match sys_reg_id {
             CNTKCTL_EL1 => self.cntkctl_el1.store(value, Ordering::Relaxed),
-            CNTFRQ_EL0 => self.frequency.store(value, Ordering::Relaxed),
+            CNTFRQ_EL0 => (), //self.frequency.store(value, Ordering::Relaxed),
             CNTPCT_EL0 => todo!("CNTPCT_EL0"),
             CNTVCT_EL0 => todo!("CNTVCT_EL0"),
             CNTP_TVAL_EL0 => todo!("CNTP_TVAL_EL0"),

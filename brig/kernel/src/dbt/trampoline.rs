@@ -5,8 +5,9 @@ pub const MAX_STACK_SIZE: usize = 2 * 1024 * 1024;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u64)]
 pub enum ExecutionResult {
-    Ok,
+    Ok = 0,
     NeedTLBInvalidate,
+    InterruptPending,
 }
 
 impl From<u64> for ExecutionResult {
@@ -14,6 +15,7 @@ impl From<u64> for ExecutionResult {
         match value {
             0 => Self::Ok,
             1 => Self::NeedTLBInvalidate,
+            2 => Self::InterruptPending,
             _ => panic!("unknown execution result value: {value:x}"),
         }
     }
@@ -21,10 +23,7 @@ impl From<u64> for ExecutionResult {
 
 impl ExecutionResult {
     pub fn as_u64(&self) -> u64 {
-        match self {
-            Self::Ok => 0,
-            Self::NeedTLBInvalidate => 1,
-        }
+        *self as u64
     }
 }
 

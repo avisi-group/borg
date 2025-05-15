@@ -11,6 +11,7 @@ use {
     crate::object::{ObjectId, device::DeviceFactory, tickable::Tickable},
     alloc::{boxed::Box, sync::Arc},
     core::{alloc::GlobalAlloc, panic::PanicInfo},
+    embedded_time::duration::Nanoseconds,
 };
 
 pub mod object;
@@ -40,7 +41,7 @@ pub trait PluginHost: Send + Sync {
         guest_device_factory: Box<dyn DeviceFactory>,
     );
 
-    fn register_periodic_tick(&self, frequency: u64, tickable: &dyn Tickable);
+    fn register_periodic_tick(&self, interval: Nanoseconds<u64>, tickable: &dyn Tickable);
 
     /// Panic from plugin
     fn panic(&self, info: &PanicInfo);

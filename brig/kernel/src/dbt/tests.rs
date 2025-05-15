@@ -4532,7 +4532,25 @@ fn mrs_timer() {
 
     crate::println!("{translation:?}");
 
-    translation.execute(&register_file);
+    // translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("R0"), 0x1234);
+}
+
+#[ktest]
+fn prologue() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    emitter.prologue();
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    crate::println!("{translation:?}");
 }

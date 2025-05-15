@@ -119,6 +119,8 @@ pub enum Opcode<A: Alloc> {
     SETLE(Operand<A>),
     /// setae {0}
     SETAE(Operand<A>),
+    /// je {0}
+    JE(Operand<A>),
     /// jne {0}
     JNE(Operand<A>),
     /// nop
@@ -365,6 +367,7 @@ pub enum SegmentRegister {
 pub enum Register {
     PhysicalRegister(PhysicalRegister),
     VirtualRegister(usize),
+    GlobalRegister(usize),
 }
 
 impl Display for Register {
@@ -372,6 +375,7 @@ impl Display for Register {
         match self {
             Register::PhysicalRegister(pr) => write!(f, "%{pr}"),
             Register::VirtualRegister(vr) => write!(f, "v{vr}"),
+            Register::GlobalRegister(gr) => write!(f, "g{gr}"),
         }
     }
 }
@@ -724,6 +728,32 @@ fn memory_operand_to_iced(
     mem
 }
 
+fn segment_memory_operand_to_iced(
+    segment: SegmentRegister,
+    index: Option<Register>,
+    scale: MemoryScale,
+    displacement: i32,
+) -> AsmMemoryOperand {
+    let mut mem = AsmMemoryOperand::from(displacement);
+
+    if let Some(Register::PhysicalRegister(index)) = index {
+        let scale: i32 = match scale {
+            MemoryScale::S1 => 1,
+            MemoryScale::S2 => 2,
+            MemoryScale::S4 => 4,
+            MemoryScale::S8 => 8,
+        }
+        .into();
+
+        mem = mem + AsmRegister64::from(index) * scale;
+    }
+
+    match segment {
+        SegmentRegister::FS => mem.fs(),
+        SegmentRegister::GS => mem.gs(),
+    }
+}
+
 impl<A: Alloc> Instruction<A> {
     pub fn adc(a: Operand<A>, b: Operand<A>, c: Operand<A>) -> Self {
         Self(Opcode::ADC(a, b, c))
@@ -853,6 +883,10 @@ impl<A: Alloc> Instruction<A> {
         Self(Opcode::SETAE(r))
     }
 
+    pub fn je(block: Ref<X86Block<A>>) -> Self {
+        Self(Opcode::JE(Operand::target(block)))
+    }
+
     pub fn jne(block: Ref<X86Block<A>>) -> Self {
         Self(Opcode::JNE(Operand::target(block)))
     }
@@ -934,6 +968,15 @@ impl<A: Alloc> Instruction<A> {
                     .unwrap_or_else(|| panic!("no label for {target:?} found"))
                     .clone();
                 assembler.jne(label).unwrap();
+            }
+            JE(Operand {
+                kind: T(target), ..
+            }) => {
+                let label = label_map
+                    .get(target)
+                    .unwrap_or_else(|| panic!("no label for {target:?} found"))
+                    .clone();
+                assembler.je(label).unwrap();
             }
             JMP(Operand {
                 kind: T(target), ..
@@ -1346,10 +1389,9 @@ impl<A: Alloc> Instruction<A> {
                 Some((OperandDirection::In, divisor)),
             ]
             .into_iter(),
-            Opcode::JMP(tgt) | Opcode::JNE(tgt) => {
+            Opcode::JMP(tgt) | Opcode::JNE(tgt) | Opcode::JE(tgt) => {
                 [Some((OperandDirection::In, tgt)), None, None].into_iter()
             }
-            // if call has been handled properly we should need to modify its registers
             Opcode::CALL { function, .. } => {
                 [Some((OperandDirection::In, function)), None, None].into_iter()
             }
@@ -1434,10 +1476,9 @@ impl<A: Alloc> Instruction<A> {
             ]
             .into_iter()
             .collect(),
-            Opcode::JMP(tgt) | Opcode::JNE(tgt) => {
+            Opcode::JMP(tgt) | Opcode::JNE(tgt) | Opcode::JE(tgt) => {
                 [((OperandDirection::In, tgt))].into_iter().collect()
             }
-
             Opcode::RET | Opcode::NOP => alloc::vec![],
             Opcode::TEST(op0, op1) | Opcode::CMP(op0, op1) => {
                 [((OperandDirection::In, op0)), ((OperandDirection::In, op1))]
@@ -1485,7 +1526,6 @@ impl<A: Alloc> Instruction<A> {
             ]
             .into_iter()
             .collect(),
-
             Opcode::CALL {
                 function,
                 nr_input_args,

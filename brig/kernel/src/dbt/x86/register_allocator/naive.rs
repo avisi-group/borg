@@ -221,6 +221,9 @@ impl FreshAllocator {
                         assert!(physical_used.bit_test(phys_reg));
                         physical_used.bit_reset(phys_reg);
                     }
+                    Register::GlobalRegister(_) => {
+                        // TODO
+                    }
                 });
             }
 
@@ -252,6 +255,7 @@ impl FreshAllocator {
                let intersecting_physicals = intersecting_registers.iter().filter_map(|reg| match reg {
                     Register::VirtualRegister(idx) => self.allocation_plan.get(&*idx).copied(), // intersects in the future but not yet allocated
                     Register::PhysicalRegister(idx) => Some(idx.index()),
+                    Register::GlobalRegister(_) => None
                 }).collect::<Vec<_>>();
 
                 // todo: maybe start at 0 and set bits, rather than copying currently used
@@ -329,6 +333,7 @@ impl FreshAllocator {
                         Register::VirtualRegister(virt) => {
                             PhysicalRegister::from_index(*self.allocation_plan.get(virt).unwrap())
                         }
+                        Register::GlobalRegister(_) => todo!(),
                     })
                     .collect::<Vec<_>>();
 

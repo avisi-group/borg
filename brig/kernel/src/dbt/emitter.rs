@@ -100,6 +100,8 @@ pub trait Emitter<A: Alloc> {
         arguments: Vec<Self::NodeRef, A>,
     ) -> Self::NodeRef;
 
+    fn prologue(&mut self);
+
     // cleanup and return
     fn leave(&mut self);
     fn leave_with_cache(&mut self, chain_cache: u64);

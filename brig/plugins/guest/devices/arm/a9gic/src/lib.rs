@@ -11,6 +11,7 @@ use {
             Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
             ToTickable,
             device::{Device, DeviceFactory, MemoryMappedDevice},
+            irq::IrqController,
         },
     },
     spin::Mutex,
@@ -248,6 +249,12 @@ impl MemoryMappedDevice for GlobalInterruptController {
                 error!("[GIC] write offset: {offset:x}, data: {value:x?}");
             }
         }
+    }
+}
+
+impl IrqController for GlobalInterruptController {
+    fn request_irq(&self, index: usize) -> plugins_rt::api::object::irq::IrqLine {
+        todo!()
     }
 }
 

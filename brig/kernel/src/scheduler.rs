@@ -9,6 +9,8 @@ use {
     x86::current::segmentation::wrgsbase,
 };
 
+pub const TIMER_FREQUENCY: u32 = 1000;
+
 pub struct Scheduler {
     run_queue: LinkedList<Task>,
     idle_task: Task,
@@ -53,7 +55,7 @@ impl Scheduler {
 pub fn local_run() -> ! {
     trace!("scheduler started");
 
-    LAPIC.get().unwrap().lock().start_periodic(1000);
+    LAPIC.get().unwrap().lock().start_periodic(TIMER_FREQUENCY);
 
     // The idle task is active at this point, and because its RFLAGS
     // enables interrupts, the following iretq will also enable

@@ -10,7 +10,7 @@ use {
         object_store,
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
-    core::ptr,
+    core::{ptr, sync::atomic::AtomicBool},
     plugins_api::{
         object::{
             ObjectStore,
@@ -49,6 +49,7 @@ impl Guest {
 #[repr(C)]
 pub struct GuestExecutionContext {
     pub current_address_space: *mut AddressSpace,
+    pub interrupt_pending: u64,
 }
 
 impl GuestExecutionContext {
@@ -157,6 +158,7 @@ pub fn start() {
     let temp_exec_ctx = Box::new(GuestExecutionContext {
         current_address_space: guest.address_spaces.get_mut("as0").unwrap().as_mut()
             as *mut AddressSpace,
+        interrupt_pending: 0,
     });
 
     log::debug!("activating guest execution context");

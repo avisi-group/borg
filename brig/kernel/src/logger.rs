@@ -1,8 +1,9 @@
 //! Logger implementation
 
 use {
-    crate::{devices::serial::UART16550Device, timer::current_milliseconds},
+    crate::{devices::serial::UART16550Device, timer::GLOBAL_CLOCK},
     core::fmt::{self, Write},
+    embedded_time::{duration::Duration, rate::Fraction},
     log::{Level, LevelFilter, Log, Metadata, Record},
     spin::Once,
 };
@@ -93,7 +94,7 @@ impl Log for Logger {
         if self.enable_colors {
             crate::println!(
                 "\x1b[0;30m({}ms)\x1b[0m {} \x1b[0;30m[{}]\x1b[0m {}",
-                current_milliseconds(),
+                GLOBAL_CLOCK.now() / 1_000_000,
                 format_level(record.level(), true),
                 target,
                 record.args()
@@ -101,7 +102,7 @@ impl Log for Logger {
         } else {
             crate::println!(
                 "({}ms) {} [{}] {}",
-                current_milliseconds(),
+                GLOBAL_CLOCK.now() / 1_000_000,
                 format_level(record.level(), false),
                 target,
                 record.args()
