@@ -25,8 +25,12 @@ use {
         util::parse_hex_prefix,
     },
     alloc::{
-        alloc::alloc_zeroed, borrow::ToOwned, collections::btree_map::BTreeMap, string::String,
-        sync::Arc, vec::Vec,
+        alloc::alloc_zeroed,
+        borrow::ToOwned,
+        collections::btree_map::BTreeMap,
+        string::{String, ToString},
+        sync::Arc,
+        vec::Vec,
     },
     common::{
         hashmap::HashMap,
@@ -37,6 +41,7 @@ use {
         alloc::Layout,
         fmt::{self, Debug, Write},
     },
+    proc_macro_lib::guest_device_factory,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
 };
@@ -55,16 +60,19 @@ const CHAIN_CACHE_ENABLED: bool = true;
 pub const CHAIN_CACHE_ENTRY_COUNT: usize = 65536;
 const _: () = assert!(CHAIN_CACHE_ENTRY_COUNT.is_power_of_two());
 
-static MODEL_MANAGER: Mutex<BTreeMap<String, Arc<Model>>> = Mutex::new(BTreeMap::new());
+static MODEL_MANAGER: Mutex<BTreeMap<InternedString, Arc<Model>>> = Mutex::new(BTreeMap::new());
 
-pub fn register_model(name: &str, model: Model) {
+pub fn register_model(name: InternedString, model: Model) {
     log::info!("registering {name:?} ISA model");
     let model = Arc::new(model);
     MODEL_MANAGER.lock().insert(name.to_owned(), model.clone());
 }
 
 pub fn get(name: &str) -> Option<Arc<Model>> {
-    MODEL_MANAGER.lock().get(name).cloned()
+    MODEL_MANAGER
+        .lock()
+        .get(&InternedString::from(name))
+        .cloned()
 }
 
 pub fn load_all<FS: Filesystem>(fs: &mut FS) {
@@ -76,7 +84,7 @@ pub fn load_all<FS: Filesystem>(fs: &mut FS) {
         .into_iter()
         .map(|path| {
             (
-                path.strip_suffix(".postcard").unwrap(),
+                InternedString::from(path.strip_suffix(".postcard").unwrap()),
                 fs.read_to_vec(path).unwrap(),
             )
         })
@@ -118,24 +126,17 @@ impl ToRegisterMappedDevice for ModelDeviceFactory {}
 impl ToMemoryMappedDevice for ModelDeviceFactory {}
 impl ToIrqController for ModelDeviceFactory {}
 
-impl DeviceFactory for ModelDeviceFactory {
-    fn create(&self, store: &ObjectStore, config: BTreeMap<String, String>) -> Arc<dyn Device> {
-        let initial_pc = config
-            .get("initial_pc")
-            .map(parse_hex_prefix)
-            .unwrap()
-            .unwrap();
+#[guest_device_factory(core)]
+fn create_core(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
+    let model_name = config.get(&InternedString::from_static("model")).unwrap();
+    let model = get(model_name.as_ref()).unwrap();
+    let initial_pc = config
+        .get(&InternedString::from_static("initial_pc"))
+        .map(parse_hex_prefix)
+        .unwrap()
+        .unwrap();
 
-        let dev = Arc::new(ModelDevice::new(
-            self.name.clone(),
-            self.model.clone(),
-            initial_pc,
-        ));
-
-        store.insert(dev.clone());
-
-        dev
-    }
+    Arc::new(ModelDevice::new(model_name.to_string(), model, initial_pc))
 }
 
 pub struct ModelDevice {

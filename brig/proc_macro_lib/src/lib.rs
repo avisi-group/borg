@@ -238,7 +238,11 @@ pub fn guest_device_factory(attribute: TokenStream, item: TokenStream) -> TokenS
 
     quote! {
         #[linkme::distributed_slice(crate::guest::devices::DEVICE_FACTORIES)]
-        static #static_name: (&'static str, fn(&BTreeMap<InternedString, InternedString>) -> Arc<dyn Device>) = (#device_kind, #fn_name);
+        static #static_name: (&'static str, fn(&BTreeMap<InternedString, InternedString>) -> Arc<dyn Device>) = (#device_kind, |config| {
+            let device = #fn_name(config);
+            ObjectStore::global().insert(device.clone());
+            device
+        });
 
         #item
     }

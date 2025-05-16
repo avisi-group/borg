@@ -20,14 +20,16 @@ static LOGGER: &Logger = &Logger {
         ("tar_no_std", LevelFilter::Off), /* todo: find better way of silencing error
                                            * about empty file named "" at end of
                                            * archive */
-        ("elfloader", LevelFilter::Info),
         ("common::mask", LevelFilter::Off), // silencing overflows when generating masks
-        ("kernel::dbt::x86::register_allocator", LevelFilter::Info),
-        ("kernel::dbt::x86", LevelFilter::Info),
-        ("kernel::dbt::translate", LevelFilter::Info),
-        ("kernel::dbt::interpret", LevelFilter::Info),
-        ("kernel::arch::x86::irq", LevelFilter::Trace),
-        ("kernel::arch::x86::aarch64_mmu", LevelFilter::Trace),
+        (
+            "kernel::host::dbt::x86::register_allocator",
+            LevelFilter::Info,
+        ),
+        ("kernel::host::dbt::x86", LevelFilter::Info),
+        ("kernel::host::dbt::translate", LevelFilter::Info),
+        ("kernel::host::dbt::interpret", LevelFilter::Info),
+        ("kernel::host::arch::x86::irq", LevelFilter::Trace),
+        ("kernel::host::arch::x86::aarch64_mmu", LevelFilter::Trace),
     ],
 };
 

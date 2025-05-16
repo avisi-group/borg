@@ -35,7 +35,8 @@
     ],
     "devices": {
         "core0": {
-            "kind": "aarch64",
+            "kind": "core",
+            "model": "aarch64",
             "address_space": "as0",
             "initial_pc": "0x8000_0000"
         },

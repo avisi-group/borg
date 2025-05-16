@@ -11,7 +11,7 @@ pub mod primecell;
 //pub type DeviceConfig =
 
 #[distributed_slice]
-static DEVICE_FACTORIES: [(
+pub static DEVICE_FACTORIES: [(
     &str,
     fn(&BTreeMap<InternedString, InternedString>) -> Arc<dyn Device>,
 )];

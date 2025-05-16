@@ -13,7 +13,7 @@ use {
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
-    core::ptr,
+    core::{panic, ptr},
     spin::Once,
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
@@ -89,22 +89,13 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS) {
 
     // create devices, including cores
     for (name, device_config) in config.devices {
-        // let factories = unsafe { GUEST_DEVICE_FACTORIES.lock() };
-
-        // let Some(factory) = factories.get(device_config.kind.as_str()) else {
-        //     panic!("unsupported guest device type {}", device_config.kind);
-        // };
-
-        // let device = factory.create(
-        //     ObjectStore::get(),
-        //     [("tracer", "noop")]
-        //         .into_iter()
-        //         .map(|(k, v)| (k.to_owned(), v.to_owned()))
-        //         .chain(device_config.extra.into_iter())
-        //         .collect(),
-        // );
-
-        let device = devices::create_device(device_config.kind, &device_config.extra).unwrap();
+        let device = devices::create_device(device_config.kind, &device_config.extra)
+            .unwrap_or_else(|| {
+                panic!(
+                    "failed to create device {:?} with config {:?}",
+                    device_config.kind, device_config.extra
+                )
+            });
 
         guest.devices.insert(name.clone(), device.clone());
         ObjectStore::global().insert(device.clone());
