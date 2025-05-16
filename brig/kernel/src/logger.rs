@@ -1,7 +1,7 @@
 //! Logger implementation
 
 use {
-    crate::{devices::serial::UART16550Device, timer::GLOBAL_CLOCK},
+    crate::host::{devices::serial::UART16550Device, timer::GLOBAL_CLOCK},
     core::fmt::{self, Write},
     embedded_time::{duration::Duration, rate::Fraction},
     log::{Level, LevelFilter, Log, Metadata, Record},

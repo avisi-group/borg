@@ -1,7 +1,0 @@
-[package]
-name = "plugins_api"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-embedded-time = "0.12.1"

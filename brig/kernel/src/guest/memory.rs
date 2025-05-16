@@ -1,11 +1,12 @@
 use {
+    crate::host::objects::device::MemoryMappedDevice,
     alloc::{collections::BTreeMap, string::String, sync::Arc},
+    common::intern::InternedString,
     core::{
         fmt::Display,
         mem::{MaybeUninit, size_of},
         slice,
     },
-    plugins_api::object::device::MemoryMappedDevice,
 };
 
 #[derive(Debug)]
@@ -65,7 +66,7 @@ impl core::fmt::Debug for AddressSpaceRegionKind {
 
 #[derive(Debug)]
 pub struct AddressSpaceRegion {
-    name: String,
+    name: InternedString,
     base: u64,
     size: u64,
     kind: AddressSpaceRegionKind,
@@ -82,7 +83,7 @@ impl Display for AddressSpaceRegion {
 }
 
 impl AddressSpaceRegion {
-    pub fn new(name: String, base: u64, size: u64, kind: AddressSpaceRegionKind) -> Self {
+    pub fn new(name: InternedString, base: u64, size: u64, kind: AddressSpaceRegionKind) -> Self {
         Self {
             name,
             base,
@@ -91,8 +92,8 @@ impl AddressSpaceRegion {
         }
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn name(&self) -> InternedString {
+        self.name
     }
 
     pub fn kind(&self) -> &AddressSpaceRegionKind {

@@ -13,38 +13,32 @@ extern crate alloc;
 
 use {
     crate::{
-        arch::x86::{
-            backtrace::backtrace,
-            memory::{
-                HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
-                VirtualMemoryArea,
+        host::{
+            arch::x86::{
+                backtrace::backtrace,
+                memory::{
+                    HIGH_HALF_CANONICAL_END, HIGH_HALF_CANONICAL_START, PHYSICAL_MEMORY_OFFSET,
+                    VirtualMemoryArea,
+                },
             },
+            dbt::models,
+            devices::manager::SharedDeviceManager,
+            fs::{Filesystem, tar::TarFilesystem},
+            memory::bytes,
+            rand, scheduler, tasks, timer,
         },
-        dbt::models,
-        devices::manager::SharedDeviceManager,
-        fs::{File, Filesystem, tar::TarFilesystem},
         logger::WRITER,
-        memory::bytes,
     },
     bootloader_api::{BootInfo, BootloaderConfig, config::Mapping},
     core::panic::PanicInfo,
     x86::io::outw,
 };
 
-mod arch;
-mod dbt;
-mod devices;
-mod fs;
-pub mod guest;
+mod guest;
+mod host;
 mod logger;
-pub mod memory;
-mod object_store;
-pub mod plugins;
-mod rand;
-mod scheduler;
-mod tasks;
 mod tests;
-mod timer;
+mod util;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -66,13 +60,13 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
 
     VirtualMemoryArea::current().opt.level_4_table_mut()[0].set_unused();
 
-    arch::CoreStorage::init_self();
+    host::arch::CoreStorage::init_self();
 
     // required for generating UUIDs
     rand::init();
 
     // Host machine initialisation
-    arch::platform_init(boot_info);
+    host::arch::platform_init(boot_info);
     timer::init();
     tasks::init();
 
@@ -85,6 +79,8 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     }
 
     scheduler::local_run();
+
+    loop {}
 }
 
 fn continue_start() {
@@ -96,22 +92,20 @@ fn continue_start() {
         .get_device_by_alias("disk00:03.0")
         .expect("disk not found");
 
-    plugins::load_all(&device);
-    models::load_all(&device);
+    let mut dev = device.lock();
+    let mut fs = TarFilesystem::mount(dev.as_block());
+
+    models::load_all(&mut fs);
 
     let test_config = {
-        let mut dev = device.lock();
-        let mut fs = TarFilesystem::mount(dev.as_block());
         let file = fs
-            .open("test_config.postcard")
-            .expect("missing test configuration file")
-            .read_to_vec()
-            .unwrap();
+            .read_to_vec("test_config.postcard")
+            .expect("failed to load test configuration file");
         postcard::from_bytes(&file).unwrap()
     };
     tests::run(test_config);
 
-    guest::start();
+    guest::start(&mut fs);
 }
 
 fn serial_in() {
@@ -141,8 +135,8 @@ fn serial_in() {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    arch::x86::irq::local_disable();
-    let (used, total) = arch::x86::memory::stats();
+    host::arch::x86::irq::local_disable();
+    let (used, total) = host::arch::x86::memory::stats();
 
     log::error!("{info}");
     log::error!("heap {:.2}/{:.2} used", bytes(used), bytes(total));

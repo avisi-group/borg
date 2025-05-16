@@ -59,6 +59,7 @@
         },
         "timer": {
             "kind": "generic_timer",
+            "irq_controller": "gic",
             "attach": {
                 "sysreg": {
                     "cntkctl_el1": [

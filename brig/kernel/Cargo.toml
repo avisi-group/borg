@@ -8,9 +8,7 @@ no_logging = ["log/release_max_level_error", "log/max_level_error"]
 
 [dependencies]
 common = { path = "../../common", features = ["no-std"] }
-
-proc_macro_lib.workspace = true
-plugins_api.workspace = true
+proc_macro_lib = { path = "../proc_macro_lib" }
 
 bootloader_api = "0.11.10"
 x86_64 = "0.15.2"
@@ -64,3 +62,4 @@ derive-where = "1.4.0"
 aarch64-paging = { git = "https://github.com/google/aarch64-paging" }
 paste = "1.0.15"
 embedded-time = "0.12.1"
+bitfields = "0.13.2"

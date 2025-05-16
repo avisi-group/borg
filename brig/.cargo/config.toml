@@ -1,5 +1,5 @@
 [build]
-target = "x86_64-unknown-brig.json"
+target = "x86_64-unknown-none"
 # ideally force frame pointers only enabled for debug builds
 rustflags = [
     "-C",
@@ -9,7 +9,3 @@ rustflags = [
     "-C",
     "link-arg=nostart-stop-gc",
 ]
-
-[unstable]
-build-std = ["core", "compiler_builtins", "alloc"]
-build-std-features = ["compiler-builtins-mem"]

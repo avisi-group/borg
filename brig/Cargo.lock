@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "a9gic"
-version = "0.1.0"
-dependencies = [
- "log",
- "plugins_rt",
- "spin 0.10.0",
-]
-
-[[package]]
 name = "aarch64-paging"
 version = "0.9.1"
 source = "git+https://github.com/google/aarch64-paging#a092caaefaff48a88597c6d02091c85018bc273a"
@@ -322,17 +313,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
-name = "generic_timer"
-version = "0.1.0"
-dependencies = [
- "bitfields",
- "embedded-time",
- "log",
- "plugins_rt",
- "spin 0.10.0",
-]
-
-[[package]]
 name = "hashbrown"
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -394,6 +374,7 @@ version = "0.1.0"
 dependencies = [
  "aarch64-paging",
  "acpi",
+ "bitfields",
  "bitset-core",
  "bootloader_api",
  "buddy_system_allocator",
@@ -416,7 +397,6 @@ dependencies = [
  "num-rational 0.4.2",
  "paste",
  "phf",
- "plugins_api",
  "postcard",
  "proc_macro_lib",
  "rustc-demangle",
@@ -641,29 +621,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
 dependencies = [
  "siphasher",
-]
-
-[[package]]
-name = "pl011"
-version = "0.1.0"
-dependencies = [
- "log",
- "plugins_rt",
-]
-
-[[package]]
-name = "plugins_api"
-version = "0.1.0"
-dependencies = [
- "embedded-time",
-]
-
-[[package]]
-name = "plugins_rt"
-version = "0.1.0"
-dependencies = [
- "log",
- "plugins_api",
 ]
 
 [[package]]
