@@ -8,7 +8,7 @@
 extern crate alloc;
 
 use {
-    crate::object::{ObjectId, device::DeviceFactory, tickable::Tickable},
+    crate::object::{ObjectId, ObjectStore, device::DeviceFactory, tickable::Tickable},
     alloc::{boxed::Box, sync::Arc},
     core::{alloc::GlobalAlloc, panic::PanicInfo},
     embedded_time::duration::Nanoseconds,
@@ -45,4 +45,6 @@ pub trait PluginHost: Send + Sync {
 
     /// Panic from plugin
     fn panic(&self, info: &PanicInfo);
+
+    fn object_store(&self) -> &dyn ObjectStore;
 }

@@ -3,27 +3,25 @@
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, collections::BTreeMap, format, string::String, sync::Arc},
+    alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
     bitfields::bitfield,
     core::sync::atomic::{AtomicBool, AtomicU64, Ordering},
-    embedded_time::{
-        duration::{Milliseconds, Nanoseconds},
-        rate::{Hertz, Rate},
-    },
+    embedded_time::duration::Nanoseconds,
     plugins_rt::{
         api::{
             PluginHeader, PluginHost,
             object::{
-                Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice,
+                Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
                 ToRegisterMappedDevice, ToTickable,
                 device::{Device, DeviceFactory, RegisterMappedDevice},
-                irq::IrqLine,
+                irq::IrqController,
                 tickable::Tickable,
             },
             util::encode_sysreg_id,
         },
         get_host,
     },
+    spin::Once,
 };
 
 #[unsafe(no_mangle)]
@@ -39,7 +37,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     host.register_device_factory(
         "generic_timer",
         Box::new(GenericTimerFactory {
-            id: ObjectId::new(),
+            id: get_host().object_store().new_id(),
         }),
     );
 
@@ -60,6 +58,7 @@ impl ToDevice for GenericTimerFactory {}
 impl ToTickable for GenericTimerFactory {}
 impl ToRegisterMappedDevice for GenericTimerFactory {}
 impl ToMemoryMappedDevice for GenericTimerFactory {}
+impl ToIrqController for GenericTimerFactory {}
 
 impl DeviceFactory for GenericTimerFactory {
     fn create(
@@ -67,10 +66,12 @@ impl DeviceFactory for GenericTimerFactory {
         store: &dyn ObjectStore,
         _config: BTreeMap<String, String>,
     ) -> Arc<dyn Device> {
-        // Lookup GIC
-        // Request IRQ line
-        let irq = IrqLine;
-        let dev = Arc::new(GenericTimer::new(irq, Nanoseconds::new(1_000)));
+        let dev = Arc::new(GenericTimer::new(
+            "gic".to_owned(),
+            27,
+            Nanoseconds::new(1_000),
+        ));
+
         store.insert(dev.clone());
         dev
     }
@@ -95,11 +96,15 @@ const CNTV_TVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 0);
 const CNTV_CTL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 1);
 const CNTV_CVAL_EL0: u64 = encode_sysreg_id(3, 3, 14, 3, 2);
 
-#[derive(Debug)]
 struct GenericTimer {
     id: ObjectId,
+
+    controller_name: String,
+    controller: Once<Arc<dyn IrqController>>,
+    irq: usize,
+
     tick_interval: Nanoseconds<u64>,
-    irq: IrqLine,
+
     counter: AtomicU64,
     /// Used when registering for a periodic tick from the kernel
     frequency: AtomicU64,
@@ -115,10 +120,12 @@ struct GenericTimer {
 }
 
 impl GenericTimer {
-    fn new(irq: IrqLine, tick_interval: Nanoseconds<u64>) -> Self {
+    fn new(controller_name: String, irq: usize, tick_interval: Nanoseconds<u64>) -> Self {
         Self {
-            id: ObjectId::new(),
+            id: get_host().object_store().new_id(),
             irq,
+            controller_name,
+            controller: Once::new(),
             tick_interval,
             counter: AtomicU64::new(0),
             frequency: AtomicU64::new(10_000_000), //
@@ -141,6 +148,7 @@ impl GenericTimer {
 }
 
 impl ToMemoryMappedDevice for GenericTimer {}
+impl ToIrqController for GenericTimer {}
 
 impl Tickable for GenericTimer {
     fn tick(&self, time_since_last_tick: Nanoseconds<u64>) {
@@ -161,8 +169,9 @@ impl Tickable for GenericTimer {
         if self.timer_condition_met.load(Ordering::Relaxed)
             && !self.timer_interrupt_masked.load(Ordering::Relaxed)
         {
-            self.irq.raise();
-            panic!()
+            self.controller.get().unwrap().raise(self.irq);
+        } else {
+            self.controller.get().unwrap().rescind(self.irq);
         }
     }
 }
@@ -175,6 +184,17 @@ impl Object for GenericTimer {
 
 impl Device for GenericTimer {
     fn start(&self) {
+        // Lookup GIC
+        let gic_id = get_host()
+            .object_store()
+            .lookup_by_alias(&self.controller_name)
+            .unwrap();
+        let gic = get_host()
+            .object_store()
+            .get_irq_controller(gic_id)
+            .unwrap();
+        self.controller.call_once(|| gic);
+
         get_host().register_periodic_tick(self.tick_interval, self);
     }
 
@@ -205,7 +225,8 @@ impl RegisterMappedDevice for GenericTimer {
             _ => panic!("read unknown sys_reg_id {sys_reg_id:x}"),
         };
 
-        get_host().print_message(&format!("read {sys_reg_id:x} = {value}\n"), true);
+        //        get_host().print_message(&format!("read {sys_reg_id:x} = {value}\n"),
+        // true);
 
         dest.copy_from_slice(&value.to_le_bytes());
     }
@@ -213,7 +234,8 @@ impl RegisterMappedDevice for GenericTimer {
     fn write(&self, sys_reg_id: u64, value: &[u8]) {
         let value = u64::from_le_bytes(value.try_into().unwrap());
 
-        get_host().print_message(&format!("write! {sys_reg_id:x} = {value}\n"), true);
+        //      get_host().print_message(&format!("write! {sys_reg_id:x} = {value}\n"),
+        // true);
 
         match sys_reg_id {
             CNTKCTL_EL1 => self.cntkctl_el1.store(value, Ordering::Relaxed),
@@ -229,9 +251,9 @@ impl RegisterMappedDevice for GenericTimer {
             CNTPS_CVAL_EL1 => todo!("CNTPS_CVAL_EL1"),
             CNTV_TVAL_EL0 => todo!("CNTV_TVAL_EL0"),
             CNTV_CTL_EL0 => {
-                let enable = (value & 0b001) == 1;
-                let imask = (value & 0b010 >> 1) == 1;
-                let istatus = (value & 0b100 >> 2) == 1;
+                let enable = (value & 0b001) == 0b001;
+                let imask = (value & 0b010) == 0b010;
+                let istatus = (value & 0b100) == 0b100;
 
                 self.timer_enabled.store(enable, Ordering::Relaxed);
                 self.timer_interrupt_masked.store(imask, Ordering::Relaxed);

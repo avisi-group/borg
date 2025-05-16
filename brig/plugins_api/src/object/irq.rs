@@ -1,14 +1,7 @@
 use crate::object::Object;
 
-#[derive(Debug)]
-pub struct IrqLine;
-
 pub trait IrqController: Object {
-    fn request_irq(&self, index: usize) -> IrqLine;
-}
-
-impl IrqLine {
-    pub fn raise(&self) {
-        todo!()
-    }
+    fn raise(&self, line: usize);
+    fn rescind(&self, line: usize);
+    fn acknowledge(&self, line: usize);
 }

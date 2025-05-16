@@ -16,6 +16,7 @@ use {
         fs::{File, Filesystem, tar::TarFilesystem},
         guest::register_device_factory,
         memory::bump::{BumpAllocator, BumpAllocatorRef},
+        object_store,
     },
     alloc::{
         alloc::alloc_zeroed,
@@ -37,8 +38,8 @@ use {
     },
     plugins_api::{
         object::{
-            Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
-            ToTickable,
+            Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
+            ToRegisterMappedDevice, ToTickable,
             device::{Device, DeviceFactory},
         },
         util::parse_hex_prefix,
@@ -111,7 +112,7 @@ struct ModelDeviceFactory {
 impl ModelDeviceFactory {
     fn new(name: String, model: Arc<Model>) -> Self {
         Self {
-            id: ObjectId::new(),
+            id: object_store::get().new_id(),
             name,
             model,
         }
@@ -128,6 +129,7 @@ impl ToDevice for ModelDeviceFactory {}
 impl ToTickable for ModelDeviceFactory {}
 impl ToRegisterMappedDevice for ModelDeviceFactory {}
 impl ToMemoryMappedDevice for ModelDeviceFactory {}
+impl ToIrqController for ModelDeviceFactory {}
 
 impl DeviceFactory for ModelDeviceFactory {
     fn create(&self, store: &dyn ObjectStore, config: BTreeMap<String, String>) -> Arc<dyn Device> {
@@ -171,6 +173,7 @@ impl Object for ModelDevice {
 impl ToTickable for ModelDevice {}
 impl ToRegisterMappedDevice for ModelDevice {}
 impl ToMemoryMappedDevice for ModelDevice {}
+impl ToIrqController for ModelDevice {}
 
 impl Device for ModelDevice {
     fn start(&self) {
@@ -218,7 +221,7 @@ impl ModelDevice {
         register_file.write("_PC", initial_pc);
 
         Self {
-            id: ObjectId::new(),
+            id: object_store::get().new_id(),
             name,
             model,
             register_file,

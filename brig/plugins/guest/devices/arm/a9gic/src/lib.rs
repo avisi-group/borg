@@ -3,16 +3,19 @@
 extern crate alloc;
 
 use {
-    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc},
+    alloc::{boxed::Box, collections::BTreeMap, string::String, sync::Arc, vec::Vec},
     log::error,
-    plugins_rt::api::{
-        PluginHeader, PluginHost,
-        object::{
-            Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice, ToRegisterMappedDevice,
-            ToTickable,
-            device::{Device, DeviceFactory, MemoryMappedDevice},
-            irq::IrqController,
+    plugins_rt::{
+        api::{
+            PluginHeader, PluginHost,
+            object::{
+                Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
+                ToRegisterMappedDevice, ToTickable,
+                device::{Device, DeviceFactory, MemoryMappedDevice},
+                irq::IrqController,
+            },
         },
+        get_host,
     },
     spin::Mutex,
 };
@@ -30,7 +33,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     host.register_device_factory(
         "a9gic",
         Box::new(GlobalInterruptControllerFactory {
-            id: ObjectId::new(),
+            id: get_host().object_store().new_id(),
         }),
     );
 
@@ -51,6 +54,7 @@ impl ToDevice for GlobalInterruptControllerFactory {}
 impl ToTickable for GlobalInterruptControllerFactory {}
 impl ToRegisterMappedDevice for GlobalInterruptControllerFactory {}
 impl ToMemoryMappedDevice for GlobalInterruptControllerFactory {}
+impl ToIrqController for GlobalInterruptControllerFactory {}
 
 impl DeviceFactory for GlobalInterruptControllerFactory {
     fn create(
@@ -116,17 +120,69 @@ struct State {
 struct GlobalInterruptController {
     id: ObjectId,
     state: Mutex<State>,
+    lines: Mutex<Vec<IrqLine>>,
+}
+
+#[derive(Debug)]
+struct IrqLine {
+    raised: bool,
+    enabled: bool,
+    active: bool,
+    pending: bool,
+    priority: u8,
+    cpu_mask: u8,
+    config: u8,
+}
+
+impl IrqLine {
+    pub fn new(config: u8, cpu_mask: u8) -> Self {
+        Self {
+            raised: false,
+            enabled: false,
+            active: false,
+            pending: false,
+            priority: 0,
+            cpu_mask,
+            config,
+        }
+    }
+
+    pub fn edge_triggered(&self) -> bool {
+        self.config & 2 == 2
+    }
+
+    pub fn level_triggered(&self) -> bool {
+        self.config & 2 != 2
+    }
 }
 
 impl GlobalInterruptController {
     fn new() -> Self {
+        let mut lines = Vec::new();
+
+        for i in 0..1020 {
+            let mut config = 0u8;
+            let mut cpu_mask = 0u8;
+
+            if i < 16 {
+                config |= 2u8;
+            }
+
+            if i < 32 {
+                cpu_mask = 1u8;
+            }
+
+            lines.push(IrqLine::new(config, cpu_mask));
+        }
+
         Self {
-            id: ObjectId::new(),
+            id: get_host().object_store().new_id(),
             state: Mutex::new(State {
                 gicc_ctlr: 0,
                 pending: None,
                 active: None,
             }),
+            lines: Mutex::new(lines),
         }
     }
 
@@ -253,7 +309,32 @@ impl MemoryMappedDevice for GlobalInterruptController {
 }
 
 impl IrqController for GlobalInterruptController {
-    fn request_irq(&self, index: usize) -> plugins_rt::api::object::irq::IrqLine {
+    fn raise(&self, line: usize) {
+        //error!("[GIC] raise irq {line}");
+
+        let line = &mut self.lines.lock()[line];
+
+        if !line.raised {
+            line.raised = true;
+            if line.edge_triggered() {
+                line.pending = true;
+            }
+
+            // TODO: Update CPU Interface
+        }
+    }
+
+    fn rescind(&self, line: usize) {
+        let line = &mut self.lines.lock()[line];
+
+        if line.raised {
+            line.raised = false;
+            // TODO: Update CPU Interface
+        }
+    }
+
+    fn acknowledge(&self, line: usize) {
+        error!("[GIC] acknowledge irq {line}");
         todo!()
     }
 }

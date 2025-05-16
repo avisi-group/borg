@@ -10,7 +10,7 @@ use {
         object_store,
     },
     alloc::{borrow::ToOwned, boxed::Box, collections::BTreeMap, string::String, sync::Arc},
-    core::{ptr, sync::atomic::AtomicBool},
+    core::ptr,
     plugins_api::{
         object::{
             ObjectStore,
@@ -112,6 +112,7 @@ pub fn start() {
                 .collect(),
         );
         guest.devices.insert(name.clone(), device.clone());
+        object_store::get().insert_alias(device.id(), name.clone());
 
         // locate address space for attachment, if any
         match device_config.attach {

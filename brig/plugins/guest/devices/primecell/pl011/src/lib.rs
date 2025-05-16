@@ -8,7 +8,7 @@ use {
         api::{
             PluginHeader, PluginHost,
             object::{
-                Object, ObjectId, ObjectStore, ToDevice, ToMemoryMappedDevice,
+                Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
                 ToRegisterMappedDevice, ToTickable,
                 device::{Device, DeviceFactory, MemoryMappedDevice},
             },
@@ -30,7 +30,7 @@ fn entrypoint(host: &'static dyn PluginHost) {
     host.register_device_factory(
         "pl011",
         Box::new(Pl011Factory {
-            id: ObjectId::new(),
+            id: get_host().object_store().new_id(),
         }),
     );
 
@@ -51,6 +51,7 @@ impl ToDevice for Pl011Factory {}
 impl ToTickable for Pl011Factory {}
 impl ToRegisterMappedDevice for Pl011Factory {}
 impl ToMemoryMappedDevice for Pl011Factory {}
+impl ToIrqController for Pl011Factory {}
 
 impl DeviceFactory for Pl011Factory {
     fn create(
@@ -59,7 +60,7 @@ impl DeviceFactory for Pl011Factory {
         _config: BTreeMap<String, String>,
     ) -> Arc<dyn Device> {
         let dev = Arc::new(Pl011 {
-            id: ObjectId::new(),
+            id: get_host().object_store().new_id(),
         });
         store.insert(dev.clone());
         dev
@@ -79,6 +80,7 @@ impl Object for Pl011 {
 
 impl ToTickable for Pl011 {}
 impl ToRegisterMappedDevice for Pl011 {}
+impl ToIrqController for Pl011 {}
 
 impl Device for Pl011 {
     fn start(&self) {}

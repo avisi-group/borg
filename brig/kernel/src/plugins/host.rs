@@ -40,4 +40,8 @@ impl PluginHost for Host {
         let tickable = object_store::get().get_tickable(tickable.id()).unwrap();
         register_tickable(interval, tickable);
     }
+
+    fn object_store(&self) -> &dyn ObjectStore {
+        object_store::get()
+    }
 }
