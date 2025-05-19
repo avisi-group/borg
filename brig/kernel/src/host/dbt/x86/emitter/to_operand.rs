@@ -596,8 +596,8 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
         }
 
         // pull out widths but also validate types are compatible
-        let (left, mut right) = match (left.typ(), right.typ()) {
-            (Type::Unsigned(l), Type::Unsigned(r)) => {
+        let (left, right) = match (left.typ(), right.typ()) {
+            (Type::Unsigned(_), Type::Unsigned(_)) => {
                 let left = self.to_operand_oversize_reg_promote(left);
                 let right = self.to_operand_oversize_reg_promote(right);
 
@@ -873,12 +873,7 @@ fn encode_compare<A: Alloc>(
         }
 
         (Immediate(_), Immediate(_)) => {
-            panic!(
-                "why was this not const evaluated? {:?} {:?} {:?}",
-                left,
-                right,
-                todo!() // kind
-            )
+            panic!("why was this not const evaluated? {:?} {:?}", left, right,)
         }
         (Target(_), _) | (_, Target(_)) => panic!("why"),
     }

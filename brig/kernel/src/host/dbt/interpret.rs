@@ -1,8 +1,5 @@
 use {
-    crate::host::dbt::{
-        bit_extract, bit_insert,
-        register_file::{RegisterFile, RegisterValue},
-    },
+    crate::host::dbt::{bit_extract, bit_insert, register_file::RegisterFile},
     alloc::vec::Vec,
     common::{
         arena::Ref,

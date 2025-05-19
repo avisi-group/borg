@@ -1,16 +1,14 @@
 use {
-    crate::{
-        host::{
-            self,
-            objects::{
-                Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
-                ToRegisterMappedDevice, ToTickable,
-                device::{Device, DeviceFactory, RegisterMappedDevice},
-                irq::IrqController,
-                tickable::Tickable,
-            },
+    crate::host::{
+        self,
+        dbt::sysreg_helpers::encode_sysreg_id,
+        objects::{
+            Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
+            ToRegisterMappedDevice, ToTickable,
+            device::{Device, RegisterMappedDevice},
+            irq::IrqController,
+            tickable::Tickable,
         },
-        util::encode_sysreg_id,
     },
     alloc::{borrow::ToOwned, collections::BTreeMap, string::String, sync::Arc},
     bitfields::bitfield,
@@ -121,9 +119,7 @@ impl Tickable for GenericTimer {
         self.timer_condition_met
             .store(interrupt_status, Ordering::Relaxed);
 
-        if self.timer_condition_met.load(Ordering::Relaxed)
-            && !self.timer_interrupt_masked.load(Ordering::Relaxed)
-        {
+        if interrupt_status && !self.timer_interrupt_masked.load(Ordering::Relaxed) {
             self.controller.get().unwrap().raise(self.irq);
         } else {
             self.controller.get().unwrap().rescind(self.irq);
@@ -147,6 +143,7 @@ impl Device for GenericTimer {
         self.controller.call_once(|| gic);
 
         host::timer::register_tickable(
+            // Nanoseconds(1_000_000_000),
             self.tick_interval,
             ObjectStore::global().get_tickable(self.id()).unwrap(),
         );
@@ -207,11 +204,9 @@ impl RegisterMappedDevice for GenericTimer {
             CNTV_CTL_EL0 => {
                 let enable = (value & 0b001) == 0b001;
                 let imask = (value & 0b010) == 0b010;
-                let istatus = (value & 0b100) == 0b100;
 
                 self.timer_enabled.store(enable, Ordering::Relaxed);
                 self.timer_interrupt_masked.store(imask, Ordering::Relaxed);
-                self.timer_condition_met.store(istatus, Ordering::Relaxed);
             }
             CNTV_CVAL_EL0 => {
                 self.compare_value.store(value, Ordering::Relaxed);

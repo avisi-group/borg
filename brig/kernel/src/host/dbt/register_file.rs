@@ -3,7 +3,7 @@ use {
     alloc::vec::Vec,
     byteorder::ByteOrder,
     common::{hashmap::HashMap, intern::InternedString, rudder::Model},
-    core::{any::type_name, borrow::Borrow, cell::UnsafeCell},
+    core::{any::type_name, borrow::Borrow, cell::UnsafeCell, ptr::NonNull},
     itertools::Itertools,
     paste::paste,
 };
@@ -105,6 +105,36 @@ impl RegisterFile {
         V::read(&unsafe { self.inner.as_ref_unchecked() }[offset..offset + V::SIZE])
     }
 
+    pub fn as_wellknown<V: RegisterValue>(
+        &self,
+        name: impl Into<InternedString>,
+    ) -> WellKnownRegister<V::Inner> {
+        let name = name.into();
+        let (offset, size) = self.registers.get(&name).copied().unwrap();
+
+        if V::SIZE > size {
+            log::error!(
+                "wrong size instantiation of {name:?}: expected {:#x} got {:#x}
+        ({})",
+                size,
+                V::SIZE,
+                type_name::<V>()
+            );
+        }
+
+        self.validate_range::<V>(offset);
+        //V::read(&unsafe { self.inner.as_ref_unchecked() }[offset..offset + V::SIZE])
+
+        WellKnownRegister::<V::Inner>::new(unsafe {
+            NonNull::new_unchecked(
+                self.inner
+                    .as_mut_unchecked()
+                    .as_mut_ptr()
+                    .offset(offset as isize) as *mut V::Inner,
+            )
+        })
+    }
+
     pub fn validate_range<V: RegisterValue>(&self, offset: usize) {
         // given an offset into the register file, return the range in which it
         // lies
@@ -127,9 +157,32 @@ impl RegisterFile {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct WellKnownRegister<T>(NonNull<T>);
+
+unsafe impl<T> Send for WellKnownRegister<T> {}
+unsafe impl<T> Sync for WellKnownRegister<T> {}
+
+impl<T> WellKnownRegister<T> {
+    pub fn new(ptr: NonNull<T>) -> Self {
+        Self(ptr)
+    }
+
+    pub fn read(&self) -> T {
+        unsafe { self.0.read() }
+    }
+
+    pub fn write(&self, value: T) {
+        unsafe {
+            self.0.write(value);
+        }
+    }
+}
+
 pub trait RegisterValue {
     /// Size in bytes
     const SIZE: usize;
+    type Inner;
 
     fn write(&self, dest: &mut [u8]);
     fn read(src: &[u8]) -> Self;
@@ -139,6 +192,7 @@ macro_rules! impl_register_value {
     ($target_type:ty) => {
         impl RegisterValue for $target_type {
             const SIZE: usize = (Self::BITS / 8) as usize;
+            type Inner = $target_type;
 
             paste! {
                 fn write(&self, dest: &mut [u8]) {
@@ -163,6 +217,7 @@ impl_register_value!(i16);
 
 impl RegisterValue for u8 {
     const SIZE: usize = 1;
+    type Inner = u8;
 
     fn write(&self, dest: &mut [u8]) {
         dest[0] = *self;
@@ -175,6 +230,7 @@ impl RegisterValue for u8 {
 
 impl RegisterValue for bool {
     const SIZE: usize = 1;
+    type Inner = bool;
 
     fn write(&self, dest: &mut [u8]) {
         dest[0] = match self {

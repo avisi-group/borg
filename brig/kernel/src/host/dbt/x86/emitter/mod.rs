@@ -64,7 +64,7 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             current_block_operands: HashMap::default(),
             panic_block: ctx.panic_block(),
             next_vreg: 0,
-            execution_result: ExecutionResult::Ok,
+            execution_result: ExecutionResult::new(),
             ctx,
         }
     }
@@ -936,7 +936,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             || offset == self.ctx().ttbr1_el1_offset
         {
             // return with invalidate code
-            self.execution_result = ExecutionResult::NeedTLBInvalidate;
+            self.execution_result.set_need_tlb_invalidate(true);
         }
     }
 
@@ -1046,48 +1046,49 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_target(target);
     }
 
-    fn prologue(&mut self) {
-        let interrupt_pending = Operand::vreg(Width::_64, self.next_vreg());
+    fn prologue(&mut self) {}
+
+    fn leave(&mut self) {
+        //        let interrupt_pending = Operand::vreg(Width::_32, self.next_vreg());
 
         self.push_instruction(
             Instruction::mov(
                 Operand::mem_seg_displ(
-                    64,
+                    32,
                     super::encoder::SegmentRegister::FS,
                     i32::try_from(offset_of!(GuestExecutionContext, interrupt_pending)).unwrap(),
                 ),
-                interrupt_pending,
-            )
-            .unwrap(),
-        );
-
-        self.push_instruction(Instruction::test(interrupt_pending, interrupt_pending));
-
-        let block_start = self.ctx_mut().create_block();
-
-        self.push_instruction(Instruction::je(block_start));
-        self.push_target(block_start);
-
-        self.push_instruction(
-            Instruction::mov(
-                Operand::imm(Width::_32, ExecutionResult::InterruptPending.as_u64()),
                 Operand::preg(Width::_32, PhysicalRegister::RAX),
             )
             .unwrap(),
         );
-        self.push_instruction(Instruction::ret());
 
-        self.current_block = block_start;
-    }
+        self.push_instruction(Instruction::shl(
+            Operand::imm(Width::_32, 1),
+            Operand::preg(Width::_32, PhysicalRegister::RAX),
+        ));
 
-    fn leave(&mut self) {
-        self.push_instruction(
-            Instruction::mov(
-                Operand::imm(Width::_64, self.execution_result.as_u64()),
-                Operand::preg(Width::_64, PhysicalRegister::RAX),
-            )
-            .unwrap(),
-        );
+        self.push_instruction(Instruction::or(
+            Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
+            Operand::preg(Width::_32, PhysicalRegister::RAX),
+        ));
+
+        // self.push_instruction(
+        //     Instruction::mov(
+        //         Operand::imm(Width::_64, self.execution_result.as_u64()),
+        //         Operand::preg(Width::_64, PhysicalRegister::RAX),
+        //     )
+        //     .unwrap(),
+        // );
+
+        // self.push_instruction(Instruction::test(interrupt_pending,
+        // interrupt_pending));
+
+        // self.push_instruction(Instruction::cmovne(
+        //     Operand::preg(Width::_32, PhysicalRegister::RCX),
+        //     Operand::preg(Width::_32, PhysicalRegister::RAX),
+        // ));
+
         self.push_instruction(Instruction::ret());
     }
 
@@ -1096,11 +1097,26 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
         self.push_instruction(
             Instruction::mov(
-                Operand::imm(Width::_64, self.execution_result.as_u64()),
-                Operand::preg(Width::_64, PhysicalRegister::RAX),
+                Operand::mem_seg_displ(
+                    32,
+                    super::encoder::SegmentRegister::FS,
+                    i32::try_from(offset_of!(GuestExecutionContext, interrupt_pending)).unwrap(),
+                ),
+                Operand::preg(Width::_32, PhysicalRegister::RAX),
             )
             .unwrap(),
         );
+
+        self.push_instruction(Instruction::shl(
+            Operand::imm(Width::_32, 1),
+            Operand::preg(Width::_32, PhysicalRegister::RAX),
+        ));
+
+        self.push_instruction(Instruction::or(
+            Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
+            Operand::preg(Width::_32, PhysicalRegister::RAX),
+        ));
+
         self.push_instruction(Instruction::test(
             Operand::preg(Width::_32, PhysicalRegister::RAX),
             Operand::preg(Width::_32, PhysicalRegister::RAX),
@@ -1179,13 +1195,6 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         ))));
 
         self.set_current_block(return_block);
-        self.push_instruction(
-            Instruction::mov(
-                Operand::imm(Width::_64, self.execution_result.as_u64()),
-                Operand::preg(Width::_64, PhysicalRegister::RAX),
-            )
-            .unwrap(),
-        );
         self.push_instruction(Instruction::ret());
     }
 
@@ -1911,8 +1920,8 @@ fn contains_get_flags<A: Alloc>(value: &X86NodeRef<A>) -> Option<X86NodeRef<A>> 
 
         NodeKind::BitExtract {
             value: a,
-            start: b,
-            length: c,
+            start: _,
+            length: _,
         } => contains_get_flags(a),
         // .or_else(|| contains_get_flags(b))
         // .or_else(|| contains_get_flags(c)),

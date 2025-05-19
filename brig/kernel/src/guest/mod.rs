@@ -5,15 +5,14 @@ use {
             memory::{AddressSpace, AddressSpaceRegion},
         },
         host::{
-            dbt::sysreg_helpers::{self},
+            dbt::sysreg_helpers::{self, encode_sysreg_id},
             fs::Filesystem,
             objects::{ObjectStore, device::Device},
         },
-        util::encode_sysreg_id,
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
-    core::{panic, ptr},
+    core::{panic, ptr, sync::atomic::AtomicU64},
     spin::Once,
     x86::current::segmentation::{rdfsbase, wrfsbase},
 };
@@ -23,13 +22,6 @@ pub mod devices;
 pub mod memory;
 
 pub static mut GUEST: Once<Guest> = Once::INIT;
-
-// pub static mut GUEST_DEVICE_FACTORIES: Mutex<BTreeMap<String, Box<dyn
-// DeviceFactory>>> =     Mutex::new(BTreeMap::new());
-
-// pub fn register_device_factory(name: String, factory: Box<dyn DeviceFactory>)
-// {     unsafe { GUEST_DEVICE_FACTORIES.lock() }.insert(name, factory);
-// }
 
 #[derive(Default)]
 pub struct Guest {
@@ -46,7 +38,7 @@ impl Guest {
 #[repr(C)]
 pub struct GuestExecutionContext {
     pub current_address_space: *mut AddressSpace,
-    pub interrupt_pending: u64,
+    pub interrupt_pending: AtomicU64,
 }
 
 impl GuestExecutionContext {
@@ -149,7 +141,7 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS) {
             .get_mut(&("as0".into()))
             .unwrap()
             .as_mut() as *mut AddressSpace,
-        interrupt_pending: 0,
+        interrupt_pending: AtomicU64::new(0),
     });
 
     log::debug!("activating guest execution context");

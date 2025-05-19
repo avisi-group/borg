@@ -1,9 +1,13 @@
 use {
-    crate::host::objects::device::{Device, RegisterMappedDevice},
-    alloc::{collections::BTreeMap, sync::Arc},
+    crate::host::objects::device::RegisterMappedDevice,
+    alloc::sync::Arc,
     common::hashmap::HashMap,
     spin::{Lazy, Mutex},
 };
+
+pub const fn encode_sysreg_id(op0: u64, op1: u64, crn: u64, crm: u64, op2: u64) -> u64 {
+    (op0 << 19) | (op1 << 16) | (crn << 12) | (crm << 8) | (op2 << 5)
+}
 
 enum Handler {
     Device(Arc<dyn RegisterMappedDevice>),

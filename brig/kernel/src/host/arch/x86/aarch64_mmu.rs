@@ -152,7 +152,7 @@ fn guest_page_fault(device: &ModelDevice, guest_virtual_address: u64) {
     interrupt_restore_safepoint(1);
 }
 
-fn take_arm_exception(
+pub fn take_arm_exception(
     device: &ModelDevice,
     target_el: u8,
     typ: u8,

@@ -4229,7 +4229,7 @@ fn udf() {
     emitter.leave();
 
     let num_regs = emitter.next_vreg();
-    let translation = ctx.compile(num_regs);
+    let _translation = ctx.compile(num_regs);
 
     //  translation.execute(&register_file); // todo
 }
@@ -4531,10 +4531,8 @@ fn mrs_timer() {
 }
 
 #[ktest]
-fn prologue() {
+fn empty() {
     let model = models::get("aarch64").unwrap();
-
-    let register_file = RegisterFile::init(&*model);
 
     let mut ctx = X86TranslationContext::new(&model, false);
     let mut emitter = X86Emitter::new(&mut ctx);

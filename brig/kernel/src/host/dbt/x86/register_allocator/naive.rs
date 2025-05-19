@@ -114,22 +114,20 @@ impl FreshAllocator {
                 let instr_clone = instruction.clone();
 
                 if matches!(instruction.0, Opcode::RET) {
-                    let live_ranges = self
+                    if let Some(live_ranges) = self
                         .live_ranges
                         .get_mut(&Register::PhysicalRegister(PhysicalRegister::RAX))
-                        .unwrap_or_else(|| {
-                            panic!("use of undef'd register RAX @ {instruction_index}")
-                        });
+                    {
+                        // update end
+                        let last_use = &mut live_ranges
+                            .as_mut_slice()
+                            .last_mut()
+                            .expect("should have at least one live range")
+                            .1;
 
-                    // update end
-                    let last_use = &mut live_ranges
-                        .as_mut_slice()
-                        .last_mut()
-                        .expect("should have at least one live range")
-                        .1;
-
-                    if last_use.unwrap_or_default() < instruction_index {
-                        *last_use = Some(instruction_index);
+                        if last_use.unwrap_or_default() < instruction_index {
+                            *last_use = Some(instruction_index);
+                        }
                     }
                 } else {
                     instruction.get_use_defs().for_each(|ud| {

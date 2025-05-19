@@ -1,12 +1,15 @@
 use {
     crate::{
         host::{
-            arch::x86::{aarch64_mmu, memory::VirtualMemoryArea, safepoint::record_safepoint},
+            arch::x86::{
+                aarch64_mmu::{self, take_arm_exception},
+                memory::VirtualMemoryArea,
+                safepoint::record_safepoint,
+            },
             dbt::{
                 Alloc, Translation,
                 emitter::{Emitter, Type},
-                register_file::RegisterFile,
-                trampoline::ExecutionResult,
+                register_file::{RegisterFile, WellKnownRegister},
                 translate::translate_instruction,
                 x86::{
                     X86TranslationContext,
@@ -17,9 +20,8 @@ use {
             fs::Filesystem,
             memory::bump::{BumpAllocator, BumpAllocatorRef},
             objects::{
-                Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
-                ToRegisterMappedDevice, ToTickable,
-                device::{Device, DeviceFactory},
+                Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
+                ToRegisterMappedDevice, ToTickable, device::Device,
             },
         },
         util::parse_hex_prefix,
@@ -40,6 +42,7 @@ use {
     core::{
         alloc::Layout,
         fmt::{self, Debug, Write},
+        ptr::NonNull,
     },
     proc_macro_lib::guest_device_factory,
     spin::Mutex,
@@ -97,35 +100,6 @@ pub fn load_all<FS: Filesystem>(fs: &mut FS) {
         });
 }
 
-/// Factory for creating execution instances for a supplied model
-struct ModelDeviceFactory {
-    id: ObjectId,
-    name: String,
-    model: Arc<Model>,
-}
-
-impl ModelDeviceFactory {
-    fn new(name: String, model: Arc<Model>) -> Self {
-        Self {
-            id: ObjectId::new(),
-            name,
-            model,
-        }
-    }
-}
-
-impl Object for ModelDeviceFactory {
-    fn id(&self) -> ObjectId {
-        self.id
-    }
-}
-
-impl ToDevice for ModelDeviceFactory {}
-impl ToTickable for ModelDeviceFactory {}
-impl ToRegisterMappedDevice for ModelDeviceFactory {}
-impl ToMemoryMappedDevice for ModelDeviceFactory {}
-impl ToIrqController for ModelDeviceFactory {}
-
 #[guest_device_factory(core)]
 fn create_core(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
     let model_name = config.get(&InternedString::from_static("model")).unwrap();
@@ -139,11 +113,27 @@ fn create_core(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Dev
     Arc::new(ModelDevice::new(model_name.to_string(), model, initial_pc))
 }
 
+pub struct WellKnownRegisters {
+    pc: WellKnownRegister<u64>,
+    i: WellKnownRegister<bool>,
+}
+
+impl WellKnownRegisters {
+    pub fn pc(&self) -> WellKnownRegister<u64> {
+        self.pc
+    }
+
+    pub fn i(&self) -> WellKnownRegister<bool> {
+        self.i
+    }
+}
+
 pub struct ModelDevice {
     id: ObjectId,
     name: String,
     model: Arc<Model>,
     pub register_file: RegisterFile,
+    pub well_known_registers: WellKnownRegisters,
 }
 
 impl Debug for ModelDevice {
@@ -177,6 +167,10 @@ impl Device for ModelDevice {
 impl ModelDevice {
     fn new(name: String, model: Arc<Model>, initial_pc: u64) -> Self {
         let register_file = RegisterFile::init(&*model);
+        let well_known_registers = WellKnownRegisters {
+            pc: register_file.as_wellknown::<u64>("_PC"),
+            i: register_file.as_wellknown::<bool>("PSTATE_I"),
+        };
 
         // interpret(
         //     &model,
@@ -213,6 +207,7 @@ impl ModelDevice {
             name,
             model,
             register_file,
+            well_known_registers,
         }
     }
 
@@ -266,7 +261,7 @@ impl ModelDevice {
             //     panic!();
             // }
 
-            let block_start_virtual_pc = self.register_file.read::<u64>("_PC");
+            let block_start_virtual_pc = self.well_known_registers.pc().read(); // self.register_file.read::<u64>("_PC");
 
             let block_start_physical_pc =
                 if let Some(pc) = translation_cache.get(block_start_virtual_pc as usize) {
@@ -306,16 +301,16 @@ impl ModelDevice {
 
             let exec_result = translated_block.translation.execute(&self.register_file);
 
-            log::trace!(
-                "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x3: {:x}, x18: {:x}",
-                self.get_nzcv(),
-                self.register_file.read::<u64>("SP_EL3"),
-                self.register_file.read::<u64>("R0"),
-                self.register_file.read::<u64>("R1"),
-                self.register_file.read::<u64>("R2"),
-                self.register_file.read::<u64>("R3"),
-                self.register_file.read::<u64>("R18"),
-            );
+            // log::trace!(
+            //     "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x3: {:x}, x18:
+            // {:x}",     self.get_nzcv(),
+            //     self.register_file.read::<u64>("SP_EL3"),
+            //     self.register_file.read::<u64>("R0"),
+            //     self.register_file.read::<u64>("R1"),
+            //     self.register_file.read::<u64>("R2"),
+            //     self.register_file.read::<u64>("R3"),
+            //     self.register_file.read::<u64>("R18"),
+            // );
 
             if PRINT_REGISTERS {
                 write!(transport, "instr = {:08x}\n", translated_block.opcodes[0]).unwrap();
@@ -385,14 +380,24 @@ impl ModelDevice {
                 }
             }
 
-            match exec_result {
-                ExecutionResult::Ok => (),
-                ExecutionResult::NeedTLBInvalidate => {
-                    chain_cache.fill_keys(1);
-                    translation_cache.fill_keys(1);
-                    VirtualMemoryArea::current().invalidate_guest_mappings();
+            if exec_result.need_tlb_invalidate() {
+                chain_cache.fill_keys(1);
+                translation_cache.fill_keys(1);
+                VirtualMemoryArea::current().invalidate_guest_mappings();
+            }
+
+            if exec_result.interrupt_pending() {
+                let masked = self.well_known_registers.i().read(); //self.register_file.read::<bool>("PSTATE_I");
+
+                if !masked {
+                    let pc = self.well_known_registers.pc().read();
+                    // log::error!("interrupt pending @ {pc:x}, masked: {masked}");
+                    take_arm_exception(self, 1, 255, 0, 0, pc, 0x80);
+                    //let pc = self.well_known_registers.pc().read();
+                    //log::error!("took arm exception to {pc:x}");
+                } else {
+                    //   log::error!("masked interrupt pending");
                 }
-                ExecutionResult::InterruptPending => todo!(),
             }
         }
     }
@@ -462,7 +467,7 @@ impl ModelDevice {
 
             // if we have a TLB invalidation or other non-zero status in that instruction,
             // do not translate the rest of the block
-            if emitter.execution_result != ExecutionResult::Ok {
+            if emitter.execution_result.need_tlb_invalidate() {
                 break false;
             }
 

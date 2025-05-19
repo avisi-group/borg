@@ -1,17 +1,17 @@
 use {
-    crate::{
-        host::dbt::{
+    crate::host::{
+        dbt::{
             Alloc,
             emitter::{self, Emitter, Type},
             register_file::RegisterFile,
-            sysreg_helpers::{self, sys_reg_read, sys_reg_write},
+            sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
             trampoline::{ExecutionResult, MAX_STACK_SIZE},
             x86::{
                 emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
                 encoder::Instruction,
             },
         },
-        util::encode_sysreg_id,
+        timer::{GLOBAL_CLOCK, GlobalClock},
     },
     alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
     common::{
@@ -1159,7 +1159,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 let args = args.iter().map(|a| value_store.get(*a)).collect::<Vec<_>>();
 
                 if target.as_ref() == "sail_tlbi" {
-                    self.emitter.execution_result = ExecutionResult::NeedTLBInvalidate;
+                    self.emitter.execution_result.set_need_tlb_invalidate(true);
                 }
 
                 StatementResult::Data(translate_with_stack_offset(

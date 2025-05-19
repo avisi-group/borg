@@ -1,12 +1,4 @@
-use {
-    crate::host::objects::{Object, ObjectStore},
-    alloc::{collections::BTreeMap, string::String, sync::Arc},
-};
-
-/// Manufacturer of guest devices
-pub trait DeviceFactory: Object {
-    fn create(&self, store: &ObjectStore, config: BTreeMap<String, String>) -> Arc<dyn Device>;
-}
+use crate::host::objects::Object;
 
 /// Emulated guest device
 pub trait Device: Object {

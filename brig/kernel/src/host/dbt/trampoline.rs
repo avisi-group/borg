@@ -1,35 +1,25 @@
-use core::arch::asm;
+use {bitfields::bitfield, core::arch::asm};
 
 pub const MAX_STACK_SIZE: usize = 2 * 1024 * 1024;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u64)]
-pub enum ExecutionResult {
-    Ok = 0,
-    NeedTLBInvalidate,
-    InterruptPending,
-}
-
-impl From<u64> for ExecutionResult {
-    fn from(value: u64) -> Self {
-        match value {
-            0 => Self::Ok,
-            1 => Self::NeedTLBInvalidate,
-            2 => Self::InterruptPending,
-            _ => panic!("unknown execution result value: {value:x}"),
-        }
-    }
+#[bitfield(u32)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ExecutionResult {
+    need_tlb_invalidate: bool,
+    interrupt_pending: bool,
+    #[bits(30)]
+    _reserved: u32,
 }
 
 impl ExecutionResult {
-    pub fn as_u64(&self) -> u64 {
-        *self as u64
+    pub fn as_u32(&self) -> u32 {
+        self.into_bits()
     }
 }
 
 #[inline(never)] // only disabled to make debugging easier
 pub fn trampoline(code_ptr: *const u8, register_file: *mut u8) -> ExecutionResult {
-    let mut status: u64;
+    let mut status: u32;
 
     unsafe {
         asm!(

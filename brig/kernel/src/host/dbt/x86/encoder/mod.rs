@@ -6,7 +6,7 @@ use {
             encoder::width::Width,
         },
     },
-    alloc::vec::{self, Vec},
+    alloc::vec::Vec,
     common::{arena::Ref, hashmap::HashMapA},
     core::fmt::{Debug, Display, Formatter},
     derive_where::derive_where,
@@ -1279,6 +1279,20 @@ impl<A: Alloc> Instruction<A> {
             ) => {
                 assembler
                     .cmovne::<AsmRegister64, AsmRegister64>(dst.into(), src.into())
+                    .unwrap();
+            }
+            CMOVNE(
+                Operand {
+                    kind: R(PHYS(src)),
+                    width_in_bits: Width::_32,
+                },
+                Operand {
+                    kind: R(PHYS(dst)),
+                    width_in_bits: Width::_32,
+                },
+            ) => {
+                assembler
+                    .cmovne::<AsmRegister32, AsmRegister32>(dst.into(), src.into())
                     .unwrap();
             }
             IMUL(

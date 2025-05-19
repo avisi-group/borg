@@ -346,13 +346,13 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                         let dest = faulting_instruction.op0_register();
 
                                         let size = if dest.is_gpr8() {
-                                            8
+                                            1
                                         } else if dest.is_gpr16() {
-                                            16
+                                            2
                                         } else if dest.is_gpr32() {
-                                            32
+                                            4
                                         } else if dest.is_gpr64() {
-                                            64
+                                            8
                                         } else {
                                             panic!()
                                         };
@@ -366,7 +366,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                     }
                                 };
 
-                                let mut bytes = alloc::vec![0; size];
+                                let mut bytes = alloc::vec![0; size ];
 
                                 device.read(offset, &mut bytes);
 

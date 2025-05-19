@@ -1,24 +1,21 @@
 use {
-    crate::{
-        host::dbt::{
-            Alloc, Translation,
-            emitter::Emitter,
-            x86::{
-                emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
-                encoder::{Instruction, Opcode, OperandKind},
-                register_allocator::naive::FreshAllocator,
-            },
+    crate::host::dbt::{
+        Alloc, Translation,
+        emitter::Emitter,
+        x86::{
+            emitter::{X86Block, X86BlockMark, X86Emitter, X86NodeRef},
+            encoder::{Instruction, Opcode, OperandKind},
+            register_allocator::naive::FreshAllocator,
         },
-        timer::Measurement,
     },
-    alloc::{alloc::Global, collections::VecDeque, rc::Rc, vec::Vec},
+    alloc::{alloc::Global, collections::VecDeque, vec::Vec},
     common::{
         arena::{Arena, Ref},
         hashmap::{HashMapA, hashmap_in, hashset_in},
         intern::InternedString,
         rudder::Model,
     },
-    core::{cell::RefCell, fmt::Debug},
+    core::fmt::Debug,
     iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr, rax},
 };
 

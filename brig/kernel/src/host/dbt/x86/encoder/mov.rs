@@ -208,6 +208,31 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 )
                 .unwrap();
         }
+        // MOV M -> R
+        (
+            Operand {
+                kind:
+                    M {
+                        base: None,
+                        index,
+                        scale,
+                        displacement,
+                        segment_override: Some(seg_reg),
+                    },
+                width_in_bits: Width::_32,
+            },
+            Operand {
+                kind: R(PHYS(dst)),
+                width_in_bits: Width::_32,
+            },
+        ) => {
+            assembler
+                .mov::<AsmRegister64, AsmMemoryOperand>(
+                    dst.into(),
+                    segment_memory_operand_to_iced(*seg_reg, *index, *scale, *displacement),
+                )
+                .unwrap();
+        }
         // MOV R -> M
         (
             Operand {
