@@ -42,7 +42,7 @@ pub mod rudder;
 pub mod util;
 
 // evaluates assertions and panics as pure, could be bad
-const TREAT_PANICS_AS_PURE_DANGEROUS_UNSAFE: bool = false;
+const TREAT_PANICS_AS_PURE_DANGEROUS_UNSAFE: bool = true;
 
 /// Deserializes an AST from an archive.
 ///

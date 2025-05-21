@@ -328,19 +328,31 @@ impl<'a, 'p> StatementUseAnalysis<'a, 'p> {
     }
 
     pub fn is_dead(&self, stmt: Ref<Statement>) -> bool {
-        !self.has_side_effects(stmt) && !self.has_uses(stmt)
+        let r = !self.has_side_effects(stmt) && !self.has_uses(stmt);
+
+        if r {
+            match stmt.get(self.block.get(self.arena).arena()) {
+                Statement::Call { target, .. } => {
+                    log::debug!("call statement to {target} is dead");
+                }
+                _ => {}
+            }
+        }
+
+        r
     }
 
     pub fn has_side_effects(&self, stmt: Ref<Statement>) -> bool {
         let stmt = stmt.get(self.block.get(self.arena).arena());
 
         match stmt {
-            Statement::Call { target, .. } => true, // !self.function_purity.is_pure(*target),
+            Statement::Call { target, .. } => !self.function_purity.is_pure(*target),
             Statement::WriteVariable { .. }
             | Statement::WriteRegister { .. }
             | Statement::WriteMemory { .. }
             | Statement::WritePc { .. }
-            | Statement::Jump { .. }
+            | Statement::ReadMemory { .. }
+            | Statement::Jump { .. } // cant kill control flow
             | Statement::Branch { .. }
             | Statement::Return { .. }
             | Statement::Panic(_)

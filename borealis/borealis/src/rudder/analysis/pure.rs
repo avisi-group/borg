@@ -16,6 +16,11 @@ impl PurityAnalysis {
             functions: HashMap::default(),
         };
 
+        // special
+        celph
+            .functions
+            .insert(InternedString::from_static("sail_tlbi"), false);
+
         let mut seen = HashSet::default();
 
         for f in model.functions().keys() {
@@ -68,13 +73,16 @@ impl PurityAnalysis {
                 }
                 Statement::WriteMemory { .. }
                 | Statement::WritePc { .. }
-                | Statement::WriteRegister { .. } => {
+                | Statement::WriteRegister { .. }
+                | Statement::ReadMemory { .. } => {
                     log::debug!("impure due to {s:?}");
 
                     false
                 }
 
-                Statement::Panic(_) => TREAT_PANICS_AS_PURE_DANGEROUS_UNSAFE,
+                Statement::Panic(_) | Statement::Assert { .. } => {
+                    TREAT_PANICS_AS_PURE_DANGEROUS_UNSAFE
+                }
                 _ => true,
             });
 

@@ -25,5 +25,19 @@ fn run_on_block(arena: &mut Arena<Block>, b: Ref<Block>) -> bool {
     // about direction)     and rewrite the branch to be a jump to the
     // alternative path
 
+    if let Some(terminator) = b.get(arena).terminator_statement() {
+        match terminator.get(b.get(arena).arena()) {
+            common::rudder::statement::Statement::Branch {
+                condition,
+                true_target,
+                false_target,
+            } => {
+                // Check target block
+            }
+
+            _ => {}
+        }
+    }
+
     false
 }
