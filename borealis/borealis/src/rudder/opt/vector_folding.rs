@@ -1,15 +1,18 @@
-use common::{
-    arena::{Arena, Ref},
-    rudder::{
-        block::Block,
-        constant::Constant,
-        function::Function,
-        statement::{BinaryOperationKind, Location, Statement, build_at, cast_at},
-        types::Type,
+use {
+    crate::rudder::opt::OptimizationContext,
+    common::{
+        arena::{Arena, Ref},
+        rudder::{
+            block::Block,
+            constant::Constant,
+            function::Function,
+            statement::{BinaryOperationKind, Location, Statement, build_at, cast_at},
+            types::Type,
+        },
     },
 };
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
     let mut changed = false;
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
         changed |= run_on_block(f.arena_mut(), block);

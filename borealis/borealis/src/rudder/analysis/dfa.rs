@@ -1,11 +1,14 @@
-use common::{
-    arena::{Arena, Ref},
-    hashmap::{HashMap, HashSet},
-    intern::InternedString,
-    rudder::{
-        block::Block,
-        function::{Function, Symbol},
-        statement::Statement,
+use {
+    crate::rudder::analysis::pure::PurityAnalysis,
+    common::{
+        arena::{Arena, Ref},
+        hashmap::{HashMap, HashSet},
+        intern::InternedString,
+        rudder::{
+            block::Block,
+            function::{Function, Symbol},
+            statement::Statement,
+        },
     },
 };
 
@@ -126,18 +129,24 @@ impl SymbolUseAnalysis {
     }
 }
 
-pub struct StatementUseAnalysis<'a> {
+pub struct StatementUseAnalysis<'a, 'p> {
     arena: &'a mut Arena<Block>,
     block: Ref<Block>,
     stmt_uses: HashMap<Ref<Statement>, HashSet<Ref<Statement>>>,
+    function_purity: &'p PurityAnalysis,
 }
 
-impl<'a> StatementUseAnalysis<'a> {
-    pub fn new(arena: &'a mut Arena<Block>, b: Ref<Block>) -> Self {
+impl<'a, 'p> StatementUseAnalysis<'a, 'p> {
+    pub fn new(
+        arena: &'a mut Arena<Block>,
+        b: Ref<Block>,
+        function_purity: &'p PurityAnalysis,
+    ) -> Self {
         let mut celf = Self {
             arena,
             block: b,
             stmt_uses: HashMap::default(),
+            function_purity,
         };
 
         celf.analyse();
@@ -319,10 +328,25 @@ impl<'a> StatementUseAnalysis<'a> {
     }
 
     pub fn is_dead(&self, stmt: Ref<Statement>) -> bool {
-        !stmt
-            .get(self.block.get(&self.arena).arena())
-            .has_side_effects()
-            && !self.has_uses(stmt)
+        !self.has_side_effects(stmt) && !self.has_uses(stmt)
+    }
+
+    pub fn has_side_effects(&self, stmt: Ref<Statement>) -> bool {
+        let stmt = stmt.get(self.block.get(self.arena).arena());
+
+        match stmt {
+            Statement::Call { target, .. } => true, // !self.function_purity.is_pure(*target),
+            Statement::WriteVariable { .. }
+            | Statement::WriteRegister { .. }
+            | Statement::WriteMemory { .. }
+            | Statement::WritePc { .. }
+            | Statement::Jump { .. }
+            | Statement::Branch { .. }
+            | Statement::Return { .. }
+            | Statement::Panic(_)
+            | Statement::Assert { .. } => true,
+            _ => false,
+        }
     }
 
     pub fn has_uses(&self, stmt: Ref<Statement>) -> bool {

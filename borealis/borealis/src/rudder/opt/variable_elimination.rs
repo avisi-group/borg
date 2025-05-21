@@ -1,5 +1,5 @@
 use {
-    crate::rudder::analysis,
+    crate::rudder::{analysis, opt::OptimizationContext},
     common::{
         Entry,
         arena::{Arena, Ref},
@@ -9,20 +9,21 @@ use {
     log::trace,
 };
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(ctx: &OptimizationContext, f: &mut Function) -> bool {
     let symbol_ua = analysis::dfa::SymbolUseAnalysis::new(f);
 
     let mut changed = false;
 
     trace!("running on function {}", f.name());
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
-        changed |= run_on_block(&symbol_ua, f.arena_mut(), block);
+        changed |= run_on_block(ctx, &symbol_ua, f.arena_mut(), block);
     }
 
     changed
 }
 
 fn run_on_block(
+    ctx: &OptimizationContext,
     symbol_ua: &analysis::dfa::SymbolUseAnalysis,
     arena: &mut Arena<Block>,
     block: Ref<Block>,
@@ -42,7 +43,7 @@ fn run_on_block(
     // if we see a write to a local symbol, then all reads until the next write can
     // be replaced.
 
-    let mut stmt_ua = analysis::dfa::StatementUseAnalysis::new(arena, block);
+    let mut stmt_ua = analysis::dfa::StatementUseAnalysis::new(arena, block, &ctx.purity);
 
     let mut live_writes = HashMap::default();
 

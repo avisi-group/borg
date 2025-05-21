@@ -338,6 +338,36 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                         width: *width,
                     },
                 }),
+                (
+                    NodeKind::Constant {
+                        value: lhs_value, ..
+                    },
+                    _,
+                ) => {
+                    if *lhs_value == 0 {
+                        rhs.clone()
+                    } else {
+                        self.node(X86Node {
+                            typ: lhs.typ().clone(),
+                            kind: NodeKind::BinaryOperation(op),
+                        })
+                    }
+                }
+                (
+                    _,
+                    NodeKind::Constant {
+                        value: rhs_value, ..
+                    },
+                ) => {
+                    if *rhs_value == 0 {
+                        lhs.clone()
+                    } else {
+                        self.node(X86Node {
+                            typ: lhs.typ().clone(),
+                            kind: NodeKind::BinaryOperation(op),
+                        })
+                    }
+                }
                 _ => self.node(X86Node {
                     typ: lhs.typ().clone(),
                     kind: NodeKind::BinaryOperation(op),
@@ -1049,8 +1079,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn prologue(&mut self) {}
 
     fn leave(&mut self) {
-        //        let interrupt_pending = Operand::vreg(Width::_32, self.next_vreg());
-
+        // Read the interrupt pending field of the guest execution context
         self.push_instruction(
             Instruction::mov(
                 Operand::mem_seg_displ(
@@ -1063,32 +1092,21 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             .unwrap(),
         );
 
+        // ASSUMPTION: It will either be zero or one, so move it into bit 1 position.
         self.push_instruction(Instruction::shl(
             Operand::imm(Width::_32, 1),
             Operand::preg(Width::_32, PhysicalRegister::RAX),
         ));
 
-        self.push_instruction(Instruction::or(
-            Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
-            Operand::preg(Width::_32, PhysicalRegister::RAX),
-        ));
+        // If the execution result we're returning is non-zero, then OR it in.
+        if self.execution_result.as_u32() != 0 {
+            self.push_instruction(Instruction::or(
+                Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
+                Operand::preg(Width::_32, PhysicalRegister::RAX),
+            ));
+        }
 
-        // self.push_instruction(
-        //     Instruction::mov(
-        //         Operand::imm(Width::_64, self.execution_result.as_u64()),
-        //         Operand::preg(Width::_64, PhysicalRegister::RAX),
-        //     )
-        //     .unwrap(),
-        // );
-
-        // self.push_instruction(Instruction::test(interrupt_pending,
-        // interrupt_pending));
-
-        // self.push_instruction(Instruction::cmovne(
-        //     Operand::preg(Width::_32, PhysicalRegister::RCX),
-        //     Operand::preg(Width::_32, PhysicalRegister::RAX),
-        // ));
-
+        // Return
         self.push_instruction(Instruction::ret());
     }
 
@@ -1112,10 +1130,12 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             Operand::preg(Width::_32, PhysicalRegister::RAX),
         ));
 
-        self.push_instruction(Instruction::or(
-            Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
-            Operand::preg(Width::_32, PhysicalRegister::RAX),
-        ));
+        if self.execution_result.as_u32() != 0 {
+            self.push_instruction(Instruction::or(
+                Operand::imm(Width::_32, self.execution_result.as_u32() as u64),
+                Operand::preg(Width::_32, PhysicalRegister::RAX),
+            ));
+        }
 
         self.push_instruction(Instruction::test(
             Operand::preg(Width::_32, PhysicalRegister::RAX),

@@ -1,6 +1,10 @@
-use {crate::rudder::analysis, common::rudder::function::Function, log::trace};
+use {
+    crate::rudder::{analysis, opt::OptimizationContext},
+    common::rudder::function::Function,
+    log::trace,
+};
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
     let dfa = analysis::dfa::SymbolUseAnalysis::new(f);
 
     let mut changed = false;

@@ -1,9 +1,11 @@
 use {
-    crate::rudder::{analysis::cfg::ControlFlowGraphAnalysis, Function, StatementKind},
+    crate::rudder::{
+        Function, StatementKind, analysis::cfg::ControlFlowGraphAnalysis, opt::OptimizationContext,
+    },
     log::trace,
 };
 
-pub fn run(f: Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: Function) -> bool {
     let cfg = ControlFlowGraphAnalysis::new(&f);
 
     // If a block contains only a return statement, replace call sites that jump

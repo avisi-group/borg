@@ -1,7 +1,10 @@
 use {
     crate::{
         boom::{self, Expression, bits_to_int, passes::destruct_composites},
-        rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
+        rudder::{
+            analysis::pure::PurityAnalysis,
+            internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
+        },
     },
     common::{
         arena::{Arena, Ref},
@@ -1533,6 +1536,8 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
                     Statement::WriteMemory { address, value },
                 ))
             }
+
+            "__id" => Some(args[0].clone()),
 
             // ignore
             "append_str" | "__monomorphize" | "concat_str" => Some(args[0].clone()),

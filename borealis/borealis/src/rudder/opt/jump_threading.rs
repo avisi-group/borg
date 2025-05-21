@@ -1,9 +1,12 @@
-use common::{
-    arena::Ref,
-    rudder::{block::Block, function::Function, statement::Statement},
+use {
+    crate::rudder::opt::OptimizationContext,
+    common::{
+        arena::Ref,
+        rudder::{block::Block, function::Function, statement::Statement},
+    },
 };
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
     let mut changed = false;
 
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {

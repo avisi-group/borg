@@ -1,9 +1,9 @@
 use {
-    crate::rudder::analysis,
+    crate::rudder::{analysis, opt::OptimizationContext},
     common::rudder::{Model, block::Block},
 };
 
-pub fn run(model: &mut Model) {
+pub fn run(ctx: &OptimizationContext, model: &mut Model) {
     let mut dead_parameters = vec![];
 
     for (_, f) in model.functions_mut() {

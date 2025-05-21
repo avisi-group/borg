@@ -1,16 +1,19 @@
-use common::{
-    arena::Ref,
-    hashmap::HashMap,
-    rudder::{
-        block::Block,
-        function::Function,
-        statement::{Statement, import_statement},
+use {
+    crate::rudder::opt::OptimizationContext,
+    common::{
+        arena::Ref,
+        hashmap::HashMap,
+        rudder::{
+            block::Block,
+            function::Function,
+            statement::{Statement, import_statement},
+        },
     },
 };
 
 const INLINE_SIZE_THRESHOLD: usize = 5;
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
     let mut changed = false;
 
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {

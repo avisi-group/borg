@@ -1,4 +1,5 @@
 use {
+    crate::rudder::opt::OptimizationContext,
     common::rudder::{
         function::Function,
         statement::{Statement, UnaryOperationKind},
@@ -6,7 +7,7 @@ use {
     log::trace,
 };
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
     // check condition for branch.  if it's const, replace with a jump.  if both
     // targets are the same, replace with a jump
 

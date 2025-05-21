@@ -1,25 +1,26 @@
-use common::{
-    arena::{Arena, Ref},
-    rudder::{block::Block, function::Function, statement::Statement},
+use {
+    crate::rudder::{analysis::dfa::StatementUseAnalysis, opt::OptimizationContext},
+    common::{
+        arena::{Arena, Ref},
+        rudder::{block::Block, function::Function, statement::Statement},
+    },
 };
 
-use crate::rudder::analysis::dfa::StatementUseAnalysis;
-
-pub fn run(f: &mut Function) -> bool {
+pub fn run(ctx: &OptimizationContext, f: &mut Function) -> bool {
     let mut changed = false;
 
     //trace!("constant folding {}", f.name());
     for block in f.block_iter().collect::<Vec<_>>() {
-        changed |= run_on_block(block, f.arena_mut());
+        changed |= run_on_block(ctx, block, f.arena_mut());
     }
 
     changed
 }
 
-fn run_on_block(block: Ref<Block>, arena: &mut Arena<Block>) -> bool {
+fn run_on_block(ctx: &OptimizationContext, block: Ref<Block>, arena: &mut Arena<Block>) -> bool {
     let mut changed = false;
 
-    let mut sua = StatementUseAnalysis::new(arena, block);
+    let mut sua = StatementUseAnalysis::new(arena, block, &ctx.purity);
 
     //let block = block.get_mut(sua.block_arena());
 

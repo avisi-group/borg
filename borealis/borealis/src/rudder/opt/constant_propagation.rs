@@ -1,5 +1,8 @@
 use {
-    crate::rudder::analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
+    crate::rudder::{
+        analysis::dfa::{StatementUseAnalysis, SymbolUseAnalysis},
+        opt::OptimizationContext,
+    },
     common::{
         arena::{Arena, Ref},
         hashmap::HashMap,
@@ -10,7 +13,7 @@ use {
 
 // execute_aarch64_instrs_branch_conditional_cond
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(ctx: &OptimizationContext, f: &mut Function) -> bool {
     let mut changed = false;
 
     //trace!("constant propagation {}", f.name());
@@ -63,18 +66,22 @@ pub fn run(f: &mut Function) -> bool {
     }
 
     for block in f.block_iter().collect::<Vec<_>>().into_iter() {
-        changed |= simplify_block_local_writes(f.arena_mut(), block);
+        changed |= simplify_block_local_writes(ctx, f.arena_mut(), block);
     }
 
     changed
 }
 
-fn simplify_block_local_writes(arena: &mut Arena<Block>, block: Ref<Block>) -> bool {
+fn simplify_block_local_writes(
+    ctx: &OptimizationContext,
+    arena: &mut Arena<Block>,
+    block: Ref<Block>,
+) -> bool {
     let mut changed = false;
 
     let mut most_recent_writes = HashMap::default();
 
-    let mut sua = StatementUseAnalysis::new(arena, block);
+    let mut sua = StatementUseAnalysis::new(arena, block, &ctx.purity);
 
     for stmt in block
         .get(sua.block_arena())

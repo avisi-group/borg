@@ -1,15 +1,18 @@
-use common::{
-    arena::{Arena, Ref},
-    rudder::{
-        block::Block,
-        constant::Constant,
-        function::Function,
-        statement::{BinaryOperationKind, CastOperationKind, Statement, UnaryOperationKind},
-        types::{PrimitiveType, Type},
+use {
+    crate::rudder::opt::OptimizationContext,
+    common::{
+        arena::{Arena, Ref},
+        rudder::{
+            block::Block,
+            constant::Constant,
+            function::Function,
+            statement::{BinaryOperationKind, CastOperationKind, Statement, UnaryOperationKind},
+            types::{PrimitiveType, Type},
+        },
     },
 };
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
     let mut changed = false;
 
     //trace!("constant folding {}", f.name());

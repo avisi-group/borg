@@ -3599,6 +3599,8 @@ fn mem_load_32_bit() {
 
     register_file.write::<u64>("R0", ((&mut *src) as *mut u32) as u64);
 
+    panic!("{translation:?}");
+
     translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("R0"), 0xF1F0F1F0);
@@ -4616,7 +4618,7 @@ fn create_gpr_access_desc() {
 
     let end = GLOBAL_CLOCK.now();
 
-    let translation_time = end - start;
+    let _translation_time = end - start;
 
-    panic!("{translation_time}ns");
+    //panic!("{translation_time}ns");
 }

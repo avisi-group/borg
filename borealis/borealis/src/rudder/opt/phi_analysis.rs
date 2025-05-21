@@ -1,15 +1,15 @@
 use {
-    crate::rudder::analysis::loopy::LoopAnalysis,
+    crate::rudder::{analysis::loopy::LoopAnalysis, opt::OptimizationContext},
     common::{
         arena::Ref,
-        intern::InternedString,
         hashmap::HashMap,
+        intern::InternedString,
         rudder::{block::Block, function::Function, statement::Statement},
     },
     log::trace,
 };
 
-pub fn run(f: &mut Function) -> bool {
+pub fn run(_ctx: &OptimizationContext, f: &mut Function) -> bool {
     let la = LoopAnalysis::new(&f);
 
     // Cannot run on functions containing loops.

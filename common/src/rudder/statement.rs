@@ -265,22 +265,6 @@ impl Ref<Statement> {
 }
 
 impl Statement {
-    pub fn has_side_effects(&self) -> bool {
-        matches!(
-            self,
-            Self::WriteVariable { .. }
-                | Self::WriteRegister { .. }
-                | Self::WriteMemory { .. }
-                | Self::WritePc { .. }
-                | Self::Call { .. }
-                | Self::Jump { .. }
-                | Self::Branch { .. }
-                | Self::Return { .. }
-                | Self::Panic(_)
-                | Self::Assert { .. }
-        )
-    }
-
     pub fn typ(&self, arena: &Arena<Statement>) -> Option<Type> {
         match self {
             Self::Constant(c) => Some(c.typ()),

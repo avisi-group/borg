@@ -41,6 +41,9 @@ mod example_fns;
 pub mod rudder;
 pub mod util;
 
+// evaluates assertions and panics as pure, could be bad
+const TREAT_PANICS_AS_PURE_DANGEROUS_UNSAFE: bool = false;
+
 /// Deserializes an AST from an archive.
 ///
 /// Internally, deserialization is performed on a new thread with a sufficient
