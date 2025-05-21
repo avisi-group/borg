@@ -1,8 +1,8 @@
 use {
     crate::{
         arena::{Arena, Ref},
-        intern::InternedString,
         hashmap::HashMap,
+        intern::InternedString,
         rudder::{
             block::{Block, BlockIterator},
             types::Type,
@@ -102,6 +102,18 @@ impl Function {
 
     pub fn parameters(&self) -> Vec<Symbol> {
         self.parameters.clone()
+    }
+
+    pub fn remove_parameter(&mut self, symbol: &Symbol) {
+        let idx = self
+            .parameters
+            .iter()
+            .enumerate()
+            .find(|(_, target)| target.name() == symbol.name())
+            .map(|(i, _)| i)
+            .unwrap();
+
+        self.parameters.remove(idx);
     }
 
     pub fn new_block(&mut self) -> Ref<Block> {

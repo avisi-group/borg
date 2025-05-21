@@ -20,6 +20,7 @@ use {
             },
             memory::bump::{BumpAllocator, BumpAllocatorRef},
             objects::ObjectStore,
+            timer::GLOBAL_CLOCK,
         },
         timer::Measurement,
     },
@@ -154,6 +155,31 @@ fn num_of_feature_const_123() {
             width: 64
         }
     );
+}
+
+#[ktest]
+fn have_lse2_ext_is_const() {
+    let model = &*models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let out = translate(
+        Global,
+        &*model,
+        "HaveLSE2Ext",
+        &[],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+
+    emitter.leave();
+
+    assert_eq!(*out.kind(), NodeKind::Constant { value: 0, width: 1 });
 }
 
 #[ktest]
@@ -3309,7 +3335,7 @@ fn ldaxr() {
 }
 
 #[ktest]
-fn slow_msr() {
+fn slow_benchmark() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
@@ -3319,8 +3345,10 @@ fn slow_msr() {
 
     register_file.write("SEE", -1i64);
 
+    let start = GLOBAL_CLOCK.now();
+
     let pc = emitter.constant(0, Type::Unsigned(64));
-    let opcode = emitter.constant(0xd5184000, Type::Unsigned(32));
+    let opcode = emitter.constant(0xa9bf7bfd, Type::Unsigned(32));
     translate(
         Global,
         &*model,
@@ -3333,8 +3361,20 @@ fn slow_msr() {
 
     emitter.leave();
 
+    let end = GLOBAL_CLOCK.now();
+
+    let translation_time = end - start;
+
+    let start = GLOBAL_CLOCK.now();
+
     let num_regs = emitter.next_vreg();
-    let _translation = ctx.compile(num_regs);
+    let translation = ctx.compile(num_regs);
+
+    let end = GLOBAL_CLOCK.now();
+
+    let compilation_time = end - start;
+
+    panic!("translated in {translation_time}ns\ncompiled in {compilation_time}ns\n{translation:?}");
 }
 
 #[ktest]
@@ -4544,4 +4584,39 @@ fn empty() {
     let translation = ctx.compile(num_regs);
 
     crate::println!("{translation:?}");
+}
+
+#[ktest]
+fn create_gpr_access_desc() {
+    let model = &*models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    let memop = emitter.constant(1, Type::Signed(32));
+    let nontemporal = emitter.constant(0, Type::Unsigned(1));
+    let privileged = emitter.constant(0, Type::Unsigned(1));
+    let tagchecked = emitter.constant(0, Type::Unsigned(1));
+
+    let start = GLOBAL_CLOCK.now();
+
+    let out = translate(
+        Global,
+        &*model,
+        "CreateAccDescGPR",
+        &[memop, nontemporal, privileged, tagchecked],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap()
+    .unwrap();
+    emitter.leave();
+
+    let end = GLOBAL_CLOCK.now();
+
+    let translation_time = end - start;
+
+    panic!("{translation_time}ns");
 }

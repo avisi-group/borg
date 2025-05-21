@@ -79,8 +79,6 @@ pub fn start(boot_info: &'static mut BootInfo) -> ! {
     }
 
     scheduler::local_run();
-
-    loop {}
 }
 
 fn continue_start() {

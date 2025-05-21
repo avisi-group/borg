@@ -16,6 +16,7 @@ pub mod phi_analysis;
 //pub mod return_propagation;
 //pub mod tail_calls;
 pub mod local_tuple_removal;
+pub mod remove_unused_parameters;
 pub mod useless_cast_elimination;
 pub mod variable_elimination;
 pub mod vector_folding;
@@ -91,4 +92,6 @@ pub fn optimise(ctx: &mut Model, level: OptLevel) {
                 }
             }
         });
+
+    remove_unused_parameters::run(ctx);
 }

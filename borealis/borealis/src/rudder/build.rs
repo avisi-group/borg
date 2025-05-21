@@ -1506,10 +1506,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
 
             // val Mem_read__2 : (%bv64, %i64, struct AccessDescriptor, %bool, %bool) -> %bv
-            "Mem_read__2" => {
+            "Mem_read" | "Mem_read__1" | "Mem_read__2" => {
                 let address = args[0].clone();
                 let size = args[1].clone();
-                let _accdesc = args[2].clone();
+                //let _accdesc = args[2].clone();
 
                 Some(build(
                     self.block,
@@ -1519,10 +1519,10 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             }
 
             // val Mem_set__2 : (%bv64, %i, struct AccessDescriptor, %bool, %bool, %bv) -> %unit
-            "Mem_set__2" => {
+            "Mem_set" | "Mem_set__1" | "Mem_set__2" => {
                 let address = args[0].clone();
                 let _size = args[1].clone();
-                let _accdesc = args[2].clone();
+                //let _accdesc = args[2].clone();
                 let value = args.last().cloned().unwrap();
 
                 // assert-eq size == value.width

@@ -1,6 +1,7 @@
 use alloc::{string::String, vec::Vec};
 
 pub mod tar;
+pub mod vfs;
 
 #[derive(Debug, thiserror::Error, displaydoc::Display)]
 pub enum Error {

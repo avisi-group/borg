@@ -10,8 +10,8 @@ use {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Block {
-    statement_arena: Arena<Statement>,
-    statements: Vec<Ref<Statement>>,
+    pub statement_arena: Arena<Statement>,
+    pub statements: Vec<Ref<Statement>>,
 }
 
 impl Block {
