@@ -8,12 +8,16 @@ use {
     paste::paste,
 };
 
+pub const GLOBAL_REGISTER_SIZE: usize = 2 * 1024 * 1024;
+
 pub struct RegisterFile {
     inner: UnsafeCell<Vec<u8>>,
     registers: HashMap<InternedString, (usize, usize)>, // offset, size
 
     // sorted vec of all register start offsets, each pair forms a half-open range(?)
     register_offsets: Vec<usize>,
+
+    global_register_offset: usize,
 }
 
 // todo: bad bad bad
@@ -24,8 +28,12 @@ impl RegisterFile {
     pub fn init<M: Borrow<Model>>(model: M) -> Self {
         let model = model.borrow();
 
+        let global_register_offset = (model.register_file_size() as usize).next_multiple_of(8);
+
+        let size = global_register_offset + GLOBAL_REGISTER_SIZE;
+
         let register_file = Self {
-            inner: UnsafeCell::new(alloc::vec![0u8; model.register_file_size() as usize]),
+            inner: UnsafeCell::new(alloc::vec![0u8; size]),
             registers: model
                 .registers()
                 .iter()
@@ -46,6 +54,8 @@ impl RegisterFile {
                 .map(|desc| usize::try_from(desc.offset).unwrap())
                 .sorted()
                 .collect(),
+
+            global_register_offset,
         };
 
         interpret(model, "borealis_register_init", &[], &register_file);
@@ -53,6 +63,10 @@ impl RegisterFile {
         interpret(model, "__InitSystem", &[], &register_file);
 
         register_file
+    }
+
+    pub fn global_register_offset(&self) -> usize {
+        self.global_register_offset
     }
 
     pub fn as_mut_ptr(&self) -> *mut u8 {

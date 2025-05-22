@@ -48,6 +48,8 @@ pub struct X86TranslationContext<A: Alloc> {
     z_offset: u64,
     c_offset: u64,
     v_offset: u64,
+
+    global_register_offset: usize,
     memory_mask: bool,
 }
 
@@ -83,13 +85,18 @@ impl<A: Alloc> Debug for X86TranslationContext<A> {
 }
 
 impl X86TranslationContext<Global> {
-    pub fn new(model: &Model, memory_mask: bool) -> Self {
-        Self::new_with_allocator(Global, model, memory_mask)
+    pub fn new(model: &Model, memory_mask: bool, global_register_offset: usize) -> Self {
+        Self::new_with_allocator(Global, model, memory_mask, global_register_offset)
     }
 }
 
 impl<'a, A: Alloc> X86TranslationContext<A> {
-    pub fn new_with_allocator(allocator: A, model: &Model, memory_mask: bool) -> Self {
+    pub fn new_with_allocator(
+        allocator: A,
+        model: &Model,
+        memory_mask: bool,
+        global_register_offset: usize,
+    ) -> Self {
         let mut arena = Arena::new_in(allocator.clone());
 
         let initial_block = arena.insert(X86Block::new_in(allocator.clone()));
@@ -111,6 +118,7 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
             z_offset: model.reg_offset("PSTATE_Z"),
             c_offset: model.reg_offset("PSTATE_C"),
             v_offset: model.reg_offset("PSTATE_V"),
+            global_register_offset,
             memory_mask,
         };
 
@@ -176,10 +184,15 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
 
         log::trace!("allocating registers");
 
+        let global_register_offset = self.global_register_offset;
+
         all_blocks.iter().for_each(|block| {
             block
                 .get_mut(self.arena_mut())
-                .allocate_registers(&mut FreshAllocator::new(num_virtual_registers));
+                .allocate_registers(&mut FreshAllocator::new(
+                    num_virtual_registers,
+                    global_register_offset,
+                ));
         });
 
         log::trace!("encoding all blocks");
@@ -206,8 +219,6 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
                 });
             }
 
-            // TODO: Remove this at some point -- but what does that mean for empty blocks
-            // etc?
             // assembler
             //     .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) +
             // block.index()))     .unwrap();

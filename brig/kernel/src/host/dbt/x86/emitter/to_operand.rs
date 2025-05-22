@@ -81,21 +81,23 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
 
                 dst
             }
-            NodeKind::ReadStackVariable { offset, width } => {
+            NodeKind::ReadStackVariable { id, width } => {
                 let width = Width::from_uncanonicalized(*width).unwrap();
                 let dst = Operand::vreg(width, self.next_vreg());
 
-                self.push_instruction(
-                    Instruction::mov(
-                        Operand::mem_base_displ(
-                            width,
-                            Register::PhysicalRegister(PhysicalRegister::R14),
-                            -(i32::try_from(*offset).unwrap()),
-                        ),
-                        dst,
-                    )
-                    .unwrap(),
-                );
+                // self.push_instruction(
+                //     Instruction::mov(
+                //         Operand::mem_base_displ(
+                //             width,
+                //             Register::PhysicalRegister(PhysicalRegister::R14),
+                //             -(i32::try_from(*offset).unwrap()),
+                //         ),
+                //         dst,
+                //     )
+                //     .unwrap(),
+                // );
+
+                self.push_instruction(Instruction::mov(Operand::greg(width, *id), dst).unwrap());
 
                 dst
             }

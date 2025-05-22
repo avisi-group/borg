@@ -409,7 +409,12 @@ impl ModelDevice {
         block_start_pc: u64,
         single_step_mode: bool,
     ) -> TranslatedBlock {
-        let mut ctx = X86TranslationContext::new_with_allocator(allocator, &self.model, true);
+        let mut ctx = X86TranslationContext::new_with_allocator(
+            allocator,
+            &self.model,
+            true,
+            self.register_file.global_register_offset(),
+        );
         let mut emitter = X86Emitter::new(&mut ctx);
 
         let mut current_pc = block_start_pc;
@@ -419,19 +424,19 @@ impl ModelDevice {
         // block prologue
         emitter.prologue();
 
+        // reset BranchTaken
+        let _false = emitter.constant(0 as u64, Type::Unsigned(1));
+        emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
+
         // instruction translation loop
         let was_end_of_block = loop {
-            // reset BranchTaken
-            let _false = emitter.constant(0 as u64, Type::Unsigned(1));
-            emitter.write_register(self.model.reg_offset("__BranchTaken") as u64, _false);
-
             // read opcode
             let opcode = unsafe { *((current_pc & 0xFF_FFFF_FFFF) as *const u32) };
 
             log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
             log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
 
-            #[cfg(feature = "debug_translation")]
+            //#[cfg(feature = "debug_translation")]
             opcodes.push(opcode);
 
             let _return_value = translate_instruction(
@@ -501,19 +506,17 @@ impl ModelDevice {
 
         let translation = ctx.compile(num_regs);
 
-        // if translation.code.len() > 1024 {
-        //     crate::println!("WARNING! Large block @ {block_start_pc:x}");
+        if translation.code.len() > 1024 {
+            log::debug!("WARNING! Large block @ {block_start_pc:x}");
 
-        //     crate::println!("INPUT ASM:");
-        //     for opcode in opcodes {
-        //         crate::println!("  {}", disarm64::decoder::decode(opcode).unwrap());
-        //     }
+            log::debug!("INPUT ASM:");
+            for opcode in &opcodes {
+                log::debug!("  {}", disarm64::decoder::decode(*opcode).unwrap());
+            }
 
-        //     crate::println!("\nOUTPUT ASM:");
-        //     crate::println!("{translation:?}");
-
-        //     panic!();
-        // }
+            log::debug!("\nOUTPUT ASM:");
+            log::debug!("{translation:?}");
+        }
 
         log::trace!("finished");
 
@@ -536,6 +539,7 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         || name.as_ref() == "EL1"
         || name.as_ref() == "EL2"
         || name.as_ref() == "EL3"
+        || name.as_ref() == "MPAMIDR_EL1_bits"
     {
         RegisterCacheType::Constant
     } else if name.as_ref() == "SEE"
@@ -543,7 +547,11 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         || name.as_ref().starts_with("current_exception")
     {
         RegisterCacheType::ReadWrite
-    } else if name.as_ref() == "PSTATE_EL" || name.as_ref().starts_with("SPE") {
+    } else if name.as_ref() == "PSTATE_EL"
+        || name.as_ref().starts_with("SPE")
+        || name.as_ref() == "_MPAM3_EL3_bits"
+        || name.as_ref() == "MPAM2_EL2_bits"
+    {
         RegisterCacheType::Read
     } else {
         RegisterCacheType::None

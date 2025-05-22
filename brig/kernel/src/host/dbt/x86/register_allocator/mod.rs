@@ -43,7 +43,7 @@ fn conflicted_physical_allocation() {
         )),
     ];
 
-    let mut allocator = FreshAllocator::new(2);
+    let mut allocator = FreshAllocator::new(2, 0);
     allocator.allocate(&mut instrs);
 }
 
@@ -322,7 +322,7 @@ fn shr_full() {
         )),
     ];
 
-    let mut allocator = FreshAllocator::new(14);
+    let mut allocator = FreshAllocator::new(14, 0);
     allocator.allocate(&mut instructions);
 }
 

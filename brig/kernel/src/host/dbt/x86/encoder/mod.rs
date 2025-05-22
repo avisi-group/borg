@@ -529,6 +529,13 @@ impl<A: Alloc> Operand<A> {
         }
     }
 
+    pub fn greg(width_in_bits: Width, reg: usize) -> Operand<A> {
+        Operand {
+            kind: OperandKind::Register(Register::GlobalRegister(reg)),
+            width_in_bits: (width_in_bits),
+        }
+    }
+
     pub fn mem_base(width_in_bits: Width, base: Register) -> Operand<A> {
         Self::mem_base_displ(width_in_bits, base, 0)
     }
@@ -1582,24 +1589,6 @@ impl<A: Alloc> Instruction<A> {
                 _ => None,
             })
             .flatten()
-
-        // self.operands
-        //     .iter_mut()
-        //     .filter_map(|(direction, operand)| match &mut operand.kind {
-        //         OperandKind::Immediate(_) => None,
-        //         // todo: avoid allocation here
-        //         OperandKind::Memory { base, index, .. } => Some(
-        //             [base, index]
-        //                 .into_iter()
-        //                 .filter_map(|reg| reg.as_mut().map(|reg|
-        // (OperandDirection::In, reg)))
-        // .collect::<Vec<_>>(),         ),
-        //         OperandKind::Register(reg) => {
-        //             Some([(direction.clone(),
-        // reg)].into_iter().collect::<Vec<_>>())         }
-        //         OperandKind::Target(_) => None,
-        //     })
-        //     .flatten()
     }
 
     pub fn get_use_defs_mut(&mut self) -> impl Iterator<Item = UseDefMut> + '_ {

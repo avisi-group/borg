@@ -1281,25 +1281,27 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         self.push_instruction(Instruction::ret());
     }
 
-    fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef {
+    fn read_stack_variable(&mut self, id: usize, typ: Type) -> Self::NodeRef {
         let width = typ.width();
 
         self.node(X86Node {
             typ,
-            kind: NodeKind::ReadStackVariable { offset, width },
+            kind: NodeKind::ReadStackVariable { id, width },
         })
     }
 
-    fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef) {
+    fn write_stack_variable(&mut self, id: usize, value: Self::NodeRef) {
         let value = self.to_operand(&value);
 
-        let mem = Operand::mem_base_displ(
-            value.width(),
-            Register::PhysicalRegister(PhysicalRegister::R14),
-            -(i32::try_from(offset).unwrap()),
-        );
+        // let mem = Operand::mem_base_displ(
+        //     value.width(),
+        //     Register::PhysicalRegister(PhysicalRegister::R14),
+        //     -(i32::try_from(offset).unwrap()),
+        // );
 
-        self.push_instruction(Instruction::mov(value, mem).unwrap());
+        // self.push_instruction(Instruction::mov(value, mem).unwrap());
+
+        self.push_instruction(Instruction::mov(value, Operand::greg(value.width(), id)).unwrap());
     }
 
     fn assert(&mut self, condition: Self::NodeRef, meta: u64) {
@@ -1616,7 +1618,7 @@ pub enum NodeKind<A: Alloc> {
     },
     ReadStackVariable {
         // positive offset here (will be subtracted from RSP)
-        offset: usize,
+        id: usize,
         width: u16,
     },
     BitExtract {

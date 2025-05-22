@@ -1,7 +1,5 @@
 use {bitfields::bitfield, core::arch::asm};
 
-pub const MAX_STACK_SIZE: usize = 2 * 1024 * 1024;
-
 #[bitfield(u32)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ExecutionResult {
@@ -40,10 +38,7 @@ pub fn trampoline(code_ptr: *const u8, register_file: *mut u8) -> ExecutionResul
                 push %r15
 
                 mov {register_file}, %rbp
-                mov %rsp, %r14
-                sub ${max_stack_size}, %rsp
                 call *{code_ptr}
-                add ${max_stack_size}, %rsp
 
                 pop %r15
                 pop %r14
@@ -61,7 +56,6 @@ pub fn trampoline(code_ptr: *const u8, register_file: *mut u8) -> ExecutionResul
                 pop %rcx
             ",
             options(att_syntax),
-            max_stack_size = const MAX_STACK_SIZE,
             register_file = in(reg) register_file,
             code_ptr = in(reg) code_ptr,
             out("rax") status,

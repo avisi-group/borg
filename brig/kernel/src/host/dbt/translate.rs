@@ -1,17 +1,13 @@
 use {
-    crate::host::{
-        dbt::{
-            Alloc,
-            emitter::{self, Emitter, Type},
-            register_file::RegisterFile,
-            sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
-            trampoline::{ExecutionResult, MAX_STACK_SIZE},
-            x86::{
-                emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
-                encoder::Instruction,
-            },
+    crate::host::dbt::{
+        Alloc,
+        emitter::{self, Emitter, Type},
+        register_file::{GLOBAL_REGISTER_SIZE, RegisterFile},
+        sysreg_helpers::{self, encode_sysreg_id, sys_reg_read, sys_reg_write},
+        x86::{
+            emitter::{NodeKind, X86Block, X86Emitter, X86NodeRef},
+            encoder::Instruction,
         },
-        timer::{GLOBAL_CLOCK, GlobalClock},
     },
     alloc::{collections::BTreeMap, rc::Rc, vec::Vec},
     common::{
@@ -124,73 +120,6 @@ pub fn translate_instruction<A: Alloc>(
             register_file,
         );
 
-        // // if CNTCR[EN] == 1 {
-        // //     PhysicalCount += 1;
-        // // }
-        // {
-        //     let inc_cycle_count_block = emitter.ctx_mut().create_block();
-        //     let end_block = emitter.ctx_mut().create_block();
-
-        //     let cntcr = emitter.read_register(model.reg_offset("CNTCR_bits"),
-        // Type::Unsigned(32));     let en = translate(
-        //         allocator,
-        //         model,
-        //         "_get_CNTCR_Type_EN",
-        //         &[cntcr],
-        //         emitter,
-        //         register_file,
-        //     )
-        //     .unwrap()
-        //     .unwrap();
-
-        //     let _1 = emitter.constant(1, Type::Unsigned(1));
-        //     let is_enabled =
-        // emitter.binary_operation(BinaryOperationKind::CompareEqual(en, _1));
-
-        //     emitter.branch(is_enabled, inc_cycle_count_block, end_block);
-
-        //     emitter.set_current_block(inc_cycle_count_block);
-        //     let cycle_end =
-        //         emitter.read_register(model.reg_offset("PhysicalCount"),
-        // Type::Signed(64));     let _1 = emitter.constant(1,
-        // Type::Signed(64));     let incremented =
-        // emitter.binary_operation(BinaryOperationKind::Add(cycle_end, _1));
-        //     emitter.write_register(model.reg_offset("PhysicalCount"), incremented);
-        //     emitter.jump(end_block);
-
-        //     emitter.set_current_block(end_block);
-        // }
-
-        // // from __InstructionExecute
-        // // if not_bool(AArch64_ExecutingERETInstr()) then {
-        // //     PSTATE.BTYPE = BTypeNext
-        // // };
-        // {
-        //     let update_btype_block = emitter.ctx_mut().create_block();
-
-        //     let end_block = emitter.ctx_mut().create_block();
-
-        //     let executing_eret = translate(
-        //         allocator,
-        //         model,
-        //         "AArch64_ExecutingERETInstr",
-        //         &[],
-        //         emitter,
-        //         register_file,
-        //     )
-        //     .unwrap()
-        //     .unwrap();
-
-        //     emitter.branch(executing_eret, end_block, update_btype_block);
-
-        //     emitter.set_current_block(update_btype_block);
-        //     let btypenext = emitter.read_register(model.reg_offset("BTypeNext"),
-        // Type::Unsigned(2));     emitter.write_register(model.reg_offset("
-        // PSTATE_BTYPE"), btypenext);     emitter.jump(end_block);
-
-        //     emitter.set_current_block(end_block);
-        // }
-
         match res {
             Ok(_) => break (res, start_block),
             Err(Error::Decode) => {
@@ -223,28 +152,27 @@ pub fn translate<A: Alloc>(
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
-    // x86_64 has full descending stack so current stack offset needs to start at 8
-    // for first stack variable offset to point to the next empty slot
-    let stack_offset = Rc::new_in(AtomicUsize::new(8), allocator.clone());
-    translate_with_stack_offset(
+    // unique ID for each variable
+    let variable_ids = Rc::new_in(AtomicUsize::new(0), allocator.clone());
+    translate_with_variable_ids(
         allocator,
         model,
         function,
         arguments,
         emitter,
         register_file,
-        stack_offset,
+        variable_ids,
     )
 }
 
-fn translate_with_stack_offset<A: Alloc>(
+fn translate_with_variable_ids<A: Alloc>(
     allocator: A,
     model: &Model,
     function: &str,
     arguments: &[X86NodeRef<A>],
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
-    stack_offset: Rc<AtomicUsize, A>,
+    variable_ids: Rc<AtomicUsize, A>,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     if function == "AArch64_SysRegRead" || function == "AArch64_SysRegWrite" {
         let mut iter = arguments
@@ -317,7 +245,7 @@ fn translate_with_stack_offset<A: Alloc>(
         function,
         arguments,
         emitter,
-        stack_offset,
+        variable_ids,
         register_file,
     )
     .translate()
@@ -326,13 +254,8 @@ fn translate_with_stack_offset<A: Alloc>(
 #[derive(Clone)]
 #[derive_where(Debug)]
 enum LocalVariable<A: Alloc> {
-    Virtual {
-        value: Option<X86NodeRef<A>>,
-    },
-    Stack {
-        typ: emitter::Type,
-        stack_offset: usize,
-    },
+    Virtual { value: Option<X86NodeRef<A>> },
+    Stack { typ: emitter::Type, id: usize },
 }
 
 impl<A: Alloc> Default for LocalVariable<A> {
@@ -412,8 +335,8 @@ struct FunctionTranslator<'model, 'registers, 'emitter, 'context, A: Alloc> {
     /// Dynamic bitvector stack lengths
     bits_stack_widths: HashMapA<usize, u16, A>,
 
-    /// Stack offset used to allocate stack variables
-    current_stack_offset: Rc<AtomicUsize, A>,
+    /// Counter for allocating variable ids
+    current_variable_id: Rc<AtomicUsize, A>,
 
     /// X86 instruction emitter
     emitter: &'emitter mut X86Emitter<'context, A>,
@@ -495,14 +418,14 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                         let prev_value =
                             value.expect("no previous value written to local variable");
 
-                        let stack_offset = self.allocate_stack_offset(&typ);
+                        let id = self.allocate_variable_id();
 
                         // fix up the previous write
-                        self.emitter.write_stack_variable(stack_offset, prev_value);
+                        self.emitter.write_stack_variable(id, prev_value);
 
                         LocalVariable::Stack {
                             typ: emit_rudder_type(&typ),
-                            stack_offset,
+                            id,
                         }
                     })
                     .collect_into(&mut stack_variables);
@@ -550,7 +473,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
         function: &str,
         arguments: &[X86NodeRef<A>],
         emitter: &'e mut X86Emitter<'c, A>,
-        current_stack_offset: Rc<AtomicUsize, A>,
+        current_variable_id: Rc<AtomicUsize, A>,
         register_file: &'r RegisterFile,
     ) -> Self {
         log::debug!("translating {function:?}: {:?}", arguments);
@@ -577,7 +500,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             promoted_locations: hashmap_in(emitter.ctx().allocator()),
             bits_stack_widths: hashmap_in(emitter.ctx().allocator()),
             return_value: ReturnValue::new(emitter, function.return_type()),
-            current_stack_offset,
+            current_variable_id,
             emitter,
             register_file,
         };
@@ -883,39 +806,38 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                                 self.function.name(),
                             );
 
-                            let stack_offset =
-                                if let Some(offset) = self.promoted_locations.get(&symbol.name()) {
-                                    log::trace!(
-                                        "variable {:?} already promoted to stack @ {offset:#x}",
-                                        symbol.name()
-                                    );
-                                    *offset
-                                } else {
-                                    let offset = self.allocate_stack_offset(&symbol.typ());
-                                    self.promoted_locations.insert(symbol.name(), offset);
+                            let id = if let Some(id) = self.promoted_locations.get(&symbol.name()) {
+                                log::trace!(
+                                    "variable {:?} already promoted to stack @ {id:#x}",
+                                    symbol.name()
+                                );
+                                *id
+                            } else {
+                                let id = self.allocate_variable_id();
+                                self.promoted_locations.insert(symbol.name(), id);
 
-                                    log::trace!(
-                                        "variable {:?} promoted to stack @ {offset:#x}",
-                                        symbol.name()
-                                    );
+                                log::trace!(
+                                    "variable {:?} promoted to stack @ {id:#x}",
+                                    symbol.name()
+                                );
 
-                                    offset
-                                };
+                                id
+                            };
 
                             *variable = LocalVariable::Stack {
                                 typ: emit_rudder_type(&symbol.typ()),
-                                stack_offset,
+                                id,
                             };
 
                             // clears operands??? todo: understand this
                             let current_block = self.emitter.get_current_block();
                             self.emitter.set_current_block(current_block);
                         }
-                        LocalVariable::Stack { stack_offset, .. } => {
+                        LocalVariable::Stack { id, .. } => {
                             log::debug!(
                                 "local var {:?} already on stack @ {:#x} in block {:#x} in {:?}",
                                 symbol.name(),
-                                stack_offset,
+                                id,
                                 block.index(),
                                 self.function.name()
                             );
@@ -1163,17 +1085,17 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                     self.emitter.execution_result.set_need_tlb_invalidate(true);
                 }
 
-                StatementResult::Data(translate_with_stack_offset(
+                StatementResult::Data(translate_with_variable_ids(
                     self.allocator.clone(),
                     self.model,
                     target.as_ref(),
                     &args,
                     self.emitter,
                     self.register_file,
-                    self.current_stack_offset.clone(), /* pass in the current stack offset
-                                                        * so
-                                                        * called functions' stack variables
-                                                        * don't corrupt this function's */
+                    self.current_variable_id.clone(), /* pass in the current variable id
+                                                       * so
+                                                       * called functions' variables
+                                                       * don't corrupt this function's */
                 )?)
             }
             Statement::Jump { target } => {
@@ -1409,11 +1331,11 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             LocalVariable::Virtual { value } => {
                 value.expect("local virtual variable never written to")
             }
-            LocalVariable::Stack { stack_offset, typ } => {
-                let read = self.emitter.read_stack_variable(stack_offset, typ);
+            LocalVariable::Stack { id, typ } => {
+                let read = self.emitter.read_stack_variable(id, typ);
 
                 if matches!(typ, Type::Bits) {
-                    let width = *self.bits_stack_widths.get(&stack_offset).unwrap();
+                    let width = *self.bits_stack_widths.get(&id).unwrap();
                     self.emitter.cast(
                         read,
                         Type::Unsigned(width),
@@ -1429,34 +1351,27 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
     fn write_variable(&mut self, variable: &mut LocalVariable<A>, new_value: X86NodeRef<A>) {
         match variable {
             LocalVariable::Virtual { value } => *value = Some(new_value),
-            LocalVariable::Stack { typ, stack_offset } => {
+            LocalVariable::Stack { typ, id } => {
                 if matches!(typ, Type::Bits) {
                     // no panic even if we tried to write two different sizes to the stack :(
                     // this relies on the depth first block translation order
                     // if we see any issues, we need to actually support writing different sizes to
                     // stack, using an extra stack variable containing the size
-                    self.bits_stack_widths
-                        .insert(*stack_offset, new_value.typ().width());
+                    self.bits_stack_widths.insert(*id, new_value.typ().width());
                 }
-                self.emitter.write_stack_variable(*stack_offset, new_value)
+                self.emitter.write_stack_variable(*id, new_value)
             }
         }
     }
 
-    fn allocate_stack_offset(&self, typ: &rudder::types::Type) -> usize {
-        assert!(typ.width_bytes() <= 8);
-        let width = 8;
-        let offset = self
-            .current_stack_offset
-            .fetch_add(width, Ordering::Relaxed);
+    fn allocate_variable_id(&self) -> usize {
+        let id = self.current_variable_id.fetch_add(1, Ordering::Relaxed);
 
-        let next_offset = self.current_stack_offset.load(Ordering::Relaxed);
-
-        if next_offset >= MAX_STACK_SIZE {
-            panic!("stack offset {next_offset:#x} exceeded MAX_STACK_SIZE ({MAX_STACK_SIZE:#x})")
+        if id == GLOBAL_REGISTER_SIZE / 8 {
+            panic!("variable number {id:#x} exceeded MAX_STACK_SIZE ({GLOBAL_REGISTER_SIZE:#x})")
         }
 
-        offset
+        id
     }
 }
 

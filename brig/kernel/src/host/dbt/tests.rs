@@ -2300,9 +2300,11 @@ fn stp() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    translation.execute(&register_file);
+    panic!("{translation:?}");
 
-    assert_eq!(*dst, (0xFEED, 0xDEAD));
+    //translation.execute(&register_file);
+
+    // assert_eq!(*dst, (0xFEED, 0xDEAD));
 }
 
 #[ktest]
@@ -3334,8 +3336,8 @@ fn ldaxr() {
     let _translation = ctx.compile(num_regs);
 }
 
-#[ktest]
-fn slow_benchmark() {
+//#[ktest]
+fn _slow_benchmark() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
@@ -3532,7 +3534,6 @@ fn ldp() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //  a9405400        ldp     x0, x21, [x0]
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xa9405400, Type::Unsigned(32));
     translate(
         Global,
@@ -3554,8 +3555,6 @@ fn ldp() {
     register_file.write("SEE", -1i64);
     register_file.write("R0", ((&*src) as *const (u64, u64)) as u64);
     register_file.write("R21", 0xAAAA_AAAA_AAAA_AAAAu64);
-
-    panic!("{translation:?}");
 
     translation.execute(&register_file);
 
@@ -3600,8 +3599,6 @@ fn mem_load_32_bit() {
     let mut src = Box::<u32>::new(0xF1F0F1F0);
 
     register_file.write::<u64>("R0", ((&mut *src) as *mut u32) as u64);
-
-    panic!("{translation:?}");
 
     translation.execute(&register_file);
 

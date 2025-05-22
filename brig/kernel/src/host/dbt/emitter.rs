@@ -70,8 +70,8 @@ pub trait Emitter<A: Alloc> {
     fn read_memory(&mut self, address: Self::NodeRef, typ: Type) -> Self::NodeRef;
     fn write_memory(&mut self, address: Self::NodeRef, value: Self::NodeRef);
 
-    fn read_stack_variable(&mut self, offset: usize, typ: Type) -> Self::NodeRef;
-    fn write_stack_variable(&mut self, offset: usize, value: Self::NodeRef);
+    fn read_stack_variable(&mut self, id: usize, typ: Type) -> Self::NodeRef;
+    fn write_stack_variable(&mut self, id: usize, value: Self::NodeRef);
 
     // returns the vector with the new element
     fn mutate_element(
