@@ -1,10 +1,11 @@
-use common::{
-    hashmap::{HashMap, HashSet},
-    intern::InternedString,
-    rudder::{Model, statement::Statement},
+use {
+    crate::{TREAT_PANICS_AS_PURE_DANGEROUS_UNSAFE, rudder::opt::INTRINSICS},
+    common::{
+        hashmap::{HashMap, HashSet},
+        intern::InternedString,
+        rudder::{Model, statement::Statement},
+    },
 };
-
-use crate::TREAT_PANICS_AS_PURE_DANGEROUS_UNSAFE;
 
 pub struct PurityAnalysis {
     functions: HashMap<InternedString, bool>,
@@ -16,10 +17,13 @@ impl PurityAnalysis {
             functions: HashMap::default(),
         };
 
-        // special
-        celph
-            .functions
-            .insert(InternedString::from_static("sail_tlbi"), false);
+        // assume impure
+        celph.functions.extend(
+            INTRINSICS
+                .iter()
+                .map(|s| InternedString::from_static(s))
+                .map(|s| (s, false)),
+        );
 
         let mut seen = HashSet::default();
 

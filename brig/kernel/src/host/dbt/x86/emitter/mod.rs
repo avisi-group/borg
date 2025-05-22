@@ -684,13 +684,28 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                 self.constant(casted_value, target_type)
             }
-            _ => self.node(X86Node {
-                typ: target_type,
-                kind: NodeKind::Cast {
-                    value,
-                    kind: cast_kind,
-                },
-            }),
+            _ => match cast_kind {
+                CastOperationKind::Reinterpret | CastOperationKind::Truncate => {
+                    if *value.typ() == target_type {
+                        value
+                    } else {
+                        self.node(X86Node {
+                            typ: target_type,
+                            kind: NodeKind::Cast {
+                                value,
+                                kind: cast_kind,
+                            },
+                        })
+                    }
+                }
+                _ => self.node(X86Node {
+                    typ: target_type,
+                    kind: NodeKind::Cast {
+                        value,
+                        kind: cast_kind,
+                    },
+                }),
+            },
         }
     }
 
@@ -945,22 +960,70 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             }
         }
 
-        let value = self.to_operand(&value);
+        let optimised =
+            if let NodeKind::BinaryOperation(BinaryOperationKind::Add(lhs, rhs)) = value.kind() {
+                if let NodeKind::Constant { value, width } = rhs.kind() {
+                    if *value < i32::MAX as u64 {
+                        if let NodeKind::GuestRegister {
+                            offset: source_register_offset,
+                        } = lhs.kind()
+                        {
+                            if *source_register_offset == offset {
+                                let width = match width {
+                                    8 => Width::_8,
+                                    16 => Width::_16,
+                                    32 => Width::_32,
+                                    64 => Width::_64,
+                                    _ => panic!("unsupported register width"),
+                                };
 
-        let width = value.width();
+                                let increment = Operand::imm(width, *value);
 
-        self.push_instruction(
-            Instruction::mov(
-                value,
-                Operand::mem_base_displ(
-                    width,
-                    Register::PhysicalRegister(PhysicalRegister::RBP),
-                    offset.try_into().unwrap(),
-                ),
-            )
-            .unwrap(),
-        );
+                                // This is an increment of the same register
+                                self.push_instruction(Instruction::add(
+                                    increment,
+                                    Operand::mem_base_displ(
+                                        increment.width(),
+                                        Register::PhysicalRegister(PhysicalRegister::RBP),
+                                        offset.try_into().unwrap(),
+                                    ),
+                                ));
 
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+        if !optimised {
+            let value = self.to_operand(&value);
+            let width = value.width();
+
+            self.push_instruction(
+                Instruction::mov(
+                    value,
+                    Operand::mem_base_displ(
+                        width,
+                        Register::PhysicalRegister(PhysicalRegister::RBP),
+                        offset.try_into().unwrap(),
+                    ),
+                )
+                .unwrap(),
+            );
+        }
+
+        // TODO: Arch-specific hack
         if offset == self.ctx().sctlr_el1_offset
             || offset == self.ctx().ttbr0_el1_offset
             || offset == self.ctx().ttbr1_el1_offset

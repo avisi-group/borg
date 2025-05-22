@@ -16,7 +16,9 @@ use {
         rudder::Model,
     },
     core::fmt::Debug,
-    iced_x86::code_asm::{AsmMemoryOperand, AsmRegister64, CodeAssembler, qword_ptr, rax},
+    iced_x86::code_asm::{
+        AsmMemoryOperand, AsmRegister64, CodeAssembler, IcedError, qword_ptr, rax,
+    },
 };
 
 pub mod dot;
@@ -185,18 +187,30 @@ impl<'a, A: Alloc> X86TranslationContext<A> {
         log::debug!("{}", dot::render(self.arena(), self.initial_block()));
 
         for (i, block) in all_blocks.iter().enumerate() {
-            assembler
-                .set_label(label_map.get_mut(block).unwrap())
-                .unwrap_or_else(|e| {
+            let block_label = label_map.get_mut(block).unwrap();
+            if let Err(e) = assembler.set_label(block_label) {
+                // If there is already an active label, then emit a nop and try again.
+                assembler.nop().unwrap();
+
+                // I don't think there is a better way to do this yet, without some
+                // significant re-thinking.  This is because, we pre-create the block
+                // labels, but if we jump forward to a block label, which we then don't
+                // use (because it aliases), then we've already emitted a jump to the
+                // unused label.
+
+                assembler.set_label(block_label).unwrap_or_else(|e| {
                     panic!(
                         "{e}: label already set OR label {:?} for block {block:?} re-used",
                         label_map.get_mut(block).unwrap()
-                    )
+                    );
                 });
+            }
 
-            assembler
-                .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) + block.index()))
-                .unwrap();
+            // TODO: Remove this at some point -- but what does that mean for empty blocks
+            // etc?
+            // assembler
+            //     .nop_1::<AsmMemoryOperand>(qword_ptr(AsmRegister64::from(rax) +
+            // block.index()))     .unwrap();
 
             let instrs = block.get(self.arena()).instructions();
 

@@ -16,6 +16,7 @@ mod jump_threading;
 mod phi_analysis;
 //mod return_propagation;
 //mod tail_calls;
+mod function_inliner;
 mod local_tuple_removal;
 mod panic_asserter;
 mod remove_unused_parameters;
@@ -29,6 +30,22 @@ pub enum OptLevel {
 
 type FunctionPassFn = fn(&OptimizationContext, &mut Function) -> bool;
 type FunctionPass = (&'static str, FunctionPassFn);
+
+type ModelPassFn = fn(&OptimizationContext, &mut Model) -> bool;
+type ModelPass = (&'static str, ModelPassFn);
+
+// DO NOT OPTIMIZE AWAY
+pub const INTRINSICS: &[&'static str] = &["sail_tlbi"];
+
+// --- MODEL PASSES --- //
+static FUNCTION_PASS_RUNNER: ModelPass = ("function-pass-runner", run_function_passes);
+static REMOVE_UNUSED_PARAMETERS: ModelPass = (
+    "remove-unused-function-parameters",
+    remove_unused_parameters::run,
+);
+static FUNCTION_INLINER: ModelPass = ("function-inliner", function_inliner::run);
+
+// --- FUNCTION PASSES --- //
 
 static BLOCK_INLINER: FunctionPass = ("block-inliner", block_inliner::run);
 static JUMP_THREADING: FunctionPass = ("jump-threading", jump_threading::run);
@@ -55,18 +72,17 @@ static USELESS_CAST_ELIMINATION: FunctionPass =
 // ("materialise-apints", materialise_apints::run);
 
 struct OptimizationContext {
+    optimization_level: OptLevel,
     purity: PurityAnalysis,
 }
 
-pub fn optimise(model: &mut Model, level: OptLevel) {
-    let passes: Vec<FunctionPass> = match level {
+fn run_function_passes(ctx: &OptimizationContext, model: &mut Model) -> bool {
+    let passes: Vec<FunctionPass> = match ctx.optimization_level {
         OptLevel::Level3 => vec![
             BLOCK_INLINER,
             JUMP_THREADING,
             BRANCH_SIMPLIFICATION,
             PANIC_ASSERTER,
-            //RETURN_PROPAGATION,
-            // TAIL_CALL,
             DEAD_SYMBOL_ELIMINATION,
             DEAD_WRITE_ELIMINATION,
             DEAD_STMT_ELIMINATION,
@@ -75,16 +91,10 @@ pub fn optimise(model: &mut Model, level: OptLevel) {
             CONSTANT_PROPAGATION,
             CONSTANT_FOLDING,
             LOCAL_TUPLE_REMOVAL,
-            // DESTROY_BITVECTORS,
-            // MATERIALISE_APINTS,
             VECTOR_FOLDING,
             PHI_ANALYSIS,
         ],
     };
-
-    let purity = PurityAnalysis::new(&model);
-
-    let mut context = OptimizationContext { purity };
 
     model
         .functions_mut()
@@ -97,14 +107,44 @@ pub fn optimise(model: &mut Model, level: OptLevel) {
             while changed {
                 changed = false;
                 for pass in &passes {
-                    trace!("running pass {}", pass.0);
+                    trace!("running function pass {}", pass.0);
 
-                    while pass.1(&context, function) {
+                    while pass.1(ctx, function) {
                         changed = true;
                     }
                 }
             }
         });
 
-    remove_unused_parameters::run(&mut context, model);
+    false
+}
+
+pub fn optimise(model: &mut Model, optimization_level: OptLevel) {
+    let purity = PurityAnalysis::new(&model);
+    let context = OptimizationContext {
+        optimization_level,
+        purity,
+    };
+
+    let passes: Vec<ModelPass> = vec![
+        FUNCTION_PASS_RUNNER,
+        REMOVE_UNUSED_PARAMETERS,
+        FUNCTION_INLINER,
+    ];
+
+    let mut changed = true;
+
+    while changed {
+        changed = false;
+
+        for pass in &passes {
+            trace!("running model pass {}", pass.0);
+
+            while pass.1(&context, model) {
+                changed = true;
+            }
+
+            // pass.1(&context, model);
+        }
+    }
 }

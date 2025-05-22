@@ -431,6 +431,7 @@ impl ModelDevice {
             log::debug!("translating {opcode:#08x} @ {current_pc:#08x}");
             log::debug!("{}", disarm64::decoder::decode(opcode).unwrap());
 
+            #[cfg(feature = "debug_translation")]
             opcodes.push(opcode);
 
             let _return_value = translate_instruction(
@@ -439,7 +440,6 @@ impl ModelDevice {
                 "__DecodeA64",
                 &mut emitter,
                 &self.register_file,
-                current_pc,
                 opcode,
             )
             .unwrap();
@@ -500,6 +500,20 @@ impl ModelDevice {
         let num_regs = emitter.next_vreg();
 
         let translation = ctx.compile(num_regs);
+
+        // if translation.code.len() > 1024 {
+        //     crate::println!("WARNING! Large block @ {block_start_pc:x}");
+
+        //     crate::println!("INPUT ASM:");
+        //     for opcode in opcodes {
+        //         crate::println!("  {}", disarm64::decoder::decode(opcode).unwrap());
+        //     }
+
+        //     crate::println!("\nOUTPUT ASM:");
+        //     crate::println!("{translation:?}");
+
+        //     panic!();
+        // }
 
         log::trace!("finished");
 

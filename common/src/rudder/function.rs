@@ -12,7 +12,7 @@ use {
     core::fmt::{self, Debug, Display, Formatter},
 };
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Symbol {
     name: InternedString,
     typ: Type,

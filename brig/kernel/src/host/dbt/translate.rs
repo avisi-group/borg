@@ -95,7 +95,6 @@ pub fn translate_instruction<A: Alloc>(
     function: &str,
     emitter: &mut X86Emitter<A>,
     register_file: &RegisterFile,
-    pc: u64,
     opcode: u32,
 ) -> Result<Option<X86NodeRef<A>>, Error> {
     register_file.write("SEE", -1i64);
@@ -114,14 +113,13 @@ pub fn translate_instruction<A: Alloc>(
 
         register_file.write("have_exception", 0u8);
 
-        let pc = emitter.constant(pc, Type::Unsigned(64));
         let opcode = emitter.constant(u64::from(opcode), Type::Unsigned(32));
 
         let res = translate(
             allocator,
             model,
             function,
-            &[pc, opcode],
+            &[opcode],
             emitter,
             register_file,
         );
@@ -565,6 +563,9 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
             .functions()
             .get(&function_name)
             .unwrap_or_else(|| panic!("function named {function:?} not found"));
+
+        // allow some differences in parameter/argument types
+        assert_eq!(function.parameters().len(), arguments.len());
 
         let mut celf = Self {
             allocator,

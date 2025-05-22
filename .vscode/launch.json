@@ -39,6 +39,7 @@
             "name": "borealis",
             "cargo": {
                 "args":[
+                    "+nightly",
                     "build",
                     "--bin=borealis",
                     "--package=borealis",

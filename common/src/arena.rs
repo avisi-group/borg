@@ -32,7 +32,11 @@ impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for Arena<T, Globa
     where
         D: serde::Deserializer<'de>,
     {
-        <Vec<T> as serde::Deserialize>::deserialize(deserializer).map(|vec| Arena { vec })
+        <Vec<T> as serde::Deserialize>::deserialize(deserializer).map(|vec| Arena {
+            vec,
+            #[cfg(feature = "arena-debug")]
+            id: crate::id::Id::new(),
+        })
     }
 }
 

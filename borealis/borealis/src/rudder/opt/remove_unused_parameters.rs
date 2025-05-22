@@ -3,7 +3,9 @@ use {
     common::rudder::{Model, block::Block},
 };
 
-pub fn run(ctx: &OptimizationContext, model: &mut Model) {
+pub fn run(ctx: &OptimizationContext, model: &mut Model) -> bool {
+    let mut changed = false;
+
     let mut dead_parameters = vec![];
 
     for (_, f) in model.functions_mut() {
@@ -40,9 +42,12 @@ pub fn run(ctx: &OptimizationContext, model: &mut Model) {
                             .filter(|(name, _)| *name == *target)
                             .for_each(|(_, index)| {
                                 args.remove(*index);
+                                changed = true;
                             });
                     }
                 }
             });
     }
+
+    changed
 }
