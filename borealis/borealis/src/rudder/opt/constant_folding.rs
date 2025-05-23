@@ -103,7 +103,11 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                         Constant::UnsignedInteger {
                             value: rhs_value, ..
                         } => {
-                            if rhs_value == 8 {
+                            if rhs_value == 0 {
+                                false
+                            } else if rhs_value == 1 {
+                                false
+                            } else if rhs_value == 8 {
                                 //stmt.get_mut(arena).replace_kind(Statement::ShiftOperation {
                                 // kind: (), value: (), amount: () });
                                 false
@@ -111,7 +115,13 @@ fn run_on_stmt(stmt: Ref<Statement>, arena: &mut Arena<Statement>) -> bool {
                                 false
                             }
                         }
-                        Constant::SignedInteger { .. } => false,
+                        Constant::SignedInteger { value: rhs_value, .. } => {
+                            if rhs_value == 1 {
+                                false
+                            } else {
+                                false
+                            }
+                        }
                         Constant::FloatingPoint { .. } => false,
                         Constant::String(_interned_string) => false,
                         Constant::Tuple(_vec) => false,

@@ -112,11 +112,8 @@ pub fn interrupt_restore_safepoint(return_value: u32) -> ! {
 #[ktest]
 fn safepoint_basic() {
     let result = record_safepoint();
-    log::warn!("{result}");
 
     if result == 0 {
         restore_safepoint(1);
     }
-
-    log::warn!("done");
 }

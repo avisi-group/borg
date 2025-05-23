@@ -84,7 +84,7 @@ fn translate_l1(
     if !entry.is_valid() {
         // guest page fault, look up exception vector table (VBAR_EL2)
         guest_page_fault(device, guest_virtual_address);
-        exit_with_message!("invalid")
+        exit_with_message!("invalid L1")
     }
 
     if entry.is_table_or_page() {
@@ -106,7 +106,7 @@ fn translate_l2(
     log::trace!("l2 entry: {entry:x?}");
 
     if !entry.is_valid() {
-        exit_with_message!("invalid")
+        exit_with_message!("invalid L2")
     }
 
     if entry.is_table_or_page() {
@@ -130,7 +130,7 @@ fn translate_l3(
     if entry.is_table_or_page() {
         Some((entry.output_address().0 as u64) | (guest_virtual_address & ((1 << 12) - 1)))
     } else {
-        log::warn!("invalid");
+        log::warn!("invalid L3");
         guest_page_fault(device, guest_virtual_address);
         None
     }

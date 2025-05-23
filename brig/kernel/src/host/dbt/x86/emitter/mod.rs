@@ -822,6 +822,7 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 },
             ) => {
                 // value >> start && mask(length)
+                // should emit fixed shift?
                 let shifted = self.shift(
                     value.clone(),
                     start.clone(),
@@ -841,19 +842,6 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
 
                 self.binary_operation(BinaryOperationKind::And(cast, mask))
             }
-            // // known value, unknown start and length
-            // (NodeKind::Constant { .. }, _, _) => {
-            //     let value =
-            //     self.node(X86Node {
-            //         typ,
-            //         kind: NodeKind::BitExtract {
-            //             value,
-            //             start,
-            //             length,
-            //         },
-            //     })
-            // }
-            // todo: constant start and length with non-constant value can still be specialized?
             _ => self.node(X86Node {
                 typ,
                 kind: NodeKind::BitExtract {
@@ -886,6 +874,43 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
                 bit_insert(*target, *source, *start, *length),
                 Type::Unsigned(*target_width),
             ),
+            // constant start and length
+            (
+                _,
+                _,
+                NodeKind::Constant { value: start, .. },
+                NodeKind::Constant { value: length, .. },
+            ) => {
+                let length = u32::try_from(*length).unwrap();
+                let start = u32::try_from(*start).unwrap();
+
+                let cleared_target = {
+                    let mask = self.constant(
+                        (!(mask(length).checked_shl(start).unwrap_or_else(|| {
+                            panic!("overflow in shl with {start:?} {length:?}")
+                        }))) & mask(target.typ().width()),
+                        *target.typ(),
+                    );
+
+                    self.binary_operation(BinaryOperationKind::And(target.clone(), mask))
+                };
+
+                let shifted_source = {
+                    let cast_source =
+                        self.cast(source, *target.typ(), CastOperationKind::ZeroExtend);
+
+                    let mask = self.constant(mask(length), *cast_source.typ());
+
+                    let masked_source =
+                        self.binary_operation(BinaryOperationKind::And(cast_source, mask));
+
+                    let start = self.constant(start.into(), Type::Signed(64));
+
+                    self.shift(masked_source, start, ShiftOperationKind::LogicalShiftLeft)
+                };
+
+                self.binary_operation(BinaryOperationKind::Or(cleared_target, shifted_source))
+            }
             _ => self.node(X86Node {
                 typ,
                 kind: NodeKind::BitInsert {
@@ -926,6 +951,9 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
     fn write_register(&mut self, offset: u64, value: Self::NodeRef) {
         // todo: validate offset + width is within register file
 
+        // potential issue: read nodes that refer to this regster, which are live past
+        // this write how can we detect this?
+
         // if offset == flags register
         if offset == self.ctx().n_offset
             || offset == self.ctx().z_offset
@@ -960,51 +988,77 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
             }
         }
 
-        let optimised =
-            if let NodeKind::BinaryOperation(BinaryOperationKind::Add(lhs, rhs)) = value.kind() {
-                if let NodeKind::Constant { value, width } = rhs.kind() {
-                    if *value < i32::MAX as u64 {
-                        if let NodeKind::GuestRegister {
-                            offset: source_register_offset,
-                        } = lhs.kind()
-                        {
-                            if *source_register_offset == offset {
-                                let width = match width {
-                                    8 => Width::_8,
-                                    16 => Width::_16,
-                                    32 => Width::_32,
-                                    64 => Width::_64,
-                                    _ => panic!("unsupported register width"),
-                                };
+        // let optimised = if let NodeKind::BinaryOperation(
+        //     BinaryOperationKind::Add(lhs, rhs) | BinaryOperationKind::And(lhs, rhs),
+        // ) = value.kind()
+        // {
+        //     if let NodeKind::Constant {
+        //         value: constant_value,
+        //         width,
+        //     } = rhs.kind()
+        //     {
+        //         if *constant_value < i32::MAX as u64 {
+        //             if let NodeKind::GuestRegister {
+        //                 offset: source_register_offset,
+        //             } = lhs.kind()
+        //             {
+        //                 if *source_register_offset == offset {
+        //                     let width = match width {
+        //                         1 | 8 => Width::_8,
+        //                         16 => Width::_16,
+        //                         32 => Width::_32,
+        //                         64 => Width::_64,
+        //                         _ => panic!("unsupported register width"),
+        //                     };
 
-                                let increment = Operand::imm(width, *value);
+        //                     let increment = Operand::imm(width, *constant_value);
 
-                                // This is an increment of the same register
-                                self.push_instruction(Instruction::add(
-                                    increment,
-                                    Operand::mem_base_displ(
-                                        increment.width(),
-                                        Register::PhysicalRegister(PhysicalRegister::RBP),
-                                        offset.try_into().unwrap(),
-                                    ),
-                                ));
+        //                     // This is an increment of the same register
 
-                                true
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
+        //                     match value.kind() {
+        //                         NodeKind::BinaryOperation(BinaryOperationKind::Add(_,
+        // _)) => {
+        // self.push_instruction(Instruction::add(
+        // increment,                                 Operand::mem_base_displ(
+        //                                     increment.width(),
+        //
+        // Register::PhysicalRegister(PhysicalRegister::RBP),
+        // offset.try_into().unwrap(),                                 ),
+        //                             ));
+        //                         }
+        //                         NodeKind::BinaryOperation(BinaryOperationKind::And(_,
+        // _)) => {
+        // self.push_instruction(Instruction::and(
+        // increment,                                 Operand::mem_base_displ(
+        //                                     increment.width(),
+        //
+        // Register::PhysicalRegister(PhysicalRegister::RBP),
+        // offset.try_into().unwrap(),                                 ),
+        //                             ));
+        //                         }
+        //                         _ => {
+        //                             panic!("unsupported");
+        //                         }
+        //                     }
+
+        //                     true
+        //                 } else {
+        //                     false
+        //                 }
+        //             } else {
+        //                 false
+        //             }
+        //         } else {
+        //             false
+        //         }
+        //     } else {
+        //         false
+        //     }
+        // } else {
+        //     false
+        // };
+
+        let optimised = false;
 
         if !optimised {
             let value = self.to_operand(&value);

@@ -53,6 +53,9 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
             return *operand;
         }
 
+        // The node is not cached -- TODO: make sure it wasn't supposed to be emitted
+        // before a side-effecty node.
+
         let op = match node.kind() {
             NodeKind::Constant { value, width } => Operand::imm(
                 Width::from_uncanonicalized(*width)

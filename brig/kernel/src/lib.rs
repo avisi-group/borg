@@ -101,9 +101,8 @@ fn continue_start() {
             .expect("failed to load test configuration file");
         postcard::from_bytes(&file).unwrap()
     };
-    tests::run(test_config);
 
-    guest::start(&mut fs);
+    guest::start(&mut fs, test_config);
 }
 
 fn serial_in() {

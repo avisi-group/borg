@@ -1,6 +1,6 @@
 use {
     crate::{
-        guest::devices::create_device,
+        guest::{GuestExecutionContext, devices::create_device},
         host::{
             dbt::{
                 Translation, bit_insert,
@@ -44,7 +44,8 @@ fn static_dynamic_chaos_smoke() {
 
         let register_file = RegisterFile::init(&*model);
 
-        let mut ctx = X86TranslationContext::new(&model, false);
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
         let mut emitter = X86Emitter::new(&mut ctx);
 
         translate(
@@ -87,8 +88,9 @@ fn static_dynamic_chaos_smoke() {
 //     let  register_file = RegisterFile::init(&*model);
 //
 
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     let feature = emitter.read_register(model.reg_offset("R0"),
 // Type::Signed(32));
@@ -130,7 +132,7 @@ fn num_of_feature_const_123() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let feature = emitter.constant(123, Type::Signed(32));
@@ -163,7 +165,7 @@ fn have_lse2_ext_is_const() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let out = translate(
@@ -188,7 +190,7 @@ fn statistical_profiling_disabled() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let is_enabled = translate(
@@ -220,8 +222,9 @@ fn statistical_profiling_disabled() {
 //     let  register_file = RegisterFile::init(&*model);
 //
 
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     let is_enabled =
 //         translate(Global,&*model, "HaveBRBExt", &[], &mut emitter,
@@ -248,7 +251,7 @@ fn using_aarch32_disabled() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let is_enabled = translate(
@@ -278,17 +281,16 @@ fn branchto() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let target = emitter.constant(0xDEADFEED, Type::Unsigned(64));
-    let branch_type = emitter.constant(1, Type::Unsigned(32));
-    let branch_conditional = emitter.constant(1, Type::Unsigned(1));
+
     translate(
         Global,
         &*model,
         "BranchTo",
-        &[target, branch_type, branch_conditional],
+        &[target],
         &mut emitter,
         &register_file,
     )
@@ -314,7 +316,7 @@ fn decodea64_addsub() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -378,7 +380,7 @@ fn decodea64_mov() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //   aa0103e0        mov     x0, x1
@@ -419,10 +421,9 @@ fn decodea64_branch() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let pc = emitter.constant(44, Type::Unsigned(64));
     let opcode = emitter.constant(0x17fffffa, Type::Unsigned(32));
     translate(
         Global,
@@ -457,7 +458,7 @@ fn branch_if_eq() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -491,7 +492,10 @@ fn branch_if_eq() {
 #[ktest]
 fn branch_uncond_imm_offset_math() {
     let model = models::get("aarch64").unwrap();
-    let mut ctx = X86TranslationContext::new(&model, false);
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // s0: read-var imm26:u26
@@ -594,7 +598,8 @@ fn cmp_csel() {
 
         let register_file = RegisterFile::init(&*model);
 
-        let mut ctx = X86TranslationContext::new(&model, false);
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
         let mut emitter = X86Emitter::new(&mut ctx);
 
         let see_value = emitter.constant(-1i32 as u64, Type::Signed(32));
@@ -684,7 +689,8 @@ fn fibonacci_instr() {
 
         let model = models::get("aarch64").unwrap();
 
-        let mut ctx = X86TranslationContext::new(&model, false);
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
         let mut emitter = X86Emitter::new(&mut ctx);
 
         {
@@ -727,7 +733,7 @@ fn mem() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -769,7 +775,7 @@ fn mem_store() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -807,7 +813,7 @@ fn mem_load() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //execute_aarch64_instrs_memory_single_general_immediate_signed_post_idx
@@ -883,7 +889,8 @@ fn fibonacci_block() {
             break;
         }
 
-        let mut ctx = X86TranslationContext::new(&model, false);
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
         let mut emitter = X86Emitter::new(&mut ctx);
 
         loop {
@@ -1007,7 +1014,7 @@ fn add_with_carry_harness(x: u64, y: u64, carry_in: bool) -> (u64, u8) {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write::<u64>("R0", x);
@@ -1121,7 +1128,7 @@ fn decodea64_cmp_harness(x: u64, y: u64) -> u8 {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write::<u64>("R0", x);
@@ -1160,7 +1167,7 @@ fn shiftreg() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let _1 = emitter.constant(1, Type::Signed(64));
@@ -1200,7 +1207,7 @@ fn floorpow2_constant() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
@@ -1283,7 +1290,7 @@ fn ceilpow2_constant() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(2048, Type::Signed(64));
@@ -1366,7 +1373,7 @@ fn _ispow2() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.read_register(model.reg_offset("R3"), Type::Unsigned(0x40));
@@ -1462,7 +1469,7 @@ fn rbitx0() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // rbit x0
@@ -1511,7 +1518,8 @@ fn bitinsert() {
 
         let register_file = RegisterFile::init(&*model);
 
-        let mut ctx = X86TranslationContext::new(&model, false);
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
         let mut emitter = X86Emitter::new(&mut ctx);
 
         {
@@ -1529,7 +1537,6 @@ fn bitinsert() {
 
         let num_regs = emitter.next_vreg();
         let translation = ctx.compile(num_regs);
-        // log::trace!("{translation:?}");
 
         register_file.write::<u64>("R0", target);
         register_file.write::<u64>("R1", source);
@@ -1546,7 +1553,7 @@ fn ubfx() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // ubfx x3, x3, #16, #4
@@ -1581,7 +1588,7 @@ fn highest_set_bit() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(0b100, Type::Unsigned(64));
@@ -1629,7 +1636,7 @@ fn ror() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let x = emitter.constant(0xff00, Type::Unsigned(64));
@@ -1699,7 +1706,7 @@ fn extsv() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let m = emitter.constant(32, Type::Signed(64));
@@ -1781,7 +1788,7 @@ fn zext_ones() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let n = emitter.constant(1, Type::Signed(64));
@@ -1865,7 +1872,7 @@ fn decodebitmasks() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // times out:(
@@ -1947,7 +1954,7 @@ fn replicate_bits() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     {
@@ -2021,7 +2028,7 @@ fn rev_d00dfeed() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let _32 = emitter.constant(32, Type::Signed(64));
@@ -2054,7 +2061,7 @@ fn place_slice() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let m = emitter.constant(64, Type::Signed(64));
@@ -2088,7 +2095,7 @@ fn udiv() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let pc = emitter.constant(0, Type::Unsigned(64));
@@ -2127,8 +2134,9 @@ fn udiv() {
 //     let  register_file = RegisterFile::init(&*model);
 //
 
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     let i = emitter.constant(1, Type::Signed(64));
 
@@ -2145,8 +2153,9 @@ fn udiv() {
 //     let  register_file = RegisterFile::init(&*model);
 //
 
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     let r = emitter.read_register(0, Type::Signed(64));
 
@@ -2167,7 +2176,8 @@ fn floor() {
 
         let register_file = RegisterFile::init(&*model);
 
-        let mut ctx = X86TranslationContext::new(&model, false);
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
         let mut emitter = X86Emitter::new(&mut ctx);
 
         {
@@ -2203,7 +2213,8 @@ fn ceil() {
 
         let register_file = RegisterFile::init(&*model);
 
-        let mut ctx = X86TranslationContext::new(&model, false);
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
         let mut emitter = X86Emitter::new(&mut ctx);
 
         {
@@ -2234,7 +2245,7 @@ fn msr() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2269,7 +2280,7 @@ fn stp() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //  a9bf7bfd        stp     x29, x30, [sp, #-16]!
@@ -2300,8 +2311,6 @@ fn stp() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    panic!("{translation:?}");
-
     //translation.execute(&register_file);
 
     // assert_eq!(*dst, (0xFEED, 0xDEAD));
@@ -2313,13 +2322,12 @@ fn ldrsw() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
 
     //  b9802fe0        ldrsw   x0, [sp, #44]
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xb9802fe0, Type::Unsigned(32));
     translate(
         Global,
@@ -2376,7 +2384,7 @@ fn get_num_event_counters_accessible() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2409,7 +2417,7 @@ fn sub_pc() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2445,7 +2453,7 @@ fn lsrv() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2482,7 +2490,7 @@ fn mem_load_immediate() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2521,7 +2529,7 @@ fn eret() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2565,7 +2573,7 @@ fn clz() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2602,7 +2610,7 @@ fn highest_set_bit_const() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let bv = emitter.constant(0x1, Type::Unsigned(64));
@@ -2710,7 +2718,7 @@ fn count_leading_zero_bits_const() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let bv = emitter.constant(0x0, Type::Unsigned(64));
@@ -2818,7 +2826,7 @@ fn highest_set_bit_dynamic() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let r0 = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(64));
@@ -2852,13 +2860,12 @@ fn msr_daifclr() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
 
     //  d50348ff        msr               daifclr, #0x8
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd50348ff, Type::Unsigned(32));
     translate(
         Global,
@@ -2878,6 +2885,43 @@ fn msr_daifclr() {
     register_file.write("SEE", -1i64);
 
     translation.execute(&register_file);
+
+    // todo: test more here
+}
+
+#[ktest]
+fn mrs_cntvct_el0() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    register_file.write("SEE", -1i64);
+
+    //  d53be040        mrs     x0, cntvct_el0
+
+    let opcode = emitter.constant(0xd53be040, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    register_file.write("SEE", -1i64);
+
+    translation.execute(&register_file);
+
     // todo: test more here
 }
 
@@ -2887,7 +2931,7 @@ fn current_security_state_is_const() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let state = translate(
@@ -2915,7 +2959,7 @@ fn sys_movzx_investigation() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2957,7 +3001,7 @@ fn ttbr1_el1_write() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -2995,33 +3039,18 @@ fn aarch64_sysregwrite() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
 
-    // [X86NodeRef(X86Node { typ: Unsigned(2), kind: Constant { value: 3, width: 2 }
-    // }), X86NodeRef(X86Node { typ: Unsigned(2), kind: Constant { value: 3, width:
-    // 2 } }), X86NodeRef(X86Node { typ: Unsigned(3), kind: Constant { value: 0,
-    // width: 3 } }), X86NodeRef(X86Node { typ: Unsigned(4), kind: Constant { value:
-    // 2, width: 4 } }), X86NodeRef(X86Node { typ: Unsigned(3), kind: Constant {
-    // value: 1, width: 3 } }), X86NodeRef(X86Node { typ: Unsigned(4), kind:
-    // Constant { value: 0, width: 4 } }), X86NodeRef(X86Node { typ: Signed(64),
-    // kind: Constant { value: 1, width: 64 } })]
-
-    let el = emitter.constant(3, Type::Unsigned(2));
-    let op0 = emitter.constant(3, Type::Unsigned(2));
-    let op1 = emitter.constant(0, Type::Unsigned(3));
-    let crn = emitter.constant(2, Type::Unsigned(4));
-    let op2 = emitter.constant(1, Type::Unsigned(3));
-    let crm = emitter.constant(0, Type::Unsigned(4));
     let t = emitter.constant(1, Type::Signed(64));
 
     translate(
         Global,
         &*model,
         "TTBR1_EL1_SysRegWrite_949dc27ace2a7dbe",
-        &[el, op0, op1, crn, op2, crm, t],
+        &[t],
         &mut emitter,
         &register_file,
     )
@@ -3046,7 +3075,7 @@ fn msr_ttbr() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3083,7 +3112,7 @@ fn branch_link_pc_flag() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     assert!(!ctx.get_pc_write_flag());
 
     let mut emitter = X86Emitter::new(&mut ctx);
@@ -3114,7 +3143,7 @@ fn mrs_mpidr_el1() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     assert_eq!(register_file.read::<u64>("MPIDR_EL1_bits"), 0x80000000);
@@ -3149,7 +3178,7 @@ fn mov_300000() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3183,7 +3212,7 @@ fn mrs_ctr_el0() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3217,7 +3246,7 @@ fn mrs_id_aa64dfr0_el1() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     assert_eq!(
@@ -3268,8 +3297,9 @@ fn mrs_id_aa64dfr0_el1() {
 
 //     let  register_file = RegisterFile::init(&*model);
 //
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     unsafe {
 //         let id_aa64pfr0_el1 =
@@ -3312,7 +3342,7 @@ fn ldaxr() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3342,7 +3372,7 @@ fn _slow_benchmark() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3385,7 +3415,7 @@ fn slow_msr_2() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3414,7 +3444,7 @@ fn csinc() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3450,7 +3480,7 @@ fn ldrh() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3493,7 +3523,7 @@ fn csneg() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3530,7 +3560,7 @@ fn ldp() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //  a9405400        ldp     x0, x21, [x0]
@@ -3573,7 +3603,7 @@ fn mem_load_32_bit() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3611,7 +3641,7 @@ fn ccmp() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3654,7 +3684,7 @@ fn msr_elr_el2() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3693,7 +3723,7 @@ fn eret_3() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3735,7 +3765,7 @@ fn exception_return() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -3773,7 +3803,7 @@ fn illegal_exception_return() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let spsr = emitter.constant(0x3c9, Type::Unsigned(64));
@@ -3809,7 +3839,7 @@ fn el_from_spsr() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let spsr = emitter.constant(0b1111001001, Type::Unsigned(64));
@@ -3852,7 +3882,7 @@ fn el_state_using_aarch32k() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let el = emitter.constant(1, Type::Unsigned(2));
@@ -3935,7 +3965,7 @@ fn el_state_using_aarch32k_dynamic() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let target = emitter.read_register(model.reg_offset("R0"), Type::Unsigned(2));
@@ -3978,7 +4008,7 @@ fn have_aarch64() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let have_aarch64 = translate(
@@ -4003,7 +4033,7 @@ fn xpaclri() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     // nop
@@ -4063,7 +4093,7 @@ fn _brk() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -4096,7 +4126,7 @@ fn lsr() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -4132,8 +4162,9 @@ fn lsr() {
 
 //     let register_file = RegisterFile::init(&*model);
 
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     register_file.write("SEE", -1i64);
 
@@ -4170,8 +4201,9 @@ fn lsr() {
 
 //     let register_file = RegisterFile::init(&*model);
 
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     register_file.write("SEE", -1i64);
 
@@ -4210,8 +4242,9 @@ fn lsr() {
 
 //     let register_file = RegisterFile::init(&*model);
 
-//     let mut ctx = X86TranslationContext::new(&model, false);
-//     let mut emitter = X86Emitter::new(&mut ctx);
+//     let mut ctx = X86TranslationContext::new(&model, false,
+// register_file.global_register_offset());     let mut emitter =
+// X86Emitter::new(&mut ctx);
 
 //     register_file.write("SEE", -1i64);
 
@@ -4246,7 +4279,7 @@ fn udf() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -4270,13 +4303,13 @@ fn udf() {
     //  translation.execute(&register_file); // todo
 }
 
-//#[ktest]
-fn _eret_post_exception() {
+#[ktest]
+fn eret_post_exception() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -4315,7 +4348,7 @@ fn check_eret_trap() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -4335,13 +4368,13 @@ fn check_eret_trap() {
     assert!(res.is_none())
 }
 
-//#[ktest]
-fn _exceptionreturn_post_exception() {
+#[ktest]
+fn exceptionreturn_post_exception() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     register_file.write("SEE", -1i64);
@@ -4384,9 +4417,9 @@ fn _exceptionreturn_post_exception() {
 fn leave_with_cache() {
     let model = models::get("aarch64").unwrap();
 
-    let _register_file = RegisterFile::init(&*model);
+    let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let aaaa = emitter.constant(0xAAAA, Type::Unsigned(64));
@@ -4404,7 +4437,7 @@ fn end_cycle() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     translate(
@@ -4434,7 +4467,12 @@ fn _decodea64_profiling() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new_with_allocator(allocator_ref, &model, false);
+    let mut ctx = X86TranslationContext::new_with_allocator(
+        allocator_ref,
+        &model,
+        false,
+        register_file.global_register_offset(),
+    );
     let mut emitter = X86Emitter::new(&mut ctx);
 
     measure.trigger("init");
@@ -4484,7 +4522,12 @@ fn _branch_profiling() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new_with_allocator(allocator_ref, &model, false);
+    let mut ctx = X86TranslationContext::new_with_allocator(
+        allocator_ref,
+        &model,
+        false,
+        register_file.global_register_offset(),
+    );
     let mut emitter = X86Emitter::new(&mut ctx);
 
     measure.trigger("init");
@@ -4507,8 +4550,6 @@ fn _branch_profiling() {
 
     let translation = ctx.compile(num_regs);
 
-    crate::println!("{translation:?}");
-
     measure.trigger("compilation");
 
     register_file.write("SEE", -1i64);
@@ -4529,7 +4570,12 @@ fn cond_branch() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new_with_allocator(allocator_ref, &model, false);
+    let mut ctx = X86TranslationContext::new_with_allocator(
+        allocator_ref,
+        &model,
+        false,
+        register_file.global_register_offset(),
+    );
     let mut emitter = X86Emitter::new(&mut ctx);
 
     translate_instruction(
@@ -4547,7 +4593,6 @@ fn cond_branch() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    crate::println!("{translation:?}");
     //panic!("sausage");
 }
 
@@ -4558,7 +4603,7 @@ fn _mrs_timer() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let timer = create_device("generic_timer".into(), &BTreeMap::new()).unwrap();
@@ -4571,7 +4616,6 @@ fn _mrs_timer() {
     register_file.write("SEE", -1i64);
 
     // mrs     x0, cntvct_el0
-    let pc = emitter.constant(0, Type::Unsigned(64));
     let opcode = emitter.constant(0xd53be040, Type::Unsigned(32));
     translate(
         Global,
@@ -4588,9 +4632,7 @@ fn _mrs_timer() {
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
 
-    crate::println!("{translation:?}");
-
-    // translation.execute(&register_file);
+    translation.execute(&register_file);
 
     assert_eq!(register_file.read::<u64>("R0"), 0x1234);
 }
@@ -4599,7 +4641,9 @@ fn _mrs_timer() {
 fn empty() {
     let model = models::get("aarch64").unwrap();
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     emitter.prologue();
@@ -4607,8 +4651,6 @@ fn empty() {
 
     let num_regs = emitter.next_vreg();
     let translation = ctx.compile(num_regs);
-
-    crate::println!("{translation:?}");
 }
 
 #[ktest]
@@ -4617,7 +4659,7 @@ fn create_gpr_access_desc() {
 
     let register_file = RegisterFile::init(&*model);
 
-    let mut ctx = X86TranslationContext::new(&model, false);
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
     let memop = emitter.constant(1, Type::Signed(32));
@@ -4627,7 +4669,7 @@ fn create_gpr_access_desc() {
 
     let start = GLOBAL_CLOCK.now();
 
-    let out = translate(
+    let _out = translate(
         Global,
         &*model,
         "CreateAccDescGPR",

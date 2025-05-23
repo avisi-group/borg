@@ -11,7 +11,7 @@ use {
         },
     },
     alloc::{boxed::Box, collections::BTreeMap, sync::Arc},
-    common::intern::InternedString,
+    common::{TestConfig, intern::InternedString},
     core::{panic, ptr, sync::atomic::AtomicU64},
     spin::Once,
     x86::current::segmentation::{rdfsbase, wrfsbase},
@@ -54,7 +54,7 @@ impl GuestExecutionContext {
 }
 
 /// Start guest emulation
-pub fn start<FS: Filesystem>(guest_data: &mut FS) {
+pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
     //check each connected block device for guest config
     let config = config::load_from_fs(guest_data).unwrap();
 
@@ -146,6 +146,8 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS) {
 
     log::debug!("activating guest execution context");
     temp_exec_ctx.activate();
+
+    crate::tests::run(test_config);
 
     {
         for load in config.load {

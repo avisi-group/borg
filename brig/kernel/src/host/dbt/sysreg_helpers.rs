@@ -22,9 +22,7 @@ pub fn register_device(id: u64, device: Arc<dyn RegisterMappedDevice>) {
 }
 
 pub fn handler_exists(reg: u64) -> bool {
-    let res = SYSREG_HANDLERS.lock().contains_key(&reg);
-    log::debug!("{reg:x}: {res:?}");
-    res
+    SYSREG_HANDLERS.lock().contains_key(&reg)
 }
 
 pub fn sys_reg_read(reg: u64) -> u64 {

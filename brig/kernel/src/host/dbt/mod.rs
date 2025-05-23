@@ -18,7 +18,7 @@ pub mod interpret;
 pub mod models;
 pub mod register_file;
 pub mod sysreg_helpers;
-//mod tests;
+mod tests;
 mod trampoline;
 pub mod translate;
 pub mod x86;

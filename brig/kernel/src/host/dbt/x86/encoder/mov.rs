@@ -488,6 +488,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                 assembler
                     .xor::<AsmRegister32, AsmRegister32>(dst.into(), dst.into())
                     .unwrap();
+            } else if *src < i32::MAX as u64 {
+                assembler
+                    .mov::<AsmRegister32, i32>(dst.into(), i32::try_from(*src).unwrap())
+                    .unwrap();
             } else {
                 assembler
                     .mov::<AsmRegister64, u64>(dst.into(), *src)
@@ -511,7 +515,10 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
                     .unwrap();
             } else {
                 assembler
-                    .mov::<AsmRegister32, u32>(dst.into(), u32::try_from(*src).unwrap())
+                    .mov::<AsmRegister32, u32>(
+                        dst.into(),
+                        u32::try_from(*src).unwrap_or_else(|_| panic!("{src:x} too big :(")),
+                    )
                     .unwrap();
             }
         }

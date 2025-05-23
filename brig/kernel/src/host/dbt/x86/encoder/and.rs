@@ -3,13 +3,14 @@ use {
         Alloc,
         x86::encoder::{
             Operand,
-            OperandKind::{Immediate as I, Register as R},
+            OperandKind::{Immediate as I, Memory as M, Register as R},
             Register::PhysicalRegister as PHYS,
-            Width,
+            Width, memory_operand_to_iced,
         },
     },
     iced_x86::code_asm::{
-        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+        AsmMemoryOperand, AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+        byte_ptr, qword_ptr,
     },
 };
 
@@ -69,6 +70,56 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
             }
             assembler
                 .and::<AsmRegister64, i32>(right.into(), *left as i32)
+                .unwrap();
+        }
+        // AND IMM -> MEM
+        (
+            Operand { kind: I(left), .. },
+            Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_64,
+            },
+        ) => {
+            if *left > i32::MAX as u64 {
+                panic!("AND immediate too large: {left:x}");
+            }
+            assembler
+                .and::<AsmMemoryOperand, i32>(
+                    qword_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    *left as i32,
+                )
+                .unwrap();
+        }
+        // AND IMM -> MEM
+        (
+            Operand { kind: I(left), .. },
+            Operand {
+                kind:
+                    M {
+                        base: Some(PHYS(base)),
+                        index,
+                        scale,
+                        displacement,
+                        ..
+                    },
+                width_in_bits: Width::_8,
+            },
+        ) => {
+            if *left > u8::MAX as u64 {
+                panic!("AND immediate too large: {left:x}");
+            }
+            assembler
+                .and::<AsmMemoryOperand, u32>(
+                    byte_ptr(memory_operand_to_iced(*base, *index, *scale, *displacement)),
+                    *left as u32,
+                )
                 .unwrap();
         }
         (
