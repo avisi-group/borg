@@ -203,6 +203,11 @@ pub enum Statement {
         /// Width of `source` that will be inserted
         width: Ref<Statement>,
     },
+
+    BitReplicate {
+        pattern: Ref<Statement>,
+        count: Ref<Statement>,
+    },
     ReadElement {
         vector: Ref<Statement>,
         index: Ref<Statement>,
@@ -353,6 +358,9 @@ impl Statement {
                 target: original_value,
                 ..
             } => original_value.get(arena).typ(arena),
+            Self::BitReplicate { .. } => Some(Type::Bits), /* todo: calculate more accurate type
+                                                             * if */
+            // possible?
             Self::ReadElement { vector, .. } => {
                 let Some(Type::Vector { element_type, .. }) = &vector.get(arena).typ(arena) else {
                     panic!("cannot read field of non-composite type")
@@ -565,6 +573,21 @@ impl Statement {
                     start,
                     width: length,
                 };
+            }
+            Self::BitReplicate { pattern, count } => {
+                let pattern = if pattern == use_of {
+                    with.clone()
+                } else {
+                    pattern.clone()
+                };
+
+                let count = if count == use_of {
+                    with.clone()
+                } else {
+                    count.clone()
+                };
+
+                *self = Self::BitReplicate { pattern, count };
             }
 
             Self::Assert { condition } => {
@@ -1048,6 +1071,9 @@ impl Statement {
                 "bit-insert {} {} {} {}",
                 original_value, insert_value, start, length
             ),
+            Self::BitReplicate { pattern, count } => {
+                format!("bit-replicate {} {}", pattern, count)
+            }
             Self::ReadElement { vector, index } => {
                 format!("read-element {}[{}]", vector, index)
             }
@@ -1500,6 +1526,10 @@ pub fn import_statement(
             source: mapping.get(&source).unwrap().clone(),
             start: mapping.get(&start).unwrap().clone(),
             width: mapping.get(&length).unwrap().clone(),
+        },
+        Statement::BitReplicate { pattern, count } => Statement::BitReplicate {
+            pattern: mapping.get(&pattern).unwrap().clone(),
+            count: mapping.get(&count).unwrap().clone(),
         },
         Statement::ReadElement { vector, index } => Statement::ReadElement {
             vector: mapping.get(&vector).unwrap().clone(),

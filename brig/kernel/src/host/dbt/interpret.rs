@@ -517,6 +517,10 @@ impl<'f, 'r> Interpreter<'f, 'r> {
                         width: target_width,
                     })
                 }
+                Statement::BitReplicate { pattern, count } => {
+                    todo!()
+                }
+
                 Statement::ReadElement { .. } => todo!(),
                 Statement::AssignElement {
                     vector,

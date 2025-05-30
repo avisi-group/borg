@@ -923,6 +923,38 @@ impl<'ctx, A: Alloc> Emitter<A> for X86Emitter<'ctx, A> {
         }
     }
 
+    fn bit_replicate(&mut self, pattern: Self::NodeRef, count: Self::NodeRef) -> Self::NodeRef {
+        match (pattern.kind(), count.kind()) {
+            (
+                NodeKind::Constant {
+                    value: pattern,
+                    width: pattern_width,
+                },
+                NodeKind::Constant { value: count, .. },
+            ) => {
+                let mut dest = *pattern;
+
+                for _ in 1..*count {
+                    dest <<= pattern_width;
+                    dest |= pattern;
+                }
+
+                self.constant(
+                    dest,
+                    Type::Unsigned(*pattern_width * u16::try_from(*count).unwrap()),
+                )
+            }
+            // todo pattern const non const count -> make all possible values and select?
+            // todo pattern non const, const count -> unroll shifts?
+            // todo pattern single bit
+            // todo: const, partial const
+            (_, _) => self.node(X86Node {
+                typ: Type::Unsigned(64),
+                kind: NodeKind::BitReplicate { pattern, count },
+            }),
+        }
+    }
+
     fn select(
         &mut self,
         condition: Self::NodeRef,
@@ -1685,6 +1717,10 @@ pub enum NodeKind<A: Alloc> {
         source: X86NodeRef<A>,
         start: X86NodeRef<A>,
         length: X86NodeRef<A>,
+    },
+    BitReplicate {
+        pattern: X86NodeRef<A>,
+        count: X86NodeRef<A>,
     },
     GetFlags {
         operation: X86NodeRef<A>,

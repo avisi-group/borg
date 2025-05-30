@@ -1,20 +1,21 @@
-use core::cmp::Ordering;
-
-use crate::host::dbt::{
-    Alloc,
-    emitter::Type,
-    x86::{
-        Emitter,
-        emitter::{
-            BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
-            TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
-        },
-        encoder::{
-            Instruction, Opcode, Operand, OperandKind, PhysicalRegister,
-            Register::{self},
-            width::Width,
+use {
+    crate::host::dbt::{
+        Alloc,
+        emitter::Type,
+        x86::{
+            Emitter,
+            emitter::{
+                BinaryOperationKind, CastOperationKind, NodeKind, ShiftOperationKind,
+                TernaryOperationKind, UnaryOperationKind, X86Emitter, X86NodeRef,
+            },
+            encoder::{
+                Instruction, Opcode, Operand, OperandKind, PhysicalRegister,
+                Register::{self},
+                width::Width,
+            },
         },
     },
+    core::cmp::Ordering,
 };
 
 impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
@@ -445,6 +446,41 @@ impl<'a, 'ctx, A: Alloc> X86Emitter<'ctx, A> {
                 self.push_instruction(Instruction::or(shifted_source, masked_target));
 
                 masked_target
+            }
+            NodeKind::BitReplicate { pattern, count } => {
+                let pattern_width = pattern.typ().width();
+
+                let pattern = self.to_operand(pattern);
+                let count = self.to_operand(count);
+
+                let OperandKind::Immediate(count) = *count.kind() else {
+                    todo!()
+                };
+
+                if count == 0 {
+                    panic!()
+                }
+
+                let destination_width =
+                    Width::from_uncanonicalized(pattern_width * u16::try_from(count).unwrap())
+                        .unwrap();
+
+                let pattern_zx = Operand::vreg(destination_width, self.next_vreg());
+                self.push_instruction(Instruction::movzx(pattern, pattern_zx));
+
+                let dest = Operand::vreg(destination_width, self.next_vreg());
+
+                self.push_instruction(Instruction::mov(pattern_zx, dest).unwrap());
+
+                for _ in 1..count {
+                    self.push_instruction(Instruction::shl(
+                        Operand::imm(Width::_8, u64::from(pattern_width)),
+                        dest,
+                    ));
+                    self.push_instruction(Instruction::or(pattern_zx, dest));
+                }
+
+                dest
             }
             NodeKind::GetFlags { operation } => {
                 let n = Operand::vreg(Width::_8, self.next_vreg());

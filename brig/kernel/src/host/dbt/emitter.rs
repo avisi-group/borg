@@ -53,6 +53,8 @@ pub trait Emitter<A: Alloc> {
         length: Self::NodeRef,
     ) -> Self::NodeRef;
 
+    fn bit_replicate(&mut self, pattern: Self::NodeRef, count: Self::NodeRef) -> Self::NodeRef;
+
     fn select(
         &mut self,
         condition: Self::NodeRef,

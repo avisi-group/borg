@@ -1,10 +1,7 @@
 use {
     crate::{
         boom::{self, Expression, bits_to_int, passes::destruct_composites},
-        rudder::{
-            analysis::pure::PurityAnalysis,
-            internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
-        },
+        rudder::internal_fns::{self, REPLICATE_BITS_BOREALIS_INTERNAL},
     },
     common::{
         arena::{Arena, Ref},
@@ -1447,10 +1444,14 @@ impl<'ctx: 'fn_ctx, 'fn_ctx> BlockBuildContext<'ctx, 'fn_ctx> {
             "replicate_bits" => Some(build(
                 self.block,
                 self.block_arena_mut(),
-                Statement::Call {
-                    target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
-                    args: vec![args[0].clone(), args[1].clone()],
-                    return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
+                // Statement::Call {
+                //     target: REPLICATE_BITS_BOREALIS_INTERNAL.name(),
+                //     args: vec![args[0].clone(), args[1].clone()],
+                //     return_type: REPLICATE_BITS_BOREALIS_INTERNAL.return_type(),
+                // },
+                Statement::BitReplicate {
+                    pattern: args[0].clone(),
+                    count: args[1].clone(),
                 },
             )),
 

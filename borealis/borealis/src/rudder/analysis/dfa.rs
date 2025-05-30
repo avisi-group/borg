@@ -258,6 +258,10 @@ impl<'a, 'p> StatementUseAnalysis<'a, 'p> {
                     self.add_use(start, stmt);
                     self.add_use(length, stmt);
                 }
+                Statement::BitReplicate { pattern, count } => {
+                    self.add_use(pattern, stmt);
+                    self.add_use(count, stmt);
+                }
                 Statement::ReadElement { vector, index } => {
                     self.add_use(vector, stmt);
                     self.add_use(index, stmt);

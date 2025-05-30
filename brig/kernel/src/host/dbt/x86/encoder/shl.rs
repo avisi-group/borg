@@ -9,7 +9,9 @@ use {
             Width,
         },
     },
-    iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+    },
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, value: &Operand<A>) {
@@ -25,6 +27,19 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, amount: &Operand<A>, valu
         ) => {
             assembler
                 .shl::<AsmRegister8, u32>(value.into(), u32::try_from(*amount).unwrap())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: I(amount), ..
+            },
+            Operand {
+                kind: R(PHYS(value)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .shl::<AsmRegister16, u32>(value.into(), u32::try_from(*amount).unwrap())
                 .unwrap();
         }
         (
