@@ -70,6 +70,7 @@ pub struct Device {
     pub attach: Option<DeviceAttachment>,
     #[serde(flatten)]
     pub extra: BTreeMap<InternedString, InternedString>,
+    pub register_init: Option<BTreeMap<InternedString, InternedString>>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -81,13 +81,12 @@ pub fn start<FS: Filesystem>(guest_data: &mut FS, test_config: TestConfig) {
 
     // create devices, including cores
     for (name, device_config) in config.devices {
-        let device = devices::create_device(device_config.kind, &device_config.extra)
-            .unwrap_or_else(|| {
-                panic!(
-                    "failed to create device {:?} with config {:?}",
-                    device_config.kind, device_config.extra
-                )
-            });
+        let device = devices::create_device(&device_config).unwrap_or_else(|| {
+            panic!(
+                "failed to create device {:?} with config {:?}",
+                device_config.kind, device_config.extra
+            )
+        });
 
         guest.devices.insert(name.clone(), device.clone());
         ObjectStore::global().insert(device.clone());

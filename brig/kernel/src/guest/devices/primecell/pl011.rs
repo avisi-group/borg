@@ -1,7 +1,10 @@
 use {
-    crate::host::objects::{
-        Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
-        device::{Device, MemoryMappedDevice},
+    crate::{
+        guest::config,
+        host::objects::{
+            Object, ObjectId, ObjectStore, ToIrqController, ToRegisterMappedDevice, ToTickable,
+            device::{Device, MemoryMappedDevice},
+        },
     },
     alloc::{collections::BTreeMap, sync::Arc},
     common::intern::InternedString,
@@ -9,7 +12,7 @@ use {
 };
 
 #[guest_device_factory(pl011)]
-fn create_pl011(_config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
+fn create_pl011(_config: &config::Device) -> Arc<dyn Device> {
     let dev = Arc::new(Pl011 {
         id: ObjectId::new(),
     });

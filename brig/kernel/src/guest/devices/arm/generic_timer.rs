@@ -1,13 +1,16 @@
 use {
-    crate::host::{
-        self,
-        dbt::sysreg_helpers::encode_sysreg_id,
-        objects::{
-            Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
-            ToRegisterMappedDevice, ToTickable,
-            device::{Device, RegisterMappedDevice},
-            irq::IrqController,
-            tickable::Tickable,
+    crate::{
+        guest::config,
+        host::{
+            self,
+            dbt::sysreg_helpers::encode_sysreg_id,
+            objects::{
+                Object, ObjectId, ObjectStore, ToDevice, ToIrqController, ToMemoryMappedDevice,
+                ToRegisterMappedDevice, ToTickable,
+                device::{Device, RegisterMappedDevice},
+                irq::IrqController,
+                tickable::Tickable,
+            },
         },
     },
     alloc::{borrow::ToOwned, collections::BTreeMap, string::String, sync::Arc},
@@ -20,9 +23,10 @@ use {
 };
 
 #[guest_device_factory(generic_timer)]
-fn create_generic_timer(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
+fn create_generic_timer(config: &config::Device) -> Arc<dyn Device> {
     Arc::new(GenericTimer::new(
         *config
+            .extra
             .get(&InternedString::from_static("irq_controller"))
             .unwrap(),
         27,

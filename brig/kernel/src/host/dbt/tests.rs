@@ -1,6 +1,6 @@
 use {
     crate::{
-        guest::{GuestExecutionContext, devices::create_device},
+        guest::{GuestExecutionContext, config, devices::create_device},
         host::{
             dbt::{
                 Translation, bit_insert,
@@ -4614,7 +4614,13 @@ fn _mrs_timer() {
     let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
     let mut emitter = X86Emitter::new(&mut ctx);
 
-    let timer = create_device("generic_timer".into(), &BTreeMap::new()).unwrap();
+    let timer = create_device(&config::Device {
+        kind: "generic_timer".into(),
+        attach: None,
+        extra: BTreeMap::default(),
+        register_init: None,
+    })
+    .unwrap();
     let reg_map_dev = ObjectStore::global()
         .get_register_mapped_device(timer.id())
         .unwrap();

@@ -168,7 +168,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
     let error_code = PageFaultErrorCode::from_bits(machine_context.error_code).unwrap();
 
     if faulting_address <= LOW_HALF_CANONICAL_END {
-        log::debug!("guest fault @ {faulting_address:#x}");
+        log::trace!("guest fault @ {faulting_address:#x}");
         let exec_ctx = crate::guest::GuestExecutionContext::current();
         let addrspace = unsafe { &*exec_ctx.current_address_space };
 
@@ -184,7 +184,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             .unwrap();
 
         let pc = device.register_file.read::<u64>("_PC");
-        log::debug!("PC = {pc:016x}");
+        log::trace!("PC = {pc:016x}");
 
         let mmu_enabled = device.register_file.read::<u64>("SCTLR_EL1_bits") & 1 == 1;
 
@@ -207,19 +207,19 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             unmasked_address.as_u64()
         };
 
-        log::debug!("guest physical: {guest_physical:x?}");
+        log::trace!("guest physical: {guest_physical:x?}");
 
         // gp = guest_physical
         let host_virtual_in_gp_mapping =
             (GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64);
 
-        log::debug!("host virtual: {host_virtual_in_gp_mapping:x?}");
+        log::trace!("host virtual: {host_virtual_in_gp_mapping:x?}");
 
         let guest_backing_frame = VirtualMemoryArea::current()
             .opt
             .translate_addr(host_virtual_in_gp_mapping);
 
-        log::debug!("guest backing frame: {guest_backing_frame:x?}");
+        log::trace!("guest backing frame: {guest_backing_frame:x?}");
 
         // have we already allocated this gues physical address?
         let backing_page = match guest_backing_frame {
@@ -246,7 +246,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                                 PageTableFlags::PRESENT | PageTableFlags::WRITABLE,
                             );
 
-                            log::debug!(
+                            log::trace!(
                                 "allocated backing page {backing_page:x?} -> {:x?}",
                                 (GUEST_PHYSICAL_START + guest_physical).align_down(0x1000u64)
                             );
@@ -254,7 +254,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                             backing_page
                         }
                         AddressSpaceRegionKind::IO(device) => {
-                            log::debug!("guest device page fault at rip {:x}", machine_context.rip);
+                            log::trace!("guest device page fault at rip {:x}", machine_context.rip);
 
                             let offset = guest_physical - rgn.base();
 
@@ -266,7 +266,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
                             let faulting_instruction = decoder.decode();
 
                             if write {
-                                log::debug!(
+                                log::trace!(
                                     "device write @ {offset:x} with instr {faulting_instruction:?}"
                                 );
 
@@ -336,7 +336,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
                                 let bytes = &value.to_le_bytes()[..size];
 
-                                log::debug!("writing {bytes:x?} to device @ {offset:x?}");
+                                log::trace!("writing {bytes:x?} to device @ {offset:x?}");
 
                                 device.write(offset, bytes);
                             } else {
@@ -370,7 +370,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
                                 device.read(offset, &mut bytes);
 
-                                log::debug!("read {bytes:x?} from device, writing to {dest:?}");
+                                log::trace!("read {bytes:x?} from device, writing to {dest:?}");
 
                                 // write bytes to dest
 
@@ -397,7 +397,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
 
                             machine_context.rip = current_ip + faulting_instruction.len() as u64;
 
-                            log::debug!(
+                            log::trace!(
                                 "setting correct return point: current_ip: {current_ip:x}, len: {len:x}, new_rip: {:x}",
                                 machine_context.rip
                             );
@@ -418,7 +418,7 @@ fn page_fault_exception(machine_context: *mut MachineContext) {
             }
         };
 
-        log::debug!(
+        log::trace!(
             "guest backing page: {backing_page:x?} mapping to {:x?}",
             faulting_address.align_down(0x1000u64)
         );
@@ -465,7 +465,20 @@ fn gpf_exception(machine_context: *mut MachineContext) {
 
 #[irq_handler(with_code = true)]
 fn dbt_handler_undefined_terminator(_machine_context: *mut MachineContext) {
-    exit_with_message!("DBT interrupt: undefined terminator")
+    let device = ((&**unsafe {
+        crate::guest::GUEST
+            .get()
+            .unwrap()
+            .devices
+            .get(&("core0".into()))
+            .unwrap()
+    }) as &dyn Any)
+        .downcast_ref::<ModelDevice>()
+        .unwrap();
+
+    let pc = device.register_file.read::<u64>("_PC");
+    let instr = device.register_file.read::<u32>("__ThisInstr");
+    exit_with_message!("DBT interrupt: undefined terminator in {instr:08x} @ PC = {pc:x}");
 }
 
 #[irq_handler(with_code = true)]

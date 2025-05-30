@@ -73,6 +73,10 @@ impl RegisterFile {
         unsafe { self.inner.as_mut_unchecked() }.as_mut_ptr()
     }
 
+    pub fn get_register_size(&self, name: impl Into<InternedString>) -> Option<usize> {
+        self.registers.get(&(name.into())).map(|(_, size)| *size)
+    }
+
     pub fn write<V: RegisterValue>(&self, name: impl Into<InternedString>, value: V) {
         let name = name.into();
         let (offset, size) = self
@@ -269,6 +273,8 @@ fn configure_features(register_file: &RegisterFile) {
         "FEAT_BTI_IMPLEMENTED",
         "FEAT_PAuth_IMPLEMENTED",
         "FEAT_PAuth2_IMPLEMENTED",
+        "FEAT_FGT_IMPLEMENTED",
+        "FEAT_FGT2_IMPLEMENTED",
     ];
 
     disabled.into_iter().for_each(|name| {

@@ -1,5 +1,6 @@
 use {
     crate::{
+        guest::config,
         host::{
             arch::x86::{
                 aarch64_mmu::{self, take_arm_exception},
@@ -105,16 +106,37 @@ pub fn load_all<FS: Filesystem>(fs: &mut FS) {
 }
 
 #[guest_device_factory(core)]
-fn create_core(config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
-    let model_name = config.get(&InternedString::from_static("model")).unwrap();
+fn create_core(config: &config::Device) -> Arc<dyn Device> {
+    let model_name = config
+        .extra
+        .get(&InternedString::from_static("model"))
+        .unwrap();
     let model = get(model_name.as_ref()).unwrap();
     let initial_pc = config
+        .extra
         .get(&InternedString::from_static("initial_pc"))
         .map(parse_hex_prefix)
         .unwrap()
         .unwrap();
 
-    Arc::new(ModelDevice::new(model_name.to_string(), model, initial_pc))
+    let device = ModelDevice::new(model_name.to_string(), model, initial_pc);
+
+    config
+        .register_init
+        .iter()
+        .flatten()
+        .for_each(|(reg, value)| {
+            let value = parse_hex_prefix(value).unwrap();
+            match device.register_file.get_register_size(*reg) {
+                Some(1) => device.register_file.write(*reg, value as u8),
+                Some(2) => device.register_file.write(*reg, value as u16),
+                Some(4) => device.register_file.write(*reg, value as u32),
+                Some(8) => device.register_file.write(*reg, value),
+                _ => panic!("invalid size"),
+            }
+        });
+
+    Arc::new(device)
 }
 
 pub struct WellKnownRegisters {
@@ -321,6 +343,11 @@ impl ModelDevice {
             );
 
             let exec_result = translated_block.translation.execute(&self.register_file);
+
+            log::debug!(
+                "post-exec {block_start_virtual_pc:#08x}, PC = {:x}",
+                self.well_known_registers.pc().read()
+            );
 
             // log::trace!(
             //     "nzcv: {:04b}, sp: {:x}, x0: {:x}, x1: {:x}, x2: {:x}, x3: {:x}, x18:

@@ -1,6 +1,6 @@
 use {
     crate::{
-        guest::GuestExecutionContext,
+        guest::{GuestExecutionContext, config},
         host::objects::{
             Object, ObjectId, ObjectStore, ToRegisterMappedDevice, ToTickable,
             device::{Device, MemoryMappedDevice},
@@ -19,7 +19,7 @@ use {
 };
 
 #[guest_device_factory(a9gic)]
-fn create_gic(_config: &BTreeMap<InternedString, InternedString>) -> Arc<dyn Device> {
+fn create_gic(_config: &config::Device) -> Arc<dyn Device> {
     Arc::new(GlobalInterruptController::new())
 }
 
