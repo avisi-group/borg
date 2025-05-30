@@ -18,7 +18,10 @@ use {
             },
             devices::manager::SharedDeviceManager,
             fs::Filesystem,
-            memory::bump::{BumpAllocator, BumpAllocatorRef},
+            memory::{
+                bump::{BumpAllocator, BumpAllocatorRef},
+                bytes,
+            },
             objects::{
                 Object, ObjectId, ObjectStore, ToIrqController, ToMemoryMappedDevice,
                 ToRegisterMappedDevice, ToTickable, device::Device,
@@ -44,6 +47,7 @@ use {
         fmt::{self, Debug, Write},
         ptr::NonNull,
     },
+    itertools::Itertools,
     proc_macro_lib::guest_device_factory,
     spin::Mutex,
     x86_64::structures::paging::{PageSize, Size4KiB},
@@ -242,6 +246,8 @@ impl ModelDevice {
         // guest virtual address
         let mut chain_cache = DirectMappedCache::<CHAIN_CACHE_ENTRY_COUNT, *const u8>::new(1);
 
+        let mut block_freq_hist = HashMap::<u64, (u64, usize)>::default();
+
         // virtual to physical PCs
         let mut translation_cache = DirectMappedCache::<1024, u64>::new(1);
 
@@ -284,6 +290,21 @@ impl ModelDevice {
                             single_step_mode,
                         )
                     });
+
+            // block_freq_hist
+            //     .entry(block_start_virtual_pc)
+            //     .and_modify(|(freq, _)| *freq += 1)
+            //     .or_insert_with(|| (1, translated_block.translation.code.len()));
+            // if instructions_executed > 50_000_000 {
+            //     block_freq_hist
+            //         .into_iter()
+            //         .sorted_by_key(|(_, (_, size))| *size)
+            //         .sorted_by_key(|(_, (freq, _))| *freq)
+            //         .for_each(|(addr, (freq, size))| {
+            //             crate::println!("{addr:x}: {freq} ({})", bytes(size))
+            //         });
+            //     panic!()
+            // }
 
             if CHAIN_CACHE_ENABLED {
                 chain_cache.insert(
@@ -506,17 +527,18 @@ impl ModelDevice {
 
         let translation = ctx.compile(num_regs);
 
-        if translation.code.len() > 1024 {
-            log::debug!("WARNING! Large block @ {block_start_pc:x}");
+        // if block_start_pc == 0xffffffc00811c584 {
+        //     log::error!("WARNING! Large block @ {block_start_pc:x}");
 
-            log::debug!("INPUT ASM:");
-            for opcode in &opcodes {
-                log::debug!("  {}", disarm64::decoder::decode(*opcode).unwrap());
-            }
+        //     log::error!("INPUT ASM:");
+        //     for opcode in &opcodes {
+        //         log::error!("  {}", disarm64::decoder::decode(*opcode).unwrap());
+        //     }
 
-            log::debug!("\nOUTPUT ASM:");
-            log::debug!("{translation:?}");
-        }
+        //     log::error!("\nOUTPUT ASM:");
+        //     log::error!("{translation:?}");
+        //     panic!();
+        // }
 
         log::trace!("finished");
 
@@ -551,6 +573,7 @@ fn register_cache_type(name: InternedString) -> RegisterCacheType {
         || name.as_ref().starts_with("SPE")
         || name.as_ref() == "_MPAM3_EL3_bits"
         || name.as_ref() == "MPAM2_EL2_bits"
+    //     || name.as_ref() == "SCR_EL3_bits" // todo: re-enable me
     {
         RegisterCacheType::Read
     } else {

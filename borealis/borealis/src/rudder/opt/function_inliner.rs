@@ -349,6 +349,15 @@ pub fn import_statement_at(
             start: statement_mapping.get(&start).unwrap().clone(),
             width: statement_mapping.get(&length).unwrap().clone(),
         },
+          Statement::BitReplicate {
+            pattern,
+            count,
+
+        } => Statement::BitReplicate {
+            pattern: statement_mapping.get(&pattern).unwrap().clone(),
+            count: statement_mapping.get(&count).unwrap().clone(),
+
+        },
         Statement::ReadElement { vector, index } => Statement::ReadElement {
             vector: statement_mapping.get(&vector).unwrap().clone(),
             index: statement_mapping.get(&index).unwrap().clone(),

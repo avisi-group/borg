@@ -1949,7 +1949,7 @@ fn decodebitmasks() {
 }
 
 #[ktest]
-fn replicate_bits() {
+fn replicate_bits_const() {
     let model = models::get("aarch64").unwrap();
 
     let register_file = RegisterFile::init(&*model);
@@ -1958,68 +1958,73 @@ fn replicate_bits() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     {
-        let value = emitter.constant(0xaa, Type::Unsigned(8));
+        let pattern = emitter.constant(0xaa, Type::Unsigned(8));
         let count = emitter.constant(2, Type::Signed(64));
         assert_eq!(
             &NodeKind::Constant {
                 value: 0xaaaa,
                 width: 16
             },
-            translate(
-                Global,
-                &model,
-                "replicate_bits_borealis_internal",
-                &[value, count],
-                &mut emitter,
-                &register_file,
-            )
-            .unwrap()
-            .unwrap()
-            .kind()
+            emitter.bit_replicate(pattern, count).kind()
         );
     }
     {
-        let value = emitter.constant(0x1, Type::Unsigned(1));
+        let pattern = emitter.constant(0x1, Type::Unsigned(1));
         let count = emitter.constant(32, Type::Signed(64));
         assert_eq!(
             &NodeKind::Constant {
                 value: 0xffff_ffff,
                 width: 32
             },
-            translate(
-                Global,
-                &model,
-                "replicate_bits_borealis_internal",
-                &[value, count],
-                &mut emitter,
-                &register_file,
-            )
-            .unwrap()
-            .unwrap()
-            .kind()
+            emitter.bit_replicate(pattern, count).kind()
         );
     }
     {
-        let value = emitter.constant(0xaaff, Type::Unsigned(16));
+        let pattern = emitter.constant(0xaaff, Type::Unsigned(16));
         let count = emitter.constant(4, Type::Signed(64));
         assert_eq!(
             &NodeKind::Constant {
                 value: 0xaaff_aaff_aaff_aaff,
                 width: 64
             },
-            translate(
-                Global,
-                &model,
-                "replicate_bits_borealis_internal",
-                &[value, count],
-                &mut emitter,
-                &register_file,
-            )
-            .unwrap()
-            .unwrap()
-            .kind()
+            emitter.bit_replicate(pattern, count).kind()
         );
     }
+}
+
+#[ktest]
+fn replicate_bits_dynamic() {
+    fn harness(pattern: u64, pattern_width: u16, count: u64) -> u64 {
+        let model = models::get("aarch64").unwrap();
+
+        let register_file = RegisterFile::init(&*model);
+
+        let mut ctx =
+            X86TranslationContext::new(&model, false, register_file.global_register_offset());
+        let mut emitter = X86Emitter::new(&mut ctx);
+
+        let count = emitter.constant(count, Type::Unsigned(16));
+        let pattern_reg_read =
+            emitter.read_register(model.reg_offset("R1"), Type::Unsigned(pattern_width));
+
+        let replicated = emitter.bit_replicate(pattern_reg_read, count);
+        emitter.write_register(model.reg_offset("R2"), replicated);
+
+        emitter.leave();
+
+        let num_regs = emitter.next_vreg();
+        let translation = ctx.compile(num_regs);
+
+        register_file.write("R1", pattern);
+
+        translation.execute(&register_file);
+
+        register_file.read("R2")
+    }
+
+    assert_eq!(0xaaaa, harness(0xaa, 8, 2));
+    assert_eq!(0xffff_ffff, harness(0x1, 1, 32));
+    assert_eq!(0xaaff_aaff_aaff_aaff, harness(0xaaff, 16, 4));
 }
 
 #[ktest]
@@ -2052,6 +2057,7 @@ fn rev_d00dfeed() {
     register_file.write("R3", 0xedfe0dd0u64);
 
     translation.execute(&register_file);
+
     assert_eq!(0xd00dfeed, register_file.read::<u64>("R3"));
 }
 
@@ -2284,7 +2290,7 @@ fn stp() {
     let mut emitter = X86Emitter::new(&mut ctx);
 
     //  a9bf7bfd        stp     x29, x30, [sp, #-16]!
-    let pc = emitter.constant(0, Type::Unsigned(64));
+
     let opcode = emitter.constant(0xa9bf7bfd, Type::Unsigned(32));
     translate(
         Global,
@@ -2311,9 +2317,9 @@ fn stp() {
     register_file.write("R30", 0xDEADu64);
     register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
 
-    //translation.execute(&register_file);
+    translation.execute(&register_file);
 
-    // assert_eq!(*dst, (0xFEED, 0xDEAD));
+    assert_eq!(*dst, (0xFEED, 0xDEAD));
 }
 
 #[ktest]
@@ -3868,6 +3874,8 @@ fn el_from_spsr() {
     register_file.write("SCTLR_EL2_bits", 0x30c50830);
     register_file.write("CPTR_EL2_bits", 0x33ff);
 
+    log::error!("{translation:?}");
+
     translation.execute(&register_file);
 
     // valid = true
@@ -4686,4 +4694,92 @@ fn create_gpr_access_desc() {
     let _translation_time = end - start;
 
     //panic!("{translation_time}ns");
+}
+
+#[ktest]
+fn stp_mem_init() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // a901fc1f        stp     xzr, xzr, [x0, #24]
+
+    let opcode = emitter.constant(0xa901fc1f, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+    //__DecodeA64_LoadStore
+    // decode_stp_gen_aarch64_instrs_memory_pair_general_pre_idx
+    // execute_aarch64_instrs_memory_pair_general_post_idx
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let dst = Box::<(u64, u64)>::new((0, 0));
+
+    register_file.write("SEE", -1i64);
+    register_file.write("R29", 0xFEEDu64);
+    register_file.write("R30", 0xDEADu64);
+    register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
+
+    log::error!("{translation:?}")
+
+    //translation.execute(&register_file);
+
+    // assert_eq!(*dst, (0xFEED, 0xDEAD));
+}
+
+#[ktest]
+fn sbfm() {
+    let model = models::get("aarch64").unwrap();
+
+    let register_file = RegisterFile::init(&*model);
+
+    let mut ctx = X86TranslationContext::new(&model, false, register_file.global_register_offset());
+    let mut emitter = X86Emitter::new(&mut ctx);
+
+    // 93407c63 sbfm               x3, x3, #0, #31
+
+    let opcode = emitter.constant(0x93407c63, Type::Unsigned(32));
+    translate(
+        Global,
+        &*model,
+        "__DecodeA64",
+        &[opcode],
+        &mut emitter,
+        &register_file,
+    )
+    .unwrap();
+    //__DecodeA64_LoadStore
+    // decode_stp_gen_aarch64_instrs_memory_pair_general_pre_idx
+    // execute_aarch64_instrs_memory_pair_general_post_idx
+
+    emitter.leave();
+
+    let num_regs = emitter.next_vreg();
+    let translation = ctx.compile(num_regs);
+
+    let dst = Box::<(u64, u64)>::new((0, 0));
+
+    register_file.write("SEE", -1i64);
+    register_file.write("R29", 0xFEEDu64);
+    register_file.write("R30", 0xDEADu64);
+    register_file.write("SP_EL3", (((&*dst) as *const (u64, u64)) as u64) + 16);
+
+    log::error!("{translation:?}")
+
+    //translation.execute(&register_file);
+
+    // assert_eq!(*dst, (0xFEED, 0xDEAD));
 }

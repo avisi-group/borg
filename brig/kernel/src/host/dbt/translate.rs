@@ -790,10 +790,10 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 });
 
                 if is_dynamic
-                // terrible hack to workaround ldp     x0, x21, [x0] bug, where x0 gets written to halfway through, thus corrupting the second read of x0 to write *(x0 + 8) to x21
-                    || (symbol.name().as_ref() == "address"
-                        && self.function.name().as_ref()
-                            == "execute_aarch64_instrs_memory_pair_general_post_idx")
+                        // terrible hack to workaround ldp     x0, x21, [x0] bug, where x0 gets written to halfway through, thus corrupting the second read of x0 to write *(x0 + 8) to x21
+                            || (symbol.name().as_ref() == "address"
+                                && self.function.name().as_ref()
+                                    == "execute_aarch64_instrs_memory_pair_general_post_idx")
                 {
                     // if we're in a dynamic block and the local variable is not on the
                     // stack, put it there
@@ -1077,7 +1077,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 StatementResult::Data(Some(self.emitter.shift(value, amount, op)))
             }
-
             Statement::Call { target, args, .. } => {
                 let args = args.iter().map(|a| value_store.get(*a)).collect::<Vec<_>>();
 
@@ -1179,7 +1178,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 StatementResult::ControlFlow(ControlFlow::Return)
             }
-
             Statement::Cast { kind, typ, value } => {
                 use {
                     crate::host::dbt::x86::emitter::CastOperationKind as EmitterOp,
@@ -1226,9 +1224,7 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 StatementResult::Data(Some(self.emitter.bits_cast(value, width, typ, kind)))
             }
-
             Statement::PhiNode { .. } => todo!(),
-
             Statement::Select {
                 condition,
                 true_value,
@@ -1265,6 +1261,11 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
                 let width = value_store.get(*width);
                 StatementResult::Data(Some(self.emitter.bit_insert(target, source, start, width)))
             }
+            Statement::BitReplicate { pattern, count } => {
+                let pattern = value_store.get(*pattern);
+                let count = value_store.get(*count);
+                StatementResult::Data(Some(self.emitter.bit_replicate(pattern, count)))
+            }
             Statement::ReadElement { .. } => {
                 todo!()
             }
@@ -1290,7 +1291,6 @@ impl<'m, 'r, 'e, 'c, A: Alloc> FunctionTranslator<'m, 'r, 'e, 'c, A> {
 
                 StatementResult::ControlFlow(ControlFlow::Panic)
             }
-
             Statement::Assert { condition } => {
                 let mut meta = (self.function.name().key() as u64) << 32;
                 meta |= (block.index() as u64 & 0xFFFF) << 16;

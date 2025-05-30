@@ -8,7 +8,9 @@ use {
             Width,
         },
     },
-    iced_x86::code_asm::{AsmRegister8, AsmRegister32, AsmRegister64, CodeAssembler},
+    iced_x86::code_asm::{
+        AsmRegister8, AsmRegister16, AsmRegister32, AsmRegister64, CodeAssembler,
+    },
 };
 
 pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &Operand<A>) {
@@ -94,6 +96,20 @@ pub fn encode<A: Alloc>(assembler: &mut CodeAssembler, src: &Operand<A>, dst: &O
         ) => {
             assembler
                 .or::<AsmRegister8, AsmRegister8>(right.into(), left.into())
+                .unwrap();
+        }
+        (
+            Operand {
+                kind: R(PHYS(left)),
+                width_in_bits: Width::_16,
+            },
+            Operand {
+                kind: R(PHYS(right)),
+                width_in_bits: Width::_16,
+            },
+        ) => {
+            assembler
+                .or::<AsmRegister16, AsmRegister16>(right.into(), left.into())
                 .unwrap();
         }
         (

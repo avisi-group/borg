@@ -36,7 +36,7 @@ impl Width {
         }
     }
 
-    fn as_u16(&self) -> u16 {
+    pub fn as_u16(&self) -> u16 {
         match self {
             Width::_8 => 8,
             Width::_16 => 16,
