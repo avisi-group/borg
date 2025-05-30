@@ -51,10 +51,10 @@ impl MemoryMappedDevice for Pl011 {
     /// Write `value` bytes into the device starting at `offset`
     fn write(&self, offset: u64, value: &[u8]) {
         match (offset, value) {
-            (0x0000, [c]) => crate::print!("{}", *c as char),
+            (0x0000, _) => crate::print!("{}", value[0] as char),
 
             // todo: https://developer.arm.com/documentation/ddi0183/g/programmers-model/summary-of-registers
-            (offset, value) => log::trace!("PL011: wrote {value:x?} @ {offset:x}"),
+            (offset, value) => log::debug!("PL011: wrote {value:x?} @ {offset:x}"),
         }
     }
 }
