@@ -58,6 +58,15 @@
                 }
             }
         },
+        "block": {
+            "kind": "virtio_block",
+            "attach": {
+                "memory": {
+                    "address_space": "as0",
+                    "base": "0x3d00_0000"
+                }
+            }
+        },
         "timer": {
             "kind": "generic_timer",
             "irq_controller": "gic",
@@ -165,4 +174,6 @@
             }
         }
     }
+
+
 }
