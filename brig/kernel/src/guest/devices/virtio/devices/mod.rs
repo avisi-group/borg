@@ -1,7 +1,5 @@
 use {
-    crate::guest::devices::virtio::queue::VirtQueue,
-    alloc::vec::Vec,
-    core::sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    crate::guest::devices::virtio::queue::VirtQueue, alloc::vec::Vec, bitfields::bitfield,
     virtio_drivers::transport::pci::VIRTIO_VENDOR_ID,
 };
 
@@ -12,7 +10,40 @@ const VIRTIO_VERSION: u32 = 0x2;
 const VIRTIO_DEV_NET: u16 = 0x1;
 const VIRTIO_DEV_BLK: u16 = 0x2;
 
-#[derive(Debug, Clone, Copy)]
+#[bitfield(u32)]
+#[derive(Clone, Copy)]
+struct Status {
+    /// Indicates that the guest OS has found the device and recognized it as a
+    /// valid virtio device.
+    acknowledge: bool,
+    /// Indicates that the guest OS knows how to drive the device. Note: There
+    /// could be a significant (or infinite) delay before setting this bit. For
+    /// example, under Linux, drivers can be loadable modules.
+    driver: bool,
+    /// Indicates that the driver has acknowledged all the features it
+    /// understands, and feature negotiation is complete.
+    driver_ok: bool,
+    /// Indicates that the driver is set up and ready to drive the device.
+    features_ok: bool,
+
+    #[bits(2)]
+    _reserved: u8,
+
+    /// Indicates that the device has experienced an error from which it can’t
+    /// recover.
+    device_needs_reset: bool,
+
+    /// Indicates that something went wrong in the guest, and it has given up on
+    /// the device. This could be an internal error, or the driver didn’t like
+    /// the device for some reason, or even a fatal error during device
+    /// operation.
+    failed: bool,
+
+    #[bits(24)]
+    _reserved: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReadRegister {
     Magic,
     Version,
@@ -44,7 +75,7 @@ impl ReadRegister {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WriteRegister {
     DeviceFeaturesSelect,
     DriverFeatures,
@@ -94,7 +125,7 @@ struct Virtio {
     driver_features_select: u32,
     driver_features: u32,
     isr: u32,
-    status: u32,
+    status: Status,
     queues: Vec<VirtQueue>,
     queue_select: usize,
 }
@@ -107,7 +138,7 @@ impl Virtio {
             device_feature_select: false,
             device_features: [0, 0],
             isr: 0,
-            status: 0,
+            status: Status::new(),
             queues: (0..num_queues)
                 .into_iter()
                 .map(|i| VirtQueue::new(i))
@@ -161,30 +192,38 @@ impl Virtio {
             QueueReady => u32::from(self.selected_queue().ready()),
             QueueNumMax => u32::try_from(self.selected_queue().num_max()).unwrap(),
             InterruptStatus => self.isr,
-            Status => self.status,
+            Status => self.status.0,
             ConfigGeneration => 0,
         };
 
-        log::error!("read reg {register:?}: {resp:?}");
+        if register == Status {
+            log::error!("read status {:#?}", self.status);
+        } else {
+            log::error!("read reg {register:?}: {resp:?}");
+        }
 
         resp
     }
 
     fn write_register(&mut self, register: WriteRegister, value: u32) {
-        use WriteRegister::*;
+        use WriteRegister as R;
 
-        log::error!("write reg {register:?}: {value:?}");
+        if register == R::Status {
+            log::error!("writing status {:#?}", Status::from(value));
+        } else {
+            log::error!("write reg {register:?}: {value:?}");
+        }
 
         match register {
-            DeviceFeaturesSelect => {
+            R::DeviceFeaturesSelect => {
                 self.device_feature_select = match value {
                     0 => false,
                     1 => true,
                     _ => panic!(),
                 };
             }
-            Status => {
-                self.status = value;
+            R::Status => {
+                self.status = Status::from(value);
 
                 if value == 0 {
                     self.driver_features_select = 0;
@@ -193,22 +232,22 @@ impl Virtio {
                     self.reset();
                 }
             }
-            DriverFeatures => {
+            R::DriverFeatures => {
                 self.driver_features = value;
             }
-            DriverFeaturesSelect => {
+            R::DriverFeaturesSelect => {
                 self.driver_features_select = value;
             }
-            QueueSelect => {
+            R::QueueSelect => {
                 let idx = usize::try_from(value).unwrap();
                 assert!(idx < self.queues.len());
                 self.queue_select = idx;
             }
-            QueueNum => {
+            R::QueueNum => {
                 let num = usize::try_from(value).unwrap();
                 self.selected_queue_mut().set_num(num);
             }
-            QueueReady => {
+            R::QueueReady => {
                 let ready = match value {
                     0 => false,
                     1 => true,
@@ -216,14 +255,14 @@ impl Virtio {
                 };
                 self.selected_queue_mut().set_ready(ready);
             }
-            QueueNotify => todo!(),
-            InterruptAcknowledge => todo!(),
-            QueueDescriptorLow => self.selected_queue_mut().set_descriptor_low(value),
-            QueueDescriptorHigh => self.selected_queue_mut().set_descriptor_high(value),
-            QueueAvailableLow => self.selected_queue_mut().set_available_low(value),
-            QueueAvailableHigh => self.selected_queue_mut().set_available_high(value),
-            QueueUsedLow => self.selected_queue_mut().set_used_low(value),
-            QueueUsedHigh => self.selected_queue_mut().set_used_high(value),
+            R::QueueNotify => todo!(),
+            R::InterruptAcknowledge => todo!(),
+            R::QueueDescriptorLow => self.selected_queue_mut().set_descriptor_low(value),
+            R::QueueDescriptorHigh => self.selected_queue_mut().set_descriptor_high(value),
+            R::QueueAvailableLow => self.selected_queue_mut().set_available_low(value),
+            R::QueueAvailableHigh => self.selected_queue_mut().set_available_high(value),
+            R::QueueUsedLow => self.selected_queue_mut().set_used_low(value),
+            R::QueueUsedHigh => self.selected_queue_mut().set_used_high(value),
         }
     }
 }

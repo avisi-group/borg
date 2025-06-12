@@ -53,7 +53,7 @@ pub struct VirtQueue {
     available_gpa: u64,
     used_gpa: u64,
     descriptor_hva: u64,
-    avail_hva: u64,
+    available_hva: u64,
     used_hva: u64,
     prev_idx: u16,
 }
@@ -68,7 +68,7 @@ impl VirtQueue {
             available_gpa: 0,
             used_gpa: 0,
             descriptor_hva: 0,
-            avail_hva: 0,
+            available_hva: 0,
             used_hva: 0,
             prev_idx: 0,
         }
@@ -87,16 +87,18 @@ impl VirtQueue {
     pub fn num_max(&self) -> usize {
         0x1000
     }
+
     pub fn set_num(&mut self, num: usize) {
         self.queue_num = num;
     }
+
     pub fn num(&self) -> usize {
         self.queue_num
     }
 
     fn update_host_addresses(&mut self) {
         self.descriptor_hva = guest_physical_to_host_virt(self.descriptor_gpa).as_u64();
-        self.avail_hva = guest_physical_to_host_virt(self.available_gpa).as_u64();
+        self.available_hva = guest_physical_to_host_virt(self.available_gpa).as_u64();
         self.used_hva = guest_physical_to_host_virt(self.used_gpa).as_u64();
 
         self.init_vring();
